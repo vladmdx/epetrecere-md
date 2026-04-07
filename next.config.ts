@@ -21,6 +21,14 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: "img.clerk.com",
       },
+      {
+        protocol: "http",
+        hostname: "artist.md",
+      },
+      {
+        protocol: "https",
+        hostname: "artist.md",
+      },
     ],
   },
   reactStrictMode: true,

@@ -88,8 +88,29 @@ export async function getArtists(filters: ArtistFilters = {}) {
     db.select({ count: sql<number>`count(*)` }).from(artists).where(where),
   ]);
 
+  // Fetch cover images for all artists in one query
+  const artistIds = items.map((a) => a.id);
+  let coverImages: { artistId: number; url: string }[] = [];
+  if (artistIds.length) {
+    coverImages = await db
+      .select({ artistId: artistImages.artistId, url: artistImages.url })
+      .from(artistImages)
+      .where(
+        and(
+          sql`${artistImages.artistId} IN (${sql.join(artistIds.map(id => sql`${id}`), sql`, `)})`,
+          eq(artistImages.isCover, true),
+        ),
+      );
+  }
+
+  const coverMap = new Map(coverImages.map((c) => [c.artistId, c.url]));
+  const itemsWithCovers = items.map((a) => ({
+    ...a,
+    coverImageUrl: coverMap.get(a.id) || null,
+  }));
+
   return {
-    items,
+    items: itemsWithCovers,
     total: Number(countResult[0]?.count ?? 0),
     page,
     totalPages: Math.ceil(Number(countResult[0]?.count ?? 0) / limit),
@@ -138,12 +159,27 @@ export async function getArtistBySlug(slug: string) {
 }
 
 export async function getFeaturedArtists(limit = 8) {
-  return db
+  const items = await db
     .select()
     .from(artists)
     .where(and(eq(artists.isActive, true), eq(artists.isFeatured, true)))
     .orderBy(asc(artists.sortOrder))
     .limit(limit);
+
+  // Add cover images
+  const ids = items.map((a) => a.id);
+  let covers: { artistId: number; url: string }[] = [];
+  if (ids.length) {
+    covers = await db
+      .select({ artistId: artistImages.artistId, url: artistImages.url })
+      .from(artistImages)
+      .where(and(
+        sql`${artistImages.artistId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
+        eq(artistImages.isCover, true),
+      ));
+  }
+  const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
+  return items.map((a) => ({ ...a, coverImageUrl: coverMap.get(a.id) || null }));
 }
 
 export async function getSimilarArtists(artistId: number, categoryIds: number[], limit = 4) {

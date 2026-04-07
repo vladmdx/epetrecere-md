@@ -24,6 +24,7 @@ interface ArtistCardProps {
     isFeatured: boolean;
     isPremium: boolean;
     location: string | null;
+    coverImageUrl?: string | null;
   };
 }
 
@@ -37,11 +38,19 @@ export function ArtistCard({ artist }: ArtistCardProps) {
       href={`/artisti/${artist.slug}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all duration-300 hover:border-gold/30 hover:shadow-[0_4px_20px_rgba(201,168,76,0.15)] hover:-translate-y-1"
     >
-      {/* Placeholder image */}
-      <div className="relative aspect-[4/3] bg-muted">
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-          <span className="text-4xl">🎵</span>
-        </div>
+      <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+        {artist.coverImageUrl ? (
+          <img
+            src={artist.coverImageUrl}
+            alt={name}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+            <span className="text-4xl">🎵</span>
+          </div>
+        )}
         {/* Badges */}
         <div className="absolute left-2 top-2 flex gap-1">
           {artist.isVerified && (

@@ -101,8 +101,12 @@ export function ArtistDetailClient({ artist, similar }: Props) {
         <div className="lg:col-span-2">
           {/* Profile Header */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-2 border-gold bg-card text-3xl">
-              🎵
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-card">
+              {artist.images?.[0]?.url ? (
+                <img src={artist.images[0].url} alt={name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-3xl">🎵</span>
+              )}
             </div>
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2">
