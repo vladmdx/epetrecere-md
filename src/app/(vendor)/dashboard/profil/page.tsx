@@ -1,15 +1,55 @@
 "use client";
 
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Eye, Sparkles, Upload } from "lucide-react";
+import { RichEditor } from "@/components/shared/rich-editor";
+import { ImageUpload } from "@/components/shared/image-upload";
+import { Save, Eye, Sparkles, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function VendorProfilePage() {
+  const [saving, setSaving] = useState(false);
+  const [data, setData] = useState({
+    nameRo: "", location: "", phone: "", email: "",
+    website: "", instagram: "", facebook: "", youtube: "", tiktok: "",
+    priceFrom: 0, showPrice: true,
+    descriptionRo: "", descriptionRu: "", descriptionEn: "",
+    calendarEnabled: false, bufferHours: 2,
+    images: [] as { id: string; url: string; alt: string; isCover: boolean }[],
+  });
+
+  function update(partial: Partial<typeof data>) {
+    setData((prev) => ({ ...prev, ...partial }));
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    // In production: PUT /api/artists/crud with artist ID from auth context
+    toast.success("Profilul a fost salvat!");
+    setSaving(false);
+  }
+
+  async function handleAIImprove() {
+    try {
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "description", name: data.nameRo, description: data.descriptionRo, language: "ro" }),
+      });
+      if (!res.ok) throw new Error();
+      const result = await res.json();
+      update({ descriptionRo: result.result });
+      toast.success("Descriere îmbunătățită cu AI!");
+    } catch {
+      toast.error("AI indisponibil");
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -18,8 +58,11 @@ export default function VendorProfilePage() {
           <p className="text-sm text-muted-foreground">Editează informațiile și portofoliul tău</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> Preview Profil</Button>
-          <Button className="bg-gold text-background hover:bg-gold-dark gap-2"><Save className="h-4 w-4" /> Salvează</Button>
+          <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> Preview</Button>
+          <Button onClick={handleSave} disabled={saving} className="bg-gold text-background hover:bg-gold-dark gap-2">
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+            Salvează
+          </Button>
         </div>
       </div>
 
@@ -37,33 +80,27 @@ export default function VendorProfilePage() {
             <CardHeader><CardTitle>Informații de bază</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <div><Label>Nume artistic</Label><Input defaultValue="Ion Suruceanu" /></div>
-                <div><Label>Locație</Label><Input defaultValue="Chișinău" /></div>
+                <div><Label>Nume artistic</Label><Input value={data.nameRo} onChange={(e) => update({ nameRo: e.target.value })} /></div>
+                <div><Label>Locație</Label><Input value={data.location} onChange={(e) => update({ location: e.target.value })} /></div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div><Label>Telefon</Label><Input defaultValue="+373 69 123 456" /></div>
-                <div><Label>Email</Label><Input defaultValue="ion@example.md" /></div>
+                <div><Label>Telefon</Label><Input value={data.phone} onChange={(e) => update({ phone: e.target.value })} /></div>
+                <div><Label>Email</Label><Input value={data.email} onChange={(e) => update({ email: e.target.value })} /></div>
               </div>
-              <div><Label>Website</Label><Input placeholder="https://..." /></div>
+              <div><Label>Website</Label><Input value={data.website} onChange={(e) => update({ website: e.target.value })} /></div>
               <div className="grid gap-4 sm:grid-cols-4">
-                <div><Label>Instagram</Label><Input placeholder="@username" /></div>
-                <div><Label>Facebook</Label><Input placeholder="URL" /></div>
-                <div><Label>YouTube</Label><Input placeholder="URL" /></div>
-                <div><Label>TikTok</Label><Input placeholder="@username" /></div>
+                <div><Label>Instagram</Label><Input value={data.instagram} onChange={(e) => update({ instagram: e.target.value })} /></div>
+                <div><Label>Facebook</Label><Input value={data.facebook} onChange={(e) => update({ facebook: e.target.value })} /></div>
+                <div><Label>YouTube</Label><Input value={data.youtube} onChange={(e) => update({ youtube: e.target.value })} /></div>
+                <div><Label>TikTok</Label><Input value={data.tiktok} onChange={(e) => update({ tiktok: e.target.value })} /></div>
               </div>
             </CardContent>
           </Card>
-
           <Card>
             <CardHeader><CardTitle>Preț</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div><Label>Preț de la (€)</Label><Input type="number" defaultValue={1000} /></div>
-                <div>
-                  <Label>Afișează prețul pe profil</Label>
-                  <div className="mt-2"><Switch defaultChecked /></div>
-                </div>
-              </div>
+            <CardContent className="grid gap-4 sm:grid-cols-2">
+              <div><Label>Preț de la (€)</Label><Input type="number" value={data.priceFrom} onChange={(e) => update({ priceFrom: Number(e.target.value) })} /></div>
+              <div><Label>Afișează prețul</Label><div className="mt-2"><Switch checked={data.showPrice} onCheckedChange={(v) => update({ showPrice: v })} /></div></div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -73,15 +110,13 @@ export default function VendorProfilePage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Descriere</CardTitle>
-                <Button variant="outline" size="sm" className="gap-1">
-                  <Sparkles className="h-3.5 w-3.5 text-gold" /> Îmbunătățește cu AI
-                </Button>
+                <Button variant="outline" size="sm" className="gap-1" onClick={handleAIImprove}><Sparkles className="h-3.5 w-3.5 text-gold" /> Îmbunătățește cu AI</Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>Descriere (RO)</Label><Textarea rows={8} defaultValue="Unul dintre cei mai iubiți cântăreți din Republica Moldova, cu o carieră de peste 30 de ani." /></div>
-              <div><Label>Descriere (RU)</Label><Textarea rows={6} placeholder="Описание на русском..." /></div>
-              <div><Label>Descriere (EN)</Label><Textarea rows={6} placeholder="Description in English..." /></div>
+              <div><Label>Descriere (RO)</Label><RichEditor content={data.descriptionRo} onChange={(html) => update({ descriptionRo: html })} /></div>
+              <div><Label>Descriere (RU)</Label><RichEditor content={data.descriptionRu} onChange={(html) => update({ descriptionRu: html })} /></div>
+              <div><Label>Descriere (EN)</Label><RichEditor content={data.descriptionEn} onChange={(html) => update({ descriptionEn: html })} /></div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -90,11 +125,7 @@ export default function VendorProfilePage() {
           <Card>
             <CardHeader><CardTitle>Galerie Foto & Video</CardTitle></CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-border/60 p-8">
-                <Upload className="h-8 w-8 text-gold" />
-                <p className="text-sm text-muted-foreground">Trage imaginile aici sau click pentru upload</p>
-                <Button variant="outline">Upload Imagini</Button>
-              </div>
+              <ImageUpload images={data.images} onChange={(images) => update({ images })} maxFiles={10} />
               <div>
                 <Label>Link-uri Video YouTube/Vimeo</Label>
                 <div className="mt-2 space-y-2">
@@ -114,9 +145,7 @@ export default function VendorProfilePage() {
                 <Button variant="outline" size="sm">+ Adaugă Pachet</Button>
               </div>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Creează pachete cu prețuri diferite pentru a oferi clienților mai multe opțiuni.</p>
-            </CardContent>
+            <CardContent><p className="text-sm text-muted-foreground">Creează pachete cu prețuri diferite.</p></CardContent>
           </Card>
         </TabsContent>
 
@@ -125,12 +154,12 @@ export default function VendorProfilePage() {
             <CardHeader><CardTitle>Setări Profil</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <div><Label>Calendar activ</Label><p className="text-xs text-muted-foreground">Afișează calendarul pe profilul public</p></div>
-                <Switch />
+                <div><Label>Calendar activ</Label><p className="text-xs text-muted-foreground">Afișează calendarul pe profil</p></div>
+                <Switch checked={data.calendarEnabled} onCheckedChange={(v) => update({ calendarEnabled: v })} />
               </div>
               <div className="flex items-center justify-between">
-                <div><Label>Buffer între evenimente</Label><p className="text-xs text-muted-foreground">Ore pauză între 2 evenimente</p></div>
-                <Input type="number" defaultValue={2} className="w-20" />
+                <div><Label>Buffer între evenimente (ore)</Label></div>
+                <Input type="number" value={data.bufferHours} onChange={(e) => update({ bufferHours: Number(e.target.value) })} className="w-20" />
               </div>
             </CardContent>
           </Card>
