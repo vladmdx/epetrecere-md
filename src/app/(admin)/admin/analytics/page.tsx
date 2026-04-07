@@ -18,10 +18,23 @@ const topArtists = [
   { name: "MC Vitalie", bookings: 10, revenue: "3,000€" },
 ];
 
+function ExportButtons() {
+  return (
+    <div className="flex gap-2">
+      <a href="/api/export?type=artists" download className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-card px-3 py-1.5 text-xs font-medium hover:border-gold/30 hover:text-gold">📊 Export Artiști CSV</a>
+      <a href="/api/export?type=leads" download className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-card px-3 py-1.5 text-xs font-medium hover:border-gold/30 hover:text-gold">📋 Export Leads CSV</a>
+      <a href="/api/export?type=bookings" download className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-card px-3 py-1.5 text-xs font-medium hover:border-gold/30 hover:text-gold">📅 Export Booking CSV</a>
+    </div>
+  );
+}
+
 export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-bold">Analitice</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="font-heading text-2xl font-bold">Analitice</h1>
+        <ExportButtons />
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {stats.map((stat) => (

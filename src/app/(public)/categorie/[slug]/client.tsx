@@ -88,20 +88,47 @@ export function CategoryPageClient({
         <p className="mt-1 text-sm text-muted-foreground">{total} rezultate</p>
       </div>
 
-      {/* Sort bar */}
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-        {sortOptions.map((opt) => (
-          <Button
-            key={opt.value}
-            variant={currentSort === opt.value ? "default" : "outline"}
-            size="sm"
-            className={currentSort === opt.value ? "bg-gold text-background hover:bg-gold-dark" : ""}
-            onClick={() => updateParams("sort", opt.value)}
-          >
-            {opt.label}
-          </Button>
-        ))}
+      {/* Filters + Sort bar */}
+      <div className="mb-6 space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+          {sortOptions.map((opt) => (
+            <Button
+              key={opt.value}
+              variant={currentSort === opt.value ? "default" : "outline"}
+              size="sm"
+              className={currentSort === opt.value ? "bg-gold text-background hover:bg-gold-dark" : ""}
+              onClick={() => updateParams("sort", opt.value)}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
+        {/* Price range filter */}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs text-muted-foreground">Preț:</span>
+          {[100, 200, 500, 1000, 2000].map((price) => (
+            <Button
+              key={price}
+              variant="outline"
+              size="sm"
+              className={searchParams.get("price_max") === String(price) ? "bg-gold/10 border-gold/30 text-gold" : ""}
+              onClick={() => updateParams("price_max", String(price))}
+            >
+              pînă la {price}€
+            </Button>
+          ))}
+          {searchParams.get("price_max") && (
+            <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete("price_max");
+              params.delete("page");
+              router.push(`/categorie/${category.slug}?${params.toString()}`);
+            }}>
+              ✕ Resetează
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Grid */}

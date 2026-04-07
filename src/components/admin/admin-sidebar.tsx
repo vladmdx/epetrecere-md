@@ -34,6 +34,7 @@ const navItems = [
   { href: "/admin/sali", icon: Building2, label: "Săli" },
   { href: "/admin/recenzii", icon: Star, label: "Recenzii" },
   { href: "/admin/blog", icon: FileText, label: "Blog" },
+  { href: "/admin/pagini", icon: FileText, label: "Pagini" },
   { href: "/admin/seo", icon: Globe, label: "SEO" },
   { href: "/admin/import", icon: Upload, label: "Import" },
   { href: "/admin/homepage-builder", icon: Home, label: "Homepage" },
