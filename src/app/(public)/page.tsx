@@ -4,6 +4,10 @@ import { CategoriesSection } from "@/components/public/sections/categories";
 import { FeaturedArtistsSection } from "@/components/public/sections/featured-artists";
 import { FeaturedVenuesSection } from "@/components/public/sections/featured-venues";
 import { ProcessSection } from "@/components/public/sections/process";
+import { TestimonialsSection } from "@/components/public/sections/testimonials";
+import { StatsCounterSection } from "@/components/public/sections/stats-counter";
+import { ClientLogosSection } from "@/components/public/sections/client-logos";
+import { BlogPreviewSection } from "@/components/public/sections/blog-preview";
 import { CTASection } from "@/components/public/sections/cta";
 import { websiteJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";
 import { getFeaturedArtists } from "@/lib/db/queries/artists";
@@ -38,6 +42,10 @@ export default async function HomePage() {
       <FeaturedArtistsSection artists={featuredArtists} />
       <FeaturedVenuesSection venues={featuredVenues} />
       <ProcessSection />
+      <TestimonialsSection />
+      <StatsCounterSection />
+      <ClientLogosSection />
+      <BlogPreviewSection />
       <CTASection />
     </>
   );

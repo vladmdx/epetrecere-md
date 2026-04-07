@@ -7,7 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { RichEditor } from "@/components/shared/rich-editor";
+import { ImageUpload } from "@/components/shared/image-upload";
 import { ArrowLeft, Save, Sparkles, Eye } from "lucide-react";
+import { useState } from "react";
 import Link from "next/link";
 
 export default function EditArtistPage() {
@@ -96,9 +99,9 @@ export default function EditArtistPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>Descriere (RO)</Label><Textarea rows={6} placeholder="Descriere în română..." /></div>
-              <div><Label>Descriere (RU)</Label><Textarea rows={6} placeholder="Описание на русском..." /></div>
-              <div><Label>Descriere (EN)</Label><Textarea rows={6} placeholder="Description in English..." /></div>
+              <div><Label>Descriere (RO)</Label><RichEditor placeholder="Descriere în română..." /></div>
+              <div><Label>Descriere (RU)</Label><RichEditor placeholder="Описание на русском..." /></div>
+              <div><Label>Descriere (EN)</Label><RichEditor placeholder="Description in English..." /></div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -107,10 +110,7 @@ export default function EditArtistPage() {
           <Card>
             <CardHeader><CardTitle>Galerie Imagini</CardTitle></CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center gap-4 rounded-xl border-2 border-dashed border-border/60 p-12">
-                <p className="text-sm text-muted-foreground">Drag & drop imagini sau click pentru upload</p>
-                <Button variant="outline">Upload Imagini</Button>
-              </div>
+              <ImageUpload images={[]} onChange={() => {}} />
             </CardContent>
           </Card>
         </TabsContent>

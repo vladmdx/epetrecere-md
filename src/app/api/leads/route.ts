@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { leads } from "@/lib/db/schema";
+import { rateLimit } from "@/lib/rate-limit";
 
 const createLeadSchema = z.object({
   name: z.string().min(2),
@@ -19,7 +20,14 @@ const createLeadSchema = z.object({
   venueId: z.number().optional(),
 });
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  // Rate limit: 10 submissions per minute per IP
+  const ip = req.headers.get("x-forwarded-for") || "anonymous";
+  const { success } = rateLimit(`leads:${ip}`, 10, 60_000);
+  if (!success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const body = await req.json();
 
   const parsed = createLeadSchema.safeParse(body);
