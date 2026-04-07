@@ -34,17 +34,24 @@ export function t(key: string, locale: Locale = defaultLocale, vars?: Record<str
   return text;
 }
 
-/** Get a localized field from a multilingual entity (e.g. artist.name_ro) */
+/** Get a localized field from a multilingual entity.
+ * Supports both snake_case (name_ro) and camelCase (nameRo) field patterns. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function getLocalized(
   entity: Record<string, any>,
   field: string,
   locale: Locale = defaultLocale,
 ): string {
-  const key = `${field}_${locale}`;
-  const value = entity[key];
+  const capLocale = locale.charAt(0).toUpperCase() + locale.slice(1);
+
+  // Try camelCase first (nameRo), then snake_case (name_ro)
+  const value = entity[`${field}${capLocale}`] ?? entity[`${field}_${locale}`];
   if (typeof value === "string" && value) return value;
-  // Fallback to Romanian, then to any available
-  const fallback = entity[`${field}_ro`] ?? entity[`${field}_ru`] ?? entity[`${field}_en`];
+
+  // Fallback chain: ro → ru → en (both formats)
+  const fallback =
+    entity[`${field}Ro`] ?? entity[`${field}_ro`] ??
+    entity[`${field}Ru`] ?? entity[`${field}_ru`] ??
+    entity[`${field}En`] ?? entity[`${field}_en`];
   return typeof fallback === "string" ? fallback : "";
 }
