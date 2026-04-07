@@ -20,6 +20,7 @@ import {
   PanelLeftClose,
   PanelLeft,
   Sparkles,
+  Star,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/admin/artisti", icon: Users, label: "Artiști" },
   { href: "/admin/categorii", icon: Grid3X3, label: "Categorii" },
   { href: "/admin/sali", icon: Building2, label: "Săli" },
+  { href: "/admin/recenzii", icon: Star, label: "Recenzii" },
   { href: "/admin/blog", icon: FileText, label: "Blog" },
   { href: "/admin/seo", icon: Globe, label: "SEO" },
   { href: "/admin/import", icon: Upload, label: "Import" },
