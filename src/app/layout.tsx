@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Playfair_Display, DM_Sans, Cormorant_Garamond } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
+import { LocaleProvider } from "@/hooks/use-locale";
 import { ClerkProvider } from "@clerk/nextjs";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { Toaster } from "@/components/ui/sonner";
@@ -54,11 +55,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProvider><ThemeProvider>
+        <ClerkProvider><ThemeProvider><LocaleProvider>
           {children}
           <CookieConsent />
           <Toaster />
-        </ThemeProvider></ClerkProvider>
+        </LocaleProvider></ThemeProvider></ClerkProvider>
       </body>
     </html>
   );
