@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Search, Filter, Phone, Mail, Calendar, DollarSign, User, ChevronRight,
-  Clock, AlertCircle, CheckCircle, XCircle, MessageSquare,
+  Clock, AlertCircle, CheckCircle, XCircle, MessageSquare, LayoutGrid, List,
 } from "lucide-react";
+import { KanbanBoard } from "./kanban";
 import { cn } from "@/lib/utils";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -38,6 +39,7 @@ const eventTypeLabels: Record<string, string> = {
 export default function CRMPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [view, setView] = useState<"list" | "kanban">("kanban");
 
   const filtered = demoLeads.filter((lead) => {
     if (statusFilter !== "all" && lead.status !== statusFilter) return false;
@@ -52,7 +54,20 @@ export default function CRMPage() {
           <h1 className="font-heading text-2xl font-bold">CRM — Solicitări</h1>
           <p className="text-sm text-muted-foreground">{demoLeads.length} solicitări totale</p>
         </div>
+        <div className="flex gap-1 rounded-lg border border-border/40 p-1">
+          <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className={view === "kanban" ? "bg-gold text-background hover:bg-gold-dark" : ""} onClick={() => setView("kanban")}>
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button variant={view === "list" ? "default" : "ghost"} size="sm" className={view === "list" ? "bg-gold text-background hover:bg-gold-dark" : ""} onClick={() => setView("list")}>
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
+
+      {view === "kanban" && <KanbanBoard />}
+
+      {view === "list" && (<>
+      {/* List view below */}
 
       {/* Status Filter Pills */}
       <div className="flex flex-wrap gap-2">
@@ -144,6 +159,7 @@ export default function CRMPage() {
           </div>
         )}
       </div>
+      </>)}
     </div>
   );
 }

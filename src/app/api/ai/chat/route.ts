@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { chatWithAI } from "@/lib/ai";
+import Anthropic from "@anthropic-ai/sdk";
+import { adminTools, vendorTools, executeTool } from "@/lib/ai/tools";
 
 const chatSchema = z.object({
   messages: z.array(
@@ -13,38 +14,90 @@ const chatSchema = z.object({
 });
 
 const ADMIN_SYSTEM = `Ești un asistent AI pentru platforma ePetrecere.md — un marketplace de servicii pentru evenimente din Republica Moldova.
-Ajuți administratorii cu:
-- Gestionarea artiștilor, sălilor și categoriilor
-- Analiza solicitărilor și lead-urilor
-- Generarea de texte SEO, descrieri, articole blog
-- Răspunsuri la întrebări despre platforma
-Răspunde concis și profesional în limba în care ți se adresează utilizatorul.`;
+Ai acces la baza de date a platformei prin funcții (tools). Folosește-le pentru a răspunde la întrebări despre artiști, leads, analytics.
+Poți actualiza statusul lead-urilor și genera descrieri.
+Răspunde concis și profesional în limba utilizatorului.`;
 
-const VENDOR_SYSTEM = `Ești un asistent AI personal pentru artiștii/furnizorii de pe platforma ePetrecere.md.
-Ajuți cu:
-- Gestionarea calendarului și rezervărilor
-- Îmbunătățirea descrierii profilului
-- Răspunsuri la recenzii
-- Sfaturi de marketing și promovare
+const VENDOR_SYSTEM = `Ești un asistent AI personal pentru artiștii de pe platforma ePetrecere.md.
+Ai acces la calendarul, rezervările și datele artistului prin funcții (tools).
+Ajuți cu gestionarea calendarului, răspunsuri la întrebări, și sfaturi de promovare.
 Răspunde prietenos și util în limba utilizatorului.`;
 
 export async function POST(req: Request) {
   const body = await req.json();
   const parsed = chatSchema.safeParse(body);
-
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const systemPrompt = parsed.data.context === "admin" ? ADMIN_SYSTEM : VENDOR_SYSTEM;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
+  }
+
+  const client = new Anthropic({ apiKey });
+  const isAdmin = parsed.data.context === "admin";
+  const systemPrompt = isAdmin ? ADMIN_SYSTEM : VENDOR_SYSTEM;
+  const tools = isAdmin ? adminTools : vendorTools;
+
+  const messages: Anthropic.MessageParam[] = parsed.data.messages.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
 
   try {
-    const reply = await chatWithAI(parsed.data.messages, systemPrompt);
-    return NextResponse.json({ reply });
-  } catch (err) {
-    return NextResponse.json(
-      { error: "AI service unavailable" },
-      { status: 503 },
+    // Loop to handle tool calls
+    let response = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1500,
+      system: systemPrompt,
+      tools,
+      messages,
+    });
+
+    // Process tool use blocks (up to 3 rounds)
+    let rounds = 0;
+    while (response.stop_reason === "tool_use" && rounds < 3) {
+      rounds++;
+
+      const toolBlocks = response.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
+      );
+
+      // Add assistant response with tool use
+      messages.push({ role: "assistant", content: response.content });
+
+      // Execute tools and add results
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      for (const block of toolBlocks) {
+        const result = await executeTool(block.name, block.input as Record<string, unknown>);
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: block.id,
+          content: result,
+        });
+      }
+
+      messages.push({ role: "user", content: toolResults });
+
+      // Get next response
+      response = await client.messages.create({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1500,
+        system: systemPrompt,
+        tools,
+        messages,
+      });
+    }
+
+    // Extract final text
+    const textBlock = response.content.find(
+      (b): b is Anthropic.TextBlock => b.type === "text",
     );
+
+    return NextResponse.json({ reply: textBlock?.text || "Nu am putut genera un răspuns." });
+  } catch (err) {
+    console.error("AI chat error:", err);
+    return NextResponse.json({ error: "AI service unavailable" }, { status: 503 });
   }
 }
