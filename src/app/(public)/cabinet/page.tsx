@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 export default function ClientCabinetPage() {
+  const { isSignedIn, user: clerkUser } = useUser();
   const [email, setEmail] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
@@ -47,6 +49,19 @@ export default function ClientCabinetPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [clientName, setClientName] = useState("");
+
+  // Auto-login if Clerk user is signed in
+  useEffect(() => {
+    if (isSignedIn && clerkUser?.primaryEmailAddress?.emailAddress) {
+      const e = clerkUser.primaryEmailAddress.emailAddress;
+      setEmail(e);
+      setClientName(clerkUser.fullName || "");
+      fetch(`/api/booking-requests?client_email=${encodeURIComponent(e)}`)
+        .then(r => r.json())
+        .then(data => { setBookings(data); setLoggedIn(true); })
+        .catch(() => {});
+    }
+  }, [isSignedIn, clerkUser]);
 
   async function handleLogin() {
     if (!email) return;
