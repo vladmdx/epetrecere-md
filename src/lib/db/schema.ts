@@ -534,6 +534,93 @@ export const notifications = pgTable("notifications", {
 });
 
 // ═══════════════════════════════════════════════════════
+// WORK SCHEDULE (artist working hours)
+// ═══════════════════════════════════════════════════════
+
+export const workSchedule = pgTable("work_schedule", {
+  id: serial("id").primaryKey(),
+  artistId: integer("artist_id")
+    .references(() => artists.id, { onDelete: "cascade" })
+    .notNull(),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Mon, 6=Sun
+  startTime: text("start_time").notNull(), // "09:00"
+  endTime: text("end_time").notNull(), // "18:00"
+  isWorking: boolean("is_working").default(true).notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
+// BOOKING REQUESTS (client → artist)
+// ═══════════════════════════════════════════════════════
+
+export const bookingRequestStatusEnum = pgEnum("booking_request_status", [
+  "pending",
+  "accepted",
+  "rejected",
+  "cancelled",
+]);
+
+export const bookingRequests = pgTable("booking_requests", {
+  id: serial("id").primaryKey(),
+  artistId: integer("artist_id")
+    .references(() => artists.id, { onDelete: "cascade" })
+    .notNull(),
+  clientUserId: uuid("client_user_id")
+    .references(() => users.id, { onDelete: "cascade" }),
+  clientName: text("client_name").notNull(),
+  clientPhone: text("client_phone").notNull(),
+  clientEmail: text("client_email"),
+  eventDate: date("event_date").notNull(),
+  startTime: text("start_time"), // "14:00"
+  endTime: text("end_time"), // "18:00"
+  eventType: text("event_type"),
+  guestCount: integer("guest_count"),
+  message: text("message"),
+  status: bookingRequestStatusEnum("status").default("pending").notNull(),
+  artistReply: text("artist_reply"),
+  adminNotes: text("admin_notes"),
+  adminSeen: boolean("admin_seen").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
+// CHAT MESSAGES
+// ═══════════════════════════════════════════════════════
+
+export const chatMessages = pgTable("chat_messages", {
+  id: serial("id").primaryKey(),
+  bookingRequestId: integer("booking_request_id")
+    .references(() => bookingRequests.id, { onDelete: "cascade" })
+    .notNull(),
+  senderType: text("sender_type").notNull(), // "client" | "artist" | "admin"
+  senderName: text("sender_name").notNull(),
+  message: text("message").notNull(),
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
+// OFFER REQUESTS (mini CRM for admin)
+// ═══════════════════════════════════════════════════════
+
+export const offerRequests = pgTable("offer_requests", {
+  id: serial("id").primaryKey(),
+  artistId: integer("artist_id")
+    .references(() => artists.id, { onDelete: "cascade" })
+    .notNull(),
+  clientName: text("client_name").notNull(),
+  clientPhone: text("client_phone").notNull(),
+  clientEmail: text("client_email"),
+  eventType: text("event_type"),
+  eventDate: date("event_date"),
+  message: text("message"),
+  adminSeen: boolean("admin_seen").default(false).notNull(),
+  adminComment: text("admin_comment"),
+  status: text("status").default("new").notNull(), // "new" | "seen" | "processed"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
 // RELATIONS
 // ═══════════════════════════════════════════════════════
 

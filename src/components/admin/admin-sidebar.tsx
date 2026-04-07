@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/admin/cereri-oferte", icon: Star, label: "Cereri Oferte" },
   { href: "/admin/crm", icon: MessageSquare, label: "CRM" },
   { href: "/admin/artisti", icon: Users, label: "Artiști" },
   { href: "/admin/categorii", icon: Grid3X3, label: "Categorii" },
