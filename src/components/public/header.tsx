@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles, ChevronDown } from "lucide-react";
+import { Menu, X, Sparkles, ChevronDown, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { SearchAutocomplete } from "@/components/public/search-autocomplete";
 import { useLocale } from "@/hooks/use-locale";
 import { cn } from "@/lib/utils";
+import { useUser, useClerk } from "@clerk/nextjs";
 
 const artistCategories = [
   { slug: "moderatori", label: "Moderatori" },
@@ -77,6 +78,81 @@ function DropdownMenu({ label, items, href }: { label: string; items: { slug: st
   );
 }
 
+function UserMenu() {
+  const { isSignedIn, user } = useUser();
+  const { signOut } = useClerk();
+  const [open, setOpen] = useState(false);
+
+  if (!isSignedIn) {
+    return (
+      <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+        <Link href="/sign-in">
+          <Button variant="ghost" size="icon">
+            <User className="h-5 w-5" />
+          </Button>
+        </Link>
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
+              className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
+            >
+              <Link href="/sign-in" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+                <LogIn className="h-4 w-4" /> Autentificare
+              </Link>
+              <Link href="/sign-up" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+                <UserCircle className="h-4 w-4" /> Înregistrare
+              </Link>
+              <Link href="/cabinet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+                <LayoutDashboard className="h-4 w-4" /> Cabinet Client
+              </Link>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+      <Button variant="ghost" size="icon" className="relative">
+        {user?.imageUrl ? (
+          <img src={user.imageUrl} alt="" className="h-7 w-7 rounded-full" />
+        ) : (
+          <User className="h-5 w-5 text-gold" />
+        )}
+      </Button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
+            className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
+          >
+            <div className="border-b border-border/40 px-3 py-2 mb-1">
+              <p className="text-sm font-medium truncate">{user?.fullName || user?.primaryEmailAddress?.emailAddress}</p>
+              <p className="text-xs text-muted-foreground truncate">{user?.primaryEmailAddress?.emailAddress}</p>
+            </div>
+            <Link href="/cabinet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+              <UserCircle className="h-4 w-4" /> Cabinetul Meu
+            </Link>
+            <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+              <LayoutDashboard className="h-4 w-4" /> Dashboard Artist
+            </Link>
+            <Link href="/admin" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+              <Shield className="h-4 w-4" /> Admin Panel
+            </Link>
+            <div className="border-t border-border/40 mt-1 pt-1">
+              <button onClick={() => { signOut(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive hover:bg-accent">
+                <LogOut className="h-4 w-4" /> Deconectare
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useLocale();
@@ -112,6 +188,7 @@ export function Header() {
           <div className="hidden lg:block">
             <SearchAutocomplete />
           </div>
+          <UserMenu />
           <LanguageSwitcher />
           <ThemeToggle />
           <Link href="/planifica" className="hidden lg:block">
