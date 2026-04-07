@@ -185,7 +185,7 @@ export async function getFeaturedArtists(limit = 8) {
 export async function getSimilarArtists(artistId: number, categoryIds: number[], limit = 4) {
   if (!categoryIds.length) return [];
 
-  return db
+  const items = await db
     .select()
     .from(artists)
     .where(
@@ -197,4 +197,19 @@ export async function getSimilarArtists(artistId: number, categoryIds: number[],
     )
     .orderBy(desc(artists.ratingAvg))
     .limit(limit);
+
+  // Add cover images
+  const ids = items.map((a) => a.id);
+  let covers: { artistId: number; url: string }[] = [];
+  if (ids.length) {
+    covers = await db
+      .select({ artistId: artistImages.artistId, url: artistImages.url })
+      .from(artistImages)
+      .where(and(
+        sql`${artistImages.artistId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
+        eq(artistImages.isCover, true),
+      ));
+  }
+  const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
+  return items.map((a) => ({ ...a, coverImageUrl: coverMap.get(a.id) || null }));
 }

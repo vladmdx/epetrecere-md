@@ -166,18 +166,11 @@ export function ArtistDetailClient({ artist, similar }: Props) {
               ) : (
                 <p className="text-muted-foreground">Nu există descriere momentan.</p>
               )}
-              {(artist.phone || artist.website) && (
-                <div className="mt-6 flex flex-wrap gap-3">
-                  {artist.phone && (
-                    <a href={`tel:${artist.phone}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold">
-                      <Phone className="h-4 w-4" /> {artist.phone}
-                    </a>
-                  )}
-                  {artist.website && (
-                    <a href={artist.website} target="_blank" rel="noopener" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold">
-                      <Globe className="h-4 w-4" /> Website
-                    </a>
-                  )}
+              {artist.phone && (
+                <div className="mt-6">
+                  <a href={`tel:${artist.phone}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold">
+                    <Phone className="h-4 w-4" /> {artist.phone}
+                  </a>
                 </div>
               )}
             </TabsContent>
@@ -253,8 +246,11 @@ export function ArtistDetailClient({ artist, similar }: Props) {
             )}
 
             <TabsContent value="reviews" className="mt-4">
+              {/* Review Form */}
+              <ReviewForm artistId={artist.id} />
+
               {artist.reviews.length > 0 ? (
-                <div className="space-y-4">
+                <div className="mt-6 space-y-4">
                   {artist.reviews.map((review) => (
                     <div key={review.id} className="rounded-lg border border-border/40 bg-card p-4">
                       <div className="flex items-center justify-between">
@@ -278,7 +274,7 @@ export function ArtistDetailClient({ artist, similar }: Props) {
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">Nu există recenzii momentan.</p>
+                <p className="mt-4 text-muted-foreground">Fii primul care lasă o recenzie!</p>
               )}
             </TabsContent>
           </Tabs>
@@ -325,5 +321,91 @@ export function ArtistDetailClient({ artist, similar }: Props) {
         </div>
       )}
     </div>
+  );
+}
+
+function ReviewForm({ artistId }: { artistId: number }) {
+  const [rating, setRating] = useState(5);
+  const [name, setName] = useState("");
+  const [text, setText] = useState("");
+  const [eventType, setEventType] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name || !text) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artistId, authorName: name, rating, text, eventType: eventType || undefined }),
+      });
+      if (!res.ok) throw new Error();
+      setSubmitted(true);
+    } catch {
+      // silent
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="rounded-xl border border-success/30 bg-success/10 p-6 text-center">
+        <p className="font-heading font-bold text-success">Mulțumim pentru recenzie!</p>
+        <p className="mt-1 text-sm text-muted-foreground">Recenzia va fi publicată după verificare.</p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="rounded-xl border border-border/40 bg-card p-5">
+      <h3 className="mb-4 font-heading text-base font-bold">Lasă o recenzie</h3>
+      <div className="mb-4 flex gap-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <button key={i} type="button" onClick={() => setRating(i + 1)}>
+            <Star className={`h-6 w-6 cursor-pointer transition-colors ${i < rating ? "fill-gold text-gold" : "text-muted hover:text-gold/50"}`} />
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Numele tău *"
+          required
+          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        <select
+          value={eventType}
+          onChange={(e) => setEventType(e.target.value)}
+          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          <option value="">Tip eveniment</option>
+          <option value="Nuntă">Nuntă</option>
+          <option value="Botez">Botez</option>
+          <option value="Corporate">Corporate</option>
+          <option value="Aniversare">Aniversare</option>
+        </select>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Scrie recenzia ta (min 10 caractere) *"
+        required
+        minLength={10}
+        rows={3}
+        className="mt-3 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+      />
+      <button
+        type="submit"
+        disabled={submitting || !name || text.length < 10}
+        className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-6 py-2 text-sm font-medium text-background hover:bg-gold-dark disabled:opacity-50"
+      >
+        {submitting ? "Se trimite..." : "Trimite Recenzia"}
+      </button>
+    </form>
   );
 }
