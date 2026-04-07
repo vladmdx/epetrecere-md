@@ -84,7 +84,7 @@ export async function getArtists(filters: ArtistFilters = {}) {
   const where = conditions.length > 1 ? and(...conditions) : conditions[0];
 
   const [items, countResult] = await Promise.all([
-    db.select().from(artists).where(where).orderBy(orderBy).limit(limit).offset(offset),
+    db.select().from(artists).where(where).orderBy(orderBy, asc(artists.id)).limit(limit).offset(offset),
     db.select({ count: sql<number>`count(*)` }).from(artists).where(where),
   ]);
 

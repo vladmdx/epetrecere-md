@@ -28,9 +28,13 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             onClick={() => setLightboxIndex(i)}
             className="group relative aspect-[4/3] overflow-hidden rounded-lg bg-muted"
           >
-            <div className="absolute inset-0 flex items-center justify-center text-muted-foreground transition-colors group-hover:bg-gold/10">
-              <span className="text-2xl">📷</span>
-            </div>
+            {img.url ? (
+              <img src={img.url} alt={img.alt || ""} className="h-full w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
+                <span className="text-2xl">📷</span>
+              </div>
+            )}
           </button>
         ))}
       </div>
@@ -59,8 +63,12 @@ export function ImageGallery({ images }: ImageGalleryProps) {
           )}
 
           <div className="flex h-[80vh] w-[80vw] items-center justify-center">
-            <div className="flex flex-col items-center gap-2 text-white">
+            {images[lightboxIndex]?.url ? (
+              <img src={images[lightboxIndex].url} alt={images[lightboxIndex].alt || ""} className="max-h-full max-w-full object-contain" />
+            ) : (
               <span className="text-6xl">📷</span>
+            )}
+            <div className="absolute bottom-8 flex flex-col items-center gap-1 text-white">
               <p className="text-sm opacity-70">
                 {images[lightboxIndex]?.alt || `Imagine ${lightboxIndex + 1}`}
               </p>

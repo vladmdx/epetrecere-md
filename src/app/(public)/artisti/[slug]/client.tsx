@@ -198,10 +198,25 @@ export function ArtistDetailClient({ artist, similar }: Props) {
               <TabsContent value="videos" className="mt-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   {artist.videos.map((video) => (
-                    <div key={video.id} className="aspect-video rounded-lg bg-muted flex items-center justify-center">
-                      <span className="text-muted-foreground text-sm">
-                        🎬 {video.platform}: {video.videoId}
-                      </span>
+                    <div key={video.id} className="aspect-video rounded-lg bg-muted overflow-hidden">
+                      {video.videoId.includes(".mp4") ? (
+                        <video
+                          src={video.videoId}
+                          controls
+                          preload="metadata"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : video.videoId.includes("youtube.com") || video.videoId.includes("youtu.be") ? (
+                        <iframe
+                          src={`https://www.youtube.com/embed/${video.videoId.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)?.[1] || video.videoId}`}
+                          className="h-full w-full"
+                          allowFullScreen
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
+                          🎬 {video.title || "Video"}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
