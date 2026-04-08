@@ -22,13 +22,13 @@ export function ClientLogosSection() {
           {partners.map((partner) => (
             <div
               key={partner.name}
-              className="group flex h-16 w-40 items-center justify-center rounded-xl border border-white/5 bg-white/[0.03] px-5 transition-all duration-300 hover:border-gold/20 hover:bg-white/[0.06] hover:shadow-[0_0_20px_rgba(201,168,76,0.08)] hover:scale-105"
+              className="group flex h-14 w-44 items-center justify-center rounded-xl border border-white/8 bg-white/[0.04] px-4 transition-all duration-300 hover:border-gold/25 hover:bg-white/[0.08] hover:shadow-[0_0_20px_rgba(201,168,76,0.1)] hover:scale-105"
               title={partner.name}
             >
               <img
                 src={partner.logo}
                 alt={partner.name}
-                className="max-h-10 max-w-full object-contain opacity-60 transition-all duration-300 group-hover:opacity-100"
+                className="max-h-9 max-w-[140px] object-contain opacity-75 transition-all duration-300 group-hover:opacity-100"
                 loading="lazy"
               />
             </div>
