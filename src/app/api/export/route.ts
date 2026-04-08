@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { artists, leads, bookings } from "@/lib/db/schema";
+import { artists, leads, bookings, bookingRequests, offerRequests } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
@@ -29,13 +29,27 @@ export async function GET(req: NextRequest) {
     data = rows;
     filename = "leads-export.csv";
   } else if (type === "bookings") {
-    const rows = await db.select().from(bookings).orderBy(desc(bookings.createdAt));
+    const rows = await db.select({
+      id: bookingRequests.id, artistId: bookingRequests.artistId,
+      clientName: bookingRequests.clientName, clientPhone: bookingRequests.clientPhone,
+      clientEmail: bookingRequests.clientEmail, eventDate: bookingRequests.eventDate,
+      startTime: bookingRequests.startTime, endTime: bookingRequests.endTime,
+      eventType: bookingRequests.eventType, status: bookingRequests.status,
+      createdAt: bookingRequests.createdAt,
+    }).from(bookingRequests).orderBy(desc(bookingRequests.createdAt));
     data = rows;
     filename = "bookings-export.csv";
+  } else if (type === "offers") {
+    const rows = await db.select().from(offerRequests).orderBy(desc(offerRequests.createdAt));
+    data = rows;
+    filename = "offers-export.csv";
   }
 
   if (!data.length) {
-    return NextResponse.json({ error: "No data" }, { status: 404 });
+    // Return empty CSV with headers
+    return new NextResponse("No data to export", {
+      headers: { "Content-Type": "text/plain" },
+    });
   }
 
   // Convert to CSV
