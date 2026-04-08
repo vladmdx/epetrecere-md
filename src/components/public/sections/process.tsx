@@ -2,6 +2,7 @@
 
 import { Phone, MessageSquare, Search, FileCheck, PartyPopper } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
+import { GoldDivider } from "@/components/shared/gold-divider";
 
 const steps = [
   { icon: Phone, key: "step1" },
@@ -18,7 +19,8 @@ export function ProcessSection() {
     <section className="bg-card py-20">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
         <div className="mb-16 text-center">
-          <h2 className="font-heading text-3xl font-bold md:text-4xl">
+          <GoldDivider />
+          <h2 className="mt-4 font-heading text-3xl font-bold md:text-4xl">
             {t("process.title")}
           </h2>
         </div>

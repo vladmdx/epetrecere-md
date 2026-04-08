@@ -53,7 +53,6 @@ export default async function HomePage() {
         <div className="section-dark">
           <FeaturedVenuesSection venues={featuredVenues} />
         </div>
-        <GoldDivider />
         <div className="section-navy border-t border-b border-gold/10">
           <ProcessSection />
         </div>
