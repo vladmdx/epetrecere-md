@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Sparkles, ChevronDown, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -154,11 +154,13 @@ function UserMenu() {
 }
 
 export function Header() {
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => { const h = () => setScrolled(window.scrollY > 50); window.addEventListener("scroll", h); return () => window.removeEventListener("scroll", h); }, []);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useLocale();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/80 backdrop-blur-xl">
+    <header className={`fixed top-0 z-50 w-full transition-all duration-300 ${scrolled ? "bg-[#0D0D0D]/90 backdrop-blur-md border-b border-gold/10 shadow-lg" : "bg-transparent border-b border-transparent"}`}>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2">

@@ -9,6 +9,8 @@ import { StatsCounterSection } from "@/components/public/sections/stats-counter"
 import { ClientLogosSection } from "@/components/public/sections/client-logos";
 import { BlogPreviewSection } from "@/components/public/sections/blog-preview";
 import { CTASection } from "@/components/public/sections/cta";
+import { GoldDivider } from "@/components/shared/gold-divider";
+import { FloatingCTA } from "@/components/shared/floating-cta";
 import { websiteJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";
 import { getFeaturedArtists } from "@/lib/db/queries/artists";
 import { getFeaturedVenues } from "@/lib/db/queries/venues";
@@ -36,17 +38,41 @@ export default async function HomePage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
       />
-      <HeroSection />
-      <SearchBarSection />
-      <CategoriesSection />
-      <FeaturedArtistsSection artists={featuredArtists} />
-      <FeaturedVenuesSection venues={featuredVenues} />
-      <ProcessSection />
-      <TestimonialsSection />
-      <StatsCounterSection />
-      <ClientLogosSection />
-      <BlogPreviewSection />
-      <CTASection />
+      <div className="noise-overlay">
+        <HeroSection />
+        <div className="section-navy">
+          <SearchBarSection />
+        </div>
+        <div className="section-dark relative">
+          <CategoriesSection />
+        </div>
+        <GoldDivider />
+        <div className="section-mid">
+          <FeaturedArtistsSection artists={featuredArtists} />
+        </div>
+        <div className="section-dark">
+          <FeaturedVenuesSection venues={featuredVenues} />
+        </div>
+        <GoldDivider />
+        <div className="section-navy border-t border-b border-gold/10">
+          <ProcessSection />
+        </div>
+        <div className="section-dark relative">
+          <TestimonialsSection />
+        </div>
+        <div className="section-navy">
+          <StatsCounterSection />
+        </div>
+        <div className="section-dark">
+          <ClientLogosSection />
+        </div>
+        <GoldDivider />
+        <div className="section-mid relative">
+          <BlogPreviewSection />
+        </div>
+        <CTASection />
+        <FloatingCTA />
+      </div>
     </>
   );
 }

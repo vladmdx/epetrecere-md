@@ -210,3 +210,58 @@
 .dark ::-webkit-scrollbar-thumb:hover {
   background: #C9A84C;
 }
+
+/* ═══════════════════════════════════════════════════════
+   VISUAL ENHANCEMENTS
+   ═══════════════════════════════════════════════════════ */
+
+/* Improved text contrast */
+.dark h1, .dark h2 { color: #FAF8F2 !important; }
+
+/* Premium card hover */
+.card-premium {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(201, 168, 76, 0.08);
+}
+.card-premium:hover {
+  transform: translateY(-6px);
+  border-color: rgba(201, 168, 76, 0.3);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3), 0 0 20px rgba(201, 168, 76, 0.08);
+}
+.card-premium:hover img { transform: scale(1.05); }
+
+/* Calendar gold theme */
+.rdp { --rdp-accent-color: #C9A84C; --rdp-accent-background-color: rgba(201, 168, 76, 0.15); }
+.rdp-day_selected { background-color: #C9A84C !important; color: #0D0D0D !important; font-weight: 600; }
+.rdp-day:hover:not(.rdp-day_selected) { background-color: rgba(201, 168, 76, 0.1); color: #C9A84C; }
+.rdp-head_cell { color: #C9A84C; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+.rdp-caption_label { color: #FAF8F2; font-size: 18px; }
+.rdp-nav_button { color: #C9A84C; border: 1px solid rgba(201, 168, 76, 0.3); border-radius: 8px; }
+.rdp-nav_button:hover { background-color: rgba(201, 168, 76, 0.15); }
+.rdp-day { color: #E8D5A3; border-radius: 8px; transition: all 0.2s ease; }
+.rdp-day_today { border: 1px solid #C9A84C; font-weight: 600; }
+
+/* Skeleton shimmer gold */
+.skeleton-gold {
+  background: linear-gradient(90deg, #1A1A2E 25%, #2A2A42 50%, #1A1A2E 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* Noise texture overlay */
+.noise-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  opacity: 0.025;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Section alternating backgrounds */
+.section-dark { background-color: #0D0D0D; }
+.section-navy { background-color: #1A1A2E; }
+.section-mid { background-color: #141428; }
+.section-deepblack { background-color: #0A0A0A; }
