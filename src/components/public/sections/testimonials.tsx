@@ -26,8 +26,9 @@ export function TestimonialsSection() {
   const t = testimonials[current];
 
   return (
-    <section className="py-20">
-      <div className="mx-auto max-w-4xl px-4 lg:px-8">
+    <section className="py-20 relative">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none"><img src="/images/parallax/testimonials.jpg" alt="" className="w-full h-full object-cover opacity-[0.06] blur-[2px]" loading="lazy" /></div>
+      <div className="relative z-10 mx-auto max-w-4xl px-4 lg:px-8">
         <div className="mb-12 text-center">
           <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">Testimoniale</p>
           <h2 className="font-heading text-3xl font-bold md:text-4xl">Ce spun clienții noștri</h2>

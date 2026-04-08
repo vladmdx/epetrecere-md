@@ -6,9 +6,9 @@ import { ArrowRight, Calendar } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 
 const demoPosts = [
-  { slug: "top-10-artisti-nunti", title: "Top 10 Artiști pentru Nunți în 2026", excerpt: "Descoperă cei mai populari artiști pentru nunți din Republica Moldova.", date: "15 Mar 2026", category: "Nunți" },
-  { slug: "cum-sa-alegi-sala", title: "Cum Să Alegi Sala Perfectă pentru Eveniment", excerpt: "Ghid complet pentru alegerea locației ideale pentru nunta sau evenimentul tău.", date: "20 Feb 2026", category: "Sfaturi" },
-  { slug: "tendinte-muzicale-2026", title: "Tendințe Muzicale pentru Evenimente în 2026", excerpt: "Ce genuri muzicale sunt la modă și cum să creezi playlist-ul perfect.", date: "10 Jan 2026", category: "Tendințe" },
+  { slug: "top-10-artisti-nunti", image: "/images/blog-wedding.jpg", title: "Top 10 Artiști pentru Nunți în 2026", excerpt: "Descoperă cei mai populari artiști pentru nunți din Republica Moldova.", date: "15 Mar 2026", category: "Nunți" },
+  { slug: "cum-sa-alegi-sala", image: "/images/blog-decor.jpg", title: "Cum Să Alegi Sala Perfectă pentru Eveniment", excerpt: "Ghid complet pentru alegerea locației ideale pentru nunta sau evenimentul tău.", date: "20 Feb 2026", category: "Sfaturi" },
+  { slug: "tendinte-muzicale-2026", image: "/images/blog-party.jpg", title: "Tendințe Muzicale pentru Evenimente în 2026", excerpt: "Ce genuri muzicale sunt la modă și cum să creezi playlist-ul perfect.", date: "10 Jan 2026", category: "Tendințe" },
 ];
 
 export function BlogPreviewSection() {
@@ -36,8 +36,8 @@ export function BlogPreviewSection() {
               href={`/blog/${post.slug}`}
               className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all hover:border-gold/30 hover:shadow-[0_4px_20px_rgba(201,168,76,0.1)]"
             >
-              <div className="aspect-[16/9] bg-muted flex items-center justify-center text-3xl">
-                📝
+              <div className="aspect-[16/9] overflow-hidden">
+                <img src={post.image} alt={post.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
               </div>
               <div className="flex flex-1 flex-col p-5">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
