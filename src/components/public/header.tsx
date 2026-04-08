@@ -46,7 +46,7 @@ function DropdownMenu({ label, items, href }: { label: string; items: { slug: st
     >
       <Link
         href={href}
-        className="flex items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-gold"
+        className="flex items-center gap-1 text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap"
       >
         {label}
         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
@@ -65,7 +65,7 @@ function DropdownMenu({ label, items, href }: { label: string; items: { slug: st
               <Link
                 key={item.slug}
                 href={`/categorie/${item.slug}`}
-                className="block rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-gold"
+                className="block rounded-lg px-3 py-2 text-sm text-white/80 transition-colors hover:bg-accent hover:text-gold"
                 onClick={() => setOpen(false)}
               >
                 {item.label}
@@ -173,14 +173,14 @@ export function Header() {
         {/* Desktop Nav */}
         <nav className="hidden items-center gap-5 xl:flex">
           <DropdownMenu label={t("nav.artists")} items={artistCategories} href="/artisti" />
-          <Link href="/sali" className="text-sm font-medium text-muted-foreground transition-colors hover:text-gold">
+          <Link href="/sali" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
             {t("nav.venues")}
           </Link>
           <DropdownMenu label={t("nav.services")} items={serviceCategories} href="/servicii" />
-          <Link href="/blog" className="text-sm font-medium text-muted-foreground transition-colors hover:text-gold">
+          <Link href="/blog" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
             {t("nav.blog")}
           </Link>
-          <Link href="/contact" className="text-sm font-medium text-muted-foreground transition-colors hover:text-gold">
+          <Link href="/contact" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
             {t("nav.contact")}
           </Link>
         </nav>
