@@ -1,16 +1,290 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
-import { Search, CalendarDays } from "lucide-react";
+import {
+  Search, CalendarDays, ChevronDown, ChevronLeft, ChevronRight,
+  Heart, Baby, Users, Building2, PartyPopper, Sparkles,
+  Mic2, Disc3, Music2, Guitar, Camera, Video,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function getTomorrow() {
   const d = new Date();
   d.setDate(d.getDate() + 1);
+  return d;
+}
+
+function formatDate(d: Date) {
   return d.toISOString().split("T")[0];
+}
+
+function formatDisplay(d: Date) {
+  return d.toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" });
+}
+
+const eventTypes = [
+  { value: "", label: "Toate", icon: Sparkles },
+  { value: "wedding", label: "Nuntă", icon: Heart },
+  { value: "baptism", label: "Botez", icon: Baby },
+  { value: "cumpatrie", label: "Cumpătrie", icon: Users },
+  { value: "corporate", label: "Corporate", icon: Building2 },
+  { value: "birthday", label: "Aniversare", icon: PartyPopper },
+];
+
+const categories = [
+  { value: "", label: "Toate", icon: Sparkles },
+  { value: "1", label: "Moderatori", icon: Mic2 },
+  { value: "2", label: "DJ", icon: Disc3 },
+  { value: "3", label: "Cântăreți", icon: Music2 },
+  { value: "4", label: "Formații", icon: Guitar },
+  { value: "5", label: "Fotografi", icon: Camera },
+  { value: "6", label: "Videografi", icon: Video },
+];
+
+// Custom Dropdown
+function CustomDropdown({
+  label,
+  items,
+  value,
+  onChange,
+}: {
+  label: string;
+  items: { value: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const selected = items.find((i) => i.value === value) || items[0];
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div className="flex-1" ref={ref}>
+      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-gold/70">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "relative flex h-12 w-full items-center gap-3 rounded-xl border px-4 text-sm transition-all duration-200",
+          "bg-[#1A1A2E]/80 backdrop-blur-sm",
+          open
+            ? "border-gold/50 shadow-[0_0_15px_rgba(201,168,76,0.15)] ring-1 ring-gold/20"
+            : "border-white/10 hover:border-gold/30 hover:shadow-[0_0_10px_rgba(201,168,76,0.08)]"
+        )}
+      >
+        <selected.icon className="h-4 w-4 text-gold shrink-0" />
+        <span className="flex-1 text-left text-white/90 truncate">{selected.label}</span>
+        <ChevronDown className={cn("h-4 w-4 text-gold/60 transition-transform duration-200", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-2 w-[calc(100%-2rem)] sm:w-auto sm:min-w-[220px] rounded-xl border border-gold/20 bg-[#141428]/98 backdrop-blur-xl p-1.5 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+          {items.map((item) => (
+            <button
+              key={item.value}
+              type="button"
+              onClick={() => { onChange(item.value); setOpen(false); }}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-all duration-150",
+                item.value === value
+                  ? "bg-gold/15 text-gold"
+                  : "text-white/70 hover:bg-white/5 hover:text-white"
+              )}
+            >
+              <item.icon className={cn("h-4 w-4 shrink-0", item.value === value ? "text-gold" : "text-white/40")} />
+              <span>{item.label}</span>
+              {item.value === value && (
+                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-gold" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Custom Calendar
+function CustomCalendar({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: Date;
+  onChange: (d: Date) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date(value));
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+  const monthNames = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
+  const dayNames = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
+
+  // Start from Monday (adjust firstDay)
+  const startDay = firstDay === 0 ? 6 : firstDay - 1;
+
+  const cells: { day: number; current: boolean; date: Date }[] = [];
+
+  // Previous month days
+  for (let i = startDay - 1; i >= 0; i--) {
+    const d = daysInPrevMonth - i;
+    cells.push({ day: d, current: false, date: new Date(year, month - 1, d) });
+  }
+  // Current month
+  for (let i = 1; i <= daysInMonth; i++) {
+    cells.push({ day: i, current: true, date: new Date(year, month, i) });
+  }
+  // Next month
+  const remaining = 42 - cells.length;
+  for (let i = 1; i <= remaining; i++) {
+    cells.push({ day: i, current: false, date: new Date(year, month + 1, i) });
+  }
+
+  function isSelected(d: Date) {
+    return d.toDateString() === value.toDateString();
+  }
+  function isToday(d: Date) {
+    return d.toDateString() === today.toDateString();
+  }
+  function isPast(d: Date) {
+    return d < today;
+  }
+
+  return (
+    <div className="flex-1 relative" ref={ref}>
+      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-gold/70">
+        {label}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "relative flex h-12 w-full items-center gap-3 rounded-xl border px-4 text-sm transition-all duration-200",
+          "bg-[#1A1A2E]/80 backdrop-blur-sm",
+          open
+            ? "border-gold/50 shadow-[0_0_15px_rgba(201,168,76,0.15)] ring-1 ring-gold/20"
+            : "border-white/10 hover:border-gold/30 hover:shadow-[0_0_10px_rgba(201,168,76,0.08)]"
+        )}
+      >
+        <CalendarDays className="h-4 w-4 text-gold shrink-0" />
+        <span className="flex-1 text-left text-white/90">{formatDisplay(value)}</span>
+        <ChevronDown className={cn("h-4 w-4 text-gold/60 transition-transform duration-200", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-2 left-0 w-[300px] rounded-xl border border-gold/20 bg-[#141428]/98 backdrop-blur-xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <button
+              type="button"
+              onClick={() => setViewDate(new Date(year, month - 1, 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-gold transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold text-white">
+              {monthNames[month]} {year}
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewDate(new Date(year, month + 1, 1))}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-gold transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          {/* Day names */}
+          <div className="grid grid-cols-7 mb-1">
+            {dayNames.map((d) => (
+              <div key={d} className="text-center text-[10px] font-medium uppercase tracking-wider text-gold/50 py-1">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          {/* Days grid */}
+          <div className="grid grid-cols-7 gap-0.5">
+            {cells.map((cell, i) => (
+              <button
+                key={i}
+                type="button"
+                disabled={isPast(cell.date)}
+                onClick={() => {
+                  onChange(cell.date);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "h-9 w-full rounded-lg text-xs font-medium transition-all duration-150",
+                  !cell.current && "text-white/20",
+                  cell.current && !isPast(cell.date) && !isSelected(cell.date) && !isToday(cell.date) && "text-white/70 hover:bg-gold/15 hover:text-gold",
+                  cell.current && isPast(cell.date) && "text-white/15 cursor-not-allowed",
+                  isToday(cell.date) && !isSelected(cell.date) && "border border-gold/40 text-gold",
+                  isSelected(cell.date) && "bg-gold text-[#0D0D0D] font-bold shadow-[0_0_12px_rgba(201,168,76,0.3)]",
+                )}
+              >
+                {cell.day}
+              </button>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+            <button
+              type="button"
+              onClick={() => { onChange(getTomorrow()); setViewDate(getTomorrow()); setOpen(false); }}
+              className="text-xs text-gold/70 hover:text-gold transition-colors"
+            >
+              Mâine
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = new Date();
+                next.setDate(next.getDate() + ((6 - next.getDay() + 7) % 7 || 7));
+                onChange(next);
+                setViewDate(next);
+                setOpen(false);
+              }}
+              className="text-xs text-gold/70 hover:text-gold transition-colors"
+            >
+              Sâmbătă viitoare
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function SearchBarSection() {
@@ -18,81 +292,47 @@ export function SearchBarSection() {
   const router = useRouter();
   const [eventType, setEventType] = useState("");
   const [date, setDate] = useState(getTomorrow());
-  const dateRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState("");
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const params = new URLSearchParams();
     if (eventType) params.set("event_type", eventType);
-    if (date) params.set("date", date);
+    if (date) params.set("date", formatDate(date));
     if (category) params.set("category", category);
     router.push(`/artisti?${params.toString()}`);
   }
 
   return (
-    <section className="sticky top-16 z-40 border-b border-border/40 bg-card/95 backdrop-blur-sm py-4">
+    <section className="sticky top-16 z-40 border-b border-gold/10 bg-[#0D0D0D]/90 backdrop-blur-md py-5">
       <form
         onSubmit={handleSearch}
         className="mx-auto flex max-w-5xl flex-col gap-3 px-4 sm:flex-row sm:items-end lg:px-8"
       >
-        <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
-            {t("search.event_type")}
-          </label>
-          <select
-            value={eventType}
-            onChange={(e) => setEventType(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="">— {t("common.all")} —</option>
-            <option value="wedding">{t("event_types.wedding")}</option>
-            <option value="baptism">{t("event_types.baptism")}</option>
-            <option value="cumpatrie">{t("event_types.cumpatrie")}</option>
-            <option value="corporate">{t("event_types.corporate")}</option>
-            <option value="birthday">{t("event_types.birthday")}</option>
-          </select>
-        </div>
+        <CustomDropdown
+          label={t("search.event_type")}
+          items={eventTypes}
+          value={eventType}
+          onChange={setEventType}
+        />
 
-        <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
-            {t("search.date")}
-          </label>
-          <div
-            className="relative cursor-pointer"
-            onClick={() => dateRef.current?.showPicker?.()}
-          >
-            <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
-            <Input
-              ref={dateRef}
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="pl-9 cursor-pointer"
-            />
-          </div>
-        </div>
+        <CustomCalendar
+          label={t("search.date")}
+          value={date}
+          onChange={setDate}
+        />
 
-        <div className="flex-1">
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
-            {t("search.category")}
-          </label>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="">— {t("common.all")} —</option>
-            <option value="1">Moderatori</option>
-            <option value="2">DJ</option>
-            <option value="3">Cântăreți</option>
-            <option value="4">Formații</option>
-            <option value="5">Fotografi</option>
-            <option value="6">Videografi</option>
-          </select>
-        </div>
+        <CustomDropdown
+          label={t("search.category")}
+          items={categories}
+          value={category}
+          onChange={setCategory}
+        />
 
-        <Button type="submit" className="bg-gold text-background hover:bg-gold-dark h-10 px-8 gap-2">
+        <Button
+          type="submit"
+          className="h-12 rounded-xl bg-gold text-[#0D0D0D] hover:bg-gold-dark px-8 gap-2 font-semibold text-sm shadow-[0_4px_20px_rgba(201,168,76,0.25)] hover:shadow-[0_4px_25px_rgba(201,168,76,0.4)] transition-all duration-200"
+        >
           <Search className="h-4 w-4" />
           {t("search.search_button")}
         </Button>
