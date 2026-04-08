@@ -26,8 +26,10 @@ export function ProcessSection() {
         </div>
 
         <div className="relative flex flex-col items-center gap-12 md:flex-row md:justify-between md:gap-0">
-          {/* Connecting line */}
-          <div className="absolute left-1/2 top-0 hidden h-full w-px bg-gradient-to-b from-gold/20 via-gold/40 to-gold/20 md:left-0 md:top-1/2 md:h-px md:w-full md:bg-gradient-to-r md:block" />
+          {/* Animated connecting line */}
+          <div className="absolute left-1/2 top-0 hidden h-full w-px bg-gold/10 md:left-[10%] md:right-[10%] md:top-[calc(50%-20px)] md:h-[2px] md:w-[80%] md:bg-gold/10 md:block">
+            <div className="absolute inset-0 process-line-animated h-full rounded-full" />
+          </div>
 
           {steps.map((step, i) => (
             <div
@@ -35,7 +37,7 @@ export function ProcessSection() {
               className="relative z-10 flex flex-col items-center text-center md:flex-1 animate-fade-up"
               style={{ animationDelay: `${i * 100}ms` }}
             >
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-gold bg-background text-gold">
+              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-gold bg-background text-gold shadow-[0_0_20px_rgba(201,168,76,0.15)]">
                 <step.icon className="h-7 w-7" />
               </div>
               <h3 className="mb-1 font-heading text-sm font-bold">

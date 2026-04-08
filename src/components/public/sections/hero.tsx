@@ -22,18 +22,18 @@ export function HeroSection() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-[#0D0D0D] z-10" />
         {/* Radial gold glow */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gold/8 via-transparent to-transparent z-10" />
-        {/* Background video (desktop) / poster image (mobile) */}
+        {/* Background video (desktop) / image (mobile) */}
         <video
           autoPlay
           muted
           loop
           playsInline
-          poster="/images/hero-poster.jpg"
+          poster="/images/backgrounds/concert-lights.jpg"
           className="absolute inset-0 w-full h-full object-cover hidden md:block"
         >
           <source src="/videos/hero-wedding.mp4" type="video/mp4" />
         </video>
-        <img src="/images/hero-poster.jpg" alt="" className="absolute inset-0 w-full h-full object-cover md:hidden" loading="eager" />
+        <img src="/images/backgrounds/concert-lights.jpg" alt="" className="absolute inset-0 w-full h-full object-cover md:hidden" loading="eager" />
       </div>
 
       <div className="relative z-20 mx-auto max-w-7xl px-4 py-24 text-center lg:px-8">

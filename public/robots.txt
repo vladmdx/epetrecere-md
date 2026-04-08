@@ -1,0 +1,14 @@
+# *
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /api
+Disallow: /sign-in
+Disallow: /sign-up
+
+# Host
+Host: https://epetrecere.md
+
+# Sitemaps
+Sitemap: https://epetrecere.md/sitemap.xml

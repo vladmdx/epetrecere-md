@@ -1,17 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
 import { Search, CalendarDays } from "lucide-react";
 
+function getTomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split("T")[0];
+}
+
 export function SearchBarSection() {
   const { t } = useLocale();
   const router = useRouter();
   const [eventType, setEventType] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(getTomorrow());
+  const dateRef = useRef<HTMLInputElement>(null);
   const [category, setCategory] = useState("");
 
   function handleSearch(e: React.FormEvent) {
@@ -51,13 +58,17 @@ export function SearchBarSection() {
           <label className="mb-1 block text-xs font-medium text-muted-foreground">
             {t("search.date")}
           </label>
-          <div className="relative">
-            <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div
+            className="relative cursor-pointer"
+            onClick={() => dateRef.current?.showPicker?.()}
+          >
+            <CalendarDays className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gold" />
             <Input
+              ref={dateRef}
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="pl-9"
+              className="pl-9 cursor-pointer"
             />
           </div>
         </div>

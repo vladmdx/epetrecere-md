@@ -28,10 +28,10 @@ export function TestimonialsSection() {
   return (
     <section className="py-20 relative">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <video autoPlay muted loop playsInline className="w-full h-full object-cover opacity-[0.12] blur-[2px] hidden md:block">
+        <video autoPlay muted loop playsInline className="w-full h-full object-cover opacity-[0.12] blur-[2px] hidden md:block parallax-bg">
           <source src="/videos/testimonials-bg.mp4" type="video/mp4" />
         </video>
-        <img src="/images/parallax/testimonials.jpg" alt="" className="w-full h-full object-cover opacity-[0.06] blur-[2px] md:hidden" loading="lazy" />
+        <img src="/images/backgrounds/club-blue.jpg" alt="" className="w-full h-full object-cover opacity-[0.10] blur-[2px] md:hidden" loading="lazy" />
       </div>
       <div className="relative z-10 mx-auto max-w-4xl px-4 lg:px-8">
         <div className="mb-12 text-center">

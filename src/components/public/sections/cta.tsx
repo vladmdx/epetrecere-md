@@ -12,6 +12,7 @@ export function CTASection() {
         <video autoPlay muted loop playsInline className="w-full h-full object-cover hidden md:block">
           <source src="/videos/cta-bg.mp4" type="video/mp4" />
         </video>
+        <img src="/images/backgrounds/birthday-party.jpg" alt="" className="w-full h-full object-cover md:hidden" loading="lazy" />
         <div className="absolute inset-0 bg-black/60 md:bg-black/55" />
         <div className="absolute inset-0 bg-gradient-to-r from-gold/5 via-gold/10 to-gold/5" />
       </div>

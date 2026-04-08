@@ -46,27 +46,25 @@ export default async function HomePage() {
         <div className="section-dark relative">
           <CategoriesSection />
         </div>
-        <GoldDivider />
-        <div className="section-mid">
+        <div className="section-navy relative">
           <FeaturedArtistsSection artists={featuredArtists} />
         </div>
-        <div className="section-dark">
+        <div className="section-mid">
           <FeaturedVenuesSection venues={featuredVenues} />
         </div>
-        <div className="section-navy border-t border-b border-gold/10">
+        <div className="section-dark border-t border-b border-gold/10">
           <ProcessSection />
         </div>
-        <div className="section-dark relative">
+        <div className="section-navy relative">
           <TestimonialsSection />
         </div>
-        <div className="section-navy">
+        <div className="section-mid relative">
           <StatsCounterSection />
         </div>
         <div className="section-dark">
           <ClientLogosSection />
         </div>
-        <GoldDivider />
-        <div className="section-mid relative">
+        <div className="section-navy relative">
           <BlogPreviewSection />
         </div>
         <CTASection />

@@ -41,7 +41,7 @@ export function CategoriesSection() {
     <section className="py-20 relative">
       {/* Parallax background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <img src="/images/parallax/categories.jpg" alt="" className="w-full h-full object-cover opacity-[0.05] blur-[2px]" loading="lazy" />
+        <img src="/images/backgrounds/party-dance.jpg" alt="" className="w-full h-full object-cover opacity-[0.07] blur-[2px] parallax-bg" loading="lazy" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-7xl px-4 lg:px-8">

@@ -265,3 +265,45 @@
 .section-navy { background-color: #1A1A2E; }
 .section-mid { background-color: #141428; }
 .section-deepblack { background-color: #0A0A0A; }
+
+/* Parallax background effect */
+.parallax-bg {
+  will-change: transform;
+  animation: parallax-float 20s ease-in-out infinite alternate;
+}
+@keyframes parallax-float {
+  0% { transform: scale(1.05) translateY(0); }
+  100% { transform: scale(1.05) translateY(-3%); }
+}
+
+/* Process animated line */
+.process-line-animated {
+  background: linear-gradient(90deg, transparent, #C9A84C, transparent);
+  background-size: 200% 100%;
+  animation: process-line-move 3.5s ease-in-out infinite;
+}
+@keyframes process-line-move {
+  0% { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* Date input styling for dark theme */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  cursor: pointer;
+}
+input[type="date"] {
+  cursor: pointer;
+}
+
+/* Calendar popover gold theme */
+.calendar-gold {
+  --accent: #C9A84C;
+}
+.calendar-gold button[data-today] {
+  border: 1px solid #C9A84C;
+}
+.calendar-gold button[data-selected] {
+  background: #C9A84C !important;
+  color: #0D0D0D !important;
+}

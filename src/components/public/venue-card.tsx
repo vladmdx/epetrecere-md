@@ -32,10 +32,17 @@ export function VenueCard({ venue }: VenueCardProps) {
       href={`/sali/${venue.slug}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all duration-300 hover:border-gold/30 hover:shadow-[0_4px_20px_rgba(201,168,76,0.15)] hover:-translate-y-1"
     >
-      <div className="relative aspect-[16/10] bg-muted">
-        <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-          <span className="text-4xl">🏛️</span>
-        </div>
+      <div className="relative aspect-[16/10] bg-muted overflow-hidden">
+        <img
+          src={`/images/venues/hall-${(venue.id % 6) + 1}.jpg`}
+          alt={name}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+          loading="lazy"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            target.style.display = "none";
+          }}
+        />
       </div>
 
       <div className="flex flex-1 flex-col p-4">

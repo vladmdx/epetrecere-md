@@ -15,8 +15,12 @@ export function BlogPreviewSection() {
   const { t } = useLocale();
 
   return (
-    <section className="py-20">
-      <div className="mx-auto max-w-7xl px-4 lg:px-8">
+    <section className="py-20 relative">
+      {/* Parallax background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <img src="/images/backgrounds/club-blue.jpg" alt="" className="w-full h-full object-cover opacity-[0.06] blur-[2px] parallax-bg" loading="lazy" />
+      </div>
+      <div className="relative z-10 mx-auto max-w-7xl px-4 lg:px-8">
         <div className="mb-8 flex items-end justify-between">
           <div>
             <p className="mb-1 text-sm font-medium uppercase tracking-[3px] text-gold">Articole recente</p>
