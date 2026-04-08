@@ -28,7 +28,7 @@ export function ClientLogosSection() {
               <img
                 src={partner.logo}
                 alt={partner.name}
-                className="max-h-10 max-w-full object-contain brightness-0 invert opacity-50 transition-all duration-300 group-hover:opacity-90"
+                className="max-h-10 max-w-full object-contain opacity-60 transition-all duration-300 group-hover:opacity-100"
                 loading="lazy"
               />
             </div>
