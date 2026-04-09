@@ -1,1 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 60"><rect x="8" y="12" width="36" height="36" rx="8" fill="#00A651"/><text x="52" y="40" font-family="Arial,sans-serif" font-size="26" font-weight="bold" fill="white">maib</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80">
+  <rect x="12" y="18" width="44" height="44" rx="12" fill="#00A651"/>
+  <path d="M24,48 L34,28 L44,48" stroke="white" stroke-width="3" fill="none"/>
+  <text x="68" y="52" font-family="Helvetica Neue,Arial,sans-serif" font-size="36" font-weight="800" fill="#FFFFFF">maib</text>
+</svg>
