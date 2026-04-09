@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 340 80">
-  <circle cx="32" cy="40" r="20" fill="none" stroke="#F7941D" stroke-width="3"/>
-  <path d="M32,24 L32,56 M20,40 L44,40" stroke="#F7941D" stroke-width="3"/>
-  <text x="62" y="47" font-family="Helvetica Neue,Arial,sans-serif" font-size="24" font-weight="600" fill="#FFFFFF">Premier</text>
-  <text x="192" y="47" font-family="Helvetica Neue,Arial,sans-serif" font-size="24" font-weight="600" fill="#F7941D">Energy</text>
-</svg>

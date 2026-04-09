@@ -1,4 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80">
-  <text x="20" y="34" font-family="Playfair Display,Georgia,serif" font-size="16" font-weight="400" letter-spacing="4" fill="#C9A84C">CHÂTEAU</text>
-  <text x="20" y="58" font-family="Playfair Display,Georgia,serif" font-size="30" font-weight="700" letter-spacing="3" fill="#FFFFFF">VARTELY</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 80">
+  <!-- Grape cluster -->
+  <circle cx="24" cy="28" r="5.5" fill="#6B1D3A"/>
+  <circle cx="35" cy="28" r="5.5" fill="#6B1D3A"/>
+  <circle cx="18" cy="38" r="5.5" fill="#6B1D3A"/>
+  <circle cx="29.5" cy="38" r="5.5" fill="#6B1D3A"/>
+  <circle cx="41" cy="38" r="5.5" fill="#6B1D3A"/>
+  <circle cx="23" cy="48" r="5.5" fill="#6B1D3A"/>
+  <circle cx="35" cy="48" r="5.5" fill="#6B1D3A"/>
+  <circle cx="29" cy="57" r="5" fill="#6B1D3A"/>
+  <!-- Vine stem and leaf -->
+  <path d="M29,22 C29,14 34,10 40,8" stroke="#6B1D3A" stroke-width="1.8" fill="none"/>
+  <path d="M40,8 C44,6 47,8 46,13 C45,16 41,15 40,12" fill="#6B1D3A" opacity="0.7"/>
+  <path d="M36,12 C38,10 42,11 41,14" stroke="#6B1D3A" stroke-width="1" fill="none" opacity="0.5"/>
+  <!-- Château text -->
+  <text x="60" y="32" font-family="Georgia,Times New Roman,serif" font-size="13" font-weight="400" letter-spacing="4.5" fill="#6B1D3A">CHÂTEAU</text>
+  <!-- Vartely text -->
+  <text x="60" y="58" font-family="Georgia,Times New Roman,serif" font-size="28" font-weight="700" letter-spacing="3" fill="#1A1A1A">VARTELY</text>
+  <!-- Decorative line -->
+  <line x1="60" y1="38" x2="210" y2="38" stroke="#6B1D3A" stroke-width="0.5" opacity="0.4"/>
 </svg>

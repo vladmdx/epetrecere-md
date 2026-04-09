@@ -6,7 +6,7 @@ const partners = [
   { name: "Vinăria Purcari", logo: "/images/partners/purcari.svg" },
   { name: "Château Vartely", logo: "/images/partners/vartely.svg" },
   { name: "maib", logo: "/images/partners/maib.svg" },
-  { name: "Premier Energy", logo: "/images/partners/premier-energy.svg" },
+  { name: "Premier Energy", logo: "/images/partners/premier-energy.png" },
   { name: "Kaufland Moldova", logo: "/images/partners/kaufland.svg" },
   { name: "Starnet", logo: "/images/partners/starnet.svg" },
 ];
@@ -22,13 +22,13 @@ export function ClientLogosSection() {
           {partners.map((partner) => (
             <div
               key={partner.name}
-              className="group flex h-16 w-48 items-center justify-center rounded-xl border border-white/8 bg-white/[0.04] px-5 transition-all duration-300 hover:border-gold/25 hover:bg-white/[0.08] hover:shadow-[0_0_20px_rgba(201,168,76,0.1)] hover:scale-105"
+              className="group flex h-14 w-44 items-center justify-center rounded-xl bg-white px-4 transition-all duration-300 hover:shadow-[0_4px_20px_rgba(201,168,76,0.2)] hover:scale-105"
               title={partner.name}
             >
               <img
                 src={partner.logo}
                 alt={partner.name}
-                className="max-h-11 max-w-[160px] w-full object-contain opacity-80 transition-all duration-300 group-hover:opacity-100"
+                className="max-h-10 max-w-[140px] w-full object-contain opacity-80 transition-all duration-300 group-hover:opacity-100"
                 loading="lazy"
               />
             </div>
