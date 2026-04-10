@@ -38,12 +38,12 @@ export function ArtistCard({ artist }: ArtistCardProps) {
       href={`/artisti/${artist.slug}`}
       className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all duration-300 hover:border-gold/30 hover:shadow-[0_4px_20px_rgba(201,168,76,0.15)] hover:-translate-y-1"
     >
-      <div className="relative aspect-[4/3] bg-muted overflow-hidden">
+      <div className="relative aspect-[4/5] bg-muted overflow-hidden">
         {artist.coverImageUrl ? (
           <img
             src={artist.coverImageUrl}
             alt={name}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            className="h-full w-full object-cover object-[center_20%] transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
           />
         ) : (
