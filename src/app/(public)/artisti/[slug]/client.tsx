@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtistCard } from "@/components/public/artist-card";
-import { CalendarWidget } from "@/components/public/calendar-widget";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { useLocale } from "@/hooks/use-locale";
@@ -83,7 +82,6 @@ export function ArtistDetailClient({ artist, similar }: Props) {
   const { locale, t } = useLocale();
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
-  const [selectedDate, setSelectedDate] = useState<string | undefined>();
   const [avatarOpen, setAvatarOpen] = useState(false);
   const coverImage = artist.images?.[0];
   const isPlaceholder = coverImage?.url?.includes("placeholder.svg");
@@ -307,16 +305,7 @@ export function ArtistDetailClient({ artist, similar }: Props) {
             <RequestPriceForm artistId={artist.id} />
             <RequestBookingForm
               artistId={artist.id}
-              preselectedDate={selectedDate}
               icon={<CalendarDays className="h-4 w-4" />}
-            />
-
-            {/* Calendar */}
-            <CalendarWidget
-              entityType="artist"
-              entityId={artist.id}
-              enabled={true}
-              onDateSelect={(date) => setSelectedDate(date)}
             />
           </div>
         </div>
