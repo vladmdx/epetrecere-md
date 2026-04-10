@@ -2,7 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { leads, offerRequests } from "@/lib/db/schema";
+import { desc } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+
+// GET all leads for CRM
+export async function GET() {
+  const allLeads = await db
+    .select()
+    .from(leads)
+    .orderBy(desc(leads.createdAt))
+    .limit(200);
+
+  return NextResponse.json(allLeads);
+}
 
 const createLeadSchema = z.object({
   name: z.string().min(2),
