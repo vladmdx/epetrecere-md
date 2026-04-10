@@ -606,14 +606,16 @@ export const chatMessages = pgTable("chat_messages", {
 export const offerRequests = pgTable("offer_requests", {
   id: serial("id").primaryKey(),
   artistId: integer("artist_id")
-    .references(() => artists.id, { onDelete: "cascade" })
-    .notNull(),
+    .references(() => artists.id, { onDelete: "cascade" }),
+  venueId: integer("venue_id")
+    .references(() => venues.id, { onDelete: "cascade" }),
   clientName: text("client_name").notNull(),
   clientPhone: text("client_phone").notNull(),
   clientEmail: text("client_email"),
   eventType: text("event_type"),
   eventDate: date("event_date"),
   message: text("message"),
+  source: text("source").default("form").notNull(), // "form" | "wizard" | "direct"
   adminSeen: boolean("admin_seen").default(false).notNull(),
   adminComment: text("admin_comment"),
   status: text("status").default("new").notNull(), // "new" | "seen" | "processed"

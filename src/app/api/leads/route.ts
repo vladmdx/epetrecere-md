@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { leads } from "@/lib/db/schema";
+import { leads, offerRequests } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
 
 const createLeadSchema = z.object({
@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
 
   const { artistId, venueId, ...leadData } = parsed.data;
 
+  // 1. Create lead record
   const [lead] = await db
     .insert(leads)
     .values({
@@ -48,6 +49,25 @@ export async function POST(req: NextRequest) {
       score: calculateScore(leadData),
     })
     .returning();
+
+  // 2. Also create offerRequest for admin panel visibility
+  try {
+    await db.insert(offerRequests).values({
+      artistId: artistId ?? null,
+      venueId: venueId ?? null,
+      clientName: leadData.name,
+      clientPhone: `${leadData.phonePrefix || "+373"} ${leadData.phone}`,
+      clientEmail: leadData.email ?? null,
+      eventType: leadData.eventType ?? null,
+      eventDate: leadData.eventDate ?? null,
+      message: leadData.message ?? null,
+      source: leadData.source ?? "form",
+      status: "new",
+    });
+  } catch (e) {
+    // Don't fail the lead creation if offerRequest fails
+    console.error("Failed to create offer request:", e);
+  }
 
   return NextResponse.json(lead, { status: 201 });
 }

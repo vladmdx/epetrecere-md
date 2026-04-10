@@ -11,14 +11,17 @@ import { toast } from "sonner";
 
 interface OfferRequest {
   id: number;
-  artistId: number;
+  artistId: number | null;
   artistName: string | null;
+  venueId: number | null;
+  venueName: string | null;
   clientName: string;
   clientPhone: string;
   clientEmail: string | null;
   eventType: string | null;
   eventDate: string | null;
   message: string | null;
+  source: string | null;
   adminSeen: boolean;
   adminComment: string | null;
   status: string;
@@ -109,7 +112,9 @@ function OfferCard({ request, onMarkSeen, onComment }: { request: OfferRequest; 
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2">
               <span className="font-medium">{request.clientName}</span>
-              {request.artistName && <Badge variant="secondary" className="text-xs">→ {request.artistName}</Badge>}
+              {request.artistName && <Badge variant="secondary" className="text-xs">🎤 → {request.artistName}</Badge>}
+              {request.venueName && <Badge variant="secondary" className="text-xs">🏛 → {request.venueName}</Badge>}
+              {!request.artistName && !request.venueName && <Badge variant="secondary" className="text-xs">📋 Cerere generală</Badge>}
               <Badge variant="outline" className={cn("text-xs",
                 request.status === "new" ? "text-warning border-warning/30" :
                 request.status === "processed" ? "text-success border-success/30" :
