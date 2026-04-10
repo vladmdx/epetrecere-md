@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -14,20 +14,21 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Calendar, DollarSign, User } from "lucide-react";
+import { Calendar, DollarSign, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface Lead {
   id: number;
   name: string;
   phone: string;
-  eventType: string;
-  eventDate: string;
-  budget: number;
+  eventType: string | null;
+  eventDate: string | null;
+  budget: number | null;
   status: string;
-  score: number;
-  source: string;
+  score: number | null;
+  source: string | null;
 }
 
 const columns = [
@@ -40,20 +41,11 @@ const columns = [
 
 const eventLabels: Record<string, string> = {
   wedding: "Nuntă", baptism: "Botez", cumpatrie: "Cumpătrie",
-  corporate: "Corporate", birthday: "Aniversare",
+  corporate: "Corporate", birthday: "Aniversare", other: "Altele",
 };
 
-// Demo data
-const demoLeads: Lead[] = [
-  { id: 1, name: "Maria Popescu", phone: "+373 69 123", eventType: "wedding", eventDate: "2026-08-15", budget: 5000, status: "new", score: 75, source: "wizard" },
-  { id: 2, name: "Ion Rusu", phone: "+373 78 555", eventType: "baptism", eventDate: "2026-06-20", budget: 2000, status: "new", score: 45, source: "form" },
-  { id: 3, name: "Alina Cojocaru", phone: "+373 60 888", eventType: "corporate", eventDate: "2026-05-10", budget: 3000, status: "contacted", score: 60, source: "direct" },
-  { id: 4, name: "Vasile Munteanu", phone: "+373 68 777", eventType: "wedding", eventDate: "2026-09-05", budget: 8000, status: "proposal_sent", score: 85, source: "wizard" },
-  { id: 5, name: "Natalia Lupu", phone: "+373 79 444", eventType: "birthday", eventDate: "2026-07-12", budget: 1500, status: "negotiation", score: 50, source: "form" },
-  { id: 6, name: "SC TechCorp", phone: "+373 22 100", eventType: "corporate", eventDate: "2026-05-25", budget: 4000, status: "confirmed", score: 70, source: "direct" },
-];
-
 function LeadCard({ lead }: { lead: Lead }) {
+  const score = lead.score ?? 0;
   return (
     <Link href={`/admin/crm/${lead.id}`}>
       <div className="rounded-lg border border-border/40 bg-card p-3 shadow-sm transition-all hover:border-gold/30 hover:shadow-md cursor-pointer">
@@ -61,20 +53,26 @@ function LeadCard({ lead }: { lead: Lead }) {
           <span className="text-sm font-medium truncate">{lead.name}</span>
           <span className={cn(
             "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold",
-            lead.score >= 70 ? "bg-success/20 text-success" : lead.score >= 40 ? "bg-warning/20 text-warning" : "bg-muted text-muted-foreground",
+            score >= 70 ? "bg-success/20 text-success" : score >= 40 ? "bg-warning/20 text-warning" : "bg-muted text-muted-foreground",
           )}>
-            {lead.score}
+            {score}
           </span>
         </div>
         <div className="space-y-1 text-[11px] text-muted-foreground">
-          <div className="flex items-center gap-1.5">
-            <Calendar className="h-3 w-3" />
-            {eventLabels[lead.eventType] || lead.eventType} · {lead.eventDate}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <DollarSign className="h-3 w-3" />
-            {lead.budget}€
-          </div>
+          {(lead.eventType || lead.eventDate) && (
+            <div className="flex items-center gap-1.5">
+              <Calendar className="h-3 w-3" />
+              {lead.eventType ? (eventLabels[lead.eventType] || lead.eventType) : ""}
+              {lead.eventType && lead.eventDate ? " · " : ""}
+              {lead.eventDate || ""}
+            </div>
+          )}
+          {lead.budget && (
+            <div className="flex items-center gap-1.5">
+              <DollarSign className="h-3 w-3" />
+              {lead.budget}€
+            </div>
+          )}
         </div>
       </div>
     </Link>
@@ -101,34 +99,81 @@ function SortableLeadCard({ lead }: { lead: Lead }) {
 }
 
 export function KanbanBoard() {
-  const [leadsList, setLeadsList] = useState(demoLeads);
+  const [leadsList, setLeadsList] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(true);
   const [activeId, setActiveId] = useState<number | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
+  useEffect(() => {
+    fetch("/api/leads")
+      .then(r => r.json())
+      .then(data => {
+        setLeadsList(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as number);
   }
 
-  function handleDragEnd(event: DragEndEvent) {
+  async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveId(null);
 
     if (!over) return;
 
     const overId = String(over.id);
-    // Check if dropped on a column
     const targetColumn = columns.find((c) => c.id === overId);
-    if (targetColumn) {
+    if (!targetColumn) return;
+
+    const leadId = active.id as number;
+    const currentLead = leadsList.find(l => l.id === leadId);
+    if (!currentLead || currentLead.status === targetColumn.id) return;
+
+    // Optimistic update
+    setLeadsList((prev) =>
+      prev.map((l) => (l.id === leadId ? { ...l, status: targetColumn.id } : l)),
+    );
+
+    // Persist to API
+    try {
+      await fetch(`/api/leads/${leadId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: targetColumn.id }),
+      });
+      toast.success(`${currentLead.name} → ${targetColumn.label}`);
+    } catch {
+      // Revert on failure
       setLeadsList((prev) =>
-        prev.map((l) => (l.id === active.id ? { ...l, status: targetColumn.id } : l)),
+        prev.map((l) => (l.id === leadId ? { ...l, status: currentLead.status } : l)),
       );
+      toast.error("Eroare la actualizare status");
     }
   }
 
   const activeLead = leadsList.find((l) => l.id === activeId);
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-gold" /></div>;
+  }
+
+  // Include completed/lost/follow_up as extra columns if they have leads
+  const extraStatuses = ["completed", "lost", "follow_up"];
+  const extraColumns = extraStatuses
+    .filter(s => leadsList.some(l => l.status === s))
+    .map(s => ({
+      id: s,
+      label: s === "completed" ? "Finalizate" : s === "lost" ? "Pierdute" : "Follow-up",
+      color: s === "completed" ? "bg-success" : s === "lost" ? "bg-destructive" : "bg-warning",
+    }));
+
+  const allColumns = [...columns, ...extraColumns];
 
   return (
     <DndContext
@@ -138,7 +183,7 @@ export function KanbanBoard() {
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {columns.map((col) => {
+        {allColumns.map((col) => {
           const colLeads = leadsList.filter((l) => l.status === col.id);
           return (
             <div
