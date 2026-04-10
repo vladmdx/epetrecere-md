@@ -5,9 +5,10 @@ const isVendorRoute = createRouteMatcher(["/dashboard(.*)"]);
 const isProtectedRoute = createRouteMatcher(["/admin(.*)", "/dashboard(.*)"]);
 
 export default clerkMiddleware(async (auth, req) => {
-  if (isProtectedRoute(req)) {
-    await auth.protect();
-  }
+  // TODO: Re-enable auth protection when email verification is configured
+  // if (isProtectedRoute(req)) {
+  //   await auth.protect();
+  // }
 
   // Role-based access will be enforced at the layout/page level
   // using auth().sessionClaims for more granular control
