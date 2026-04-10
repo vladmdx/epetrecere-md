@@ -3,9 +3,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { CustomCalendar } from "@/components/public/custom-calendar";
 import { useLocale } from "@/hooks/use-locale";
 import {
-  Search, CalendarDays, ChevronDown, ChevronLeft, ChevronRight,
+  Search, ChevronDown,
   Heart, Baby, Users, Building2, PartyPopper, Sparkles,
   Mic2, Disc3, Music2, Guitar, Camera, Video,
 } from "lucide-react";
@@ -19,10 +20,6 @@ function getTomorrow() {
 
 function formatDate(d: Date) {
   return d.toISOString().split("T")[0];
-}
-
-function formatDisplay(d: Date) {
-  return d.toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" });
 }
 
 const eventTypes = [
@@ -110,177 +107,6 @@ function CustomDropdown({
               )}
             </button>
           ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Custom Calendar
-function CustomCalendar({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: Date;
-  onChange: (d: Date) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [viewDate, setViewDate] = useState(new Date(value));
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const year = viewDate.getFullYear();
-  const month = viewDate.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const daysInPrevMonth = new Date(year, month, 0).getDate();
-
-  const monthNames = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
-  const dayNames = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
-
-  // Start from Monday (adjust firstDay)
-  const startDay = firstDay === 0 ? 6 : firstDay - 1;
-
-  const cells: { day: number; current: boolean; date: Date }[] = [];
-
-  // Previous month days
-  for (let i = startDay - 1; i >= 0; i--) {
-    const d = daysInPrevMonth - i;
-    cells.push({ day: d, current: false, date: new Date(year, month - 1, d) });
-  }
-  // Current month
-  for (let i = 1; i <= daysInMonth; i++) {
-    cells.push({ day: i, current: true, date: new Date(year, month, i) });
-  }
-  // Next month
-  const remaining = 42 - cells.length;
-  for (let i = 1; i <= remaining; i++) {
-    cells.push({ day: i, current: false, date: new Date(year, month + 1, i) });
-  }
-
-  function isSelected(d: Date) {
-    return d.toDateString() === value.toDateString();
-  }
-  function isToday(d: Date) {
-    return d.toDateString() === today.toDateString();
-  }
-  function isPast(d: Date) {
-    return d < today;
-  }
-
-  return (
-    <div className="flex-1 relative" ref={ref}>
-      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-gold/70">
-        {label}
-      </label>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "relative flex h-12 w-full items-center gap-3 rounded-xl border px-4 text-sm transition-all duration-200",
-          "bg-[#1A1A2E]/80 backdrop-blur-sm",
-          open
-            ? "border-gold/50 shadow-[0_0_15px_rgba(201,168,76,0.15)] ring-1 ring-gold/20"
-            : "border-white/10 hover:border-gold/30 hover:shadow-[0_0_10px_rgba(201,168,76,0.08)]"
-        )}
-      >
-        <CalendarDays className="h-4 w-4 text-gold shrink-0" />
-        <span className="flex-1 text-left text-white/90">{formatDisplay(value)}</span>
-        <ChevronDown className={cn("h-4 w-4 text-gold/60 transition-transform duration-200", open && "rotate-180")} />
-      </button>
-
-      {open && (
-        <div className="absolute z-50 mt-2 left-0 w-[300px] rounded-xl border border-gold/20 bg-[#141428]/98 backdrop-blur-xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <button
-              type="button"
-              onClick={() => setViewDate(new Date(year, month - 1, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-gold transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="text-sm font-semibold text-white">
-              {monthNames[month]} {year}
-            </span>
-            <button
-              type="button"
-              onClick={() => setViewDate(new Date(year, month + 1, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-gold transition-colors"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Day names */}
-          <div className="grid grid-cols-7 mb-1">
-            {dayNames.map((d) => (
-              <div key={d} className="text-center text-[10px] font-medium uppercase tracking-wider text-gold/50 py-1">
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Days grid */}
-          <div className="grid grid-cols-7 gap-0.5">
-            {cells.map((cell, i) => (
-              <button
-                key={i}
-                type="button"
-                disabled={isPast(cell.date)}
-                onClick={() => {
-                  onChange(cell.date);
-                  setOpen(false);
-                }}
-                className={cn(
-                  "h-9 w-full rounded-lg text-xs font-medium transition-all duration-150",
-                  !cell.current && "text-white/20",
-                  cell.current && !isPast(cell.date) && !isSelected(cell.date) && !isToday(cell.date) && "text-white/70 hover:bg-gold/15 hover:text-gold",
-                  cell.current && isPast(cell.date) && "text-white/15 cursor-not-allowed",
-                  isToday(cell.date) && !isSelected(cell.date) && "border border-gold/40 text-gold",
-                  isSelected(cell.date) && "bg-gold text-[#0D0D0D] font-bold shadow-[0_0_12px_rgba(201,168,76,0.3)]",
-                )}
-              >
-                {cell.day}
-              </button>
-            ))}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
-            <button
-              type="button"
-              onClick={() => { onChange(getTomorrow()); setViewDate(getTomorrow()); setOpen(false); }}
-              className="text-xs text-gold/70 hover:text-gold transition-colors"
-            >
-              Mâine
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                const next = new Date();
-                next.setDate(next.getDate() + ((6 - next.getDay() + 7) % 7 || 7));
-                onChange(next);
-                setViewDate(next);
-                setOpen(false);
-              }}
-              className="text-xs text-gold/70 hover:text-gold transition-colors"
-            >
-              Sâmbătă viitoare
-            </button>
-          </div>
         </div>
       )}
     </div>

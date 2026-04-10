@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { CustomCalendar } from "@/components/public/custom-calendar";
 import { useLocale } from "@/hooks/use-locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -299,12 +300,19 @@ function StepDate({ data, update, autoNext }: StepProps) {
       <div className="space-y-6">
         <div>
           <Label>{t("form.event_date")} *</Label>
-          <Input
-            type="date"
-            value={data.eventDate}
-            onChange={(e) => update({ eventDate: e.target.value })}
-            className="mt-1"
-          />
+          <div className="mt-1">
+            <CustomCalendar
+              value={data.eventDate ? new Date(data.eventDate + "T00:00:00") : null}
+              onChange={(d) => {
+                // Format to YYYY-MM-DD without timezone shift
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, "0");
+                const day = String(d.getDate()).padStart(2, "0");
+                update({ eventDate: `${y}-${m}-${day}` });
+              }}
+              placeholder={t("form.event_date")}
+            />
+          </div>
         </div>
         <div>
           <Label>{t("form.location")} *</Label>
