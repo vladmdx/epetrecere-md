@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Star, BadgeCheck, Crown, MapPin, Phone, Globe, CalendarDays } from "lucide-react";
+import { Star, BadgeCheck, Crown, MapPin, Phone, Globe, CalendarDays, X, ZoomIn } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -84,6 +84,9 @@ export function ArtistDetailClient({ artist, similar }: Props) {
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
   const [selectedDate, setSelectedDate] = useState<string | undefined>();
+  const [avatarOpen, setAvatarOpen] = useState(false);
+  const coverImage = artist.images?.[0];
+  const isPlaceholder = coverImage?.url?.includes("placeholder.svg");
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
@@ -101,13 +104,30 @@ export function ArtistDetailClient({ artist, similar }: Props) {
         <div className="lg:col-span-2">
           {/* Profile Header */}
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-gold bg-card">
-              {artist.images?.[0]?.url ? (
-                <img src={artist.images[0].url} alt={name} className="h-full w-full object-cover" />
+            <button
+              type="button"
+              onClick={() => !isPlaceholder && coverImage?.url && setAvatarOpen(true)}
+              disabled={isPlaceholder || !coverImage?.url}
+              className="group relative flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-gold bg-card shadow-[0_0_20px_rgba(201,168,76,0.15)] transition-all hover:shadow-[0_0_30px_rgba(201,168,76,0.35)] disabled:cursor-default disabled:hover:shadow-[0_0_20px_rgba(201,168,76,0.15)]"
+              aria-label={isPlaceholder ? name : `Vezi poza mare a lui ${name}`}
+            >
+              {coverImage?.url ? (
+                <>
+                  <img
+                    src={coverImage.url}
+                    alt={name}
+                    className={`h-full w-full object-cover transition-transform duration-300 ${!isPlaceholder ? "group-hover:scale-105" : ""}`}
+                  />
+                  {!isPlaceholder && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+                      <ZoomIn className="h-6 w-6 text-white" />
+                    </div>
+                  )}
+                </>
               ) : (
                 <span className="text-3xl">🎵</span>
               )}
-            </div>
+            </button>
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-heading text-2xl font-bold md:text-3xl">{name}</h1>
@@ -301,6 +321,32 @@ export function ArtistDetailClient({ artist, similar }: Props) {
           </div>
         </div>
       </div>
+
+      {/* Avatar Lightbox */}
+      {avatarOpen && coverImage?.url && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+          onClick={() => setAvatarOpen(false)}
+        >
+          <button
+            type="button"
+            onClick={() => setAvatarOpen(false)}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+            aria-label="Închide"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          <img
+            src={coverImage.url}
+            alt={name}
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
+          />
+          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 rounded-full bg-black/50 backdrop-blur-sm px-4 py-1.5 text-sm text-white">
+            {name}
+          </div>
+        </div>
+      )}
 
       {/* Similar Artists */}
       {similar.length > 0 && (

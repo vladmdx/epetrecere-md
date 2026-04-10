@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a2e"/>
+      <stop offset="50%" stop-color="#2d2a4a"/>
+      <stop offset="100%" stop-color="#1a1a2e"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#c9a84c" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#c9a84c" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#bg)"/>
+  <rect width="400" height="300" fill="url(#glow)"/>
+  <g transform="translate(200,125)">
+    <circle cx="0" cy="0" r="42" fill="none" stroke="#c9a84c" stroke-width="2" stroke-opacity="0.4"/>
+    <path d="M -14,-16 L -14,12 A 8,6 0 1 1 -22,12 A 8,6 0 1 1 -14,12 M -14,-16 L 14,-22 L 14,8 A 8,6 0 1 1 6,8 A 8,6 0 1 1 14,8" fill="#c9a84c" fill-opacity="0.7"/>
+  </g>
+  <text x="200" y="205" text-anchor="middle" font-family="Georgia, serif" font-size="18" font-weight="600" fill="#c9a84c" fill-opacity="0.85">Fotografie în curând</text>
+  <text x="200" y="230" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#9d8f7a" fill-opacity="0.6">ePetrecere.md</text>
+</svg>
