@@ -18,6 +18,21 @@ const postSchema = z.object({
   status: z.enum(["available", "booked", "tentative", "blocked"]),
 });
 
+/** Normalize a date value to YYYY-MM-DD string, handling timezone offsets */
+function normalizeDate(d: string | Date): string {
+  if (typeof d === "string") {
+    // If already YYYY-MM-DD, return as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    // If ISO timestamp, parse and extract local date
+    const dt = new Date(d);
+    return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+  }
+  if (d instanceof Date) {
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+  }
+  return String(d);
+}
+
 export async function GET(req: NextRequest) {
   const params = Object.fromEntries(req.nextUrl.searchParams);
   const parsed = getSchema.safeParse(params);
@@ -32,7 +47,13 @@ export async function GET(req: NextRequest) {
     parsed.data.month,
   );
 
-  return NextResponse.json(events);
+  // Normalize dates to YYYY-MM-DD to avoid timezone issues
+  const normalized = events.map((e) => ({
+    ...e,
+    date: normalizeDate(e.date),
+  }));
+
+  return NextResponse.json(normalized);
 }
 
 export async function POST(req: Request) {

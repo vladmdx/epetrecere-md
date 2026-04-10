@@ -295,7 +295,7 @@ export function ArtistDetailClient({ artist, similar }: Props) {
             <CalendarWidget
               entityType="artist"
               entityId={artist.id}
-              enabled={artist.calendarEnabled}
+              enabled={true}
               onDateSelect={(date) => setSelectedDate(date)}
             />
           </div>

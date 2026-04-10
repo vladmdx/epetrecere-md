@@ -222,18 +222,18 @@
   padding: 0 0.875rem;
   font-size: 0.875rem;
   border-radius: 0.75rem;
-  border: 1px solid hsl(var(--border) / 0.4);
-  background: hsl(var(--accent) / 0.3);
-  color: hsl(var(--foreground));
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: var(--foreground);
   transition: all 0.2s;
   outline: none;
 }
 .form-input::placeholder {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
 }
 .form-input:focus {
-  border-color: hsl(var(--gold) / 0.5);
-  box-shadow: 0 0 0 2px hsl(var(--gold) / 0.1);
+  border-color: color-mix(in srgb, var(--gold) 50%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 10%, transparent);
 }
 
 /* ═══════════════════════════════════════════════════════

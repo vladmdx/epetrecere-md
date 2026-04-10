@@ -80,47 +80,49 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
       </div>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="font-heading flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-gold" />
-              Solicită Preț
-            </SheetTitle>
-            <p className="text-sm text-muted-foreground">
-              Lăsați datele de contact și vă vom reveni cu o ofertă personalizată.
-            </p>
-          </SheetHeader>
+        <SheetContent className="overflow-y-auto sm:max-w-md">
+          <div className="px-6 pb-8">
+            <SheetHeader className="px-0 pt-2 pb-0">
+              <SheetTitle className="font-heading flex items-center gap-2 text-lg">
+                <Sparkles className="h-5 w-5 text-gold" />
+                Solicită Preț
+              </SheetTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Lăsați datele de contact și vă vom reveni cu o ofertă personalizată.
+              </p>
+            </SheetHeader>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-            <FormField icon={User} label="Nume" required>
-              <input id="price-name" name="name" required
-                className="form-input" placeholder="Numele dvs." />
-            </FormField>
+            <form onSubmit={handleSubmit} className="mt-8 space-y-6">
+              <FormField icon={User} label="Nume" required>
+                <input id="price-name" name="name" required
+                  className="form-input" placeholder="Numele dvs." />
+              </FormField>
 
-            <FormField icon={Phone} label="Telefon" required>
-              <div className="flex gap-2">
-                <span className="flex h-11 w-20 items-center justify-center rounded-xl border border-border/40 bg-accent/30 text-sm text-muted-foreground">
-                  +373
-                </span>
-                <input id="price-phone" name="phone" type="tel" required
-                  className="form-input flex-1" placeholder="6X XXX XXX" />
+              <FormField icon={Phone} label="Telefon" required>
+                <div className="flex gap-2">
+                  <span className="flex h-11 w-20 items-center justify-center rounded-xl border border-border/40 bg-accent/30 text-sm text-muted-foreground shrink-0">
+                    +373
+                  </span>
+                  <input id="price-phone" name="phone" type="tel" required
+                    className="form-input flex-1" placeholder="6X XXX XXX" />
+                </div>
+              </FormField>
+
+              <div className="flex items-start gap-3 pt-2">
+                <Checkbox id="gdpr-price" name="gdpr" required className="mt-0.5" />
+                <Label htmlFor="gdpr-price" className="text-xs text-muted-foreground leading-relaxed">
+                  {t("form.gdpr_consent")}
+                </Label>
               </div>
-            </FormField>
 
-            <div className="flex items-start gap-2 pt-1">
-              <Checkbox id="gdpr-price" name="gdpr" required />
-              <Label htmlFor="gdpr-price" className="text-xs text-muted-foreground leading-tight">
-                {t("form.gdpr_consent")}
-              </Label>
-            </div>
-
-            <Button type="submit" disabled={loading}
-              className="w-full h-12 bg-gold text-background hover:bg-gold-dark text-sm font-semibold rounded-xl">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                <><Send className="mr-2 h-4 w-4" /> Trimite cererea</>
-              )}
-            </Button>
-          </form>
+              <Button type="submit" disabled={loading}
+                className="w-full h-12 bg-gold text-background hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                  <><Send className="mr-2 h-4 w-4" /> Trimite cererea</>
+                )}
+              </Button>
+            </form>
+          </div>
         </SheetContent>
       </Sheet>
     </>
@@ -133,8 +135,15 @@ export function RequestBookingForm({ artistId, venueId, preselectedDate, classNa
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [eventDate, setEventDate] = useState<Date | null>(
-    preselectedDate ? new Date(preselectedDate) : null
+    preselectedDate ? new Date(preselectedDate + "T00:00:00") : null
   );
+
+  // Sync preselectedDate from calendar widget
+  useEffect(() => {
+    if (preselectedDate) {
+      setEventDate(new Date(preselectedDate + "T00:00:00"));
+    }
+  }, [preselectedDate]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -196,82 +205,84 @@ export function RequestBookingForm({ artistId, venueId, preselectedDate, classNa
       </div>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="font-heading flex items-center gap-2">
-              <CalendarDays className="h-5 w-5 text-gold" />
-              Solicită Rezervare
-            </SheetTitle>
-            <p className="text-sm text-muted-foreground">
-              Completați detaliile evenimentului și vă vom confirma disponibilitatea.
-            </p>
-          </SheetHeader>
+        <SheetContent className="overflow-y-auto sm:max-w-md">
+          <div className="px-6 pb-8">
+            <SheetHeader className="px-0 pt-2 pb-0">
+              <SheetTitle className="font-heading flex items-center gap-2 text-lg">
+                <CalendarDays className="h-5 w-5 text-gold" />
+                Solicită Rezervare
+              </SheetTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Completați detaliile evenimentului și vă vom confirma disponibilitatea.
+              </p>
+            </SheetHeader>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-5">
-            <FormField icon={User} label="Nume" required>
-              <input id="book-name" name="name" required
-                className="form-input" placeholder="Numele dvs." />
-            </FormField>
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              <FormField icon={User} label="Nume" required>
+                <input id="book-name" name="name" required
+                  className="form-input" placeholder="Numele dvs." />
+              </FormField>
 
-            <FormField icon={Phone} label="Telefon" required>
-              <div className="flex gap-2">
-                <span className="flex h-11 w-20 items-center justify-center rounded-xl border border-border/40 bg-accent/30 text-sm text-muted-foreground">
-                  +373
-                </span>
-                <input id="book-phone" name="phone" type="tel" required
-                  className="form-input flex-1" placeholder="6X XXX XXX" />
+              <FormField icon={Phone} label="Telefon" required>
+                <div className="flex gap-2">
+                  <span className="flex h-11 w-20 items-center justify-center rounded-xl border border-border/40 bg-accent/30 text-sm text-muted-foreground shrink-0">
+                    +373
+                  </span>
+                  <input id="book-phone" name="phone" type="tel" required
+                    className="form-input flex-1" placeholder="6X XXX XXX" />
+                </div>
+              </FormField>
+
+              <FormField icon={Mail} label="Email">
+                <input id="book-email" name="email" type="email"
+                  className="form-input" placeholder="email@exemplu.md" />
+              </FormField>
+
+              <FormField icon={Sparkles} label="Tip Eveniment">
+                <select name="eventType"
+                  className="form-input appearance-none cursor-pointer">
+                  <option value="">Selectează tipul</option>
+                  {eventTypes.map(et => (
+                    <option key={et.value} value={et.value}>{et.label}</option>
+                  ))}
+                </select>
+              </FormField>
+
+              <FormField icon={CalendarDays} label="Data Evenimentului">
+                <MiniCalendar value={eventDate} onChange={setEventDate} />
+              </FormField>
+
+              <FormField icon={MapPin} label="Locație">
+                <input id="book-location" name="location"
+                  className="form-input" placeholder="Orașul, locația" />
+              </FormField>
+
+              <FormField icon={Users} label="Număr invitați">
+                <input id="book-guests" name="guestCount" type="number" min={1}
+                  className="form-input" placeholder="ex: 150" />
+              </FormField>
+
+              <FormField icon={MessageSquare} label="Mesaj">
+                <textarea id="book-message" name="message" rows={3}
+                  className="form-input min-h-[80px] resize-none py-2.5"
+                  placeholder="Detalii suplimentare despre eveniment..." />
+              </FormField>
+
+              <div className="flex items-start gap-3 pt-2">
+                <Checkbox id="gdpr-booking" name="gdpr" required className="mt-0.5" />
+                <Label htmlFor="gdpr-booking" className="text-xs text-muted-foreground leading-relaxed">
+                  {t("form.gdpr_consent")}
+                </Label>
               </div>
-            </FormField>
 
-            <FormField icon={Mail} label="Email">
-              <input id="book-email" name="email" type="email"
-                className="form-input" placeholder="email@exemplu.md" />
-            </FormField>
-
-            <FormField icon={Sparkles} label="Tip Eveniment">
-              <select name="eventType"
-                className="form-input appearance-none cursor-pointer">
-                <option value="">Selectează tipul</option>
-                {eventTypes.map(et => (
-                  <option key={et.value} value={et.value}>{et.label}</option>
-                ))}
-              </select>
-            </FormField>
-
-            <FormField icon={CalendarDays} label="Data Evenimentului">
-              <MiniCalendar value={eventDate} onChange={setEventDate} />
-            </FormField>
-
-            <FormField icon={MapPin} label="Locație">
-              <input id="book-location" name="location"
-                className="form-input" placeholder="Orașul, locația" />
-            </FormField>
-
-            <FormField icon={Users} label="Număr invitați">
-              <input id="book-guests" name="guestCount" type="number" min={1}
-                className="form-input" placeholder="ex: 150" />
-            </FormField>
-
-            <FormField icon={MessageSquare} label="Mesaj">
-              <textarea id="book-message" name="message" rows={3}
-                className="form-input min-h-[80px] resize-none py-2.5"
-                placeholder="Detalii suplimentare despre eveniment..." />
-            </FormField>
-
-            <div className="flex items-start gap-2 pt-1">
-              <Checkbox id="gdpr-booking" name="gdpr" required />
-              <Label htmlFor="gdpr-booking" className="text-xs text-muted-foreground leading-tight">
-                {t("form.gdpr_consent")}
-              </Label>
-            </div>
-
-            <Button type="submit" disabled={loading}
-              className="w-full h-12 bg-gold text-background hover:bg-gold-dark text-sm font-semibold rounded-xl">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                <><Send className="mr-2 h-4 w-4" /> Trimite cererea de rezervare</>
-              )}
-            </Button>
-          </form>
+              <Button type="submit" disabled={loading}
+                className="w-full h-12 bg-gold text-background hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                  <><Send className="mr-2 h-4 w-4" /> Trimite cererea de rezervare</>
+                )}
+              </Button>
+            </form>
+          </div>
         </SheetContent>
       </Sheet>
     </>
@@ -291,8 +302,8 @@ function FormField({
 }) {
   return (
     <div className="space-y-2">
-      <label className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-        <Icon className="h-3.5 w-3.5 text-gold/70" />
+      <label className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <Icon className="h-4 w-4 text-gold/70" />
         {label}
         {required && <span className="text-gold">*</span>}
       </label>

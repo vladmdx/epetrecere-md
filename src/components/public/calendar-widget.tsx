@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
@@ -24,13 +24,6 @@ const MONTHS_RO = [
   "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie",
 ];
 
-const statusColors: Record<string, string> = {
-  available: "bg-success/20 text-success hover:bg-success/30 cursor-pointer",
-  booked: "bg-destructive/20 text-destructive",
-  tentative: "bg-warning/20 text-warning",
-  blocked: "bg-muted text-muted-foreground",
-};
-
 export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: CalendarWidgetProps) {
   const { t } = useLocale();
   const [currentMonth, setCurrentMonth] = useState(() => {
@@ -39,9 +32,9 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
   });
   const [events, setEvents] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const fetchEvents = useCallback(async () => {
-    if (!enabled) return;
     setLoading(true);
     try {
       const monthStr = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, "0")}`;
@@ -50,29 +43,18 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
       );
       if (res.ok) {
         const data = await res.json();
-        setEvents(data);
+        setEvents(Array.isArray(data) ? data : []);
       }
     } catch {
       // silent fail
     } finally {
       setLoading(false);
     }
-  }, [entityType, entityId, enabled, currentMonth]);
+  }, [entityType, entityId, currentMonth]);
 
   useEffect(() => {
     fetchEvents();
   }, [fetchEvents]);
-
-  if (!enabled) {
-    return (
-      <div className="rounded-xl border border-border/40 bg-card p-6 text-center">
-        <p className="text-sm text-muted-foreground">{t("artist.calendar_unavailable")}</p>
-        <Button className="mt-4 bg-gold text-background hover:bg-gold-dark">
-          {t("artist.send_request")}
-        </Button>
-      </div>
-    );
-  }
 
   const { year, month } = currentMonth;
   const firstDay = new Date(year, month, 1);
@@ -80,7 +62,15 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
   const startDay = (firstDay.getDay() + 6) % 7;
   const daysInMonth = lastDay.getDate();
 
-  const eventMap = new Map(events.map((e) => [e.date, e.status]));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Build event map from API data
+  const eventMap = new Map(events.map((e) => {
+    // Handle date strings that come as ISO timestamps
+    const dateStr = e.date.includes("T") ? e.date.split("T")[0] : e.date;
+    return [dateStr, e.status];
+  }));
 
   const prev = () => {
     setCurrentMonth((c) =>
@@ -93,44 +83,79 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
     );
   };
 
+  function handleDayClick(dateStr: string, status: string | undefined) {
+    if (status === "booked" || status === "blocked") return;
+    setSelectedDate(dateStr);
+    if (onDateSelect) onDateSelect(dateStr);
+  }
+
   return (
     <div className="rounded-xl border border-border/40 bg-card p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={prev}>
-          <ChevronLeft className="h-4 w-4" />
+      {/* Header */}
+      <div className="mb-1 flex items-center gap-2 text-sm font-heading font-bold">
+        <CalendarDays className="h-4 w-4 text-gold" />
+        <span>Disponibilitate</span>
+      </div>
+
+      {/* Month nav */}
+      <div className="mb-3 flex items-center justify-between">
+        <Button variant="ghost" size="icon" onClick={prev} className="h-7 w-7">
+          <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
-        <h3 className="font-heading text-sm font-bold">
+        <h3 className="text-xs font-semibold text-muted-foreground">
           {MONTHS_RO[month]} {year}
         </h3>
-        <Button variant="ghost" size="icon" onClick={next}>
-          <ChevronRight className="h-4 w-4" />
+        <Button variant="ghost" size="icon" onClick={next} className="h-7 w-7">
+          <ChevronRight className="h-3.5 w-3.5" />
         </Button>
       </div>
 
-      <div className="mb-2 grid grid-cols-7 text-center text-xs font-medium text-muted-foreground">
+      {/* Day names */}
+      <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-medium uppercase tracking-wider text-gold/50">
         {DAYS_RO.map((d) => (
           <div key={d}>{d}</div>
         ))}
       </div>
 
-      <div className={cn("grid grid-cols-7 gap-1", loading && "opacity-50")}>
+      {/* Calendar grid */}
+      <div className={cn("grid grid-cols-7 gap-0.5", loading && "opacity-40")}>
         {Array.from({ length: startDay }).map((_, i) => (
-          <div key={`empty-${i}`} />
+          <div key={`empty-${i}`} className="h-7" />
         ))}
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
           const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const status = eventMap.get(dateStr);
+          const dateObj = new Date(year, month, day);
+          const isPast = dateObj < today;
+          const isToday = dateObj.toDateString() === today.toDateString();
+          const isSelected = selectedDate === dateStr;
+
+          // Determine display style
+          let dayClass = "";
+          if (isPast) {
+            dayClass = "text-white/15 cursor-not-allowed";
+          } else if (status === "booked" || status === "blocked") {
+            dayClass = "bg-destructive/25 text-destructive/90 cursor-not-allowed";
+          } else if (status === "tentative") {
+            dayClass = "bg-warning/20 text-warning cursor-pointer hover:bg-warning/30";
+          } else if (isSelected) {
+            dayClass = "bg-gold text-[#0D0D0D] font-bold shadow-[0_0_8px_rgba(201,168,76,0.3)]";
+          } else {
+            // Available (explicitly or no record = free)
+            dayClass = "bg-success/15 text-success/90 cursor-pointer hover:bg-success/25";
+          }
 
           return (
             <button
               key={day}
-              onClick={() => {
-                if ((!status || status === "available") && onDateSelect) onDateSelect(dateStr);
-              }}
+              type="button"
+              disabled={isPast || status === "booked" || status === "blocked"}
+              onClick={() => handleDayClick(dateStr, status)}
               className={cn(
-                "flex h-8 w-full items-center justify-center rounded text-xs font-medium transition-colors",
-                status ? statusColors[status] : "text-muted-foreground hover:bg-accent",
+                "flex h-7 w-full items-center justify-center rounded-md text-[11px] font-medium transition-all",
+                dayClass,
+                isToday && !isSelected && "ring-1 ring-gold/50",
               )}
             >
               {day}
@@ -139,17 +164,33 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
         })}
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-3 text-xs">
+      {/* Legend */}
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
-          <span className="h-2.5 w-2.5 rounded-full bg-success" /> {t("common.available")}
+          <span className="h-2 w-2 rounded-full bg-success" /> Liber
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2.5 w-2.5 rounded-full bg-destructive" /> {t("common.booked")}
+          <span className="h-2 w-2 rounded-full bg-destructive" /> Ocupat
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2.5 w-2.5 rounded-full bg-warning" /> {t("common.tentative")}
+          <span className="h-2 w-2 rounded-full bg-warning" /> Tentativ
         </span>
       </div>
+
+      {/* Selected date info */}
+      {selectedDate && (
+        <div className="mt-3 rounded-lg bg-gold/10 border border-gold/20 p-2.5 text-center">
+          <p className="text-xs text-gold font-medium">
+            {(() => {
+              const d = new Date(selectedDate + "T00:00:00");
+              return `${d.getDate()} ${MONTHS_RO[d.getMonth()]} ${d.getFullYear()}`;
+            })()}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Data selectată — apăsați &quot;Solicită Rezervare&quot; pentru a rezerva
+          </p>
+        </div>
+      )}
     </div>
   );
 }
