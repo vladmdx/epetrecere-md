@@ -15,7 +15,7 @@ export function HeroSection() {
   const { t } = useLocale();
 
   return (
-    <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden pt-16">
+    <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden -mt-16 pt-16">
       {/* Video/Image Background */}
       <div className="absolute inset-0">
         {/* Gradient overlay — always visible */}
