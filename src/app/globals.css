@@ -212,6 +212,31 @@
 }
 
 /* ═══════════════════════════════════════════════════════
+   FORM INPUTS
+   ═══════════════════════════════════════════════════════ */
+
+.form-input {
+  display: flex;
+  height: 2.75rem;
+  width: 100%;
+  padding: 0 0.875rem;
+  font-size: 0.875rem;
+  border-radius: 0.75rem;
+  border: 1px solid hsl(var(--border) / 0.4);
+  background: hsl(var(--accent) / 0.3);
+  color: hsl(var(--foreground));
+  transition: all 0.2s;
+  outline: none;
+}
+.form-input::placeholder {
+  color: hsl(var(--muted-foreground));
+}
+.form-input:focus {
+  border-color: hsl(var(--gold) / 0.5);
+  box-shadow: 0 0 0 2px hsl(var(--gold) / 0.1);
+}
+
+/* ═══════════════════════════════════════════════════════
    VISUAL ENHANCEMENTS
    ═══════════════════════════════════════════════════════ */
 

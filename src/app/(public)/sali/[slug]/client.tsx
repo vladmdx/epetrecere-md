@@ -4,7 +4,7 @@ import { Star, MapPin, Users, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ImageGallery } from "@/components/public/image-gallery";
-import { RequestForm } from "@/components/public/request-form";
+import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 
@@ -131,14 +131,8 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
                 <p className="text-sm text-muted-foreground">{t("venue.price_per_person")}</p>
               </div>
             )}
-            <RequestForm
-              trigger={
-                <Button className="w-full bg-gold text-background hover:bg-gold-dark py-6 text-base">
-                  {t("artist.request_price")}
-                </Button>
-              }
-              venueId={venue.id}
-            />
+            <RequestPriceForm venueId={venue.id} />
+            <RequestBookingForm venueId={venue.id} />
           </div>
         </div>
       </div>

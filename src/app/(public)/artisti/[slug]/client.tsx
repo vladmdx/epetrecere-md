@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtistCard } from "@/components/public/artist-card";
 import { CalendarWidget } from "@/components/public/calendar-widget";
 import { ImageGallery } from "@/components/public/image-gallery";
-import { RequestForm } from "@/components/public/request-form";
+import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 
@@ -284,19 +284,12 @@ export function ArtistDetailClient({ artist, similar }: Props) {
         <div className="space-y-6">
           {/* CTA Buttons */}
           <div className="sticky top-20 space-y-3">
-            <RequestForm
-              trigger={
-                <Button className="w-full bg-gold text-background hover:bg-gold-dark text-base py-6">
-                  {t("artist.request_price")}
-                </Button>
-              }
+            <RequestPriceForm artistId={artist.id} />
+            <RequestBookingForm
               artistId={artist.id}
               preselectedDate={selectedDate}
+              icon={<CalendarDays className="h-4 w-4" />}
             />
-            <Button variant="outline" className="w-full border-gold text-gold hover:bg-gold/10 py-6">
-              <CalendarDays className="mr-2 h-4 w-4" />
-              {t("artist.check_availability")}
-            </Button>
 
             {/* Calendar */}
             <CalendarWidget
