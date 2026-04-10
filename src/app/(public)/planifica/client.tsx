@@ -111,6 +111,13 @@ export function WizardClient() {
     setStep(Math.min(next, 7));
   }
 
+  // Auto-advance with a short delay so the user sees their selection highlight
+  function autoNext() {
+    setTimeout(() => {
+      nextStep();
+    }, 220);
+  }
+
   function prevStep() {
     let prev = step - 1;
     if (prev === 5 && !["wedding", "baptism", "cumpatrie", "birthday"].includes(data.eventType)) prev = 4;
@@ -182,13 +189,13 @@ export function WizardClient() {
 
       {/* Step Content */}
       <div className="mx-auto max-w-2xl px-4 py-10">
-        {step === 0 && <StepEventType data={data} update={update} />}
-        {step === 1 && <StepDate data={data} update={update} />}
-        {step === 2 && <StepGuests data={data} update={update} />}
+        {step === 0 && <StepEventType data={data} update={update} autoNext={autoNext} />}
+        {step === 1 && <StepDate data={data} update={update} autoNext={autoNext} />}
+        {step === 2 && <StepGuests data={data} update={update} autoNext={autoNext} />}
         {step === 3 && <StepServices data={data} update={update} />}
         {step === 4 && <StepArtists data={data} update={update} />}
-        {step === 5 && <StepVenue data={data} update={update} />}
-        {step === 6 && <StepBudget data={data} update={update} />}
+        {step === 5 && <StepVenue data={data} update={update} autoNext={autoNext} />}
+        {step === 6 && <StepBudget data={data} update={update} autoNext={autoNext} />}
         {step === 7 && <StepSummary data={data} update={update} />}
 
         {/* Navigation */}
@@ -238,6 +245,7 @@ export function WizardClient() {
 interface StepProps {
   data: WizardData;
   update: (partial: Partial<WizardData>) => void;
+  autoNext?: () => void;
 }
 
 const eventTypes = [
@@ -250,7 +258,7 @@ const eventTypes = [
   { value: "other", icon: "✨" },
 ];
 
-function StepEventType({ data, update }: StepProps) {
+function StepEventType({ data, update, autoNext }: StepProps) {
   const { t } = useLocale();
   return (
     <div>
@@ -260,7 +268,10 @@ function StepEventType({ data, update }: StepProps) {
         {eventTypes.map((et) => (
           <button
             key={et.value}
-            onClick={() => update({ eventType: et.value })}
+            onClick={() => {
+              update({ eventType: et.value });
+              autoNext?.();
+            }}
             className={cn(
               "flex flex-col items-center gap-2 rounded-xl border-2 p-6 transition-all",
               data.eventType === et.value
@@ -279,7 +290,7 @@ function StepEventType({ data, update }: StepProps) {
 
 const cities = ["Chișinău", "Bălți", "Cahul", "Orhei", "Ungheni", "Soroca", "Comrat", "Edineț"];
 
-function StepDate({ data, update }: StepProps) {
+function StepDate({ data, update, autoNext }: StepProps) {
   const { t } = useLocale();
   return (
     <div>
@@ -301,7 +312,11 @@ function StepDate({ data, update }: StepProps) {
             {cities.map((city) => (
               <button
                 key={city}
-                onClick={() => update({ location: city })}
+                onClick={() => {
+                  update({ location: city });
+                  // Auto-advance only if the required "date" is already filled
+                  if (data.eventDate) autoNext?.();
+                }}
                 className={cn(
                   "rounded-lg border px-4 py-2 text-sm transition-all",
                   data.location === city
@@ -320,7 +335,11 @@ function StepDate({ data, update }: StepProps) {
             {["dimineață", "după-amiază", "seară"].map((slot) => (
               <button
                 key={slot}
-                onClick={() => update({ timeSlot: slot })}
+                onClick={() => {
+                  update({ timeSlot: slot });
+                  // Auto-advance only if the required fields are already filled
+                  if (data.eventDate && data.location) autoNext?.();
+                }}
                 className={cn(
                   "rounded-lg border px-4 py-2 text-sm capitalize transition-all",
                   data.timeSlot === slot
@@ -340,7 +359,7 @@ function StepDate({ data, update }: StepProps) {
 
 const guestPresets = [50, 100, 150, 200, 300, 500];
 
-function StepGuests({ data, update }: StepProps) {
+function StepGuests({ data, update, autoNext }: StepProps) {
   const { t } = useLocale();
   return (
     <div>
@@ -351,7 +370,10 @@ function StepGuests({ data, update }: StepProps) {
           {guestPresets.map((n) => (
             <button
               key={n}
-              onClick={() => update({ guestCount: n })}
+              onClick={() => {
+                update({ guestCount: n });
+                autoNext?.();
+              }}
               className={cn(
                 "rounded-lg border px-5 py-3 text-sm font-medium transition-all",
                 data.guestCount === n
@@ -471,7 +493,7 @@ function StepArtists({ data, update }: StepProps) {
   );
 }
 
-function StepVenue({ data, update }: StepProps) {
+function StepVenue({ data, update, autoNext }: StepProps) {
   const { t } = useLocale();
   return (
     <div>
@@ -479,7 +501,10 @@ function StepVenue({ data, update }: StepProps) {
       <p className="mb-8 text-muted-foreground">Ai nevoie de o sală sau restaurant?</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <button
-          onClick={() => update({ venueChoice: "select" })}
+          onClick={() => {
+            update({ venueChoice: "select" });
+            autoNext?.();
+          }}
           className={cn(
             "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
             data.venueChoice === "select"
@@ -492,7 +517,10 @@ function StepVenue({ data, update }: StepProps) {
           <span className="text-xs text-muted-foreground">Vă vom sugera cele mai bune locații</span>
         </button>
         <button
-          onClick={() => update({ venueChoice: "have" })}
+          onClick={() => {
+            update({ venueChoice: "have" });
+            autoNext?.();
+          }}
           className={cn(
             "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
             data.venueChoice === "have"
@@ -511,7 +539,7 @@ function StepVenue({ data, update }: StepProps) {
 
 const budgetPresets = [500, 1000, 2000, 3000, 5000, 10000];
 
-function StepBudget({ data, update }: StepProps) {
+function StepBudget({ data, update, autoNext }: StepProps) {
   const { t } = useLocale();
   return (
     <div>
@@ -522,7 +550,10 @@ function StepBudget({ data, update }: StepProps) {
           {budgetPresets.map((b) => (
             <button
               key={b}
-              onClick={() => update({ budget: b })}
+              onClick={() => {
+                update({ budget: b });
+                autoNext?.();
+              }}
               className={cn(
                 "rounded-lg border px-5 py-3 font-accent text-sm font-semibold transition-all",
                 data.budget === b
