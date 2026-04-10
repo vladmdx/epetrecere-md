@@ -49,6 +49,7 @@ export default function ClientCabinetPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [clientName, setClientName] = useState("");
+  const [activeTab, setActiveTab] = useState<"bookings" | "chat">("bookings");
 
   // Auto-login if Clerk user is signed in
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function ClientCabinetPage() {
 
   async function loadChat(bookingId: number) {
     setSelectedBooking(bookingId);
+    setActiveTab("chat");
     const res = await fetch(`/api/chat?booking_request_id=${bookingId}`);
     const data = await res.json();
     setChatMessages(data);
@@ -121,7 +123,7 @@ export default function ClientCabinetPage() {
     <div className="mx-auto max-w-5xl py-8 px-4">
       <h1 className="font-heading text-2xl font-bold mb-6">Cabinetul Meu</h1>
 
-      <Tabs defaultValue="bookings">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "bookings" | "chat")}>
         <TabsList>
           <TabsTrigger value="bookings">Rezervările Mele ({bookings.length})</TabsTrigger>
           <TabsTrigger value="chat">Chat</TabsTrigger>

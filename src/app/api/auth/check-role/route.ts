@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     // Check if artist with completed onboarding
     if (dbUser.role === "artist") {
       const [artist] = await db
-        .select({ id: artists.id, isActive: artists.isActive })
+        .select({ id: artists.id, slug: artists.slug, isActive: artists.isActive })
         .from(artists)
         .where(eq(artists.userId, dbUser.id))
         .limit(1);
@@ -27,6 +27,8 @@ export async function GET(req: NextRequest) {
         role: "artist",
         onboardingComplete: !!artist,
         artistApproved: artist?.isActive ?? false,
+        artistId: artist?.id ?? null,
+        artistSlug: artist?.slug ?? null,
       });
     }
 
