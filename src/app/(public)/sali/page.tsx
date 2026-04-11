@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 import { getVenues } from "@/lib/db/queries/venues";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { VenuesListClient } from "./client";
@@ -21,8 +22,17 @@ export default async function VenuesPage({ searchParams }: Props) {
     capacityMin: sp.capacity_min ? Number(sp.capacity_min) : undefined,
     sort: (sp.sort as "popular" | "price_asc" | "price_desc" | "rating" | "capacity") || "popular",
     page: sp.page ? Number(sp.page) : 1,
+    // Availability filter — exclude venues booked/blocked on this date.
+    availableDate: (sp.date as string) || undefined,
   };
 
   const result = await getVenues(filters);
-  return <VenuesListClient venues={result.items} total={result.total} page={result.page} totalPages={result.totalPages} currentSort={filters.sort} />;
+
+  // M0a #8 — gate price per person behind login at the server layer.
+  const { userId } = await auth();
+  const items = userId
+    ? result.items
+    : result.items.map((v) => ({ ...v, pricePerPerson: null }));
+
+  return <VenuesListClient venues={items} total={result.total} page={result.page} totalPages={result.totalPages} currentSort={filters.sort} />;
 }

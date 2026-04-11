@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,8 +13,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, ArrowRight, Loader2, Send, Sparkles,
-  PartyPopper, Calendar, Users, Wrench, Music, Building2, DollarSign, ClipboardCheck,
-  Mic, Disc3, Guitar, Camera, Video, Palette, Speaker, Star, Flame, Cake,
+  PartyPopper, Calendar, Users, Wrench, Building2, DollarSign, ClipboardCheck,
+  Music, Mic, Disc3, Guitar, Camera, Video, Palette, Speaker, Star, Flame, Cake, LogIn,
 } from "lucide-react";
 
 // ═══════════════════════════════════════════════
@@ -26,10 +27,8 @@ interface WizardData {
   location: string;
   timeSlot: string;
   guestCount: number;
-  services: string[];
-  selectedArtists: Record<string, number | null>; // service -> artistId or null
-  venueChoice: "select" | "have" | "";
-  selectedVenueId: number | null;
+  venueNeeded: "" | "yes" | "no"; // do they need a venue
+  services: string[]; // selected category ids
   budget: number;
   name: string;
   phone: string;
@@ -42,26 +41,29 @@ const initialData: WizardData = {
   location: "",
   timeSlot: "",
   guestCount: 100,
+  venueNeeded: "",
   services: [],
-  selectedArtists: {},
-  venueChoice: "",
-  selectedVenueId: null,
   budget: 2000,
   name: "",
   phone: "",
   email: "",
 };
 
+// Reordered per requirements: Sală (venue) BEFORE Servicii (categories)
+// StepArtists removed — clients only pick categories, the artists are
+// revealed after login on the results page.
 const STEPS = [
   { key: "event_type", icon: PartyPopper },
   { key: "date", icon: Calendar },
   { key: "guests", icon: Users },
-  { key: "services", icon: Wrench },
-  { key: "artists", icon: Music },
   { key: "venue", icon: Building2 },
+  { key: "services", icon: Wrench },
   { key: "budget", icon: DollarSign },
   { key: "summary", icon: ClipboardCheck },
 ];
+
+const TOTAL_STEPS = STEPS.length; // 7
+const SUMMARY_INDEX = TOTAL_STEPS - 1; // 6
 
 // ═══════════════════════════════════════════════
 // WIZARD COMPONENT
@@ -70,6 +72,7 @@ const STEPS = [
 export function WizardClient() {
   const { t } = useLocale();
   const router = useRouter();
+  const { isSignedIn, user } = useUser();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<WizardData>(initialData);
   const [submitting, setSubmitting] = useState(false);
@@ -86,47 +89,62 @@ export function WizardClient() {
     sessionStorage.setItem("wizard-data", JSON.stringify(data));
   }, [data]);
 
+  // Pre-fill name/email/phone when user is signed in
+  useEffect(() => {
+    if (isSignedIn && user) {
+      setData((prev) => ({
+        ...prev,
+        name: prev.name || [user.firstName, user.lastName].filter(Boolean).join(" ") || "",
+        email: prev.email || user.primaryEmailAddress?.emailAddress || "",
+        phone: prev.phone || user.primaryPhoneNumber?.phoneNumber?.replace(/^\+373/, "") || "",
+      }));
+    }
+  }, [isSignedIn, user]);
+
   function update(partial: Partial<WizardData>) {
     setData((prev) => ({ ...prev, ...partial }));
   }
 
+  // All fields mandatory per M0a #4
   function canAdvance(): boolean {
     switch (step) {
       case 0: return !!data.eventType;
-      case 1: return !!data.eventDate && !!data.location;
+      case 1: return !!data.eventDate && !!data.location && !!data.timeSlot;
       case 2: return data.guestCount > 0;
-      case 3: return true; // services optional
-      case 4: return true; // artist selection optional
-      case 5: return true; // venue optional
-      case 6: return data.budget > 0;
-      case 7: return !!data.name && !!data.phone;
+      case 3: return data.venueNeeded === "yes" || data.venueNeeded === "no";
+      case 4: return data.services.length > 0;
+      case 5: return data.budget > 0;
+      case 6: return !!data.name && !!data.phone;
       default: return false;
     }
   }
 
-  // Skip artists step if no services selected
   function nextStep() {
-    let next = step + 1;
-    if (next === 4 && data.services.length === 0) next = 5; // skip artists
-    if (next === 5 && !["wedding", "baptism", "cumpatrie", "birthday"].includes(data.eventType)) next = 6; // skip venue
-    setStep(Math.min(next, 7));
+    setStep((s) => Math.min(s + 1, SUMMARY_INDEX));
   }
 
   // Auto-advance with a short delay so the user sees their selection highlight
   function autoNext() {
     setTimeout(() => {
-      nextStep();
+      // Use functional setState so we don't race on rapid auto-advances
+      setStep((s) => Math.min(s + 1, SUMMARY_INDEX));
     }, 220);
   }
 
   function prevStep() {
-    let prev = step - 1;
-    if (prev === 5 && !["wedding", "baptism", "cumpatrie", "birthday"].includes(data.eventType)) prev = 4;
-    if (prev === 4 && data.services.length === 0) prev = 3;
-    setStep(Math.max(prev, 0));
+    setStep((s) => Math.max(s - 1, 0));
   }
 
   async function handleSubmit() {
+    // Login gate (M0a #5): final "see results" CTA requires authenticated
+    // client. If not signed in we send them to sign-in and bring them back to
+    // the results page which will pick up the wizard payload from storage.
+    if (!isSignedIn) {
+      sessionStorage.setItem("wizard-data", JSON.stringify(data));
+      router.push(`/sign-in?redirect_url=${encodeURIComponent("/planifica/rezultate")}`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/leads", {
@@ -142,14 +160,19 @@ export function WizardClient() {
           guestCount: data.guestCount,
           budget: data.budget,
           source: "wizard",
-          message: `Servicii: ${data.services.join(", ")}`,
+          message: `Categorii: ${data.services.join(", ")}${data.venueNeeded === "yes" ? " | Are nevoie de sală" : ""}`,
+          wizardData: {
+            services: data.services,
+            venueNeeded: data.venueNeeded,
+            timeSlot: data.timeSlot,
+          },
         }),
       });
       if (!res.ok) throw new Error("Failed");
 
-      sessionStorage.removeItem("wizard-data");
+      // Keep wizard-data in sessionStorage so results page can reuse filters
       toast.success(t("form.submit_success"));
-      router.push("/");
+      router.push("/planifica/rezultate");
     } catch {
       toast.error("A apărut o eroare. Încercați din nou.");
     } finally {
@@ -183,7 +206,7 @@ export function WizardClient() {
             ))}
           </div>
           <p className="mt-3 text-center text-sm font-medium text-muted-foreground">
-            {t(`wizard.step_${STEPS[step].key}`)} ({step + 1}/8)
+            {t(`wizard.step_${STEPS[step].key}`)} ({step + 1}/{TOTAL_STEPS})
           </p>
         </div>
       </div>
@@ -193,11 +216,10 @@ export function WizardClient() {
         {step === 0 && <StepEventType data={data} update={update} autoNext={autoNext} />}
         {step === 1 && <StepDate data={data} update={update} autoNext={autoNext} />}
         {step === 2 && <StepGuests data={data} update={update} autoNext={autoNext} />}
-        {step === 3 && <StepServices data={data} update={update} />}
-        {step === 4 && <StepArtists data={data} update={update} />}
-        {step === 5 && <StepVenue data={data} update={update} autoNext={autoNext} />}
-        {step === 6 && <StepBudget data={data} update={update} autoNext={autoNext} />}
-        {step === 7 && <StepSummary data={data} update={update} />}
+        {step === 3 && <StepVenue data={data} update={update} autoNext={autoNext} />}
+        {step === 4 && <StepServices data={data} update={update} />}
+        {step === 5 && <StepBudget data={data} update={update} autoNext={autoNext} />}
+        {step === 6 && <StepSummary data={data} update={update} isSignedIn={!!isSignedIn} />}
 
         {/* Navigation */}
         <div className="mt-10 flex items-center justify-between">
@@ -210,7 +232,7 @@ export function WizardClient() {
             <ArrowLeft className="h-4 w-4" /> {t("common.back")}
           </Button>
 
-          {step < 7 ? (
+          {step < SUMMARY_INDEX ? (
             <Button
               onClick={nextStep}
               disabled={!canAdvance()}
@@ -226,9 +248,13 @@ export function WizardClient() {
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : isSignedIn ? (
+                <>
+                  <Send className="h-4 w-4" /> Vezi rezultatele
+                </>
               ) : (
                 <>
-                  <Send className="h-4 w-4" /> {t("common.submit")}
+                  <LogIn className="h-4 w-4" /> Autentifică-te pentru rezultate
                 </>
               )}
             </Button>
@@ -322,8 +348,8 @@ function StepDate({ data, update, autoNext }: StepProps) {
                 key={city}
                 onClick={() => {
                   update({ location: city });
-                  // Auto-advance only if the required "date" is already filled
-                  if (data.eventDate) autoNext?.();
+                  // Advance only once all three mandatory fields are filled
+                  if (data.eventDate && data.timeSlot) autoNext?.();
                 }}
                 className={cn(
                   "rounded-lg border px-4 py-2 text-sm transition-all",
@@ -338,14 +364,13 @@ function StepDate({ data, update, autoNext }: StepProps) {
           </div>
         </div>
         <div>
-          <Label>Interval orar</Label>
+          <Label>Interval orar *</Label>
           <div className="mt-2 flex gap-2">
             {["dimineață", "după-amiază", "seară"].map((slot) => (
               <button
                 key={slot}
                 onClick={() => {
                   update({ timeSlot: slot });
-                  // Auto-advance only if the required fields are already filled
                   if (data.eventDate && data.location) autoNext?.();
                 }}
                 className={cn(
@@ -409,6 +434,56 @@ function StepGuests({ data, update, autoNext }: StepProps) {
   );
 }
 
+// Venue question — simple yes/no. If "yes" the results page will show
+// available venues filtered by guestCount + city + date. If "no" we skip
+// venue listings on results and focus on artists.
+function StepVenue({ data, update, autoNext }: StepProps) {
+  const { t } = useLocale();
+  return (
+    <div>
+      <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_venue")}</h2>
+      <p className="mb-8 text-muted-foreground">Ai nevoie de o sală sau restaurant?</p>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <button
+          onClick={() => {
+            update({ venueNeeded: "yes" });
+            autoNext?.();
+          }}
+          className={cn(
+            "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
+            data.venueNeeded === "yes"
+              ? "border-gold bg-gold/10"
+              : "border-border/40 hover:border-gold/30",
+          )}
+        >
+          <Building2 className={cn("h-10 w-10", data.venueNeeded === "yes" ? "text-gold" : "text-muted-foreground")} />
+          <span className="text-sm font-medium">Da, am nevoie de sală</span>
+          <span className="text-xs text-muted-foreground">Vom afișa sălile disponibile pentru data ta</span>
+        </button>
+        <button
+          onClick={() => {
+            update({ venueNeeded: "no" });
+            autoNext?.();
+          }}
+          className={cn(
+            "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
+            data.venueNeeded === "no"
+              ? "border-gold bg-gold/10"
+              : "border-border/40 hover:border-gold/30",
+          )}
+        >
+          <Sparkles className={cn("h-10 w-10", data.venueNeeded === "no" ? "text-gold" : "text-muted-foreground")} />
+          <span className="text-sm font-medium">Nu, am deja o locație</span>
+          <span className="text-xs text-muted-foreground">Am sala rezervată sau eveniment outdoor</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Service / category picker. Renamed from "services" — per M0a the wizard
+// collects *categories* of artists only; actual artist profiles are revealed
+// post-login on the results page.
 const serviceOptions = [
   { id: "singer", label: "Cântăreț", icon: Music },
   { id: "mc", label: "Moderator / MC", icon: Mic },
@@ -438,7 +513,9 @@ function StepServices({ data, update }: StepProps) {
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_services")}</h2>
-      <p className="mb-8 text-muted-foreground">Ce servicii ai nevoie? (opțional)</p>
+      <p className="mb-8 text-muted-foreground">
+        Bifează categoriile de artiști dorite. După autentificare îți vom arăta doar artiștii liberi pentru data ta.
+      </p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {serviceOptions.map((svc) => (
           <button
@@ -455,91 +532,6 @@ function StepServices({ data, update }: StepProps) {
             <span className="text-sm font-medium">{svc.label}</span>
           </button>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function StepArtists({ data, update }: StepProps) {
-  const { t } = useLocale();
-  return (
-    <div>
-      <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_artists")}</h2>
-      <p className="mb-8 text-muted-foreground">
-        Ai preferințe de artiști? Sau lasă la alegerea noastră.
-      </p>
-      <div className="space-y-4">
-        {data.services.map((svc) => {
-          const service = serviceOptions.find((s) => s.id === svc);
-          return (
-            <div key={svc} className="rounded-xl border border-border/40 bg-card p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">{service?.label || svc}</span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-xs border-gold text-gold hover:bg-gold/10"
-                  onClick={() => {
-                    update({
-                      selectedArtists: { ...data.selectedArtists, [svc]: null },
-                    });
-                  }}
-                >
-                  {t("wizard.let_us_choose")}
-                </Button>
-              </div>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {data.selectedArtists[svc] === null
-                  ? "✓ Vom selecta cel mai potrivit artist pentru tine"
-                  : "Selectează un artist sau lasă la alegerea noastră"}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function StepVenue({ data, update, autoNext }: StepProps) {
-  const { t } = useLocale();
-  return (
-    <div>
-      <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_venue")}</h2>
-      <p className="mb-8 text-muted-foreground">Ai nevoie de o sală sau restaurant?</p>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <button
-          onClick={() => {
-            update({ venueChoice: "select" });
-            autoNext?.();
-          }}
-          className={cn(
-            "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
-            data.venueChoice === "select"
-              ? "border-gold bg-gold/10"
-              : "border-border/40 hover:border-gold/30",
-          )}
-        >
-          <Building2 className={cn("h-10 w-10", data.venueChoice === "select" ? "text-gold" : "text-muted-foreground")} />
-          <span className="text-sm font-medium">Da, ajută-mă să aleg</span>
-          <span className="text-xs text-muted-foreground">Vă vom sugera cele mai bune locații</span>
-        </button>
-        <button
-          onClick={() => {
-            update({ venueChoice: "have" });
-            autoNext?.();
-          }}
-          className={cn(
-            "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
-            data.venueChoice === "have"
-              ? "border-gold bg-gold/10"
-              : "border-border/40 hover:border-gold/30",
-          )}
-        >
-          <Sparkles className={cn("h-10 w-10", data.venueChoice === "have" ? "text-gold" : "text-muted-foreground")} />
-          <span className="text-sm font-medium">{t("wizard.have_venue")}</span>
-          <span className="text-xs text-muted-foreground">Am deja sala rezervată</span>
-        </button>
       </div>
     </div>
   );
@@ -588,12 +580,18 @@ function StepBudget({ data, update, autoNext }: StepProps) {
   );
 }
 
-function StepSummary({ data, update }: StepProps) {
+interface SummaryProps extends StepProps {
+  isSignedIn: boolean;
+}
+
+function StepSummary({ data, update, isSignedIn }: SummaryProps) {
   const { t } = useLocale();
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_summary")}</h2>
-      <p className="mb-8 text-muted-foreground">Verifică detaliile și completează datele de contact.</p>
+      <p className="mb-8 text-muted-foreground">
+        Verifică detaliile și completează datele de contact.
+      </p>
 
       {/* Summary */}
       <div className="mb-8 space-y-3 rounded-xl border border-border/40 bg-card p-6">
@@ -602,17 +600,29 @@ function StepSummary({ data, update }: StepProps) {
         <SummaryRow label="Locație" value={data.location} />
         {data.timeSlot && <SummaryRow label="Interval" value={data.timeSlot} />}
         <SummaryRow label="Invitați" value={String(data.guestCount)} />
+        <SummaryRow label="Sală" value={data.venueNeeded === "yes" ? "Am nevoie de sală" : "Am deja locație"} />
         {data.services.length > 0 && (
           <SummaryRow
-            label="Servicii"
+            label="Categorii"
             value={data.services.map((s) => serviceOptions.find((o) => o.id === s)?.label || s).join(", ")}
           />
         )}
-        {data.venueChoice && (
-          <SummaryRow label="Sală" value={data.venueChoice === "have" ? "Am deja" : "Ajutor la selecție"} />
-        )}
         <SummaryRow label="Buget" value={`${data.budget.toLocaleString()}€`} />
       </div>
+
+      {/* Login banner (M0a #5) */}
+      {!isSignedIn && (
+        <div className="mb-6 flex items-start gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4">
+          <LogIn className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
+          <div>
+            <p className="text-sm font-semibold">Autentificare obligatorie</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Pentru a vedea prețurile și artiștii disponibili pentru data ta este necesară
+              crearea unui cont. Durează mai puțin de un minut.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Contact Form */}
       <div className="space-y-4">

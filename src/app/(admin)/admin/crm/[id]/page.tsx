@@ -29,6 +29,8 @@ interface Lead {
   status: string;
   source: string | null;
   score: number | null;
+  aiScore: number | null;
+  aiReasons: string[] | null;
   message: string | null;
   createdAt: string;
   updatedAt: string | null;
@@ -319,6 +321,40 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
               )}
             </CardContent>
           </Card>
+
+          {/* AI Quality Score */}
+          {(lead.aiScore !== null || (lead.aiReasons && lead.aiReasons.length > 0)) && (
+            <Card>
+              <CardHeader><CardTitle className="flex items-center gap-2">Scor AI
+                {lead.aiScore !== null && (
+                  <span className={cn(
+                    "ml-auto flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold",
+                    lead.aiScore >= 70 ? "bg-success/10 text-success" :
+                    lead.aiScore >= 40 ? "bg-warning/10 text-warning" :
+                    "bg-muted text-muted-foreground",
+                  )}>
+                    {lead.aiScore}
+                  </span>
+                )}
+              </CardTitle></CardHeader>
+              <CardContent>
+                {lead.aiReasons && lead.aiReasons.length > 0 ? (
+                  <ul className="space-y-1.5 text-sm">
+                    {lead.aiReasons.map((r, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+                        <span className="text-muted-foreground">{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Scor în curs de calculare…
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Quick actions */}
           <Card>

@@ -7,8 +7,9 @@ import {
   reviews,
   calendarEvents,
   categories,
+  eventPhotos,
 } from "@/lib/db/schema";
-import { eq, and, desc, asc, sql, ilike, gte, lte, arrayContains, notInArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, ilike, gte, lte, arrayContains, notInArray, or } from "drizzle-orm";
 
 export interface ArtistFilters {
   categoryId?: number;
@@ -17,6 +18,12 @@ export interface ArtistFilters {
   priceMax?: number;
   ratingMin?: number;
   city?: string;
+  /**
+   * M2 — alternate spellings for the same city (e.g. "Chișinău", "Chisinau",
+   * "Кишинёв") so SEO landing pages match artists regardless of how the
+   * vendor typed their location.
+   */
+  cityKeywords?: string[];
   featured?: boolean;
   availableDate?: string; // "2026-08-15" — exclude booked/blocked artists
   sort?: "popular" | "price_asc" | "price_desc" | "rating" | "newest";
@@ -61,6 +68,18 @@ export async function getArtists(filters: ArtistFilters = {}) {
   }
   if (filters.featured) {
     conditions.push(eq(artists.isFeatured, true));
+  }
+  // M2 — location filter (SEO auto-pages). Match the free-text location
+  // column against any of the city's known spellings so "Chișinău" /
+  // "Chisinau" / "Кишинёв" all count.
+  const locationNeedles: string[] = [];
+  if (filters.cityKeywords?.length) locationNeedles.push(...filters.cityKeywords);
+  if (filters.city) locationNeedles.push(filters.city);
+  if (locationNeedles.length) {
+    const unique = Array.from(new Set(locationNeedles.map((s) => s.trim()).filter(Boolean)));
+    const ilikeConds = unique.map((needle) => ilike(artists.location, `%${needle}%`));
+    const combined = ilikeConds.length === 1 ? ilikeConds[0] : or(...ilikeConds);
+    if (combined) conditions.push(combined);
   }
 
   let orderBy;
@@ -180,6 +199,31 @@ export async function getFeaturedArtists(limit = 8) {
   }
   const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
   return items.map((a) => ({ ...a, coverImageUrl: coverMap.get(a.id) || null }));
+}
+
+/**
+ * M5 — Public UGC feed: approved + public event photos clients have tagged
+ * with this artist. Surfaces as a "Real events" gallery on the artist page.
+ */
+export async function getUgcPhotosForArtist(artistId: number, limit = 12) {
+  const rows = await db
+    .select({
+      id: eventPhotos.id,
+      url: eventPhotos.url,
+      caption: eventPhotos.caption,
+      createdAt: eventPhotos.createdAt,
+    })
+    .from(eventPhotos)
+    .where(
+      and(
+        eq(eventPhotos.taggedArtistId, artistId),
+        eq(eventPhotos.isApproved, true),
+        eq(eventPhotos.isPublic, true),
+      ),
+    )
+    .orderBy(desc(eventPhotos.createdAt))
+    .limit(limit);
+  return rows;
 }
 
 export async function getSimilarArtists(artistId: number, categoryIds: number[], limit = 4) {

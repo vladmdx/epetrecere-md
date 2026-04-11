@@ -2,6 +2,9 @@ import { inngest } from "./client";
 import { sendEmail } from "@/lib/email/send";
 import { leadConfirmationEmail } from "@/lib/email/templates/lead-confirmation";
 import { adminNotificationEmail } from "@/lib/email/templates/admin-notification";
+import { db } from "@/lib/db";
+import { invitations, invitationGuests } from "@/lib/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 
 // Trigger 1: New lead → emails
 export const onLeadCreated = inngest.createFunction(
@@ -80,4 +83,84 @@ export const eventReminder = inngest.createFunction(
   },
 );
 
-export const functions = [onLeadCreated, leadFollowUp, eventReminder];
+// ─────────────────────────────────────────────────────────
+// M8 — Invitation RSVP reminders
+// Daily cron. Picks guests whose host's event is in ~14, 7, or 3 days and
+// who haven't responded yet, then emails them a one-click RSVP link.
+// ─────────────────────────────────────────────────────────
+export const invitationRsvpReminders = inngest.createFunction(
+  {
+    id: "invitation-rsvp-reminders",
+    triggers: [{ cron: "0 10 * * *" }], // every day at 10:00 UTC
+  },
+  async ({ step }) => {
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
+
+    for (const daysAhead of [14, 7, 3]) {
+      await step.run(`remind-${daysAhead}d`, async () => {
+        // Find invitations with eventDate exactly N days from now
+        const rows = await db
+          .select({
+            guest: invitationGuests,
+            invitation: invitations,
+          })
+          .from(invitationGuests)
+          .innerJoin(
+            invitations,
+            eq(invitationGuests.invitationId, invitations.id),
+          )
+          .where(
+            and(
+              eq(invitations.status, "published"),
+              eq(invitationGuests.rsvpStatus, "pending"),
+              sql`${invitationGuests.email} IS NOT NULL`,
+              sql`${invitations.eventDate}::date = CURRENT_DATE + ${daysAhead}::int`,
+            ),
+          );
+
+        for (const { guest, invitation } of rows) {
+          if (!guest.email || !guest.rsvpToken) continue;
+          const title =
+            invitation.coupleNames || invitation.hostName || "Eveniment";
+          const rsvpUrl = `${appUrl}/i/${invitation.slug}?rsvp=${guest.rsvpToken}`;
+
+          try {
+            await sendEmail({
+              to: guest.email,
+              subject: `Reminder: Confirmă prezența la ${title} (în ${daysAhead} zile)`,
+              html: `
+                <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+                  <h2>Salut ${guest.name}!</h2>
+                  <p>Îți reamintim cu drag că <strong>${title}</strong> are loc în doar <strong>${daysAhead} zile</strong>, pe <strong>${invitation.eventDate}</strong>.</p>
+                  <p>Te rugăm să îți confirmi prezența accesând link-ul de mai jos:</p>
+                  <p style="text-align:center;margin:30px 0">
+                    <a href="${rsvpUrl}" style="display:inline-block;background:#d4a574;color:#111;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Confirmă prezența</a>
+                  </p>
+                  <p style="color:#666;font-size:13px">Sau copiază link-ul: ${rsvpUrl}</p>
+                </div>
+              `,
+            });
+            await db
+              .update(invitationGuests)
+              .set({
+                remindersSent: (guest.remindersSent ?? 0) + 1,
+                lastReminderAt: new Date(),
+              })
+              .where(eq(invitationGuests.id, guest.id));
+          } catch (err) {
+            console.error("[rsvp-reminder] failed for guest", guest.id, err);
+          }
+        }
+        return { daysAhead, processed: rows.length };
+      });
+    }
+  },
+);
+
+export const functions = [
+  onLeadCreated,
+  leadFollowUp,
+  eventReminder,
+  invitationRsvpReminders,
+];

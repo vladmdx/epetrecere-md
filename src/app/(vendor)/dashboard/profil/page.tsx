@@ -20,6 +20,8 @@ export default function VendorProfilePage() {
     priceFrom: 0, showPrice: true,
     descriptionRo: "", descriptionRu: "", descriptionEn: "",
     calendarEnabled: false, bufferHours: 2,
+    autoReplyEnabled: false,
+    autoReplyMessage: "Mulțumim pentru cerere! Am primit-o și revin cu un răspuns în cel mai scurt timp posibil.",
     images: [] as { id: string; url: string; alt: string; isCover: boolean }[],
   });
 
@@ -161,6 +163,43 @@ export default function VendorProfilePage() {
                 <div><Label>Buffer între evenimente (ore)</Label></div>
                 <Input type="number" value={data.bufferHours} onChange={(e) => update({ bufferHours: Number(e.target.value) })} className="w-20" />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Feature 14 — Auto-reply setup */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle>Răspuns automat</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Trimite instant un email clientului când lasă o cerere, ca să știe că ai primit-o.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Activează răspunsul automat</Label>
+                  <p className="text-xs text-muted-foreground">Doar clienții care lasă email vor primi mesajul.</p>
+                </div>
+                <Switch
+                  checked={data.autoReplyEnabled}
+                  onCheckedChange={(v) => update({ autoReplyEnabled: v })}
+                />
+              </div>
+              {data.autoReplyEnabled && (
+                <div>
+                  <Label>Mesajul tău</Label>
+                  <textarea
+                    value={data.autoReplyMessage}
+                    onChange={(e) => update({ autoReplyMessage: e.target.value })}
+                    rows={5}
+                    className="mt-2 w-full rounded-md border border-border/40 bg-background px-3 py-2 text-sm"
+                    placeholder="Ex: Mulțumim pentru cerere! Revin în maxim 2 ore..."
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Max. 500 caractere. Mesajul este inserat într-un email cu branding ePetrecere.
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

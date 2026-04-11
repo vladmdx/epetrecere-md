@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { ArtistsListClient } from "./client";
@@ -23,13 +24,22 @@ export default async function ArtistsPage({ searchParams }: Props) {
     page: sp.page ? Number(sp.page) : 1,
     priceMin: sp.price_min ? Number(sp.price_min) : undefined,
     priceMax: sp.price_max ? Number(sp.price_max) : undefined,
+    // Availability filter — when present we exclude artists booked/blocked on
+    // that date via the calendar_events join in getArtists().
+    availableDate: (sp.date as string) || undefined,
   };
 
   const result = await getArtists(filters);
 
+  // M0a #8 — redact price for unauthenticated visitors at the server layer.
+  const { userId } = await auth();
+  const items = userId
+    ? result.items
+    : result.items.map((a) => ({ ...a, priceFrom: null }));
+
   return (
     <ArtistsListClient
-      artists={result.items}
+      artists={items}
       total={result.total}
       page={result.page}
       totalPages={result.totalPages}

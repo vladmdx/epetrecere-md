@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Star, Users, MapPin } from "lucide-react";
+import { Star, Users, MapPin, Lock } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 
@@ -25,7 +26,9 @@ interface VenueCardProps {
 
 export function VenueCard({ venue }: VenueCardProps) {
   const { locale, t } = useLocale();
+  const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(venue, "name", locale);
+  const showPrice = isLoaded && isSignedIn;
 
   return (
     <Link
@@ -71,11 +74,17 @@ export function VenueCard({ venue }: VenueCardProps) {
             ) : null}
           </div>
 
-          {venue.pricePerPerson && (
-            <p className="font-accent text-sm font-semibold text-gold">
-              {venue.pricePerPerson}€ {t("common.perPerson")}
-            </p>
-          )}
+          {venue.pricePerPerson ? (
+            showPrice ? (
+              <p className="font-accent text-sm font-semibold text-gold">
+                {venue.pricePerPerson}€ {t("common.perPerson")}
+              </p>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">
+                <Lock className="h-3 w-3" /> Preț la autentificare
+              </span>
+            )
+          ) : null}
         </div>
       </div>
     </Link>

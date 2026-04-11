@@ -51,6 +51,7 @@ export function Footer() {
               <li><Link href="/sali" className="text-muted-foreground hover:text-gold">{t("nav.venues")}</Link></li>
               <li><Link href="/servicii" className="text-muted-foreground hover:text-gold">{t("nav.services")}</Link></li>
               <li><Link href="/planifica" className="text-muted-foreground hover:text-gold">{t("nav.planner")}</Link></li>
+              <li><Link href="/calculatoare" className="text-muted-foreground hover:text-gold">Calculatoare</Link></li>
               <li><Link href="/blog" className="text-muted-foreground hover:text-gold">{t("nav.blog")}</Link></li>
             </ul>
           </div>

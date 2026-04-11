@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Star, BadgeCheck, Crown, MapPin, Phone, Globe, CalendarDays, X, ZoomIn } from "lucide-react";
+import { Star, BadgeCheck, Crown, MapPin, Phone, Globe, CalendarDays, X, ZoomIn, Lock, Camera } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
+import { CalendarWidget } from "@/components/public/calendar-widget";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtistCard } from "@/components/public/artist-card";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
+import { ChatWidget } from "@/components/public/chat-widget";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 
@@ -56,8 +59,15 @@ interface ArtistData {
   }>;
 }
 
+interface UgcPhoto {
+  id: number;
+  url: string;
+  caption: string | null;
+}
+
 interface Props {
   artist: ArtistData;
+  ugcPhotos?: UgcPhoto[];
   similar: Array<{
     id: number;
     slug: string;
@@ -78,13 +88,17 @@ interface Props {
   }>;
 }
 
-export function ArtistDetailClient({ artist, similar }: Props) {
+export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const { locale, t } = useLocale();
+  const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
   const [avatarOpen, setAvatarOpen] = useState(false);
   const coverImage = artist.images?.[0];
   const isPlaceholder = coverImage?.url?.includes("placeholder.svg");
+  // M0a #8 — contact info and price are gated behind login. We wait for Clerk
+  // to hydrate so we don't flash a "Lock" state for authenticated visitors.
+  const canSeeContact = isLoaded && isSignedIn;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
@@ -153,11 +167,20 @@ export function ArtistDetailClient({ artist, similar }: Props) {
                     {artist.ratingAvg.toFixed(1)} ({artist.ratingCount} recenzii)
                   </span>
                 ) : null}
-                {artist.priceFrom && (
-                  <span className="font-accent font-semibold text-gold">
-                    {t("common.from")} {artist.priceFrom}€
-                  </span>
-                )}
+                {artist.priceFrom ? (
+                  canSeeContact ? (
+                    <span className="font-accent font-semibold text-gold">
+                      {t("common.from")} {artist.priceFrom}€
+                    </span>
+                  ) : (
+                    <a
+                      href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
+                      className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-xs font-medium text-gold/90 hover:text-gold"
+                    >
+                      <Lock className="h-3 w-3" /> Preț la autentificare
+                    </a>
+                  )
+                ) : null}
               </div>
             </div>
           </div>
@@ -174,6 +197,11 @@ export function ArtistDetailClient({ artist, similar }: Props) {
                 <TabsTrigger value="packages">{t("artist.packages")}</TabsTrigger>
               )}
               <TabsTrigger value="reviews">{t("artist.reviews")} ({artist.reviews.length})</TabsTrigger>
+              {ugcPhotos.length > 0 && (
+                <TabsTrigger value="moments" className="gap-1.5">
+                  <Camera className="h-3.5 w-3.5" /> Momente reale ({ugcPhotos.length})
+                </TabsTrigger>
+              )}
             </TabsList>
 
             <TabsContent value="description" className="mt-4">
@@ -186,8 +214,29 @@ export function ArtistDetailClient({ artist, similar }: Props) {
               )}
               {artist.phone && (
                 <div className="mt-6">
-                  <a href={`tel:${artist.phone}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold">
-                    <Phone className="h-4 w-4" /> {artist.phone}
+                  {canSeeContact ? (
+                    <a href={`tel:${artist.phone}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold">
+                      <Phone className="h-4 w-4" /> {artist.phone}
+                    </a>
+                  ) : (
+                    <a
+                      href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm text-gold/90 hover:text-gold"
+                    >
+                      <Lock className="h-4 w-4" /> Telefon vizibil după autentificare
+                    </a>
+                  )}
+                </div>
+              )}
+              {artist.instagram && canSeeContact && (
+                <div className="mt-2">
+                  <a
+                    href={artist.instagram.startsWith("http") ? artist.instagram : `https://instagram.com/${artist.instagram.replace(/^@/, "")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold"
+                  >
+                    <Globe className="h-4 w-4" /> {artist.instagram}
                   </a>
                 </div>
               )}
@@ -240,8 +289,17 @@ export function ArtistDetailClient({ artist, similar }: Props) {
                   {artist.packages.map((pkg) => {
                     const pkgName = getLocalized(pkg, "name", locale);
                     const pkgDesc = getLocalized(pkg, "description", locale);
+                    // M1 #5 — prefill the booking request message so the
+                    // artist sees which package triggered the lead.
+                    const presetMessage = [
+                      `Sunt interesat de pachetul "${pkgName}"`,
+                      pkg.price ? `— ${pkg.price}€` : "",
+                      pkg.durationHours ? `(${pkg.durationHours}h)` : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ") + ".";
                     return (
-                      <div key={pkg.id} className="rounded-lg border border-border/40 bg-card p-4">
+                      <div key={pkg.id} className="flex flex-col rounded-lg border border-border/40 bg-card p-4">
                         <h3 className="font-heading text-base font-bold">{pkgName}</h3>
                         {pkgDesc && <p className="mt-1 text-sm text-muted-foreground">{pkgDesc}</p>}
                         <div className="mt-3 flex items-center justify-between">
@@ -256,9 +314,47 @@ export function ArtistDetailClient({ artist, similar }: Props) {
                             </span>
                           )}
                         </div>
+                        <div className="mt-4">
+                          <RequestBookingForm
+                            artistId={artist.id}
+                            label="Solicită pachetul"
+                            variant="primary"
+                            presetMessage={presetMessage}
+                            className="!py-2 text-sm"
+                          />
+                        </div>
                       </div>
                     );
                   })}
+                </div>
+              </TabsContent>
+            )}
+
+            {ugcPhotos.length > 0 && (
+              <TabsContent value="moments" className="mt-4">
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Fotografii încărcate de clienți reali care au lucrat cu acest artist.
+                </p>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+                  {ugcPhotos.map((p) => (
+                    <figure
+                      key={p.id}
+                      className="overflow-hidden rounded-lg border border-border/40 bg-card"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={p.url}
+                        alt={p.caption || "Moment real de la eveniment"}
+                        loading="lazy"
+                        className="aspect-square w-full object-cover"
+                      />
+                      {p.caption && (
+                        <figcaption className="p-2 text-xs text-muted-foreground line-clamp-2">
+                          {p.caption}
+                        </figcaption>
+                      )}
+                    </figure>
+                  ))}
                 </div>
               </TabsContent>
             )}
@@ -307,6 +403,30 @@ export function ArtistDetailClient({ artist, similar }: Props) {
               artistId={artist.id}
               icon={<CalendarDays className="h-4 w-4" />}
             />
+            <ChatWidget
+              artistId={artist.id}
+              artistName={name}
+              artistSlug={artist.slug}
+            />
+
+            {/* M6 Intern #1 — calendar vizibil doar după login; mesaj altfel */}
+            {artist.calendarEnabled && (
+              canSeeContact ? (
+                <CalendarWidget
+                  entityType="artist"
+                  entityId={artist.id}
+                  enabled
+                />
+              ) : (
+                <a
+                  href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
+                  className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/5 px-4 py-3 text-sm text-gold/90 hover:bg-gold/10 hover:text-gold"
+                >
+                  <Lock className="h-4 w-4 shrink-0" />
+                  <span>Calendar disponibil după autentificare</span>
+                </a>
+              )
+            )}
           </div>
         </div>
       </div>

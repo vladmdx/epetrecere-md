@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Star, BadgeCheck, Crown, Zap } from "lucide-react";
+import { Star, BadgeCheck, Crown, Lock } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
@@ -30,8 +31,12 @@ interface ArtistCardProps {
 
 export function ArtistCard({ artist }: ArtistCardProps) {
   const { locale, t } = useLocale();
+  const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
+  // Price is gated behind login (M0a #8). We only show the locked pill once
+  // Clerk has hydrated so we don't flash a "Lock" state for authed users.
+  const showPrice = isLoaded && isSignedIn;
 
   return (
     <Link
@@ -91,12 +96,18 @@ export function ArtistCard({ artist }: ArtistCardProps) {
             ) : null}
           </div>
 
-          {/* Price */}
-          {artist.priceFrom && (
-            <p className="font-accent text-sm font-semibold text-gold">
-              {t("common.from")} {artist.priceFrom}€
-            </p>
-          )}
+          {/* Price — gated behind login */}
+          {artist.priceFrom ? (
+            showPrice ? (
+              <p className="font-accent text-sm font-semibold text-gold">
+                {t("common.from")} {artist.priceFrom}€
+              </p>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">
+                <Lock className="h-3 w-3" /> Preț la autentificare
+              </span>
+            )
+          ) : null}
         </div>
 
         {artist.location && (

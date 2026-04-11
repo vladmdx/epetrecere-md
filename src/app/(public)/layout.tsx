@@ -1,5 +1,6 @@
 import { Header } from "@/components/public/header";
 import { Footer } from "@/components/public/footer";
+import { PublicAiChat } from "@/components/public/public-ai-chat";
 
 export default function PublicLayout({
   children,
@@ -11,6 +12,7 @@ export default function PublicLayout({
       <Header />
       <main className="flex-1 pt-16">{children}</main>
       <Footer />
+      <PublicAiChat />
     </>
   );
 }

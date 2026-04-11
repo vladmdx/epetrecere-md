@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { leads, offerRequests } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { matchLeadToVendors } from "@/lib/leads/matching";
+import { scoreAndPersist } from "@/lib/leads/quality-score";
 
 // GET all leads for CRM
 export async function GET() {
@@ -16,21 +18,52 @@ export async function GET() {
   return NextResponse.json(allLeads);
 }
 
-const createLeadSchema = z.object({
-  name: z.string().min(2),
-  phone: z.string().min(6),
-  phonePrefix: z.string().default("+373"),
-  email: z.email().optional(),
-  eventType: z.string().optional(),
-  eventDate: z.string().optional(),
-  location: z.string().optional(),
-  guestCount: z.number().optional(),
-  budget: z.number().optional(),
-  message: z.string().optional(),
-  source: z.enum(["form", "wizard", "direct"]).default("form"),
-  artistId: z.number().optional(),
-  venueId: z.number().optional(),
-});
+const createLeadSchema = z
+  .object({
+    name: z.string().min(2),
+    phone: z.string().min(6),
+    phonePrefix: z.string().default("+373"),
+    email: z.email().optional(),
+    eventType: z.string().optional(),
+    eventDate: z.string().optional(),
+    location: z.string().optional(),
+    guestCount: z.number().optional(),
+    budget: z.number().optional(),
+    message: z.string().optional(),
+    source: z.enum(["form", "wizard", "direct"]).default("form"),
+    artistId: z.number().optional(),
+    venueId: z.number().optional(),
+    /** M3 — full wizard payload persisted so the matching engine can pull
+     *  services[] and venueNeeded later. */
+    wizardData: z
+      .object({
+        services: z.array(z.string()).optional(),
+        venueNeeded: z.string().optional(),
+        timeSlot: z.string().optional(),
+      })
+      .passthrough()
+      .optional(),
+  })
+  // M6 Intern #2 — wizard submissions must carry the full event payload so
+  // the matching engine always has something to work with. Other sources
+  // (contact form, artist profile form) keep the individual fields optional.
+  .refine(
+    (v) =>
+      v.source !== "wizard" ||
+      (!!v.eventType &&
+        !!v.eventDate &&
+        !!v.location &&
+        typeof v.guestCount === "number" &&
+        v.guestCount > 0 &&
+        typeof v.budget === "number" &&
+        v.budget > 0 &&
+        !!v.wizardData?.services &&
+        v.wizardData.services.length > 0),
+    {
+      message:
+        "Wizard submissions require eventType, eventDate, location, guestCount, budget și services.",
+    },
+  );
 
 export async function POST(req: NextRequest) {
   // Rate limit: 10 submissions per minute per IP
@@ -50,17 +83,39 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { artistId, venueId, ...leadData } = parsed.data;
+  const { artistId, venueId, wizardData, ...leadData } = parsed.data;
 
   // 1. Create lead record
   const [lead] = await db
     .insert(leads)
     .values({
       ...leadData,
+      wizardData: wizardData ?? null,
       status: "new",
       score: calculateScore(leadData),
     })
     .returning();
+
+  // 1b. M3 — Fire-and-forget lead matching. We don't await so the user
+  // submission stays snappy; errors are swallowed inside the matcher.
+  void matchLeadToVendors({ leadId: lead.id });
+
+  // 1c. M9 Intern #2 — Fire-and-forget AI quality score. Also safe: the
+  // helper catches its own errors and updates the row when done.
+  void scoreAndPersist({
+    id: lead.id,
+    name: leadData.name,
+    phone: leadData.phone,
+    email: leadData.email,
+    eventType: leadData.eventType,
+    eventDate: leadData.eventDate,
+    location: leadData.location,
+    guestCount: leadData.guestCount,
+    budget: leadData.budget,
+    message: leadData.message,
+    source: leadData.source,
+    services: wizardData?.services,
+  });
 
   // 2. Also create offerRequest for admin panel visibility
   try {

@@ -7,6 +7,9 @@ import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized } from "@/i18n";
 import { CategoryPageClient } from "./client";
 
+// M11 Intern #2 — ISR: category landings refresh every hour.
+export const revalidate = 3600;
+
 interface Props {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

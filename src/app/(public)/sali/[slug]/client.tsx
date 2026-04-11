@@ -1,10 +1,11 @@
 "use client";
 
-import { Star, MapPin, Users, Check } from "lucide-react";
+import { Star, MapPin, Users, Check, Lock } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
+import { CalendarWidget } from "@/components/public/calendar-widget";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 
@@ -26,6 +27,9 @@ interface VenueData {
   email: string | null;
   website: string | null;
   facilities: string[] | null;
+  menuUrl: string | null;
+  virtualTourUrl: string | null;
+  calendarEnabled: boolean;
   ratingAvg: number | null;
   ratingCount: number | null;
   images: Array<{ id: number; url: string; altRo: string | null }>;
@@ -41,8 +45,11 @@ interface VenueData {
 
 export function VenueDetailClient({ venue }: { venue: VenueData }) {
   const { locale, t } = useLocale();
+  const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(venue, "name", locale);
   const description = getLocalized(venue, "description", locale);
+  // M0a #8 — price gated behind login
+  const canSeePrice = isLoaded && isSignedIn;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
@@ -99,6 +106,36 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
             </div>
           )}
 
+          {/* F-S4 — Meniu digital */}
+          {venue.menuUrl && (
+            <div className="mt-6">
+              <h2 className="mb-3 font-heading text-lg font-bold">Meniu</h2>
+              <a
+                href={venue.menuUrl}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
+              >
+                Vezi meniu complet
+              </a>
+            </div>
+          )}
+
+          {/* F-S5 — Virtual tour 360° */}
+          {venue.virtualTourUrl && (
+            <div className="mt-6">
+              <h2 className="mb-3 font-heading text-lg font-bold">Tur virtual 360°</h2>
+              <div className="aspect-video overflow-hidden rounded-xl border border-border/40">
+                <iframe
+                  src={venue.virtualTourUrl}
+                  className="h-full w-full"
+                  allow="xr-spatial-tracking; fullscreen"
+                  title={`Tur virtual — ${name}`}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Reviews */}
           {venue.reviews.length > 0 && (
             <div className="mt-8">
@@ -127,13 +164,43 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
           <div className="sticky top-20 space-y-3 rounded-xl border border-border/40 bg-card p-6">
             {venue.pricePerPerson && (
               <div className="text-center">
-                <p className="font-accent text-3xl font-semibold text-gold">{venue.pricePerPerson}€</p>
-                <p className="text-sm text-muted-foreground">{t("venue.price_per_person")}</p>
+                {canSeePrice ? (
+                  <>
+                    <p className="font-accent text-3xl font-semibold text-gold">{venue.pricePerPerson}€</p>
+                    <p className="text-sm text-muted-foreground">{t("venue.price_per_person")}</p>
+                  </>
+                ) : (
+                  <a
+                    href={`/sign-in?redirect_url=${encodeURIComponent(`/sali/${venue.slug}`)}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
+                  >
+                    <Lock className="h-4 w-4" /> Preț la autentificare
+                  </a>
+                )}
               </div>
             )}
             <RequestPriceForm venueId={venue.id} />
             <RequestBookingForm venueId={venue.id} />
           </div>
+
+          {/* M6 Intern #1 — calendar gated behind login */}
+          {venue.calendarEnabled && (
+            canSeePrice ? (
+              <CalendarWidget
+                entityType="venue"
+                entityId={venue.id}
+                enabled
+              />
+            ) : (
+              <a
+                href={`/sign-in?redirect_url=${encodeURIComponent(`/sali/${venue.slug}`)}`}
+                className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/5 px-4 py-3 text-sm text-gold/90 hover:bg-gold/10 hover:text-gold"
+              >
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Calendar disponibil după autentificare</span>
+              </a>
+            )
+          )}
         </div>
       </div>
     </div>

@@ -17,6 +17,7 @@ export async function getCalendarEvents(
       date: calendarEvents.date,
       status: calendarEvents.status,
       note: calendarEvents.note,
+      eventType: calendarEvents.eventType,
     })
     .from(calendarEvents)
     .where(
@@ -36,6 +37,7 @@ export async function setCalendarEvent(
   status: CalendarStatus,
   source: "manual" | "google_sync" | "booking" = "manual",
   note?: string,
+  eventType?: string | null,
 ) {
   // Upsert: delete existing + insert new
   await db
@@ -60,6 +62,7 @@ export async function setCalendarEvent(
     status,
     source,
     note,
+    eventType: eventType ?? null,
   });
 }
 
@@ -69,6 +72,8 @@ export async function bulkSetCalendarEvents(
   dates: string[],
   status: CalendarStatus,
   source: "manual" | "google_sync" | "booking" = "manual",
+  note?: string | null,
+  eventType?: string | null,
 ) {
   if (!dates.length) return;
 
@@ -91,6 +96,8 @@ export async function bulkSetCalendarEvents(
       date,
       status,
       source,
+      note: note ?? null,
+      eventType: eventType ?? null,
     })),
   );
 }

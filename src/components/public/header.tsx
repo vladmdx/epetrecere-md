@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { SearchAutocomplete } from "@/components/public/search-autocomplete";
+import { NotificationBell } from "@/components/public/notification-bell";
 import { useLocale } from "@/hooks/use-locale";
 import { cn } from "@/lib/utils";
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -177,6 +178,9 @@ export function Header() {
             {t("nav.venues")}
           </Link>
           <DropdownMenu label={t("nav.services")} items={serviceCategories} href="/servicii" />
+          <Link href="/calculatoare" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
+            Calculatoare
+          </Link>
           <Link href="/blog" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
             {t("nav.blog")}
           </Link>
@@ -190,6 +194,7 @@ export function Header() {
           <div className="hidden lg:block">
             <SearchAutocomplete />
           </div>
+          <NotificationBell />
           <UserMenu />
           <LanguageSwitcher />
           <ThemeToggle />
@@ -241,6 +246,7 @@ export function Header() {
               ))}
               <div className="my-2 border-t border-border/40" />
               <Link href="/sali" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.venues")}</Link>
+              <Link href="/calculatoare" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">Calculatoare</Link>
               <Link href="/blog" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.blog")}</Link>
               <Link href="/contact" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.contact")}</Link>
               <Link href="/planifica" onClick={() => setMobileOpen(false)}>

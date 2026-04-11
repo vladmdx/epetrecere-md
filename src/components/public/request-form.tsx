@@ -27,6 +27,9 @@ interface FormBaseProps {
   label?: string;
   variant?: "primary" | "outline";
   icon?: React.ReactNode;
+  // M1 #5 — allows package cards to prefill the booking message field so the
+  // artist receives context on which package the client is interested in.
+  presetMessage?: string;
 }
 
 // ─── Price Request (simple: name + phone) ────────────────
@@ -130,7 +133,7 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
 }
 
 // ─── Booking Request (full form) ─────────────────────────
-export function RequestBookingForm({ artistId, venueId, preselectedDate, className, label = "Solicită Rezervare", variant = "outline", icon }: FormBaseProps) {
+export function RequestBookingForm({ artistId, venueId, preselectedDate, className, label = "Solicită Rezervare", variant = "outline", icon, presetMessage }: FormBaseProps) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -264,6 +267,7 @@ export function RequestBookingForm({ artistId, venueId, preselectedDate, classNa
 
               <FormField icon={MessageSquare} label="Mesaj">
                 <textarea id="book-message" name="message" rows={3}
+                  defaultValue={presetMessage}
                   className="form-input min-h-[80px] resize-none py-2.5"
                   placeholder="Detalii suplimentare despre eveniment..." />
               </FormField>

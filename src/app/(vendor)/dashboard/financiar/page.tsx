@@ -1,34 +1,174 @@
+// M5 — Vendor financial overview wired to real data.
+//
+// Computes aggregates from confirmed booking_requests for the signed-in
+// artist. Since we don't yet store a per-booking negotiated price, the
+// vendor's public priceFrom is used as the estimate per event. When we
+// add a real `quotedPrice` column this becomes a trivial swap.
+
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
+import { and, eq, inArray } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import {
+  DollarSign,
+  TrendingUp,
+  Clock,
+  CheckCircle,
+  CalendarDays,
+} from "lucide-react";
+import { db } from "@/lib/db";
+import { artists, bookingRequests, users } from "@/lib/db/schema";
 
-const stats = [
-  { label: "Venituri luna asta", value: "2,400€", icon: DollarSign, color: "text-gold" },
-  { label: "Total 2026", value: "8,600€", icon: TrendingUp, color: "text-success" },
-  { label: "Plăți în așteptare", value: "1,200€", icon: Clock, color: "text-warning" },
-  { label: "Plăți confirmate", value: "7,400€", icon: CheckCircle, color: "text-success" },
+export const dynamic = "force-dynamic";
+
+const ROMANIAN_MONTHS = [
+  "Ian",
+  "Feb",
+  "Mar",
+  "Apr",
+  "Mai",
+  "Iun",
+  "Iul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Noi",
+  "Dec",
 ];
 
-const transactions = [
-  { id: 1, event: "Nuntă Popescu", date: "2026-08-15", amount: 1200, status: "pending" },
-  { id: 2, event: "Corporate TechCorp", date: "2026-05-10", amount: 800, status: "paid" },
-  { id: 3, event: "Botez Rusu", date: "2026-06-20", amount: 600, status: "paid" },
-  { id: 4, event: "Aniversare Moraru", date: "2026-03-01", amount: 500, status: "paid" },
-];
+export default async function VendorFinancialPage() {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) redirect("/sign-in");
 
-const months = [
-  { month: "Ian", revenue: 800 },
-  { month: "Feb", revenue: 1200 },
-  { month: "Mar", revenue: 1500 },
-  { month: "Apr", revenue: 2400 },
-];
+  const [appUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  if (!appUser) redirect("/sign-in");
 
-export default function VendorFinancialPage() {
-  const maxRevenue = Math.max(...months.map((m) => m.revenue));
+  const [artist] = await db
+    .select({
+      id: artists.id,
+      nameRo: artists.nameRo,
+      priceFrom: artists.priceFrom,
+      priceCurrency: artists.priceCurrency,
+    })
+    .from(artists)
+    .where(eq(artists.userId, appUser.id))
+    .limit(1);
+
+  if (!artist) {
+    return (
+      <div className="space-y-6">
+        <h1 className="font-heading text-2xl font-bold">Financiar</h1>
+        <Card>
+          <CardContent className="py-16 text-center text-muted-foreground">
+            Nu ești înregistrat ca artist încă.
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  const priceFrom = artist.priceFrom ?? 0;
+  const currency = artist.priceCurrency ?? "€";
+
+  // Pull every booking for this artist that is in an "earning" state
+  const rows = await db
+    .select({
+      id: bookingRequests.id,
+      clientName: bookingRequests.clientName,
+      eventDate: bookingRequests.eventDate,
+      eventType: bookingRequests.eventType,
+      status: bookingRequests.status,
+      createdAt: bookingRequests.createdAt,
+    })
+    .from(bookingRequests)
+    .where(
+      and(
+        eq(bookingRequests.artistId, artist.id),
+        inArray(bookingRequests.status, [
+          "accepted",
+          "confirmed_by_client",
+          "pending",
+        ]),
+      ),
+    );
+
+  const today = new Date().toISOString().slice(0, 10);
+  const year = new Date().getFullYear();
+  const currentMonth = new Date().getMonth();
+
+  // Aggregate
+  let totalYear = 0;
+  let monthRevenue = 0;
+  let pendingRevenue = 0;
+  let confirmedRevenue = 0;
+  const monthly = new Array(12).fill(0) as number[];
+
+  for (const b of rows) {
+    const d = new Date(b.eventDate);
+    if (d.getFullYear() !== year) continue;
+    const isConfirmed = b.status === "confirmed_by_client";
+    const isPending = b.status === "pending" || b.status === "accepted";
+
+    if (isConfirmed) confirmedRevenue += priceFrom;
+    if (isPending) pendingRevenue += priceFrom;
+
+    totalYear += priceFrom;
+    if (d.getMonth() === currentMonth) monthRevenue += priceFrom;
+    monthly[d.getMonth()] += priceFrom;
+  }
+
+  const maxMonth = Math.max(...monthly, 1);
+
+  // Upcoming transactions sorted by date
+  const sorted = [...rows].sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+  const upcoming = sorted.filter((b) => b.eventDate >= today).slice(0, 10);
+  const past = sorted.filter((b) => b.eventDate < today).slice(-10).reverse();
+
+  const stats = [
+    {
+      label: "Venituri luna asta",
+      value: `${monthRevenue}${currency}`,
+      icon: DollarSign,
+      color: "text-gold",
+    },
+    {
+      label: `Total ${year}`,
+      value: `${totalYear}${currency}`,
+      icon: TrendingUp,
+      color: "text-success",
+    },
+    {
+      label: "Plăți în așteptare",
+      value: `${pendingRevenue}${currency}`,
+      icon: Clock,
+      color: "text-warning",
+    },
+    {
+      label: "Plăți confirmate",
+      value: `${confirmedRevenue}${currency}`,
+      icon: CheckCircle,
+      color: "text-success",
+    },
+  ];
+
+  const noBookings = rows.length === 0;
 
   return (
     <div className="space-y-6">
-      <h1 className="font-heading text-2xl font-bold">Financiar</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Financiar</h1>
+          <p className="text-xs text-muted-foreground">
+            Estimat pe baza prețului tău public ({priceFrom}
+            {currency} / eveniment).
+          </p>
+        </div>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
@@ -44,47 +184,134 @@ export default function VendorFinancialPage() {
         ))}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Revenue chart */}
+      {noBookings ? (
         <Card>
-          <CardHeader><CardTitle>Venituri pe Luni</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex items-end gap-3 h-40">
-              {months.map((m) => (
-                <div key={m.month} className="flex flex-1 flex-col items-center gap-1">
-                  <span className="text-xs font-medium text-gold">{m.revenue}€</span>
-                  <div className="w-full rounded-t bg-gold/20 relative" style={{ height: `${(m.revenue / maxRevenue) * 100}%` }}>
-                    <div className="absolute inset-x-0 bottom-0 rounded-t bg-gold" style={{ height: "60%" }} />
-                  </div>
-                  <span className="text-xs text-muted-foreground">{m.month}</span>
-                </div>
-              ))}
-            </div>
+          <CardContent className="flex flex-col items-center py-16 text-muted-foreground">
+            <CalendarDays className="mb-3 h-10 w-10" />
+            <p>Nu ai rezervări pentru {year}.</p>
           </CardContent>
         </Card>
+      ) : (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Revenue chart */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Venituri estimate {year}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex h-40 items-end gap-1">
+                {monthly.map((v, i) => (
+                  <div
+                    key={i}
+                    className="flex flex-1 flex-col items-center gap-1"
+                  >
+                    <span className="text-[10px] font-medium text-gold">
+                      {v || ""}
+                    </span>
+                    <div
+                      className="w-full rounded-t bg-gold/20"
+                      style={{ height: `${Math.max(4, (v / maxMonth) * 100)}%` }}
+                    >
+                      <div
+                        className="h-full rounded-t bg-gold"
+                        style={{ opacity: v ? 1 : 0.2 }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground">
+                      {ROMANIAN_MONTHS[i]}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Transactions */}
-        <Card>
-          <CardHeader><CardTitle>Tranzacții</CardTitle></CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {transactions.map((t) => (
-                <div key={t.id} className="flex items-center justify-between">
+          {/* Transactions */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Rezervări</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {upcoming.length > 0 && (
                   <div>
-                    <p className="text-sm font-medium">{t.event}</p>
-                    <p className="text-xs text-muted-foreground">{t.date}</p>
+                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
+                      Viitoare
+                    </p>
+                    <div className="space-y-3">
+                      {upcoming.map((t) => (
+                        <TransactionRow
+                          key={t.id}
+                          row={t}
+                          amount={priceFrom}
+                          currency={currency}
+                        />
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-accent font-semibold text-gold">{t.amount}€</p>
-                    <Badge variant="outline" className={t.status === "paid" ? "text-success border-success/30 text-xs" : "text-warning border-warning/30 text-xs"}>
-                      {t.status === "paid" ? "Plătit" : "În așteptare"}
-                    </Badge>
+                )}
+                {past.length > 0 && (
+                  <div>
+                    <p className="mb-2 mt-2 text-xs font-semibold uppercase text-muted-foreground">
+                      Trecute
+                    </p>
+                    <div className="space-y-3">
+                      {past.map((t) => (
+                        <TransactionRow
+                          key={t.id}
+                          row={t}
+                          amount={priceFrom}
+                          currency={currency}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface TransactionRowProps {
+  row: {
+    clientName: string;
+    eventDate: string;
+    eventType: string | null;
+    status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled";
+  };
+  amount: number;
+  currency: string;
+}
+
+function TransactionRow({ row, amount, currency }: TransactionRowProps) {
+  const isConfirmed = row.status === "confirmed_by_client";
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">
+          {row.eventType ?? "Eveniment"} — {row.clientName}
+        </p>
+        <p className="text-xs text-muted-foreground">{row.eventDate}</p>
+      </div>
+      <div className="text-right">
+        <p className="font-accent font-semibold text-gold">
+          {amount}
+          {currency}
+        </p>
+        <Badge
+          variant="outline"
+          className={
+            isConfirmed
+              ? "border-success/30 text-success text-xs"
+              : "border-warning/30 text-warning text-xs"
+          }
+        >
+          {isConfirmed ? "Confirmat" : "În așteptare"}
+        </Badge>
       </div>
     </div>
   );

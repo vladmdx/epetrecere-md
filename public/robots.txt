@@ -10,5 +10,7 @@ Disallow: /sign-up
 # Host
 Host: https://epetrecere.md
 
+
 # Sitemaps
-Sitemap: https://epetrecere.md/sitemap.xml
+Sitemap: https://epetrecere.md
+/sitemap.xml

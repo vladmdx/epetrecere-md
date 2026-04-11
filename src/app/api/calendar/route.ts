@@ -16,6 +16,8 @@ const postSchema = z.object({
   entity_id: z.number(),
   dates: z.array(z.string()),
   status: z.enum(["available", "booked", "tentative", "blocked"]),
+  note: z.string().nullable().optional(),
+  event_type: z.string().nullable().optional(),
 });
 
 /** Normalize a date value to YYYY-MM-DD string, handling timezone offsets */
@@ -69,6 +71,9 @@ export async function POST(req: Request) {
     parsed.data.entity_id,
     parsed.data.dates,
     parsed.data.status,
+    "manual",
+    parsed.data.note ?? null,
+    parsed.data.event_type ?? null,
   );
 
   return NextResponse.json({ success: true });

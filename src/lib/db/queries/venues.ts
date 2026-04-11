@@ -1,13 +1,17 @@
 import { db } from "@/lib/db";
-import { venues, venueImages, reviews } from "@/lib/db/schema";
-import { eq, and, desc, asc, sql, gte, lte } from "drizzle-orm";
+import { venues, venueImages, reviews, calendarEvents } from "@/lib/db/schema";
+import { eq, and, desc, asc, sql, gte, lte, ilike, or } from "drizzle-orm";
 
 export interface VenueFilters {
   capacityMin?: number;
   capacityMax?: number;
   priceMax?: number;
   city?: string;
+  /** M2 — alternate spellings for SEO landing pages, matched case-insensitively. */
+  cityKeywords?: string[];
   featured?: boolean;
+  /** Exclude venues that are booked/blocked on this date. Format: YYYY-MM-DD */
+  availableDate?: string;
   sort?: "popular" | "price_asc" | "price_desc" | "rating" | "capacity";
   page?: number;
   limit?: number;
@@ -29,11 +33,31 @@ export async function getVenues(filters: VenueFilters = {}) {
   if (filters.priceMax) {
     conditions.push(lte(venues.pricePerPerson, filters.priceMax));
   }
-  if (filters.city) {
-    conditions.push(eq(venues.city, filters.city));
+  // City filter: use ILIKE OR over a list of keywords so vendors' free-form
+  // city entries ("Chișinău", "mun. Chisinau", "Кишинёв") all match.
+  const cityNeedles: string[] = [];
+  if (filters.cityKeywords?.length) cityNeedles.push(...filters.cityKeywords);
+  if (filters.city) cityNeedles.push(filters.city);
+  if (cityNeedles.length) {
+    const unique = Array.from(new Set(cityNeedles.map((s) => s.trim()).filter(Boolean)));
+    const ilikeConds = unique.map((needle) => ilike(venues.city, `%${needle}%`));
+    const combined = ilikeConds.length === 1 ? ilikeConds[0] : or(...ilikeConds);
+    if (combined) conditions.push(combined);
   }
   if (filters.featured) {
     conditions.push(eq(venues.isFeatured, true));
+  }
+  if (filters.availableDate) {
+    // Exclude venues booked or blocked on this date. Uses the shared
+    // calendar_events table where entity_type='venue'.
+    conditions.push(
+      sql`${venues.id} NOT IN (
+        SELECT ${calendarEvents.entityId} FROM ${calendarEvents}
+        WHERE ${calendarEvents.entityType} = 'venue'
+        AND ${calendarEvents.date} = ${filters.availableDate}
+        AND ${calendarEvents.status} IN ('booked', 'blocked')
+      )`,
+    );
   }
 
   let orderBy;

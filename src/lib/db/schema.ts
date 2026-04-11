@@ -199,6 +199,10 @@ export const artists = pgTable("artists", {
   calendarEnabled: boolean("calendar_enabled").default(false).notNull(),
   bufferHours: integer("buffer_hours").default(2),
   sortOrder: integer("sort_order").default(0),
+  // Feature 14 — auto-reply on new booking request. When enabled, the message
+  // is emailed to the client the moment their request lands, reducing bounce.
+  autoReplyEnabled: boolean("auto_reply_enabled").default(false).notNull(),
+  autoReplyMessage: text("auto_reply_message"),
   seoTitleRo: text("seo_title_ro"),
   seoTitleRu: text("seo_title_ru"),
   seoTitleEn: text("seo_title_en"),
@@ -275,6 +279,9 @@ export const venues = pgTable("venues", {
   website: text("website"),
   facilities: jsonb("facilities").$type<string[]>().default([]),
   menuUrl: text("menu_url"),
+  /** M12 — URL to an embeddable virtual tour (Matterport, Kuula, YouTube 360).
+   *  Rendered as an iframe on the public venue detail page. */
+  virtualTourUrl: text("virtual_tour_url"),
   calendarEnabled: boolean("calendar_enabled").default(false).notNull(),
   isActive: boolean("is_active").default(false).notNull(),
   isFeatured: boolean("is_featured").default(false).notNull(),
@@ -315,6 +322,10 @@ export const calendarEvents = pgTable("calendar_events", {
   status: calendarStatusEnum("status").default("available").notNull(),
   bookingId: integer("booking_id"),
   note: text("note"),
+  /** F-S6 — Event type for color coding on the owner dashboard calendar.
+   *  Free-form string (e.g. "nunta", "cumetrie", "corporate") so new types
+   *  can be introduced without a schema migration. Null = uncategorized. */
+  eventType: text("event_type"),
   source: calendarSourceEnum("source").default("manual").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -341,6 +352,9 @@ export const leads = pgTable("leads", {
     onDelete: "set null",
   }),
   score: integer("score").default(0),
+  /** M9 Intern #2 — AI-generated quality score 0-100 with short rationale list. */
+  aiScore: integer("ai_score"),
+  aiReasons: jsonb("ai_reasons"),
   wizardData: jsonb("wizard_data"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -389,6 +403,14 @@ export const reviews = pgTable("reviews", {
   }),
   venueId: integer("venue_id").references(() => venues.id, {
     onDelete: "cascade",
+  }),
+  /** M4 — FK to the booking the review is written for. Lets us enforce
+   *  "one review per completed booking" and prove the author actually
+   *  transacted with this vendor (Trustpilot-style verification). */
+  bookingRequestId: integer("booking_request_id").unique(),
+  /** M4 — The client's internal user id (when signed in through Clerk). */
+  authorUserId: uuid("author_user_id").references(() => users.id, {
+    onDelete: "set null",
   }),
   authorName: text("author_name").notNull(),
   eventType: text("event_type"),
@@ -552,9 +574,16 @@ export const workSchedule = pgTable("work_schedule", {
 // BOOKING REQUESTS (client → artist)
 // ═══════════════════════════════════════════════════════
 
+// Bilateral confirmation flow (M0b #9):
+//   pending              – client has submitted, artist has not replied yet
+//   accepted             – artist accepted, waiting for client to confirm
+//   confirmed_by_client  – both parties confirmed, booking is live
+//   rejected             – artist declined the request
+//   cancelled            – client or admin cancelled the request
 export const bookingRequestStatusEnum = pgEnum("booking_request_status", [
   "pending",
   "accepted",
+  "confirmed_by_client",
   "rejected",
   "cancelled",
 ]);
@@ -584,18 +613,258 @@ export const bookingRequests = pgTable("booking_requests", {
 });
 
 // ═══════════════════════════════════════════════════════
+// CONVERSATIONS (M0b #10)
+//
+// Persistent 1-on-1 chat between a client and an artist that lives BEYOND the
+// scope of a single booking request. A conversation is created the first time
+// the client opens the chat widget on an artist profile — even before they
+// send a booking. This lets the chat outlive the booking lifecycle (and
+// rejected/cancelled bookings) while still being reusable across future
+// requests between the same pair.
+// ═══════════════════════════════════════════════════════
+
+export const conversations = pgTable("conversations", {
+  id: serial("id").primaryKey(),
+  clientUserId: uuid("client_user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  artistId: integer("artist_id")
+    .references(() => artists.id, { onDelete: "cascade" })
+    .notNull(),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  lastMessagePreview: text("last_message_preview"),
+  clientUnread: integer("client_unread").default(0).notNull(),
+  artistUnread: integer("artist_unread").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
 // CHAT MESSAGES
 // ═══════════════════════════════════════════════════════
 
 export const chatMessages = pgTable("chat_messages", {
   id: serial("id").primaryKey(),
+  // A message belongs to either a legacy booking request OR a persistent
+  // conversation (preferred for new messages). Both columns are nullable and
+  // we rely on application logic to ensure at least one is set.
   bookingRequestId: integer("booking_request_id")
-    .references(() => bookingRequests.id, { onDelete: "cascade" })
-    .notNull(),
+    .references(() => bookingRequests.id, { onDelete: "cascade" }),
+  conversationId: integer("conversation_id")
+    .references(() => conversations.id, { onDelete: "cascade" }),
   senderType: text("sender_type").notNull(), // "client" | "artist" | "admin"
   senderName: text("sender_name").notNull(),
   message: text("message").notNull(),
   isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
+// EVENT PLANNING SUITE (M4)
+//
+// A signed-in client can manage their event end-to-end: planning checklist,
+// guest list (RSVP tracking), seating chart (drag guests onto tables), and
+// user-generated content (photo uploads + post-event reviews). Every row is
+// scoped to a single event_plan owned by a user.
+// ═══════════════════════════════════════════════════════
+
+export const rsvpStatusEnum = pgEnum("rsvp_status", [
+  "pending",
+  "accepted",
+  "declined",
+  "maybe",
+]);
+
+export const checklistPriorityEnum = pgEnum("checklist_priority", [
+  "low",
+  "medium",
+  "high",
+]);
+
+export const eventPlans = pgTable("event_plans", {
+  id: serial("id").primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  /** Short friendly name the user picks: "Nunta Ana & Ion" */
+  title: text("title").notNull(),
+  eventType: text("event_type"),
+  eventDate: date("event_date"),
+  location: text("location"),
+  guestCountTarget: integer("guest_count_target"),
+  budgetTarget: integer("budget_target"),
+  seatsPerTable: integer("seats_per_table").default(10),
+  notes: text("notes"),
+  /** Event Moments (F-C8): unique slug guests use to reach the public
+   *  upload page via QR code. Anonymous upload, no auth required. */
+  momentsSlug: text("moments_slug").unique(),
+  momentsEnabled: boolean("moments_enabled").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Planning checklist — seed from template on plan creation.
+export const checklistItems = pgTable("checklist_items", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id")
+    .references(() => eventPlans.id, { onDelete: "cascade" })
+    .notNull(),
+  title: text("title").notNull(),
+  category: text("category"),            // "venue" | "artists" | "menu" | ...
+  priority: checklistPriorityEnum("priority").default("medium").notNull(),
+  /** Days-before-event when this task should ideally be done. */
+  dueDaysBefore: integer("due_days_before"),
+  done: boolean("done").default(false).notNull(),
+  doneAt: timestamp("done_at"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Guest list with RSVP tracking.
+export const guestList = pgTable("guest_list", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id")
+    .references(() => eventPlans.id, { onDelete: "cascade" })
+    .notNull(),
+  fullName: text("full_name").notNull(),
+  phone: text("phone"),
+  email: text("email"),
+  /** "Side of the family": "bride" | "groom" | "friends" | "work" */
+  group: text("group"),
+  /** Number of +1s / children this guest brings. */
+  plusOnes: integer("plus_ones").default(0).notNull(),
+  dietary: text("dietary"),
+  rsvp: rsvpStatusEnum("rsvp").default("pending").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Seating plan: tables + per-seat guest assignments.
+export const seatingTables = pgTable("seating_tables", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id")
+    .references(() => eventPlans.id, { onDelete: "cascade" })
+    .notNull(),
+  name: text("name").notNull(),          // "Masa 1", "Masa mirilor", etc.
+  seats: integer("seats").default(10).notNull(),
+  /** Optional x/y canvas coords for drag-to-arrange layout. */
+  posX: integer("pos_x"),
+  posY: integer("pos_y"),
+  sortOrder: integer("sort_order").default(0),
+});
+
+export const seatAssignments = pgTable("seat_assignments", {
+  id: serial("id").primaryKey(),
+  tableId: integer("table_id")
+    .references(() => seatingTables.id, { onDelete: "cascade" })
+    .notNull(),
+  guestId: integer("guest_id")
+    .references(() => guestList.id, { onDelete: "cascade" })
+    .notNull()
+    .unique(),        // a guest can only sit at one table
+  seatNumber: integer("seat_number"),
+});
+
+// UGC — event photos uploaded by the client after the wedding, OR by
+// anonymous guests during the event via the Event Moments QR flow (F-C8).
+export const eventPhotos = pgTable("event_photos", {
+  id: serial("id").primaryKey(),
+  planId: integer("plan_id")
+    .references(() => eventPlans.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "set null" }),
+  url: text("url").notNull(),
+  caption: text("caption"),
+  /** Event Moments — name the guest typed when uploading anonymously. */
+  guestName: text("guest_name"),
+  /** Event Moments — optional short message from the uploader. */
+  guestMessage: text("guest_message"),
+  /** Event Moments — source of the upload: "client" (plan owner) or
+   *  "guest" (anonymous via QR). */
+  source: text("source").default("client").notNull(),
+  /** Optional FK to an artist the client tags as having been at the event. */
+  taggedArtistId: integer("tagged_artist_id").references(() => artists.id, {
+    onDelete: "set null",
+  }),
+  taggedVenueId: integer("tagged_venue_id").references(() => venues.id, {
+    onDelete: "set null",
+  }),
+  isPublic: boolean("is_public").default(false).notNull(),
+  isApproved: boolean("is_approved").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
+// LEAD ENGINE (M3)
+//
+// When a client submits a lead through the wizard / request form we
+// automatically match it against all eligible active vendors (artists
+// first, venues as phase 2). A row in lead_matches is created for each
+// candidate. Vendors see the lead in their dashboard but contact details
+// are REDACTED until they spend a lead credit to unlock it — the
+// pay-per-lead monetization model for the marketplace.
+// ═══════════════════════════════════════════════════════
+
+export const leadMatchStatusEnum = pgEnum("lead_match_status", [
+  "matched",   // system produced the match, vendor has not opened it
+  "seen",      // vendor opened the lead card
+  "unlocked",  // vendor spent a credit and revealed contact info
+  "contacted", // vendor marked they reached out to the client
+  "won",       // vendor booked this lead
+  "lost",      // vendor explicitly passed / client picked someone else
+]);
+
+export const leadMatches = pgTable("lead_matches", {
+  id: serial("id").primaryKey(),
+  leadId: integer("lead_id")
+    .references(() => leads.id, { onDelete: "cascade" })
+    .notNull(),
+  artistId: integer("artist_id").references(() => artists.id, {
+    onDelete: "cascade",
+  }),
+  venueId: integer("venue_id").references(() => venues.id, {
+    onDelete: "cascade",
+  }),
+  /** 0-100 match score from the matching algorithm (category+city+date+budget). */
+  score: integer("score").default(0).notNull(),
+  /** JSON snapshot of why this vendor was matched (for transparency). */
+  reasons: jsonb("reasons").$type<string[]>().default([]),
+  status: leadMatchStatusEnum("status").default("matched").notNull(),
+  /** When the vendor opened the card (null = never opened). */
+  seenAt: timestamp("seen_at"),
+  /** When the vendor spent a credit to unlock the lead. */
+  unlockedAt: timestamp("unlocked_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Vendor credit wallet. A lead unlock costs 1 credit; admin tops up.
+export const vendorCredits = pgTable("vendor_credits", {
+  id: serial("id").primaryKey(),
+  artistId: integer("artist_id")
+    .references(() => artists.id, { onDelete: "cascade" })
+    .unique()
+    .notNull(),
+  balance: integer("balance").default(0).notNull(),
+  totalPurchased: integer("total_purchased").default(0).notNull(),
+  totalSpent: integer("total_spent").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Ledger of every credit movement for audit + history.
+export const creditTransactions = pgTable("credit_transactions", {
+  id: serial("id").primaryKey(),
+  artistId: integer("artist_id")
+    .references(() => artists.id, { onDelete: "cascade" })
+    .notNull(),
+  /** Positive = top-up, negative = spend. */
+  delta: integer("delta").notNull(),
+  /** "topup" | "unlock" | "refund" | "bonus" */
+  kind: text("kind").notNull(),
+  /** Optional FK to the lead match when kind = "unlock". */
+  leadMatchId: integer("lead_match_id").references(() => leadMatches.id, {
+    onDelete: "set null",
+  }),
+  note: text("note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -619,6 +888,30 @@ export const offerRequests = pgTable("offer_requests", {
   adminSeen: boolean("admin_seen").default(false).notNull(),
   adminComment: text("admin_comment"),
   status: text("status").default("new").notNull(), // "new" | "seen" | "processed"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
+// PROFILE VIEWS (M5 — analytics)
+//
+// Lightweight view tracking for artist / venue public detail pages.
+// A session token is derived from hashed IP+UA server-side and is used
+// to dedupe multiple hits from the same visitor within 30 minutes so
+// counts reflect unique engagement, not page reloads. Aggregates power
+// the vendor dashboard + admin analytics.
+// ═══════════════════════════════════════════════════════
+
+export const profileViews = pgTable("profile_views", {
+  id: serial("id").primaryKey(),
+  artistId: integer("artist_id").references(() => artists.id, {
+    onDelete: "cascade",
+  }),
+  venueId: integer("venue_id").references(() => venues.id, {
+    onDelete: "cascade",
+  }),
+  /** SHA-256 of `${ip}|${userAgent}|salt` — opaque, not reversible. */
+  sessionHash: text("session_hash").notNull(),
+  referrer: text("referrer"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -743,3 +1036,114 @@ export const notificationsRelations = relations(notifications, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+// ═══════════════════════════════════════════════════════
+// M8 — INVITATIONS (templates, invitations, guests, RSVPs)
+// ═══════════════════════════════════════════════════════
+
+export const invitationRsvpStatusEnum = pgEnum("invitation_rsvp_status", [
+  "pending",
+  "yes",
+  "no",
+  "maybe",
+]);
+
+export const invitationStatusEnum = pgEnum("invitation_status", [
+  "draft",
+  "published",
+  "closed",
+]);
+
+export const invitationTemplates = pgTable("invitation_templates", {
+  id: serial("id").primaryKey(),
+  slug: text("slug").unique().notNull(),
+  nameRo: text("name_ro").notNull(),
+  nameRu: text("name_ru"),
+  nameEn: text("name_en"),
+  description: text("description"),
+  category: text("category"), // wedding, birthday, baptism, corporate
+  thumbnailUrl: text("thumbnail_url"),
+  // Design tokens the template uses — colors, fonts, decorative elements.
+  // Serialized so we can tweak per-invitation without forking the template.
+  designTokens: jsonb("design_tokens"),
+  isPremium: boolean("is_premium").default(false).notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const invitations = pgTable("invitations", {
+  id: serial("id").primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }),
+  templateId: integer("template_id").references(() => invitationTemplates.id, {
+    onDelete: "set null",
+  }),
+  slug: text("slug").unique().notNull(), // public URL slug
+  status: invitationStatusEnum("status").default("draft").notNull(),
+  // Event metadata rendered in the public invitation
+  eventType: text("event_type"), // wedding, birthday, baptism
+  coupleNames: text("couple_names"), // "Ana & Ion" for weddings
+  hostName: text("host_name"), // for birthdays, corporate
+  eventDate: date("event_date"),
+  ceremonyTime: text("ceremony_time"),
+  receptionTime: text("reception_time"),
+  ceremonyLocation: text("ceremony_location"),
+  receptionLocation: text("reception_location"),
+  message: text("message"), // invitation message / story
+  dressCode: text("dress_code"),
+  // Design overrides on top of the template's default design
+  customColors: jsonb("custom_colors"),
+  customFonts: jsonb("custom_fonts"),
+  coverImageUrl: text("cover_image_url"),
+  // RSVP config
+  rsvpDeadline: date("rsvp_deadline"),
+  rsvpEnabled: boolean("rsvp_enabled").default(true).notNull(),
+  allowPlusOne: boolean("allow_plus_one").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const invitationGuests = pgTable("invitation_guests", {
+  id: serial("id").primaryKey(),
+  invitationId: integer("invitation_id")
+    .references(() => invitations.id, { onDelete: "cascade" })
+    .notNull(),
+  name: text("name").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  group: text("group"), // "family", "friends", "colleagues"
+  // RSVP response
+  rsvpStatus: invitationRsvpStatusEnum("rsvp_status").default("pending").notNull(),
+  respondedAt: timestamp("responded_at"),
+  plusOne: boolean("plus_one").default(false).notNull(),
+  plusOneName: text("plus_one_name"),
+  dietaryNotes: text("dietary_notes"),
+  message: text("message"), // message from guest to host
+  // Unique token for one-click RSVP links (sent via email/SMS)
+  rsvpToken: text("rsvp_token").unique(),
+  remindersSent: integer("reminders_sent").default(0).notNull(),
+  lastReminderAt: timestamp("last_reminder_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const invitationsRelations = relations(invitations, ({ one, many }) => ({
+  template: one(invitationTemplates, {
+    fields: [invitations.templateId],
+    references: [invitationTemplates.id],
+  }),
+  user: one(users, {
+    fields: [invitations.userId],
+    references: [users.id],
+  }),
+  guests: many(invitationGuests),
+}));
+
+export const invitationGuestsRelations = relations(
+  invitationGuests,
+  ({ one }) => ({
+    invitation: one(invitations, {
+      fields: [invitationGuests.invitationId],
+      references: [invitations.id],
+    }),
+  }),
+);

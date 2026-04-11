@@ -8,6 +8,10 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   images: {
+    // M11 Intern #2 — perf audit. Prefer AVIF where supported, WebP as
+    // fallback. Cache optimized images in Next's cache for 24h.
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 60 * 60 * 24,
     remotePatterns: [
       {
         protocol: "https",
@@ -32,6 +36,15 @@ const nextConfig: NextConfig = {
     ],
   },
   reactStrictMode: true,
+  // M11 Intern #2 — tree-shake big icon libraries so Turbopack doesn't ship
+  // the whole catalog to the client bundle.
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@radix-ui/react-icons",
+      "date-fns",
+    ],
+  },
   async headers() {
     return [
       {

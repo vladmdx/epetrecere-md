@@ -7,6 +7,7 @@ import { TestimonialsSection } from "@/components/public/sections/testimonials";
 import { StatsCounterSection } from "@/components/public/sections/stats-counter";
 import { ClientLogosSection } from "@/components/public/sections/client-logos";
 import { BlogPreviewSection } from "@/components/public/sections/blog-preview";
+import { PackagesSection } from "@/components/public/sections/packages";
 import { CTASection } from "@/components/public/sections/cta";
 import { GoldDivider } from "@/components/shared/gold-divider";
 import { FloatingCTA } from "@/components/shared/floating-cta";
@@ -62,6 +63,9 @@ export default async function HomePage() {
         </div>
         <div className="section-navy relative">
           <BlogPreviewSection />
+        </div>
+        <div className="section-dark border-t border-gold/10">
+          <PackagesSection />
         </div>
         <CTASection />
         <FloatingCTA />

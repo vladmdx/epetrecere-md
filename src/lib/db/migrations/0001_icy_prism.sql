@@ -1,0 +1,1 @@
+ALTER TYPE "public"."booking_request_status" ADD VALUE 'confirmed_by_client' BEFORE 'rejected';

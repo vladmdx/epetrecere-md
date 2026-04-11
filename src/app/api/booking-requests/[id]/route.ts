@@ -1,18 +1,27 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { bookingRequests, calendarEvents, artists } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 import { sendEmail } from "@/lib/email/send";
 import { bookingResponseEmail } from "@/lib/email/templates/booking-response";
+import { dispatchNotification } from "@/lib/notifications/dispatch";
 
-// UPDATE booking request (accept/reject by artist)
+// UPDATE booking request — drives the bilateral confirmation flow (M0b #9):
+//   action=accept          → artist accepts, status becomes "accepted"
+//   action=reject          → artist rejects, status becomes "rejected"
+//   action=client_confirm  → client confirms, status becomes "confirmed_by_client"
+//   action=cancel          → client cancels while still pending, status "cancelled"
 export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const body = await req.json();
-  const { action, reply } = body as { action: "accept" | "reject"; reply?: string };
+  const { action, reply } = body as {
+    action: "accept" | "reject" | "client_confirm" | "cancel";
+    reply?: string;
+  };
 
   const [booking] = await db
     .select()
@@ -29,7 +38,8 @@ export async function PUT(
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
-    // Block date in calendar
+    // Tentatively block the artist's date — confirmed_by_client will promote
+    // the event to a fully-confirmed booking in the calendar.
     if (booking.eventDate) {
       await db.insert(calendarEvents).values({
         entityType: "artist",
@@ -40,16 +50,138 @@ export async function PUT(
         note: `Rezervare: ${booking.clientName} - ${booking.eventType || "Eveniment"}`,
       });
     }
-  } else {
+  } else if (action === "reject") {
     await db.update(bookingRequests).set({
       status: "rejected",
       artistReply: reply || "Ne pare rău, nu suntem disponibili.",
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
+
+    // If the booking had already been accepted, the calendar has a
+    // source="booking" block on that date — remove it so the artist is
+    // bookable again.
+    if (booking.status === "accepted" && booking.eventDate) {
+      await db
+        .delete(calendarEvents)
+        .where(
+          and(
+            eq(calendarEvents.entityType, "artist"),
+            eq(calendarEvents.entityId, booking.artistId),
+            eq(calendarEvents.date, booking.eventDate),
+            eq(calendarEvents.source, "booking"),
+          ),
+        );
+    }
+  } else if (action === "client_confirm") {
+    // Only the original client (matched via users.clerkId → clientUserId) may
+    // promote an "accepted" booking to "confirmed_by_client".
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const [appUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    if (!appUser || appUser.id !== booking.clientUserId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (booking.status !== "accepted") {
+      return NextResponse.json(
+        { error: "Booking must be accepted by artist first" },
+        { status: 409 },
+      );
+    }
+    await db.update(bookingRequests).set({
+      status: "confirmed_by_client",
+      updatedAt: new Date(),
+    }).where(eq(bookingRequests.id, Number(id)));
+  } else if (action === "cancel") {
+    // The client may cancel while the request is still pending.
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const [appUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    if (!appUser || appUser.id !== booking.clientUserId) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    await db.update(bookingRequests).set({
+      status: "cancelled",
+      updatedAt: new Date(),
+    }).where(eq(bookingRequests.id, Number(id)));
+
+    // Same cleanup as reject: if the artist had already accepted, release
+    // the calendar block so they become bookable again.
+    if (
+      (booking.status === "accepted" || booking.status === "confirmed_by_client") &&
+      booking.eventDate
+    ) {
+      await db
+        .delete(calendarEvents)
+        .where(
+          and(
+            eq(calendarEvents.entityType, "artist"),
+            eq(calendarEvents.entityId, booking.artistId),
+            eq(calendarEvents.date, booking.eventDate),
+            eq(calendarEvents.source, "booking"),
+          ),
+        );
+    }
+  } else {
+    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
 
-  // Send email notification to client
-  if (booking.clientEmail) {
+  // M5 — in-app notifications for both sides of the flow.
+  void (async () => {
+    try {
+      if (action === "accept" || action === "reject") {
+        if (booking.clientUserId) {
+          const [artist] = await db
+            .select({ nameRo: artists.nameRo })
+            .from(artists)
+            .where(eq(artists.id, booking.artistId))
+            .limit(1);
+          await dispatchNotification({
+            userId: booking.clientUserId,
+            type: "booking_status_changed",
+            title:
+              action === "accept"
+                ? `Rezervarea ta la ${artist?.nameRo ?? "artist"} a fost acceptată`
+                : `Răspuns la cererea ta către ${artist?.nameRo ?? "artist"}`,
+            message: reply ?? undefined,
+            actionUrl: "/cabinet",
+          });
+        }
+      } else if (action === "client_confirm") {
+        const [artist] = await db
+          .select({ userId: artists.userId, nameRo: artists.nameRo })
+          .from(artists)
+          .where(eq(artists.id, booking.artistId))
+          .limit(1);
+        if (artist?.userId) {
+          await dispatchNotification({
+            userId: artist.userId,
+            type: "booking_request_status_changed",
+            title: "Client a confirmat rezervarea",
+            message: `${booking.clientName} — ${booking.eventDate}`,
+            actionUrl: "/dashboard/rezervari",
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[notifications] booking PUT", err);
+    }
+  })();
+
+  // Send email notification to the client on accept/reject. client_confirm
+  // and cancel are silent — the artist already sees them in the dashboard.
+  if ((action === "accept" || action === "reject") && booking.clientEmail) {
     try {
       const [artist] = await db.select({ nameRo: artists.nameRo }).from(artists).where(eq(artists.id, booking.artistId)).limit(1);
       const finalReply = action === "accept"

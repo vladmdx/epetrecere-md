@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { artists, artistImages, artistVideos, artistPackages, reviews } from "@/lib/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
@@ -26,5 +27,21 @@ export async function GET(
     db.select().from(reviews).where(and(eq(reviews.artistId, artistId), eq(reviews.isApproved, true))).orderBy(desc(reviews.createdAt)).limit(20),
   ]);
 
-  return NextResponse.json({ ...artist, images, videos, packages, reviews: artistReviews });
+  // M0a #8 — contact/price gated behind login.
+  const { userId } = await auth();
+  const payload = userId
+    ? artist
+    : {
+        ...artist,
+        priceFrom: null,
+        phone: null,
+        email: null,
+        instagram: null,
+        facebook: null,
+        youtube: null,
+        tiktok: null,
+        website: null,
+      };
+
+  return NextResponse.json({ ...payload, images, videos, packages, reviews: artistReviews });
 }

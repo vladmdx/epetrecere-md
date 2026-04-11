@@ -20,7 +20,7 @@ type BookingRequest = {
   eventType: string | null;
   guestCount: number | null;
   message: string | null;
-  status: "pending" | "accepted" | "rejected" | "cancelled";
+  status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled";
   artistReply: string | null;
   createdAt: string;
 };
@@ -36,7 +36,8 @@ type ChatMessage = {
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "În așteptare", color: "bg-warning/10 text-warning border-warning/30" },
-  accepted: { label: "Acceptat", color: "bg-success/10 text-success border-success/30" },
+  accepted: { label: "Așteaptă confirmare client", color: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
+  confirmed_by_client: { label: "Confirmat ambele părți", color: "bg-success/10 text-success border-success/30" },
   rejected: { label: "Refuzat", color: "bg-destructive/10 text-destructive border-destructive/30" },
   cancelled: { label: "Anulat", color: "bg-muted text-muted-foreground border-border" },
 };
@@ -225,7 +226,7 @@ export default function VendorBookingsPage() {
                     </div>
                   )}
 
-                  {booking.status === "accepted" && (
+                  {(booking.status === "accepted" || booking.status === "confirmed_by_client") && (
                     <div className="mt-4 space-y-3 border-t border-border/40 pt-3">
                       <Button
                         size="sm"

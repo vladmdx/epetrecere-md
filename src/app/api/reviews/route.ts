@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { reviews } from "@/lib/db/schema";
+import { reviews, artists, venues } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
 
 const reviewSchema = z.object({
   artistId: z.number().optional(),
@@ -30,6 +32,52 @@ export async function POST(req: NextRequest) {
     ...parsed.data,
     isApproved: false, // Needs admin approval
   }).returning();
+
+  // M5 — dispatch in-app notifications (non-blocking)
+  void (async () => {
+    try {
+      await dispatchToAdmins({
+        type: "admin_review_pending",
+        title: "Recenzie nouă de aprobat",
+        message: `${parsed.data.authorName} — ${parsed.data.rating}★`,
+        actionUrl: "/admin/recenzii",
+      });
+      if (parsed.data.artistId) {
+        const [artist] = await db
+          .select({ userId: artists.userId })
+          .from(artists)
+          .where(eq(artists.id, parsed.data.artistId))
+          .limit(1);
+        if (artist?.userId) {
+          await dispatchNotification({
+            userId: artist.userId,
+            type: "review_new",
+            title: "Ai o recenzie nouă",
+            message: `${parsed.data.rating}★ de la ${parsed.data.authorName}`,
+            actionUrl: "/dashboard/recenzii",
+          });
+        }
+      }
+      if (parsed.data.venueId) {
+        const [venue] = await db
+          .select({ userId: venues.userId })
+          .from(venues)
+          .where(eq(venues.id, parsed.data.venueId))
+          .limit(1);
+        if (venue?.userId) {
+          await dispatchNotification({
+            userId: venue.userId,
+            type: "review_new",
+            title: "Ai o recenzie nouă",
+            message: `${parsed.data.rating}★ de la ${parsed.data.authorName}`,
+            actionUrl: "/dashboard/recenzii",
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[notifications] review POST", err);
+    }
+  })();
 
   return NextResponse.json(review, { status: 201 });
 }

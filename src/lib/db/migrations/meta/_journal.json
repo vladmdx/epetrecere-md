@@ -8,6 +8,41 @@
       "when": 1775781076006,
       "tag": "0000_known_meteorite",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1775872742437,
+      "tag": "0001_icy_prism",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775873357958,
+      "tag": "0002_fluffy_moondragon",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1775876181747,
+      "tag": "0003_hard_kulan_gath",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1775877135156,
+      "tag": "0004_clean_sunspot",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775877838030,
+      "tag": "0005_sparkling_menace",
+      "breakpoints": true
     }
   ]
 }

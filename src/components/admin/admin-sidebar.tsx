@@ -21,6 +21,7 @@ import {
   PanelLeft,
   Sparkles,
   Star,
+  Camera,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/admin/categorii", icon: Grid3X3, label: "Categorii" },
   { href: "/admin/sali", icon: Building2, label: "Săli" },
   { href: "/admin/recenzii", icon: Star, label: "Recenzii" },
+  { href: "/admin/foto-ugc", icon: Camera, label: "Fotografii UGC" },
   { href: "/admin/blog", icon: FileText, label: "Blog" },
   { href: "/admin/pagini", icon: FileText, label: "Pagini" },
   { href: "/admin/seo", icon: Globe, label: "SEO" },

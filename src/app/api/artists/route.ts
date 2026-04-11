@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
 
 export async function GET(req: NextRequest) {
@@ -18,5 +19,24 @@ export async function GET(req: NextRequest) {
   };
 
   const result = await getArtists(filters);
+
+  // M0a #8 — price is only exposed to authenticated clients.
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({
+      ...result,
+      items: result.items.map((a) => ({
+        ...a,
+        priceFrom: null,
+        phone: null,
+        email: null,
+        instagram: null,
+        facebook: null,
+        youtube: null,
+        tiktok: null,
+      })),
+    });
+  }
+
   return NextResponse.json(result);
 }

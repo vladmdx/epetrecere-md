@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { users, artists } from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { users, artists, venues } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function GET(req: NextRequest) {
   const email = req.nextUrl.searchParams.get("email");
@@ -15,6 +15,14 @@ export async function GET(req: NextRequest) {
     .limit(1);
 
   if (dbUser) {
+    // Venue ownership is separate from role — a user can own a venue without
+    // being role=artist.
+    const [venue] = await db
+      .select({ id: venues.id, slug: venues.slug, isActive: venues.isActive })
+      .from(venues)
+      .where(eq(venues.userId, dbUser.id))
+      .limit(1);
+
     // Check if artist with completed onboarding
     if (dbUser.role === "artist") {
       const [artist] = await db
@@ -29,10 +37,19 @@ export async function GET(req: NextRequest) {
         artistApproved: artist?.isActive ?? false,
         artistId: artist?.id ?? null,
         artistSlug: artist?.slug ?? null,
+        venueId: venue?.id ?? null,
+        venueSlug: venue?.slug ?? null,
+        venueApproved: venue?.isActive ?? false,
       });
     }
 
-    return NextResponse.json({ role: dbUser.role, onboardingComplete: true });
+    return NextResponse.json({
+      role: venue ? "venue" : dbUser.role,
+      onboardingComplete: true,
+      venueId: venue?.id ?? null,
+      venueSlug: venue?.slug ?? null,
+      venueApproved: venue?.isActive ?? false,
+    });
   }
 
   // Check if email matches any artist in DB (for linking)
