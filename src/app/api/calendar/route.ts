@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
+import { auth } from "@clerk/nextjs/server";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { users, artists, venues } from "@/lib/db/schema";
 import {
   getCalendarEvents,
   bulkSetCalendarEvents,
@@ -59,11 +63,50 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: Request) {
+  // Ownership-gated write: the signed-in user must own the entity
+  // (artist.userId or venue.userId === users.id derived from Clerk session).
+  // Same pattern as PUT /api/venues/[id] and PUT /api/artists/[id].
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json();
   const parsed = postSchema.safeParse(body);
 
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid body", details: parsed.error.issues }, { status: 400 });
+  }
+
+  const [appUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+
+  if (!appUser) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Verify ownership of the target entity before touching its calendar.
+  if (parsed.data.entity_type === "artist") {
+    const [artist] = await db
+      .select({ id: artists.id, userId: artists.userId })
+      .from(artists)
+      .where(eq(artists.id, parsed.data.entity_id))
+      .limit(1);
+    if (!artist || artist.userId !== appUser.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+  } else {
+    const [venue] = await db
+      .select({ id: venues.id, userId: venues.userId })
+      .from(venues)
+      .where(eq(venues.id, parsed.data.entity_id))
+      .limit(1);
+    if (!venue || venue.userId !== appUser.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   await bulkSetCalendarEvents(
