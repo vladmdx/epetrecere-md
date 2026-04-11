@@ -3,21 +3,23 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { invitations, invitationGuests } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { requireAppUser } from "@/lib/planner/ownership";
 
 async function requireOwner(id: number) {
-  const { userId } = await auth();
-  if (!userId) return null;
+  // `invitations.userId` is the app-user UUID — resolve from Clerk session
+  // first. (Same fix as sibling routes for the INV-01 500 bug.)
+  const appUser = await requireAppUser();
+  if (!appUser.ok) return null;
   const [row] = await db
     .select()
     .from(invitations)
-    .where(and(eq(invitations.id, id), eq(invitations.userId, userId)))
+    .where(and(eq(invitations.id, id), eq(invitations.userId, appUser.userId)))
     .limit(1);
   if (!row) return null;
-  return { userId, invitation: row };
+  return { userId: appUser.userId, invitation: row };
 }
 
 function genToken(): string {

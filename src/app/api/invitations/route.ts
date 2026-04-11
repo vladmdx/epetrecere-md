@@ -5,22 +5,25 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { invitations, invitationGuests } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { requireAppUser } from "@/lib/planner/ownership";
 
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // `invitations.userId` is a `uuid` FK to `users.id` — we must resolve the
+  // Clerk session to the internal app-user UUID before querying, otherwise
+  // Postgres errors on the type mismatch (bug surfaced by E2E INV-01).
+  const appUser = await requireAppUser();
+  if (!appUser.ok) {
+    return NextResponse.json({ error: appUser.error }, { status: appUser.status });
   }
 
   const rows = await db
     .select()
     .from(invitations)
-    .where(eq(invitations.userId, userId))
+    .where(eq(invitations.userId, appUser.userId))
     .orderBy(desc(invitations.createdAt));
 
   return NextResponse.json(rows);
@@ -70,13 +73,13 @@ function genToken(): string {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const appUser = await requireAppUser();
+  if (!appUser.ok) {
+    return NextResponse.json({ error: appUser.error }, { status: appUser.status });
   }
 
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
-  const { success } = rateLimit(`invitations:${userId}:${ip}`, 10, 60_000);
+  const { success } = rateLimit(`invitations:${appUser.userId}:${ip}`, 10, 60_000);
   if (!success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
@@ -99,7 +102,7 @@ export async function POST(req: NextRequest) {
   const [invitation] = await db
     .insert(invitations)
     .values({
-      userId,
+      userId: appUser.userId,
       templateId: data.templateId,
       slug,
       status: "draft",

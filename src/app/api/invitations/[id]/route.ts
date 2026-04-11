@@ -2,21 +2,24 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { invitations, invitationGuests } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { requireAppUser } from "@/lib/planner/ownership";
 
 async function requireOwner(id: number) {
-  const { userId } = await auth();
-  if (!userId) return { error: "Unauthorized" as const };
+  // `invitations.userId` is the app-user UUID, not the Clerk ID — resolve
+  // the Clerk session to our internal user row first or Postgres will
+  // reject the FK comparison with a type error.
+  const appUser = await requireAppUser();
+  if (!appUser.ok) return { error: "Unauthorized" as const };
   const [row] = await db
     .select()
     .from(invitations)
-    .where(and(eq(invitations.id, id), eq(invitations.userId, userId)))
+    .where(and(eq(invitations.id, id), eq(invitations.userId, appUser.userId)))
     .limit(1);
   if (!row) return { error: "Not found" as const };
-  return { userId, invitation: row };
+  return { userId: appUser.userId, invitation: row };
 }
 
 export async function GET(

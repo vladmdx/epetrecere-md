@@ -31,7 +31,40 @@ export async function PUT(
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Ownership helper — for artist-side actions (accept/reject), resolve the
+  // signed-in user to the artist that owns the target booking. Surfaced as
+  // a vulnerability by the E2E BOOK-02 pass: previously any unauthenticated
+  // caller could flip a booking to accepted/rejected and mutate the
+  // artist's calendar.
+  async function requireBookingArtistOwner() {
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return { ok: false as const, status: 401, error: "Unauthorized" };
+    }
+    const [appUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    if (!appUser) {
+      return { ok: false as const, status: 401, error: "Unauthorized" };
+    }
+    const [artist] = await db
+      .select({ id: artists.id, userId: artists.userId })
+      .from(artists)
+      .where(eq(artists.id, booking.artistId))
+      .limit(1);
+    if (!artist || artist.userId !== appUser.id) {
+      return { ok: false as const, status: 403, error: "Forbidden" };
+    }
+    return { ok: true as const };
+  }
+
   if (action === "accept") {
+    const owner = await requireBookingArtistOwner();
+    if (!owner.ok) {
+      return NextResponse.json({ error: owner.error }, { status: owner.status });
+    }
     await db.update(bookingRequests).set({
       status: "accepted",
       artistReply: reply || "Cererea a fost acceptată!",
@@ -51,6 +84,10 @@ export async function PUT(
       });
     }
   } else if (action === "reject") {
+    const owner = await requireBookingArtistOwner();
+    if (!owner.ok) {
+      return NextResponse.json({ error: owner.error }, { status: owner.status });
+    }
     await db.update(bookingRequests).set({
       status: "rejected",
       artistReply: reply || "Ne pare rău, nu suntem disponibili.",
