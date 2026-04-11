@@ -374,12 +374,42 @@ e2e/global.setup.ts                    2 passed (setup — artist / client)
 
 ### How to run
 
+Top-level npm scripts:
+
 ```bash
-# Requires DATABASE_URL + CLERK_SECRET_KEY in .env.production.local or .env.local
-npx playwright test                    # full suite against live site
-npx playwright test e2e/api/ai.spec.ts # a single file
-E2E_BASE_URL=http://localhost:3000 npx playwright test  # against local dev
+npm run test:e2e         # default (live site per playwright.config.ts)
+npm run test:e2e:prod    # explicit https://epetrecere.md
+npm run test:e2e:local   # against http://localhost:3000 (dev server)
+npm run test:e2e:ui      # Playwright UI mode for debugging
 ```
 
-Reports land in `e2e-report/` (HTML) and `test-results/` (traces). Both
-are gitignored.
+The suite pulls `DATABASE_URL`, `CLERK_SECRET_KEY`, and
+`NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` from `.env.production.local` or
+`.env.local` (see `e2e/helpers/db.ts` and `playwright.config.ts`).
+Reports land in `e2e-report/` (HTML) and `test-results/` (traces),
+both gitignored.
+
+### CI (GitHub Actions)
+
+`.github/workflows/ci.yml` runs three jobs:
+
+1. **lint** — `npm run lint`. Currently `continue-on-error: true`
+   because of ~31 pre-existing errors inherited from the scaffold;
+   surfaced in the UI but doesn't block merges.
+2. **build** — `npm run build` with `DATABASE_URL`,
+   `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, and
+   `NEXT_PUBLIC_APP_URL=https://epetrecere.md` wired in. Runs on
+   every push and PR.
+3. **e2e** — full Playwright suite against the production URL.
+   Gated on `push` to `main` (so PR forks can't exfiltrate secrets)
+   and `needs: [build]`. Caches Playwright browsers keyed on the
+   `@playwright/test` version. Uploads the HTML report + traces as
+   artifacts (14-day retention).
+
+Required repo secrets:
+
+| Secret | Used by |
+|---|---|
+| `DATABASE_URL` | build (generateStaticParams) + e2e (Neon queries) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | build + e2e (Clerk SDK bootstrap on /test-login) |
+| `CLERK_SECRET_KEY` | build + e2e (minting sign-in tickets) |
