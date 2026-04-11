@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,28 +12,160 @@ import { ImageUpload } from "@/components/shared/image-upload";
 import { Save, Eye, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-export default function VendorProfilePage() {
-  const [saving, setSaving] = useState(false);
-  const [data, setData] = useState({
-    nameRo: "", location: "", phone: "", email: "",
-    website: "", instagram: "", facebook: "", youtube: "", tiktok: "",
-    priceFrom: 0, showPrice: true,
-    descriptionRo: "", descriptionRu: "", descriptionEn: "",
-    calendarEnabled: false, bufferHours: 2,
-    autoReplyEnabled: false,
-    autoReplyMessage: "Mulțumim pentru cerere! Am primit-o și revin cu un răspuns în cel mai scurt timp posibil.",
-    images: [] as { id: string; url: string; alt: string; isCover: boolean }[],
-  });
+type ProfileData = {
+  nameRo: string;
+  location: string;
+  phone: string;
+  email: string;
+  website: string;
+  instagram: string;
+  facebook: string;
+  youtube: string;
+  tiktok: string;
+  priceFrom: number;
+  showPrice: boolean;
+  descriptionRo: string;
+  descriptionRu: string;
+  descriptionEn: string;
+  calendarEnabled: boolean;
+  bufferHours: number;
+  autoReplyEnabled: boolean;
+  autoReplyMessage: string;
+  images: { id: string; url: string; alt: string; isCover: boolean }[];
+};
 
-  function update(partial: Partial<typeof data>) {
+const EMPTY: ProfileData = {
+  nameRo: "",
+  location: "",
+  phone: "",
+  email: "",
+  website: "",
+  instagram: "",
+  facebook: "",
+  youtube: "",
+  tiktok: "",
+  priceFrom: 0,
+  showPrice: true,
+  descriptionRo: "",
+  descriptionRu: "",
+  descriptionEn: "",
+  calendarEnabled: false,
+  bufferHours: 2,
+  autoReplyEnabled: false,
+  autoReplyMessage:
+    "Mulțumim pentru cerere! Am primit-o și revin cu un răspuns în cel mai scurt timp posibil.",
+  images: [],
+};
+
+export default function VendorProfilePage() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [artistId, setArtistId] = useState<number | null>(null);
+  const [data, setData] = useState<ProfileData>(EMPTY);
+
+  // Hydrate from the signed-in user's artist row. F-A4 before this fix
+  // used hardcoded empty values and silently discarded every edit.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/me/artist", { cache: "no-store" });
+        if (!res.ok) throw new Error("fetch failed");
+        const json = await res.json();
+        if (cancelled) return;
+        if (!json.artist) {
+          toast.error(
+            "Nu ai încă un profil de artist — completează onboarding-ul.",
+          );
+          setLoading(false);
+          return;
+        }
+        const a = json.artist as Record<string, unknown>;
+        setArtistId((a.id as number) ?? null);
+        setData({
+          nameRo: (a.nameRo as string) ?? "",
+          location: (a.location as string) ?? "",
+          phone: (a.phone as string) ?? "",
+          email: (a.email as string) ?? "",
+          website: (a.website as string) ?? "",
+          instagram: (a.instagram as string) ?? "",
+          facebook: (a.facebook as string) ?? "",
+          youtube: (a.youtube as string) ?? "",
+          tiktok: (a.tiktok as string) ?? "",
+          priceFrom: (a.priceFrom as number) ?? 0,
+          showPrice: true,
+          descriptionRo: (a.descriptionRo as string) ?? "",
+          descriptionRu: (a.descriptionRu as string) ?? "",
+          descriptionEn: (a.descriptionEn as string) ?? "",
+          calendarEnabled: Boolean(a.calendarEnabled),
+          bufferHours: (a.bufferHours as number) ?? 2,
+          autoReplyEnabled: Boolean(a.autoReplyEnabled),
+          autoReplyMessage:
+            (a.autoReplyMessage as string) ?? EMPTY.autoReplyMessage,
+          images: [],
+        });
+      } catch {
+        if (!cancelled) toast.error("Nu am putut încărca profilul");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function update(partial: Partial<ProfileData>) {
     setData((prev) => ({ ...prev, ...partial }));
   }
 
   async function handleSave() {
+    if (!artistId) {
+      toast.error("Profil indisponibil");
+      return;
+    }
     setSaving(true);
-    // In production: PUT /api/artists/crud with artist ID from auth context
-    toast.success("Profilul a fost salvat!");
-    setSaving(false);
+    try {
+      // Send only the editable schema fields — `showPrice` / `images` are
+      // not persisted by this endpoint (showPrice is UI-only until we wire
+      // a dedicated column; images live under /api/artist-images).
+      const payload = {
+        id: artistId,
+        nameRo: data.nameRo,
+        location: data.location,
+        phone: data.phone,
+        email: data.email,
+        website: data.website,
+        instagram: data.instagram,
+        facebook: data.facebook,
+        youtube: data.youtube,
+        tiktok: data.tiktok,
+        priceFrom: data.priceFrom,
+        descriptionRo: data.descriptionRo,
+        descriptionRu: data.descriptionRu,
+        descriptionEn: data.descriptionEn,
+        calendarEnabled: data.calendarEnabled,
+        bufferHours: data.bufferHours,
+        autoReplyEnabled: data.autoReplyEnabled,
+        autoReplyMessage: data.autoReplyMessage,
+      };
+      const res = await fetch("/api/artists/crud", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Save failed");
+      }
+      toast.success("Profilul a fost salvat!");
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Eroare la salvarea profilului",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAIImprove() {
@@ -41,7 +173,12 @@ export default function VendorProfilePage() {
       const res = await fetch("/api/ai/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "description", name: data.nameRo, description: data.descriptionRo, language: "ro" }),
+        body: JSON.stringify({
+          type: "description",
+          name: data.nameRo,
+          description: data.descriptionRo,
+          language: "ro",
+        }),
       });
       if (!res.ok) throw new Error();
       const result = await res.json();
@@ -50,6 +187,14 @@ export default function VendorProfilePage() {
     } catch {
       toast.error("AI indisponibil");
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   return (
@@ -61,7 +206,7 @@ export default function VendorProfilePage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> Preview</Button>
-          <Button onClick={handleSave} disabled={saving} className="bg-gold text-background hover:bg-gold-dark gap-2">
+          <Button onClick={handleSave} disabled={saving || !artistId} className="bg-gold text-background hover:bg-gold-dark gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Salvează
           </Button>

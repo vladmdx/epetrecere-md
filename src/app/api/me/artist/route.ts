@@ -1,6 +1,8 @@
-// F-S6 — Returns the artist owned by the currently signed-in user, or null.
-// Mirrors /api/me/venue. Powers entity-agnostic dashboard pages like the
-// calendar, which needs to know whether to load artist or venue data.
+// F-S6 / F-A4 — Returns the artist row owned by the currently signed-in
+// user, or `{ artist: null }`. Mirrors `/api/me/venue`. Powers
+// entity-agnostic dashboard pages (calendar) and the profile editor
+// (/cabinet-adjacent vendor dashboard) which needs the full row to
+// hydrate the form.
 
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
@@ -24,13 +26,11 @@ export async function GET() {
     return NextResponse.json({ artist: null });
   }
 
+  // Return the full artist row so callers like the vendor profile page
+  // can hydrate every editable field. Existing consumers (calendar) only
+  // read `.artist.id` / `.artist.nameRo`, so this is backwards-compatible.
   const [artist] = await db
-    .select({
-      id: artists.id,
-      slug: artists.slug,
-      nameRo: artists.nameRo,
-      isActive: artists.isActive,
-    })
+    .select()
     .from(artists)
     .where(eq(artists.userId, appUser.id))
     .limit(1);

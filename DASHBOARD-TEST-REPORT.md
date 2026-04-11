@@ -18,7 +18,7 @@ Legend:
 | F-A1 | Home / Panoul Meu | ⚠️ | `src/app/(vendor)/dashboard/page.tsx` — stats cards show static zeros, not wired to DB |
 | F-A2 | Calendar + iCal sync | ✅ | `src/app/(vendor)/dashboard/calendar/page.tsx`, `src/app/api/calendar/route.ts`, `src/app/api/calendar/ical/[artistId]/[token]/route.ts` |
 | F-A3 | Rezervări (bilateral confirm) | ✅ | `src/app/(vendor)/dashboard/rezervari/page.tsx`, `src/app/api/booking-requests/[id]/route.ts` — accept auto-blocks calendar (source="booking"); reject/cancel now auto-unblock (this session) |
-| F-A4 | Profil (info, descriere, galerie, pachete, setări) | ⚠️ | `src/app/(vendor)/dashboard/profil/page.tsx` is a visual mock — state is local, save only toasts. Real CRUD exists at `/api/artists/crud` but profile UI is not yet wired to it |
+| F-A4 | Profil (info, descriere, galerie, pachete, setări) | ✅ *(fixed)* | `src/app/(vendor)/dashboard/profil/page.tsx` now hydrates from `/api/me/artist` on mount and persists via `PUT /api/artists/crud`. The CRUD endpoint is auth-gated: admins can touch any row; owners can only PUT their own, with moderation flags (`isActive`/`isFeatured`/`isVerified`/`isPremium`/`userId`) stripped before write. Galerie/Pachete tabs are still placeholders. |
 | F-A5 | Mesaje | ✅ | `src/app/(vendor)/dashboard/mesaje/page.tsx`, `src/app/api/conversations/*` |
 | F-A6 | Recenzii (+ reply) | ✅ | `src/app/(vendor)/dashboard/recenzii/page.tsx`, `src/app/api/reviews/[id]/route.ts` |
 | F-A7 | Financiar | ⚠️ | `src/app/(vendor)/dashboard/financiar/page.tsx` (gated) |
@@ -203,12 +203,21 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 - **Venue owner dashboard** (F-S1..F-S6). Needs: venue onboarding flow,
   venue profile CRUD API + UI, facilities editor, menu builder, virtual tour
   field, venue calendar page.
-- **Artist profile save wiring** (F-A4 save button only toasts). Needs to
-  POST to `/api/artists/crud`.
 - **Dashboard Home stats** (F-A1) show hardcoded zeros.
 - **`next-sitemap` vs `sitemap.ts` conflict** causes dev server 500 on
   `/sitemap.xml`. Production build still works — choose one source of truth.
 - **AI endpoints 503** without `ANTHROPIC_API_KEY`.
+- **Admin UI has no server-side auth gate.** The `/admin/*` routes render
+  via `src/app/(admin)/admin/layout.tsx` which performs zero role check.
+  The underlying CRUD endpoint is now admin-gated (fixed in this session,
+  see below), so the blast radius is limited to the read-only admin pages,
+  but the layout still needs a `requireAdmin()` wrapper. Related: no
+  `super_admin` / `admin` users are currently seeded in the DB — flipping
+  someone's role is a one-off SQL update against the `users.role` column.
+- **Artist image gallery / video / package persistence** still uses local
+  component state — the profile page hydrate/save wiring only covers the
+  scalar `artists` columns. `artist_images`, `artist_videos`, and
+  `artist_packages` tables exist but aren't wired to UI yet.
 
 ---
 
@@ -259,21 +268,13 @@ Shared helpers in `e2e/helpers/`:
 - `db.ts` — Neon serverless SQL client + `getTestUsers()` / `getIgorArtist()`
   fixtures for direct DB assertions and teardown.
 
-### Final results
+### Initial pass — results (25/25 → now superseded)
 
-```
-e2e/api/ai.spec.ts                     2 passed (AI-01 / AI-02)
-e2e/api/booking-lifecycle.spec.ts      5 passed (CAL-02 / CAL-03 / BOOK-02 / BOOK-03)
-e2e/api/cross-01.spec.ts               7 passed (CROSS-01)
-e2e/api/invitations-rsvp.spec.ts       3 passed (INV-01 / INV-03)
-e2e/api/moments.spec.ts                6 passed (MOM-01 / MOM-02)
-e2e/global.setup.ts                    2 passed (setup — artist / client)
-
-25 passed (36.6s)
-```
-
-All 7 previously BLOCKED test cases now have green automated coverage
-against the live production deploy.
+Initial pass against the live deploy unblocked 7 previously-BLOCKED
+test cases (CAL-02/CAL-03/BOOK-02/BOOK-03/INV-01/INV-03/MOM-01/MOM-02/
+AI-01/AI-02/CROSS-01) with **25/25 green** and surfaced two production
+regressions documented below. See "Final results" further down for the
+current suite after F-A4 lockdown.
 
 ### Bugs discovered and fixed during the pass
 
@@ -306,6 +307,49 @@ were deployed as `044ff00` before the final suite ran.
    be added if needed.
 
 Both fixes are live on `epetrecere.md`.
+
+### Follow-up pass — F-A4 profile save wiring
+
+A second E2E-driven pass added `e2e/api/artists-crud-auth.spec.ts` (7
+negative cases) and `e2e/api/profile-roundtrip.spec.ts` (4 positive /
+negative cases) covering the newly-wired vendor profile editor.
+
+**Third CRITIC — `/api/artists/crud` had no auth.** Before the fix,
+anonymous `POST`/`PUT`/`DELETE` against any artist row succeeded. The
+vendor dashboard profile page was a local mock with a toast-only save
+button, which masked the fact that its intended backend was wide open.
+Fix applied:
+
+- `POST` / `DELETE` are now admin-only (role in `super_admin` / `admin`).
+- `PUT` accepts the owner (`artists.user_id === appUser.id`) OR an admin.
+- For non-admin PUTs the handler strips the moderation flags
+  (`isActive`, `isFeatured`, `isVerified`, `isPremium`) and `userId`
+  from the payload before writing, so an owner can't self-promote.
+- `/api/me/artist` GET now returns the full artist row (not just the
+  4-field summary) so the profile form can hydrate every editable field.
+- `src/app/(vendor)/dashboard/profil/page.tsx` hydrates on mount via
+  `GET /api/me/artist` and persists via `PUT /api/artists/crud` with
+  the resolved artist id. Loading state + error toasts added.
+
+Silent data loss fixed. Admin dashboard at `/admin/artisti/[id]/page.tsx`
+still calls the same endpoint — now rejects with 403 unless the signed-in
+user's DB role is `super_admin` or `admin` (see known gaps).
+
+### Final results
+
+```
+e2e/api/ai.spec.ts                     2 passed (AI-01 / AI-02)
+e2e/api/artists-crud-auth.spec.ts      7 passed (F-A4 auth matrix)
+e2e/api/booking-auth-negative.spec.ts  8 passed (BOOK-AUTH-NEG)
+e2e/api/booking-lifecycle.spec.ts      5 passed (CAL-02 / CAL-03 / BOOK-02 / BOOK-03)
+e2e/api/cross-01.spec.ts               7 passed (CROSS-01)
+e2e/api/invitations-rsvp.spec.ts       3 passed (INV-01 / INV-03)
+e2e/api/moments.spec.ts                6 passed (MOM-01 / MOM-02)
+e2e/api/profile-roundtrip.spec.ts      4 passed (F-A4 round-trip)
+e2e/global.setup.ts                    2 passed (setup — artist / client)
+
+44 passed (41.8s)
+```
 
 ### How to run
 
