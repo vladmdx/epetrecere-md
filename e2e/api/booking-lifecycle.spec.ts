@@ -98,9 +98,10 @@ test.describe.serial("booking lifecycle (CAL-02 / BOOK-02 / BOOK-03)", () => {
   });
 
   test("2. artist accepts → status=accepted, calendar_events row inserted", async () => {
-    // NOTE: The current `action=accept` branch has NO auth gate — any caller
-    // can accept any booking. We still send the artist session to model the
-    // expected flow; a follow-up finding documents the vulnerability.
+    // `action=accept` is gated by `requireBookingArtistOwner()` — anonymous
+    // and wrong-user calls are rejected with 401/403. The dedicated
+    // `booking-auth-negative.spec.ts` locks that in. Here we exercise the
+    // happy path with Igor's persisted session so the gate passes.
     const req = await pwRequest.newContext({
       baseURL: BASE,
       storageState: ARTIST_STATE,
