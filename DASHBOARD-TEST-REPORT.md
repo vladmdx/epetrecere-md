@@ -15,7 +15,7 @@ Legend:
 
 | Code | Feature | Status | Path |
 |------|---------|--------|------|
-| F-A1 | Home / Panoul Meu | ⚠️ | `src/app/(vendor)/dashboard/page.tsx` — stats cards show static zeros, not wired to DB |
+| F-A1 | Home / Panoul Meu | ✅ *(fixed)* | `src/app/(vendor)/dashboard/page.tsx` is now a server component that resolves the signed-in user → artist row and renders four real stats via `getArtistStats` (`src/lib/db/queries/artist-stats.ts`): pending requests, profile views (30d), rating avg, confirmed this month. Same helper powers `GET /api/me/artist/stats`. |
 | F-A2 | Calendar + iCal sync | ✅ | `src/app/(vendor)/dashboard/calendar/page.tsx`, `src/app/api/calendar/route.ts`, `src/app/api/calendar/ical/[artistId]/[token]/route.ts` |
 | F-A3 | Rezervări (bilateral confirm) | ✅ | `src/app/(vendor)/dashboard/rezervari/page.tsx`, `src/app/api/booking-requests/[id]/route.ts` — accept auto-blocks calendar (source="booking"); reject/cancel now auto-unblock (this session) |
 | F-A4 | Profil (info, descriere, galerie, pachete, setări) | ✅ *(fixed)* | `src/app/(vendor)/dashboard/profil/page.tsx` now hydrates from `/api/me/artist` on mount and persists via `PUT /api/artists/crud`. The CRUD endpoint is auth-gated: admins can touch any row; owners can only PUT their own, with moderation flags (`isActive`/`isFeatured`/`isVerified`/`isPremium`/`userId`) stripped before write. Galerie/Pachete tabs are still placeholders. |
@@ -203,7 +203,6 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 - **Venue owner dashboard** (F-S1..F-S6). Needs: venue onboarding flow,
   venue profile CRUD API + UI, facilities editor, menu builder, virtual tour
   field, venue calendar page.
-- **Dashboard Home stats** (F-A1) show hardcoded zeros.
 - **`next-sitemap` vs `sitemap.ts` conflict** causes dev server 500 on
   `/sitemap.xml`. Production build still works — choose one source of truth.
 - **AI endpoints 503** without `ANTHROPIC_API_KEY`.
@@ -335,10 +334,34 @@ Silent data loss fixed. Admin dashboard at `/admin/artisti/[id]/page.tsx`
 still calls the same endpoint — now rejects with 403 unless the signed-in
 user's DB role is `super_admin` or `admin` (see known gaps).
 
+### Follow-up pass — F-A1 dashboard home stats
+
+A third pass wired the four stat cards on `/dashboard` to real DB data.
+Before, the page was a client component with four hardcoded `"0"` values —
+zero signal for the artist on first login.
+
+- New shared helper `src/lib/db/queries/artist-stats.ts::getArtistStats()`
+  runs four reads in parallel: pending `booking_requests`, `profile_views`
+  in the last 30 days, `artists.rating_avg`/`rating_count`, and
+  `booking_requests` flipped to `confirmed_by_client` since the start of
+  the current calendar month (our "Venituri luna" proxy until we persist
+  agreed price per request).
+- New auth-gated endpoint `GET /api/me/artist/stats` returns the same
+  object. Anonymous → 401; signed-in non-artist → 200 + `{ stats: null }`.
+- `src/app/(vendor)/dashboard/page.tsx` is now a server component that
+  resolves the signed-in user → artist row and calls the helper directly
+  (no extra HTTP hop). Marked `dynamic = "force-dynamic"` so each
+  dashboard paint fetches fresh numbers.
+- `e2e/api/artist-stats.spec.ts` (3 cases) seeds one pending booking
+  request for Igor, asserts the endpoint auth matrix, and cross-checks
+  the `pendingRequests` field against the raw SQL count so a drift in
+  the helper would fail the test, not pass silently.
+
 ### Final results
 
 ```
 e2e/api/ai.spec.ts                     2 passed (AI-01 / AI-02)
+e2e/api/artist-stats.spec.ts           3 passed (F-A1 stats dashboard)
 e2e/api/artists-crud-auth.spec.ts      7 passed (F-A4 auth matrix)
 e2e/api/booking-auth-negative.spec.ts  8 passed (BOOK-AUTH-NEG)
 e2e/api/booking-lifecycle.spec.ts      5 passed (CAL-02 / CAL-03 / BOOK-02 / BOOK-03)
@@ -348,7 +371,7 @@ e2e/api/moments.spec.ts                6 passed (MOM-01 / MOM-02)
 e2e/api/profile-roundtrip.spec.ts      4 passed (F-A4 round-trip)
 e2e/global.setup.ts                    2 passed (setup — artist / client)
 
-44 passed (41.8s)
+47 passed (39.9s)
 ```
 
 ### How to run

@@ -1,15 +1,91 @@
+// F-A1 — Artist dashboard home.
+//
+// Was a client component with four hardcoded "0" stat cards — zero
+// signal for the artist and a trust killer on first login. It's now a
+// server component that resolves the signed-in user → artist row and
+// renders real numbers via `getArtistStats` (same helper the
+// /api/me/artist/stats endpoint uses).
+//
+// Users who aren't signed in or don't have an artist row yet still see
+// the dashboard shell (so venue-only vendors and mid-onboarding artists
+// aren't locked out); they just get dashes in the stat cards.
+
 import Link from "next/link";
+import { auth } from "@clerk/nextjs/server";
+import { eq } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Eye, Star, DollarSign, Building2 } from "lucide-react";
+import {
+  BookOpen,
+  Eye,
+  Star,
+  CheckCircle2,
+  Building2,
+} from "lucide-react";
+import { db } from "@/lib/db";
+import { artists, users } from "@/lib/db/schema";
+import {
+  getArtistStats,
+  type ArtistStats,
+} from "@/lib/db/queries/artist-stats";
 
-const stats = [
-  { label: "Rezervări noi", value: "0", icon: BookOpen, color: "text-gold" },
-  { label: "Vizite profil", value: "0", icon: Eye, color: "text-info" },
-  { label: "Rating mediu", value: "—", icon: Star, color: "text-warning" },
-  { label: "Venituri luna", value: "0 €", icon: DollarSign, color: "text-success" },
-];
+export const dynamic = "force-dynamic";
 
-export default function VendorDashboard() {
+async function loadStats(): Promise<ArtistStats | null> {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) return null;
+
+  const [appUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  if (!appUser) return null;
+
+  const [artist] = await db
+    .select({ id: artists.id })
+    .from(artists)
+    .where(eq(artists.userId, appUser.id))
+    .limit(1);
+  if (!artist) return null;
+
+  return getArtistStats(artist.id);
+}
+
+function formatRating(stats: ArtistStats | null): string {
+  if (!stats || stats.ratingCount === 0 || stats.ratingAvg === null) return "—";
+  return stats.ratingAvg.toFixed(1);
+}
+
+export default async function VendorDashboard() {
+  const stats = await loadStats();
+
+  const cards = [
+    {
+      label: "Cereri noi",
+      value: stats ? String(stats.pendingRequests) : "—",
+      icon: BookOpen,
+      color: "text-gold",
+    },
+    {
+      label: "Vizite profil (30 zile)",
+      value: stats ? String(stats.profileViews30d) : "—",
+      icon: Eye,
+      color: "text-info",
+    },
+    {
+      label: "Rating mediu",
+      value: formatRating(stats),
+      icon: Star,
+      color: "text-warning",
+    },
+    {
+      label: "Confirmate luna",
+      value: stats ? String(stats.confirmedThisMonth) : "—",
+      icon: CheckCircle2,
+      color: "text-success",
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -20,7 +96,7 @@ export default function VendorDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
+        {cards.map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
