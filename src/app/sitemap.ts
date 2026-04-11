@@ -13,7 +13,13 @@ import { CITIES } from "@/lib/seo/cities";
 //   - All published blog posts
 //   - SEO auto-pages: /artisti/in/[city], /artisti/in/[city]/[category], /sali/in/[city]
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
+// `.trim()` + trailing-slash strip defends against env values that carry
+// a trailing newline or stray slash — one such value is currently in
+// `.env.production.local` and was previously shipping broken `<loc>` URLs
+// (`https://epetrecere.md\n/artisti/...`) to Google via next-sitemap.
+const BASE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md")
+  .trim()
+  .replace(/\/+$/, "");
 
 // Revalidate the sitemap at most once an hour so Google doesn't hammer the DB.
 export const revalidate = 3600;

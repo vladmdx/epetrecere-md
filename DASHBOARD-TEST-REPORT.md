@@ -203,8 +203,6 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 - **Venue owner dashboard** (F-S1..F-S6). Needs: venue onboarding flow,
   venue profile CRUD API + UI, facilities editor, menu builder, virtual tour
   field, venue calendar page.
-- **`next-sitemap` vs `sitemap.ts` conflict** causes dev server 500 on
-  `/sitemap.xml`. Production build still works — choose one source of truth.
 - **AI endpoints 503** without `ANTHROPIC_API_KEY`.
 - **Admin UI has no server-side auth gate.** The `/admin/*` routes render
   via `src/app/(admin)/admin/layout.tsx` which performs zero role check.
