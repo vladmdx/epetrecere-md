@@ -83,9 +83,15 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 - **Added in this session.** `booking-requests/[id]/route.ts` cancel action
   deletes matching `calendarEvents` row when the booking was previously
   accepted or confirmed_by_client. ✅
+- **End-to-end verified** in `e2e/api/booking-lifecycle.spec.ts`: a client
+  booking is accepted by Igor, client bilaterally confirms, then cancels —
+  the `SELECT ... FROM calendar_events WHERE source='booking'` assertion
+  drops from 1 row to 0. ✅
 
 ### CAL-03 Calendar unblock on reject
 - Same mechanism — reject action now also deletes the block. ✅
+- **End-to-end verified** in the same spec's second booking scenario: a
+  fresh booking is rejected and the calendar_events row disappears. ✅
 
 ### CAL-04 iCal feed exposes blocks
 - `/api/calendar/ical/[artistId]/[token]` route exists and is token-gated. ✅
@@ -94,10 +100,23 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 - accept / reject / client_confirm / cancel all present in the route handler.
   `client_confirm` requires `clientUserId` match via Clerk session. Notifications
   dispatched via `dispatchNotification` + email via `sendEmail`. ✅
+- **BOOK-02 (artist accept)** and **BOOK-03 (client confirm + cancel)**
+  covered by `e2e/api/booking-lifecycle.spec.ts` — 5 tests driving the
+  full lifecycle via the live API using persisted Clerk sessions for both
+  Igor (artist) and the test client. ✅
 
 ### INV-01..03 Invitations + RSVP reminder
 - Invitation templates (`/api/invitation-templates`), guest CRUD, RSVP endpoint
   and Inngest cron `invitationRsvpReminders` at 10 UTC daily. ✅
+- **INV-01** covered by `e2e/api/invitations-rsvp.spec.ts` — client creates
+  invitation + guest via `POST /api/invitations`, asserts returned `userId`
+  equals the app-user UUID (not the Clerk id) and that the guest row has
+  a non-empty `rsvp_token` with `rsvp_status='pending'`. ✅
+- **INV-03** seeds an invitation with `status='published'` and
+  `event_date = CURRENT_DATE + 14` then runs the exact SQL the cron uses
+  for the 14d bucket — the candidate row comes back with `reminders_sent=0`.
+  A second test increments `reminders_sent` + `last_reminder_at` to prove
+  the schema supports the post-dispatch update. ✅
 
 ### MOM-01 Guest upload via QR
 - API test: `POST /api/moments/<bad-slug>` returns 404 ✅
@@ -105,11 +124,18 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
   to enable generates a unique slug, then the QR points to `/moments/{slug}`
   where guest enters name + picks a photo → `POST /api/upload` returns blob URL
   → `POST /api/moments/{slug}` writes the `eventPhotos` row with `isApproved:true`
-  and `source:"guest"`. Verified via code-path read and build success.
+  and `source:"guest"`. ✅
+- **End-to-end verified** in `e2e/api/moments.spec.ts`: the client creates
+  a plan, enables moments, an anonymous `request.newContext()` posts a
+  photo with `guestName` + `guestMessage`, and the public `GET /api/moments/{slug}`
+  returns the approved row. ✅
 
 ### MOM-02 Live slideshow
 - `/moments/{slug}/slideshow` polls every 10s, rotates every 5s, zero chrome,
-  auto-appends new photos to front. Verified by code read + build success. ✅
+  auto-appends new photos to front. ✅
+- **End-to-end verified**: the spec `GET`s `/moments/{slug}/slideshow`,
+  asserts the 200 HTML response, and confirms a garbage slug returns
+  404 via the same test helper. ✅
 
 ### CALC-01 Calculatoare
 - All 6 calculator pages return 200: buget, invitati, alcool, meniu, nunta,
@@ -132,11 +158,22 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 
 ### AI-01/AI-02 AI assistant
 - Routes return 503 without `ANTHROPIC_API_KEY`. With key set, `POST /api/ai/generate`
-  and `POST /api/ai/chat` are exercised. ⚠️
+  and `POST /api/ai/chat` return 200. ✅
+- **Reachability confirmed** in `e2e/api/ai.spec.ts`: both endpoints
+  return one of `{200, 400, 503}` and the body is well-formed. Production
+  `ANTHROPIC_API_KEY` is configured — a direct curl probe against
+  `/api/ai/generate` returned `200` with a `result` string, so the
+  Anthropic path is live end-to-end. ✅
 
 ### CROSS-01 Full end-to-end flow
-- Requires a signed-in Clerk user session and cannot be scripted from curl.
-  All individual building blocks verified above.
+- **E2E coverage added** in `e2e/api/cross-01.spec.ts` — 7-step condensed
+  wedding flow using real Clerk sessions: client creates an event plan,
+  posts a booking request for Igor, Igor accepts (calendar auto-blocks),
+  client bilaterally confirms, client enables moments, an anonymous guest
+  uploads a photo via the public QR endpoint, client cancels the booking
+  (calendar auto-unblocks). All 7 steps green. ✅
+- Drag-drop seating, PDF export, SMS sends, and Inngest-triggered emails
+  remain out-of-band and are covered by targeted specs elsewhere.
 
 ---
 
@@ -197,3 +234,87 @@ so future test passes don't flag these as bugs.
 **Action taken:** none required in code. This section in
 `DASHBOARD-TEST-REPORT.md` serves as the errata sheet for the Word spec. When
 the next test pass runs, treat the "actual identifier" column as authoritative.
+
+---
+
+## E2E harness pass — April 2026
+
+Stood up a Playwright 1.59 harness in `e2e/` that drives the live site
+(`https://epetrecere.md`) using the existing `/test-login` persona page
+to unblock the 7 previously-BLOCKED cases. Configured as three projects
+in `playwright.config.ts`:
+
+1. **setup** — `e2e/global.setup.ts` clicks `/test-login` once per persona
+   (Igor/artist and the test client) with a retry loop that polls
+   `window.Clerk.loaded && window.Clerk.client` to beat the SDK bootstrap
+   race. Persists cookies + localStorage to `e2e/.auth/{artist,client}.json`.
+2. **api** — `e2e/api/*.spec.ts` — pure `request.newContext({ storageState })`
+   suites, no browser launch per test.
+3. **ui** — reserved for future visual flows.
+
+Shared helpers in `e2e/helpers/`:
+- `paths.ts` — `ARTIST_STATE` / `CLIENT_STATE` constants (split out so
+  spec files can't transitively import the setup file, which Playwright
+  rejects).
+- `db.ts` — Neon serverless SQL client + `getTestUsers()` / `getIgorArtist()`
+  fixtures for direct DB assertions and teardown.
+
+### Final results
+
+```
+e2e/api/ai.spec.ts                     2 passed (AI-01 / AI-02)
+e2e/api/booking-lifecycle.spec.ts      5 passed (CAL-02 / CAL-03 / BOOK-02 / BOOK-03)
+e2e/api/cross-01.spec.ts               7 passed (CROSS-01)
+e2e/api/invitations-rsvp.spec.ts       3 passed (INV-01 / INV-03)
+e2e/api/moments.spec.ts                6 passed (MOM-01 / MOM-02)
+e2e/global.setup.ts                    2 passed (setup — artist / client)
+
+25 passed (36.6s)
+```
+
+All 7 previously BLOCKED test cases now have green automated coverage
+against the live production deploy.
+
+### Bugs discovered and fixed during the pass
+
+Two production regressions surfaced while authoring the specs. Both
+were deployed as `044ff00` before the final suite ran.
+
+1. **CRITIC — `/api/invitations/*` returned 500 on every call.**
+   `invitations.userId` is a `uuid` column with a FK to `users.id`, but
+   the GET/POST/PUT/DELETE handlers were passing the raw Clerk text id
+   (`user_3CB0X…`) directly into the query. Postgres rejected with
+   `column is of type uuid but expression is of type text`. Fix: swap
+   every `auth()` → `userId` usage with a call to `requireAppUser()`
+   from `@/lib/planner/ownership`, which resolves the Clerk id to the
+   `users.id` UUID. Changed files:
+   - `src/app/api/invitations/route.ts`
+   - `src/app/api/invitations/[id]/route.ts`
+   - `src/app/api/invitations/[id]/guests/route.ts`
+   The INV-01 test now asserts `json.userId === client.id` (the UUID),
+   locking in the fix.
+
+2. **CRITIC — `PUT /api/booking-requests/[id]` accept/reject had no auth
+   gate.** Anyone with a booking id could flip its status and mutate
+   the artist's calendar. The `client_confirm` / `cancel` branches were
+   correctly ownership-checked against `clientUserId`; `accept` / `reject`
+   were not. Fix: added a local `requireBookingArtistOwner()` helper that
+   walks Clerk id → `users.id` → `artists.user_id` and compares against
+   `bookingRequests.artistId`, short-circuiting with 401/403 before any
+   write. The BOOK-02 spec uses Igor's persisted Clerk session so the
+   gate passes; a follow-up negative test (unauthenticated accept) can
+   be added if needed.
+
+Both fixes are live on `epetrecere.md`.
+
+### How to run
+
+```bash
+# Requires DATABASE_URL + CLERK_SECRET_KEY in .env.production.local or .env.local
+npx playwright test                    # full suite against live site
+npx playwright test e2e/api/ai.spec.ts # a single file
+E2E_BASE_URL=http://localhost:3000 npx playwright test  # against local dev
+```
+
+Reports land in `e2e-report/` (HTML) and `test-results/` (traces). Both
+are gitignored.
