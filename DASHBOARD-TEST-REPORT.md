@@ -172,3 +172,28 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 - **`next-sitemap` vs `sitemap.ts` conflict** causes dev server 500 on
   `/sitemap.xml`. Production build still works — choose one source of truth.
 - **AI endpoints 503** without `ANTHROPIC_API_KEY`.
+
+---
+
+## Spec ↔ Schema errata (WARN #3)
+
+The Word test spec (`ePetrecere-Dashboard-Functions-Test-Cases.docx`) was
+drafted before the final schema landed and references a handful of table /
+column names that never existed in the codebase. The behaviour described is
+correct — only the identifiers differ. This table is the canonical mapping
+so future test passes don't flag these as bugs.
+
+| Spec identifier | Actual identifier | Location | Notes |
+|-----------------|-------------------|----------|-------|
+| `gallery_items` (MOM-01 line 722, CROSS-01 line 941) | `event_photos` | `src/lib/db/schema.ts:769` | Table holds Event Moments uploads from guests + plan owner. Used by `/api/moments/[slug]` and `/api/event-plans/[id]/moments`. |
+| `gallery_items.author_name` (MOM-01) | `event_photos.guest_name` | `src/lib/db/schema.ts:779` | Plus sibling `guest_message` for the uploader's short note. |
+| `author_name` implied author role | `event_photos.source` (`"client"` \| `"guest"`) | `src/lib/db/schema.ts:784` | Anonymous QR uploads get `source="guest"` and are auto-approved so they land in the live slideshow immediately. |
+| `reminder_count` (INV-03 line 698) | `invitation_guests.reminders_sent` | `src/lib/db/schema.ts:1124` | Incremented by the Inngest cron `invitationRsvpReminders`. |
+| `reminder_sent_at` (INV-03 line 698) | `invitation_guests.last_reminder_at` | `src/lib/db/schema.ts:1125` | Timestamp of most recent reminder dispatch. |
+| `event_plan_checklist` / `event_plan_guests` / `event_plan_tables` / `event_plan_seats` (implied grouping in F-C3..F-C7) | `checklist_items` / `guest_list` / `seating_tables` / `seat_assignments` | `src/lib/db/schema.ts:706,723,742,755` | All four reference `event_plans.id` via `plan_id` foreign keys; the spec's grouped `event_plan_*` prefix is cosmetic only. |
+| `chat_messages` between client and vendor (F-C10) | `chat_messages` (as-is) ✅ | `src/lib/db/schema.ts:645` | Not a discrepancy — documented here for completeness since it sits next to the `conversations` table the spec doesn't name. |
+| `calendar_events` (AI-01 line 859, F-A2 line 542) | `calendar_events` (as-is) ✅ | `src/lib/db/schema.ts:317` | Not a discrepancy — confirming spec matches schema for the AI calendar-block flow. |
+
+**Action taken:** none required in code. This section in
+`DASHBOARD-TEST-REPORT.md` serves as the errata sheet for the Word spec. When
+the next test pass runs, treat the "actual identifier" column as authoritative.
