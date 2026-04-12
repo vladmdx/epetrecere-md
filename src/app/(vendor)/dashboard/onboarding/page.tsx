@@ -31,9 +31,9 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     fetch("/api/categories")
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(cats => setCategories(cats.filter((c: Category) => c.type === "artist")))
-      .catch(() => {});
+      .catch(() => toast.error("Nu s-au putut încărca categoriile"));
 
     if (user) {
       setData(d => ({ ...d, name: user.fullName || "" }));

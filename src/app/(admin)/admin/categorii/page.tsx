@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Edit, GripVertical, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Category {
   id: number;
@@ -43,7 +44,7 @@ export default function CategoriesPage() {
           setCategories(Array.isArray(data) ? data : []);
         }
       } catch {
-        // silent
+        toast.error("Nu s-au putut încărca categoriile");
       } finally {
         setLoading(false);
       }

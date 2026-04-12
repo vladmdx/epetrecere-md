@@ -82,7 +82,7 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
 
           {/* Gallery */}
           <div className="mt-6">
-            <ImageGallery images={venue.images.map((img) => ({ url: img.url, alt: img.altRo }))} />
+            <ImageGallery images={(venue.images || []).map((img) => ({ url: img.url, alt: img.altRo }))} />
           </div>
 
           {/* Description */}

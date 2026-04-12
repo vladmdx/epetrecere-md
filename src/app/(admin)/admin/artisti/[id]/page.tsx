@@ -58,9 +58,10 @@ export default function EditArtistPage() {
   useEffect(() => {
     if (!isNew) {
       fetch(`/api/artists/${id}`)
-        .then((r) => r.json())
-        .then((data) => { setArtist(data); setLoading(false); })
-        .catch(() => { toast.error("Nu s-a putut încărca artistul"); setLoading(false); });
+        .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+        .then((data) => { setArtist(data); })
+        .catch(() => { toast.error("Nu s-a putut încărca artistul"); })
+        .finally(() => { setLoading(false); });
     }
   }, [id, isNew]);
 
@@ -91,9 +92,14 @@ export default function EditArtistPage() {
 
   async function handleDelete() {
     if (!confirm("Sigur vrei să ștergi acest artist?")) return;
-    await fetch(`/api/artists/crud?id=${id}`, { method: "DELETE" });
-    toast.success("Artist șters");
-    router.push("/admin/artisti");
+    try {
+      const res = await fetch(`/api/artists/crud?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.success("Artist șters");
+      router.push("/admin/artisti");
+    } catch {
+      toast.error("Nu s-a putut șterge artistul");
+    }
   }
 
   async function handleAIGenerate(field: string) {
@@ -228,7 +234,16 @@ export default function EditArtistPage() {
             <CardContent>
               <ImageUpload
                 images={(artist.images || []).map((img) => ({ id: String(img.id), url: img.url, alt: img.altRo || "", isCover: img.isCover }))}
-                onChange={() => {}}
+                onChange={(updated) =>
+                  update({
+                    images: updated.map((img) => ({
+                      id: Number(img.id) || 0,
+                      url: img.url,
+                      altRo: img.alt,
+                      isCover: img.isCover,
+                    })),
+                  })
+                }
               />
             </CardContent>
           </Card>

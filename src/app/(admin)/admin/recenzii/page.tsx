@@ -27,9 +27,10 @@ export default function AdminReviewsPage() {
 
   useEffect(() => {
     fetch("/api/reviews/list")
-      .then((r) => r.json())
-      .then((data) => { setReviews(data); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((data) => { setReviews(data); })
+      .catch(() => toast.error("Nu s-au putut încărca recenziile"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleAction(id: number, action: "approve" | "reject") {

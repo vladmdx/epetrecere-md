@@ -17,6 +17,7 @@ const KanbanBoard = dynamic(
   { ssr: false },
 );
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
   new: { label: "Nou", color: "bg-info/10 text-info border-info/30", icon: AlertCircle },
@@ -61,9 +62,10 @@ export default function CRMPage() {
 
   useEffect(() => {
     fetch("/api/leads")
-      .then(r => r.json())
-      .then(data => { setLeads(Array.isArray(data) ? data : []); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => { setLeads(Array.isArray(data) ? data : []); })
+      .catch(() => toast.error("Nu s-au putut încărca solicitările"))
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = leads.filter((lead) => {

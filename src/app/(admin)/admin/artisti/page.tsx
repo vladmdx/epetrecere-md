@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Plus, Search, Edit, Star, BadgeCheck, Eye, Sparkles, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface Artist {
   id: number; nameRo: string; slug: string; priceFrom: number | null;
@@ -38,7 +39,7 @@ export default function AdminArtistsPage() {
         }
         setArtists(allArtists);
       } catch {
-        // silent
+        toast.error("Nu s-au putut încărca artiștii");
       } finally {
         setLoading(false);
       }

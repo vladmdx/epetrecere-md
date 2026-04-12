@@ -26,11 +26,14 @@ export default function AdminPagesPage() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    fetch("/api/pages").then(r => r.json()).then(data => {
-      setPages(data);
-      if (data.length) setSelectedPage(data[0]);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    fetch("/api/pages")
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => {
+        setPages(data);
+        if (data.length) setSelectedPage(data[0]);
+      })
+      .catch(() => toast.error("Nu s-au putut încărca paginile"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function handleSave() {

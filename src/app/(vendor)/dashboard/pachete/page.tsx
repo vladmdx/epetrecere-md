@@ -104,8 +104,11 @@ export default function VendorPackagesPage() {
       setLoading(true);
       try {
         const r = await fetch(`/api/artist-packages?artist_id=${artistId}`);
+        if (!r.ok) throw new Error();
         const data = await r.json();
         setPkgs(Array.isArray(data) ? data : []);
+      } catch {
+        toast.error("Nu s-au putut încărca pachetele");
       } finally {
         setLoading(false);
       }

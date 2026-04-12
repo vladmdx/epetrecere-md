@@ -43,9 +43,14 @@ export default function BlogPage() {
 
   async function handleDelete(id: number) {
     if (!confirm("Sigur ștergi?")) return;
-    await fetch(`/api/blog?id=${id}`, { method: "DELETE" });
-    setPosts(prev => prev.filter(p => p.id !== id));
-    toast.success("Articol șters");
+    try {
+      const res = await fetch(`/api/blog?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      setPosts(prev => prev.filter(p => p.id !== id));
+      toast.success("Articol șters");
+    } catch {
+      toast.error("Nu s-a putut șterge articolul");
+    }
   }
 
   return (

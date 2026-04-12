@@ -64,9 +64,14 @@ export default function BlogEditorPage() {
 
   async function handleDelete() {
     if (!confirm("Sigur ștergi articolul?")) return;
-    await fetch(`/api/blog?id=${id}`, { method: "DELETE" });
-    toast.success("Articol șters");
-    router.push("/admin/blog");
+    try {
+      const res = await fetch(`/api/blog?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error();
+      toast.success("Articol șters");
+      router.push("/admin/blog");
+    } catch {
+      toast.error("Nu s-a putut șterge articolul");
+    }
   }
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-gold" /></div>;

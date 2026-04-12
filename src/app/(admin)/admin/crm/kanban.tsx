@@ -109,12 +109,10 @@ export function KanbanBoard() {
 
   useEffect(() => {
     fetch("/api/leads")
-      .then(r => r.json())
-      .then(data => {
-        setLeadsList(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => { setLeadsList(Array.isArray(data) ? data : []); })
+      .catch(() => toast.error("Nu s-au putut încărca solicitările"))
+      .finally(() => setLoading(false));
   }, []);
 
   function handleDragStart(event: DragStartEvent) {

@@ -46,9 +46,10 @@ export default function AdminOfferRequestsPage() {
 
   useEffect(() => {
     fetch("/api/offer-requests")
-      .then(r => r.json())
-      .then(data => { setRequests(data); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(data => { setRequests(data); })
+      .catch(() => toast.error("Nu s-au putut încărca cererile de ofertă"))
+      .finally(() => setLoading(false));
   }, []);
 
   async function updateStatus(id: number, status: string, extraFields?: Record<string, unknown>) {
