@@ -18,6 +18,7 @@ import {
   Flame,
   Building2,
   BarChart3,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ const artistNav = [
   { href: "/dashboard/analytics", icon: BarChart3, label: "Analitice" },
   { href: "/dashboard/recenzii", icon: Star, label: "Recenzii" },
   { href: "/dashboard/ai-assistant", icon: Bot, label: "AI Assistant" },
+  { href: "/dashboard/setari", icon: Settings, label: "Setări" },
 ];
 
 // M12 — Venue owner sidebar. Shown when /api/me/venue returns a venue.
@@ -44,7 +46,9 @@ const venueNav = [
   { href: "/dashboard/rezervari", icon: BookOpen, label: "Rezervări" },
   { href: "/dashboard/venue-profil", icon: Building2, label: "Profil Sală" },
   { href: "/dashboard/mesaje", icon: MessageSquare, label: "Mesaje" },
+  { href: "/dashboard/analytics", icon: BarChart3, label: "Analitice" },
   { href: "/dashboard/recenzii", icon: Star, label: "Recenzii" },
+  { href: "/dashboard/setari", icon: Settings, label: "Setări" },
 ];
 
 export function VendorSidebar() {

@@ -1,16 +1,14 @@
-// F-A8 — Vendor-side analytics surface.
+// F-A8 — Vendor-side analytics surface, entity-aware.
 //
-// Mirrors the admin analytics page but scoped to the signed-in artist.
-// Before this existed the only place an artist could see their own
-// profile views / conversion numbers was the admin dashboard, which
-// they can't reach. The underlying profile_views table has been
-// collecting hashed sessions since M5, so the data is already there —
-// this page just surfaces it.
+// Mirrors the admin analytics page but scoped to the signed-in vendor.
+// First landed as an artist-only page (see `getArtistAnalytics`); this
+// pass adds the venue flavour so venue owners get the same surface
+// without a duplicate route.
 //
-// Venue owners are out of scope here: the venue nav doesn't link to
-// this route, and the resolution logic redirects venue-only users back
-// to /dashboard. Adding a venue flavour would be a straightforward
-// clone of `getArtistAnalytics` against the venues / bookings tables.
+// Resolution order mirrors `/dashboard/page.tsx`: artist first, venue
+// fallback. Users with neither are bounced home so they don't stare at
+// a zero-populated shell. Both payloads share the same shape
+// (ArtistAnalytics / VenueAnalytics) so one render tree handles both.
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
@@ -25,8 +23,15 @@ import {
   Percent,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { artists, users } from "@/lib/db/schema";
-import { getArtistAnalytics } from "@/lib/db/queries/artist-analytics";
+import { artists, users, venues } from "@/lib/db/schema";
+import {
+  getArtistAnalytics,
+  type ArtistAnalytics,
+} from "@/lib/db/queries/artist-analytics";
+import {
+  getVenueAnalytics,
+  type VenueAnalytics,
+} from "@/lib/db/queries/venue-analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -45,39 +50,73 @@ const ROMANIAN_MONTHS = [
   "Dec",
 ];
 
-export default async function VendorAnalyticsPage() {
+// Both analytics shapes are identical — this alias is just to make the
+// render code read naturally regardless of entity kind.
+type Analytics = ArtistAnalytics | VenueAnalytics;
+
+type Resolved =
+  | { kind: "artist"; entityName: string; analytics: Analytics }
+  | { kind: "venue"; entityName: string; analytics: Analytics };
+
+async function resolveAnalytics(): Promise<Resolved | "anon" | "none"> {
   const { userId: clerkId } = await auth();
-  if (!clerkId) redirect("/sign-in?redirect_url=/dashboard/analytics");
+  if (!clerkId) return "anon";
 
   const [appUser] = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
-  if (!appUser) redirect("/sign-in?redirect_url=/dashboard/analytics");
+  if (!appUser) return "anon";
 
   const [artist] = await db
-    .select({
-      id: artists.id,
-      nameRo: artists.nameRo,
-    })
+    .select({ id: artists.id, nameRo: artists.nameRo })
     .from(artists)
     .where(eq(artists.userId, appUser.id))
     .limit(1);
+  if (artist) {
+    return {
+      kind: "artist",
+      entityName: artist.nameRo,
+      analytics: await getArtistAnalytics(artist.id),
+    };
+  }
 
-  if (!artist) {
-    // Venue-only or mid-onboarding users: bounce home so they don't
-    // stare at an empty "0 views" shell they can't do anything about.
+  const [venue] = await db
+    .select({ id: venues.id, nameRo: venues.nameRo })
+    .from(venues)
+    .where(eq(venues.userId, appUser.id))
+    .limit(1);
+  if (venue) {
+    return {
+      kind: "venue",
+      entityName: venue.nameRo,
+      analytics: await getVenueAnalytics(venue.id),
+    };
+  }
+
+  return "none";
+}
+
+export default async function VendorAnalyticsPage() {
+  const resolved = await resolveAnalytics();
+  if (resolved === "anon") {
+    redirect("/sign-in?redirect_url=/dashboard/analytics");
+  }
+  if (resolved === "none") {
+    // Neither an artist nor a venue owner → bounce to dashboard home
+    // so they don't stare at an empty shell they can't populate.
     redirect("/dashboard");
   }
 
-  const analytics = await getArtistAnalytics(artist.id);
+  const { kind, entityName, analytics } = resolved;
   const year = new Date().getFullYear();
   const maxMonth = Math.max(...analytics.viewsByMonth, 1);
-
   const deltaSign = analytics.viewsDeltaPct >= 0 ? "+" : "";
   const conversionDisplay =
     analytics.conversionPct === null ? "—" : `${analytics.conversionPct}%`;
+
+  const subtitleEntity = kind === "venue" ? "sala ta" : "profilul tău public";
 
   const stats = [
     {
@@ -130,7 +169,7 @@ export default async function VendorAnalyticsPage() {
       <div>
         <h1 className="font-heading text-2xl font-bold">Analitice</h1>
         <p className="text-sm text-muted-foreground">
-          {artist.nameRo} · date live din profilul tău public
+          {entityName} · date live din {subtitleEntity}
         </p>
       </div>
 
@@ -166,7 +205,6 @@ export default async function VendorAnalyticsPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Views chart — 12-month bar chart for the current year. */}
         <Card>
           <CardHeader>
             <CardTitle>Vizite profil — {year}</CardTitle>
@@ -201,7 +239,6 @@ export default async function VendorAnalyticsPage() {
           </CardContent>
         </Card>
 
-        {/* Traffic sources — top 5 referrer buckets this month. */}
         <Card>
           <CardHeader>
             <CardTitle>Surse trafic (luna asta)</CardTitle>

@@ -8,7 +8,9 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RichEditor } from "@/components/shared/rich-editor";
-import { ImageUpload } from "@/components/shared/image-upload";
+import { GalleryManager } from "@/components/vendor/gallery-manager";
+import { VideoManager } from "@/components/vendor/video-manager";
+import { PackagesManager } from "@/components/vendor/packages-manager";
 import { Save, Eye, Sparkles, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -31,7 +33,6 @@ type ProfileData = {
   bufferHours: number;
   autoReplyEnabled: boolean;
   autoReplyMessage: string;
-  images: { id: string; url: string; alt: string; isCover: boolean }[];
 };
 
 const EMPTY: ProfileData = {
@@ -54,7 +55,6 @@ const EMPTY: ProfileData = {
   autoReplyEnabled: false,
   autoReplyMessage:
     "Mulțumim pentru cerere! Am primit-o și revin cu un răspuns în cel mai scurt timp posibil.",
-  images: [],
 };
 
 export default function VendorProfilePage() {
@@ -102,7 +102,6 @@ export default function VendorProfilePage() {
           autoReplyEnabled: Boolean(a.autoReplyEnabled),
           autoReplyMessage:
             (a.autoReplyMessage as string) ?? EMPTY.autoReplyMessage,
-          images: [],
         });
       } catch {
         if (!cancelled) toast.error("Nu am putut încărca profilul");
@@ -219,7 +218,6 @@ export default function VendorProfilePage() {
           <TabsTrigger value="description">Descriere</TabsTrigger>
           <TabsTrigger value="gallery">Galerie</TabsTrigger>
           <TabsTrigger value="packages">Pachete</TabsTrigger>
-          <TabsTrigger value="settings">Setări</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="mt-6 space-y-6">
@@ -268,18 +266,17 @@ export default function VendorProfilePage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="gallery" className="mt-6">
+        <TabsContent value="gallery" className="mt-6 space-y-6">
           <Card>
-            <CardHeader><CardTitle>Galerie Foto & Video</CardTitle></CardHeader>
-            <CardContent className="space-y-6">
-              <ImageUpload images={data.images} onChange={(images) => update({ images })} maxFiles={10} />
-              <div>
-                <Label>Link-uri Video YouTube/Vimeo</Label>
-                <div className="mt-2 space-y-2">
-                  <Input placeholder="https://youtube.com/watch?v=..." />
-                  <Button variant="outline" size="sm">+ Adaugă Video</Button>
-                </div>
-              </div>
+            <CardHeader><CardTitle>Galerie Foto</CardTitle></CardHeader>
+            <CardContent>
+              <GalleryManager artistId={artistId} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Videoclipuri</CardTitle></CardHeader>
+            <CardContent>
+              <VideoManager artistId={artistId} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -287,67 +284,14 @@ export default function VendorProfilePage() {
         <TabsContent value="packages" className="mt-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Pachete Servicii</CardTitle>
-                <Button variant="outline" size="sm">+ Adaugă Pachet</Button>
-              </div>
+              <CardTitle>Pachete Servicii</CardTitle>
             </CardHeader>
-            <CardContent><p className="text-sm text-muted-foreground">Creează pachete cu prețuri diferite.</p></CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="settings" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle>Setări Profil</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div><Label>Calendar activ</Label><p className="text-xs text-muted-foreground">Afișează calendarul pe profil</p></div>
-                <Switch checked={data.calendarEnabled} onCheckedChange={(v) => update({ calendarEnabled: v })} />
-              </div>
-              <div className="flex items-center justify-between">
-                <div><Label>Buffer între evenimente (ore)</Label></div>
-                <Input type="number" value={data.bufferHours} onChange={(e) => update({ bufferHours: Number(e.target.value) })} className="w-20" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Feature 14 — Auto-reply setup */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Răspuns automat</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Trimite instant un email clientului când lasă o cerere, ca să știe că ai primit-o.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Activează răspunsul automat</Label>
-                  <p className="text-xs text-muted-foreground">Doar clienții care lasă email vor primi mesajul.</p>
-                </div>
-                <Switch
-                  checked={data.autoReplyEnabled}
-                  onCheckedChange={(v) => update({ autoReplyEnabled: v })}
-                />
-              </div>
-              {data.autoReplyEnabled && (
-                <div>
-                  <Label>Mesajul tău</Label>
-                  <textarea
-                    value={data.autoReplyMessage}
-                    onChange={(e) => update({ autoReplyMessage: e.target.value })}
-                    rows={5}
-                    className="mt-2 w-full rounded-md border border-border/40 bg-background px-3 py-2 text-sm"
-                    placeholder="Ex: Mulțumim pentru cerere! Revin în maxim 2 ore..."
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Max. 500 caractere. Mesajul este inserat într-un email cu branding ePetrecere.
-                  </p>
-                </div>
-              )}
+            <CardContent>
+              <PackagesManager artistId={artistId} />
             </CardContent>
           </Card>
         </TabsContent>
+
       </Tabs>
     </div>
   );
