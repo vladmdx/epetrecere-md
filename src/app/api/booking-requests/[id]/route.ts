@@ -5,6 +5,7 @@ import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema
 import { and, eq } from "drizzle-orm";
 import { sendEmail } from "@/lib/email/send";
 import { bookingResponseEmail } from "@/lib/email/templates/booking-response";
+import { reviewRequestEmail } from "@/lib/email/templates/review-request";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 
 // UPDATE booking request — drives the bilateral confirmation flow (M0b #9):
@@ -197,7 +198,7 @@ export async function PUT(
         }
       } else if (action === "client_confirm") {
         const [artist] = await db
-          .select({ userId: artists.userId, nameRo: artists.nameRo })
+          .select({ userId: artists.userId, nameRo: artists.nameRo, slug: artists.slug })
           .from(artists)
           .where(eq(artists.id, booking.artistId))
           .limit(1);
@@ -209,6 +210,31 @@ export async function PUT(
             message: `${booking.clientName} — ${booking.eventDate}`,
             actionUrl: "/dashboard/rezervari",
           });
+        }
+
+        // Schedule a review request email to the client after the event date.
+        // If the event already passed, send immediately. Otherwise the Inngest
+        // event-reminder cron will pick it up.
+        if (booking.clientEmail && artist) {
+          const eventDate = new Date(booking.eventDate);
+          const now = new Date();
+          if (eventDate <= now) {
+            try {
+              const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
+              await sendEmail({
+                to: booking.clientEmail,
+                subject: `Cum a fost evenimentul cu ${artist.nameRo ?? "artist"}?`,
+                html: reviewRequestEmail({
+                  clientName: booking.clientName,
+                  artistName: artist.nameRo ?? "Artist",
+                  eventDate: booking.eventDate,
+                  reviewUrl: `${appUrl}/artisti/${artist.slug}#recenzii`,
+                }),
+              });
+            } catch (mailErr) {
+              console.error("[review-request] email failed", mailErr);
+            }
+          }
         }
       }
     } catch (err) {

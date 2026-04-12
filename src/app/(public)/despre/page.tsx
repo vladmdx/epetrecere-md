@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { generateMeta } from "@/lib/seo/generate-meta";
+import { breadcrumbJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";
 import { Sparkles, Users, Calendar, Shield } from "lucide-react";
 
 export const metadata: Metadata = generateMeta({
@@ -17,6 +18,19 @@ const features = [
 
 export default function AboutPage() {
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify([
+            breadcrumbJsonLd([
+              { name: "Acasă", url: "https://epetrecere.md" },
+              { name: "Despre Noi", url: "https://epetrecere.md/despre" },
+            ]),
+            organizationJsonLd(),
+          ]),
+        }}
+      />
     <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
       <div className="mx-auto max-w-3xl text-center">
         <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">
@@ -49,5 +63,6 @@ export default function AboutPage() {
         </p>
       </div>
     </div>
+    </>
   );
 }
