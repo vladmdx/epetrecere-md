@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
+import { getAllCategories } from "@/lib/db/queries/categories";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { ArtistsListClient } from "./client";
 
@@ -29,7 +30,10 @@ export default async function ArtistsPage({ searchParams }: Props) {
     availableDate: (sp.date as string) || undefined,
   };
 
-  const result = await getArtists(filters);
+  const [result, cats] = await Promise.all([
+    getArtists(filters),
+    getAllCategories(),
+  ]);
 
   // M0a #8 — redact price for unauthenticated visitors at the server layer.
   const { userId } = await auth();
@@ -45,6 +49,10 @@ export default async function ArtistsPage({ searchParams }: Props) {
       totalPages={result.totalPages}
       currentSort={filters.sort}
       searchQuery={(sp.q as string) || ""}
+      categories={cats.map((c) => ({ id: c.id, nameRo: c.nameRo }))}
+      currentCategory={(sp.category as string) || ""}
+      currentPriceMin={(sp.price_min as string) || ""}
+      currentPriceMax={(sp.price_max as string) || ""}
     />
   );
 }

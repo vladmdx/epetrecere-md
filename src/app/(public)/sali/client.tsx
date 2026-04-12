@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { VenueCard } from "@/components/public/venue-card";
 import { SortBar } from "@/components/public/sort-bar";
 import { PaginationBar } from "@/components/public/pagination-bar";
+import { CityFilter, CapacityFilter, ActiveFiltersReset } from "@/components/public/filter-bar";
 import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
@@ -26,6 +27,9 @@ interface Props {
   page: number;
   totalPages: number;
   currentSort: string;
+  cities: string[];
+  currentCity: string;
+  currentCapacityMin: string;
 }
 
 const sortOptions = [
@@ -36,17 +40,24 @@ const sortOptions = [
   { value: "capacity", label: "Capacitate" },
 ];
 
-export function VenuesListClient({ venues, total, page, totalPages, currentSort }: Props) {
+export function VenuesListClient({ venues, total, page, totalPages, currentSort, cities, currentCity, currentCapacityMin }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLocale();
 
-  function updateParams(key: string, value: string) {
+  function updateParams(key: string, value: string | undefined) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set(key, value);
+    if (value) params.set(key, value);
+    else params.delete(key);
     if (key !== "page") params.delete("page");
     router.push(`/sali?${params.toString()}`);
   }
+
+  function resetFilters() {
+    router.push("/sali");
+  }
+
+  const hasFilters = !!(currentCity || currentCapacityMin);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
@@ -61,6 +72,20 @@ export function VenuesListClient({ venues, total, page, totalPages, currentSort 
           current={currentSort}
           onChange={(v) => updateParams("sort", v)}
         />
+      </div>
+
+      {/* Filters */}
+      <div className="mb-6 flex flex-col gap-3">
+        <CityFilter
+          cities={cities}
+          currentCity={currentCity || undefined}
+          onChange={(city) => updateParams("city", city)}
+        />
+        <CapacityFilter
+          currentMin={currentCapacityMin || undefined}
+          onChange={(min) => updateParams("capacity_min", min)}
+        />
+        <ActiveFiltersReset hasFilters={hasFilters} onReset={resetFilters} />
       </div>
 
       {venues.length > 0 ? (

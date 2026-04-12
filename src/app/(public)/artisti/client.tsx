@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ArtistCard } from "@/components/public/artist-card";
 import { SortBar } from "@/components/public/sort-bar";
 import { PaginationBar } from "@/components/public/pagination-bar";
+import { PriceFilter, CategoryFilter, ActiveFiltersReset } from "@/components/public/filter-bar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
@@ -34,6 +35,10 @@ interface Props {
   totalPages: number;
   currentSort: string;
   searchQuery: string;
+  categories: Array<{ id: number; nameRo: string }>;
+  currentCategory: string;
+  currentPriceMin: string;
+  currentPriceMax: string;
 }
 
 const sortOptions = [
@@ -44,18 +49,38 @@ const sortOptions = [
   { value: "newest", label: "Nou" },
 ];
 
-export function ArtistsListClient({ artists, total, page, totalPages, currentSort, searchQuery }: Props) {
+export function ArtistsListClient({ artists, total, page, totalPages, currentSort, searchQuery, categories, currentCategory, currentPriceMin, currentPriceMax }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLocale();
   const [query, setQuery] = useState(searchQuery);
 
-  function updateParams(key: string, value: string) {
+  function updateParams(key: string, value: string | undefined) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set(key, value);
+    if (value) {
+      params.set(key, value);
+    } else {
+      params.delete(key);
+    }
     if (key !== "page") params.delete("page");
     router.push(`/artisti?${params.toString()}`);
   }
+
+  function updateMultiParams(updates: Record<string, string | undefined>) {
+    const params = new URLSearchParams(searchParams.toString());
+    for (const [k, v] of Object.entries(updates)) {
+      if (v) params.set(k, v);
+      else params.delete(k);
+    }
+    params.delete("page");
+    router.push(`/artisti?${params.toString()}`);
+  }
+
+  function resetFilters() {
+    router.push("/artisti");
+  }
+
+  const hasFilters = !!(currentCategory || currentPriceMin || currentPriceMax || searchQuery);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
@@ -87,6 +112,21 @@ export function ArtistsListClient({ artists, total, page, totalPages, currentSor
           current={currentSort}
           onChange={(v) => updateParams("sort", v)}
         />
+      </div>
+
+      {/* Filters */}
+      <div className="mb-6 flex flex-col gap-3">
+        <CategoryFilter
+          categories={categories}
+          currentId={currentCategory || undefined}
+          onChange={(id) => updateParams("category", id)}
+        />
+        <PriceFilter
+          currentMin={currentPriceMin || undefined}
+          currentMax={currentPriceMax || undefined}
+          onChange={(min, max) => updateMultiParams({ price_min: min, price_max: max })}
+        />
+        <ActiveFiltersReset hasFilters={hasFilters} onReset={resetFilters} />
       </div>
 
       {/* Grid */}

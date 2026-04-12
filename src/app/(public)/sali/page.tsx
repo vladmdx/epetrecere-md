@@ -34,5 +34,19 @@ export default async function VenuesPage({ searchParams }: Props) {
     ? result.items
     : result.items.map((v) => ({ ...v, pricePerPerson: null }));
 
-  return <VenuesListClient venues={items} total={result.total} page={result.page} totalPages={result.totalPages} currentSort={filters.sort} />;
+  // Extract unique cities from results for filter pills
+  const allCities = Array.from(new Set(result.items.map((v) => v.city).filter(Boolean) as string[])).sort();
+
+  return (
+    <VenuesListClient
+      venues={items}
+      total={result.total}
+      page={result.page}
+      totalPages={result.totalPages}
+      currentSort={filters.sort}
+      cities={allCities}
+      currentCity={(sp.city as string) || ""}
+      currentCapacityMin={(sp.capacity_min as string) || ""}
+    />
+  );
 }
