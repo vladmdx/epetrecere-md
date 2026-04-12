@@ -31,8 +31,13 @@ export function ImageGallery({ images }: ImageGalleryProps) {
 
   useEffect(() => {
     if (lightboxIndex !== null) {
+      // Prevent background scrolling when lightbox is open
+      document.body.style.overflow = "hidden";
       document.addEventListener("keydown", handleKeyDown);
-      return () => document.removeEventListener("keydown", handleKeyDown);
+      return () => {
+        document.body.style.overflow = "";
+        document.removeEventListener("keydown", handleKeyDown);
+      };
     }
   }, [lightboxIndex, handleKeyDown]);
 
@@ -46,11 +51,12 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             key={i}
             onClick={() => setLightboxIndex(i)}
             className="group relative aspect-[4/3] overflow-hidden rounded-lg bg-muted"
+            aria-label={img.alt || `Deschide imaginea ${i + 1}`}
           >
             {img.url ? (
               <Image
                 src={img.url}
-                alt={img.alt || ""}
+                alt={img.alt || `Imagine ${i + 1}`}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                 className="object-cover transition-transform group-hover:scale-105"
@@ -67,7 +73,13 @@ export function ImageGallery({ images }: ImageGalleryProps) {
 
       {/* Lightbox */}
       {lightboxIndex !== null && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90" role="dialog" aria-label="Galerie imagini">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
+          role="dialog"
+          aria-label="Galerie imagini"
+          aria-modal="true"
+          onClick={(e) => { if (e.target === e.currentTarget) setLightboxIndex(null); }}
+        >
           <Button
             variant="ghost"
             size="icon"

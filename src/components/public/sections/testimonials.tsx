@@ -5,23 +5,48 @@ import { Star, ChevronLeft, ChevronRight, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const testimonials = [
-  { id: 1, author: "Maria & Andrei", type: "Nuntă", text: "O experiență incredibilă! Echipa ePetrecere ne-a ajutat să găsim artiștii perfecți pentru nunta noastră. Totul a fost impecabil.", rating: 5 },
-  { id: 2, author: "Elena Moraru", type: "Corporate", text: "Profesionalism la cel mai înalt nivel. Am organizat un eveniment corporate pentru 200 de persoane și totul a decurs perfect.", rating: 5 },
-  { id: 3, author: "Ion & Ana", type: "Botez", text: "Mulțumim pentru ajutor în organizarea botezului! Artiștii recomandați au fost excelenți, iar oaspeții au fost încântați.", rating: 5 },
-  { id: 4, author: "SC ProBusiness", type: "Corporate", text: "Colaborăm cu ePetrecere de 3 ani pentru toate evenimentele noastre corporate. Mereu livrează calitate.", rating: 4 },
-  { id: 5, author: "Natalia & Victor", type: "Nuntă", text: "Platforma ne-a economisit enorm de mult timp. Am găsit totul într-un singur loc — de la moderator la fotograf.", rating: 5 },
-];
+interface Testimonial {
+  id: number;
+  authorName: string;
+  eventType: string | null;
+  text: string;
+  rating: number;
+}
 
 export function TestimonialsSection() {
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [current, setCurrent] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+
+  // Fetch real approved reviews (high-rated)
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/reviews/featured");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setTestimonials(data);
+          }
+        }
+      } catch {
+        // Section won't render if no data
+      } finally {
+        setLoaded(true);
+      }
+    })();
+  }, []);
 
   useEffect(() => {
+    if (testimonials.length === 0) return;
     const timer = setInterval(() => {
       setCurrent((c) => (c + 1) % testimonials.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, []);
+  }, [testimonials.length]);
+
+  // Don't render until loaded; hide if no testimonials
+  if (!loaded || testimonials.length === 0) return null;
 
   const t = testimonials[current];
 
@@ -50,8 +75,8 @@ export function TestimonialsSection() {
                 <Star key={i} className={cn("h-4 w-4", i < t.rating ? "fill-gold text-gold" : "text-muted")} />
               ))}
             </div>
-            <p className="mt-3 font-heading font-bold">{t.author}</p>
-            <p className="text-sm text-gold">{t.type}</p>
+            <p className="mt-3 font-heading font-bold">{t.authorName}</p>
+            <p className="text-sm text-gold">{t.eventType || "Eveniment"}</p>
           </div>
 
           {/* Navigation */}

@@ -30,34 +30,52 @@ export function SearchAutocomplete() {
     venues: [],
   });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout>(undefined);
+  const abortRef = useRef<AbortController>(undefined);
 
   useEffect(() => {
     if (query.length < 2) {
       setResults({ artists: [], venues: [] });
       setOpen(false);
+      setError(false);
       return;
     }
 
     clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(async () => {
+      // Cancel previous in-flight request
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       setLoading(true);
+      setError(false);
       try {
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
         if (res.ok) {
           const data = await res.json();
           setResults(data);
           setOpen(true);
+        } else {
+          setError(true);
         }
-      } catch {
-        // silent
+      } catch (err) {
+        if ((err as Error).name !== "AbortError") {
+          setError(true);
+        }
       } finally {
         setLoading(false);
       }
     }, 300);
 
-    return () => clearTimeout(debounceRef.current);
+    return () => {
+      clearTimeout(debounceRef.current);
+      abortRef.current?.abort();
+    };
   }, [query]);
 
   // Close on outside click
@@ -106,7 +124,13 @@ export function SearchAutocomplete() {
             </div>
           )}
 
-          {!loading && !hasResults && query.length >= 2 && (
+          {!loading && error && (
+            <div className="px-4 py-3 text-sm text-destructive">
+              Eroare la căutare. Încercați din nou.
+            </div>
+          )}
+
+          {!loading && !error && !hasResults && query.length >= 2 && (
             <div className="px-4 py-3 text-sm text-muted-foreground">
               {t("common.noResults")}
             </div>

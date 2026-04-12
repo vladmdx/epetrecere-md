@@ -99,13 +99,13 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
 
       {/* Month nav */}
       <div className="mb-3 flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={prev} className="h-7 w-7">
+        <Button variant="ghost" size="icon" onClick={prev} disabled={loading} className="h-7 w-7" aria-label="Luna anterioară">
           <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
-        <h3 className="text-xs font-semibold text-muted-foreground">
+        <h3 className="text-xs font-semibold text-muted-foreground" aria-live="polite">
           {MONTHS_RO[month]} {year}
         </h3>
-        <Button variant="ghost" size="icon" onClick={next} className="h-7 w-7">
+        <Button variant="ghost" size="icon" onClick={next} disabled={loading} className="h-7 w-7" aria-label="Luna următoare">
           <ChevronRight className="h-3.5 w-3.5" />
         </Button>
       </div>
@@ -118,7 +118,7 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
       </div>
 
       {/* Calendar grid */}
-      <div className={cn("grid grid-cols-7 gap-0.5", loading && "opacity-40")}>
+      <div className={cn("grid grid-cols-7 gap-0.5", loading && "opacity-40 pointer-events-none")} aria-busy={loading}>
         {Array.from({ length: startDay }).map((_, i) => (
           <div key={`empty-${i}`} className="h-7" />
         ))}

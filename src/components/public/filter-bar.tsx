@@ -38,6 +38,8 @@ export function PriceFilter({ currentMin, currentMax, onChange }: PriceFilterPro
             "h-7 text-xs",
             isActive(range.min, range.max) && "bg-gold text-background hover:bg-gold-dark border-gold",
           )}
+          aria-pressed={isActive(range.min, range.max)}
+          aria-label={`Filtru preț: ${range.label}`}
           onClick={() =>
             isActive(range.min, range.max)
               ? onChange(undefined, undefined)
@@ -76,6 +78,8 @@ export function CategoryFilter({ categories, currentId, onChange }: CategoryFilt
             "h-7 text-xs",
             currentId === String(cat.id) && "bg-gold text-background hover:bg-gold-dark border-gold",
           )}
+          aria-pressed={currentId === String(cat.id)}
+          aria-label={`Filtru categorie: ${cat.nameRo}`}
           onClick={() =>
             currentId === String(cat.id) ? onChange(undefined) : onChange(String(cat.id))
           }
@@ -112,6 +116,8 @@ export function CityFilter({ cities, currentCity, onChange }: CityFilterProps) {
             "h-7 text-xs",
             currentCity === city && "bg-gold text-background hover:bg-gold-dark border-gold",
           )}
+          aria-pressed={currentCity === city}
+          aria-label={`Filtru oraș: ${city}`}
           onClick={() => (currentCity === city ? onChange(undefined) : onChange(city))}
         >
           {city}
@@ -151,6 +157,8 @@ export function CapacityFilter({ currentMin, onChange }: CapacityFilterProps) {
             "h-7 text-xs",
             currentMin === opt.min && "bg-gold text-background hover:bg-gold-dark border-gold",
           )}
+          aria-pressed={currentMin === opt.min}
+          aria-label={`Filtru capacitate: ${opt.label}`}
           onClick={() => (currentMin === opt.min ? onChange(undefined) : onChange(opt.min))}
         >
           {opt.label}

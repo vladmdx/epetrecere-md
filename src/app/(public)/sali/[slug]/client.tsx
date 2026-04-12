@@ -114,7 +114,7 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
               <a
                 href={venue.menuUrl}
                 target="_blank"
-                rel="noopener"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
               >
                 Vezi meniu complet

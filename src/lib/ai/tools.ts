@@ -184,16 +184,25 @@ export async function executeTool(
       }
 
       case "get_my_bookings": {
+        if (!_vendorArtistId) return JSON.stringify({ error: "No artist context" });
+        const conditions = [eq(bookings.artistId, _vendorArtistId)];
+        if (input.status) {
+          const validBookingStatuses = ["pending", "accepted", "confirmed_by_client", "rejected", "cancelled"];
+          if (validBookingStatuses.includes(input.status as string)) {
+            conditions.push(sql`${bookings.status} = ${input.status as string}`);
+          }
+        }
         const result = await db
           .select()
           .from(bookings)
-          .where(input.status ? sql`${bookings.status} = ${input.status as string}` : undefined)
+          .where(and(...conditions))
           .limit(20)
           .orderBy(desc(bookings.createdAt));
         return JSON.stringify(result);
       }
 
       case "get_my_calendar": {
+        if (!_vendorArtistId) return JSON.stringify({ error: "No artist context" });
         const month = input.month as string;
         const [year, mon] = month.split("-").map(Number);
         const startDate = `${year}-${String(mon).padStart(2, "0")}-01`;
@@ -206,6 +215,7 @@ export async function executeTool(
           .where(
             and(
               eq(calendarEvents.entityType, "artist"),
+              eq(calendarEvents.entityId, _vendorArtistId),
               gte(calendarEvents.date, startDate),
               sql`${calendarEvents.date} <= ${endDate}`,
             ),

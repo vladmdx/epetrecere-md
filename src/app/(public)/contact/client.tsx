@@ -42,7 +42,7 @@ export function ContactPageClient() {
             </div>
             <div>
               <h3 className="font-heading font-bold">{t("form.phone")}</h3>
-              <p className="text-sm text-muted-foreground">+373 60 123 456</p>
+              <p className="text-sm text-muted-foreground">{process.env.NEXT_PUBLIC_CONTACT_PHONE || "+373 60 123 456"}</p>
             </div>
           </div>
 
@@ -116,7 +116,7 @@ export function ContactPageClient() {
               </div>
               <div>
                 <Label htmlFor="phone">{t("form.phone")} *</Label>
-                <Input id="phone" name="phone" type="tel" required />
+                <Input id="phone" name="phone" type="tel" required pattern="^(\+?373|0)\s?\d{2}\s?\d{3}\s?\d{3}$" title="Format: +373 XX XXX XXX sau 0XX XXX XXX" />
               </div>
             </div>
             <div>
