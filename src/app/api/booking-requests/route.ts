@@ -6,6 +6,7 @@ import { eq, desc, and } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
+import { bookingRequestNewEmail } from "@/lib/email/templates/booking-request-new";
 
 const bookingSchema = z.object({
   artistId: z.number(),
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest) {
           userId: artists.userId,
           nameRo: artists.nameRo,
           slug: artists.slug,
+          email: artists.email,
           autoReplyEnabled: artists.autoReplyEnabled,
           autoReplyMessage: artists.autoReplyMessage,
         })
@@ -99,6 +101,25 @@ export async function POST(req: NextRequest) {
         message: `${parsed.data.clientName} — ${artist?.nameRo ?? "artist"}`,
         actionUrl: "/admin/cereri-oferte",
       });
+
+      // Email the artist about the new booking request
+      if (artist?.email) {
+        try {
+          await sendEmail({
+            to: artist.email,
+            subject: `Cerere nouă de rezervare de la ${parsed.data.clientName}`,
+            html: bookingRequestNewEmail({
+              vendorName: artist.nameRo ?? "Artist",
+              clientName: parsed.data.clientName,
+              eventType: parsed.data.eventType ?? null,
+              eventDate: parsed.data.eventDate ?? null,
+              message: parsed.data.message ?? null,
+            }),
+          });
+        } catch (mailErr) {
+          console.error("[booking-email] artist notification failed", mailErr);
+        }
+      }
 
       // Feature 14 — auto-reply: dacă artistul a activat mesajul automat și
       // clientul a lăsat un email, îi trimitem instant confirmarea primirii.

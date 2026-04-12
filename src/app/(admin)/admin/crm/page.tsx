@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,11 @@ import {
   Search, Phone, Mail, Calendar, DollarSign, User, ChevronRight,
   Clock, AlertCircle, CheckCircle, XCircle, MessageSquare, LayoutGrid, List, Loader2,
 } from "lucide-react";
-import { KanbanBoard } from "./kanban";
+
+const KanbanBoard = dynamic(
+  () => import("./kanban").then((m) => m.KanbanBoard),
+  { ssr: false },
+);
 import { cn } from "@/lib/utils";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,11 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RichEditor } from "@/components/shared/rich-editor";
+
+const RichEditor = dynamic(
+  () => import("@/components/shared/rich-editor").then((m) => m.RichEditor),
+  { ssr: false },
+);
 import { ImageUpload } from "@/components/shared/image-upload";
 import { ArrowLeft, Save, Sparkles, Eye, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";

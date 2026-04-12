@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Star, BadgeCheck, Crown, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
@@ -45,11 +46,13 @@ export function ArtistCard({ artist }: ArtistCardProps) {
     >
       <div className="relative aspect-[4/5] bg-muted overflow-hidden">
         {artist.coverImageUrl ? (
-          <img
+          <Image
             src={artist.coverImageUrl}
             alt={name}
-            className="h-full w-full object-cover object-[center_20%] transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+            className="object-cover object-[center_20%] transition-transform duration-300 group-hover:scale-105"
+            unoptimized={artist.coverImageUrl.includes("r2.cloudflarestorage.com")}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">

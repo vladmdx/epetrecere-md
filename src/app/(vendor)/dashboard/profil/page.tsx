@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RichEditor } from "@/components/shared/rich-editor";
+
+const RichEditor = dynamic(
+  () => import("@/components/shared/rich-editor").then((m) => m.RichEditor),
+  { ssr: false },
+);
 import { GalleryManager } from "@/components/vendor/gallery-manager";
 import { VideoManager } from "@/components/vendor/video-manager";
 import { PackagesManager } from "@/components/vendor/packages-manager";

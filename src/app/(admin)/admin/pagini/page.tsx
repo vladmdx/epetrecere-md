@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RichEditor } from "@/components/shared/rich-editor";
+
+const RichEditor = dynamic(
+  () => import("@/components/shared/rich-editor").then((m) => m.RichEditor),
+  { ssr: false },
+);
 import { Save, FileText, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Star, Users, MapPin, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useLocale } from "@/hooks/use-locale";
@@ -36,15 +37,12 @@ export function VenueCard({ venue }: VenueCardProps) {
       className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all duration-300 hover:border-gold/30 hover:shadow-[0_4px_20px_rgba(201,168,76,0.15)] hover:-translate-y-1"
     >
       <div className="relative aspect-[16/10] bg-muted overflow-hidden">
-        <img
+        <Image
           src={`/images/venues/hall-${(venue.id % 6) + 1}.jpg`}
           alt={name}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.style.display = "none";
-          }}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+          className="object-cover transition-transform duration-500 group-hover:scale-105"
         />
       </div>
 

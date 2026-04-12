@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,14 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             className="group relative aspect-[4/3] overflow-hidden rounded-lg bg-muted"
           >
             {img.url ? (
-              <img src={img.url} alt={img.alt || ""} className="h-full w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+              <Image
+                src={img.url}
+                alt={img.alt || ""}
+                fill
+                sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+                className="object-cover transition-transform group-hover:scale-105"
+                unoptimized
+              />
             ) : (
               <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                 <span className="text-2xl">📷</span>
