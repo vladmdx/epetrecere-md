@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { offerRequests, leads } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth/admin";
 
 // POST — send offer request to CRM (creates a lead from the offer request)
 export async function POST(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
+
   const { id } = await params;
 
   // Get the offer request

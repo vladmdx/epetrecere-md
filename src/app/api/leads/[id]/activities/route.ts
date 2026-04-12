@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { leadActivities } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth/admin";
 
-// GET activities for a lead
+// GET activities for a lead — admin only
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
+
   const { id } = await params;
 
   const activities = await db
@@ -19,11 +23,14 @@ export async function GET(
   return NextResponse.json(activities);
 }
 
-// POST — add activity (note, call, email, sms)
+// POST — add activity (note, call, email, sms) — admin only
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
+
   const { id } = await params;
   const body = await req.json();
 

@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { leads, leadActivities } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth/admin";
 
-// GET single lead with activities
+// GET single lead with activities — admin only
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
+
   const { id } = await params;
 
   const [lead] = await db
@@ -34,6 +38,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
+
   const { id } = await params;
   const body = await req.json();
 
@@ -73,11 +80,14 @@ export async function PATCH(
   return NextResponse.json(updated);
 }
 
-// DELETE lead
+// DELETE lead — admin only
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
+
   const { id } = await params;
   await db.delete(leads).where(eq(leads.id, Number(id)));
   return NextResponse.json({ success: true });
