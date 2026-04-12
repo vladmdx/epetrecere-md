@@ -5,11 +5,26 @@ import { homepageSections } from "@/lib/db/schema";
 import { asc, eq } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 
-// GET — return all homepage sections ordered by sortOrder
-export async function GET() {
+// GET — return homepage sections ordered by sortOrder
+// Public: only visible sections. Admin with ?all=true: all sections.
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const all = searchParams.get("all");
+
+  if (all === "true") {
+    const admin = await requireAdmin();
+    if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
+    const rows = await db
+      .select()
+      .from(homepageSections)
+      .orderBy(asc(homepageSections.sortOrder));
+    return NextResponse.json(rows);
+  }
+
   const rows = await db
     .select()
     .from(homepageSections)
+    .where(eq(homepageSections.isVisible, true))
     .orderBy(asc(homepageSections.sortOrder));
 
   return NextResponse.json(rows);

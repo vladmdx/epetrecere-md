@@ -24,7 +24,21 @@ export default function BlogPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/blog").then(r => r.json()).then(data => { setPosts(data); setLoading(false); }).catch(() => setLoading(false));
+    async function fetchPosts() {
+      try {
+        const res = await fetch("/api/blog?all=true");
+        if (!res.ok) {
+          throw new Error(`Eroare la încărcarea articolelor (${res.status})`);
+        }
+        const data = await res.json();
+        setPosts(data);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Nu s-au putut încărca articolele");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchPosts();
   }, []);
 
   async function handleDelete(id: number) {

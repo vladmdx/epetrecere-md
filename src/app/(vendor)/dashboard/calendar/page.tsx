@@ -201,6 +201,29 @@ export default function VendorCalendarPage() {
     };
   }, []);
 
+  // Load work schedule from server when entity is resolved
+  useEffect(() => {
+    if (!entity || entity.type !== "artist") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/work-schedule?artist_id=${entity.id}`);
+        if (!res.ok || cancelled) return;
+        const data: { dayOfWeek: number; startTime: string; endTime: string; isWorking: boolean }[] = await res.json();
+        if (cancelled || data.length === 0) return;
+        setSchedule((prev) =>
+          prev.map((day) => {
+            const serverDay = data.find((d) => d.dayOfWeek === day.dayOfWeek);
+            return serverDay ? { ...day, ...serverDay } : day;
+          }),
+        );
+      } catch {
+        // Use defaults if fetch fails
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [entity]);
+
   // Load events for the current entity + month whenever either changes.
   const loadEvents = useCallback(async () => {
     if (!entity) return;

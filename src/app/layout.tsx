@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import "@/lib/env"; // Validate env vars at startup
 import { Playfair_Display, DM_Sans, Cormorant_Garamond } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { LocaleProvider } from "@/hooks/use-locale";

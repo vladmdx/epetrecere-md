@@ -7,6 +7,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { matchLeadToVendors } from "@/lib/leads/matching";
 import { scoreAndPersist } from "@/lib/leads/quality-score";
 import { requireAdmin } from "@/lib/auth/admin";
+import { inngest } from "@/lib/inngest/client";
 
 // SEC — CRM lead listing exposes all client PII (name, phone, email,
 // budget). Admin-only gate prevents anonymous scraping.
@@ -142,6 +143,17 @@ export async function POST(req: NextRequest) {
   } catch (e) {
     // Don't fail the lead creation if offerRequest fails
     console.error("Failed to create offer request:", e);
+  }
+
+  // 3. Fire Inngest event for email notifications (confirmation + admin alert)
+  try {
+    await inngest.send({
+      name: "lead/created",
+      data: { lead },
+    });
+  } catch (e) {
+    // Don't fail the lead if Inngest is unreachable
+    console.error("[leads] Failed to send Inngest event:", e);
   }
 
   return NextResponse.json(lead, { status: 201 });

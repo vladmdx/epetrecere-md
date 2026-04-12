@@ -3,8 +3,16 @@ import { searchAll } from "@/lib/search/meilisearch";
 import { db } from "@/lib/db";
 import { artists, venues } from "@/lib/db/schema";
 import { eq, sql, or } from "drizzle-orm";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
+  // Rate limit: 30 searches per minute per IP
+  const ip = req.headers.get("x-forwarded-for") || "anonymous";
+  const { success } = await rateLimit(`search:${ip}`, 30, 60_000);
+  if (!success) {
+    return NextResponse.json({ artists: [], venues: [] }, { status: 429 });
+  }
+
   const query = req.nextUrl.searchParams.get("q");
   if (!query || query.length < 2) {
     return NextResponse.json({ artists: [], venues: [] });

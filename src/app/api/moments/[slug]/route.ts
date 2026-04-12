@@ -99,8 +99,8 @@ export async function POST(
       guestName: parsed.data.guestName,
       guestMessage: parsed.data.guestMessage ?? null,
       source: "guest",
-      isApproved: true, // auto-approve guest uploads for live slideshow; owner can delete
-      isPublic: true,
+      isApproved: false, // require moderation before showing in slideshow
+      isPublic: false,
     })
     .returning({ id: eventPhotos.id });
 

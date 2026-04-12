@@ -3,7 +3,9 @@ import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, offerRequests, artists } from "@/lib/db/schema";
+import { users } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
@@ -22,7 +24,9 @@ const bookingSchema = z.object({
   message: z.string().optional(),
 });
 
-// GET booking requests — requires auth; scoped to caller's own data
+// GET booking requests — requires auth; scoped to caller's own data.
+// Admins can query any artist_id or client_email. Regular users can only
+// query bookings for their own artist profile or their own email.
 export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,6 +36,41 @@ export async function GET(req: NextRequest) {
 
   if (!artistId && !clientEmail) {
     return NextResponse.json({ error: "artist_id or client_email required" }, { status: 400 });
+  }
+
+  // Check if the caller is admin — admins can query any data
+  const admin = await requireAdmin();
+  const isAdmin = admin.ok;
+
+  if (!isAdmin) {
+    // Regular user — verify ownership
+    const [appUser] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+
+    if (!appUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 403 });
+    }
+
+    // If querying by artist_id, verify the user owns that artist
+    if (artistId) {
+      const [artist] = await db
+        .select({ userId: artists.userId })
+        .from(artists)
+        .where(eq(artists.id, Number(artistId)))
+        .limit(1);
+
+      if (!artist || artist.userId !== appUser.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
+
+    // If querying by client_email, verify it matches the user's email
+    if (clientEmail && clientEmail !== appUser.email) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   const conditions = [];

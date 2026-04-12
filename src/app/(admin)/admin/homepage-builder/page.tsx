@@ -70,9 +70,9 @@ export default function HomepageBuilderPage() {
       });
   }, []);
 
-  function toggleVisibility(id: number) {
+  function toggleVisibility(type: string) {
     setSections((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, isVisible: !s.isVisible } : s)),
+      prev.map((s) => (s.type === type ? { ...s, isVisible: !s.isVisible } : s)),
     );
     setDirty(true);
   }
@@ -169,7 +169,7 @@ export default function HomepageBuilderPage() {
           };
           return (
             <Card
-              key={section.id || section.type}
+              key={section.type}
               className={cn(
                 "transition-all",
                 !section.isVisible && "opacity-50",
@@ -206,7 +206,7 @@ export default function HomepageBuilderPage() {
                 </div>
                 <Switch
                   checked={section.isVisible}
-                  onCheckedChange={() => toggleVisibility(section.id)}
+                  onCheckedChange={() => toggleVisibility(section.type)}
                 />
               </CardContent>
             </Card>

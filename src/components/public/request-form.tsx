@@ -185,7 +185,7 @@ export function RequestBookingForm({ artistId, venueId, preselectedDate, classNa
   const eventTypes = [
     { value: "wedding", label: "🎊 Nuntă" },
     { value: "baptism", label: "👶 Botez" },
-    { value: "cumpatrie", label: "🤝 Cumpătrie" },
+    { value: "cumetrie", label: "🤝 Cumetrie" },
     { value: "corporate", label: "💼 Corporate" },
     { value: "birthday", label: "🎂 Aniversare" },
     { value: "other", label: "📋 Altele" },

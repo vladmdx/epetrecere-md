@@ -55,16 +55,27 @@ export function VendorSidebar() {
   const pathname = usePathname();
   const [isVenue, setIsVenue] = useState(false);
 
-  // Lightweight client check — ask /api/me/venue once on mount. If the user
-  // owns a venue we render the venue nav; otherwise we default to the artist
-  // nav. This also handles users who own both (they can still reach venue
-  // pages via direct link).
+  // Lightweight client check — ask /api/me/artist first on mount. If the user
+  // owns an artist profile we render the artist nav; only when no artist
+  // profile exists do we check /api/me/venue and show the venue nav. This
+  // ensures artists who also have a venue profile see the correct sidebar.
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/me/venue")
-      .then((r) => (r.ok ? r.json() : { venue: null }))
+    fetch("/api/me/artist")
+      .then((r) => (r.ok ? r.json() : { artist: null }))
       .then((data) => {
-        if (!cancelled) setIsVenue(!!data.venue);
+        if (cancelled) return;
+        if (data.artist) {
+          // User has an artist profile — keep isVenue false (default).
+          setIsVenue(false);
+          return;
+        }
+        // No artist profile — fall through to venue check.
+        return fetch("/api/me/venue")
+          .then((r) => (r.ok ? r.json() : { venue: null }))
+          .then((venueData) => {
+            if (!cancelled) setIsVenue(!!venueData.venue);
+          });
       })
       .catch(() => {});
     return () => {

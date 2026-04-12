@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 /**
  * Google OAuth2 callback for Calendar sync.
@@ -62,8 +66,23 @@ export async function GET(req: NextRequest) {
     }
 
     const tokens = await tokenRes.json();
-    // TODO: Store tokens.refresh_token in DB for the current user
-    // This enables background sync via Inngest cron job
+
+    // Store tokens in DB for the current user
+    const { userId: clerkId } = await auth();
+    if (clerkId) {
+      const expiresAt = tokens.expires_in
+        ? new Date(Date.now() + tokens.expires_in * 1000)
+        : null;
+      await db
+        .update(users)
+        .set({
+          googleAccessToken: tokens.access_token || null,
+          googleRefreshToken: tokens.refresh_token || null,
+          googleTokenExpiresAt: expiresAt,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.clerkId, clerkId));
+    }
 
     return NextResponse.redirect(new URL("/dashboard/calendar?success=connected", req.url));
   } catch {

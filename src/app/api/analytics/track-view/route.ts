@@ -4,6 +4,7 @@ import { createHash } from "crypto";
 import { and, eq, gte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { profileViews } from "@/lib/db/schema";
+import { rateLimit } from "@/lib/rate-limit";
 
 // M5 — POST /api/analytics/track-view
 //
@@ -21,7 +22,7 @@ const trackSchema = z.object({
 });
 
 const SESSION_SALT =
-  process.env.ANALYTICS_SALT ?? process.env.CLERK_SECRET_KEY ?? "epetrecere-dev-salt";
+  process.env.ANALYTICS_SALT ?? process.env.CLERK_SECRET_KEY ?? "";
 const DEDUPE_MINUTES = 30;
 
 function getClientIp(req: NextRequest): string {
@@ -31,6 +32,11 @@ function getClientIp(req: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limit: 60 view beacons per minute per IP (generous for normal browsing)
+  const ip = getClientIp(req);
+  const { success: rlOk } = await rateLimit(`track-view:${ip}`, 60, 60_000);
+  if (!rlOk) return NextResponse.json({ ok: false }, { status: 429 });
+
   const body = await req.json().catch(() => null);
   const parsed = trackSchema.safeParse(body);
   if (!parsed.success) {
@@ -38,7 +44,6 @@ export async function POST(req: NextRequest) {
   }
   const { kind, id, referrer } = parsed.data;
 
-  const ip = getClientIp(req);
   const ua = req.headers.get("user-agent") ?? "unknown";
   const sessionHash = createHash("sha256")
     .update(`${ip}|${ua}|${SESSION_SALT}`)

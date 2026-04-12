@@ -133,6 +133,10 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").default("user").notNull(),
   avatarUrl: text("avatar_url"),
   languagePref: varchar("language_pref", { length: 2 }).default("ro"),
+  // Google Calendar OAuth tokens for calendar sync
+  googleRefreshToken: text("google_refresh_token"),
+  googleAccessToken: text("google_access_token"),
+  googleTokenExpiresAt: timestamp("google_token_expires_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

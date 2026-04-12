@@ -224,7 +224,44 @@ export async function executeTool(
       }
 
       case "update_my_calendar": {
-        return JSON.stringify({ success: true, message: "Calendar updated for " + (input.dates as string[]).length + " dates" });
+        if (!_vendorArtistId) return JSON.stringify({ error: "No artist context" });
+        const dates = input.dates as string[];
+        const status = input.status as string;
+        const validStatuses = ["available", "booked", "tentative", "blocked"] as const;
+        type CalStatus = (typeof validStatuses)[number];
+        if (!validStatuses.includes(status as CalStatus)) {
+          return JSON.stringify({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
+        }
+        const typedStatus = status as CalStatus;
+        for (const date of dates) {
+          // Upsert: check if entry exists, update or insert
+          const [existing] = await db
+            .select({ id: calendarEvents.id })
+            .from(calendarEvents)
+            .where(
+              and(
+                eq(calendarEvents.entityType, "artist"),
+                eq(calendarEvents.entityId, _vendorArtistId),
+                eq(calendarEvents.date, date),
+              ),
+            )
+            .limit(1);
+
+          if (existing) {
+            await db
+              .update(calendarEvents)
+              .set({ status: typedStatus })
+              .where(eq(calendarEvents.id, existing.id));
+          } else {
+            await db.insert(calendarEvents).values({
+              entityType: "artist" as const,
+              entityId: _vendorArtistId,
+              date,
+              status: typedStatus,
+            });
+          }
+        }
+        return JSON.stringify({ success: true, message: `Calendar updated for ${dates.length} dates`, dates, status });
       }
 
       default:

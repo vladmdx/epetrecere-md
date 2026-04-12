@@ -21,10 +21,28 @@ export default function AdminArtistsPage() {
   const [search, setSearch] = useState("");
 
   useEffect(() => {
-    fetch("/api/artists?limit=100")
-      .then((r) => r.json())
-      .then((data) => { setArtists(data.items || []); setLoading(false); })
-      .catch(() => setLoading(false));
+    (async () => {
+      try {
+        // Fetch all artists for admin view (paginated in batches)
+        let allArtists: Artist[] = [];
+        let page = 1;
+        let hasMore = true;
+        while (hasMore) {
+          const res = await fetch(`/api/artists?limit=100&page=${page}`);
+          if (!res.ok) break;
+          const data = await res.json();
+          const items = data.items || [];
+          allArtists = [...allArtists, ...items];
+          hasMore = items.length === 100;
+          page++;
+        }
+        setArtists(allArtists);
+      } catch {
+        // silent
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   const filtered = artists.filter((a) =>

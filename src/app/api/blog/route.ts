@@ -10,8 +10,26 @@ function slugify(text: string): string {
 }
 
 // GET — public (blog listing used by the public page).
-export async function GET() {
-  const posts = await db.select().from(blogPosts).orderBy(desc(blogPosts.createdAt)).limit(100);
+// By default only published posts are returned.
+// Admin callers can pass ?all=true to include drafts.
+export async function GET(req: NextRequest) {
+  const showAll = req.nextUrl.searchParams.get("all") === "true";
+
+  if (showAll) {
+    const admin = await requireAdmin();
+    if (!admin.ok) {
+      return NextResponse.json({ error: admin.error }, { status: admin.status });
+    }
+    const posts = await db.select().from(blogPosts).orderBy(desc(blogPosts.createdAt)).limit(100);
+    return NextResponse.json(posts);
+  }
+
+  const posts = await db
+    .select()
+    .from(blogPosts)
+    .where(eq(blogPosts.status, "published"))
+    .orderBy(desc(blogPosts.createdAt))
+    .limit(100);
   return NextResponse.json(posts);
 }
 
