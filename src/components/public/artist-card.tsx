@@ -52,7 +52,7 @@ export function ArtistCard({ artist }: ArtistCardProps) {
             fill
             sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
             className="object-cover object-[center_20%] transition-transform duration-300 group-hover:scale-105"
-            unoptimized={artist.coverImageUrl.includes("r2.cloudflarestorage.com")}
+            unoptimized={artist.coverImageUrl?.includes("r2.cloudflarestorage.com") ?? false}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">

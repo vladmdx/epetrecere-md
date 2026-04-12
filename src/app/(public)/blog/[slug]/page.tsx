@@ -62,7 +62,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   const crumbs = breadcrumbJsonLd([
     { name: "Acasă", url: "/" },
-    { name: "Blog", url: "/" },
+    { name: "Blog", url: "/blog" },
     { name: post.titleRo, url: `/blog/${slug}` },
   ]);
 

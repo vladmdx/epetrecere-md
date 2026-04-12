@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, MapPin, CheckCircle, XCircle, Loader2, MessageSquare, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type BookingRequest = {
   id: number;
@@ -106,40 +107,58 @@ export default function VendorBookingsPage() {
       : "Ne pare rău, nu sunt disponibil la data respectivă.";
     setBusy(id);
     try {
-      await fetch(`/api/booking-requests/${id}`, {
+      const res = await fetch(`/api/booking-requests/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action, reply }),
       });
+      if (!res.ok) {
+        toast.error("Nu s-a putut actualiza rezervarea");
+        return;
+      }
+      toast.success(action === "accept" ? "Rezervare acceptată!" : "Rezervare respinsă");
       // Refresh
       const r = await fetch(`/api/booking-requests?artist_id=${artistId}`);
-      setBookings(await r.json());
+      if (r.ok) setBookings(await r.json());
+    } catch {
+      toast.error("Eroare la actualizarea rezervării");
     } finally {
       setBusy(null);
     }
   }
 
   async function loadChat(bookingId: number) {
-    const r = await fetch(`/api/chat?booking_request_id=${bookingId}`);
-    const data = await r.json();
-    setChats((prev) => ({ ...prev, [bookingId]: Array.isArray(data) ? data : [] }));
+    try {
+      const r = await fetch(`/api/chat?booking_request_id=${bookingId}`);
+      if (!r.ok) return;
+      const data = await r.json();
+      setChats((prev) => ({ ...prev, [bookingId]: Array.isArray(data) ? data : [] }));
+    } catch {
+      // Silent — chat is secondary
+    }
   }
 
   async function sendMessage(bookingId: number) {
     const msg = newMsg[bookingId]?.trim();
     if (!msg) return;
-    await fetch(`/api/chat`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bookingRequestId: bookingId,
-        senderType: "artist",
-        senderName: user?.fullName || "Artist",
-        message: msg,
-      }),
-    });
-    setNewMsg((prev) => ({ ...prev, [bookingId]: "" }));
-    await loadChat(bookingId);
+    try {
+      const res = await fetch(`/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingRequestId: bookingId,
+          message: msg,
+        }),
+      });
+      if (!res.ok) {
+        toast.error("Nu s-a putut trimite mesajul");
+        return;
+      }
+      setNewMsg((prev) => ({ ...prev, [bookingId]: "" }));
+      await loadChat(bookingId);
+    } catch {
+      toast.error("Eroare la trimiterea mesajului");
+    }
   }
 
   async function toggleExpand(id: number) {

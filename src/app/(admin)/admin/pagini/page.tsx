@@ -36,13 +36,22 @@ export default function AdminPagesPage() {
   async function handleSave() {
     if (!selectedPage) return;
     setSaving(true);
-    await fetch("/api/pages", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(selectedPage),
-    });
-    toast.success("Pagina salvată!");
-    setSaving(false);
+    try {
+      const res = await fetch("/api/pages", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(selectedPage),
+      });
+      if (res.ok) {
+        toast.success("Pagina salvată!");
+      } else {
+        toast.error("Eroare la salvarea paginii");
+      }
+    } catch {
+      toast.error("Eroare la salvarea paginii");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) return <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-gold" /></div>;

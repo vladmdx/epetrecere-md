@@ -33,7 +33,10 @@ export default function BlogEditorPage() {
 
   useEffect(() => {
     if (!isNew) {
-      fetch("/api/blog").then(r => r.json()).then(posts => {
+      fetch("/api/blog?all=true").then(r => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      }).then(posts => {
         const found = posts.find((p: { id: number }) => p.id === Number(id));
         if (found) setPost(found);
         setLoading(false);

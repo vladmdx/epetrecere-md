@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { GripVertical, Eye, Save, Loader2, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 // Fallback sections when DB is empty (initial seed)
 const defaultSections = [
@@ -112,7 +113,14 @@ export default function HomepageBuilderPage() {
           })),
         }),
       });
-      if (res.ok) setDirty(false);
+      if (res.ok) {
+        setDirty(false);
+        toast.success("Secțiunile au fost salvate!");
+      } else {
+        toast.error("Eroare la salvarea secțiunilor");
+      }
+    } catch {
+      toast.error("Eroare la salvarea secțiunilor");
     } finally {
       setSaving(false);
     }

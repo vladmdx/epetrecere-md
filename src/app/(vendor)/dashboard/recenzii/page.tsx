@@ -3,6 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 import { Star, MessageSquare, TrendingUp, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -73,7 +74,12 @@ export default function VendorReviewsPage() {
         );
         setReplyingTo(null);
         setReplyText("");
+        toast.success("Răspunsul a fost salvat!");
+      } else {
+        toast.error("Nu s-a putut salva răspunsul");
       }
+    } catch {
+      toast.error("Eroare la salvarea răspunsului");
     } finally {
       setSubmitting(false);
     }

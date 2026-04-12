@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Send, User, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -84,7 +85,10 @@ export default function VendorMessagesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        toast.error("Nu s-a putut trimite mesajul");
+        return;
+      }
       const inserted = await res.json();
       setMessages((prev) => [...prev, inserted]);
       // Bump preview locally so the sidebar reflects the latest message.

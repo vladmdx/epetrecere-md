@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { venues, venueImages, reviews, users } from "@/lib/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth/admin";
 
 export async function GET(
   _req: Request,
@@ -62,6 +63,8 @@ const updateSchema = z.object({
   menuUrl: z.string().url().optional().or(z.literal("")),
   virtualTourUrl: z.string().url().optional().or(z.literal("")),
   calendarEnabled: z.boolean().optional(),
+  isActive: z.boolean().optional(),
+  isFeatured: z.boolean().optional(),
 });
 
 export async function PUT(
@@ -99,7 +102,11 @@ export async function PUT(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  if (venue.userId !== appUser.id) {
+  // Allow admin OR venue owner
+  const admin = await requireAdmin();
+  const isAdmin = admin.ok;
+
+  if (!isAdmin && venue.userId !== appUser.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
