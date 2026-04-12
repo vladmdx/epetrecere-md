@@ -135,3 +135,18 @@ export function venueJsonLd(venue: {
     }),
   };
 }
+
+export function itemListJsonLd(items: Array<{ name: string; url: string }>, listName: string) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: listName,
+    numberOfItems: items.length,
+    itemListElement: items.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: item.name,
+      url: item.url,
+    })),
+  };
+}

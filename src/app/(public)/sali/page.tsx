@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getVenues } from "@/lib/db/queries/venues";
 import { generateMeta } from "@/lib/seo/generate-meta";
+import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo/jsonld";
 import { VenuesListClient } from "./client";
 
 export const metadata: Metadata = generateMeta({
@@ -37,16 +38,38 @@ export default async function VenuesPage({ searchParams }: Props) {
   // Extract unique cities from results for filter pills
   const allCities = Array.from(new Set(result.items.map((v) => v.city).filter(Boolean) as string[])).sort();
 
+  const jsonLdItems = result.items.slice(0, 20).map((v) => ({
+    name: v.nameRo,
+    url: `https://epetrecere.md/sali/${v.slug}`,
+  }));
+
   return (
-    <VenuesListClient
-      venues={items}
-      total={result.total}
-      page={result.page}
-      totalPages={result.totalPages}
-      currentSort={filters.sort}
-      cities={allCities}
-      currentCity={(sp.city as string) || ""}
-      currentCapacityMin={(sp.capacity_min as string) || ""}
-    />
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd([
+            { name: "Acasă", url: "https://epetrecere.md" },
+            { name: "Săli", url: "https://epetrecere.md/sali" },
+          ])),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(itemListJsonLd(jsonLdItems, "Săli pentru Evenimente")),
+        }}
+      />
+      <VenuesListClient
+        venues={items}
+        total={result.total}
+        page={result.page}
+        totalPages={result.totalPages}
+        currentSort={filters.sort}
+        cities={allCities}
+        currentCity={(sp.city as string) || ""}
+        currentCapacityMin={(sp.capacity_min as string) || ""}
+      />
+    </>
   );
 }

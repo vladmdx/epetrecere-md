@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,24 @@ interface ImageGalleryProps {
 
 export function ImageGallery({ images }: ImageGalleryProps) {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  // Keyboard navigation for lightbox
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (lightboxIndex === null) return;
+      if (e.key === "Escape") setLightboxIndex(null);
+      if (e.key === "ArrowLeft" && lightboxIndex > 0) setLightboxIndex(lightboxIndex - 1);
+      if (e.key === "ArrowRight" && lightboxIndex < images.length - 1) setLightboxIndex(lightboxIndex + 1);
+    },
+    [lightboxIndex, images.length],
+  );
+
+  useEffect(() => {
+    if (lightboxIndex !== null) {
+      document.addEventListener("keydown", handleKeyDown);
+      return () => document.removeEventListener("keydown", handleKeyDown);
+    }
+  }, [lightboxIndex, handleKeyDown]);
 
   if (!images.length) return null;
 
@@ -49,7 +67,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
 
       {/* Lightbox */}
       {lightboxIndex !== null && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90" role="dialog" aria-label="Galerie imagini">
           <Button
             variant="ghost"
             size="icon"

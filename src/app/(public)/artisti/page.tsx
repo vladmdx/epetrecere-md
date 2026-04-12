@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
 import { getAllCategories } from "@/lib/db/queries/categories";
 import { generateMeta } from "@/lib/seo/generate-meta";
+import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo/jsonld";
 import { ArtistsListClient } from "./client";
 
 export const metadata: Metadata = generateMeta({
@@ -41,7 +42,28 @@ export default async function ArtistsPage({ searchParams }: Props) {
     ? result.items
     : result.items.map((a) => ({ ...a, priceFrom: null }));
 
+  const jsonLdItems = result.items.slice(0, 20).map((a) => ({
+    name: a.nameRo,
+    url: `https://epetrecere.md/artisti/${a.slug}`,
+  }));
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbJsonLd([
+            { name: "Acasă", url: "https://epetrecere.md" },
+            { name: "Artiști", url: "https://epetrecere.md/artisti" },
+          ])),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(itemListJsonLd(jsonLdItems, "Artiști pentru Evenimente")),
+        }}
+      />
     <ArtistsListClient
       artists={items}
       total={result.total}
@@ -54,5 +76,6 @@ export default async function ArtistsPage({ searchParams }: Props) {
       currentPriceMin={(sp.price_min as string) || ""}
       currentPriceMax={(sp.price_max as string) || ""}
     />
+    </>
   );
 }
