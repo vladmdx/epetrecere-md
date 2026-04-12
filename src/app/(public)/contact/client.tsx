@@ -94,7 +94,7 @@ export function ContactPageClient() {
                     phone: fd.get("phone"),
                     email: fd.get("email") || undefined,
                     message: fd.get("message"),
-                    source: "contact_page",
+                    source: "form",
                     eventType: "other",
                   }),
                 });

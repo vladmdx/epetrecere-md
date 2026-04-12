@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminTools, vendorTools, executeTool } from "@/lib/ai/tools";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { users, artists } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 const chatSchema = z.object({
@@ -70,6 +70,24 @@ export async function POST(req: Request) {
   const systemPrompt = isAdmin ? ADMIN_SYSTEM : VENDOR_SYSTEM;
   const tools = isAdmin ? adminTools : vendorTools;
 
+  // Resolve vendor artist ID for scoping vendor tools
+  let vendorArtistId: number | undefined;
+  if (!isAdmin) {
+    const [appUserFull] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    if (appUserFull) {
+      const [artist] = await db
+        .select({ id: artists.id })
+        .from(artists)
+        .where(eq(artists.userId, appUserFull.id))
+        .limit(1);
+      vendorArtistId = artist?.id;
+    }
+  }
+
   const messages: Anthropic.MessageParam[] = parsed.data.messages.map((m) => ({
     role: m.role,
     content: m.content,
@@ -100,7 +118,7 @@ export async function POST(req: Request) {
       // Execute tools and add results
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
       for (const block of toolBlocks) {
-        const result = await executeTool(block.name, block.input as Record<string, unknown>);
+        const result = await executeTool(block.name, block.input as Record<string, unknown>, vendorArtistId);
         toolResults.push({
           type: "tool_result",
           tool_use_id: block.id,

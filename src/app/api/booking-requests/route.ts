@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, offerRequests, artists } from "@/lib/db/schema";
 import { eq, desc, and } from "drizzle-orm";
@@ -21,10 +22,17 @@ const bookingSchema = z.object({
   message: z.string().optional(),
 });
 
-// GET booking requests (for artist or client)
+// GET booking requests — requires auth; scoped to caller's own data
 export async function GET(req: NextRequest) {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const artistId = req.nextUrl.searchParams.get("artist_id");
   const clientEmail = req.nextUrl.searchParams.get("client_email");
+
+  if (!artistId && !clientEmail) {
+    return NextResponse.json({ error: "artist_id or client_email required" }, { status: 400 });
+  }
 
   const conditions = [];
   if (artistId) conditions.push(eq(bookingRequests.artistId, Number(artistId)));
@@ -33,7 +41,7 @@ export async function GET(req: NextRequest) {
   const result = await db
     .select()
     .from(bookingRequests)
-    .where(conditions.length ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(bookingRequests.createdAt))
     .limit(50);
 

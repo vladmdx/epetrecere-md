@@ -38,7 +38,7 @@ const createLeadSchema = z
     guestCount: z.number().optional(),
     budget: z.number().optional(),
     message: z.string().optional(),
-    source: z.enum(["form", "wizard", "direct"]).default("form"),
+    source: z.enum(["form", "wizard", "direct", "import"]).default("form"),
     artistId: z.number().optional(),
     venueId: z.number().optional(),
     /** M3 — full wizard payload persisted so the matching engine can pull

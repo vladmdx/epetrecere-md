@@ -51,8 +51,6 @@ export default function OnboardingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clerkUserId: user?.id,
-          email: user?.primaryEmailAddress?.emailAddress,
           name: data.name,
           phone: data.phone,
           categoryId: data.categoryId,

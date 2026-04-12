@@ -59,14 +59,45 @@ export async function POST(req: Request) {
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { bookingRequestId, senderType, senderName, message } = body;
+  const { bookingRequestId, message } = body;
 
-  if (!bookingRequestId || !senderType || !senderName || !message) {
-    return NextResponse.json({ error: "All fields required" }, { status: 400 });
+  if (!bookingRequestId || !message) {
+    return NextResponse.json({ error: "bookingRequestId and message required" }, { status: 400 });
   }
 
   const hasAccess = await verifyBookingAccess(clerkId, Number(bookingRequestId));
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
+  // Derive senderType and senderName from the authenticated user (not client input)
+  const [appUser] = await db
+    .select({ id: users.id, name: users.name, role: users.role })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+
+  let senderType = "client";
+  let senderName = appUser?.name || "Client";
+
+  if (appUser) {
+    // Check if user is the artist on this booking
+    const [booking] = await db
+      .select({ artistId: bookingRequests.artistId })
+      .from(bookingRequests)
+      .where(eq(bookingRequests.id, Number(bookingRequestId)))
+      .limit(1);
+
+    if (booking) {
+      const [artist] = await db
+        .select({ id: artists.id, nameRo: artists.nameRo })
+        .from(artists)
+        .where(and(eq(artists.id, booking.artistId), eq(artists.userId, appUser.id)))
+        .limit(1);
+      if (artist) {
+        senderType = "artist";
+        senderName = artist.nameRo || appUser.name || "Artist";
+      }
+    }
+  }
 
   const [msg] = await db.insert(chatMessages).values({
     bookingRequestId,

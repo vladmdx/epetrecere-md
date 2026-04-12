@@ -30,7 +30,11 @@ export async function POST(req: Request) {
   const payload = await req.json();
   const body = JSON.stringify(payload);
 
-  const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET || "");
+  if (!process.env.CLERK_WEBHOOK_SECRET) {
+    console.error("[clerk-webhook] CLERK_WEBHOOK_SECRET is not configured");
+    return new NextResponse("Webhook secret not configured", { status: 500 });
+  }
+  const wh = new Webhook(process.env.CLERK_WEBHOOK_SECRET);
 
   let event: ClerkWebhookEvent;
   try {

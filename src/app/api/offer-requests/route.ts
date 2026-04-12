@@ -2,9 +2,12 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { offerRequests, artists, venues } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth/admin";
 
-// GET all offer requests for admin
+// GET all offer requests — admin only (contains PII)
 export async function GET() {
+  const admin = await requireAdmin();
+  if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
   const requests = await db
     .select({
       id: offerRequests.id,

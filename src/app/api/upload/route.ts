@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { auth } from "@clerk/nextjs/server";
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  // Auth: require signed-in user to upload files
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
   const { success } = await rateLimit(`upload:${ip}`, 30, 60_000);
   if (!success) {
