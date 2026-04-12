@@ -51,9 +51,16 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Detect if user signed up recently (within last 2 minutes) — show role picker
+    const isNewUser = dbUser.createdAt
+      ? Date.now() - new Date(dbUser.createdAt).getTime() < 2 * 60 * 1000
+      : false;
+
     return NextResponse.json({
       role: venue ? "venue" : dbUser.role,
       onboardingComplete: true,
+      hasVenue: !!venue,
+      isNewUser,
       venueId: venue?.id ?? null,
       venueSlug: venue?.slug ?? null,
       venueApproved: venue?.isActive ?? false,
