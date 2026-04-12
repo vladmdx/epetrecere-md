@@ -236,7 +236,7 @@ export default function VendorPackagesPage() {
         <div>
           <h1 className="font-heading text-2xl font-bold">Pachete</h1>
           <p className="text-sm text-muted-foreground">
-            {pkgs.length} {pkgs.length === 1 ? "pachet" : "pachete"} — apar pe profilul tău public în tab-ul "Pachete".
+            {pkgs.length} {pkgs.length === 1 ? "pachet" : "pachete"} — apar pe profilul tău public în tab-ul &ldquo;Pachete&rdquo;.
           </p>
         </div>
         <Button onClick={openCreate} className="gap-2 bg-gold text-background hover:bg-gold-dark">

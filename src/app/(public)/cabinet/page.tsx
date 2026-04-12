@@ -77,7 +77,14 @@ export default function ClientCabinetPage() {
   useEffect(() => {
     if (isSignedIn && clerkUser?.primaryEmailAddress?.emailAddress) {
       const e = clerkUser.primaryEmailAddress.emailAddress;
+      // Intentional sync-in-effect: we hydrate form fields from Clerk on
+      // first sign-in detection, then kick off the fetch. The double
+      // render is unavoidable — Clerk state arrives after the initial
+      // render. The fetch-then-setState chain is the expected pattern
+      // for data fetching in effects.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEmail(e);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setClientName(clerkUser.fullName || "");
       fetch(`/api/booking-requests?client_email=${encodeURIComponent(e)}`)
         .then(r => r.json())
@@ -180,6 +187,10 @@ export default function ClientCabinetPage() {
   // Auto-load conversations the first time the user opens the tab.
   useEffect(() => {
     if (activeTab === "conversations" && !convLoaded && loggedIn) {
+      // Intentional setState-via-fetch in effect: loadConversations
+      // kicks off a fetch and sets state on resolve. This is the
+      // canonical React data-fetching-in-effect pattern.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       loadConversations();
     }
   }, [activeTab, convLoaded, loggedIn]);
@@ -296,7 +307,7 @@ export default function ClientCabinetPage() {
                 <p className="text-sm text-muted-foreground py-4">Se încarcă...</p>
               ) : conversations.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-4">
-                  Nu ai conversații încă. Deschide profilul unui artist și apasă "Chat direct".
+                  Nu ai conversații încă. Deschide profilul unui artist și apasă &ldquo;Chat direct&rdquo;.
                 </p>
               ) : (
                 conversations.map((c) => (

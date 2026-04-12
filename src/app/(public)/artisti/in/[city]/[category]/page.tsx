@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
@@ -108,11 +109,11 @@ export default async function CityCategoryPage({ params, searchParams }: Props) 
 
       <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <a href="/" className="hover:text-gold">Acasă</a>
+          <Link href="/" className="hover:text-gold">Acasă</Link>
           <span className="mx-2">/</span>
-          <a href="/artisti" className="hover:text-gold">Artiști</a>
+          <Link href="/artisti" className="hover:text-gold">Artiști</Link>
           <span className="mx-2">/</span>
-          <a href={`/artisti/in/${citySlug}`} className="hover:text-gold">{city.nameRo}</a>
+          <Link href={`/artisti/in/${citySlug}`} className="hover:text-gold">{city.nameRo}</Link>
           <span className="mx-2">/</span>
           <span className="text-foreground">{category.nameRo}</span>
         </nav>

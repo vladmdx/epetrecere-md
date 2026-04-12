@@ -165,7 +165,7 @@ async function main() {
 
       // Add video if exists
       if (videoUrl) {
-        let platform: "youtube" | "vimeo" = "youtube";
+        const platform: "youtube" | "vimeo" = "youtube";
         let videoId = videoUrl;
 
         if (videoUrl.includes("youtube.com") || videoUrl.includes("youtu.be")) {

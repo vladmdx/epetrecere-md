@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -168,12 +169,12 @@ export function InvitationWizard() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center lg:px-8">
         <h1 className="font-heading text-2xl font-bold">Autentifică-te</h1>
-        <a
+        <Link
           href="/sign-in?redirect_url=/cabinet/invitatii/nou"
           className="mt-4 inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
         >
           Conectează-te
-        </a>
+        </Link>
       </div>
     );
   }

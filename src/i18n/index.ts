@@ -35,23 +35,28 @@ export function t(key: string, locale: Locale = defaultLocale, vars?: Record<str
 }
 
 /** Get a localized field from a multilingual entity.
- * Supports both snake_case (name_ro) and camelCase (nameRo) field patterns. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function getLocalized(
-  entity: Record<string, any>,
+ * Supports both snake_case (name_ro) and camelCase (nameRo) field patterns.
+ *
+ * The generic `T extends object` lets callers pass named Drizzle row types
+ * (ArtistData, VenueData, …) without requiring an index signature. We cast
+ * to `Record<string, unknown>` inside so we can index by computed key names
+ * — the runtime guards on `typeof === "string"` keep the cast sound. */
+export function getLocalized<T extends object>(
+  entity: T,
   field: string,
   locale: Locale = defaultLocale,
 ): string {
+  const obj = entity as Record<string, unknown>;
   const capLocale = locale.charAt(0).toUpperCase() + locale.slice(1);
 
   // Try camelCase first (nameRo), then snake_case (name_ro)
-  const value = entity[`${field}${capLocale}`] ?? entity[`${field}_${locale}`];
+  const value = obj[`${field}${capLocale}`] ?? obj[`${field}_${locale}`];
   if (typeof value === "string" && value) return value;
 
   // Fallback chain: ro → ru → en (both formats)
   const fallback =
-    entity[`${field}Ro`] ?? entity[`${field}_ro`] ??
-    entity[`${field}Ru`] ?? entity[`${field}_ru`] ??
-    entity[`${field}En`] ?? entity[`${field}_en`];
+    obj[`${field}Ro`] ?? obj[`${field}_ro`] ??
+    obj[`${field}Ru`] ?? obj[`${field}_ru`] ??
+    obj[`${field}En`] ?? obj[`${field}_en`];
   return typeof fallback === "string" ? fallback : "";
 }

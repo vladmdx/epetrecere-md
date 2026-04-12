@@ -191,7 +191,7 @@ export default function VendorBookingsPage() {
                         {booking.startTime && booking.endTime && <span>{booking.startTime}–{booking.endTime}</span>}
                       </div>
                       {booking.message && (
-                        <p className="text-sm text-muted-foreground italic">"{booking.message}"</p>
+                        <p className="text-sm text-muted-foreground italic">&ldquo;{booking.message}&rdquo;</p>
                       )}
                       {booking.artistReply && (
                         <p className="text-sm text-gold">↳ {booking.artistReply}</p>

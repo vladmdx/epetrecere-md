@@ -8,7 +8,12 @@ export function CookieConsent() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
+    // Intentional sync-in-effect: show the banner only on first visit,
+    // reading the existing choice from localStorage. Runs once after
+    // hydration — no re-render loop because setShow(false) never fires
+    // from here.
     const consent = localStorage.getItem("cookie-consent");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!consent) setShow(true);
   }, []);
 

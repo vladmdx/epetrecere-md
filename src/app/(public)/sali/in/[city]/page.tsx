@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getVenues } from "@/lib/db/queries/venues";
@@ -88,9 +89,9 @@ export default async function VenuesByCityPage({ params, searchParams }: Props) 
 
       <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <a href="/" className="hover:text-gold">Acasă</a>
+          <Link href="/" className="hover:text-gold">Acasă</Link>
           <span className="mx-2">/</span>
-          <a href="/sali" className="hover:text-gold">Săli</a>
+          <Link href="/sali" className="hover:text-gold">Săli</Link>
           <span className="mx-2">/</span>
           <span className="text-foreground">{city.nameRo}</span>
         </nav>
@@ -111,9 +112,9 @@ export default async function VenuesByCityPage({ params, searchParams }: Props) 
             <p className="text-muted-foreground">
               Nicio sală disponibilă în {city.nameRo} momentan.
             </p>
-            <a href="/sali" className="mt-4 inline-block text-sm text-gold hover:underline">
+            <Link href="/sali" className="mt-4 inline-block text-sm text-gold hover:underline">
               Vezi toate sălile →
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

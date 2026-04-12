@@ -14,10 +14,13 @@ export function ChecklistClient() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // Intentional sync-in-effect: one-time hydration from localStorage.
+    // loaded flag gates the save effect below.
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const arr = JSON.parse(raw) as string[];
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setChecked(new Set(arr));
       }
     } catch {

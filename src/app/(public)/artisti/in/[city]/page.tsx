@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
@@ -98,9 +99,9 @@ export default async function ArtistsByCityPage({ params, searchParams }: Props)
 
       <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <a href="/" className="hover:text-gold">Acasă</a>
+          <Link href="/" className="hover:text-gold">Acasă</Link>
           <span className="mx-2">/</span>
-          <a href="/artisti" className="hover:text-gold">Artiști</a>
+          <Link href="/artisti" className="hover:text-gold">Artiști</Link>
           <span className="mx-2">/</span>
           <span className="text-foreground">{city.nameRo}</span>
         </nav>
@@ -121,12 +122,12 @@ export default async function ArtistsByCityPage({ params, searchParams }: Props)
             <p className="text-muted-foreground">
               Niciun artist disponibil în {city.nameRo} momentan.
             </p>
-            <a
+            <Link
               href="/artisti"
               className="mt-4 inline-block text-sm text-gold hover:underline"
             >
               Vezi toți artiștii →
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

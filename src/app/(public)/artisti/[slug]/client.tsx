@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Star, BadgeCheck, Crown, MapPin, Phone, Globe, CalendarDays, X, ZoomIn, Lock, Camera } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { CalendarWidget } from "@/components/public/calendar-widget";
@@ -104,9 +105,9 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
       {/* Breadcrumb */}
       <nav className="mb-6 text-xs text-muted-foreground">
-        <a href="/" className="hover:text-gold">Acasă</a>
+        <Link href="/" className="hover:text-gold">Acasă</Link>
         <span className="mx-2">/</span>
-        <a href="/artisti" className="hover:text-gold">{t("nav.artists")}</a>
+        <Link href="/artisti" className="hover:text-gold">{t("nav.artists")}</Link>
         <span className="mx-2">/</span>
         <span className="text-foreground">{name}</span>
       </nav>

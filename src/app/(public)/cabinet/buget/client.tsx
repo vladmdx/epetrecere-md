@@ -133,11 +133,16 @@ export function BudgetTrackerClient() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // Intentional sync-in-effect: load persisted budget from localStorage
+    // on first mount. One-time hydration; setLoaded(true) guards the save
+    // effect below from clobbering the stored value with defaults.
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const saved = JSON.parse(raw);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (saved.categories) setCategories(saved.categories);
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (saved.totalBudget) setTotalBudget(saved.totalBudget);
       }
     } catch {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArtistCard } from "@/components/public/artist-card";
 import { Button } from "@/components/ui/button";
@@ -77,7 +78,7 @@ export function CategoryPageClient({
       {/* Hero */}
       <div className="mb-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <a href="/" className="hover:text-gold">Acasă</a>
+          <Link href="/" className="hover:text-gold">Acasă</Link>
           <span className="mx-2">/</span>
           <span className="text-foreground">{name}</span>
         </nav>

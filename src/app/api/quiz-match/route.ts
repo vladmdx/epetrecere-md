@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
 
   // 4. Fetch cover images and category names for the top list
   const topIds = top.map((t) => t.id);
-  let coverByArtist: Record<number, string> = {};
+  const coverByArtist: Record<number, string> = {};
   if (topIds.length > 0) {
     const imgs = await db
       .select({

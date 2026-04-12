@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Star, MapPin, Users, Check, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
@@ -54,9 +55,9 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
       <nav className="mb-6 text-xs text-muted-foreground">
-        <a href="/" className="hover:text-gold">Acasă</a>
+        <Link href="/" className="hover:text-gold">Acasă</Link>
         <span className="mx-2">/</span>
-        <a href="/sali" className="hover:text-gold">{t("nav.venues")}</a>
+        <Link href="/sali" className="hover:text-gold">{t("nav.venues")}</Link>
         <span className="mx-2">/</span>
         <span className="text-foreground">{name}</span>
       </nav>

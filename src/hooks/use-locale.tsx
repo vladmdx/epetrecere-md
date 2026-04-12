@@ -24,6 +24,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(defaultLocale);
 
   useEffect(() => {
+    // Intentional sync-in-effect: read the locale cookie on first mount
+    // to swap from SSR default to the user's preference. The cookie is
+    // the source of truth; refactor to useSyncExternalStore is tracked
+    // for follow-up.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLocaleState(getStoredLocale());
   }, []);
 

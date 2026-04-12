@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Heart, Calendar, MapPin, Clock, Check, X, HelpCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -301,12 +302,12 @@ export function PublicInvitationView({
       {/* Footer */}
       <footer className="border-t border-border/40 py-8 text-center text-xs text-muted-foreground">
         Invitație creată cu{" "}
-        <a
+        <Link
           href="/cabinet/invitatii/nou"
           className="text-gold hover:underline"
         >
           ePetrecere.md
-        </a>
+        </Link>
       </footer>
     </div>
   );
