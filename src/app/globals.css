@@ -241,7 +241,21 @@
    ═══════════════════════════════════════════════════════ */
 
 /* Improved text contrast */
-.dark h1, .dark h2 { color: #FAF8F2 !important; }
+.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 { color: #FAF8F2 !important; }
+
+/* Ensure text readability on dark section backgrounds */
+.section-dark,
+.section-navy,
+.section-mid,
+.section-deepblack {
+  color: #FAF8F2;
+}
+.section-dark .text-muted-foreground,
+.section-navy .text-muted-foreground,
+.section-mid .text-muted-foreground,
+.section-deepblack .text-muted-foreground {
+  color: #B0B0C0 !important;
+}
 
 /* Premium card hover */
 .card-premium {

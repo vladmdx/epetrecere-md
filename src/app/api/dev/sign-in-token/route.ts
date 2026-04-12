@@ -13,9 +13,7 @@ const TEST_PERSONAS: Record<string, { email: string }> = {
 export async function GET(req: NextRequest) {
   // Gated by ENABLE_TEST_LOGIN env flag (set it to "1" in Vercel to expose
   // the test-login flow on the live site). Defaults to ON in development.
-  const enabled =
-    process.env.ENABLE_TEST_LOGIN === "1" ||
-    process.env.NODE_ENV !== "production";
+  const enabled = process.env.ENABLE_TEST_LOGIN === "1";
   if (!enabled) {
     return NextResponse.json({ error: "disabled" }, { status: 403 });
   }

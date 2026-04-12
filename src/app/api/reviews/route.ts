@@ -6,6 +6,38 @@ import { eq } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
 
+// GET — list reviews for an artist or venue (public, only approved; or all if owner)
+export async function GET(req: NextRequest) {
+  const artistId = req.nextUrl.searchParams.get("artist_id");
+  const venueId = req.nextUrl.searchParams.get("venue_id");
+
+  if (!artistId && !venueId) {
+    return NextResponse.json({ error: "artist_id or venue_id required" }, { status: 400 });
+  }
+
+  const conditions = [eq(reviews.isApproved, true)];
+  if (artistId) conditions.push(eq(reviews.artistId, Number(artistId)));
+  if (venueId) conditions.push(eq(reviews.venueId, Number(venueId)));
+
+  const { and, desc } = await import("drizzle-orm");
+  const result = await db
+    .select({
+      id: reviews.id,
+      authorName: reviews.authorName,
+      rating: reviews.rating,
+      text: reviews.text,
+      eventType: reviews.eventType,
+      reply: reviews.reply,
+      createdAt: reviews.createdAt,
+    })
+    .from(reviews)
+    .where(and(...conditions))
+    .orderBy(desc(reviews.createdAt))
+    .limit(50);
+
+  return NextResponse.json(result);
+}
+
 const reviewSchema = z.object({
   artistId: z.number().optional(),
   venueId: z.number().optional(),

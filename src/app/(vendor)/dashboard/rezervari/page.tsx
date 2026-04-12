@@ -58,23 +58,29 @@ export default function VendorBookingsPage() {
   const [newMsg, setNewMsg] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
 
-  // Load artistId for the signed-in user; fall back to Igor (11) for demo/dev
+  // Load artistId for the signed-in user
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     if (!isLoaded) return;
     (async () => {
       try {
         const email = user?.primaryEmailAddress?.emailAddress;
-        if (email) {
-          const r = await fetch(`/api/auth/check-role?email=${encodeURIComponent(email)}`);
-          const data = await r.json();
-          if (data.artistId) {
-            setArtistId(data.artistId);
-            return;
-          }
+        if (!email) {
+          setError("Nu s-a putut determina contul de artist. Autentificați-vă din nou.");
+          setLoading(false);
+          return;
         }
-        setArtistId(11); // demo fallback
+        const r = await fetch(`/api/auth/check-role?email=${encodeURIComponent(email)}`);
+        const data = await r.json();
+        if (data.artistId) {
+          setArtistId(data.artistId);
+        } else {
+          setError("Contul dvs. nu este asociat cu un profil de artist.");
+          setLoading(false);
+        }
       } catch {
-        setArtistId(11);
+        setError("Eroare la încărcarea profilului de artist. Încercați din nou.");
+        setLoading(false);
       }
     })();
   }, [isLoaded, user]);
@@ -143,6 +149,19 @@ export default function VendorBookingsPage() {
     }
     setExpandedId(id);
     if (!chats[id]) await loadChat(id);
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <Card>
+          <CardContent className="py-12 text-center text-destructive">
+            <XCircle className="mx-auto mb-3 h-8 w-8" />
+            <p>{error}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   if (loading) {

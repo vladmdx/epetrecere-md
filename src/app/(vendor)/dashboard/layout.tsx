@@ -1,11 +1,18 @@
 import { VendorSidebar } from "@/components/vendor/vendor-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 
-export default function VendorLayout({
+export default async function VendorLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const { userId } = await auth();
+  if (!userId) {
+    redirect("/sign-in");
+  }
+
   return (
     <div className="flex h-screen overflow-hidden">
       <VendorSidebar />

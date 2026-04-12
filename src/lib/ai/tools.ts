@@ -133,8 +133,11 @@ export async function executeTool(
       }
 
       case "get_leads": {
+        const validLeadStatuses = ["new", "contacted", "qualified", "converted", "lost"];
         const conditions = [];
-        if (input.status) conditions.push(sql`${leads.status} = ${input.status as string}`);
+        if (input.status && validLeadStatuses.includes(input.status as string)) {
+          conditions.push(sql`${leads.status} = ${input.status as string}`);
+        }
 
         const result = await db
           .select({

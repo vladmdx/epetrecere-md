@@ -12,6 +12,7 @@ export function ContactPageClient() {
   const { t } = useLocale();
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
@@ -82,9 +83,10 @@ export function ContactPageClient() {
             onSubmit={async (e) => {
               e.preventDefault();
               setSubmitting(true);
+              setFormError(null);
               const fd = new FormData(e.currentTarget);
               try {
-                await fetch("/api/leads", {
+                const res = await fetch("/api/leads", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({
@@ -96,7 +98,12 @@ export function ContactPageClient() {
                     eventType: "other",
                   }),
                 });
+                if (!res.ok) {
+                  throw new Error("Eroare la trimiterea mesajului");
+                }
                 setSubmitted(true);
+              } catch {
+                setFormError("Nu am putut trimite mesajul. Încercați din nou sau contactați-ne telefonic.");
               } finally {
                 setSubmitting(false);
               }
@@ -120,6 +127,9 @@ export function ContactPageClient() {
               <Label htmlFor="message">{t("form.message")} *</Label>
               <Textarea id="message" name="message" rows={5} required />
             </div>
+            {formError && (
+              <p className="text-sm text-destructive">{formError}</p>
+            )}
             <Button
               type="submit"
               className="w-full bg-gold text-background hover:bg-gold-dark"

@@ -11,6 +11,7 @@ import {
   varchar,
   serial,
   date,
+  index,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -328,7 +329,10 @@ export const calendarEvents = pgTable("calendar_events", {
   eventType: text("event_type"),
   source: calendarSourceEnum("source").default("manual").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_cal_entity_date").on(t.entityType, t.entityId, t.date),
+  index("idx_cal_entity_type_date_status").on(t.entityType, t.date, t.status),
+]);
 
 // ═══════════════════════════════════════════════════════
 // LEADS & BOOKINGS
@@ -553,7 +557,10 @@ export const notifications = pgTable("notifications", {
   isRead: boolean("is_read").default(false).notNull(),
   actionUrl: text("action_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_notif_user_read").on(t.userId, t.isRead),
+  index("idx_notif_user_created").on(t.userId, t.createdAt),
+]);
 
 // ═══════════════════════════════════════════════════════
 // WORK SCHEDULE (artist working hours)
@@ -610,7 +617,10 @@ export const bookingRequests = pgTable("booking_requests", {
   adminSeen: boolean("admin_seen").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_booking_artist_status").on(t.artistId, t.status),
+  index("idx_booking_client_user").on(t.clientUserId),
+]);
 
 // ═══════════════════════════════════════════════════════
 // CONVERSATIONS (M0b #10)
@@ -636,7 +646,10 @@ export const conversations = pgTable("conversations", {
   clientUnread: integer("client_unread").default(0).notNull(),
   artistUnread: integer("artist_unread").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_conv_client_artist").on(t.clientUserId, t.artistId),
+  index("idx_conv_artist").on(t.artistId),
+]);
 
 // ═══════════════════════════════════════════════════════
 // CHAT MESSAGES
@@ -656,7 +669,10 @@ export const chatMessages = pgTable("chat_messages", {
   message: text("message").notNull(),
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_chat_booking").on(t.bookingRequestId),
+  index("idx_chat_conversation").on(t.conversationId, t.createdAt),
+]);
 
 // ═══════════════════════════════════════════════════════
 // EVENT PLANNING SUITE (M4)
