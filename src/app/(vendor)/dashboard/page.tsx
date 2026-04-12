@@ -1,14 +1,14 @@
-// F-A1 — Artist dashboard home.
+// F-A1 / F-S1 — Vendor dashboard home, entity-aware.
 //
 // Was a client component with four hardcoded "0" stat cards — zero
-// signal for the artist and a trust killer on first login. It's now a
-// server component that resolves the signed-in user → artist row and
-// renders real numbers via `getArtistStats` (same helper the
-// /api/me/artist/stats endpoint uses).
+// signal for the artist and a trust killer on first login. Then F-A1
+// wired the artist flow via getArtistStats. F-S1 completes the picture
+// for venue owners so they don't see a row of dashes either.
 //
-// Users who aren't signed in or don't have an artist row yet still see
-// the dashboard shell (so venue-only vendors and mid-onboarding artists
-// aren't locked out); they just get dashes in the stat cards.
+// Resolution order: try artist first (most common), fall back to venue.
+// Users who own both still land on the artist view — they can reach the
+// venue pages via direct link. Users with neither still see the shell
+// with dashes, so mid-onboarding flows aren't locked out.
 
 import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
@@ -22,15 +22,24 @@ import {
   Building2,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { artists, users } from "@/lib/db/schema";
+import { artists, users, venues } from "@/lib/db/schema";
 import {
   getArtistStats,
   type ArtistStats,
 } from "@/lib/db/queries/artist-stats";
+import {
+  getVenueStats,
+  type VenueStats,
+} from "@/lib/db/queries/venue-stats";
 
 export const dynamic = "force-dynamic";
 
-async function loadStats(): Promise<ArtistStats | null> {
+type Loaded =
+  | { kind: "artist"; stats: ArtistStats }
+  | { kind: "venue"; stats: VenueStats; venueName: string }
+  | null;
+
+async function loadStats(): Promise<Loaded> {
   const { userId: clerkId } = await auth();
   if (!clerkId) return null;
 
@@ -41,58 +50,81 @@ async function loadStats(): Promise<ArtistStats | null> {
     .limit(1);
   if (!appUser) return null;
 
+  // Artist first — the dominant flow on ePetrecere.md.
   const [artist] = await db
     .select({ id: artists.id })
     .from(artists)
     .where(eq(artists.userId, appUser.id))
     .limit(1);
-  if (!artist) return null;
+  if (artist) {
+    return { kind: "artist", stats: await getArtistStats(artist.id) };
+  }
 
-  return getArtistStats(artist.id);
+  // Venue fallback — mirrors the artist path so the home card grid
+  // works for venue-only owners too.
+  const [venue] = await db
+    .select({ id: venues.id, nameRo: venues.nameRo })
+    .from(venues)
+    .where(eq(venues.userId, appUser.id))
+    .limit(1);
+  if (venue) {
+    return {
+      kind: "venue",
+      stats: await getVenueStats(venue.id),
+      venueName: venue.nameRo,
+    };
+  }
+
+  return null;
 }
 
-function formatRating(stats: ArtistStats | null): string {
-  if (!stats || stats.ratingCount === 0 || stats.ratingAvg === null) return "—";
-  return stats.ratingAvg.toFixed(1);
+function formatRating(ratingAvg: number | null, ratingCount: number): string {
+  if (ratingCount === 0 || ratingAvg === null) return "—";
+  return ratingAvg.toFixed(1);
 }
 
 export default async function VendorDashboard() {
-  const stats = await loadStats();
+  const loaded = await loadStats();
 
-  const cards = [
-    {
-      label: "Cereri noi",
-      value: stats ? String(stats.pendingRequests) : "—",
-      icon: BookOpen,
-      color: "text-gold",
-    },
-    {
-      label: "Vizite profil (30 zile)",
-      value: stats ? String(stats.profileViews30d) : "—",
-      icon: Eye,
-      color: "text-info",
-    },
-    {
-      label: "Rating mediu",
-      value: formatRating(stats),
-      icon: Star,
-      color: "text-warning",
-    },
-    {
-      label: "Confirmate luna",
-      value: stats ? String(stats.confirmedThisMonth) : "—",
-      icon: CheckCircle2,
-      color: "text-success",
-    },
-  ];
+  // Same four slots for both entity types — different data sources.
+  const cards = (() => {
+    if (loaded?.kind === "artist") {
+      const s = loaded.stats;
+      return [
+        { label: "Cereri noi", value: String(s.pendingRequests), icon: BookOpen, color: "text-gold" },
+        { label: "Vizite profil (30 zile)", value: String(s.profileViews30d), icon: Eye, color: "text-info" },
+        { label: "Rating mediu", value: formatRating(s.ratingAvg, s.ratingCount), icon: Star, color: "text-warning" },
+        { label: "Confirmate luna", value: String(s.confirmedThisMonth), icon: CheckCircle2, color: "text-success" },
+      ];
+    }
+    if (loaded?.kind === "venue") {
+      const s = loaded.stats;
+      return [
+        { label: "Rezervări pending", value: String(s.pendingBookings), icon: BookOpen, color: "text-gold" },
+        { label: "Vizite profil (30 zile)", value: String(s.profileViews30d), icon: Eye, color: "text-info" },
+        { label: "Rating mediu", value: formatRating(s.ratingAvg, s.ratingCount), icon: Star, color: "text-warning" },
+        { label: "Rezervări luna", value: String(s.bookingsThisMonth), icon: CheckCircle2, color: "text-success" },
+      ];
+    }
+    // Unresolved entity — show dashes so the shell still renders.
+    return [
+      { label: "Cereri noi", value: "—", icon: BookOpen, color: "text-gold" },
+      { label: "Vizite profil (30 zile)", value: "—", icon: Eye, color: "text-info" },
+      { label: "Rating mediu", value: "—", icon: Star, color: "text-warning" },
+      { label: "Confirmate luna", value: "—", icon: CheckCircle2, color: "text-success" },
+    ];
+  })();
+
+  const subtitle =
+    loaded?.kind === "venue"
+      ? loaded.venueName
+      : "Bine ai venit în panoul tău";
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">Panoul Meu</h1>
-        <p className="text-sm text-muted-foreground">
-          Bine ai venit în panoul tău
-        </p>
+        <p className="text-sm text-muted-foreground">{subtitle}</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -111,30 +143,32 @@ export default async function VendorDashboard() {
         ))}
       </div>
 
-      {/* M12 — Call-to-action for users who want to list a venue. The actual
-          gating happens inside venue-onboarding (redirects if already a
-          venue owner). */}
-      <Card>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg bg-gold/10 p-2 text-gold">
-              <Building2 className="h-5 w-5" />
+      {/* M12 — Venue upsell CTA. Only shown to artists (and unresolved
+          users). Venue owners already landed on the venue flow and
+          don't need the upsell. */}
+      {loaded?.kind !== "venue" && (
+        <Card>
+          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+            <div className="flex items-center gap-3">
+              <div className="rounded-lg bg-gold/10 p-2 text-gold">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-heading font-bold">Ai o sală de evenimente?</p>
+                <p className="text-sm text-muted-foreground">
+                  Publică-o pe ePetrecere.md și primește cereri de ofertă.
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-heading font-bold">Ai o sală de evenimente?</p>
-              <p className="text-sm text-muted-foreground">
-                Publică-o pe ePetrecere.md și primește cereri de ofertă.
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/dashboard/venue-onboarding"
-            className="inline-flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/5 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/10"
-          >
-            Înregistrează sala
-          </Link>
-        </CardContent>
-      </Card>
+            <Link
+              href="/dashboard/venue-onboarding"
+              className="inline-flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/5 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/10"
+            >
+              Înregistrează sala
+            </Link>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

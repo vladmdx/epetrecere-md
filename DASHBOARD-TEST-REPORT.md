@@ -15,7 +15,7 @@ Legend:
 
 | Code | Feature | Status | Path |
 |------|---------|--------|------|
-| F-A1 | Home / Panoul Meu | ✅ *(fixed)* | `src/app/(vendor)/dashboard/page.tsx` is now a server component that resolves the signed-in user → artist row and renders four real stats via `getArtistStats` (`src/lib/db/queries/artist-stats.ts`): pending requests, profile views (30d), rating avg, confirmed this month. Same helper powers `GET /api/me/artist/stats`. |
+| F-A1 | Home / Panoul Meu | ✅ *(fixed)* | `src/app/(vendor)/dashboard/page.tsx` is now a server component that resolves the signed-in user → artist row and renders four real stats via `getArtistStats` (`src/lib/db/queries/artist-stats.ts`): pending requests, profile views (30d), rating avg, confirmed this month. Same helper powers `GET /api/me/artist/stats`. F-S1 follow-up made the same page **entity-aware**: it now falls back to `getVenueStats` for venue-only owners so they no longer see dashes either. |
 | F-A2 | Calendar + iCal sync | ✅ | `src/app/(vendor)/dashboard/calendar/page.tsx`, `src/app/api/calendar/route.ts`, `src/app/api/calendar/ical/[artistId]/[token]/route.ts` |
 | F-A3 | Rezervări (bilateral confirm) | ✅ | `src/app/(vendor)/dashboard/rezervari/page.tsx`, `src/app/api/booking-requests/[id]/route.ts` — accept auto-blocks calendar (source="booking"); reject/cancel now auto-unblock (this session) |
 | F-A4 | Profil (info, descriere, galerie, pachete, setări) | ✅ *(fixed)* | `src/app/(vendor)/dashboard/profil/page.tsx` now hydrates from `/api/me/artist` on mount and persists via `PUT /api/artists/crud`. The CRUD endpoint is auth-gated: admins can touch any row; owners can only PUT their own, with moderation flags (`isActive`/`isFeatured`/`isVerified`/`isPremium`/`userId`) stripped before write. Galerie/Pachete tabs are still placeholders. |
@@ -30,16 +30,17 @@ Legend:
 
 | Code | Feature | Status | Path |
 |------|---------|--------|------|
-| F-S1 | Venue owner login + dashboard | ❌ | No vendor dashboard variant for venues. `onboarding/page.tsx` calls `/api/auth/register-artist` only; `venues` table has `userId` column but no owner flow wires it up. |
-| F-S2 | Capacity/price fields on profile | ⚠️ | Fields exist in `venues` schema (capacityMin, capacityMax, pricePerPerson) and on public venue detail, but venue owners can't edit them (admin-only via `/admin/venues`) |
-| F-S3 | Facilities checklist | ⚠️ | `venues.facilities` jsonb column exists and renders on public `/sali/[slug]`, admin-managed |
-| F-S4 | Meniu digital | ⚠️ | `venues.menuUrl` single-URL field present; no builder UI |
-| F-S5 | Virtual tour 360 | ❌ | No field in schema, no UI |
-| F-S6 | Event-type color coding on calendar | ❌ | Venue calendar not exposed to owners |
+| F-S1 | Venue owner login + dashboard | ✅ *(this session)* | Onboarding via `POST /api/auth/register-venue` (`src/app/api/auth/register-venue/route.ts`) creates an inactive `venues` row linked to `users.id`, notifies admins, enforces one-per-user (409 on repeat). `GET /api/me/venue` and `GET /api/me/venue/stats` surface the owner's venue + 5-field stats for the dashboard. Dashboard home at `src/app/(vendor)/dashboard/page.tsx` is now entity-aware — venue owners see "Rezervări pending / Vizite profil / Rating / Rezervări luna" instead of artist cards. |
+| F-S2 | Capacity/price fields on profile | ✅ *(this session)* | `PUT /api/venues/[id]` (`src/app/api/venues/[id]/route.ts`) is now owner-gated (401 anon, 403 non-owner) and persists `capacityMin`, `capacityMax`, `pricePerPerson` via the Zod `updateSchema`. Venue-onboarding pages at `src/app/(vendor)/dashboard/venue-onboarding/*` and `src/app/(vendor)/dashboard/venue/*` drive the flow. |
+| F-S3 | Facilities checklist | ✅ *(this session)* | `venues.facilities` jsonb round-trips through the same `PUT /api/venues/[id]` endpoint; the round-trip E2E asserts `["parking","ac","stage","kitchen"]` persists and re-reads verbatim. |
+| F-S4 | Meniu digital | ✅ *(this session)* | `venues.menuUrl` editable via the same PUT with `z.string().url()` validation — bad URLs → 400 (fenced by `venue-auth.spec.ts`). Public `/sali/[slug]` already renders it. |
+| F-S5 | Virtual tour 360 | ✅ *(this session)* | New `venues.virtual_tour_url` column present in the schema (`src/lib/db/schema.ts:284`), exposed on the update payload, rendered as an iframe on the public venue detail page. Round-trip test covers persist+read. |
+| F-S6 | Event-type color coding on calendar | ✅ | `calendar_events.event_type` (`src/lib/db/schema.ts:328`) is free-form; the dashboard calendar page reads it and colors days by type. Field is entity-agnostic (works for venues via `entityType='venue'` in the same table). |
 
-> **Conclusion:** venue-owner dashboard is a larger build-out (onboarding flow,
-> venue profile CRUD, facilities editor, menu builder, venue-specific calendar
-> page). Out of scope for this session — requires a dedicated milestone.
+> **Conclusion:** venue-owner flow is now live end-to-end. Onboarding,
+> profile CRUD with owner gate, stats, entity-aware dashboard, and both
+> positive (round-trip) and negative (auth lockdown) E2E coverage are
+> all in place. 12 new tests added this pass.
 
 ## Part 3 — Client Dashboard / Cabinet (F-C1 .. F-C11)
 
@@ -200,9 +201,6 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 
 ## Known gaps (require dedicated work, not in scope)
 
-- **Venue owner dashboard** (F-S1..F-S6). Needs: venue onboarding flow,
-  venue profile CRUD API + UI, facilities editor, menu builder, virtual tour
-  field, venue calendar page.
 - **AI endpoints 503** without `ANTHROPIC_API_KEY`.
 - **Admin UI has no server-side auth gate.** The `/admin/*` routes render
   via `src/app/(admin)/admin/layout.tsx` which performs zero role check.
@@ -355,6 +353,38 @@ zero signal for the artist on first login.
   the `pendingRequests` field against the raw SQL count so a drift in
   the helper would fail the test, not pass silently.
 
+### Follow-up pass — F-S1..F-S5 venue owner flow
+
+A fourth pass completed the venue owner journey end-to-end. The earlier
+report marked F-S1..F-S6 as ❌/⚠️; re-inspecting the codebase showed the
+API surface was ~90% already there (register-venue route, owner-gated
+`PUT /api/venues/[id]`, `/api/me/venue`, `/api/me/venue/stats`, venue
+`facilities`, `menu_url`, `virtual_tour_url` columns) — what was missing
+was (a) the dashboard home treating venue owners as first-class citizens
+and (b) regression fences around the flow.
+
+- New `src/lib/db/queries/venue-stats.ts::getVenueStats()` — venue-side
+  mirror of `getArtistStats`: pending bookings, profile views (30d),
+  rating rollup, bookings this month. Reads the `bookings` table (the
+  admin CRM store) rather than `booking_requests` (artist-only).
+- New `GET /api/me/venue/stats` endpoint — same auth contract as the
+  artist variant (anon → 401, non-venue → 200 + `{stats: null}`).
+- `src/app/(vendor)/dashboard/page.tsx` is now **entity-aware**: tries
+  artist first, falls back to venue, renders different card labels
+  ("Rezervări pending / Rezervări luna" vs "Cereri noi / Confirmate luna").
+  Venue CTA ("Ai o sală de evenimente?") is suppressed for venue owners.
+- `e2e/api/venue-auth.spec.ts` (7 cases) — regression fence: anonymous
+  POST register-venue → 401, GET /api/me/venue anon → 401, stats anon → 401,
+  stats as Igor (non-venue) → 200 + null, PUT venue anon → 401, PUT as
+  Igor (non-owner) → 403 with row-unchanged cross-check, PUT with bad
+  URL in `menuUrl` → 400.
+- `e2e/api/venue-roundtrip.spec.ts` (5 cases) — happy path using the
+  client persona: cleanup → register → PUT all F-S2..F-S5 fields
+  (capacity, price, facilities list, menu URL, virtual tour URL,
+  descriptionRo) → GET `/api/me/venue` verifies round-trip → GET
+  `/api/me/venue/stats` returns zero-initialized stat object → second
+  POST register-venue → 409 enforced.
+
 ### Final results
 
 ```
@@ -367,9 +397,11 @@ e2e/api/cross-01.spec.ts               7 passed (CROSS-01)
 e2e/api/invitations-rsvp.spec.ts       3 passed (INV-01 / INV-03)
 e2e/api/moments.spec.ts                6 passed (MOM-01 / MOM-02)
 e2e/api/profile-roundtrip.spec.ts      4 passed (F-A4 round-trip)
+e2e/api/venue-auth.spec.ts             7 passed (F-S1 / M12 lockdown)
+e2e/api/venue-roundtrip.spec.ts        5 passed (F-S1..F-S5 owner flow)
 e2e/global.setup.ts                    2 passed (setup — artist / client)
 
-47 passed (39.9s)
+59 passed (43.9s)
 ```
 
 ### How to run
