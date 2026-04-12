@@ -4,6 +4,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { db } from "@/lib/db";
 import { artists, importBatches } from "@/lib/db/schema";
+import { requireAdmin } from "@/lib/auth/admin";
 
 function slugify(text: string): string {
   return text
@@ -14,7 +15,15 @@ function slugify(text: string): string {
     .replace(/^-|-$/g, "");
 }
 
+// SEC — bulk artist import is admin-only. Anonymous access would let
+// anyone inject fake artist rows into the DB.
+
 export async function POST(req: NextRequest) {
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
+  }
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
   const mappingRaw = formData.get("mapping") as string | null;

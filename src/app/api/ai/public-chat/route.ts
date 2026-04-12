@@ -90,7 +90,7 @@ Răspunsuri foarte lungi sunt interzise. Preferă concizia.`;
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
-  const { success } = rateLimit(`public-chat:${ip}`, 20, 60_000);
+  const { success } = await rateLimit(`public-chat:${ip}`, 20, 60_000);
   if (!success) {
     return NextResponse.json({ error: "Prea multe mesaje. Încearcă peste un minut." }, { status: 429 });
   }

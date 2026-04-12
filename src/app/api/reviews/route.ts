@@ -17,7 +17,7 @@ const reviewSchema = z.object({
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
-  const { success } = rateLimit(`review:${ip}`, 5, 60_000);
+  const { success } = await rateLimit(`review:${ip}`, 5, 60_000);
   if (!success) {
     return NextResponse.json({ error: "Too many reviews" }, { status: 429 });
   }

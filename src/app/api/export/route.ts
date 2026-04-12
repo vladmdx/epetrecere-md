@@ -2,8 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { artists, leads, bookings, bookingRequests, offerRequests } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth/admin";
+
+// SEC — export endpoint exposes all PII (leads, bookings, artist contacts).
+// Admin-only gate is mandatory; anonymous access was a GDPR breach.
 
 export async function GET(req: NextRequest) {
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
+  }
+
   const type = req.nextUrl.searchParams.get("type") || "artists";
 
   let data: Record<string, unknown>[] = [];

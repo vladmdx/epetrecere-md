@@ -4,7 +4,7 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
-  const { success } = rateLimit(`upload:${ip}`, 30, 60_000);
+  const { success } = await rateLimit(`upload:${ip}`, 30, 60_000);
   if (!success) {
     return NextResponse.json({ error: "Too many uploads" }, { status: 429 });
   }

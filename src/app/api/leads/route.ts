@@ -6,9 +6,17 @@ import { desc } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 import { matchLeadToVendors } from "@/lib/leads/matching";
 import { scoreAndPersist } from "@/lib/leads/quality-score";
+import { requireAdmin } from "@/lib/auth/admin";
 
-// GET all leads for CRM
+// SEC — CRM lead listing exposes all client PII (name, phone, email,
+// budget). Admin-only gate prevents anonymous scraping.
+
 export async function GET() {
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
+  }
+
   const allLeads = await db
     .select()
     .from(leads)
@@ -68,7 +76,7 @@ const createLeadSchema = z
 export async function POST(req: NextRequest) {
   // Rate limit: 10 submissions per minute per IP
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
-  const { success } = rateLimit(`leads:${ip}`, 10, 60_000);
+  const { success } = await rateLimit(`leads:${ip}`, 10, 60_000);
   if (!success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

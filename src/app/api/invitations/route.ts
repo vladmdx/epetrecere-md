@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   }
 
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
-  const { success } = rateLimit(`invitations:${appUser.userId}:${ip}`, 10, 60_000);
+  const { success } = await rateLimit(`invitations:${appUser.userId}:${ip}`, 10, 60_000);
   if (!success) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }

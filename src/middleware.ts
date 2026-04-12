@@ -138,13 +138,14 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(url, 301);
   }
 
-  // TODO: Re-enable auth protection when email verification is configured
-  // if (isProtectedRoute(req)) {
-  //   await auth.protect();
-  // }
-
-  // Role-based access will be enforced at the layout/page level
-  // using auth().sessionClaims for more granular control
+  // SEC — Force sign-in for protected routes (/admin/*, /dashboard/*).
+  // Role-based access (admin vs vendor vs user) is enforced at the
+  // layout/page/API level via requireAdmin() and individual auth()
+  // checks; this middleware gate catches the anonymous-access case
+  // early so unauthenticated requests never reach server components.
+  if (isProtectedRoute(req)) {
+    await auth.protect();
+  }
 });
 
 export const config = {

@@ -2,18 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { requireAdmin } from "@/lib/auth/admin";
 
 function slugify(text: string): string {
   return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").substring(0, 80);
 }
 
+// GET — public (blog listing used by the public page).
 export async function GET() {
   const posts = await db.select().from(blogPosts).orderBy(desc(blogPosts.createdAt)).limit(100);
   return NextResponse.json(posts);
 }
 
+// SEC — blog CMS writes are admin-only. Anonymous access would let
+// anyone create, edit, or delete blog posts.
+
 export async function POST(req: Request) {
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
+  }
+
   const body = await req.json();
   const slug = body.slug || slugify(body.titleRo || "post") + "-" + Date.now().toString(36);
 
@@ -38,6 +48,11 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
+  }
+
   const body = await req.json();
   const { id, ...data } = body;
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
@@ -47,6 +62,11 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
+  }
+
   const id = req.nextUrl.searchParams.get("id");
   if (!id) return NextResponse.json({ error: "ID required" }, { status: 400 });
   await db.delete(blogPosts).where(eq(blogPosts.id, Number(id)));

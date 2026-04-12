@@ -72,7 +72,7 @@ export async function POST(
 ) {
   const { slug } = await params;
   const ip = req.headers.get("x-forwarded-for") || "anon";
-  const { success } = rateLimit(`moments:${ip}:${slug}`, 20, 60_000);
+  const { success } = await rateLimit(`moments:${ip}:${slug}`, 20, 60_000);
   if (!success) {
     return NextResponse.json({ error: "Too many uploads" }, { status: 429 });
   }
