@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArtistCard } from "@/components/public/artist-card";
+import { SortBar } from "@/components/public/sort-bar";
+import { PaginationBar } from "@/components/public/pagination-bar";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 
 interface Props {
   category: {
@@ -91,20 +92,11 @@ export function CategoryPageClient({
 
       {/* Filters + Sort bar */}
       <div className="mb-6 space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-          {sortOptions.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={currentSort === opt.value ? "default" : "outline"}
-              size="sm"
-              className={currentSort === opt.value ? "bg-gold text-background hover:bg-gold-dark" : ""}
-              onClick={() => updateParams("sort", opt.value)}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
+        <SortBar
+          options={sortOptions}
+          current={currentSort}
+          onChange={(v) => updateParams("sort", v)}
+        />
         {/* Price range filter */}
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs text-muted-foreground">Preț:</span>
@@ -145,30 +137,11 @@ export function CategoryPageClient({
         </div>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="mt-8 flex items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => updateParams("page", String(page - 1))}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            {page} / {totalPages}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => updateParams("page", String(page + 1))}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        </div>
-      )}
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        onPageChange={(p) => updateParams("page", String(p))}
+      />
     </div>
   );
 }

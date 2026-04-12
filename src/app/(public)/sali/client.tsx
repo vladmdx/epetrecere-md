@@ -2,9 +2,9 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { VenueCard } from "@/components/public/venue-card";
-import { Button } from "@/components/ui/button";
+import { SortBar } from "@/components/public/sort-bar";
+import { PaginationBar } from "@/components/public/pagination-bar";
 import { useLocale } from "@/hooks/use-locale";
-import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 
 interface Props {
   venues: Array<{
@@ -55,13 +55,12 @@ export function VenuesListClient({ venues, total, page, totalPages, currentSort 
         <p className="mt-2 text-muted-foreground">{total} rezultate</p>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-2">
-        <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-        {sortOptions.map((opt) => (
-          <Button key={opt.value} variant={currentSort === opt.value ? "default" : "outline"} size="sm" className={currentSort === opt.value ? "bg-gold text-background hover:bg-gold-dark" : ""} onClick={() => updateParams("sort", opt.value)}>
-            {opt.label}
-          </Button>
-        ))}
+      <div className="mb-6">
+        <SortBar
+          options={sortOptions}
+          current={currentSort}
+          onChange={(v) => updateParams("sort", v)}
+        />
       </div>
 
       {venues.length > 0 ? (
@@ -74,13 +73,11 @@ export function VenuesListClient({ venues, total, page, totalPages, currentSort 
         </div>
       )}
 
-      {totalPages > 1 && (
-        <div className="mt-8 flex items-center justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => updateParams("page", String(page - 1))}><ChevronLeft className="h-4 w-4" /></Button>
-          <span className="text-sm text-muted-foreground">{page} / {totalPages}</span>
-          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => updateParams("page", String(page + 1))}><ChevronRight className="h-4 w-4" /></Button>
-        </div>
-      )}
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        onPageChange={(p) => updateParams("page", String(p))}
+      />
     </div>
   );
 }

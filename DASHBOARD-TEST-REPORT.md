@@ -18,13 +18,13 @@ Legend:
 | F-A1 | Home / Panoul Meu | ✅ *(fixed)* | `src/app/(vendor)/dashboard/page.tsx` is now a server component that resolves the signed-in user → artist row and renders four real stats via `getArtistStats` (`src/lib/db/queries/artist-stats.ts`): pending requests, profile views (30d), rating avg, confirmed this month. Same helper powers `GET /api/me/artist/stats`. F-S1 follow-up made the same page **entity-aware**: it now falls back to `getVenueStats` for venue-only owners so they no longer see dashes either. |
 | F-A2 | Calendar + iCal sync | ✅ | `src/app/(vendor)/dashboard/calendar/page.tsx`, `src/app/api/calendar/route.ts`, `src/app/api/calendar/ical/[artistId]/[token]/route.ts` |
 | F-A3 | Rezervări (bilateral confirm) | ✅ | `src/app/(vendor)/dashboard/rezervari/page.tsx`, `src/app/api/booking-requests/[id]/route.ts` — accept auto-blocks calendar (source="booking"); reject/cancel now auto-unblock (this session) |
-| F-A4 | Profil (info, descriere, galerie, pachete, setări) | ✅ *(fixed)* | `src/app/(vendor)/dashboard/profil/page.tsx` now hydrates from `/api/me/artist` on mount and persists via `PUT /api/artists/crud`. The CRUD endpoint is auth-gated: admins can touch any row; owners can only PUT their own, with moderation flags (`isActive`/`isFeatured`/`isVerified`/`isPremium`/`userId`) stripped before write. Galerie/Pachete tabs are still placeholders. |
+| F-A4 | Profil (info, descriere, galerie, pachete, setări) | ✅ *(fixed)* | `src/app/(vendor)/dashboard/profil/page.tsx` now hydrates from `/api/me/artist` on mount and persists via `PUT /api/artists/crud`. The CRUD endpoint is auth-gated: admins can touch any row; owners can only PUT their own, with moderation flags (`isActive`/`isFeatured`/`isVerified`/`isPremium`/`userId`) stripped before write. **Galerie/Video/Pachete tabs now wired to DB:** `GalleryManager` → `/api/artist-images` (blob upload + cover invariant), `VideoManager` → `/api/artist-videos` (YouTube/Vimeo URL parser), `PackagesManager` → `/api/artist-packages` (CRUD + visibility toggle). Settings tab moved to standalone `/dashboard/setari`. |
 | F-A5 | Mesaje | ✅ | `src/app/(vendor)/dashboard/mesaje/page.tsx`, `src/app/api/conversations/*` |
 | F-A6 | Recenzii (+ reply) | ✅ | `src/app/(vendor)/dashboard/recenzii/page.tsx`, `src/app/api/reviews/[id]/route.ts` |
 | F-A7 | Financiar | ✅ | `src/app/(vendor)/dashboard/financiar/page.tsx` is a server component aggregating confirmed + pending `booking_requests` for the signed-in artist, multiplying by `artists.priceFrom` for a revenue estimate, and rendering a 12-month bar chart + upcoming/past transactions list. |
 | F-A8 | Analytics | ✅ *(this session)* | `src/app/(vendor)/dashboard/analytics/page.tsx` — vendor-side analytics surface backed by `src/lib/db/queries/artist-analytics.ts::getArtistAnalytics()`. Six KPI cards (views this month/last month + delta, leads via `booking_requests`, confirmed bookings, conversion rate, days booked this year) + 12-month views chart + traffic source breakdown from `profile_views.referrer`. Admin-side analytics at `/admin/analytics` was already wired. |
 | F-A9 | AI Assistant | ✅ | `src/app/(vendor)/dashboard/ai-assistant/page.tsx`, `/api/ai/generate`, `/api/ai/chat` — requires `ANTHROPIC_API_KEY` to return 200, otherwise 503 |
-| F-A10 | Setări (auto-reply, buffer hours, calendar toggle) | ⚠️ | Mixed into profil tab; no standalone route |
+| F-A10 | Setări (auto-reply, buffer hours, calendar toggle) | ✅ *(fixed)* | Standalone `/dashboard/setari` page (`src/app/(vendor)/dashboard/setari/page.tsx`) — entity-aware: hydrates artist first (`/api/me/artist`), falls back to venue (`/api/me/venue`). Artist: calendarEnabled, bufferHours, autoReplyEnabled, autoReplyMessage. Venue: calendarEnabled. Persists via existing `PUT /api/artists/crud` or `PUT /api/venues/[id]`. Sidebar entry added for both artist and venue nav. |
 
 ## Part 2 — Sală / Venue Dashboard (F-S1 .. F-S6)
 
@@ -202,10 +202,9 @@ requires a signed-in Clerk user and real event plans which is out-of-band.
 ## Known gaps (require dedicated work, not in scope)
 
 - **AI endpoints 503** without `ANTHROPIC_API_KEY`.
-- **Artist image gallery / video / package persistence** still uses local
-  component state — the profile page hydrate/save wiring only covers the
-  scalar `artists` columns. `artist_images`, `artist_videos`, and
-  `artist_packages` tables exist but aren't wired to UI yet.
+- ~~**Artist image gallery / video / package persistence**~~ — **CLOSED.**
+  `GalleryManager`, `VideoManager`, `PackagesManager` now wired to
+  `/api/artist-images`, `/api/artist-videos`, `/api/artist-packages`.
 - **No seeded `admin` / `super_admin` persona** — flipping someone's
   role is a one-off SQL update against `users.role`. The layout gate is
   now exercised only via the non-admin branches; a smoke test that an
@@ -430,6 +429,38 @@ already there; this pass just surfaced it to the vendor.
   with a DB cross-check that Client owns no artist row, Igor (artist)
   → 200 with "Analitice" + his name + "Vizite profil" inlined in the
   server-rendered HTML.
+
+### Follow-up pass — F-A10 + gallery persistence + venue analytics
+
+The seventh pass closed three gaps in a single commit:
+
+**F-A10 — standalone settings page:**
+- New `src/app/(vendor)/dashboard/setari/page.tsx` — entity-aware
+  client component. Hydrates artist first, falls back to venue. Artist
+  fields: calendarEnabled, bufferHours, autoReplyEnabled, autoReplyMessage.
+  Venue fields: calendarEnabled only.
+- Persists via existing `PUT /api/artists/crud` or `PUT /api/venues/[id]`.
+- Sidebar gains "Setări" entry for both artist and venue nav.
+- Redundant "Setări" tab removed from `/dashboard/profil`.
+
+**F-A4 gallery/video/package persistence:**
+- `GET/POST /api/artist-images` + `PUT/DELETE [id]` with cover invariant
+  (promotion auto-demotes siblings). Owner-gated with admin bypass.
+- `GET/POST /api/artist-videos` + `PUT/DELETE [id]` with YouTube/Vimeo
+  URL parser (youtu.be, watch?v=, /embed/, /shorts/, vimeo.com/NUM,
+  player.vimeo.com/video/NUM). Rejects unsupported platforms with 400.
+- Three new client components: `GalleryManager` (two-step blob upload →
+  persist), `VideoManager` (iframe previews), `PackagesManager` (CRUD +
+  visibility toggle).
+- `/dashboard/profil` gallery and packages tabs wired to real managers.
+
+**F-A8 venue analytics flavour:**
+- New `src/lib/db/queries/venue-analytics.ts::getVenueAnalytics()` mirrors
+  the artist shape using `bookings` + `profile_views.venueId` +
+  `calendar_events` with `entityType='venue'`.
+- `/dashboard/analytics` is now entity-aware: resolves artist-first,
+  venue-fallback. Same 6-card grid + 12-month chart + traffic list
+  renders for both entity types.
 
 ### Follow-up pass — lint backlog cleared (CI strict)
 

@@ -1,4 +1,5 @@
 import { HeroSection } from "@/components/public/sections/hero";
+import { SearchBarSection } from "@/components/public/sections/search-bar";
 import { CategoriesSection } from "@/components/public/sections/categories";
 import { FeaturedArtistsSection } from "@/components/public/sections/featured-artists";
 import { FeaturedVenuesSection } from "@/components/public/sections/featured-venues";
@@ -40,6 +41,7 @@ export default async function HomePage() {
       />
       <div className="noise-overlay">
         <HeroSection />
+        <SearchBarSection />
         <div className="section-dark relative">
           <CategoriesSection />
         </div>
