@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
+  // Rate limit to prevent email enumeration attacks
+  const ip = req.headers.get("x-forwarded-for") || "anonymous";
+  const { success } = await rateLimit(`check-role:${ip}`, 10, 60_000);
+  if (!success) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const email = req.nextUrl.searchParams.get("email");
   if (!email) return NextResponse.json({ role: "user" });
 

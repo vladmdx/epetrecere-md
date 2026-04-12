@@ -78,7 +78,7 @@ export const eventReminder = inngest.createFunction(
   async ({ step }) => {
     await step.run("check-events", async () => {
       // Query DB for bookings with eventDate = today + 7
-      console.log("Checking upcoming events...");
+      // TODO: Query DB for bookings with eventDate = today + 7 and send reminders
     });
   },
 );

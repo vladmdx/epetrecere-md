@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
+import { auth } from "@clerk/nextjs/server";
 import { generateArtistDescription, generateSEOTexts } from "@/lib/ai";
 
 const generateSchema = z.object({
@@ -12,6 +13,12 @@ const generateSchema = z.object({
 });
 
 export async function POST(req: Request) {
+  // Auth gate — only authenticated users (vendors, admins) may generate AI content
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json();
   const parsed = generateSchema.safeParse(body);
 

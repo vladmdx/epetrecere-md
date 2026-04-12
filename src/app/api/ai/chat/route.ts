@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
+import { auth } from "@clerk/nextjs/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { adminTools, vendorTools, executeTool } from "@/lib/ai/tools";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 const chatSchema = z.object({
   messages: z.array(
@@ -24,10 +28,36 @@ Ajuți cu gestionarea calendarului, răspunsuri la întrebări, și sfaturi de p
 Răspunde prietenos și util în limba utilizatorului.`;
 
 export async function POST(req: Request) {
+  // Auth gate — only authenticated users with the correct role may use the
+  // admin/vendor AI chat. The context field is validated against the user's
+  // actual role so callers cannot escalate to admin tools.
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const [appUser] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  if (!appUser) {
+    return NextResponse.json({ error: "User not found" }, { status: 401 });
+  }
+
   const body = await req.json();
   const parsed = chatSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  // Enforce role: only admins get admin tools, only artists get vendor tools
+  const requestedContext = parsed.data.context;
+  if (requestedContext === "admin" && appUser.role !== "admin" && appUser.role !== "super_admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (requestedContext === "vendor" && appUser.role !== "artist" && appUser.role !== "admin" && appUser.role !== "super_admin") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -36,7 +66,7 @@ export async function POST(req: Request) {
   }
 
   const client = new Anthropic({ apiKey });
-  const isAdmin = parsed.data.context === "admin";
+  const isAdmin = requestedContext === "admin";
   const systemPrompt = isAdmin ? ADMIN_SYSTEM : VENDOR_SYSTEM;
   const tools = isAdmin ? adminTools : vendorTools;
 
