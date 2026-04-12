@@ -77,6 +77,38 @@ export function artistJsonLd(artist: {
   };
 }
 
+export function articleJsonLd(article: {
+  title: string;
+  description: string;
+  url: string;
+  image?: string;
+  datePublished: string;
+  dateModified?: string;
+  category?: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: article.title,
+    description: article.description,
+    url: article.url.startsWith("http") ? article.url : `${BASE_URL}${article.url}`,
+    ...(article.image && { image: article.image }),
+    datePublished: article.datePublished,
+    ...(article.dateModified && { dateModified: article.dateModified }),
+    ...(article.category && { articleSection: article.category }),
+    author: {
+      "@type": "Organization",
+      name: "ePetrecere.md",
+      url: BASE_URL,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "ePetrecere.md",
+      url: BASE_URL,
+    },
+  };
+}
+
 export function venueJsonLd(venue: {
   name: string;
   description: string;

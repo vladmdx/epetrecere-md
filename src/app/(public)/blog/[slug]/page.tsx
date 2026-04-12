@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -5,9 +6,34 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Calendar, Tag, Edit } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
+import { generateMeta } from "@/lib/seo/generate-meta";
+import { articleJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld";
 
 interface Props {
   params: Promise<{ slug: string }>;
+}
+
+// SEO — blog posts are the primary long-tail content surface.
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+
+  const [post] = await db
+    .select()
+    .from(blogPosts)
+    .where(eq(blogPosts.slug, slug))
+    .limit(1);
+
+  if (!post) return {};
+
+  return generateMeta({
+    title: post.seoTitleRo || post.titleRo,
+    description:
+      post.seoDescRo || post.excerptRo || post.contentRo?.substring(0, 155) || "",
+    entity: post,
+    path: `/blog/${slug}`,
+    type: "article",
+    image: post.coverImageUrl || undefined,
+  });
 }
 
 export default async function BlogPostPage({ params }: Props) {
@@ -118,8 +144,32 @@ export default async function BlogPostPage({ params }: Props) {
   // Real blog post from DB
   const { userId } = await auth();
 
+  const jsonLd = articleJsonLd({
+    title: post.titleRo,
+    description: post.excerptRo || post.contentRo?.substring(0, 155) || "",
+    url: `/blog/${slug}`,
+    image: post.coverImageUrl || undefined,
+    datePublished: (post.publishedAt || post.createdAt).toISOString(),
+    dateModified: post.updatedAt.toISOString(),
+    category: post.category || undefined,
+  });
+
+  const crumbs = breadcrumbJsonLd([
+    { name: "Acasă", url: "/" },
+    { name: "Blog", url: "/" },
+    { name: post.titleRo, url: `/blog/${slug}` },
+  ]);
+
   return (
     <div className="min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(crumbs) }}
+      />
       {post.coverImageUrl && (
         <div className="relative h-[40vh] overflow-hidden">
           <img src={post.coverImageUrl} alt={post.titleRo} className="h-full w-full object-cover" />
