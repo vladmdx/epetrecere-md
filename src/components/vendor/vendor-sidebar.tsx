@@ -17,6 +17,7 @@ import {
   Package,
   Flame,
   Building2,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,7 @@ const artistNav = [
   { href: "/dashboard/pachete", icon: Package, label: "Pachete" },
   { href: "/dashboard/mesaje", icon: MessageSquare, label: "Mesaje" },
   { href: "/dashboard/financiar", icon: DollarSign, label: "Financiar" },
+  { href: "/dashboard/analytics", icon: BarChart3, label: "Analitice" },
   { href: "/dashboard/recenzii", icon: Star, label: "Recenzii" },
   { href: "/dashboard/ai-assistant", icon: Bot, label: "AI Assistant" },
 ];
