@@ -4,7 +4,7 @@
 // and notifies admins for approval.
 
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -23,81 +23,137 @@ const registerSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const body = await req.json();
-  const parsed = registerSchema.safeParse(body);
-  if (!parsed.success) {
+    const body = await req.json();
+    const parsed = registerSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.issues },
+        { status: 400 },
+      );
+    }
+
+    // Look up user by clerkId
+    let [appUser] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+
+    // If user not in DB yet (webhook delay), create them on the fly
+    if (!appUser) {
+      const clerkUser = await currentUser();
+      if (!clerkUser) {
+        return NextResponse.json(
+          { error: "Could not load user profile" },
+          { status: 500 },
+        );
+      }
+
+      const email = clerkUser.primaryEmailAddress?.emailAddress;
+      if (!email) {
+        return NextResponse.json(
+          { error: "No email found on account" },
+          { status: 400 },
+        );
+      }
+
+      const [created] = await db
+        .insert(users)
+        .values({
+          clerkId,
+          email,
+          name: [clerkUser.firstName, clerkUser.lastName]
+            .filter(Boolean)
+            .join(" ") || null,
+          phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || null,
+          avatarUrl: clerkUser.imageUrl || null,
+          role: "user",
+        })
+        .onConflictDoNothing()
+        .returning({ id: users.id, email: users.email });
+
+      if (created) {
+        appUser = created;
+      } else {
+        const [existing] = await db
+          .select({ id: users.id, email: users.email })
+          .from(users)
+          .where(eq(users.clerkId, clerkId))
+          .limit(1);
+        if (!existing) {
+          return NextResponse.json(
+            { error: "User creation failed" },
+            { status: 500 },
+          );
+        }
+        appUser = existing;
+      }
+    }
+
+    // A user may only own one venue through this flow.
+    const existing = await db
+      .select({ id: venues.id })
+      .from(venues)
+      .where(eq(venues.userId, appUser.id))
+      .limit(1);
+
+    if (existing.length > 0) {
+      return NextResponse.json(
+        { error: "Venue already registered", venueId: existing[0].id },
+        { status: 409 },
+      );
+    }
+
+    const data = parsed.data;
+    const slug = `${slugify(data.name)}-${Date.now().toString(36)}`;
+
+    const [venue] = await db
+      .insert(venues)
+      .values({
+        userId: appUser.id,
+        nameRo: data.name,
+        slug,
+        phone: data.phone,
+        email: data.email ?? appUser.email ?? null,
+        city: data.city ?? "Chișinău",
+        address: data.address ?? null,
+        capacityMin: data.capacityMin ?? null,
+        capacityMax: data.capacityMax ?? null,
+        descriptionRo: data.description ?? null,
+        isActive: false,
+        isFeatured: false,
+        facilities: [],
+        seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
+      })
+      .returning();
+
+    // Notify admins so they can approve the venue.
+    const admins = await db
+      .select()
+      .from(users)
+      .where(eq(users.role, "super_admin"));
+    for (const admin of admins) {
+      await db.insert(notifications).values({
+        userId: admin.id,
+        type: "venue_registered",
+        title: "Sală nouă înregistrată!",
+        message: `${data.name} (${data.phone}) s-a înregistrat ca sală și așteaptă aprobare.`,
+        actionUrl: `/admin/sali/${venue.id}`,
+      });
+    }
+
+    return NextResponse.json({ success: true, venueId: venue.id, slug });
+  } catch (err) {
+    console.error("[register-venue] Error:", err);
     return NextResponse.json(
-      { error: "Validation failed", details: parsed.error.issues },
-      { status: 400 },
+      { error: "Internal server error" },
+      { status: 500 },
     );
   }
-
-  const [appUser] = await db
-    .select({ id: users.id, email: users.email })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-
-  if (!appUser) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
-
-  // A user may only own one venue through this flow.
-  const existing = await db
-    .select({ id: venues.id })
-    .from(venues)
-    .where(eq(venues.userId, appUser.id))
-    .limit(1);
-
-  if (existing.length > 0) {
-    return NextResponse.json(
-      { error: "Venue already registered", venueId: existing[0].id },
-      { status: 409 },
-    );
-  }
-
-  const data = parsed.data;
-  const slug = `${slugify(data.name)}-${Date.now().toString(36)}`;
-
-  const [venue] = await db
-    .insert(venues)
-    .values({
-      userId: appUser.id,
-      nameRo: data.name,
-      slug,
-      phone: data.phone,
-      email: data.email ?? appUser.email ?? null,
-      city: data.city ?? "Chișinău",
-      address: data.address ?? null,
-      capacityMin: data.capacityMin ?? null,
-      capacityMax: data.capacityMax ?? null,
-      descriptionRo: data.description ?? null,
-      isActive: false,
-      isFeatured: false,
-      facilities: [],
-      seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
-    })
-    .returning();
-
-  // Notify admins so they can approve the venue.
-  const admins = await db
-    .select()
-    .from(users)
-    .where(eq(users.role, "super_admin"));
-  for (const admin of admins) {
-    await db.insert(notifications).values({
-      userId: admin.id,
-      type: "venue_registered",
-      title: "Sală nouă înregistrată!",
-      message: `${data.name} (${data.phone}) s-a înregistrat ca sală și așteaptă aprobare.`,
-      actionUrl: `/admin/sali/${venue.id}`,
-    });
-  }
-
-  return NextResponse.json({ success: true, venueId: venue.id, slug });
 }

@@ -59,11 +59,14 @@ export default function OnboardingPage() {
           imageUrl: data.imageUrl,
         }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
       toast.success("Profilul a fost trimis pentru aprobare! Vei fi notificat când administratorul îl aprobă.");
       router.push("/dashboard");
-    } catch {
-      toast.error("Eroare la înregistrare");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare la înregistrare");
     } finally {
       setSubmitting(false);
     }
