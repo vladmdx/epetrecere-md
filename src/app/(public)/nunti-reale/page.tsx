@@ -14,7 +14,7 @@ import { Camera, Calendar, MapPin, ArrowRight } from "lucide-react";
 // Each card links to /nunti-reale/[planId] for a full lightbox.
 
 export const metadata: Metadata = generateMeta({
-  title: "Nunți reale din Moldova — galerie cu povești adevărate | ePetrecere.md",
+  title: "Nunți reale din Moldova — galerie cu povești adevărate",
   description:
     "Descoperă povești reale de nuntă din Moldova. Fotografii aprobate de cuplurile care au folosit ePetrecere.md — inspirație și idei pentru nunta ta.",
   path: "/nunti-reale",

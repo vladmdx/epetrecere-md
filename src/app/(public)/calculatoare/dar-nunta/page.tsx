@@ -9,7 +9,7 @@ import { DarNuntaClient } from "./client";
 // suggested minimum / typical / generous gift amount in €.
 
 export const metadata: Metadata = generateMeta({
-  title: "Cât să dau dar la nuntă? — Calculator Moldova | ePetrecere.md",
+  title: "Cât să dau dar la nuntă? — Calculator Moldova",
   description:
     "Calculează suma potrivită pentru darul de nuntă în funcție de relația cu mirii, oraș, tipul sălii și câte persoane mergi. Sugestii reale pentru Moldova 2025.",
   path: "/calculatoare/dar-nunta",

@@ -9,7 +9,7 @@ import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
 
 export const metadata: Metadata = generateMeta({
-  title: "Blog — ePetrecere.md",
+  title: "Blog",
   description:
     "Sfaturi, idei și inspirație pentru organizarea evenimentelor perfecte în Moldova.",
   path: "/blog",

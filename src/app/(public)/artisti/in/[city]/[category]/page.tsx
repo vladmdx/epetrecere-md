@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const catName = category.nameRo;
   return generateMeta({
-    title: `${catName} în ${city.nameRo} — ${total} disponibili | ePetrecere.md`,
+    title: `${catName} în ${city.nameRo} — ${total} disponibili`,
     description: `Top ${catName.toLowerCase()} în ${city.nameRo} pentru nuntă, botez și evenimente. Compară prețuri, recenzii și rezervă online. ${total} profesioniști disponibili acum.`,
     path: `/artisti/in/${citySlug}/${categorySlug}`,
   });

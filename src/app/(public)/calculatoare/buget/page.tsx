@@ -10,7 +10,7 @@ import { BudgetCalculatorClient } from "./client";
 // in ./client.tsx since it needs React state.
 
 export const metadata: Metadata = generateMeta({
-  title: "Calculator buget nuntă, botez, cumătrie — estimare online gratuită | ePetrecere.md",
+  title: "Calculator buget nuntă, botez, cumătrie — estimare online gratuită",
   description:
     "Calculează bugetul exact pentru nuntă, botez sau cumătrie în Moldova. Meniu, artiști, decor, foto-video, transport — prețuri reale 2025 pe ePetrecere.md.",
   path: "/calculatoare/buget",

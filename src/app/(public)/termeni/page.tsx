@@ -3,7 +3,7 @@ import Link from "next/link";
 import { generateMeta } from "@/lib/seo/generate-meta";
 
 export const metadata: Metadata = generateMeta({
-  title: "Termeni și Condiții | ePetrecere.md",
+  title: "Termeni și Condiții",
   description:
     "Termenii și condițiile de utilizare a platformei ePetrecere.md.",
   path: "/termeni",

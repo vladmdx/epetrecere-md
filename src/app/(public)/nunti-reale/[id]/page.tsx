@@ -80,7 +80,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!data) return {};
 
   return generateMeta({
-    title: `${data.plan.title} — Nuntă reală | ePetrecere.md`,
+    title: `${data.plan.title} — Nuntă reală`,
     description: `Poveste reală de nuntă: ${data.plan.title}${
       data.plan.location ? ` în ${data.plan.location}` : ""
     }. ${data.photos.length} fotografii, furnizori verificați.`,

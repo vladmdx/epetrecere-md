@@ -8,7 +8,7 @@ import { DrinksCalculatorClient } from "./client";
 // URL: /calculatoare/alcool
 
 export const metadata: Metadata = generateMeta({
-  title: "Calculator băuturi nuntă — vin, vodcă, coniac, șampanie, apă | ePetrecere.md",
+  title: "Calculator băuturi nuntă — vin, vodcă, coniac, șampanie, apă",
   description:
     "Calculează câte sticle de vin, vodcă, coniac, șampanie, bere și apă îți trebuie pentru nuntă, botez sau cumătrie. Norme Moldova, 2025.",
   path: "/calculatoare/alcool",

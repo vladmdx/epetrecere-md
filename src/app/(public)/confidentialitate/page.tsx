@@ -5,7 +5,7 @@ import { generateMeta } from "@/lib/seo/generate-meta";
 // M11 Intern #1 — GDPR privacy policy (Feature: compliance).
 
 export const metadata: Metadata = generateMeta({
-  title: "Politica de Confidențialitate | ePetrecere.md",
+  title: "Politica de Confidențialitate",
   description:
     "Cum colectăm, folosim și protejăm datele tale personale pe ePetrecere.md. Drepturile tale conform GDPR și Legii 133/2011 a RM.",
   path: "/confidentialitate",

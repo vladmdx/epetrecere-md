@@ -7,7 +7,7 @@ import { Calculator, Wallet, Users, Wine, Utensils, Heart, Gift, ArrowRight } fr
 // M3 — Calculators index. Entry point for all event planning tools.
 
 export const metadata: Metadata = generateMeta({
-  title: "Calculatoare pentru evenimente — Buget, invitați, băuturi, meniu | ePetrecere.md",
+  title: "Calculatoare pentru evenimente — Buget, invitați, băuturi, meniu",
   description:
     "Calculează bugetul nunții, numărul de invitați și mese, cantitățile de băuturi și meniul pentru evenimentul tău. Estimări gratuite bazate pe prețuri reale din Moldova.",
   path: "/calculatoare",

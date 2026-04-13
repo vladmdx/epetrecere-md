@@ -3,7 +3,7 @@ import Link from "next/link";
 import { generateMeta } from "@/lib/seo/generate-meta";
 
 export const metadata: Metadata = generateMeta({
-  title: "Politica Cookies | ePetrecere.md",
+  title: "Politica Cookies",
   description:
     "Cum folosim cookie-urile pe ePetrecere.md și cum le poți gestiona.",
   path: "/cookies",

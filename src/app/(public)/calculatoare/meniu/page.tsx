@@ -8,7 +8,7 @@ import { MenuCalculatorClient } from "./client";
 // URL: /calculatoare/meniu
 
 export const metadata: Metadata = generateMeta({
-  title: "Calculator meniu & mâncare nuntă, botez, cumătrie | ePetrecere.md",
+  title: "Calculator meniu & mâncare nuntă, botez, cumătrie",
   description:
     "Calculează cantitățile de aperitive, fel principal, zeamă, fructe și tort pentru evenimentul tău. Norme pe porții, prețuri bulk Moldova 2025.",
   path: "/calculatoare/meniu",

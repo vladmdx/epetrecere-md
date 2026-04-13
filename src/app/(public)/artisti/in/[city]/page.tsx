@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 
   return generateMeta({
-    title: `Artiști pentru evenimente în ${city.nameRo} — ${total} profesioniști | ePetrecere.md`,
+    title: `Artiști pentru evenimente în ${city.nameRo} — ${total} profesioniști`,
     description: `Descoperă ${total} artiști și trupe pentru nuntă, botez, cumătrie și evenimente corporate în ${city.nameRo}. Rezervă online pe ePetrecere.md.`,
     path: `/artisti/in/${citySlug}`,
   });

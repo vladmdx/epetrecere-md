@@ -21,7 +21,7 @@ import { asc } from "drizzle-orm";
 
 export async function generateMetadata() {
   return generateMeta({
-    title: "ePetrecere.md — Marketplace pentru Evenimente din Moldova",
+    title: "Marketplace pentru Evenimente din Moldova",
     description:
       "Găsește artiști, săli de evenimente și servicii pentru nuntă, botez, cumetrie și corporate. Cea mai mare platformă de evenimente din Republica Moldova.",
     path: "/",

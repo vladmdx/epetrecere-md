@@ -26,7 +26,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { total } = await getVenues({ cityKeywords: city.keywords, limit: 1 });
 
   return generateMeta({
-    title: `Săli și restaurante pentru nuntă în ${city.nameRo} — ${total} locații | ePetrecere.md`,
+    title: `Săli și restaurante pentru nuntă în ${city.nameRo} — ${total} locații`,
     description: `Descoperă ${total} săli și restaurante pentru nuntă, botez, cumătrie și evenimente corporate în ${city.nameRo}. Capacitate, preț pe persoană, galerie foto, rezervare online.`,
     path: `/sali/in/${citySlug}`,
   });
