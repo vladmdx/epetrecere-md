@@ -10,6 +10,7 @@ import { invitations, invitationGuests } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAppUser } from "@/lib/planner/ownership";
+import { slugify } from "@/lib/utils/slugify";
 
 export async function GET() {
   // `invitations.userId` is a `uuid` FK to `users.id` — we must resolve the
@@ -56,14 +57,6 @@ const createSchema = z.object({
     .optional(),
 });
 
-function slugify(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-}
 
 function genToken(): string {
   const bytes = new Uint8Array(16);

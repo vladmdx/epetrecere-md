@@ -3,11 +3,7 @@ import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
-
-function slugify(text: string): string {
-  return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").substring(0, 80);
-}
+import { slugify } from "@/lib/utils/slugify";
 
 // GET — public (blog listing used by the public page).
 // By default only published posts are returned.

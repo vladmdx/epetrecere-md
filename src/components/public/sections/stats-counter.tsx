@@ -1,20 +1,32 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Users, Calendar, Award, Clock } from "lucide-react";
+import { Users, Calendar, Award, Building2 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-const stats = [
-  { icon: Users, value: 500, suffix: "+", label: "Artiști" },
-  { icon: Calendar, value: 200, suffix: "+", label: "Evenimente" },
-  { icon: Award, value: 1500, suffix: "+", label: "Clienți Mulțumiți" },
-  { icon: Clock, value: 12, suffix: "", label: "Ani Experiență" },
+interface StatDef {
+  icon: LucideIcon;
+  key: string;
+  suffix: string;
+  label: string;
+  fallback: number;
+}
+
+const statDefs: StatDef[] = [
+  { icon: Users, key: "artists", suffix: "+", label: "Artiști", fallback: 500 },
+  { icon: Building2, key: "venues", suffix: "+", label: "Săli", fallback: 10 },
+  { icon: Calendar, key: "events", suffix: "+", label: "Solicitări", fallback: 200 },
+  { icon: Award, key: "clients", suffix: "+", label: "Clienți", fallback: 1500 },
 ];
 
 function useCountUp(target: number, duration = 2000, trigger: boolean) {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
-    if (!trigger) return;
+    if (!trigger || target === 0) {
+      if (trigger) setCount(0);
+      return;
+    }
     let start = 0;
     const increment = target / (duration / 16);
     const timer = setInterval(() => {
@@ -32,7 +44,17 @@ function useCountUp(target: number, duration = 2000, trigger: boolean) {
   return count;
 }
 
-function StatItem({ icon: Icon, value, suffix, label }: typeof stats[0]) {
+function StatItem({
+  icon: Icon,
+  value,
+  suffix,
+  label,
+}: {
+  icon: LucideIcon;
+  value: number;
+  suffix: string;
+  label: string;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const count = useCountUp(value, 2000, visible);
@@ -41,7 +63,9 @@ function StatItem({ icon: Icon, value, suffix, label }: typeof stats[0]) {
     const el = ref.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      ([entry]) => {
+        if (entry.isIntersecting) setVisible(true);
+      },
       { threshold: 0.3 },
     );
     observer.observe(el);
@@ -52,7 +76,8 @@ function StatItem({ icon: Icon, value, suffix, label }: typeof stats[0]) {
     <div ref={ref} className="text-center">
       <Icon className="mx-auto mb-3 h-8 w-8 text-gold" />
       <p className="font-accent text-4xl font-semibold text-gold md:text-5xl">
-        {count}{suffix}
+        {count}
+        {suffix}
       </p>
       <p className="mt-1 text-sm text-muted-foreground">{label}</p>
     </div>
@@ -60,16 +85,37 @@ function StatItem({ icon: Icon, value, suffix, label }: typeof stats[0]) {
 }
 
 export function StatsCounterSection() {
+  const [values, setValues] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    fetch("/api/public/stats")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setValues(data);
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <section className="bg-card py-20 relative">
-      {/* Parallax background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <img src="/images/backgrounds/concert-lights.jpg" alt="" className="w-full h-full object-cover opacity-[0.06] blur-[2px] parallax-bg" loading="lazy" />
+        <img
+          src="/images/backgrounds/concert-lights.jpg"
+          alt=""
+          className="w-full h-full object-cover opacity-[0.06] blur-[2px] parallax-bg"
+          loading="lazy"
+        />
       </div>
       <div className="relative z-10 mx-auto max-w-5xl px-4 lg:px-8">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-          {stats.map((stat) => (
-            <StatItem key={stat.label} {...stat} />
+          {statDefs.map((stat) => (
+            <StatItem
+              key={stat.label}
+              icon={stat.icon}
+              value={values[stat.key] ?? stat.fallback}
+              suffix={stat.suffix}
+              label={stat.label}
+            />
           ))}
         </div>
       </div>

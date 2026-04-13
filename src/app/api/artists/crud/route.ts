@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { artists, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { slugify } from "@/lib/utils/slugify";
 
 // F-A4 auth lockdown — until this fix the endpoint accepted anonymous
 // POST/PUT/DELETE against any artist row. Ownership model is:
@@ -17,15 +18,6 @@ import { eq } from "drizzle-orm";
 //
 // Regular onboarding still goes through `/api/auth/register-artist`, so
 // POST here is admin-only.
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
 
 type AuthedUser = { id: string; role: string };
 

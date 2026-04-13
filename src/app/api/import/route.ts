@@ -5,15 +5,7 @@ import * as XLSX from "xlsx";
 import { db } from "@/lib/db";
 import { artists, importBatches } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/admin";
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+import { slugify } from "@/lib/utils/slugify";
 
 // SEC — bulk artist import is admin-only. Anonymous access would let
 // anyone inject fake artist rows into the DB.
