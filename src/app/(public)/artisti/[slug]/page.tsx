@@ -37,8 +37,9 @@ export default async function ArtistPage({ params }: Props) {
   // M0a #8 — server-side gate: redact price, phone, email and social handles
   // when the visitor is not authenticated so the data never reaches the DOM.
   const { userId } = await auth();
+  // Phone is never shown publicly — only in admin panel
   const gatedArtist = userId
-    ? artist
+    ? { ...artist, phone: null }
     : {
         ...artist,
         priceFrom: null,

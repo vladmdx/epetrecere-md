@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Star, BadgeCheck, Crown, MapPin, Phone, Globe, CalendarDays, X, ZoomIn, Lock, Camera } from "lucide-react";
+import { Star, BadgeCheck, Crown, MapPin, Globe, CalendarDays, X, ZoomIn, Lock, Camera } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { CalendarWidget } from "@/components/public/calendar-widget";
 import { Badge } from "@/components/ui/badge";
@@ -213,22 +213,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               ) : (
                 <p className="text-muted-foreground">Nu există descriere momentan.</p>
               )}
-              {artist.phone && (
-                <div className="mt-6">
-                  {canSeeContact ? (
-                    <a href={`tel:${artist.phone}`} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold">
-                      <Phone className="h-4 w-4" /> {artist.phone}
-                    </a>
-                  ) : (
-                    <a
-                      href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm text-gold/90 hover:text-gold"
-                    >
-                      <Lock className="h-4 w-4" /> Telefon vizibil după autentificare
-                    </a>
-                  )}
-                </div>
-              )}
+              {/* Phone number hidden from public view — only visible in admin panel */}
               {artist.instagram && canSeeContact && (
                 <div className="mt-2">
                   <a

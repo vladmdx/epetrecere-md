@@ -111,7 +111,10 @@ export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
       </Button>
 
       {open && (
-        <div className="fixed inset-0 z-[90] flex items-end justify-end bg-black/30 p-0 sm:items-end sm:p-6">
+        <div
+          className="fixed inset-0 z-[9999] flex items-end justify-end bg-black/30 p-0 sm:p-6"
+          onClick={() => setOpen(false)}
+        >
           <div
             className="flex h-[100dvh] w-full flex-col overflow-hidden border border-border/40 bg-card shadow-2xl sm:h-[600px] sm:max-h-[80vh] sm:w-[400px] sm:rounded-2xl"
             onClick={(e) => e.stopPropagation()}
