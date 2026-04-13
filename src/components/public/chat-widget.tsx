@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useUser } from "@clerk/nextjs";
 import { MessageCircle, X, Send, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // M0b #10 — Persistent pre-booking chat widget.
-// Shown on the artist profile (and anywhere a client needs to DM an artist).
-// On first open we POST /api/conversations to find-or-create the conversation,
-// then GET /api/conversations/:id/messages and append via POST on send.
+// Uses a React Portal so the modal escapes any sticky/overflow parent.
 
 type ChatMessage = {
   id: number;
@@ -34,6 +33,11 @@ export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   async function openChat() {
     setOpen(true);
@@ -78,7 +82,6 @@ export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
     }
   }
 
-  // Auto-scroll to the newest message whenever the list changes.
   useEffect(() => {
     if (!open) return;
     const el = scrollRef.current;
@@ -87,7 +90,6 @@ export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
 
   if (!isLoaded) return null;
 
-  // Unauthenticated visitors see a CTA that links to sign-in and returns here.
   if (!isSignedIn) {
     return (
       <a
@@ -99,20 +101,10 @@ export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
     );
   }
 
-  return (
-    <>
-      <Button
-        type="button"
-        onClick={openChat}
-        variant="outline"
-        className="w-full gap-2 border-gold/40 text-gold hover:bg-gold/10 hover:text-gold"
-      >
-        <MessageCircle className="h-4 w-4" /> Chat direct
-      </Button>
-
-      {open && (
+  const chatModal = open && mounted
+    ? createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-end justify-end bg-black/30 p-0 sm:p-6"
+          className="fixed inset-0 z-[9999] flex items-end justify-end bg-black/50 p-0 sm:p-6"
           onClick={() => setOpen(false)}
         >
           <div
@@ -200,8 +192,22 @@ export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
               </Button>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body,
+      )
+    : null;
+
+  return (
+    <>
+      <Button
+        type="button"
+        onClick={openChat}
+        variant="outline"
+        className="w-full gap-2 border-gold/40 text-gold hover:bg-gold/10 hover:text-gold"
+      >
+        <MessageCircle className="h-4 w-4" /> Chat direct
+      </Button>
+      {chatModal}
     </>
   );
 }
