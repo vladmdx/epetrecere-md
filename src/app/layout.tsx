@@ -56,7 +56,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProvider><ThemeProvider><LocaleProvider>
+        <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up"><ThemeProvider><LocaleProvider>
           {children}
           <CookieConsent />
           <Toaster />
