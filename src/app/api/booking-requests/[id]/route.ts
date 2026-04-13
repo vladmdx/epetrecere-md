@@ -185,6 +185,8 @@ export async function PUT(
             .from(artists)
             .where(eq(artists.id, booking.artistId))
             .limit(1);
+          const { notificationEmail } = await import("@/lib/email/templates/notification-email");
+          const clientUser = await db.select({ email: (await import("@/lib/db/schema")).users.email }).from((await import("@/lib/db/schema")).users).where(eq((await import("@/lib/db/schema")).users.id, booking.clientUserId)).limit(1);
           await dispatchNotification({
             userId: booking.clientUserId,
             type: "booking_status_changed",
@@ -194,21 +196,44 @@ export async function PUT(
                 : `Răspuns la cererea ta către ${artist?.nameRo ?? "artist"}`,
             message: reply ?? undefined,
             actionUrl: "/cabinet",
+            email: clientUser[0]?.email ?? undefined,
+            emailSubject: action === "accept"
+              ? `✅ Rezervarea ta la ${artist?.nameRo ?? "artist"} a fost acceptată!`
+              : `Răspuns la cererea ta — ${artist?.nameRo ?? "artist"}`,
+            emailHtml: notificationEmail({
+              title: action === "accept" ? "Rezervare Acceptată!" : "Răspuns la Cererea Ta",
+              message: action === "accept"
+                ? `<strong>${artist?.nameRo ?? "Artist"}</strong> a acceptat cererea ta de rezervare pentru ${booking.eventDate}.`
+                : `<strong>${artist?.nameRo ?? "Artist"}</strong> a răspuns la cererea ta. ${reply ?? ""}`,
+              ctaUrl: "https://epetrecere.md/cabinet",
+              ctaText: "Vezi detalii →",
+              emoji: action === "accept" ? "✅" : "📩",
+            }),
           });
         }
       } else if (action === "client_confirm") {
         const [artist] = await db
-          .select({ userId: artists.userId, nameRo: artists.nameRo, slug: artists.slug })
+          .select({ userId: artists.userId, nameRo: artists.nameRo, slug: artists.slug, email: artists.email })
           .from(artists)
           .where(eq(artists.id, booking.artistId))
           .limit(1);
         if (artist?.userId) {
+          const { notificationEmail } = await import("@/lib/email/templates/notification-email");
           await dispatchNotification({
             userId: artist.userId,
             type: "booking_request_status_changed",
             title: "Client a confirmat rezervarea",
             message: `${booking.clientName} — ${booking.eventDate}`,
             actionUrl: "/dashboard/rezervari",
+            email: artist.email ?? undefined,
+            emailSubject: `✅ ${booking.clientName} a confirmat rezervarea!`,
+            emailHtml: notificationEmail({
+              title: "Rezervare Confirmată de Client!",
+              message: `<strong>${booking.clientName}</strong> a confirmat rezervarea pentru ${booking.eventDate}. Evenimentul este acum confirmat!`,
+              ctaUrl: "https://epetrecere.md/dashboard/rezervari",
+              ctaText: "Vezi rezervarea →",
+              emoji: "🎉",
+            }),
           });
         }
 

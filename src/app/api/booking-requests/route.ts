@@ -142,11 +142,20 @@ export async function POST(req: NextRequest) {
           actionUrl: "/dashboard/rezervari",
         });
       }
+      const { notificationEmail } = await import("@/lib/email/templates/notification-email");
       await dispatchToAdmins({
         type: "admin_lead_new",
         title: "Cerere nouă în CRM",
         message: `${parsed.data.clientName} — ${artist?.nameRo ?? "artist"}`,
         actionUrl: "/admin/cereri-oferte",
+        emailSubject: `🔔 Cerere nouă: ${parsed.data.clientName} → ${artist?.nameRo ?? "artist"}`,
+        emailHtml: notificationEmail({
+          title: "Cerere Nouă de Rezervare",
+          message: `<strong>${parsed.data.clientName}</strong> a trimis o cerere pentru <strong>${artist?.nameRo ?? "artist"}</strong>.<br>Eveniment: ${parsed.data.eventType ?? "Nespecificat"} · Data: ${parsed.data.eventDate}`,
+          ctaUrl: "https://epetrecere.md/admin/cereri-oferte",
+          ctaText: "Deschide în CRM →",
+          emoji: "🔔",
+        }),
       });
 
       // Email the artist about the new booking request

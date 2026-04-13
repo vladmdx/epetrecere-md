@@ -65,18 +65,28 @@ export async function POST(req: NextRequest) {
     isApproved: false, // Needs admin approval
   }).returning();
 
-  // M5 — dispatch in-app notifications (non-blocking)
+  // M5 — dispatch in-app + email notifications (non-blocking)
   void (async () => {
     try {
+      const { notificationEmail } = await import("@/lib/email/templates/notification-email");
+      const adminEmailHtml = notificationEmail({
+        title: "Recenzie nouă de aprobat",
+        message: `<strong>${parsed.data.authorName}</strong> a lăsat o recenzie de ${parsed.data.rating}★`,
+        ctaUrl: "https://epetrecere.md/admin/recenzii",
+        ctaText: "Vezi recenzia →",
+        emoji: "⭐",
+      });
       await dispatchToAdmins({
         type: "admin_review_pending",
         title: "Recenzie nouă de aprobat",
         message: `${parsed.data.authorName} — ${parsed.data.rating}★`,
         actionUrl: "/admin/recenzii",
+        emailSubject: `⭐ Recenzie nouă: ${parsed.data.rating}★ de la ${parsed.data.authorName}`,
+        emailHtml: adminEmailHtml,
       });
       if (parsed.data.artistId) {
         const [artist] = await db
-          .select({ userId: artists.userId })
+          .select({ userId: artists.userId, email: artists.email, nameRo: artists.nameRo })
           .from(artists)
           .where(eq(artists.id, parsed.data.artistId))
           .limit(1);
@@ -87,12 +97,21 @@ export async function POST(req: NextRequest) {
             title: "Ai o recenzie nouă",
             message: `${parsed.data.rating}★ de la ${parsed.data.authorName}`,
             actionUrl: "/dashboard/recenzii",
+            email: artist.email ?? undefined,
+            emailSubject: `⭐ Recenzie nouă: ${parsed.data.rating}★ de la ${parsed.data.authorName}`,
+            emailHtml: notificationEmail({
+              title: "Ai o recenzie nouă!",
+              message: `<strong>${parsed.data.authorName}</strong> ți-a lăsat o recenzie de <strong>${parsed.data.rating}★</strong>. Verifică-o în dashboard!`,
+              ctaUrl: "https://epetrecere.md/dashboard/recenzii",
+              ctaText: "Vezi recenzia →",
+              emoji: "⭐",
+            }),
           });
         }
       }
       if (parsed.data.venueId) {
         const [venue] = await db
-          .select({ userId: venues.userId })
+          .select({ userId: venues.userId, email: venues.email })
           .from(venues)
           .where(eq(venues.id, parsed.data.venueId))
           .limit(1);
@@ -103,6 +122,15 @@ export async function POST(req: NextRequest) {
             title: "Ai o recenzie nouă",
             message: `${parsed.data.rating}★ de la ${parsed.data.authorName}`,
             actionUrl: "/dashboard/recenzii",
+            email: venue.email ?? undefined,
+            emailSubject: `⭐ Recenzie nouă: ${parsed.data.rating}★ de la ${parsed.data.authorName}`,
+            emailHtml: notificationEmail({
+              title: "Ai o recenzie nouă!",
+              message: `<strong>${parsed.data.authorName}</strong> a lăsat o recenzie de <strong>${parsed.data.rating}★</strong> pentru sala ta.`,
+              ctaUrl: "https://epetrecere.md/dashboard/recenzii",
+              ctaText: "Vezi recenzia →",
+              emoji: "⭐",
+            }),
           });
         }
       }
