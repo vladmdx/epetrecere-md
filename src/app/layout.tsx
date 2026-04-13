@@ -4,6 +4,7 @@ import { Playfair_Display, DM_Sans, Cormorant_Garamond } from "next/font/google"
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { LocaleProvider } from "@/hooks/use-locale";
 import { ClerkProvider } from "@clerk/nextjs";
+import { roRO } from "@clerk/localizations";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -56,7 +57,7 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up"><ThemeProvider><LocaleProvider>
+        <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" localization={roRO}><ThemeProvider><LocaleProvider>
           {children}
           <CookieConsent />
           <Toaster />

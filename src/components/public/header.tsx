@@ -104,9 +104,6 @@ function UserMenu() {
               <Link href="/sign-up" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
                 <UserCircle className="h-4 w-4" /> Înregistrare
               </Link>
-              <Link href="/cabinet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-                <LayoutDashboard className="h-4 w-4" /> Cabinet Client
-              </Link>
             </motion.div>
           )}
         </AnimatePresence>
