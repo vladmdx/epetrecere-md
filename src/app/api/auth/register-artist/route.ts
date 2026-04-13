@@ -138,9 +138,9 @@ export async function POST(req: Request) {
       .set({ role: "artist" })
       .where(eq(users.id, appUser.id));
 
-    // Notify admins
+    // Notify admins (in-app + email)
     const admins = await db
-      .select()
+      .select({ id: users.id, email: users.email })
       .from(users)
       .where(eq(users.role, "super_admin"));
     for (const admin of admins) {
@@ -149,8 +149,26 @@ export async function POST(req: Request) {
         type: "artist_registered",
         title: "Artist nou înregistrat!",
         message: `${data.name} (${appUser.email}) s-a înregistrat ca artist și așteaptă aprobare.`,
-        actionUrl: `/admin/artisti/${artist.id}`,
+        actionUrl: `/admin/cereri-inregistrare`,
       });
+
+      // Email notification to admin
+      if (admin.email) {
+        const { sendEmail } = await import("@/lib/email/send");
+        await sendEmail({
+          to: admin.email,
+          subject: `🔔 Artist nou: ${data.name} așteaptă aprobare`,
+          html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#1A1A2E;border-radius:12px;color:#FAF8F2;">
+            <h2 style="color:#C9A84C;margin:0 0 16px;">Artist Nou Înregistrat</h2>
+            <p><strong>${data.name}</strong> (${appUser.email}) s-a înregistrat ca artist.</p>
+            <p>Telefon: ${data.phone}</p>
+            <p>Oraș: ${data.location || "Nespecificat"}</p>
+            <div style="margin-top:20px;text-align:center;">
+              <a href="https://epetrecere.md/admin/cereri-inregistrare" style="display:inline-block;background:#C9A84C;color:#0D0D0D;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Vezi cererea →</a>
+            </div>
+          </div>`,
+        }).catch((err) => console.error("[register-artist] Email failed:", err));
+      }
     }
 
     return NextResponse.json({ success: true, artistId: artist.id });

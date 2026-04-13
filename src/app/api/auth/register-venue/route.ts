@@ -133,9 +133,9 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    // Notify admins so they can approve the venue.
+    // Notify admins (in-app + email)
     const admins = await db
-      .select()
+      .select({ id: users.id, email: users.email })
       .from(users)
       .where(eq(users.role, "super_admin"));
     for (const admin of admins) {
@@ -144,8 +144,24 @@ export async function POST(req: Request) {
         type: "venue_registered",
         title: "Sală nouă înregistrată!",
         message: `${data.name} (${data.phone}) s-a înregistrat ca sală și așteaptă aprobare.`,
-        actionUrl: `/admin/sali/${venue.id}`,
+        actionUrl: `/admin/cereri-inregistrare`,
       });
+
+      if (admin.email) {
+        const { sendEmail } = await import("@/lib/email/send");
+        await sendEmail({
+          to: admin.email,
+          subject: `🔔 Sală nouă: ${data.name} așteaptă aprobare`,
+          html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#1A1A2E;border-radius:12px;color:#FAF8F2;">
+            <h2 style="color:#C9A84C;margin:0 0 16px;">Sală Nouă Înregistrată</h2>
+            <p><strong>${data.name}</strong> (${data.phone}) s-a înregistrat ca sală.</p>
+            <p>Oraș: ${data.city || "Nespecificat"}</p>
+            <div style="margin-top:20px;text-align:center;">
+              <a href="https://epetrecere.md/admin/cereri-inregistrare" style="display:inline-block;background:#C9A84C;color:#0D0D0D;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Vezi cererea →</a>
+            </div>
+          </div>`,
+        }).catch((err) => console.error("[register-venue] Email failed:", err));
+      }
     }
 
     return NextResponse.json({ success: true, venueId: venue.id, slug });
