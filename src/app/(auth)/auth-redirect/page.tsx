@@ -27,11 +27,18 @@ export default function AuthRedirectPage() {
       try {
         const email = user?.primaryEmailAddress?.emailAddress;
         if (!email) {
-          router.replace("/cabinet");
+          // No email yet — show role picker directly (safest default for new users)
+          setShowRoleSelect(true);
+          setChecking(false);
           return;
         }
 
         const res = await fetch(`/api/auth/check-role?email=${encodeURIComponent(email)}`);
+        if (!res.ok) {
+          setShowRoleSelect(true);
+          setChecking(false);
+          return;
+        }
         const data = await res.json();
 
         if (data.role === "admin" || data.role === "super_admin") {
@@ -42,7 +49,7 @@ export default function AuthRedirectPage() {
           } else {
             router.replace("/dashboard/onboarding");
           }
-        } else if (data.isNewUser === true && !data.hasVenue) {
+        } else if (data.isNewUser === true) {
           // New user without a role — show role selection
           setShowRoleSelect(true);
           setChecking(false);
@@ -52,7 +59,9 @@ export default function AuthRedirectPage() {
           router.replace("/cabinet");
         }
       } catch {
-        router.replace("/cabinet");
+        // On error, show role picker as safe fallback
+        setShowRoleSelect(true);
+        setChecking(false);
       }
     }
 
