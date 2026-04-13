@@ -10,7 +10,6 @@
 // venue pages via direct link. Users with neither still see the shell
 // with dashes, so mid-onboarding flows aren't locked out.
 
-import Link from "next/link";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,7 +18,6 @@ import {
   Eye,
   Star,
   CheckCircle2,
-  Building2,
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { artists, users, venues } from "@/lib/db/schema";
@@ -143,32 +141,6 @@ export default async function VendorDashboard() {
         ))}
       </div>
 
-      {/* M12 — Venue upsell CTA. Only shown to artists (and unresolved
-          users). Venue owners already landed on the venue flow and
-          don't need the upsell. */}
-      {loaded?.kind !== "venue" && (
-        <Card>
-          <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-gold/10 p-2 text-gold">
-                <Building2 className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="font-heading font-bold">Ai o sală de evenimente?</p>
-                <p className="text-sm text-muted-foreground">
-                  Publică-o pe ePetrecere.md și primește cereri de ofertă.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/dashboard/venue-onboarding"
-              className="inline-flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/5 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/10"
-            >
-              Înregistrează sala
-            </Link>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
