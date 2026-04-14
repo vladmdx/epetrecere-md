@@ -42,6 +42,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     priceMin: sp.price_min ? Number(sp.price_min) : undefined,
     priceMax: sp.price_max ? Number(sp.price_max) : undefined,
     ratingMin: sp.rating_min ? Number(sp.rating_min) : undefined,
+    availableDate: typeof sp.date === "string" ? sp.date : undefined,
   };
 
   const result = await getArtists(filters);

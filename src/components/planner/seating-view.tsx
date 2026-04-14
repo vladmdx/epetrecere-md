@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2, UtensilsCrossed, UserMinus } from "lucide-react";
+import { Plus, Trash2, Loader2, UtensilsCrossed, UserMinus, Download } from "lucide-react";
 import type { Guest } from "./guests-view";
 import { cn } from "@/lib/utils";
 
@@ -150,8 +150,43 @@ export function SeatingView({
     }
   }
 
+  // C-40 — Export seating plan as PDF
+  function exportSeatingPDF() {
+    const tableRows = tables.map((table) => {
+      const assigned = seats.filter((s) => s.tableId === table.id);
+      const guestNames = assigned.map((s) => {
+        const g = guests.find((gg) => gg.id === s.guestId);
+        return g ? g.fullName : `Invitat #${s.guestId}`;
+      });
+      return `<div style="background:#1A1A2E;border:1px solid rgba(201,168,76,0.15);border-radius:12px;padding:16px;break-inside:avoid">
+        <h3 style="color:#C9A84C;margin:0 0 8px;font-size:16px">${table.name}</h3>
+        <p style="color:#A0A0B0;font-size:12px;margin:0 0 8px">${assigned.length}/${table.seats} locuri</p>
+        ${guestNames.length > 0
+          ? `<ul style="margin:0;padding-left:18px;color:#FAF8F2;font-size:13px">${guestNames.map((n) => `<li style="margin-bottom:2px">${n}</li>`).join("")}</ul>`
+          : `<p style="color:#6B6B7B;font-size:12px;font-style:italic">Niciun invitat asignat</p>`}
+      </div>`;
+    });
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plan Mese — ePetrecere.md</title>
+      <style>body{font-family:system-ui,sans-serif;background:#0D0D0D;color:#FAF8F2;padding:40px}
+      h1{color:#C9A84C}h2{color:#A0A0B0;font-size:14px;font-weight:normal}
+      .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-top:20px}
+      @media print{body{background:white;color:black}h3{color:#333}}</style></head>
+      <body><h1>Plan Așezare Mese</h1><h2>ePetrecere.md — ${new Date().toLocaleDateString("ro-RO")} · ${unassigned.length} neasignați din ${guests.length} total</h2>
+      <div class="grid">${tableRows.join("")}</div></body></html>`;
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
+  }
+
   return (
     <div className="space-y-5">
+      {/* Export button */}
+      {tables.length > 0 && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" className="gap-2 border-gold/30 text-gold hover:bg-gold/10" onClick={exportSeatingPDF}>
+            <Download className="h-4 w-4" /> Export PDF
+          </Button>
+        </div>
+      )}
       {/* Add table */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
         <p className="mb-3 text-xs font-medium uppercase text-muted-foreground">

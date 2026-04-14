@@ -30,6 +30,8 @@ interface VenueData {
   facilities: string[] | null;
   menuUrl: string | null;
   virtualTourUrl: string | null;
+  lat: number | null;
+  lng: number | null;
   calendarEnabled: boolean;
   ratingAvg: number | null;
   ratingCount: number | null;
@@ -107,6 +109,29 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
             </div>
           )}
 
+          {/* G-70 — Google Maps embed */}
+          {venue.lat && venue.lng && (
+            <div className="mt-6">
+              <h2 className="mb-3 font-heading text-lg font-bold">Locație</h2>
+              <div className="aspect-video overflow-hidden rounded-xl border border-border/40">
+                <iframe
+                  src={`https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d2000!2d${venue.lng}!3d${venue.lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sro!2smd`}
+                  className="h-full w-full"
+                  style={{ border: 0 }}
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="no-referrer-when-downgrade"
+                  title={`Locație — ${name}`}
+                />
+              </div>
+              {venue.address && (
+                <p className="mt-2 flex items-center gap-1.5 text-sm text-muted-foreground">
+                  <MapPin className="h-3.5 w-3.5 text-gold" /> {venue.address}, {venue.city}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* F-S4 — Meniu digital */}
           {venue.menuUrl && (
             <div className="mt-6">
@@ -181,7 +206,7 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
               </div>
             )}
             <RequestPriceForm venueId={venue.id} />
-            <RequestBookingForm venueId={venue.id} />
+            <RequestBookingForm venueId={venue.id} capacityMax={venue.capacityMax} />
           </div>
 
           {/* M6 Intern #1 — calendar gated behind login */}

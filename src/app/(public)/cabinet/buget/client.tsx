@@ -8,6 +8,7 @@ import {
   TrendingUp,
   AlertCircle,
   Check,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -228,19 +229,62 @@ export function BudgetTrackerClient() {
 
   const overBudget = stats.actual > totalBudget;
 
+  // C-18 — Export budget as PDF (opens print dialog)
+  function exportPDF() {
+    const rows = categories.flatMap((cat) =>
+      cat.items.map((item) => `
+        <tr>
+          <td style="padding:6px 8px;border-bottom:1px solid #333">${cat.label}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #333">${item.label}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #333;text-align:right">${item.estimated.toLocaleString()}€</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #333;text-align:right">${item.actual.toLocaleString()}€</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #333;text-align:center">${item.paid ? "✓" : "—"}</td>
+        </tr>
+      `),
+    );
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buget Nuntă — ePetrecere.md</title>
+      <style>body{font-family:system-ui,sans-serif;background:#0D0D0D;color:#FAF8F2;padding:40px}
+      h1{color:#C9A84C;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:20px}
+      th{text-align:left;padding:8px;border-bottom:2px solid #C9A84C;color:#C9A84C;font-size:13px}
+      td{font-size:13px}.summary{display:flex;gap:24px;margin-top:16px}
+      .box{background:#1A1A2E;padding:16px;border-radius:8px;border:1px solid rgba(201,168,76,0.15)}
+      .box h3{font-size:12px;color:#A0A0B0;margin:0 0 4px}.box p{font-size:20px;margin:0;font-weight:bold;color:#C9A84C}
+      @media print{body{background:white;color:black}th{color:#333;border-color:#333}td{border-color:#ccc}.box{background:#f5f5f5;border-color:#ddd}.box p{color:#333}}</style></head>
+      <body><h1>Buget Nuntă</h1><p style="color:#A0A0B0;margin:0 0 12px">ePetrecere.md — ${new Date().toLocaleDateString("ro-RO")}</p>
+      <div class="summary">
+        <div class="box"><h3>Buget Total</h3><p>${totalBudget.toLocaleString()}€</p></div>
+        <div class="box"><h3>Estimat</h3><p>${stats.estimated.toLocaleString()}€</p></div>
+        <div class="box"><h3>Cheltuit</h3><p>${stats.actual.toLocaleString()}€</p></div>
+        <div class="box"><h3>Plătit</h3><p>${stats.paid.toLocaleString()}€</p></div>
+      </div>
+      <table><thead><tr><th>Categorie</th><th>Cheltuială</th><th style="text-align:right">Estimat</th><th style="text-align:right">Real</th><th style="text-align:center">Plătit</th></tr></thead>
+      <tbody>${rows.join("")}</tbody></table></body></html>`;
+    const w = window.open("", "_blank");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+      setTimeout(() => w.print(), 400);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 lg:px-8">
-      <header>
-        <p className="text-sm font-medium uppercase tracking-[3px] text-gold">
-          Planificare
-        </p>
-        <h1 className="font-heading text-3xl font-bold md:text-4xl">
-          Buget nuntă — tracker
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground md:text-base">
-          Urmărește cheltuielile pe categorii: estimat, real și plătit. Datele
-          se salvează automat în browser.
-        </p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-[3px] text-gold">
+            Planificare
+          </p>
+          <h1 className="font-heading text-3xl font-bold md:text-4xl">
+            Buget nuntă — tracker
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground md:text-base">
+            Urmărește cheltuielile pe categorii: estimat, real și plătit. Datele
+            se salvează automat în browser.
+          </p>
+        </div>
+        <Button variant="outline" className="gap-2 border-gold/30 text-gold hover:bg-gold/10 shrink-0" onClick={exportPDF}>
+          <Download className="h-4 w-4" /> Export PDF
+        </Button>
       </header>
 
       {/* Summary */}

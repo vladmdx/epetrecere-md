@@ -79,6 +79,13 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   const [addingNote, setAddingNote] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  // AD-06 — Send email from CRM
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState("");
+  const [emailBody, setEmailBody] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
+  // AD-08 — Assign lead to staff
+  const [assignee, setAssignee] = useState("");
 
   useEffect(() => {
     fetch(`/api/leads/${id}`)
@@ -145,6 +152,62 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       router.push("/admin/crm");
     } catch {
       toast.error("Eroare la ștergere");
+    }
+  }
+
+  // AD-06 — Send email
+  async function handleSendEmail() {
+    if (!lead?.email || !emailSubject.trim() || !emailBody.trim()) return;
+    setSendingEmail(true);
+    try {
+      const res = await fetch(`/api/leads/${id}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subject: emailSubject, body: emailBody }),
+      });
+      if (!res.ok) throw new Error();
+      // Log as activity
+      await fetch(`/api/leads/${id}/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "email", content: `Email trimis: "${emailSubject}"` }),
+      });
+      // Refresh activities
+      const actRes = await fetch(`/api/leads/${id}/activities`);
+      const activities = await actRes.json();
+      setLead(prev => prev ? { ...prev, activities } : null);
+      setEmailOpen(false);
+      setEmailSubject("");
+      setEmailBody("");
+      toast.success("Email trimis cu succes");
+    } catch {
+      toast.error("Eroare la trimiterea emailului");
+    } finally {
+      setSendingEmail(false);
+    }
+  }
+
+  // AD-08 — Assign lead
+  async function handleAssign() {
+    if (!assignee.trim()) return;
+    try {
+      await fetch(`/api/leads/${id}/activities`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "note", content: `Asignat la: ${assignee}` }),
+      });
+      await fetch(`/api/leads/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedTo: assignee }),
+      });
+      const actRes = await fetch(`/api/leads/${id}/activities`);
+      const activities = await actRes.json();
+      setLead(prev => prev ? { ...prev, activities } : null);
+      toast.success(`Lead asignat la ${assignee}`);
+      setAssignee("");
+    } catch {
+      toast.error("Eroare la asignare");
     }
   }
 
@@ -402,10 +465,65 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <XCircle className="h-4 w-4" /> Marchează Pierdut
                 </Button>
               )}
+              {/* AD-06 — Send email button */}
+              {lead.email && (
+                <Button variant="outline" className="w-full justify-start gap-2" size="sm"
+                  onClick={() => setEmailOpen(!emailOpen)}>
+                  <Send className="h-4 w-4 text-gold" /> Trimite Email
+                </Button>
+              )}
               <hr className="border-border/40" />
               <Button variant="outline" className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10" size="sm"
                 onClick={deleteLead}>
                 <Trash2 className="h-4 w-4" /> Șterge Lead
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* AD-06 — Email compose card */}
+          {emailOpen && lead.email && (
+            <Card>
+              <CardHeader><CardTitle className="text-sm">Trimite Email către {lead.email}</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                <input
+                  type="text"
+                  placeholder="Subiect email"
+                  value={emailSubject}
+                  onChange={e => setEmailSubject(e.target.value)}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+                <Textarea
+                  placeholder="Conținut email..."
+                  value={emailBody}
+                  onChange={e => setEmailBody(e.target.value)}
+                  rows={4}
+                />
+                <div className="flex gap-2">
+                  <Button size="sm" className="bg-gold text-background hover:bg-gold-dark gap-1"
+                    onClick={handleSendEmail} disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}>
+                    {sendingEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                    Trimite
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEmailOpen(false)}>Anulează</Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* AD-08 — Assign to staff */}
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Asignare</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              <input
+                type="text"
+                placeholder="Numele persoanei responsabile"
+                value={assignee}
+                onChange={e => setAssignee(e.target.value)}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+              <Button size="sm" variant="outline" className="w-full gap-1"
+                onClick={handleAssign} disabled={!assignee.trim()}>
+                <Users className="h-3.5 w-3.5" /> Asignează
               </Button>
             </CardContent>
           </Card>

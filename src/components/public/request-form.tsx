@@ -133,10 +133,11 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
 }
 
 // ─── Booking Request (full form) ─────────────────────────
-export function RequestBookingForm({ artistId, venueId, preselectedDate, className, label = "Solicită Rezervare", variant = "outline", icon, presetMessage }: FormBaseProps) {
+export function RequestBookingForm({ artistId, venueId, preselectedDate, className, label = "Solicită Rezervare", variant = "outline", icon, presetMessage, capacityMax }: FormBaseProps & { capacityMax?: number | null }) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [capacityWarning, setCapacityWarning] = useState(false);
   const [eventDate, setEventDate] = useState<Date | null>(
     preselectedDate ? new Date(preselectedDate + "T00:00:00") : null
   );
@@ -262,7 +263,20 @@ export function RequestBookingForm({ artistId, venueId, preselectedDate, classNa
 
               <FormField icon={Users} label="Număr invitați">
                 <input id="book-guests" name="guestCount" type="number" min={1}
-                  className="form-input" placeholder="ex: 150" />
+                  className="form-input" placeholder="ex: 150"
+                  onChange={(e) => {
+                    if (capacityMax && Number(e.target.value) > capacityMax) {
+                      setCapacityWarning(true);
+                    } else {
+                      setCapacityWarning(false);
+                    }
+                  }}
+                />
+                {capacityWarning && capacityMax && (
+                  <p className="mt-1 text-xs text-amber-500 font-medium">
+                    ⚠️ Depășește capacitatea maximă ({capacityMax} locuri)
+                  </p>
+                )}
               </FormField>
 
               <FormField icon={MessageSquare} label="Mesaj">

@@ -46,7 +46,7 @@ export async function PATCH(
 
   const allowedFields = [
     "name", "phone", "email", "eventType", "eventDate",
-    "location", "guestCount", "budget", "message", "status", "score",
+    "location", "guestCount", "budget", "message", "status", "score", "assignedTo",
   ];
 
   const updates: Record<string, unknown> = {};
