@@ -164,6 +164,10 @@ export default function VendorCalendarPage() {
       isWorking: true,
     })),
   );
+  const [applyingSchedule, setApplyingSchedule] = useState(false);
+  const [blockFrom, setBlockFrom] = useState("");
+  const [blockTo, setBlockTo] = useState("");
+  const [blockingPeriod, setBlockingPeriod] = useState(false);
 
   // Resolve entity on mount — venue first, fallback to artist.
   useEffect(() => {
@@ -346,6 +350,101 @@ export default function VendorCalendarPage() {
       toast.error("Eroare la salvare");
     } finally {
       setSaving(false);
+    }
+  }
+
+  /** Collect all non-working weekdays for the next N months and block them */
+  async function applyScheduleToCalendar() {
+    if (!entity) return;
+    const offDays = schedule.filter((d) => !d.isWorking).map((d) => d.dayOfWeek);
+    if (offDays.length === 0) {
+      toast.error("Toate zilele sunt lucrătoare — nu e nimic de blocat.");
+      return;
+    }
+    setApplyingSchedule(true);
+    try {
+      const dates: string[] = [];
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + 3);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dow = (d.getDay() + 6) % 7; // 0=Mon
+        if (offDays.includes(dow)) {
+          dates.push(
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+          );
+        }
+      }
+      if (dates.length === 0) {
+        toast.error("Nu s-au găsit zile de blocat.");
+        return;
+      }
+      const res = await fetch("/api/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity_type: entity.type,
+          entity_id: entity.id,
+          dates,
+          status: "blocked",
+          note: "Zi liberă (grafic săptămânal)",
+        }),
+      });
+      if (!res.ok) throw new Error();
+      await loadEvents();
+      toast.success(`${dates.length} zile libere blocate pe calendar (3 luni)`);
+    } catch {
+      toast.error("Eroare la aplicarea graficului");
+    } finally {
+      setApplyingSchedule(false);
+    }
+  }
+
+  /** Block a date range (vacation / unavailable period) */
+  async function blockPeriod() {
+    if (!entity || !blockFrom || !blockTo) {
+      toast.error("Selectează data de început și sfârșit");
+      return;
+    }
+    if (blockFrom > blockTo) {
+      toast.error("Data de început trebuie să fie înainte de data de sfârșit");
+      return;
+    }
+    setBlockingPeriod(true);
+    try {
+      const dates: string[] = [];
+      const start = new Date(blockFrom + "T00:00:00");
+      const end = new Date(blockTo + "T00:00:00");
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dates.push(
+          `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+        );
+      }
+      if (dates.length > 180) {
+        toast.error("Perioada nu poate depăși 180 de zile");
+        return;
+      }
+      const res = await fetch("/api/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity_type: entity.type,
+          entity_id: entity.id,
+          dates,
+          status: "blocked",
+          note: "Perioadă blocată",
+        }),
+      });
+      if (!res.ok) throw new Error();
+      await loadEvents();
+      toast.success(`${dates.length} zile blocate!`);
+      setBlockFrom("");
+      setBlockTo("");
+    } catch {
+      toast.error("Eroare la blocarea perioadei");
+    } finally {
+      setBlockingPeriod(false);
     }
   }
 
@@ -641,27 +740,33 @@ export default function VendorCalendarPage() {
 
         {entity.type === "artist" && (
           <TabsContent value="schedule" className="mt-6 space-y-4">
-            <div className="flex justify-end">
-              <Button
-                onClick={saveSchedule}
-                disabled={saving}
-                className="gap-2 bg-gold text-background hover:bg-gold-dark"
-              >
-                {saving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}{" "}
-                Salvează Grafic
-              </Button>
-            </div>
+            {/* Weekly schedule */}
             <Card>
               <CardHeader>
-                <CardTitle>Grafic de Lucru Săptămânal</CardTitle>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Grafic de Lucru Săptămânal</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Setează zilele și orele în care ești disponibil
+                    </p>
+                  </div>
+                  <Button
+                    onClick={saveSchedule}
+                    disabled={saving}
+                    className="gap-2 bg-gold text-background hover:bg-gold-dark"
+                  >
+                    {saving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}{" "}
+                    Salvează
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-3">
                 {schedule.map((day, i) => (
-                  <div key={i} className="flex items-center gap-4">
+                  <div key={i} className="flex items-center gap-4 rounded-lg border border-border/40 p-3">
                     <div className="w-24 text-sm font-medium">{DAYS[i]}</div>
                     <Switch
                       checked={day.isWorking}
@@ -696,12 +801,93 @@ export default function VendorCalendarPage() {
                         />
                       </>
                     ) : (
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-sm text-destructive/70 font-medium">
                         Zi liberă
                       </span>
                     )}
                   </div>
                 ))}
+                {/* Apply schedule to calendar */}
+                {schedule.some((d) => !d.isWorking) && (
+                  <div className="rounded-lg border border-dashed border-gold/40 bg-gold/5 p-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-medium">Aplică zilele libere pe calendar</p>
+                        <p className="text-xs text-muted-foreground">
+                          Marchează automat{" "}
+                          {schedule
+                            .filter((d) => !d.isWorking)
+                            .map((d) => DAYS[d.dayOfWeek])
+                            .join(", ")}{" "}
+                          ca „blocate" pe următoarele 3 luni
+                        </p>
+                      </div>
+                      <Button
+                        onClick={applyScheduleToCalendar}
+                        disabled={applyingSchedule}
+                        variant="outline"
+                        className="shrink-0 gap-2"
+                      >
+                        {applyingSchedule ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CalendarIcon className="h-4 w-4" />
+                        )}
+                        Aplică
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Block period */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Blochează Perioadă</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Marchează o perioadă ca indisponibilă (vacanță, concediu, etc.)
+                </p>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <Label>De la</Label>
+                    <Input
+                      type="date"
+                      value={blockFrom}
+                      onChange={(e) => setBlockFrom(e.target.value)}
+                      className="w-44"
+                    />
+                  </div>
+                  <div>
+                    <Label>Până la</Label>
+                    <Input
+                      type="date"
+                      value={blockTo}
+                      onChange={(e) => setBlockTo(e.target.value)}
+                      className="w-44"
+                    />
+                  </div>
+                  <Button
+                    onClick={blockPeriod}
+                    disabled={blockingPeriod || !blockFrom || !blockTo}
+                    variant="destructive"
+                    className="gap-2"
+                  >
+                    {blockingPeriod ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <X className="h-4 w-4" />
+                    )}
+                    Blochează
+                  </Button>
+                </div>
+                {blockFrom && blockTo && blockFrom <= blockTo && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {Math.ceil((new Date(blockTo).getTime() - new Date(blockFrom).getTime()) / 86400000) + 1} zile vor fi marcate ca blocate
+                  </p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
