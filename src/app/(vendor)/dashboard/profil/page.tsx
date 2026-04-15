@@ -171,12 +171,19 @@ export default function VendorProfilePage() {
       formData.append("file", file);
       formData.append("folder", "avatars");
       const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Upload failed (${res.status})`);
+      }
       const { url } = await res.json();
       update({ photoUrl: url });
       toast.success("Poza de profil încărcată! Nu uita să salvezi.");
-    } catch {
-      toast.error("Nu s-a putut încărca imaginea");
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : "Nu s-a putut încărca imaginea";
+      toast.error(msg);
     } finally {
       setUploadingPhoto(false);
       e.target.value = "";
