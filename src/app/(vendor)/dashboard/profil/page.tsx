@@ -16,7 +16,8 @@ const RichEditor = dynamic(
 import { GalleryManager } from "@/components/vendor/gallery-manager";
 import { VideoManager } from "@/components/vendor/video-manager";
 import { PackagesManager } from "@/components/vendor/packages-manager";
-import { Save, Eye, Sparkles, Loader2 } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Save, Eye, Sparkles, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
 
 type ProfileData = {
@@ -38,6 +39,13 @@ type ProfileData = {
   bufferHours: number;
   autoReplyEnabled: boolean;
   autoReplyMessage: string;
+  seoTitleRo: string;
+  seoDescRo: string;
+};
+
+type Category = {
+  id: number;
+  nameRo: string;
 };
 
 const EMPTY: ProfileData = {
@@ -60,6 +68,8 @@ const EMPTY: ProfileData = {
   autoReplyEnabled: false,
   autoReplyMessage:
     "Mulțumim pentru cerere! Am primit-o și revin cu un răspuns în cel mai scurt timp posibil.",
+  seoTitleRo: "",
+  seoDescRo: "",
 };
 
 export default function VendorProfilePage() {
@@ -67,6 +77,9 @@ export default function VendorProfilePage() {
   const [saving, setSaving] = useState(false);
   const [artistId, setArtistId] = useState<number | null>(null);
   const [data, setData] = useState<ProfileData>(EMPTY);
+  const [generatingAI, setGeneratingAI] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [artistCategoryIds, setArtistCategoryIds] = useState<number[]>([]);
 
   // Hydrate from the signed-in user's artist row. F-A4 before this fix
   // used hardcoded empty values and silently discarded every edit.
@@ -74,10 +87,21 @@ export default function VendorProfilePage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/me/artist", { cache: "no-store" });
-        if (!res.ok) throw new Error("fetch failed");
-        const json = await res.json();
+        // Fetch artist data and categories in parallel
+        const [artistRes, catRes] = await Promise.all([
+          fetch("/api/me/artist", { cache: "no-store" }),
+          fetch("/api/categories", { cache: "no-store" }),
+        ]);
+        if (!artistRes.ok) throw new Error("fetch failed");
+        const json = await artistRes.json();
         if (cancelled) return;
+
+        // Load categories for SEO auto-generation
+        if (catRes.ok) {
+          const cats = await catRes.json();
+          if (!cancelled) setCategories(cats as Category[]);
+        }
+
         if (!json.artist) {
           toast.error(
             "Nu ai încă un profil de artist — completează onboarding-ul.",
@@ -87,6 +111,7 @@ export default function VendorProfilePage() {
         }
         const a = json.artist as Record<string, unknown>;
         setArtistId((a.id as number) ?? null);
+        setArtistCategoryIds((a.categoryIds as number[]) ?? []);
         setData({
           nameRo: (a.nameRo as string) ?? "",
           location: (a.location as string) ?? "",
@@ -107,6 +132,8 @@ export default function VendorProfilePage() {
           autoReplyEnabled: Boolean(a.autoReplyEnabled),
           autoReplyMessage:
             (a.autoReplyMessage as string) ?? EMPTY.autoReplyMessage,
+          seoTitleRo: (a.seoTitleRo as string) ?? "",
+          seoDescRo: (a.seoDescRo as string) ?? "",
         });
       } catch {
         if (!cancelled) toast.error("Nu am putut încărca profilul");
@@ -152,6 +179,8 @@ export default function VendorProfilePage() {
         bufferHours: data.bufferHours,
         autoReplyEnabled: data.autoReplyEnabled,
         autoReplyMessage: data.autoReplyMessage,
+        seoTitleRo: data.seoTitleRo,
+        seoDescRo: data.seoDescRo,
       };
       const res = await fetch("/api/artists/crud", {
         method: "PUT",
@@ -193,6 +222,67 @@ export default function VendorProfilePage() {
     }
   }
 
+  async function handleAIGenerate() {
+    if (!data.nameRo.trim()) {
+      toast.error("Completează mai întâi numele artistic");
+      return;
+    }
+    setGeneratingAI(true);
+    try {
+      // Resolve category names from the artist's categoryIds
+      const categoryNames = artistCategoryIds
+        .map((cid) => categories.find((c) => c.id === cid)?.nameRo)
+        .filter(Boolean);
+      const categoryLabel = categoryNames.length > 0
+        ? categoryNames.join(", ")
+        : "artist";
+
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "generate-description",
+          name: data.nameRo,
+          category: categoryLabel,
+          location: data.location || "",
+          language: "ro",
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const result = await res.json();
+      update({ descriptionRo: result.result });
+      toast.success("Descriere generată cu AI!");
+    } catch {
+      toast.error("AI indisponibil — încearcă din nou");
+    } finally {
+      setGeneratingAI(false);
+    }
+  }
+
+  function handleAutoGenerateSEO() {
+    // Resolve category names from the artist's categoryIds
+    const categoryNames = artistCategoryIds
+      .map((cid) => categories.find((c) => c.id === cid)?.nameRo)
+      .filter(Boolean);
+    const categoryLabel = categoryNames.length > 0
+      ? categoryNames.join(", ")
+      : "Artist";
+    const locationLabel = data.location || "Moldova";
+
+    // Title: max 60 chars
+    const titleBase = `${data.nameRo} — ${categoryLabel} pentru Evenimente | ePetrecere.md`;
+    const seoTitle = titleBase.length > 60
+      ? `${data.nameRo} — ${categoryLabel} | ePetrecere.md`.substring(0, 60)
+      : titleBase;
+
+    // Description: max 155 chars
+    const descBase = `Rezervă ${data.nameRo} pentru evenimentul tău. ${categoryLabel} din ${locationLabel}. Solicită preț pe ePetrecere.md`;
+    const seoDesc = descBase.length > 155 ? descBase.substring(0, 152) + "..." : descBase;
+
+    update({ seoTitleRo: seoTitle, seoDescRo: seoDesc });
+    toast.success("SEO generat automat!");
+  }
+
   if (loading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -223,6 +313,7 @@ export default function VendorProfilePage() {
           <TabsTrigger value="description">Descriere</TabsTrigger>
           <TabsTrigger value="gallery">Galerie</TabsTrigger>
           <TabsTrigger value="packages">Pachete</TabsTrigger>
+          <TabsTrigger value="seo">SEO</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="mt-6 space-y-6">
@@ -260,7 +351,25 @@ export default function VendorProfilePage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Descriere</CardTitle>
-                <Button variant="outline" size="sm" className="gap-1" onClick={handleAIImprove}><Sparkles className="h-3.5 w-3.5 text-gold" /> Îmbunătățește cu AI</Button>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    disabled={generatingAI}
+                    onClick={handleAIGenerate}
+                  >
+                    {generatingAI ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-3.5 w-3.5 text-gold" />
+                    )}
+                    Generează cu AI
+                  </Button>
+                  <Button variant="outline" size="sm" className="gap-1" onClick={handleAIImprove}>
+                    <Sparkles className="h-3.5 w-3.5 text-gold" /> Îmbunătățește cu AI
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -293,6 +402,87 @@ export default function VendorProfilePage() {
             </CardHeader>
             <CardContent>
               <PackagesManager artistId={artistId} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="seo" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Search className="h-5 w-5" />
+                  SEO — Optimizare pentru Motoarele de Căutare
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={handleAutoGenerateSEO}
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-gold" />
+                  Auto-generează SEO
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Controlează cum apare profilul tău în rezultatele Google.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label>
+                  Meta Title{" "}
+                  <span className="text-xs text-muted-foreground">
+                    ({data.seoTitleRo.length}/60 caractere)
+                  </span>
+                </Label>
+                <Input
+                  value={data.seoTitleRo}
+                  onChange={(e) => update({ seoTitleRo: e.target.value })}
+                  maxLength={60}
+                  placeholder="ex: DJ Andrei — DJ pentru Nunți | ePetrecere.md"
+                />
+                {data.seoTitleRo.length > 60 && (
+                  <p className="mt-1 text-xs text-destructive">
+                    Titlul depășește 60 de caractere și poate fi trunchiat în Google.
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label>
+                  Meta Description{" "}
+                  <span className="text-xs text-muted-foreground">
+                    ({data.seoDescRo.length}/155 caractere)
+                  </span>
+                </Label>
+                <Textarea
+                  value={data.seoDescRo}
+                  onChange={(e) => update({ seoDescRo: e.target.value })}
+                  maxLength={155}
+                  rows={3}
+                  placeholder="ex: Rezervă DJ Andrei pentru nunta ta. DJ profesionist din Chișinău. Solicită preț pe ePetrecere.md"
+                />
+                {data.seoDescRo.length > 155 && (
+                  <p className="mt-1 text-xs text-destructive">
+                    Descrierea depășește 155 de caractere și poate fi trunchiată în Google.
+                  </p>
+                )}
+              </div>
+              {/* Live preview of how it looks in search results */}
+              {(data.seoTitleRo || data.seoDescRo) && (
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Previzualizare Google</p>
+                  <p className="text-base text-blue-600 hover:underline">
+                    {data.seoTitleRo || "Titlu pagină"}
+                  </p>
+                  <p className="text-xs text-green-700">
+                    epetrecere.md/artisti/...
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {data.seoDescRo || "Descrierea paginii va apărea aici..."}
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

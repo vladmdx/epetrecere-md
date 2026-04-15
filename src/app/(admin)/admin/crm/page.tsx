@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
   Search, Phone, Mail, Calendar, DollarSign, User, ChevronRight,
-  Clock, AlertCircle, CheckCircle, XCircle, MessageSquare, LayoutGrid, List, Loader2,
+  Clock, AlertCircle, CheckCircle, XCircle, MessageSquare, LayoutGrid, List, Loader2, Download,
 } from "lucide-react";
 
 const KanbanBoard = dynamic(
@@ -83,6 +83,23 @@ export default function CRMPage() {
           <h1 className="font-heading text-2xl font-bold">CRM — Solicitări</h1>
           <p className="text-sm text-muted-foreground">{leads.length} solicitări totale</p>
         </div>
+        <div className="flex items-center gap-2">
+          {/* AD-10: CSV Export */}
+          <Button variant="outline" size="sm" className="gap-1.5 border-gold/30 text-gold hover:bg-gold/10" onClick={() => {
+            const header = "Nume,Telefon,Email,Eveniment,Data,Locatie,Invitati,Buget,Status,Sursa,Creat\n";
+            const rows = leads.map((l) =>
+              [l.name, l.phone, l.email || "", l.eventType || "", l.eventDate || "", l.location || "", l.guestCount || "", l.budget || "", l.status, l.source || "", l.createdAt]
+                .map(v => `"${String(v).replace(/"/g, '""')}"`)
+                .join(",")
+            ).join("\n");
+            const blob = new Blob(["\uFEFF" + header + rows], { type: "text/csv;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a"); a.href = url; a.download = `crm-leads-${new Date().toISOString().split("T")[0]}.csv`; a.click();
+            URL.revokeObjectURL(url);
+            toast.success("CSV exportat");
+          }}>
+            <Download className="h-4 w-4" /> Export CSV
+          </Button>
         <div className="flex gap-1 rounded-lg border border-border/40 p-1">
           <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className={view === "kanban" ? "bg-gold text-background hover:bg-gold-dark" : ""} onClick={() => setView("kanban")}>
             <LayoutGrid className="h-4 w-4" />
@@ -90,6 +107,7 @@ export default function CRMPage() {
           <Button variant={view === "list" ? "default" : "ghost"} size="sm" className={view === "list" ? "bg-gold text-background hover:bg-gold-dark" : ""} onClick={() => setView("list")}>
             <List className="h-4 w-4" />
           </Button>
+        </div>
         </div>
       </div>
 

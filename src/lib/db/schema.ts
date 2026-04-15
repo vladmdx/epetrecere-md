@@ -597,6 +597,7 @@ export const bookingRequestStatusEnum = pgEnum("booking_request_status", [
   "confirmed_by_client",
   "rejected",
   "cancelled",
+  "completed",
 ]);
 
 export const bookingRequests = pgTable("booking_requests", {

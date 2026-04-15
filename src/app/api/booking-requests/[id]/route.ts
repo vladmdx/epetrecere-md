@@ -20,7 +20,7 @@ export async function PUT(
   const { id } = await params;
   const body = await req.json();
   const { action, reply } = body as {
-    action: "accept" | "reject" | "client_confirm" | "cancel";
+    action: "accept" | "reject" | "client_confirm" | "cancel" | "complete";
     reply?: string;
   };
 
@@ -171,6 +171,21 @@ export async function PUT(
           ),
         );
     }
+  } else if (action === "complete") {
+    const owner = await requireBookingArtistOwner();
+    if (!owner.ok) {
+      return NextResponse.json({ error: owner.error }, { status: owner.status });
+    }
+    if (booking.status !== "accepted" && booking.status !== "confirmed_by_client") {
+      return NextResponse.json(
+        { error: "Booking must be accepted or confirmed first" },
+        { status: 409 },
+      );
+    }
+    await db.update(bookingRequests).set({
+      status: "completed",
+      updatedAt: new Date(),
+    }).where(eq(bookingRequests.id, Number(id)));
   } else {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }

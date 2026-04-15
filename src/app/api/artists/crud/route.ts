@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { artists, users } from "@/lib/db/schema";
+import { artists, redirects, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { slugify } from "@/lib/utils/slugify";
 
@@ -175,6 +175,11 @@ export async function PUT(req: Request) {
     data = filtered;
   }
 
+  // AD-29: detect slug change and record redirect
+  const oldSlug = existing.slug;
+  const newSlug = typeof data.slug === "string" ? data.slug : oldSlug;
+  const slugChanged = newSlug !== oldSlug;
+
   await db
     .update(artists)
     .set({
@@ -182,6 +187,13 @@ export async function PUT(req: Request) {
       updatedAt: new Date(),
     })
     .where(eq(artists.id, Number(id)));
+
+  if (slugChanged) {
+    await db.insert(redirects).values({
+      fromPath: `/artisti/${oldSlug}`,
+      toPath: `/artisti/${newSlug}`,
+    });
+  }
 
   const [updated] = await db
     .select()

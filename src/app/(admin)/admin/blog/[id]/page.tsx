@@ -27,6 +27,7 @@ export default function BlogEditorPage() {
     contentRo: "", contentRu: "", contentEn: "",
     excerptRo: "", category: "", coverImageUrl: "",
     status: "draft", seoTitleRo: "", seoDescRo: "",
+    publishedAt: "",
   });
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
@@ -85,8 +86,18 @@ export default function BlogEditorPage() {
         <select value={post.status} onChange={e => update({ status: e.target.value })} className="rounded-md border border-input bg-background px-3 py-2 text-sm">
           <option value="draft">Draft</option>
           <option value="published">Publicat</option>
+          <option value="scheduled">Programat</option>
           <option value="archived">Arhivat</option>
         </select>
+        {post.status === "scheduled" && (
+          <input
+            type="datetime-local"
+            value={post.publishedAt ? new Date(post.publishedAt).toISOString().slice(0, 16) : ""}
+            onChange={e => update({ publishedAt: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+            min={new Date().toISOString().slice(0, 16)}
+          />
+        )}
         <Button onClick={handleSave} disabled={saving} className="bg-gold text-background hover:bg-gold-dark gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvează
         </Button>

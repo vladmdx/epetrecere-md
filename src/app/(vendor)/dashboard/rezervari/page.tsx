@@ -21,7 +21,7 @@ type BookingRequest = {
   eventType: string | null;
   guestCount: number | null;
   message: string | null;
-  status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled";
+  status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled" | "completed";
   artistReply: string | null;
   createdAt: string;
 };
@@ -41,6 +41,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   confirmed_by_client: { label: "Confirmat ambele părți", color: "bg-success/10 text-success border-success/30" },
   rejected: { label: "Refuzat", color: "bg-destructive/10 text-destructive border-destructive/30" },
   cancelled: { label: "Anulat", color: "bg-muted text-muted-foreground border-border" },
+  completed: { label: "Finalizat", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" },
 };
 
 function formatDate(d: string | null): string {
@@ -100,6 +101,28 @@ export default function VendorBookingsPage() {
       }
     })();
   }, [artistId]);
+
+  async function handleComplete(id: number) {
+    setBusy(id);
+    try {
+      const res = await fetch(`/api/booking-requests/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete" }),
+      });
+      if (!res.ok) {
+        toast.error("Nu s-a putut finaliza rezervarea");
+        return;
+      }
+      toast.success("Rezervare marcată ca finalizată!");
+      const r = await fetch(`/api/booking-requests?artist_id=${artistId}`);
+      if (r.ok) setBookings(await r.json());
+    } catch {
+      toast.error("Eroare la finalizarea rezervării");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function handleAction(id: number, action: "accept" | "reject") {
     const reply = action === "accept"
@@ -266,6 +289,7 @@ export default function VendorBookingsPage() {
 
                   {(booking.status === "accepted" || booking.status === "confirmed_by_client") && (
                     <div className="mt-4 space-y-3 border-t border-border/40 pt-3">
+                      <div className="flex gap-2">
                       <Button
                         size="sm"
                         variant="outline"
@@ -275,6 +299,15 @@ export default function VendorBookingsPage() {
                         <MessageSquare className="h-3.5 w-3.5" />
                         {isExpanded ? "Ascunde chat" : `Chat (${chatMessages.length || "deschide"})`}
                       </Button>
+                      <Button
+                        size="sm"
+                        disabled={busy === booking.id}
+                        onClick={() => handleComplete(booking.id)}
+                        className="gap-1 bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        <CheckCircle className="h-3.5 w-3.5" /> Finalizat
+                      </Button>
+                      </div>
 
                       {isExpanded && (
                         <div className="space-y-2 rounded-lg border border-border/40 bg-background/50 p-3">

@@ -1,6 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { redirects } from "@/lib/db/schema";
 import {
   getArtistBySlug,
   getSimilarArtists,
@@ -12,12 +15,33 @@ import { getLocalized } from "@/i18n";
 import { ArtistDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
 
+/** AD-29: resolve slug redirect chain — follows up to 5 hops to guard against loops. */
+async function resolveRedirect(slug: string): Promise<string | null> {
+  let currentPath = `/artisti/${slug}`;
+  for (let i = 0; i < 5; i++) {
+    const [row] = await db
+      .select({ toPath: redirects.toPath })
+      .from(redirects)
+      .where(eq(redirects.fromPath, currentPath))
+      .limit(1);
+    if (!row) break;
+    currentPath = row.toPath;
+  }
+  // Only return if we actually moved somewhere different
+  return currentPath !== `/artisti/${slug}` ? currentPath : null;
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+
+  // AD-29: if slug was renamed, don't generate metadata — the page will 301
+  const redirectTarget = await resolveRedirect(slug);
+  if (redirectTarget) return {};
+
   const artist = await getArtistBySlug(slug);
   if (!artist) return {};
 
@@ -31,6 +55,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ArtistPage({ params }: Props) {
   const { slug } = await params;
+
+  // AD-29: check if this slug has been superseded by a newer one
+  const redirectTarget = await resolveRedirect(slug);
+  if (redirectTarget) permanentRedirect(redirectTarget);
+
   const artist = await getArtistBySlug(slug);
   if (!artist) notFound();
 

@@ -2,7 +2,7 @@
 
 // M4 — Guest list sub-view: add guests, track RSVP, count totals.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,8 +14,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2, Users, UserCheck, UserX, UserMinus } from "lucide-react";
+import { Plus, Trash2, Loader2, Users, UserCheck, UserX, UserMinus, FileUp } from "lucide-react";
 import { cn } from "@/lib/utils";
+import * as XLSX from "xlsx";
 
 export interface Guest {
   id: number;
@@ -53,6 +54,79 @@ export function GuestsView({ planId, guestCountTarget, guests, onChange }: Props
   const [group, setGroup] = useState("friends");
   const [plusOnes, setPlusOnes] = useState("0");
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /** C-20 — Parse an Excel/CSV file and POST each row to the guests API. */
+  async function importFromFile(file: File) {
+    setImporting(true);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+
+      if (rows.length === 0) {
+        toast.error("Fișierul nu conține rânduri.");
+        return;
+      }
+
+      // Normalise header keys — match Romanian or English names, case-insensitive
+      function col(row: Record<string, unknown>, ...keys: string[]): string {
+        for (const k of keys) {
+          for (const rk of Object.keys(row)) {
+            if (rk.toLowerCase().trim() === k.toLowerCase()) {
+              const v = row[rk];
+              return v == null ? "" : String(v).trim();
+            }
+          }
+        }
+        return "";
+      }
+
+      let imported = 0;
+      const newGuests: Guest[] = [];
+
+      for (const row of rows) {
+        const fullName = col(row, "Nume", "Name", "FullName", "Full Name", "fullName");
+        if (!fullName) continue; // skip empty rows
+
+        const phone = col(row, "Telefon", "Phone", "Tel", "phone");
+        const email = col(row, "Email", "E-mail", "email");
+        const group = col(row, "Grup", "Group", "group");
+
+        const res = await fetch(`/api/event-plans/${planId}/guests`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fullName,
+            phone: phone || undefined,
+            email: email || undefined,
+            group: group || undefined,
+          }),
+        });
+
+        if (res.ok) {
+          const d = await res.json();
+          newGuests.push(d.guest);
+          imported++;
+        }
+      }
+
+      if (newGuests.length > 0) {
+        onChange([...guests, ...newGuests]);
+      }
+
+      toast.success(`Au fost importați ${imported} invitați.`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Eroare la importul fișierului.");
+    } finally {
+      setImporting(false);
+      // reset file input so the same file can be re-imported if needed
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
 
   const stats = useMemo(() => {
     let total = 0;
@@ -185,14 +259,39 @@ export function GuestsView({ planId, guestCountTarget, guests, onChange }: Props
             onChange={(e) => setPlusOnes(e.target.value)}
             className="w-24"
           />
-          <Button
-            onClick={addGuest}
-            disabled={adding}
-            className="ml-auto gap-1 bg-gold text-background hover:bg-gold-dark"
-          >
-            {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Adaugă
-          </Button>
+          <div className="ml-auto flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) importFromFile(f);
+              }}
+            />
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={importing}
+              className="gap-1"
+            >
+              {importing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileUp className="h-4 w-4" />
+              )}
+              Import Excel
+            </Button>
+            <Button
+              onClick={addGuest}
+              disabled={adding}
+              className="gap-1 bg-gold text-background hover:bg-gold-dark"
+            >
+              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+              Adaugă
+            </Button>
+          </div>
         </div>
       </div>
 

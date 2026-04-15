@@ -38,6 +38,35 @@ Original: ${originalDescription}`,
   return block.type === "text" ? block.text : "";
 }
 
+export async function generateArtistDescriptionFromScratch(
+  name: string,
+  category: string,
+  location: string,
+  language: "ro" | "ru" | "en" = "ro",
+): Promise<string> {
+  const langNames = { ro: "Romanian", ru: "Russian", en: "English" };
+
+  const message = await getClient().messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 600,
+    messages: [
+      {
+        role: "user",
+        content: `Write a professional, engaging description for an event artist/service profile on an events marketplace. Write in ${langNames[language]}. The description should be 2-3 paragraphs, SEO-friendly, and highlight the artist's strengths and appeal to potential clients looking for event entertainment.
+
+Artist name: ${name}
+Category: ${category}
+Location: ${location}
+
+Write ONLY the description text, no titles or headings.`,
+      },
+    ],
+  });
+
+  const block = message.content[0];
+  return block.type === "text" ? block.text : "";
+}
+
 export async function generateSEOTexts(
   entityName: string,
   entityType: "artist" | "venue",

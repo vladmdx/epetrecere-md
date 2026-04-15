@@ -61,7 +61,7 @@ export function artistJsonLd(artist: {
 }) {
   return {
     "@context": "https://schema.org",
-    "@type": "PerformingGroup",
+    "@type": ["Person", "PerformingGroup"],
     name: artist.name,
     description: artist.description,
     url: `${BASE_URL}/artisti/${artist.slug}`,
@@ -72,6 +72,7 @@ export function artistJsonLd(artist: {
           "@type": "AggregateRating",
           ratingValue: artist.ratingAvg,
           reviewCount: artist.ratingCount,
+          bestRating: 5,
         },
       }),
   };

@@ -160,22 +160,43 @@ export default function SettingsPage() {
               <div>
                 <Label>Gold (Accent)</Label>
                 <div className="mt-1 flex gap-2">
-                  <Input value={get("color_gold", "#C9A84C")} onChange={(e) => set("color_gold", e.target.value)} className="flex-1" />
-                  <div className="h-10 w-10 rounded border" style={{ background: get("color_gold", "#C9A84C") }} />
+                  <input type="color" value={get("color_gold", "#C9A84C")} onChange={(e) => set("color_gold", e.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5" />
+                  <Input value={get("color_gold", "#C9A84C")} onChange={(e) => set("color_gold", e.target.value)} className="flex-1 font-mono text-sm" />
                 </div>
               </div>
               <div>
                 <Label>Background Dark</Label>
                 <div className="mt-1 flex gap-2">
-                  <Input value={get("color_bg_dark", "#0D0D0D")} onChange={(e) => set("color_bg_dark", e.target.value)} className="flex-1" />
-                  <div className="h-10 w-10 rounded border" style={{ background: get("color_bg_dark", "#0D0D0D") }} />
+                  <input type="color" value={get("color_bg_dark", "#0D0D0D")} onChange={(e) => set("color_bg_dark", e.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5" />
+                  <Input value={get("color_bg_dark", "#0D0D0D")} onChange={(e) => set("color_bg_dark", e.target.value)} className="flex-1 font-mono text-sm" />
                 </div>
               </div>
               <div>
                 <Label>Background Light</Label>
                 <div className="mt-1 flex gap-2">
-                  <Input value={get("color_bg_light", "#FAF8F2")} onChange={(e) => set("color_bg_light", e.target.value)} className="flex-1" />
-                  <div className="h-10 w-10 rounded border" style={{ background: get("color_bg_light", "#FAF8F2") }} />
+                  <input type="color" value={get("color_bg_light", "#FAF8F2")} onChange={(e) => set("color_bg_light", e.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5" />
+                  <Input value={get("color_bg_light", "#FAF8F2")} onChange={(e) => set("color_bg_light", e.target.value)} className="flex-1 font-mono text-sm" />
+                </div>
+              </div>
+              <div>
+                <Label>Success</Label>
+                <div className="mt-1 flex gap-2">
+                  <input type="color" value={get("color_success", "#22C55E")} onChange={(e) => set("color_success", e.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5" />
+                  <Input value={get("color_success", "#22C55E")} onChange={(e) => set("color_success", e.target.value)} className="flex-1 font-mono text-sm" />
+                </div>
+              </div>
+              <div>
+                <Label>Warning</Label>
+                <div className="mt-1 flex gap-2">
+                  <input type="color" value={get("color_warning", "#F59E0B")} onChange={(e) => set("color_warning", e.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5" />
+                  <Input value={get("color_warning", "#F59E0B")} onChange={(e) => set("color_warning", e.target.value)} className="flex-1 font-mono text-sm" />
+                </div>
+              </div>
+              <div>
+                <Label>Destructive</Label>
+                <div className="mt-1 flex gap-2">
+                  <input type="color" value={get("color_destructive", "#EF4444")} onChange={(e) => set("color_destructive", e.target.value)} className="h-10 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5" />
+                  <Input value={get("color_destructive", "#EF4444")} onChange={(e) => set("color_destructive", e.target.value)} className="flex-1 font-mono text-sm" />
                 </div>
               </div>
             </CardContent>
@@ -190,9 +211,13 @@ export default function SettingsPage() {
                   value={get("font_heading", "Playfair Display")}
                   onChange={(e) => set("font_heading", e.target.value)}
                   className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  style={{ fontFamily: get("font_heading", "Playfair Display") }}
                 >
-                  <option>Playfair Display</option><option>Cormorant</option><option>Lora</option><option>Merriweather</option>
+                  <option>Playfair Display</option><option>Cormorant</option><option>Lora</option><option>Merriweather</option><option>Georgia</option><option>Cinzel</option><option>Libre Baskerville</option>
                 </select>
+                <p className="mt-2 text-lg" style={{ fontFamily: get("font_heading", "Playfair Display") }}>
+                  Previzualizare heading
+                </p>
               </div>
               <div>
                 <Label>Font Body</Label>
@@ -200,9 +225,13 @@ export default function SettingsPage() {
                   value={get("font_body", "DM Sans")}
                   onChange={(e) => set("font_body", e.target.value)}
                   className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  style={{ fontFamily: get("font_body", "DM Sans") }}
                 >
-                  <option>DM Sans</option><option>Outfit</option><option>Nunito</option><option>Source Sans</option>
+                  <option>DM Sans</option><option>Outfit</option><option>Nunito</option><option>Source Sans 3</option><option>Inter</option><option>Open Sans</option><option>Roboto</option><option>Raleway</option>
                 </select>
+                <p className="mt-2 text-sm" style={{ fontFamily: get("font_body", "DM Sans") }}>
+                  Previzualizare text de bază
+                </p>
               </div>
             </CardContent>
           </Card>

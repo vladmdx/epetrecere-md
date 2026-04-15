@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
-import { generateArtistDescription, generateSEOTexts } from "@/lib/ai";
+import { generateArtistDescription, generateArtistDescriptionFromScratch, generateSEOTexts } from "@/lib/ai";
 
 const generateSchema = z.object({
-  type: z.enum(["description", "seo"]),
+  type: z.enum(["description", "generate-description", "seo"]),
   name: z.string(),
   category: z.string().optional(),
+  location: z.string().optional(),
   description: z.string().optional(),
   entityType: z.enum(["artist", "venue"]).optional(),
   language: z.enum(["ro", "ru", "en"]).default("ro"),
@@ -27,6 +28,16 @@ export async function POST(req: Request) {
   }
 
   try {
+    if (parsed.data.type === "generate-description") {
+      const result = await generateArtistDescriptionFromScratch(
+        parsed.data.name,
+        parsed.data.category || "artist",
+        parsed.data.location || "",
+        parsed.data.language,
+      );
+      return NextResponse.json({ result });
+    }
+
     if (parsed.data.type === "description") {
       const result = await generateArtistDescription(
         parsed.data.name,

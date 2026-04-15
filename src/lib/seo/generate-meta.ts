@@ -64,9 +64,10 @@ export function generateMeta(opts: GenerateMetaOptions): Metadata {
     alternates: {
       canonical: url,
       languages: {
-        "ro": `${BASE_URL}${opts.path || ""}`,
-        "ru": `${BASE_URL}${opts.path || ""}`,
-        "en": `${BASE_URL}${opts.path || ""}`,
+        "ro": `${BASE_URL}${opts.path || ""}?lang=ro`,
+        "ru": `${BASE_URL}${opts.path || ""}?lang=ru`,
+        "en": `${BASE_URL}${opts.path || ""}?lang=en`,
+        "x-default": `${BASE_URL}${opts.path || ""}`,
       },
     },
     ...(opts.noindex && { robots: { index: false, follow: false } }),
