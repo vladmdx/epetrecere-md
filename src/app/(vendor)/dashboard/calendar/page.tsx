@@ -168,6 +168,9 @@ export default function VendorCalendarPage() {
   const [blockFrom, setBlockFrom] = useState("");
   const [blockTo, setBlockTo] = useState("");
   const [blockingPeriod, setBlockingPeriod] = useState(false);
+  const [blockedWeekdays, setBlockedWeekdays] = useState<number[]>([]);
+  const [blockWeekdayMonths, setBlockWeekdayMonths] = useState(3);
+  const [blockingWeekdays, setBlockingWeekdays] = useState(false);
 
   // Resolve entity on mount — venue first, fallback to artist.
   useEffect(() => {
@@ -445,6 +448,56 @@ export default function VendorCalendarPage() {
       toast.error("Eroare la blocarea perioadei");
     } finally {
       setBlockingPeriod(false);
+    }
+  }
+
+  function toggleWeekday(dow: number) {
+    setBlockedWeekdays((prev) =>
+      prev.includes(dow) ? prev.filter((d) => d !== dow) : [...prev, dow],
+    );
+  }
+
+  async function blockWeekdays() {
+    if (!entity || blockedWeekdays.length === 0) {
+      toast.error("Selectează cel puțin o zi din săptămână");
+      return;
+    }
+    setBlockingWeekdays(true);
+    try {
+      const dates: string[] = [];
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + blockWeekdayMonths);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dow = (d.getDay() + 6) % 7; // 0=Mon
+        if (blockedWeekdays.includes(dow)) {
+          dates.push(
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`,
+          );
+        }
+      }
+      const res = await fetch("/api/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity_type: entity.type,
+          entity_id: entity.id,
+          dates,
+          status: "blocked",
+          note: `Zi blocată recurent (${blockedWeekdays.map((d) => DAYS[d]).join(", ")})`,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      await loadEvents();
+      toast.success(
+        `${dates.length} zile blocate (fiecare ${blockedWeekdays.map((d) => DAYS[d]).join(", ")} pe ${blockWeekdayMonths} luni)`,
+      );
+      setBlockedWeekdays([]);
+    } catch {
+      toast.error("Eroare la blocarea zilelor");
+    } finally {
+      setBlockingWeekdays(false);
     }
   }
 
@@ -837,6 +890,77 @@ export default function VendorCalendarPage() {
                       </Button>
                     </div>
                   </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Block specific weekdays */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Blochează Zile din Săptămână</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Selectează zilele săptămânii care să fie marcate ca indisponibile recurent
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap gap-2">
+                  {DAYS.map((day, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleWeekday(i)}
+                      className={cn(
+                        "rounded-lg border px-4 py-2.5 text-sm font-medium transition-all",
+                        blockedWeekdays.includes(i)
+                          ? "border-destructive bg-destructive/10 text-destructive"
+                          : "border-border/40 hover:border-border hover:bg-accent",
+                      )}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <Label>Pe câte luni înainte</Label>
+                    <div className="mt-1 flex gap-2">
+                      {[1, 2, 3, 6].map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          onClick={() => setBlockWeekdayMonths(m)}
+                          className={cn(
+                            "rounded-md border px-3 py-1.5 text-sm transition-all",
+                            blockWeekdayMonths === m
+                              ? "border-gold bg-gold/10 text-gold font-medium"
+                              : "border-border/40 hover:bg-accent",
+                          )}
+                        >
+                          {m} {m === 1 ? "lună" : "luni"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <Button
+                    onClick={blockWeekdays}
+                    disabled={blockingWeekdays || blockedWeekdays.length === 0}
+                    variant="destructive"
+                    className="gap-2"
+                  >
+                    {blockingWeekdays ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <CalendarIcon className="h-4 w-4" />
+                    )}
+                    Blochează zilele
+                  </Button>
+                </div>
+                {blockedWeekdays.length > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Fiecare <strong>{blockedWeekdays.map((d) => DAYS[d]).join(", ")}</strong> va fi
+                    marcat(ă) ca blocat(ă) pe următoarele {blockWeekdayMonths}{" "}
+                    {blockWeekdayMonths === 1 ? "lună" : "luni"}
+                  </p>
                 )}
               </CardContent>
             </Card>
