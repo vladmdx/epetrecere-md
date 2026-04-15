@@ -83,6 +83,19 @@ function UserMenu() {
   const { isSignedIn, user } = useUser();
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
+  const [userRole, setUserRole] = useState<{
+    role: string;
+    hasVenue: boolean;
+    isNewUser: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isSignedIn) { setUserRole(null); return; }
+    fetch("/api/auth/check-role")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data) setUserRole(data); })
+      .catch(() => {});
+  }, [isSignedIn]);
 
   if (!isSignedIn) {
     return (
@@ -133,12 +146,16 @@ function UserMenu() {
             <Link href="/cabinet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
               <UserCircle className="h-4 w-4" /> Cabinetul Meu
             </Link>
-            <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-              <LayoutDashboard className="h-4 w-4" /> Dashboard Artist
-            </Link>
-            <Link href="/admin" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-              <Shield className="h-4 w-4" /> Admin Panel
-            </Link>
+            {userRole && (userRole.role === "artist" || userRole.hasVenue) && (
+              <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+                <LayoutDashboard className="h-4 w-4" /> {userRole.hasVenue ? "Dashboard Sală" : "Dashboard Artist"}
+              </Link>
+            )}
+            {userRole && (userRole.role === "admin" || userRole.role === "super_admin") && (
+              <Link href="/admin" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+                <Shield className="h-4 w-4" /> Admin Panel
+              </Link>
+            )}
             <div className="border-t border-border/40 mt-1 pt-1">
               <button onClick={() => { signOut(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive hover:bg-accent">
                 <LogOut className="h-4 w-4" /> Deconectare
