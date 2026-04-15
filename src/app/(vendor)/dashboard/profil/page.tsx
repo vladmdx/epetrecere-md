@@ -17,7 +17,7 @@ import { GalleryManager } from "@/components/vendor/gallery-manager";
 import { VideoManager } from "@/components/vendor/video-manager";
 import { PackagesManager } from "@/components/vendor/packages-manager";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Eye, Sparkles, Loader2, Search } from "lucide-react";
+import { Save, Eye, Sparkles, Loader2, Search, Camera, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 type ProfileData = {
@@ -39,6 +39,7 @@ type ProfileData = {
   bufferHours: number;
   autoReplyEnabled: boolean;
   autoReplyMessage: string;
+  photoUrl: string;
   seoTitleRo: string;
   seoDescRo: string;
 };
@@ -68,6 +69,7 @@ const EMPTY: ProfileData = {
   autoReplyEnabled: false,
   autoReplyMessage:
     "Mulțumim pentru cerere! Am primit-o și revin cu un răspuns în cel mai scurt timp posibil.",
+  photoUrl: "",
   seoTitleRo: "",
   seoDescRo: "",
 };
@@ -78,6 +80,7 @@ export default function VendorProfilePage() {
   const [artistId, setArtistId] = useState<number | null>(null);
   const [data, setData] = useState<ProfileData>(EMPTY);
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [artistCategoryIds, setArtistCategoryIds] = useState<number[]>([]);
 
@@ -132,6 +135,7 @@ export default function VendorProfilePage() {
           autoReplyEnabled: Boolean(a.autoReplyEnabled),
           autoReplyMessage:
             (a.autoReplyMessage as string) ?? EMPTY.autoReplyMessage,
+          photoUrl: (a.photoUrl as string) ?? "",
           seoTitleRo: (a.seoTitleRo as string) ?? "",
           seoDescRo: (a.seoDescRo as string) ?? "",
         });
@@ -148,6 +152,35 @@ export default function VendorProfilePage() {
 
   function update(partial: Partial<ProfileData>) {
     setData((prev) => ({ ...prev, ...partial }));
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selectează o imagine validă");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Imaginea nu poate depăși 10MB");
+      return;
+    }
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", "avatars");
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error();
+      const { url } = await res.json();
+      update({ photoUrl: url });
+      toast.success("Poza de profil încărcată! Nu uita să salvezi.");
+    } catch {
+      toast.error("Nu s-a putut încărca imaginea");
+    } finally {
+      setUploadingPhoto(false);
+      e.target.value = "";
+    }
   }
 
   async function handleSave() {
@@ -179,6 +212,7 @@ export default function VendorProfilePage() {
         bufferHours: data.bufferHours,
         autoReplyEnabled: data.autoReplyEnabled,
         autoReplyMessage: data.autoReplyMessage,
+        photoUrl: data.photoUrl || null,
         seoTitleRo: data.seoTitleRo,
         seoDescRo: data.seoDescRo,
       };
@@ -317,6 +351,58 @@ export default function VendorProfilePage() {
         </TabsList>
 
         <TabsContent value="info" className="mt-6 space-y-6">
+          {/* Profile Photo */}
+          <Card>
+            <CardHeader><CardTitle>Poza de Profil</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-6">
+                <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border-2 border-gold/30 bg-muted">
+                  {data.photoUrl ? (
+                    <img src={data.photoUrl} alt="Profil" className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-3xl text-muted-foreground">
+                      <Camera className="h-8 w-8" />
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Aceasta este poza principală care apare pe cardul tău și în profil.
+                  </p>
+                  <div className="flex gap-2">
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoUpload}
+                        disabled={uploadingPhoto}
+                      />
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors">
+                        {uploadingPhoto ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Upload className="h-4 w-4" />
+                        )}
+                        {data.photoUrl ? "Schimbă poza" : "Încarcă poza"}
+                      </span>
+                    </label>
+                    {data.photoUrl && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive"
+                        onClick={() => update({ photoUrl: "" })}
+                      >
+                        Șterge
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader><CardTitle>Informații de bază</CardTitle></CardHeader>
             <CardContent className="space-y-4">

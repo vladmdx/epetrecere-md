@@ -69,6 +69,7 @@ const artistSchema = z.object({
   bufferHours: z.number().default(2),
   autoReplyEnabled: z.boolean().optional(),
   autoReplyMessage: z.string().optional(),
+  photoUrl: z.string().nullable().optional(),
   seoTitleRo: z.string().optional(),
   seoTitleRu: z.string().optional(),
   seoTitleEn: z.string().optional(),

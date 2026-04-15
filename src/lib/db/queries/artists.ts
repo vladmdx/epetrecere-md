@@ -125,7 +125,7 @@ export async function getArtists(filters: ArtistFilters = {}) {
   const coverMap = new Map(coverImages.map((c) => [c.artistId, c.url]));
   const itemsWithCovers = items.map((a) => ({
     ...a,
-    coverImageUrl: coverMap.get(a.id) || null,
+    coverImageUrl: a.photoUrl || coverMap.get(a.id) || null,
   }));
 
   return {
@@ -198,7 +198,7 @@ export async function getFeaturedArtists(limit = 8) {
       ));
   }
   const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
-  return items.map((a) => ({ ...a, coverImageUrl: coverMap.get(a.id) || null }));
+  return items.map((a) => ({ ...a, coverImageUrl: a.photoUrl || coverMap.get(a.id) || null }));
 }
 
 /**
@@ -255,5 +255,5 @@ export async function getSimilarArtists(artistId: number, categoryIds: number[],
       ));
   }
   const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
-  return items.map((a) => ({ ...a, coverImageUrl: coverMap.get(a.id) || null }));
+  return items.map((a) => ({ ...a, coverImageUrl: a.photoUrl || coverMap.get(a.id) || null }));
 }

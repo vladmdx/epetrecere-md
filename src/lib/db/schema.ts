@@ -208,6 +208,7 @@ export const artists = pgTable("artists", {
   // is emailed to the client the moment their request lands, reducing bounce.
   autoReplyEnabled: boolean("auto_reply_enabled").default(false).notNull(),
   autoReplyMessage: text("auto_reply_message"),
+  photoUrl: text("photo_url"),
   seoTitleRo: text("seo_title_ro"),
   seoTitleRu: text("seo_title_ru"),
   seoTitleEn: text("seo_title_en"),

@@ -36,6 +36,7 @@ interface ArtistData {
   isFeatured: boolean;
   isPremium: boolean;
   calendarEnabled: boolean;
+  photoUrl: string | null;
   images: Array<{ id: number; url: string; altRo: string | null; isCover: boolean }>;
   videos: Array<{ id: number; platform: string; videoId: string; title: string | null }>;
   packages: Array<{
@@ -95,8 +96,9 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
   const [avatarOpen, setAvatarOpen] = useState(false);
-  const coverImage = artist.images?.[0];
-  const isPlaceholder = coverImage?.url?.includes("placeholder.svg");
+  // Profile photo: prefer dedicated photoUrl, fallback to first gallery image
+  const profilePhotoUrl = artist.photoUrl || artist.images?.[0]?.url || null;
+  const isPlaceholder = profilePhotoUrl?.includes("placeholder.svg") ?? false;
   // M0a #8 — contact info and price are gated behind login. We wait for Clerk
   // to hydrate so we don't flash a "Lock" state for authenticated visitors.
   const canSeeContact = isLoaded && isSignedIn;
@@ -119,15 +121,15 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
             <button
               type="button"
-              onClick={() => !isPlaceholder && coverImage?.url && setAvatarOpen(true)}
-              disabled={isPlaceholder || !coverImage?.url}
+              onClick={() => !isPlaceholder && profilePhotoUrl && setAvatarOpen(true)}
+              disabled={isPlaceholder || !profilePhotoUrl}
               className="group relative flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-gold bg-card shadow-[0_0_20px_rgba(201,168,76,0.15)] transition-all hover:shadow-[0_0_30px_rgba(201,168,76,0.35)] disabled:cursor-default disabled:hover:shadow-[0_0_20px_rgba(201,168,76,0.15)]"
               aria-label={isPlaceholder ? name : `Vezi poza mare a lui ${name}`}
             >
-              {coverImage?.url ? (
+              {profilePhotoUrl ? (
                 <>
                   <img
-                    src={coverImage.url}
+                    src={profilePhotoUrl}
                     alt={name}
                     className={`h-full w-full object-cover transition-transform duration-300 ${!isPlaceholder ? "group-hover:scale-105" : ""}`}
                   />
@@ -418,7 +420,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
       </div>
 
       {/* Avatar Lightbox */}
-      {avatarOpen && coverImage?.url && (
+      {avatarOpen && profilePhotoUrl && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
           onClick={() => setAvatarOpen(false)}
@@ -432,7 +434,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             <X className="h-6 w-6" />
           </button>
           <img
-            src={coverImage.url}
+            src={profilePhotoUrl}
             alt={name}
             onClick={(e) => e.stopPropagation()}
             className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-[0_20px_60px_rgba(0,0,0,0.7)]"
