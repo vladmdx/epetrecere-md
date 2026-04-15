@@ -87,18 +87,22 @@ export default function ClientCabinetPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setClientName(clerkUser.fullName || "");
       fetch(`/api/booking-requests?client_email=${encodeURIComponent(e)}`)
-        .then(r => r.json())
-        .then(data => { setBookings(data); setLoggedIn(true); })
-        .catch(() => {});
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(data => { if (Array.isArray(data)) setBookings(data); setLoggedIn(true); })
+        .catch(() => { setLoggedIn(true); });
     }
   }, [isSignedIn, clerkUser]);
 
   async function handleLogin() {
     if (!email) return;
     setLoading(true);
-    const res = await fetch(`/api/booking-requests?client_email=${encodeURIComponent(email)}`);
-    const data = await res.json();
-    setBookings(data);
+    try {
+      const res = await fetch(`/api/booking-requests?client_email=${encodeURIComponent(email)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) setBookings(data);
+      }
+    } catch { /* empty */ }
     setLoggedIn(true);
     setLoading(false);
   }

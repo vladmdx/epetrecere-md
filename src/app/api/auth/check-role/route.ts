@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -42,8 +42,47 @@ export async function GET(req: NextRequest) {
     dbUser = found ?? null;
   }
 
-  // User not in DB yet (webhook hasn't fired) — tell the client to retry or
-  // treat as a brand-new user who needs the role picker.
+  // User not in DB yet (webhook hasn't fired or CLERK_WEBHOOK_SECRET missing).
+  // Create the user record as a fallback so the flow isn't broken.
+  if (!dbUser && clerkId) {
+    try {
+      const client = await clerkClient();
+      const clerkUser = await client.users.getUser(clerkId);
+      const fallbackEmail =
+        clerkUser.emailAddresses[0]?.emailAddress || email || "";
+      const fallbackName = [clerkUser.firstName, clerkUser.lastName]
+        .filter(Boolean)
+        .join(" ") || null;
+
+      if (fallbackEmail) {
+        const [created] = await db
+          .insert(users)
+          .values({
+            clerkId,
+            email: fallbackEmail,
+            name: fallbackName,
+            avatarUrl: clerkUser.imageUrl || null,
+            role: "user",
+          })
+          .onConflictDoNothing()
+          .returning();
+        dbUser = created ?? null;
+
+        // If insert was a no-op (conflict), try fetching again
+        if (!dbUser) {
+          const [found] = await db
+            .select()
+            .from(users)
+            .where(eq(users.clerkId, clerkId))
+            .limit(1);
+          dbUser = found ?? null;
+        }
+      }
+    } catch (err) {
+      console.error("[check-role] Fallback user creation failed:", err);
+    }
+  }
+
   if (!dbUser) {
     return NextResponse.json({
       role: "user",
