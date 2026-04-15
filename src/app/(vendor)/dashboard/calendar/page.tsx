@@ -266,8 +266,10 @@ export default function VendorCalendarPage() {
   const lastDay = new Date(year, month + 1, 0);
   const startDay = (firstDay.getDay() + 6) % 7;
   const daysInMonth = lastDay.getDate();
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   function handleDayClick(dateStr: string) {
+    if (dateStr < todayStr) return; // past days are read-only
     setSelectedDate(dateStr);
     const existing = events[dateStr];
     if (existing) {
@@ -408,6 +410,10 @@ export default function VendorCalendarPage() {
   async function blockPeriod() {
     if (!entity || !blockFrom || !blockTo) {
       toast.error("Selectează data de început și sfârșit");
+      return;
+    }
+    if (blockFrom < todayStr) {
+      toast.error("Nu poți bloca zile din trecut");
       return;
     }
     if (blockFrom > blockTo) {
@@ -634,27 +640,36 @@ export default function VendorCalendarPage() {
                       ? EVENT_TYPES[entry.eventType]
                       : null;
                     const isSelected = selectedDate === dateStr;
+                    const isPast = dateStr < todayStr;
+                    const isToday = dateStr === todayStr;
                     return (
                       <button
                         key={day}
                         onClick={() => handleDayClick(dateStr)}
+                        disabled={isPast}
                         className={cn(
                           "relative flex h-16 flex-col items-center justify-center rounded-lg border text-sm font-medium transition-all",
-                          isSelected &&
+                          isPast && "cursor-not-allowed opacity-40",
+                          !isPast && isSelected &&
                             "ring-2 ring-gold ring-offset-1 ring-offset-background",
+                          !isPast && isToday && "ring-1 ring-gold/50",
                           statusCfg
                             ? statusCfg.bg
-                            : "border-border/20 hover:border-gold/30",
+                            : isPast
+                              ? "border-border/10"
+                              : "border-border/20 hover:border-gold/30",
                           // F-S6 — left-border accent for event type
                           evCfg && `border-l-4 ${evCfg.border}`,
                         )}
                         title={
-                          entry
-                            ? `${statusCfg?.label}${evCfg ? ` · ${evCfg.label}` : ""}${entry.note ? ` — ${entry.note}` : ""}`
-                            : undefined
+                          isPast
+                            ? "Zilele trecute nu pot fi modificate"
+                            : entry
+                              ? `${statusCfg?.label}${evCfg ? ` · ${evCfg.label}` : ""}${entry.note ? ` — ${entry.note}` : ""}`
+                              : undefined
                         }
                       >
-                        <span className={cn(statusCfg?.color)}>{day}</span>
+                        <span className={cn(statusCfg?.color, isToday && !statusCfg && "text-gold font-bold")}>{day}</span>
                         {evCfg && (
                           <span
                             className={cn(
