@@ -397,23 +397,21 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               artistSlug={artist.slug}
             />
 
-            {/* M6 Intern #1 — calendar vizibil doar după login; mesaj altfel */}
-            {artist.calendarEnabled && (
-              canSeeContact ? (
-                <CalendarWidget
-                  entityType="artist"
-                  entityId={artist.id}
-                  enabled
-                />
-              ) : (
-                <a
-                  href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
-                  className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/5 px-4 py-3 text-sm text-gold/90 hover:bg-gold/10 hover:text-gold"
-                >
-                  <Lock className="h-4 w-4 shrink-0" />
-                  <span>Calendar disponibil după autentificare</span>
-                </a>
-              )
+            {/* Calendar: vizibil pentru useri logați, ascuns pentru nelogați */}
+            {canSeeContact ? (
+              <CalendarWidget
+                entityType="artist"
+                entityId={artist.id}
+                enabled
+              />
+            ) : (
+              <a
+                href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
+                className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/5 px-4 py-3 text-sm text-gold/90 hover:bg-gold/10 hover:text-gold"
+              >
+                <Lock className="h-4 w-4 shrink-0" />
+                <span>Calendar disponibil după autentificare</span>
+              </a>
             )}
           </div>
         </div>
