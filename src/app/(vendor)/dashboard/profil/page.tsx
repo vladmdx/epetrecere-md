@@ -17,6 +17,8 @@ import { GalleryManager } from "@/components/vendor/gallery-manager";
 import { VideoManager } from "@/components/vendor/video-manager";
 import { PackagesManager } from "@/components/vendor/packages-manager";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Save, Eye, Sparkles, Loader2, Search, Camera, Upload } from "lucide-react";
 import { toast } from "sonner";
 
@@ -190,6 +192,12 @@ export default function VendorProfilePage() {
     }
   }
 
+  function toggleCategory(catId: number) {
+    setArtistCategoryIds((prev) =>
+      prev.includes(catId) ? prev.filter((id) => id !== catId) : [...prev, catId],
+    );
+  }
+
   async function handleSave() {
     if (!artistId) {
       toast.error("Profil indisponibil");
@@ -220,6 +228,7 @@ export default function VendorProfilePage() {
         autoReplyEnabled: data.autoReplyEnabled,
         autoReplyMessage: data.autoReplyMessage,
         photoUrl: data.photoUrl || null,
+        categoryIds: artistCategoryIds,
         seoTitleRo: data.seoTitleRo,
         seoDescRo: data.seoDescRo,
       };
@@ -406,6 +415,54 @@ export default function VendorProfilePage() {
                     )}
                   </div>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Categories */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Categorii</CardTitle>
+              <p className="text-sm text-muted-foreground">Selectează categoriile în care activezi</p>
+            </CardHeader>
+            <CardContent>
+              {/* Current categories as badges */}
+              {artistCategoryIds.length > 0 && (
+                <div className="mb-4 flex flex-wrap gap-2">
+                  {artistCategoryIds.map((cid) => {
+                    const cat = categories.find((c) => c.id === cid);
+                    return cat ? (
+                      <Badge key={cid} variant="secondary" className="gap-1">
+                        {cat.nameRo}
+                        <button
+                          type="button"
+                          className="ml-1 text-muted-foreground hover:text-foreground"
+                          onClick={() => toggleCategory(cid)}
+                        >
+                          ✕
+                        </button>
+                      </Badge>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              {artistCategoryIds.length === 0 && (
+                <p className="mb-4 text-sm text-amber-600">Nu ai nicio categorie selectată. Alege cel puțin una.</p>
+              )}
+              {/* Category checkboxes */}
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                {categories.map((cat) => (
+                  <label
+                    key={cat.id}
+                    className="flex cursor-pointer items-center gap-2 rounded-md border p-3 transition-colors hover:bg-accent"
+                  >
+                    <Checkbox
+                      checked={artistCategoryIds.includes(cat.id)}
+                      onCheckedChange={() => toggleCategory(cat.id)}
+                    />
+                    <span className="text-sm">{cat.nameRo}</span>
+                  </label>
+                ))}
               </div>
             </CardContent>
           </Card>
