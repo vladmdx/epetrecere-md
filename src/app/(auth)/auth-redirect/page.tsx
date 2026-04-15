@@ -73,6 +73,8 @@ export default function AuthRedirectPage() {
     setSubmitting(true);
 
     if (selectedRole === "client") {
+      // Mark onboarding complete so the role picker doesn't show again
+      await fetch("/api/auth/complete-onboarding", { method: "POST" }).catch(() => {});
       router.replace("/cabinet");
     } else if (selectedRole === "artist") {
       router.replace("/dashboard/onboarding");

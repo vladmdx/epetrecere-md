@@ -132,10 +132,10 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    // Update user role to artist
+    // Update user role to artist and mark onboarding complete
     await db
       .update(users)
-      .set({ role: "artist" })
+      .set({ role: "artist", onboardingComplete: true })
       .where(eq(users.id, appUser.id));
 
     // Notify admins (in-app + email)

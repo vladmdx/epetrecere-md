@@ -124,15 +124,12 @@ export async function GET(req: NextRequest) {
   }
 
   // For regular users: determine if they need to see the role picker.
-  // A user is "new" (needs role picker) if:
-  //   - role is the default "user"
-  //   - they don't own a venue
-  //   - they don't have an artist record
-  // This is more reliable than a 2-minute time window.
+  // A user is "new" (needs role picker) if onboardingComplete is false
+  // and they have no venue/artist records.
   const hasVenue = !!venue;
   let isNewUser = false;
 
-  if (dbUser.role === "user" && !hasVenue) {
+  if (dbUser.role === "user" && !hasVenue && !dbUser.onboardingComplete) {
     // Check if they have an artist record (shouldn't happen if role != "artist", but be safe)
     const [artistRecord] = await db
       .select({ id: artists.id })
@@ -141,7 +138,6 @@ export async function GET(req: NextRequest) {
       .limit(1);
 
     if (!artistRecord) {
-      // User has no role assignment at all — show role picker
       isNewUser = true;
     }
   }

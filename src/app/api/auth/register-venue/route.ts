@@ -133,6 +133,12 @@ export async function POST(req: Request) {
       })
       .returning();
 
+    // Mark onboarding complete
+    await db
+      .update(users)
+      .set({ onboardingComplete: true })
+      .where(eq(users.id, appUser.id));
+
     // Notify admins (in-app + email)
     const admins = await db
       .select({ id: users.id, email: users.email })

@@ -134,6 +134,7 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   languagePref: varchar("language_pref", { length: 2 }).default("ro"),
   // Google Calendar OAuth tokens for calendar sync
+  onboardingComplete: boolean("onboarding_complete").default(false).notNull(),
   googleRefreshToken: text("google_refresh_token"),
   googleAccessToken: text("google_access_token"),
   googleTokenExpiresAt: timestamp("google_token_expires_at"),
