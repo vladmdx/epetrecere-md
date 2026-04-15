@@ -18,8 +18,8 @@ import { VideoManager } from "@/components/vendor/video-manager";
 import { PackagesManager } from "@/components/vendor/packages-manager";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Save, Eye, Sparkles, Loader2, Search, Camera, Upload } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Save, Eye, Sparkles, Loader2, Search, Camera, Upload, ChevronDown, X } from "lucide-react";
 import { toast } from "sonner";
 
 type ProfileData = {
@@ -193,9 +193,14 @@ export default function VendorProfilePage() {
   }
 
   function toggleCategory(catId: number) {
-    setArtistCategoryIds((prev) =>
-      prev.includes(catId) ? prev.filter((id) => id !== catId) : [...prev, catId],
-    );
+    setArtistCategoryIds((prev) => {
+      if (prev.includes(catId)) return prev.filter((id) => id !== catId);
+      if (prev.length >= 3) {
+        toast.error("Poți selecta maximum 3 categorii");
+        return prev;
+      }
+      return [...prev, catId];
+    });
   }
 
   async function handleSave() {
@@ -419,54 +424,6 @@ export default function VendorProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Categories */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Categorii</CardTitle>
-              <p className="text-sm text-muted-foreground">Selectează categoriile în care activezi</p>
-            </CardHeader>
-            <CardContent>
-              {/* Current categories as badges */}
-              {artistCategoryIds.length > 0 && (
-                <div className="mb-4 flex flex-wrap gap-2">
-                  {artistCategoryIds.map((cid) => {
-                    const cat = categories.find((c) => c.id === cid);
-                    return cat ? (
-                      <Badge key={cid} variant="secondary" className="gap-1">
-                        {cat.nameRo}
-                        <button
-                          type="button"
-                          className="ml-1 text-muted-foreground hover:text-foreground"
-                          onClick={() => toggleCategory(cid)}
-                        >
-                          ✕
-                        </button>
-                      </Badge>
-                    ) : null;
-                  })}
-                </div>
-              )}
-              {artistCategoryIds.length === 0 && (
-                <p className="mb-4 text-sm text-amber-600">Nu ai nicio categorie selectată. Alege cel puțin una.</p>
-              )}
-              {/* Category checkboxes */}
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-                {categories.map((cat) => (
-                  <label
-                    key={cat.id}
-                    className="flex cursor-pointer items-center gap-2 rounded-md border p-3 transition-colors hover:bg-accent"
-                  >
-                    <Checkbox
-                      checked={artistCategoryIds.includes(cat.id)}
-                      onCheckedChange={() => toggleCategory(cat.id)}
-                    />
-                    <span className="text-sm">{cat.nameRo}</span>
-                  </label>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
           <Card>
             <CardHeader><CardTitle>Informații de bază</CardTitle></CardHeader>
             <CardContent className="space-y-4">
@@ -492,6 +449,65 @@ export default function VendorProfilePage() {
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div><Label>Preț de la (€)</Label><Input type="number" value={data.priceFrom} onChange={(e) => update({ priceFrom: Number(e.target.value) })} /></div>
               <div><Label>Afișează prețul</Label><div className="mt-2"><Switch checked={data.showPrice} onCheckedChange={(v) => update({ showPrice: v })} /></div></div>
+            </CardContent>
+          </Card>
+
+          {/* Categories */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Categorii</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Selectează categoriile în care activezi (maximum 3)
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap items-center gap-2">
+                {artistCategoryIds.map((cid) => {
+                  const cat = categories.find((c) => c.id === cid);
+                  return cat ? (
+                    <Badge key={cid} variant="secondary" className="gap-1 py-1.5 pl-3 pr-1.5 text-sm">
+                      {cat.nameRo}
+                      <button
+                        type="button"
+                        className="ml-1 rounded-full p-0.5 hover:bg-muted-foreground/20"
+                        onClick={() => toggleCategory(cid)}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ) : null;
+                })}
+
+                {artistCategoryIds.length < 3 && (
+                  <Popover>
+                    <PopoverTrigger
+                      className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      <ChevronDown className="h-3.5 w-3.5" />
+                      Adaugă categorie
+                    </PopoverTrigger>
+                    <PopoverContent className="w-56 p-2" align="start">
+                      <div className="max-h-60 space-y-0.5 overflow-y-auto">
+                        {categories
+                          .filter((c) => !artistCategoryIds.includes(c.id))
+                          .map((cat) => (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              className="w-full rounded-md px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                              onClick={() => toggleCategory(cat.id)}
+                            >
+                              {cat.nameRo}
+                            </button>
+                          ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+              {artistCategoryIds.length === 0 && (
+                <p className="mt-2 text-sm text-amber-600">Alege cel puțin o categorie.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
