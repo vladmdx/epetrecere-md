@@ -52,8 +52,8 @@ export async function setCalendarEvent(
       ),
     );
 
-  if (status !== "available") {
-    // Only insert non-available statuses (available = no record)
+  if (status === "available") {
+    // Available = no record in the DB; deleting was enough.
     return;
   }
 
@@ -104,12 +104,11 @@ export async function bulkSetCalendarEvents(
   );
 }
 
-/** Get entity IDs that are NOT booked/blocked on a given date */
-export async function getAvailableEntityIds(
+/** Get entity IDs that are booked/blocked on a given date (unavailable) */
+export async function getBookedEntityIds(
   entityType: EntityType,
   date: string,
 ): Promise<number[]> {
-  // Return IDs that have NO booked/blocked record on this date
   const bookedIds = await db
     .select({ entityId: calendarEvents.entityId })
     .from(calendarEvents)

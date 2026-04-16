@@ -162,26 +162,29 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
     }
 
     try {
-      // Create booking request (shows in artist's Rezervări)
-      const res = await fetch("/api/booking-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          artistId: entityType === "artist" ? entityId : undefined,
-          clientName: form.get("name") as string,
-          clientPhone: `+373${form.get("phone") as string}`,
-          clientEmail: (form.get("email") as string) || undefined,
-          eventDate: selectedDate || "",
-          startTime: startTime || undefined,
-          endTime: endTime || undefined,
-          eventType: (form.get("eventType") as string) || undefined,
-          message: (form.get("message") as string) || undefined,
-        }),
-      });
-      if (!res.ok) throw new Error();
+      // For artists: create booking request (shows in artist's Rezervări)
+      // For venues: skip booking-requests (schema requires artistId) — only create lead
+      if (entityType === "artist") {
+        const res = await fetch("/api/booking-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            artistId: entityId,
+            clientName: form.get("name") as string,
+            clientPhone: `+373${form.get("phone") as string}`,
+            clientEmail: (form.get("email") as string) || undefined,
+            eventDate: selectedDate || "",
+            startTime: startTime || undefined,
+            endTime: endTime || undefined,
+            eventType: (form.get("eventType") as string) || undefined,
+            message: (form.get("message") as string) || undefined,
+          }),
+        });
+        if (!res.ok) throw new Error();
+      }
 
-      // Also create a lead for the matching system
-      void fetch("/api/leads", {
+      // Create a lead for the matching system (works for both artists and venues)
+      const leadRes = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -195,7 +198,8 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           source: "form",
           ...(entityType === "artist" ? { artistId: entityId } : { venueId: entityId }),
         }),
-      }).catch(() => {});
+      });
+      if (entityType === "venue" && !leadRes.ok) throw new Error();
 
       toast.success("Cererea de rezervare a fost trimisă!");
       setSubmitted(true);

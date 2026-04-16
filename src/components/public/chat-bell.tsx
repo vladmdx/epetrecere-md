@@ -35,21 +35,36 @@ export function ChatBell() {
   const [open, setOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
   const [totalUnread, setTotalUnread] = useState(0);
+  const [userRole, setUserRole] = useState<"client" | "artist" | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(async () => {
+  // Detect if user is artist or client
+  useEffect(() => {
     if (!isSignedIn) return;
+    fetch("/api/auth/check-role")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.role === "artist" || data?.role === "venue") setUserRole("artist");
+        else setUserRole("client");
+      })
+      .catch(() => setUserRole("client"));
+  }, [isSignedIn]);
+
+  const load = useCallback(async () => {
+    if (!isSignedIn || !userRole) return;
     try {
-      const res = await fetch("/api/conversations?role=client", { cache: "no-store" });
+      const res = await fetch(`/api/conversations?role=${userRole}`, { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       if (Array.isArray(data)) {
         const convos: ConversationPreview[] = data.map((c: Record<string, unknown>) => ({
           id: c.id as number,
-          artistName: (c.artistName as string) || "Artist",
+          artistName: (c.artistName as string) || (c.clientName as string) || "Conversație",
           lastMessagePreview: c.lastMessagePreview as string | null,
           lastMessageAt: c.lastMessageAt as string | null,
-          unread: (c.clientUnread as number) || 0,
+          unread: userRole === "artist"
+            ? ((c.artistUnread as number) || 0)
+            : ((c.clientUnread as number) || 0),
         }));
         setConversations(convos);
         setTotalUnread(convos.reduce((sum, c) => sum + c.unread, 0));
@@ -57,7 +72,7 @@ export function ChatBell() {
     } catch {
       // silent
     }
-  }, [isSignedIn]);
+  }, [isSignedIn, userRole]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -126,7 +141,7 @@ export function ChatBell() {
                   .map((conv) => (
                     <Link
                       key={conv.id}
-                      href={`/cabinet?tab=chat&conversation=${conv.id}`}
+                      href={userRole === "artist" ? `/dashboard/mesaje?conversation=${conv.id}` : `/cabinet/mesaje?conversation=${conv.id}`}
                       onClick={() => setOpen(false)}
                       className={cn(
                         "flex items-start gap-3 px-4 py-3 hover:bg-accent/50 transition-colors border-b border-border/20 last:border-0",

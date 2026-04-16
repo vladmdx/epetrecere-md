@@ -4,7 +4,6 @@ import { db } from "@/lib/db";
 import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { sendEmail } from "@/lib/email/send";
-import { bookingResponseEmail } from "@/lib/email/templates/booking-response";
 import { reviewRequestEmail } from "@/lib/email/templates/review-request";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 
@@ -282,30 +281,8 @@ export async function PUT(
     }
   })();
 
-  // Send email notification to the client on accept/reject. client_confirm
-  // and cancel are silent — the artist already sees them in the dashboard.
-  if ((action === "accept" || action === "reject") && booking.clientEmail) {
-    try {
-      const [artist] = await db.select({ nameRo: artists.nameRo }).from(artists).where(eq(artists.id, booking.artistId)).limit(1);
-      const finalReply = action === "accept"
-        ? (reply || "Cererea a fost acceptată!")
-        : (reply || "Ne pare rău, nu suntem disponibili.");
-
-      await sendEmail({
-        to: booking.clientEmail,
-        subject: action === "accept"
-          ? `✅ Rezervarea ta la ${artist?.nameRo || "artist"} a fost acceptată!`
-          : `Răspuns la cererea ta — ${artist?.nameRo || "artist"}`,
-        html: bookingResponseEmail({
-          clientName: booking.clientName,
-          artistName: artist?.nameRo || "Artist",
-          eventDate: booking.eventDate,
-          status: action === "accept" ? "accepted" : "rejected",
-          reply: finalReply,
-        }),
-      });
-    } catch { /* email send failed silently */ }
-  }
+  // Email is already sent via dispatchNotification above (emailHtml param).
+  // No separate sendEmail needed — avoids duplicate emails.
 
   return NextResponse.json({ success: true });
 }

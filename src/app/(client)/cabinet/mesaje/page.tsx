@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ interface ChatMessage {
 
 export default function MessagesPage() {
   const { isSignedIn } = useUser();
+  const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedConv, setSelectedConv] = useState<number | null>(null);
@@ -41,10 +43,18 @@ export default function MessagesPage() {
     if (!isSignedIn) return;
     fetch("/api/conversations?role=client")
       .then(r => r.ok ? r.json() : [])
-      .then(data => setConversations(Array.isArray(data) ? data : []))
+      .then(data => {
+        const convs = Array.isArray(data) ? data : [];
+        setConversations(convs);
+        // Auto-open conversation from URL param
+        const convParam = searchParams.get("conversation");
+        if (convParam && convs.some((c: Conversation) => c.id === Number(convParam))) {
+          openConversation(Number(convParam));
+        }
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [isSignedIn]);
+  }, [isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function openConversation(id: number) {
     setSelectedConv(id);

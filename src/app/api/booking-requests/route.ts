@@ -99,9 +99,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
   }
 
+  // Resolve the authenticated user so we can link booking to their account
+  const { userId: clerkId } = await auth();
+  let clientUserId: string | undefined;
+  if (clerkId) {
+    const [appUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    if (appUser) clientUserId = appUser.id;
+  }
+
   // Create booking request
   const [booking] = await db.insert(bookingRequests).values({
     ...parsed.data,
+    clientUserId: clientUserId ?? null,
     status: "pending",
   }).returning();
 
