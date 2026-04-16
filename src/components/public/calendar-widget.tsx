@@ -1,10 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, User, Phone, Mail, Sparkles, MapPin, Users, MessageSquare, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { useUser } from "@clerk/nextjs";
+import { toast } from "sonner";
 
 interface CalendarWidgetProps {
   entityType: "artist" | "venue";
@@ -24,8 +28,18 @@ const MONTHS_RO = [
   "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie",
 ];
 
+const EVENT_TYPES = [
+  { value: "wedding", label: "🎊 Nuntă" },
+  { value: "baptism", label: "👶 Botez" },
+  { value: "cumetrie", label: "🤝 Cumetrie" },
+  { value: "corporate", label: "💼 Corporate" },
+  { value: "birthday", label: "🎂 Aniversare" },
+  { value: "other", label: "📋 Altele" },
+];
+
 export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: CalendarWidgetProps) {
   const { t } = useLocale();
+  const { user, isSignedIn } = useUser();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -33,6 +47,9 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
   const [events, setEvents] = useState<CalendarDay[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -67,7 +84,6 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
 
   // Build event map from API data
   const eventMap = new Map(events.map((e) => {
-    // Handle date strings that come as ISO timestamps
     const dateStr = e.date.includes("T") ? e.date.split("T")[0] : e.date;
     return [dateStr, e.status];
   }));
@@ -86,8 +102,53 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
   function handleDayClick(dateStr: string, status: string | undefined) {
     if (status === "booked" || status === "blocked") return;
     setSelectedDate(dateStr);
+    setShowForm(false);
+    setSubmitted(false);
     if (onDateSelect) onDateSelect(dateStr);
   }
+
+  function formatSelectedDate(dateStr: string) {
+    const d = new Date(dateStr + "T00:00:00");
+    return `${d.getDate()} ${MONTHS_RO[d.getMonth()]} ${d.getFullYear()}`;
+  }
+
+  async function handleBookingSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSubmitting(true);
+    const form = new FormData(e.currentTarget);
+
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.get("name") as string,
+          phone: form.get("phone") as string,
+          phonePrefix: "+373",
+          email: (form.get("email") as string) || undefined,
+          eventType: (form.get("eventType") as string) || undefined,
+          eventDate: selectedDate || undefined,
+          location: (form.get("location") as string) || undefined,
+          guestCount: form.get("guestCount") ? Number(form.get("guestCount")) : undefined,
+          message: (form.get("message") as string) || undefined,
+          source: "calendar",
+          ...(entityType === "artist" ? { artistId: entityId } : { venueId: entityId }),
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Cererea de rezervare a fost trimisă!");
+      setSubmitted(true);
+      setShowForm(false);
+    } catch {
+      toast.error("A apărut o eroare. Încercați din nou.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Pre-fill from Clerk user data
+  const userName = user ? [user.firstName, user.lastName].filter(Boolean).join(" ") : "";
+  const userEmail = user?.primaryEmailAddress?.emailAddress || "";
 
   return (
     <div className="rounded-xl border border-border/40 bg-card p-4">
@@ -131,7 +192,6 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           const isToday = dateObj.toDateString() === today.toDateString();
           const isSelected = selectedDate === dateStr;
 
-          // Determine display style
           let dayClass = "";
           if (isPast) {
             dayClass = "text-white/15 cursor-not-allowed";
@@ -142,7 +202,6 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           } else if (isSelected) {
             dayClass = "bg-gold text-[#0D0D0D] font-bold shadow-[0_0_8px_rgba(201,168,76,0.3)]";
           } else {
-            // Available (explicitly or no record = free)
             dayClass = "bg-success/15 text-success/90 cursor-pointer hover:bg-success/25";
           }
 
@@ -177,20 +236,121 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
         </span>
       </div>
 
-      {/* Selected date info */}
-      {selectedDate && (
-        <div className="mt-3 rounded-lg bg-gold/10 border border-gold/20 p-2.5 text-center">
-          <p className="text-xs text-gold font-medium">
-            {(() => {
-              const d = new Date(selectedDate + "T00:00:00");
-              return `${d.getDate()} ${MONTHS_RO[d.getMonth()]} ${d.getFullYear()}`;
-            })()}
+      {/* Selected date — booking prompt / form */}
+      {selectedDate && !submitted && (
+        <div className="mt-3 rounded-lg bg-gold/10 border border-gold/20 p-3">
+          <p className="text-xs text-gold font-medium text-center">
+            {formatSelectedDate(selectedDate)}
           </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">
-            Data selectată — apăsați &quot;Solicită Rezervare&quot; pentru a rezerva
+
+          {!showForm ? (
+            <Button
+              onClick={() => setShowForm(true)}
+              className="mt-2 w-full h-9 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs font-semibold rounded-lg"
+            >
+              <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
+              Rezervă această dată
+            </Button>
+          ) : (
+            <form onSubmit={handleBookingSubmit} className="mt-3 space-y-3">
+              <MiniField icon={User} label="Nume" required>
+                <input name="name" required defaultValue={userName}
+                  className="form-input !h-9 !text-xs" placeholder="Numele dvs." />
+              </MiniField>
+
+              <MiniField icon={Phone} label="Telefon" required>
+                <div className="flex gap-1.5">
+                  <span className="flex h-9 w-16 items-center justify-center rounded-lg border border-border/40 bg-accent/30 text-[11px] text-muted-foreground shrink-0">
+                    +373
+                  </span>
+                  <input name="phone" type="tel" required
+                    className="form-input !h-9 !text-xs flex-1" placeholder="6X XXX XXX" />
+                </div>
+              </MiniField>
+
+              <MiniField icon={Mail} label="Email">
+                <input name="email" type="email" defaultValue={userEmail}
+                  className="form-input !h-9 !text-xs" placeholder="email@exemplu.md" />
+              </MiniField>
+
+              <MiniField icon={Sparkles} label="Tip Eveniment">
+                <select name="eventType"
+                  className="form-input !h-9 !text-xs appearance-none cursor-pointer">
+                  <option value="">Selectează tipul</option>
+                  {EVENT_TYPES.map(et => (
+                    <option key={et.value} value={et.value}>{et.label}</option>
+                  ))}
+                </select>
+              </MiniField>
+
+              <MiniField icon={MessageSquare} label="Mesaj">
+                <textarea name="message" rows={2}
+                  className="form-input !text-xs min-h-[50px] resize-none py-2"
+                  placeholder="Detalii despre eveniment..." />
+              </MiniField>
+
+              <div className="flex items-start gap-2 pt-1">
+                <Checkbox id={`gdpr-cal-${entityId}`} name="gdpr" required className="mt-0.5 h-3.5 w-3.5" />
+                <Label htmlFor={`gdpr-cal-${entityId}`} className="text-[10px] text-muted-foreground leading-relaxed">
+                  {t("form.gdpr_consent")}
+                </Label>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setShowForm(false)}
+                  className="flex-1 h-9 text-xs rounded-lg"
+                >
+                  Anulează
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="flex-1 h-9 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs font-semibold rounded-lg"
+                >
+                  {submitting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <><Send className="mr-1.5 h-3.5 w-3.5" /> Trimite</>
+                  )}
+                </Button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
+
+      {/* Success message */}
+      {submitted && selectedDate && (
+        <div className="mt-3 rounded-lg bg-success/10 border border-success/20 p-3 text-center">
+          <p className="text-xs text-success font-medium">
+            ✓ Cererea pentru {formatSelectedDate(selectedDate)} a fost trimisă!
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Veți fi contactat în curând.
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/* Compact form field for inline calendar booking */
+function MiniField({
+  icon: Icon, label, required, children,
+}: {
+  icon: typeof User; label: string; required?: boolean; children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="flex items-center gap-1.5 text-[11px] font-medium text-foreground">
+        <Icon className="h-3 w-3 text-gold/70" />
+        {label}
+        {required && <span className="text-gold">*</span>}
+      </label>
+      {children}
     </div>
   );
 }
