@@ -143,12 +143,13 @@ function UserMenu() {
               <p className="text-sm font-medium truncate">{user?.fullName || user?.primaryEmailAddress?.emailAddress}</p>
               <p className="text-xs text-muted-foreground truncate">{user?.primaryEmailAddress?.emailAddress}</p>
             </div>
-            <Link href="/cabinet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-              <UserCircle className="h-4 w-4" /> Cabinetul Meu
-            </Link>
-            {userRole && (userRole.role === "artist" || userRole.hasVenue) && (
+            {userRole && (userRole.role === "artist" || userRole.hasVenue) ? (
               <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
                 <LayoutDashboard className="h-4 w-4" /> {userRole.hasVenue ? "Dashboard Sală" : "Dashboard Artist"}
+              </Link>
+            ) : (
+              <Link href="/cabinet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
+                <UserCircle className="h-4 w-4" /> Cabinetul Meu
               </Link>
             )}
             {userRole && (userRole.role === "admin" || userRole.role === "super_admin") && (

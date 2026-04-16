@@ -18,6 +18,8 @@ export async function getCalendarEvents(
       status: calendarEvents.status,
       note: calendarEvents.note,
       eventType: calendarEvents.eventType,
+      startTime: calendarEvents.startTime,
+      endTime: calendarEvents.endTime,
     })
     .from(calendarEvents)
     .where(

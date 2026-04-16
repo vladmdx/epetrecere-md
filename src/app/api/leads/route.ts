@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { leads, offerRequests } from "@/lib/db/schema";
-import { desc } from "drizzle-orm";
+import { leads, offerRequests, leadMatches, artists } from "@/lib/db/schema";
+import { desc, eq } from "drizzle-orm";
+import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { rateLimit } from "@/lib/rate-limit";
 import { matchLeadToVendors } from "@/lib/leads/matching";
 import { scoreAndPersist } from "@/lib/leads/quality-score";
@@ -105,8 +106,40 @@ export async function POST(req: NextRequest) {
     })
     .returning();
 
-  // 1b. M3 — Fire-and-forget lead matching. We don't await so the user
-  // submission stays snappy; errors are swallowed inside the matcher.
+  // 1b. Direct match: when the lead comes from a specific artist page,
+  // create a guaranteed lead_match + notify the artist immediately.
+  if (artistId) {
+    void (async () => {
+      try {
+        await db.insert(leadMatches).values({
+          leadId: lead.id,
+          artistId,
+          score: 100,
+          reasons: ["Cerere directă de pe pagina artistului"],
+          status: "matched",
+        });
+        // Notify the artist owner
+        const [artist] = await db
+          .select({ userId: artists.userId })
+          .from(artists)
+          .where(eq(artists.id, artistId))
+          .limit(1);
+        if (artist?.userId) {
+          await dispatchNotification({
+            userId: artist.userId,
+            type: "lead_new",
+            title: "Cerere nouă de rezervare!",
+            message: `${leadData.name} · ${leadData.eventType ?? "Eveniment"}${leadData.eventDate ? ` · ${leadData.eventDate}` : ""}`,
+            actionUrl: "/dashboard/lead-uri",
+          });
+        }
+      } catch (err) {
+        console.error("[leads] Direct artist match failed:", err);
+      }
+    })();
+  }
+
+  // 1c. M3 — Fire-and-forget lead matching for other vendors too.
   void matchLeadToVendors({ leadId: lead.id });
 
   // 1c. M9 Intern #2 — Fire-and-forget AI quality score. Also safe: the

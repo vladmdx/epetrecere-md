@@ -333,6 +333,8 @@ export const calendarEvents = pgTable("calendar_events", {
    *  Free-form string (e.g. "nunta", "cumetrie", "corporate") so new types
    *  can be introduced without a schema migration. Null = uncategorized. */
   eventType: text("event_type"),
+  startTime: text("start_time"), // "14:00" — null means full day
+  endTime: text("end_time"), // "18:00"
   source: calendarSourceEnum("source").default("manual").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [

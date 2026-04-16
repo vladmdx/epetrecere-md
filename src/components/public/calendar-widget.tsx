@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays, User, Phone, Mail, Sparkles, MapPin, Users, MessageSquare, Send, Loader2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, User, Phone, Mail, Sparkles, Clock, MessageSquare, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,8 @@ interface CalendarWidgetProps {
 interface CalendarDay {
   date: string;
   status: "available" | "booked" | "tentative" | "blocked";
+  startTime?: string | null;
+  endTime?: string | null;
 }
 
 const DAYS_RO = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
@@ -82,11 +84,44 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Build event map from API data
-  const eventMap = new Map(events.map((e) => {
+  // Build event map from API data — a date can have multiple events (partial bookings)
+  const eventMap = new Map<string, { status: string; events: CalendarDay[] }>();
+  for (const e of events) {
     const dateStr = e.date.includes("T") ? e.date.split("T")[0] : e.date;
-    return [dateStr, e.status];
-  }));
+    const existing = eventMap.get(dateStr);
+    if (existing) {
+      existing.events.push(e);
+      // If all events for a day are booked/blocked with no time gaps, mark fully booked
+      // If any has startTime/endTime, it's partial — day is still partially available
+    } else {
+      eventMap.set(dateStr, { status: e.status, events: [{ ...e, date: dateStr }] });
+    }
+  }
+
+  // Determine effective status per day
+  function getDayStatus(dateStr: string): { status: string; hasTimeSlots: boolean; bookedSlots: string[] } {
+    const entry = eventMap.get(dateStr);
+    if (!entry) return { status: "available", hasTimeSlots: false, bookedSlots: [] };
+
+    const dayEvents = entry.events;
+    const bookedSlots = dayEvents
+      .filter(e => (e.status === "booked" || e.status === "tentative") && e.startTime)
+      .map(e => `${e.startTime}-${e.endTime || "?"}`);
+
+    // If any event has time slots, day is partially booked (still available for other times)
+    const hasTimeSlots = dayEvents.some(e => e.startTime);
+
+    // If blocked without time = full day blocked
+    if (dayEvents.some(e => e.status === "blocked" && !e.startTime)) {
+      return { status: "blocked", hasTimeSlots: false, bookedSlots };
+    }
+    // If booked without time = full day booked
+    if (dayEvents.some(e => e.status === "booked" && !e.startTime)) {
+      return { status: "booked", hasTimeSlots: false, bookedSlots };
+    }
+
+    return { status: hasTimeSlots ? "partial" : entry.status, hasTimeSlots, bookedSlots };
+  }
 
   const prev = () => {
     setCurrentMonth((c) =>
@@ -117,8 +152,36 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
     setSubmitting(true);
     const form = new FormData(e.currentTarget);
 
+    const startTime = form.get("startTime") as string;
+    const duration = Number(form.get("duration") || 0);
+    let endTime: string | undefined;
+    if (startTime && duration) {
+      const [h, m] = startTime.split(":").map(Number);
+      const endH = h + duration;
+      endTime = `${String(Math.min(endH, 23)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+
     try {
-      const res = await fetch("/api/leads", {
+      // Create booking request (shows in artist's Rezervări)
+      const res = await fetch("/api/booking-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artistId: entityType === "artist" ? entityId : undefined,
+          clientName: form.get("name") as string,
+          clientPhone: `+373${form.get("phone") as string}`,
+          clientEmail: (form.get("email") as string) || undefined,
+          eventDate: selectedDate || "",
+          startTime: startTime || undefined,
+          endTime: endTime || undefined,
+          eventType: (form.get("eventType") as string) || undefined,
+          message: (form.get("message") as string) || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+
+      // Also create a lead for the matching system
+      void fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -128,14 +191,12 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           email: (form.get("email") as string) || undefined,
           eventType: (form.get("eventType") as string) || undefined,
           eventDate: selectedDate || undefined,
-          location: (form.get("location") as string) || undefined,
-          guestCount: form.get("guestCount") ? Number(form.get("guestCount")) : undefined,
           message: (form.get("message") as string) || undefined,
           source: "form",
           ...(entityType === "artist" ? { artistId: entityId } : { venueId: entityId }),
         }),
-      });
-      if (!res.ok) throw new Error();
+      }).catch(() => {});
+
       toast.success("Cererea de rezervare a fost trimisă!");
       setSubmitted(true);
       setShowForm(false);
@@ -186,17 +247,22 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
           const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const status = eventMap.get(dateStr);
+          const { status, hasTimeSlots } = getDayStatus(dateStr);
           const dateObj = new Date(year, month, day);
           const isPast = dateObj < today;
           const isToday = dateObj.toDateString() === today.toDateString();
           const isSelected = selectedDate === dateStr;
 
+          const isFullyBlocked = status === "booked" || status === "blocked";
+
           let dayClass = "";
           if (isPast) {
             dayClass = "text-white/15 cursor-not-allowed";
-          } else if (status === "booked" || status === "blocked") {
+          } else if (isFullyBlocked) {
             dayClass = "bg-destructive/25 text-destructive/90 cursor-not-allowed";
+          } else if (status === "partial") {
+            // Partially booked — still clickable
+            dayClass = "bg-warning/20 text-warning cursor-pointer hover:bg-warning/30";
           } else if (status === "tentative") {
             dayClass = "bg-warning/20 text-warning cursor-pointer hover:bg-warning/30";
           } else if (isSelected) {
@@ -209,7 +275,7 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
             <button
               key={day}
               type="button"
-              disabled={isPast || status === "booked" || status === "blocked"}
+              disabled={isPast || isFullyBlocked}
               onClick={() => handleDayClick(dateStr, status)}
               className={cn(
                 "flex h-7 w-full items-center justify-center rounded-md text-[11px] font-medium transition-all",
@@ -224,15 +290,15 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
       </div>
 
       {/* Legend */}
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
           <span className="h-2 w-2 rounded-full bg-success" /> Liber
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-destructive" /> Ocupat
+          <span className="h-2 w-2 rounded-full bg-warning" /> Parțial
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-warning" /> Tentativ
+          <span className="h-2 w-2 rounded-full bg-destructive" /> Ocupat
         </span>
       </div>
 
@@ -242,6 +308,11 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           <p className="text-xs text-gold font-medium text-center">
             {formatSelectedDate(selectedDate)}
           </p>
+          {getDayStatus(selectedDate).bookedSlots.length > 0 && (
+            <p className="text-[10px] text-warning text-center mt-1">
+              Ocupat: {getDayStatus(selectedDate).bookedSlots.join(", ")}
+            </p>
+          )}
 
           {!showForm ? (
             <Button
@@ -282,6 +353,29 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
                   ))}
                 </select>
               </MiniField>
+
+              <div className="grid grid-cols-2 gap-2">
+                <MiniField icon={Clock} label="Ora de început" required>
+                  <select name="startTime" required
+                    className="form-input !h-9 !text-xs appearance-none cursor-pointer">
+                    <option value="">Ora</option>
+                    {Array.from({ length: 15 }, (_, i) => i + 8).map(h => (
+                      <option key={h} value={`${String(h).padStart(2, "0")}:00`}>
+                        {String(h).padStart(2, "0")}:00
+                      </option>
+                    ))}
+                  </select>
+                </MiniField>
+                <MiniField icon={Clock} label="Durată (ore)" required>
+                  <select name="duration" required
+                    className="form-input !h-9 !text-xs appearance-none cursor-pointer">
+                    <option value="">Ore</option>
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map(h => (
+                      <option key={h} value={h}>{h} {h === 1 ? "oră" : "ore"}</option>
+                    ))}
+                  </select>
+                </MiniField>
+              </div>
 
               <MiniField icon={MessageSquare} label="Mesaj">
                 <textarea name="message" rows={2}
