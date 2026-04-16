@@ -193,14 +193,27 @@ export async function PUT(
   void (async () => {
     try {
       if (action === "accept" || action === "reject") {
+        const [artist] = await db
+          .select({ nameRo: artists.nameRo })
+          .from(artists)
+          .where(eq(artists.id, booking.artistId))
+          .limit(1);
+        const { notificationEmail } = await import("@/lib/email/templates/notification-email");
+
+        const timePart = booking.startTime
+          ? `<br>Ora: ${booking.startTime}${booking.endTime ? ` – ${booking.endTime}` : ""}`
+          : "";
+        const emailBody = action === "accept"
+          ? `<strong>${artist?.nameRo ?? "Artist"}</strong> a acceptat cererea ta de rezervare pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Mesajul artistului: <em>${reply}</em>` : ""}`
+          : `<strong>${artist?.nameRo ?? "Artist"}</strong> a răspuns la cererea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Motivul: <em>${reply}</em>` : ""}`;
+
+        // In-app notification (requires clientUserId)
         if (booking.clientUserId) {
-          const [artist] = await db
-            .select({ nameRo: artists.nameRo })
-            .from(artists)
-            .where(eq(artists.id, booking.artistId))
+          const clientUser = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, booking.clientUserId))
             .limit(1);
-          const { notificationEmail } = await import("@/lib/email/templates/notification-email");
-          const clientUser = await db.select({ email: (await import("@/lib/db/schema")).users.email }).from((await import("@/lib/db/schema")).users).where(eq((await import("@/lib/db/schema")).users.id, booking.clientUserId)).limit(1);
           await dispatchNotification({
             userId: booking.clientUserId,
             type: "booking_status_changed",
@@ -209,18 +222,32 @@ export async function PUT(
                 ? `Rezervarea ta la ${artist?.nameRo ?? "artist"} a fost acceptată`
                 : `Răspuns la cererea ta către ${artist?.nameRo ?? "artist"}`,
             message: reply ?? undefined,
-            actionUrl: "/cabinet",
+            actionUrl: "/cabinet/rezervari",
             email: clientUser[0]?.email ?? undefined,
             emailSubject: action === "accept"
               ? `✅ Rezervarea ta la ${artist?.nameRo ?? "artist"} a fost acceptată!`
               : `Răspuns la cererea ta — ${artist?.nameRo ?? "artist"}`,
             emailHtml: notificationEmail({
               title: action === "accept" ? "Rezervare Acceptată!" : "Răspuns la Cererea Ta",
-              message: action === "accept"
-                ? `<strong>${artist?.nameRo ?? "Artist"}</strong> a acceptat cererea ta de rezervare pentru ${booking.eventDate}.`
-                : `<strong>${artist?.nameRo ?? "Artist"}</strong> a răspuns la cererea ta. ${reply ?? ""}`,
-              ctaUrl: "https://epetrecere.md/cabinet",
+              message: emailBody,
+              ctaUrl: "https://epetrecere.md/cabinet/rezervari",
               ctaText: "Vezi detalii →",
+              emoji: action === "accept" ? "✅" : "📩",
+            }),
+          });
+        } else if (booking.clientEmail) {
+          // No in-app user, but we have an email — send email directly
+          const { sendEmail } = await import("@/lib/email/send");
+          await sendEmail({
+            to: booking.clientEmail,
+            subject: action === "accept"
+              ? `✅ Rezervarea ta la ${artist?.nameRo ?? "artist"} a fost acceptată!`
+              : `Răspuns la cererea ta — ${artist?.nameRo ?? "artist"}`,
+            html: notificationEmail({
+              title: action === "accept" ? "Rezervare Acceptată!" : "Răspuns la Cererea Ta",
+              message: emailBody,
+              ctaUrl: "https://epetrecere.md",
+              ctaText: "Vizitează ePetrecere.md →",
               emoji: action === "accept" ? "✅" : "📩",
             }),
           });

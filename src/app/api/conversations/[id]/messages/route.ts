@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { chatMessages, conversations, users, artists } from "@/lib/db/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
+import { dispatchNotification } from "@/lib/notifications/dispatch";
 
 // M0b #10 — Messages for a persistent client↔artist conversation.
 // GET  lists messages (oldest → newest, capped at 200) and resets the caller's
@@ -145,6 +146,75 @@ export async function POST(
         : { clientUnread: sql`${conversations.clientUnread} + 1` }),
     })
     .where(eq(conversations.id, conversationId));
+
+  // Notify the other party about the new message (fire-and-forget)
+  void (async () => {
+    try {
+      const { notificationEmail } = await import("@/lib/email/templates/notification-email");
+
+      if (ctx.side === "artist") {
+        // Artist sent a message → notify the client
+        const [clientUser] = await db
+          .select({ id: users.id, email: users.email, name: users.name })
+          .from(users)
+          .where(eq(users.id, ctx.conv.clientUserId))
+          .limit(1);
+        const [artist] = await db
+          .select({ nameRo: artists.nameRo, slug: artists.slug })
+          .from(artists)
+          .where(eq(artists.id, ctx.conv.artistId))
+          .limit(1);
+        const artistName = artist?.nameRo ?? "Artist";
+
+        if (clientUser) {
+          await dispatchNotification({
+            userId: clientUser.id,
+            type: "booking_status_changed",
+            title: `Mesaj nou de la ${artistName}`,
+            message: preview,
+            actionUrl: `/cabinet/mesaje?conversation=${conversationId}`,
+            email: clientUser.email ?? undefined,
+            emailSubject: `💬 Mesaj nou de la ${artistName} pe ePetrecere.md`,
+            emailHtml: notificationEmail({
+              title: `Mesaj nou de la ${artistName}`,
+              message: `<strong>${artistName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
+              ctaUrl: `https://epetrecere.md/cabinet/mesaje?conversation=${conversationId}`,
+              ctaText: "Răspunde →",
+              emoji: "💬",
+            }),
+          });
+        }
+      } else {
+        // Client sent a message → notify the artist
+        const [artist] = await db
+          .select({ userId: artists.userId, email: artists.email, nameRo: artists.nameRo })
+          .from(artists)
+          .where(eq(artists.id, ctx.conv.artistId))
+          .limit(1);
+
+        if (artist?.userId) {
+          await dispatchNotification({
+            userId: artist.userId,
+            type: "booking_request_new",
+            title: `Mesaj nou de la ${senderName}`,
+            message: preview,
+            actionUrl: `/dashboard/mesaje?conversation=${conversationId}`,
+            email: artist.email ?? undefined,
+            emailSubject: `💬 Mesaj nou de la ${senderName} pe ePetrecere.md`,
+            emailHtml: notificationEmail({
+              title: `Mesaj nou de la ${senderName}`,
+              message: `<strong>${senderName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
+              ctaUrl: `https://epetrecere.md/dashboard/mesaje?conversation=${conversationId}`,
+              ctaText: "Răspunde →",
+              emoji: "💬",
+            }),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[chat] message notification failed:", err);
+    }
+  })();
 
   return NextResponse.json(inserted, { status: 201 });
 }

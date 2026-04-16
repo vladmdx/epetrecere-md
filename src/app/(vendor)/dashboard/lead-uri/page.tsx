@@ -6,8 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import {
   Flame,
-  Lock,
-  Unlock,
   Calendar,
   MapPin,
   Users,
@@ -132,18 +130,9 @@ export default function LeadMatchesPage() {
         <div>
           <h1 className="font-heading text-2xl font-bold">Lead-uri noi</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Clienți care caută vendori potriviți — cumpără cu 1 credit pentru a vedea contactul.
+            Clienți care caută vendori potriviți — contactele sunt disponibile gratuit.
           </p>
         </div>
-        {credits && (
-          <div className="flex items-center gap-3 rounded-xl border border-gold/30 bg-gold/5 px-4 py-3">
-            <Wallet className="h-5 w-5 text-gold" />
-            <div>
-              <p className="text-xs text-muted-foreground">Credite disponibile</p>
-              <p className="font-heading text-xl font-bold text-gold">{credits.balance}</p>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Filters */}
@@ -203,16 +192,13 @@ export default function LeadMatchesPage() {
 
 function LeadMatchCard({
   match,
-  unlocking,
-  onUnlock,
   onStatus,
 }: {
   match: LeadMatch;
-  unlocking: boolean;
-  onUnlock: () => void;
+  unlocking?: boolean;
+  onUnlock?: () => void;
   onStatus: (status: "contacted" | "won" | "lost") => void;
 }) {
-  const isUnlocked = match.status !== "matched" && match.status !== "seen";
   const statusConfig: Record<LeadMatch["status"], { label: string; variant: string }> = {
     matched: { label: "Nou", variant: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
     seen: { label: "Văzut", variant: "bg-muted text-muted-foreground border-border/40" },
@@ -300,57 +286,32 @@ function LeadMatchCard({
         </div>
       )}
 
-      {/* Contact — gated */}
+      {/* Contact — always visible (free platform) */}
       <div className="mb-4 space-y-1.5">
-        {isUnlocked ? (
-          <>
-            {match.lead.phone && (
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-3.5 w-3.5 text-gold" />
-                <a href={`tel:${match.lead.phone}`} className="font-medium hover:text-gold">
-                  {match.lead.phone}
-                </a>
-              </div>
-            )}
-            {match.lead.email && (
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-3.5 w-3.5 text-gold" />
-                <a href={`mailto:${match.lead.email}`} className="hover:text-gold">
-                  {match.lead.email}
-                </a>
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="flex items-center gap-2 rounded-lg border border-dashed border-border/40 bg-muted/40 p-2 text-xs text-muted-foreground">
-            <Lock className="h-3.5 w-3.5" />
-            Contact blocat — folosește 1 credit pentru a debloca
+        {match.lead.phone && (
+          <div className="flex items-center gap-2 text-sm">
+            <Phone className="h-3.5 w-3.5 text-gold" />
+            <a href={`tel:${match.lead.phone}`} className="font-medium hover:text-gold">
+              {match.lead.phone}
+            </a>
+          </div>
+        )}
+        {match.lead.email && (
+          <div className="flex items-center gap-2 text-sm">
+            <Mail className="h-3.5 w-3.5 text-gold" />
+            <a href={`mailto:${match.lead.email}`} className="hover:text-gold">
+              {match.lead.email}
+            </a>
           </div>
         )}
       </div>
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">
-        {!isUnlocked ? (
-          <Button
-            onClick={onUnlock}
-            disabled={unlocking}
-            size="sm"
-            className="gap-1 bg-gold text-background hover:bg-gold-dark"
-          >
-            {unlocking ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Unlock className="h-3.5 w-3.5" />
-            )}
-            Deblochează (1 credit)
+        {(match.status === "matched" || match.status === "seen" || match.status === "unlocked") ? (
+          <Button size="sm" variant="outline" onClick={() => onStatus("contacted")} className="gap-1">
+            <Eye className="h-3.5 w-3.5" /> Marchează contactat
           </Button>
-        ) : match.status === "unlocked" ? (
-          <>
-            <Button size="sm" variant="outline" onClick={() => onStatus("contacted")} className="gap-1">
-              <Eye className="h-3.5 w-3.5" /> Marchează contactat
-            </Button>
-          </>
         ) : match.status === "contacted" ? (
           <>
             <Button size="sm" onClick={() => onStatus("won")} className="gap-1 bg-emerald-500 text-white hover:bg-emerald-600">

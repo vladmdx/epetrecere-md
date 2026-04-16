@@ -6,6 +6,8 @@ interface BookingRequestNewProps {
   clientName: string;
   eventType: string | null;
   eventDate: string | null;
+  startTime: string | null;
+  endTime: string | null;
   message: string | null;
 }
 
@@ -14,6 +16,8 @@ export function bookingRequestNewEmail({
   clientName,
   eventType,
   eventDate,
+  startTime,
+  endTime,
   message,
 }: BookingRequestNewProps): string {
   return `
@@ -36,6 +40,7 @@ export function bookingRequestNewEmail({
       <div style="background:rgba(201,168,76,0.08);border-radius:8px;padding:16px;margin:0 0 24px;border-left:3px solid #C9A84C;">
         ${eventType ? `<p style="color:#D4D4E0;font-size:14px;margin:0 0 8px;"><strong>Eveniment:</strong> ${eventType}</p>` : ""}
         ${eventDate ? `<p style="color:#D4D4E0;font-size:14px;margin:0 0 8px;"><strong>Data:</strong> ${eventDate}</p>` : ""}
+        ${startTime ? `<p style="color:#D4D4E0;font-size:14px;margin:0 0 8px;"><strong>Ora:</strong> ${startTime}${endTime ? ` – ${endTime}` : ""}</p>` : ""}
         ${message ? `<p style="color:#D4D4E0;font-size:14px;margin:0;"><strong>Mesaj:</strong> ${message}</p>` : ""}
       </div>
       <p style="color:#A0A0B0;font-size:15px;line-height:1.6;margin:0 0 24px;">

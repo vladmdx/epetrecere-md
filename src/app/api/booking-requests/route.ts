@@ -147,11 +147,14 @@ export async function POST(req: NextRequest) {
         .where(eq(artists.id, parsed.data.artistId))
         .limit(1);
       if (artist?.userId) {
+        const timePart = parsed.data.startTime
+          ? ` · ${parsed.data.startTime}${parsed.data.endTime ? `–${parsed.data.endTime}` : ""}`
+          : "";
         await dispatchNotification({
           userId: artist.userId,
           type: "booking_request_new",
           title: "Cerere nouă de rezervare",
-          message: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} · ${parsed.data.eventDate}`,
+          message: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} · ${parsed.data.eventDate}${timePart}`,
           actionUrl: "/dashboard/rezervari",
         });
       }
@@ -164,7 +167,7 @@ export async function POST(req: NextRequest) {
         emailSubject: `🔔 Cerere nouă: ${parsed.data.clientName} → ${artist?.nameRo ?? "artist"}`,
         emailHtml: notificationEmail({
           title: "Cerere Nouă de Rezervare",
-          message: `<strong>${parsed.data.clientName}</strong> a trimis o cerere pentru <strong>${artist?.nameRo ?? "artist"}</strong>.<br>Eveniment: ${parsed.data.eventType ?? "Nespecificat"} · Data: ${parsed.data.eventDate}`,
+          message: `<strong>${parsed.data.clientName}</strong> a trimis o cerere pentru <strong>${artist?.nameRo ?? "artist"}</strong>.<br>Eveniment: ${parsed.data.eventType ?? "Nespecificat"} · Data: ${parsed.data.eventDate}${parsed.data.startTime ? ` · Ora: ${parsed.data.startTime}${parsed.data.endTime ? `–${parsed.data.endTime}` : ""}` : ""}`,
           ctaUrl: "https://epetrecere.md/admin/cereri-oferte",
           ctaText: "Deschide în CRM →",
           emoji: "🔔",
@@ -182,6 +185,8 @@ export async function POST(req: NextRequest) {
               clientName: parsed.data.clientName,
               eventType: parsed.data.eventType ?? null,
               eventDate: parsed.data.eventDate ?? null,
+              startTime: parsed.data.startTime ?? null,
+              endTime: parsed.data.endTime ?? null,
               message: parsed.data.message ?? null,
             }),
           });
