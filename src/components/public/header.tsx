@@ -9,6 +9,7 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { SearchAutocomplete } from "@/components/public/search-autocomplete";
 import { NotificationBell } from "@/components/public/notification-bell";
+import { ChatBell } from "@/components/public/chat-bell";
 import { useLocale } from "@/hooks/use-locale";
 import { cn } from "@/lib/utils";
 import { useUser, useClerk } from "@clerk/nextjs";
@@ -209,6 +210,7 @@ export function Header() {
           <div className="hidden lg:block">
             <SearchAutocomplete />
           </div>
+          <ChatBell />
           <NotificationBell />
           <UserMenu />
           <LanguageSwitcher />
