@@ -220,25 +220,10 @@ export default function ClientCabinetPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl py-8 px-4">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="font-heading text-2xl font-bold">Cabinetul Meu</h1>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/cabinet/planifica"
-            className="inline-flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/5 px-4 py-2 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
-          >
-            <ClipboardList className="h-4 w-4" />
-            Planificarea evenimentului
-          </Link>
-          <Link
-            href="/cabinet/recenzii"
-            className="inline-flex items-center gap-2 rounded-xl border border-gold/40 bg-gold/5 px-4 py-2 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
-          >
-            <Star className="h-4 w-4" />
-            Recenziile mele
-          </Link>
-        </div>
+    <div className="mx-auto max-w-5xl">
+      <div className="mb-6">
+        <h1 className="font-heading text-2xl font-bold">Panoul Meu</h1>
+        <p className="text-sm text-muted-foreground mt-1">Rezervări, mesaje și planificarea evenimentului tău</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "bookings" | "chat" | "conversations")}>
