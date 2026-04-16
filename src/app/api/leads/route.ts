@@ -118,20 +118,26 @@ export async function POST(req: NextRequest) {
           reasons: ["Cerere directă de pe pagina artistului"],
           status: "matched",
         });
-        // Notify the artist owner
-        const [artist] = await db
-          .select({ userId: artists.userId })
-          .from(artists)
-          .where(eq(artists.id, artistId))
-          .limit(1);
-        if (artist?.userId) {
-          await dispatchNotification({
-            userId: artist.userId,
-            type: "lead_new",
-            title: "Cerere nouă de rezervare!",
-            message: `${leadData.name} · ${leadData.eventType ?? "Eveniment"}${leadData.eventDate ? ` · ${leadData.eventDate}` : ""}`,
-            actionUrl: "/dashboard/lead-uri",
-          });
+        // Notification is handled by /api/booking-requests when both
+        // endpoints are called together (calendar widget). Only notify
+        // here if the lead was created WITHOUT a booking request (e.g.
+        // venue leads or standalone form submissions).
+        const skipNotification = body?.skipArtistNotification === true;
+        if (!skipNotification) {
+          const [artist] = await db
+            .select({ userId: artists.userId })
+            .from(artists)
+            .where(eq(artists.id, artistId))
+            .limit(1);
+          if (artist?.userId) {
+            await dispatchNotification({
+              userId: artist.userId,
+              type: "lead_new",
+              title: "Cerere nouă de rezervare!",
+              message: `${leadData.name} · ${leadData.eventType ?? "Eveniment"}${leadData.eventDate ? ` · ${leadData.eventDate}` : ""}`,
+              actionUrl: "/dashboard/lead-uri",
+            });
+          }
         }
       } catch (err) {
         console.error("[leads] Direct artist match failed:", err);

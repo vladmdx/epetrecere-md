@@ -196,7 +196,7 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           eventDate: selectedDate || undefined,
           message: (form.get("message") as string) || undefined,
           source: "form",
-          ...(entityType === "artist" ? { artistId: entityId } : { venueId: entityId }),
+          ...(entityType === "artist" ? { artistId: entityId, skipArtistNotification: true } : { venueId: entityId }),
         }),
       });
       if (entityType === "venue" && !leadRes.ok) throw new Error();
