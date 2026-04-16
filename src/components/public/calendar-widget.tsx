@@ -131,7 +131,7 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           location: (form.get("location") as string) || undefined,
           guestCount: form.get("guestCount") ? Number(form.get("guestCount")) : undefined,
           message: (form.get("message") as string) || undefined,
-          source: "calendar",
+          source: "form",
           ...(entityType === "artist" ? { artistId: entityId } : { venueId: entityId }),
         }),
       });
