@@ -57,6 +57,7 @@ import {
   type SeatAssignment,
 } from "@/components/planner/seating-view";
 import { PhotosView } from "@/components/planner/photos-view";
+import { CustomCalendar } from "@/components/public/custom-calendar";
 import { cn } from "@/lib/utils";
 
 interface Plan {
@@ -1172,7 +1173,15 @@ function SettingsTab({
           </div>
           <div className="space-y-2">
             <Label htmlFor="s-date">Data evenimentului</Label>
-            <Input id="s-date" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+            <CustomCalendar
+              value={eventDate ? new Date(eventDate + "T00:00:00") : null}
+              onChange={(d) => {
+                const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                setEventDate(iso);
+              }}
+              placeholder="Alege data"
+              className="flex-none"
+            />
           </div>
         </div>
 

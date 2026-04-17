@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Loader2, Sparkles, Heart } from "lucide-react";
+import { CustomCalendar } from "@/components/public/custom-calendar";
 import Link from "next/link";
 
 const EVENT_TYPES = [
@@ -187,12 +188,15 @@ export default function PlannerIndexPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="date">Data</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={eventDate}
-                  onChange={(e) => setEventDate(e.target.value)}
+                <Label>Data</Label>
+                <CustomCalendar
+                  value={eventDate ? new Date(eventDate + "T00:00:00") : null}
+                  onChange={(d) => {
+                    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                    setEventDate(iso);
+                  }}
+                  placeholder="Alege data"
+                  className="flex-none"
                 />
               </div>
             </div>
