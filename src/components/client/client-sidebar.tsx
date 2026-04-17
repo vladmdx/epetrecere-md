@@ -34,7 +34,7 @@ const clientNav = [
   { href: "/cabinet/invitatii", icon: Mail, label: "Invitații Electronice" },
   { type: "divider" as const, label: "Instrumente Utile" },
   { href: "/cabinet/calculator-dar", icon: Calculator, label: "Calculator Dar" },
-  { href: "/cabinet/moments/1", icon: Camera, label: "Momente Eveniment" },
+  { href: "/cabinet/moments", icon: Camera, label: "Momente Eveniment" },
   { href: "/cabinet/furnizori", icon: Armchair, label: "Furnizori" },
   { href: "/cabinet/date", icon: Shield, label: "Confidențialitate" },
 ] as const;
