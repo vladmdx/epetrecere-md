@@ -195,17 +195,34 @@ export default function PlanDetailPage({
     if (Number.isFinite(planId)) load();
   }, [planId]);
 
-  // Load user's bookings
+  // Load user's bookings. We fetch ALL their bookings by email, then filter
+  // client-side to this plan. A booking belongs to the plan when:
+  //  • eventPlanId matches (the canonical link, Faza 1+), or
+  //  • eventPlanId is null but eventDate matches (legacy bookings made
+  //    before we had event_plan_id on booking_requests).
   useEffect(() => {
-    if (!user?.primaryEmailAddress?.emailAddress) return;
+    if (!user?.primaryEmailAddress?.emailAddress || !plan) return;
     const email = user.primaryEmailAddress.emailAddress;
     fetch(`/api/booking-requests?client_email=${encodeURIComponent(email)}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => {
-        if (Array.isArray(data)) setBookings(data);
+      .then((data: BookingRequest[] & { eventPlanId?: number | null }[]) => {
+        if (!Array.isArray(data)) return;
+        const scoped = data.filter((b) => {
+          const bp = b as BookingRequest & { eventPlanId?: number | null };
+          if (bp.eventPlanId === plan.id) return true;
+          if (
+            bp.eventPlanId == null &&
+            plan.eventDate &&
+            b.eventDate === plan.eventDate
+          ) {
+            return true;
+          }
+          return false;
+        });
+        setBookings(scoped);
       })
       .catch(() => {});
-  }, [user]);
+  }, [user, plan]);
 
   async function deletePlan() {
     if (!confirm("Sigur vrei să ștergi acest plan? Operațiunea este ireversibilă.")) return;
@@ -340,7 +357,15 @@ export default function PlanDetailPage({
           )}
 
           {activeTab === "budget" && (
-            <BudgetTab plan={plan} />
+            <BudgetTab
+              plan={plan}
+              bookings={bookings}
+              onBookingUpdate={(b) =>
+                setBookings((prev) =>
+                  prev.map((x) => (x.id === b.id ? { ...x, ...b } : x)),
+                )
+              }
+            />
           )}
 
           {activeTab === "guests" && (
@@ -394,7 +419,7 @@ export default function PlanDetailPage({
                   {plan.budgetTarget ? `${plan.budgetTarget}€` : "—"}
                 </p>
                 <p className="text-xs text-muted-foreground">Budget</p>
-                <BudgetProgress plan={plan} />
+                <BudgetProgress plan={plan} bookings={bookings} />
               </CardContent>
             </Card>
 
@@ -690,9 +715,16 @@ function LiveCountdown({ targetDate }: { targetDate: string }) {
 
 // ─── Budget Progress Widget ─────────────────────────────────────────
 
-function BudgetProgress({ plan }: { plan: Plan }) {
-  // Budget tracking from localStorage (same key as the budget page)
-  const [spent, setSpent] = useState(0);
+function BudgetProgress({
+  plan,
+  bookings,
+}: {
+  plan: Plan;
+  /** Bookings for this plan — accepted/confirmed ones with agreedPrice
+   *  contribute to the spent total alongside manual localStorage expenses. */
+  bookings: BookingRequest[];
+}) {
+  const [manualSpent, setManualSpent] = useState(0);
 
   useEffect(() => {
     try {
@@ -700,14 +732,31 @@ function BudgetProgress({ plan }: { plan: Plan }) {
       if (raw) {
         const expenses = JSON.parse(raw);
         if (Array.isArray(expenses)) {
-          setSpent(expenses.reduce((sum: number, e: { amount: number }) => sum + (e.amount || 0), 0));
+          setManualSpent(
+            expenses.reduce((sum: number, e: { amount: number }) => sum + (e.amount || 0), 0),
+          );
+        } else {
+          setManualSpent(0);
         }
+      } else {
+        setManualSpent(0);
       }
     } catch {
-      // ignore
+      setManualSpent(0);
     }
   }, [plan.id]);
 
+  // Only count bookings with an agreed price and in a "sticky" status
+  // (accepted / confirmed / completed). Cancelled/rejected don't count.
+  const bookingSpent = bookings
+    .filter(
+      (b) =>
+        typeof b.agreedPrice === "number" &&
+        ["accepted", "confirmed_by_client", "completed"].includes(b.status),
+    )
+    .reduce((sum, b) => sum + (b.agreedPrice ?? 0), 0);
+
+  const spent = manualSpent + bookingSpent;
   const total = plan.budgetTarget || 0;
   const pct = total > 0 ? Math.min(100, Math.round((spent / total) * 100)) : 0;
 
@@ -752,13 +801,29 @@ const BUDGET_CATEGORIES = [
   "Altele",
 ];
 
-function BudgetTab({ plan }: { plan: Plan }) {
+function BudgetTab({
+  plan,
+  bookings,
+  onBookingUpdate,
+}: {
+  plan: Plan;
+  bookings: BookingRequest[];
+  onBookingUpdate: (b: BookingRequest) => void;
+}) {
   const storageKey = `budget-expenses-${plan.id}`;
   const [expenses, setExpenses] = useState<BudgetExpense[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const [newCat, setNewCat] = useState(BUDGET_CATEGORIES[0]);
   const [newDesc, setNewDesc] = useState("");
   const [newAmount, setNewAmount] = useState("");
+
+  // Accepted/confirmed artist bookings with a price feed the budget as
+  // read-only entries in the "Artiști / Muzică" category.
+  const bookingExpenses = bookings.filter(
+    (b) =>
+      typeof b.agreedPrice === "number" &&
+      ["accepted", "confirmed_by_client", "completed"].includes(b.status),
+  );
 
   useEffect(() => {
     try {
@@ -768,6 +833,23 @@ function BudgetTab({ plan }: { plan: Plan }) {
       // ignore
     }
   }, [storageKey]);
+
+  async function toggleBookingPaid(b: BookingRequest) {
+    const nextStatus = b.paidStatus === "paid" ? "unpaid" : "paid";
+    // Optimistic local flip so the UI stays snappy; revert on API failure.
+    onBookingUpdate({ ...b, paidStatus: nextStatus });
+    try {
+      const res = await fetch(`/api/booking-requests/${b.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_paid", paidStatus: nextStatus }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      onBookingUpdate(b);
+      toast.error("Eroare la actualizare.");
+    }
+  }
 
   function save(updated: BudgetExpense[]) {
     setExpenses(updated);
@@ -798,8 +880,16 @@ function BudgetTab({ plan }: { plan: Plan }) {
     save(expenses.filter((e) => e.id !== id));
   }
 
-  const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
-  const totalPaid = expenses.filter((e) => e.paid).reduce((sum, e) => sum + e.amount, 0);
+  const bookingTotal = bookingExpenses.reduce((s, b) => s + (b.agreedPrice ?? 0), 0);
+  const bookingPaid = bookingExpenses
+    .filter((b) => b.paidStatus === "paid")
+    .reduce((s, b) => s + (b.agreedPrice ?? 0), 0);
+
+  const manualSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const manualPaid = expenses.filter((e) => e.paid).reduce((sum, e) => sum + e.amount, 0);
+
+  const totalSpent = manualSpent + bookingTotal;
+  const totalPaid = manualPaid + bookingPaid;
   const budget = plan.budgetTarget || 0;
   const remaining = budget - totalSpent;
 
@@ -877,8 +967,63 @@ function BudgetTab({ plan }: { plan: Plan }) {
         </div>
       )}
 
+      {/* Bookings → auto-synced "Artiști / Muzică" entries ────────── */}
+      {bookingExpenses.length > 0 && (
+        <Card className="mb-4 border-gold/30">
+          <CardHeader className="py-3 pb-0">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <BookOpen className="h-4 w-4 text-gold" />
+                Artiști / Muzică
+                <span className="text-[10px] font-normal text-muted-foreground">
+                  (din rezervări)
+                </span>
+              </CardTitle>
+              <span className="text-sm font-bold">{bookingTotal}€</span>
+            </div>
+          </CardHeader>
+          <CardContent className="py-2">
+            {bookingExpenses.map((b) => (
+              <div
+                key={b.id}
+                className="flex items-center gap-3 py-2 border-b border-border/20 last:border-0"
+              >
+                <Checkbox
+                  checked={b.paidStatus === "paid"}
+                  onCheckedChange={() => toggleBookingPaid(b)}
+                  className="data-[state=checked]:bg-success data-[state=checked]:border-success"
+                />
+                <div className="flex-1 min-w-0">
+                  <p
+                    className={cn(
+                      "text-sm truncate",
+                      b.paidStatus === "paid" && "line-through text-muted-foreground",
+                    )}
+                  >
+                    {b.artistName ?? "Artist"}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {STATUS_CONFIG[b.status]?.label ?? b.status}
+                  </p>
+                </div>
+                <span className="text-sm font-medium">{b.agreedPrice}€</span>
+                {b.artistSlug && (
+                  <Link
+                    href={`/artisti/${b.artistSlug}`}
+                    className="text-muted-foreground hover:text-gold"
+                    title="Vezi artistul"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </Link>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Expenses by category */}
-      {grouped.length === 0 ? (
+      {grouped.length === 0 && bookingExpenses.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground">
           <Wallet className="mx-auto mb-3 h-8 w-8 opacity-40" />
           <p>Nu ai cheltuieli încă.</p>

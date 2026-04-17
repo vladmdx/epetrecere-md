@@ -18,9 +18,20 @@ export async function PUT(
 ) {
   const { id } = await params;
   const body = await req.json();
-  const { action, reply } = body as {
-    action: "accept" | "reject" | "client_confirm" | "cancel" | "complete";
+  const { action, reply, agreedPrice, paidStatus } = body as {
+    action:
+      | "accept"
+      | "reject"
+      | "client_confirm"
+      | "cancel"
+      | "complete"
+      | "set_paid"
+      | "propose_price";
     reply?: string;
+    /** Artist-supplied final price on accept, or counter-offer amount. */
+    agreedPrice?: number;
+    /** Client-flipped paid flag (budget tab, overview). */
+    paidStatus?: "unpaid" | "partial" | "paid";
   };
 
   const [booking] = await db
@@ -65,9 +76,16 @@ export async function PUT(
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
+    // When the artist accepts, they may also declare the final agreed price.
+    // That price flows straight into the event plan's budget.
+    const priceUpdate =
+      typeof agreedPrice === "number" && agreedPrice >= 0
+        ? { agreedPrice }
+        : {};
     await db.update(bookingRequests).set({
       status: "accepted",
       artistReply: reply || "Cererea a fost acceptată!",
+      ...priceUpdate,
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
@@ -183,6 +201,91 @@ export async function PUT(
     }
     await db.update(bookingRequests).set({
       status: "completed",
+      updatedAt: new Date(),
+    }).where(eq(bookingRequests.id, Number(id)));
+  } else if (action === "set_paid") {
+    // Either the client (from the budget tab) or the artist (from their
+    // dashboard) can toggle paid status. Both sides have legitimate reasons
+    // to mark money moved.
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const [appUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    if (!appUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    // Client must own the booking OR be the artist owner.
+    const isClient = appUser.id === booking.clientUserId;
+    let isArtistOwner = false;
+    if (!isClient) {
+      const [artist] = await db
+        .select({ userId: artists.userId })
+        .from(artists)
+        .where(eq(artists.id, booking.artistId))
+        .limit(1);
+      isArtistOwner = artist?.userId === appUser.id;
+    }
+    if (!isClient && !isArtistOwner) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (!paidStatus || !["unpaid", "partial", "paid"].includes(paidStatus)) {
+      return NextResponse.json({ error: "paidStatus required" }, { status: 400 });
+    }
+    await db.update(bookingRequests).set({
+      paidStatus,
+      updatedAt: new Date(),
+    }).where(eq(bookingRequests.id, Number(id)));
+  } else if (action === "propose_price") {
+    // Either party can push a counter-offer onto the priceOffers jsonb log.
+    // The offer does NOT change status — it's a negotiation signal only.
+    // An accept (with agreedPrice) from the artist seals the number.
+    const { userId: clerkId } = await auth();
+    if (!clerkId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (typeof agreedPrice !== "number" || agreedPrice < 0) {
+      return NextResponse.json({ error: "agreedPrice required" }, { status: 400 });
+    }
+    const [appUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    if (!appUser) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const isClient = appUser.id === booking.clientUserId;
+    let isArtistOwner = false;
+    if (!isClient) {
+      const [artist] = await db
+        .select({ userId: artists.userId })
+        .from(artists)
+        .where(eq(artists.id, booking.artistId))
+        .limit(1);
+      isArtistOwner = artist?.userId === appUser.id;
+    }
+    if (!isClient && !isArtistOwner) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const existingOffers = (booking.priceOffers ?? []) as Array<{
+      from: "artist" | "client";
+      amount: number;
+      message?: string;
+      at: string;
+    }>;
+    existingOffers.push({
+      from: isClient ? "client" : "artist",
+      amount: agreedPrice,
+      message: reply,
+      at: new Date().toISOString(),
+    });
+    await db.update(bookingRequests).set({
+      priceOffers: existingOffers,
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
   } else {
