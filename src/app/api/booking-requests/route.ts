@@ -22,6 +22,9 @@ const bookingSchema = z.object({
   eventType: z.string().optional(),
   guestCount: z.number().optional(),
   message: z.string().optional(),
+  /** Optional — when the client sends the request from inside an event
+   *  plan we link the booking so its agreed price flows into the budget. */
+  eventPlanId: z.number().int().positive().optional(),
 });
 
 // GET booking requests — requires auth; scoped to caller's own data.
@@ -77,10 +80,19 @@ export async function GET(req: NextRequest) {
   if (artistId) conditions.push(eq(bookingRequests.artistId, Number(artistId)));
   if (clientEmail) conditions.push(eq(bookingRequests.clientEmail, clientEmail));
 
+  // Optional filter — scope to a single event plan so the planner dashboard
+  // only sees bookings tied to the current event. Other callers (artist
+  // dashboard, client overall bookings list) omit this and get everything.
+  const eventPlanId = req.nextUrl.searchParams.get("event_plan_id");
+  if (eventPlanId) {
+    conditions.push(eq(bookingRequests.eventPlanId, Number(eventPlanId)));
+  }
+
   const result = await db
     .select({
       id: bookingRequests.id,
       artistId: bookingRequests.artistId,
+      eventPlanId: bookingRequests.eventPlanId,
       clientUserId: bookingRequests.clientUserId,
       clientName: bookingRequests.clientName,
       clientPhone: bookingRequests.clientPhone,
@@ -92,6 +104,9 @@ export async function GET(req: NextRequest) {
       guestCount: bookingRequests.guestCount,
       message: bookingRequests.message,
       status: bookingRequests.status,
+      agreedPrice: bookingRequests.agreedPrice,
+      paidStatus: bookingRequests.paidStatus,
+      priceOffers: bookingRequests.priceOffers,
       artistReply: bookingRequests.artistReply,
       adminNotes: bookingRequests.adminNotes,
       adminSeen: bookingRequests.adminSeen,
@@ -133,9 +148,12 @@ export async function POST(req: NextRequest) {
     if (appUser) clientUserId = appUser.id;
   }
 
-  // Create booking request
+  // Create booking request — keep the eventPlanId through so in-plan
+  // requests surface in the dashboard "Rezervări Artiști" tab.
+  const { eventPlanId, ...bookingBase } = parsed.data;
   const [booking] = await db.insert(bookingRequests).values({
-    ...parsed.data,
+    ...bookingBase,
+    eventPlanId: eventPlanId ?? null,
     clientUserId: clientUserId ?? null,
     status: "pending",
   }).returning();

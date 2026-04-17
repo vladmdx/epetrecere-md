@@ -70,6 +70,12 @@ interface Plan {
   budgetTarget: number | null;
   seatsPerTable: number | null;
   notes: string | null;
+  /** Wizard-supplied: whether the plan also needs a venue — drives the
+   *  conditional "Săli" tab. */
+  venueNeeded?: boolean;
+  /** Wizard-supplied category IDs for pre-filtering the artist discovery. */
+  selectedCategories?: number[];
+  status?: "active" | "completed" | "cancelled";
 }
 
 interface BookingRequest {
@@ -80,6 +86,8 @@ interface BookingRequest {
   eventType: string | null;
   eventDate: string;
   status: string;
+  agreedPrice?: number | null;
+  paidStatus?: "unpaid" | "partial" | "paid";
 }
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -102,23 +110,39 @@ const EVENT_TYPES = [
 
 type TabKey =
   | "overview"
+  | "bookings"
+  | "venues"
   | "checklist"
   | "budget"
   | "guests"
   | "seating"
   | "timeline"
-  | "bookings"
   | "photos"
   | "settings";
 
-const NAV_ITEMS: { key: TabKey; icon: typeof LayoutDashboard; label: string }[] = [
+type NavItem = {
+  key: TabKey;
+  icon: typeof LayoutDashboard;
+  label: string;
+  /** When true, only rendered if plan.venueNeeded is set. */
+  venueOnly?: boolean;
+};
+
+/**
+ * Nav order matches the reference design: Rezervări Artiști is now the
+ * second tab (right after Prezentare) so clients hit the artist-booking
+ * surface immediately. "Săli" only appears if the wizard flagged the
+ * plan as venue-needed.
+ */
+const NAV_ITEMS: NavItem[] = [
   { key: "overview", icon: LayoutDashboard, label: "Prezentare" },
+  { key: "bookings", icon: BookOpen, label: "Rezervări Artiști" },
+  { key: "venues", icon: MapPin, label: "Săli", venueOnly: true },
   { key: "checklist", icon: ClipboardList, label: "Checklist" },
   { key: "budget", icon: Wallet, label: "Budget" },
   { key: "guests", icon: Users, label: "Invitați" },
   { key: "seating", icon: UtensilsCrossed, label: "Așezare Mese" },
   { key: "timeline", icon: Clock, label: "Cronologie" },
-  { key: "bookings", icon: BookOpen, label: "Rezervări" },
   { key: "photos", icon: Camera, label: "Fotografii" },
   { key: "settings", icon: Settings, label: "Setări" },
 ];
@@ -222,11 +246,15 @@ export default function PlanDetailPage({
   const seatedGuests = new Set(seats.map((s) => s.guestId)).size;
   const activeBookings = bookings.filter((b) => ["pending", "accepted", "confirmed_by_client"].includes(b.status));
 
+  // Hide the "Săli" tab unless the wizard / settings flagged this plan as
+  // needing a venue.
+  const visibleNavItems = NAV_ITEMS.filter((item) => !item.venueOnly || plan.venueNeeded);
+
   return (
     <div className="flex gap-0 -m-6 min-h-[calc(100vh-4rem)]">
       {/* Left Navigation */}
       <nav className="hidden md:flex w-48 shrink-0 flex-col border-r border-border/30 bg-card/50 py-4">
-        {NAV_ITEMS.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.key;
           return (
@@ -250,7 +278,7 @@ export default function PlanDetailPage({
 
       {/* Mobile tab bar */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex overflow-x-auto border-t border-border/40 bg-background px-2 py-1.5 gap-1">
-        {NAV_ITEMS.slice(0, 6).map((item) => {
+        {visibleNavItems.slice(0, 6).map((item) => {
           const Icon = item.icon;
           return (
             <button
@@ -340,7 +368,11 @@ export default function PlanDetailPage({
           )}
 
           {activeTab === "bookings" && (
-            <BookingsTab bookings={bookings} />
+            <BookingsTab plan={plan} bookings={bookings} />
+          )}
+
+          {activeTab === "venues" && plan.venueNeeded && (
+            <VenuesTab plan={plan} />
           )}
 
           {activeTab === "photos" && (
@@ -1042,57 +1074,340 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   completed: { label: "Finalizat", color: "text-gold border-gold/30 bg-gold/5" },
 };
 
-function BookingsTab({ bookings }: { bookings: BookingRequest[] }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="font-heading text-xl font-bold">Rezervările mele</h2>
-          <p className="text-sm text-muted-foreground">{bookings.length} rezervări</p>
-        </div>
-        <Link href="/artisti">
-          <Button variant="outline" size="sm" className="gap-1 text-xs">
-            <Plus className="h-3.5 w-3.5" /> Caută artiști
-          </Button>
-        </Link>
-      </div>
+// ─── Rezervări Artiști Tab ──────────────────────────────────────────
+// Combines the user's existing artist bookings (top) with a discovery
+// feed of artists whose calendar is free on the plan's event date (bottom).
+// The discovery feed pre-filters by selectedCategories if the wizard set
+// any, otherwise shows the newest active artists.
 
-      {bookings.length === 0 ? (
-        <div className="py-12 text-center text-muted-foreground">
-          <BookOpen className="mx-auto mb-3 h-8 w-8 opacity-40" />
-          <p>Nu ai rezervări încă.</p>
-          <p className="text-xs mt-1">Explorează artiști și trimite cereri de rezervare.</p>
+interface DiscoveryArtist {
+  id: number;
+  slug: string;
+  nameRo: string;
+  descriptionShortRo: string | null;
+  coverUrl: string | null;
+  priceFrom: number | null;
+  ratingAvg: number;
+  ratingCount: number;
+  categoryNames?: string[];
+}
+
+function BookingsTab({
+  plan,
+  bookings,
+}: {
+  plan: Plan;
+  bookings: BookingRequest[];
+}) {
+  const [discovery, setDiscovery] = useState<DiscoveryArtist[]>([]);
+  const [discoveryLoading, setDiscoveryLoading] = useState(false);
+
+  // Fetch artists whenever the event date or the selected-category set
+  // changes. Using Promise.all across categories keeps the query simple
+  // without cross-category pagination math.
+  useEffect(() => {
+    if (!plan.eventDate) return;
+    setDiscoveryLoading(true);
+    const categories = plan.selectedCategories ?? [];
+    const queries = categories.length > 0
+      ? categories.map((catId) =>
+          fetch(`/api/artists?date=${plan.eventDate}&category=${catId}&limit=6`, {
+            cache: "no-store",
+          })
+            .then((r) => (r.ok ? r.json() : { artists: [] }))
+            .catch(() => ({ artists: [] })),
+        )
+      : [
+          fetch(`/api/artists?date=${plan.eventDate}&limit=12`, { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : { artists: [] }))
+            .catch(() => ({ artists: [] })),
+        ];
+    Promise.all(queries)
+      .then((results) => {
+        // Flatten + dedupe by id so the same artist doesn't appear twice
+        // when they match multiple selected categories.
+        const seen = new Set<number>();
+        const merged: DiscoveryArtist[] = [];
+        for (const r of results) {
+          for (const a of r.artists ?? []) {
+            if (!seen.has(a.id)) {
+              seen.add(a.id);
+              merged.push(a);
+            }
+          }
+        }
+        setDiscovery(merged);
+      })
+      .finally(() => setDiscoveryLoading(false));
+  }, [plan.eventDate, plan.selectedCategories]);
+
+  // Scope bookings to this plan only. Older bookings without eventPlanId
+  // (pre-Faza 1) still show up because we fall back to email-matching
+  // at the API layer.
+  const planBookings = bookings;
+
+  return (
+    <div className="space-y-10">
+      {/* ─── Section 1: Existing bookings ───────────────────────── */}
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="font-heading text-xl font-bold">Rezervările mele</h2>
+            <p className="text-sm text-muted-foreground">
+              {planBookings.length} {planBookings.length === 1 ? "cerere" : "cereri"} trimise
+            </p>
+          </div>
+          <Link href="/artisti">
+            <Button variant="outline" size="sm" className="gap-1 text-xs">
+              <Plus className="h-3.5 w-3.5" /> Caută artiști
+            </Button>
+          </Link>
+        </div>
+
+        {planBookings.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
+            <BookOpen className="mx-auto mb-3 h-8 w-8 opacity-40" />
+            <p className="text-sm">Nu ai rezervări încă.</p>
+            <p className="text-xs mt-1">
+              Alege un artist din secțiunea de mai jos pentru a trimite prima cerere.
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {planBookings.map((b) => {
+              const cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG.pending;
+              return (
+                <Card key={b.id} className="transition-all hover:border-gold/30">
+                  <CardContent className="py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="h-10 w-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                          <BookOpen className="h-5 w-5 text-gold" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {b.artistName || "Artist"}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {b.eventDate && new Date(b.eventDate).toLocaleDateString("ro-MD")}
+                            {b.eventType && ` · ${EVENT_TYPE_LABELS[b.eventType] || b.eventType}`}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={cn("text-xs shrink-0", cfg.color)}>
+                        {cfg.label}
+                      </Badge>
+                    </div>
+                    {/* Price pill if negotiated */}
+                    {b.agreedPrice != null && (
+                      <div className="mt-3 flex items-center justify-between rounded-lg bg-gold/5 border border-gold/20 px-3 py-2">
+                        <span className="text-xs text-muted-foreground">Preț agreat</span>
+                        <span className="text-sm font-semibold text-gold">
+                          {b.agreedPrice}€
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* ─── Section 2: Discover available artists ──────────────── */}
+      {plan.eventDate && (
+        <section>
+          <div className="mb-4">
+            <h2 className="font-heading text-xl font-bold">
+              Artiști disponibili pentru data ta
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {new Date(plan.eventDate).toLocaleDateString("ro-MD", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+              {plan.selectedCategories && plan.selectedCategories.length > 0 && (
+                <span> · {plan.selectedCategories.length} categorii selectate</span>
+              )}
+            </p>
+          </div>
+
+          {discoveryLoading ? (
+            <div className="py-10 text-center">
+              <Loader2 className="mx-auto h-6 w-6 animate-spin text-gold" />
+            </div>
+          ) : discovery.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
+              <p className="text-sm">
+                Niciun artist disponibil în categoriile selectate pentru această dată.
+              </p>
+              <Link href="/artisti">
+                <Button variant="outline" size="sm" className="mt-4">
+                  Explorează toți artiștii
+                </Button>
+              </Link>
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {discovery.slice(0, 9).map((a) => (
+                <Link
+                  key={a.id}
+                  href={`/artisti/${a.slug}?plan=${plan.id}`}
+                  className="group rounded-xl border border-border/40 bg-card p-4 transition-all hover:border-gold/40"
+                >
+                  <div className="flex items-start gap-3">
+                    {a.coverUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={a.coverUrl}
+                        alt=""
+                        className="h-14 w-14 rounded-lg object-cover shrink-0"
+                      />
+                    ) : (
+                      <div className="h-14 w-14 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
+                        <BookOpen className="h-5 w-5 text-gold" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold truncate group-hover:text-gold">
+                        {a.nameRo}
+                      </p>
+                      {a.ratingCount > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          ★ {a.ratingAvg.toFixed(1)} ({a.ratingCount})
+                        </p>
+                      )}
+                      {a.priceFrom != null && (
+                        <p className="mt-1 text-xs">
+                          <span className="text-muted-foreground">de la </span>
+                          <span className="text-gold font-medium">{a.priceFrom}€</span>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ─── Săli Tab (conditional on plan.venueNeeded) ─────────────────────
+// Mirrors the artist discovery flow but for venues. Venue bookings live
+// in a separate table (`venue_booking_requests`) and never feed the
+// budget (per spec).
+
+interface DiscoveryVenue {
+  id: number;
+  slug: string;
+  nameRo: string;
+  city: string | null;
+  capacityMin: number | null;
+  capacityMax: number | null;
+  pricePerPerson: number | null;
+  coverUrl?: string | null;
+  ratingAvg: number;
+  ratingCount: number;
+}
+
+function VenuesTab({ plan }: { plan: Plan }) {
+  const [venues, setVenues] = useState<DiscoveryVenue[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (plan.eventDate) params.set("date", plan.eventDate);
+    if (plan.location) params.set("city", plan.location);
+    if (plan.guestCountTarget) params.set("capacity_min", String(plan.guestCountTarget));
+    params.set("limit", "12");
+    fetch(`/api/venues?${params.toString()}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { venues: [] }))
+      .then((data) => setVenues(data.venues ?? data ?? []))
+      .catch(() => setVenues([]))
+      .finally(() => setLoading(false));
+  }, [plan.eventDate, plan.location, plan.guestCountTarget]);
+
+  return (
+    <div className="space-y-8">
+      <section>
+        <h2 className="font-heading text-xl font-bold">Săli pentru evenimentul tău</h2>
+        <p className="text-sm text-muted-foreground">
+          {plan.eventDate && (
+            <>
+              {new Date(plan.eventDate).toLocaleDateString("ro-MD", {
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </>
+          )}
+          {plan.location && <> · {plan.location}</>}
+          {plan.guestCountTarget && <> · min. {plan.guestCountTarget} invitați</>}
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground/80">
+          Rezervările de săli nu sunt incluse în buget — bugetul e format doar din artiști.
+        </p>
+      </section>
+
+      {loading ? (
+        <div className="py-10 text-center">
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-gold" />
+        </div>
+      ) : venues.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
+          <MapPin className="mx-auto mb-3 h-8 w-8 opacity-40" />
+          <p className="text-sm">Nicio sală disponibilă cu aceste criterii.</p>
+          <Link href="/sali">
+            <Button variant="outline" size="sm" className="mt-4">
+              Explorează toate sălile
+            </Button>
+          </Link>
         </div>
       ) : (
-        <div className="space-y-2">
-          {bookings.map((b) => {
-            const cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG.pending;
-            return (
-              <Card key={b.id} className="hover:border-gold/30 transition-all">
-                <CardContent className="py-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-9 w-9 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
-                        <BookOpen className="h-4 w-4 text-gold" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {b.artistName || "Artist"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {b.eventDate && new Date(b.eventDate).toLocaleDateString("ro-MD")}
-                          {b.eventType && ` · ${EVENT_TYPE_LABELS[b.eventType] || b.eventType}`}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant="outline" className={cn("text-xs shrink-0", cfg.color)}>
-                      {cfg.label}
-                    </Badge>
+        <div className="grid gap-3 md:grid-cols-2">
+          {venues.map((v) => (
+            <Link
+              key={v.id}
+              href={`/sali/${v.slug}?plan=${plan.id}`}
+              className="group rounded-xl border border-border/40 bg-card p-4 transition-all hover:border-gold/40"
+            >
+              <div className="flex items-start gap-3">
+                {v.coverUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={v.coverUrl}
+                    alt=""
+                    className="h-16 w-16 rounded-lg object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="h-16 w-16 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
+                    <MapPin className="h-6 w-6 text-gold" />
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold truncate group-hover:text-gold">
+                    {v.nameRo}
+                  </p>
+                  {v.city && (
+                    <p className="text-xs text-muted-foreground">{v.city}</p>
+                  )}
+                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {v.capacityMin && v.capacityMax && (
+                      <span>{v.capacityMin}–{v.capacityMax} locuri</span>
+                    )}
+                    {v.pricePerPerson != null && (
+                      <span>{v.pricePerPerson}€/pers</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </Link>
+          ))}
         </div>
       )}
     </div>
@@ -1117,7 +1432,10 @@ function SettingsTab({
   const [guestCount, setGuestCount] = useState(plan.guestCountTarget?.toString() || "");
   const [budget, setBudget] = useState(plan.budgetTarget?.toString() || "");
   const [notes, setNotes] = useState(plan.notes || "");
+  const [venueNeeded, setVenueNeeded] = useState(plan.venueNeeded ?? false);
   const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const router = useRouter();
 
   async function handleSave() {
     setSaving(true);
@@ -1133,6 +1451,7 @@ function SettingsTab({
           guestCountTarget: guestCount ? Number(guestCount) : null,
           budgetTarget: budget ? Number(budget) : null,
           notes: notes || null,
+          venueNeeded,
         }),
       });
       if (!res.ok) {
@@ -1146,6 +1465,26 @@ function SettingsTab({
       toast.error("Eroare la salvare.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleArchive() {
+    if (!confirm("Marchezi evenimentul ca finalizat? Va apărea în secțiunea Arhivă.")) return;
+    setArchiving(true);
+    try {
+      const res = await fetch(`/api/event-plans/${plan.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (!res.ok) {
+        toast.error("Eroare la arhivare.");
+        return;
+      }
+      toast.success("Eveniment finalizat.");
+      router.push("/cabinet/arhiva");
+    } finally {
+      setArchiving(false);
     }
   }
 
@@ -1206,6 +1545,20 @@ function SettingsTab({
           <Textarea id="s-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </div>
 
+        <label className="flex items-start gap-3 rounded-lg border border-border/30 bg-card/50 p-3 cursor-pointer hover:border-gold/30 transition-colors">
+          <Checkbox
+            checked={venueNeeded}
+            onCheckedChange={(v) => setVenueNeeded(v === true)}
+            className="mt-0.5"
+          />
+          <div className="flex-1 text-sm">
+            <p className="font-medium">Am nevoie de sală / restaurant</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Activează tabul <span className="text-gold">Săli</span> pentru a vedea locații disponibile.
+            </p>
+          </div>
+        </label>
+
         <Button
           onClick={handleSave}
           disabled={saving}
@@ -1215,16 +1568,35 @@ function SettingsTab({
           Salvează setările
         </Button>
 
-        <div className="pt-6 border-t border-border/20">
-          <h3 className="text-sm font-semibold text-destructive mb-2">Zona periculoasă</h3>
-          <Button
-            onClick={onDelete}
-            variant="outline"
-            size="sm"
-            className="gap-1 text-destructive hover:bg-destructive/5 border-destructive/30"
-          >
-            <Trash2 className="h-4 w-4" /> Șterge planul complet
-          </Button>
+        <div className="pt-6 border-t border-border/20 space-y-3">
+          <div>
+            <h3 className="text-sm font-semibold mb-2">Finalizare</h3>
+            <Button
+              onClick={handleArchive}
+              disabled={archiving}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              {archiving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Marchează ca finalizat → Arhivă
+            </Button>
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-destructive mb-2">Zona periculoasă</h3>
+            <Button
+              onClick={onDelete}
+              variant="outline"
+              size="sm"
+              className="gap-1 text-destructive hover:bg-destructive/5 border-destructive/30"
+            >
+              <Trash2 className="h-4 w-4" /> Șterge planul complet
+            </Button>
+          </div>
         </div>
       </div>
     </div>
