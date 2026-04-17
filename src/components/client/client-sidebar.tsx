@@ -12,10 +12,12 @@ import {
   ClipboardList,
   Calculator,
   Mail,
-  Armchair,
   Wallet,
   CheckSquare,
-  Settings,
+  Shield,
+  Wrench,
+  Camera,
+  Armchair,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,9 +32,11 @@ const clientNav = [
   { href: "/cabinet/checklist", icon: CheckSquare, label: "Checklist" },
   { href: "/cabinet/buget", icon: Wallet, label: "Budget & Cheltuieli" },
   { href: "/cabinet/invitatii", icon: Mail, label: "Invitații Electronice" },
-  { href: "/cabinet/moments/1", icon: CalendarHeart, label: "Momente Eveniment" },
-  { href: "/cabinet/date", icon: Calculator, label: "Calculator Dar" },
+  { type: "divider" as const, label: "Instrumente Utile" },
+  { href: "/cabinet/calculator-dar", icon: Calculator, label: "Calculator Dar" },
+  { href: "/cabinet/moments/1", icon: Camera, label: "Momente Eveniment" },
   { href: "/cabinet/furnizori", icon: Armchair, label: "Furnizori" },
+  { href: "/cabinet/date", icon: Shield, label: "Confidențialitate" },
 ] as const;
 
 export function ClientSidebar() {

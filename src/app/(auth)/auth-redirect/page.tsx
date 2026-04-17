@@ -85,7 +85,7 @@ export default function AuthRedirectPage() {
 
   if (checking && !showRoleSelect) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D]">
+      <div className="fixed inset-0 z-[9999] flex min-h-screen items-center justify-center bg-[#0D0D0D]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-[#C9A84C]" />
           <p className="text-sm text-[#B0B0C0]">Se verifică contul...</p>

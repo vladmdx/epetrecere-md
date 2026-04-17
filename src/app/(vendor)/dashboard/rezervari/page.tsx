@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar, User, MapPin, CheckCircle, XCircle, Loader2, MessageSquare, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -214,6 +215,11 @@ export default function VendorBookingsPage() {
     );
   }
 
+  const activeStatuses = ["pending", "accepted", "confirmed_by_client"];
+  const pastStatuses = ["rejected", "cancelled", "completed"];
+  const activeBookings = bookings.filter(b => activeStatuses.includes(b.status));
+  const pastBookings = bookings.filter(b => pastStatuses.includes(b.status));
+
   return (
     <div className="space-y-6">
       <div>
@@ -230,8 +236,32 @@ export default function VendorBookingsPage() {
           </CardContent>
         </Card>
       ) : (
+        <Tabs defaultValue="active">
+          <TabsList>
+            <TabsTrigger value="active" className="gap-1.5">
+              Active
+              {activeBookings.length > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold/20 px-1 text-[10px] font-bold text-gold">
+                  {activeBookings.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="past">Trecute ({pastBookings.length})</TabsTrigger>
+          </TabsList>
+
+          {["active", "past"].map(tabKey => {
+            const list = tabKey === "active" ? activeBookings : pastBookings;
+            return (
+              <TabsContent key={tabKey} value={tabKey} className="mt-4">
+                {list.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center text-muted-foreground">
+                      {tabKey === "active" ? "Nu aveți rezervări active." : "Nu aveți rezervări trecute."}
+                    </CardContent>
+                  </Card>
+                ) : (
         <div className="space-y-3">
-          {bookings.map((booking) => {
+          {list.map((booking) => {
             const cfg = statusConfig[booking.status] || statusConfig.pending;
             const isExpanded = expandedId === booking.id;
             const chatMessages = chats[booking.id] || [];
@@ -355,6 +385,11 @@ export default function VendorBookingsPage() {
             );
           })}
         </div>
+                )}
+              </TabsContent>
+            );
+          })}
+        </Tabs>
       )}
     </div>
   );

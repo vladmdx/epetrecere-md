@@ -201,20 +201,8 @@ export default function ClientCabinetPage() {
 
   if (!loggedIn) {
     return (
-      <div className="mx-auto max-w-md py-20 px-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="font-heading text-center">Cabinetul Meu</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground text-center">Introdu emailul folosit la rezervare pentru a vedea istoricul.</p>
-            <div><Input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Numele tău" /></div>
-            <div><Input value={email} onChange={e => setEmail(e.target.value)} placeholder="Email folosit la rezervare" type="email" /></div>
-            <Button onClick={handleLogin} disabled={loading} className="w-full bg-gold text-background hover:bg-gold-dark">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Intră în cabinet"}
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-gold" />
       </div>
     );
   }

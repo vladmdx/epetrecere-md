@@ -190,8 +190,8 @@ export default function PlannerIndexPage() {
               <DialogTitle>Creează un plan nou</DialogTitle>
             </DialogHeader>
 
-            <div className="grid gap-4 py-2">
-              <div>
+            <div className="grid gap-5 py-2">
+              <div className="space-y-2">
                 <Label htmlFor="title">Titlul planului *</Label>
                 <Input
                   id="title"
@@ -202,7 +202,7 @@ export default function PlannerIndexPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className="space-y-2">
                   <Label>Tip eveniment</Label>
                   <Select value={eventType} onValueChange={(v) => setEventType(v ?? "")}>
                     <SelectTrigger>
@@ -217,7 +217,7 @@ export default function PlannerIndexPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="date">Data</Label>
                   <Input
                     id="date"
@@ -228,7 +228,7 @@ export default function PlannerIndexPage() {
                 </div>
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="loc">Locație</Label>
                 <Input
                   id="loc"
@@ -239,7 +239,7 @@ export default function PlannerIndexPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="guests">Invitați estimați</Label>
                   <Input
                     id="guests"
@@ -249,7 +249,7 @@ export default function PlannerIndexPage() {
                     onChange={(e) => setGuestCount(e.target.value)}
                   />
                 </div>
-                <div>
+                <div className="space-y-2">
                   <Label htmlFor="budget">Buget (EUR)</Label>
                   <Input
                     id="budget"
@@ -261,7 +261,7 @@ export default function PlannerIndexPage() {
                 </div>
               </div>
 
-              <div>
+              <div className="space-y-2">
                 <Label htmlFor="notes">Note</Label>
                 <Textarea
                   id="notes"

@@ -78,8 +78,30 @@ export async function GET(req: NextRequest) {
   if (clientEmail) conditions.push(eq(bookingRequests.clientEmail, clientEmail));
 
   const result = await db
-    .select()
+    .select({
+      id: bookingRequests.id,
+      artistId: bookingRequests.artistId,
+      clientUserId: bookingRequests.clientUserId,
+      clientName: bookingRequests.clientName,
+      clientPhone: bookingRequests.clientPhone,
+      clientEmail: bookingRequests.clientEmail,
+      eventDate: bookingRequests.eventDate,
+      startTime: bookingRequests.startTime,
+      endTime: bookingRequests.endTime,
+      eventType: bookingRequests.eventType,
+      guestCount: bookingRequests.guestCount,
+      message: bookingRequests.message,
+      status: bookingRequests.status,
+      artistReply: bookingRequests.artistReply,
+      adminNotes: bookingRequests.adminNotes,
+      adminSeen: bookingRequests.adminSeen,
+      createdAt: bookingRequests.createdAt,
+      updatedAt: bookingRequests.updatedAt,
+      artistName: artists.nameRo,
+      artistSlug: artists.slug,
+    })
     .from(bookingRequests)
+    .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
     .where(and(...conditions))
     .orderBy(desc(bookingRequests.createdAt))
     .limit(50);
