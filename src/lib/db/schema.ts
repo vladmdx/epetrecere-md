@@ -660,6 +660,37 @@ export const bookingRequests = pgTable("booking_requests", {
 ]);
 
 /**
+ * Artist availability slots — granular "I'm free from 14:00 to 18:00 for
+ * 150 EUR" records. Multiple slots per day are allowed (day gig + evening
+ * gig can coexist with different prices). When a slot gets claimed by a
+ * confirmed booking the `is_booked` flag flips and `booking_request_id`
+ * links the claim, but we keep the row so the artist's timeline stays
+ * auditable.
+ */
+export const artistAvailabilitySlots = pgTable("artist_availability_slots", {
+  id: serial("id").primaryKey(),
+  artistId: integer("artist_id")
+    .references(() => artists.id, { onDelete: "cascade" })
+    .notNull(),
+  date: date("date").notNull(),
+  /** "HH:MM" 24-hour — matches the same text format used by calendarEvents. */
+  startTime: text("start_time").notNull(),
+  endTime: text("end_time").notNull(),
+  /** Per-slot price in EUR. Optional; the client UI hides the number when
+   *  null (e.g., "sell on request"). */
+  price: integer("price"),
+  note: text("note"),
+  isBooked: boolean("is_booked").default(false).notNull(),
+  /** When booked, tracks which request claimed the slot so we can release
+   *  it automatically on cancel/reject. */
+  bookingRequestId: integer("booking_request_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_slot_artist_date").on(t.artistId, t.date),
+  index("idx_slot_artist_booked").on(t.artistId, t.isBooked),
+]);
+
+/**
  * Venue bookings mirror artist bookingRequests but link to a venue. Kept
  * in a separate table so existing artist-booking code stays untouched and
  * because venues never contribute to the event plan budget.

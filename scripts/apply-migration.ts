@@ -5,7 +5,10 @@
 import "dotenv/config";
 import { Pool } from "@neondatabase/serverless";
 
-const statements: Array<{ label: string; sql: string }> = [
+// For re-runs: you can switch `activeSet` to `slotsSet` to only apply
+// the Faza 6 additions without replaying the Faza 1 batch.
+
+const plannerBookingsSet: Array<{ label: string; sql: string }> = [
   {
     label: "enum booking_paid_status",
     sql: `DO $$ BEGIN
@@ -99,6 +102,43 @@ const statements: Array<{ label: string; sql: string }> = [
       ON "venue_booking_requests" ("event_plan_id")`,
   },
 ];
+
+const slotsSet: Array<{ label: string; sql: string }> = [
+  {
+    label: "artist_availability_slots table",
+    sql: `CREATE TABLE IF NOT EXISTS "artist_availability_slots" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "artist_id" integer NOT NULL REFERENCES "artists"("id") ON DELETE CASCADE,
+      "date" date NOT NULL,
+      "start_time" text NOT NULL,
+      "end_time" text NOT NULL,
+      "price" integer,
+      "note" text,
+      "is_booked" boolean DEFAULT false NOT NULL,
+      "booking_request_id" integer,
+      "created_at" timestamp DEFAULT now() NOT NULL
+    )`,
+  },
+  {
+    label: "idx_slot_artist_date",
+    sql: `CREATE INDEX IF NOT EXISTS "idx_slot_artist_date"
+      ON "artist_availability_slots" ("artist_id", "date")`,
+  },
+  {
+    label: "idx_slot_artist_booked",
+    sql: `CREATE INDEX IF NOT EXISTS "idx_slot_artist_booked"
+      ON "artist_availability_slots" ("artist_id", "is_booked")`,
+  },
+];
+
+// Pick via CLI: `npx tsx scripts/apply-migration.ts [planner|slots|all]`.
+const target = process.argv[2] ?? "all";
+const statements =
+  target === "planner"
+    ? plannerBookingsSet
+    : target === "slots"
+      ? slotsSet
+      : [...plannerBookingsSet, ...slotsSet];
 
 const url = process.env.DATABASE_URL;
 if (!url) {

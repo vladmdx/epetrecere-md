@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { SlotManager } from "@/components/vendor/slot-manager";
 
 const DAYS = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"];
 const MONTHS = [
@@ -541,9 +542,18 @@ export default function VendorCalendarPage() {
         <TabsList>
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
           {entity.type === "artist" && (
-            <TabsTrigger value="schedule">Grafic de Lucru</TabsTrigger>
+            <>
+              <TabsTrigger value="slots">Sloturi &amp; Prețuri</TabsTrigger>
+              <TabsTrigger value="schedule">Grafic de Lucru</TabsTrigger>
+            </>
           )}
         </TabsList>
+
+        {entity.type === "artist" && (
+          <TabsContent value="slots" className="mt-6">
+            <SlotManager artistId={entity.id} />
+          </TabsContent>
+        )}
 
         <TabsContent value="calendar" className="mt-6 space-y-4">
           {/* Status legend */}
