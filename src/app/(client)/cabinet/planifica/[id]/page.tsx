@@ -58,6 +58,10 @@ import {
 } from "@/components/planner/seating-view";
 import { PhotosView } from "@/components/planner/photos-view";
 import { CustomCalendar } from "@/components/public/custom-calendar";
+import {
+  PriceNegotiationPanel,
+  type BookingPriceOffer,
+} from "@/components/planner/price-negotiation-panel";
 import { cn } from "@/lib/utils";
 
 interface Plan {
@@ -88,6 +92,7 @@ interface BookingRequest {
   status: string;
   agreedPrice?: number | null;
   paidStatus?: "unpaid" | "partial" | "paid";
+  priceOffers?: BookingPriceOffer[] | null;
 }
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -393,7 +398,35 @@ export default function PlanDetailPage({
           )}
 
           {activeTab === "bookings" && (
-            <BookingsTab plan={plan} bookings={bookings} />
+            <BookingsTab
+              plan={plan}
+              bookings={bookings}
+              onRefresh={async () => {
+                if (!user?.primaryEmailAddress?.emailAddress) return;
+                const email = user.primaryEmailAddress.emailAddress;
+                const r = await fetch(
+                  `/api/booking-requests?client_email=${encodeURIComponent(email)}`,
+                );
+                if (r.ok) {
+                  const data: BookingRequest[] = await r.json();
+                  if (Array.isArray(data) && plan) {
+                    setBookings(
+                      data.filter((b) => {
+                        const bp = b as BookingRequest & {
+                          eventPlanId?: number | null;
+                        };
+                        return (
+                          bp.eventPlanId === plan.id ||
+                          (bp.eventPlanId == null &&
+                            plan.eventDate &&
+                            b.eventDate === plan.eventDate)
+                        );
+                      }),
+                    );
+                  }
+                }
+              }}
+            />
           )}
 
           {activeTab === "venues" && plan.venueNeeded && (
@@ -1240,9 +1273,13 @@ interface DiscoveryArtist {
 function BookingsTab({
   plan,
   bookings,
+  onRefresh,
 }: {
   plan: Plan;
   bookings: BookingRequest[];
+  /** Re-fetches the bookings list — called after price negotiation
+   *  or status changes so the UI reflects the new state. */
+  onRefresh: () => Promise<void> | void;
 }) {
   const [discovery, setDiscovery] = useState<DiscoveryArtist[]>([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
@@ -1350,6 +1387,29 @@ function BookingsTab({
                         <span className="text-sm font-semibold text-gold">
                           {b.agreedPrice}€
                         </span>
+                      </div>
+                    )}
+
+                    {/* Negotiation panel — always rendered for non-terminal
+                        states; component itself decides what buttons show. */}
+                    {["pending", "accepted"].includes(b.status) && (
+                      <div className="mt-3 border-t border-border/20 pt-3">
+                        <PriceNegotiationPanel
+                          booking={{
+                            id: b.id,
+                            status: b.status as
+                              | "pending"
+                              | "accepted"
+                              | "confirmed_by_client"
+                              | "rejected"
+                              | "cancelled"
+                              | "completed",
+                            agreedPrice: b.agreedPrice ?? null,
+                            priceOffers: b.priceOffers ?? null,
+                          }}
+                          perspective="client"
+                          onUpdate={onRefresh}
+                        />
                       </div>
                     )}
                   </CardContent>

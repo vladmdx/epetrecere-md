@@ -10,6 +10,8 @@ import { Calendar, User, MapPin, CheckCircle, XCircle, Loader2, MessageSquare, S
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
+import { PriceNegotiationPanel, type BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
+
 type BookingRequest = {
   id: number;
   artistId: number;
@@ -24,6 +26,8 @@ type BookingRequest = {
   message: string | null;
   status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled" | "completed";
   artistReply: string | null;
+  agreedPrice: number | null;
+  priceOffers: BookingPriceOffer[] | null;
   createdAt: string;
 };
 
@@ -296,15 +300,24 @@ export default function VendorBookingsPage() {
                   </div>
 
                   {booking.status === "pending" && (
-                    <div className="mt-4 flex gap-2 border-t border-border/40 pt-3">
-                      <Button
-                        size="sm"
-                        disabled={busy === booking.id}
-                        onClick={() => handleAction(booking.id, "accept")}
-                        className="gap-1 bg-success text-white hover:bg-success/90"
-                      >
-                        <CheckCircle className="h-3.5 w-3.5" /> Accept
-                      </Button>
+                    <div className="mt-4 space-y-3 border-t border-border/40 pt-3">
+                      <PriceNegotiationPanel
+                        booking={{
+                          id: booking.id,
+                          status: booking.status,
+                          agreedPrice: booking.agreedPrice,
+                          priceOffers: booking.priceOffers,
+                        }}
+                        perspective="artist"
+                        onUpdate={async () => {
+                          if (artistId != null) {
+                            const r = await fetch(
+                              `/api/booking-requests?artist_id=${artistId}`,
+                            );
+                            if (r.ok) setBookings(await r.json());
+                          }
+                        }}
+                      />
                       <Button
                         size="sm"
                         variant="outline"
