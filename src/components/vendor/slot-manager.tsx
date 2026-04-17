@@ -32,7 +32,15 @@ type Slot = {
   isBooked: boolean;
 };
 
-export function SlotManager({ artistId }: { artistId: number }) {
+export function SlotManager({
+  artistId,
+  refreshKey = 0,
+}: {
+  artistId: number;
+  /** Bump from parent to force a re-fetch (e.g., after the AI chat
+   *  creates slots via its own endpoint). */
+  refreshKey?: number;
+}) {
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -60,7 +68,7 @@ export function SlotManager({ artistId }: { artistId: number }) {
       .then((data) => setSlots(data.slots ?? []))
       .catch(() => setSlots([]))
       .finally(() => setLoading(false));
-  }, [artistId]);
+  }, [artistId, refreshKey]);
 
   function fmtDate(d: Date) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;

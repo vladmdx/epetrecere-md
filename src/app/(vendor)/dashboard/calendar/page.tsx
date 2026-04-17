@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { SlotManager } from "@/components/vendor/slot-manager";
+import { AICalendarChat } from "@/components/vendor/ai-calendar-chat";
 
 const DAYS = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"];
 const MONTHS = [
@@ -550,8 +551,8 @@ export default function VendorCalendarPage() {
         </TabsList>
 
         {entity.type === "artist" && (
-          <TabsContent value="slots" className="mt-6">
-            <SlotManager artistId={entity.id} />
+          <TabsContent value="slots" className="mt-6 space-y-4">
+            <ArtistSlotsPanel artistId={entity.id} />
           </TabsContent>
         )}
 
@@ -1044,6 +1045,21 @@ export default function VendorCalendarPage() {
       </Tabs>
 
       {entity.type === "artist" && <IcalSubscribeCard />}
+    </div>
+  );
+}
+
+/**
+ * Stitches the slot editor and the AI chat together. Kept local to the
+ * page so the simple refresh-counter pattern doesn't leak into shared
+ * components — we just bump a number whenever the AI writes new slots.
+ */
+function ArtistSlotsPanel({ artistId }: { artistId: number }) {
+  const [refreshKey, setRefreshKey] = useState(0);
+  return (
+    <div className="space-y-4">
+      <AICalendarChat onSlotsCreated={() => setRefreshKey((k) => k + 1)} />
+      <SlotManager artistId={artistId} refreshKey={refreshKey} />
     </div>
   );
 }
