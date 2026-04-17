@@ -75,6 +75,9 @@ const updatePlanSchema = z.object({
   budgetTarget: z.number().int().nonnegative().optional().nullable(),
   seatsPerTable: z.number().int().min(2).max(20).optional(),
   notes: z.string().optional().nullable(),
+  venueNeeded: z.boolean().optional(),
+  selectedCategories: z.array(z.number().int().positive()).optional(),
+  status: z.enum(["active", "completed", "cancelled"]).optional(),
 });
 
 export async function PUT(
@@ -98,12 +101,21 @@ export async function PUT(
     );
   }
 
+  // Stamp archivedAt whenever the plan moves out of "active" so the arhivă
+  // page can sort chronologically by completion date.
+  const patch: Record<string, unknown> = {
+    ...parsed.data,
+    updatedAt: new Date(),
+  };
+  if (parsed.data.status && parsed.data.status !== "active") {
+    patch.archivedAt = new Date();
+  } else if (parsed.data.status === "active") {
+    patch.archivedAt = null;
+  }
+
   const [updated] = await db
     .update(eventPlans)
-    .set({
-      ...parsed.data,
-      updatedAt: new Date(),
-    })
+    .set(patch)
     .where(and(eq(eventPlans.id, planId), eq(eventPlans.userId, owned.userId)))
     .returning();
 
