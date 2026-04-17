@@ -62,6 +62,7 @@ import {
   PriceNegotiationPanel,
   type BookingPriceOffer,
 } from "@/components/planner/price-negotiation-panel";
+import { AIArtistPickerChat } from "@/components/planner/ai-artist-picker-chat";
 import { cn } from "@/lib/utils";
 
 interface Plan {
@@ -1330,6 +1331,12 @@ function BookingsTab({
 
   return (
     <div className="space-y-10">
+      {/* ─── AI assistant (collapsed CTA by default) ─────────────── */}
+      <AIArtistPickerChat
+        eventPlanId={plan.id}
+        onBookingsCreated={onRefresh}
+      />
+
       {/* ─── Section 1: Existing bookings ───────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-4">
