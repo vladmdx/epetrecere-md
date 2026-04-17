@@ -604,11 +604,32 @@ export const bookingRequestStatusEnum = pgEnum("booking_request_status", [
   "completed",
 ]);
 
+export const bookingPaidStatusEnum = pgEnum("booking_paid_status", [
+  "unpaid",
+  "partial",
+  "paid",
+]);
+
+/**
+ * Price offer entry stored inside `bookingRequests.priceOffers` (jsonb array).
+ * Each entry represents a proposal from either side during negotiation.
+ */
+export type BookingPriceOffer = {
+  from: "artist" | "client";
+  amount: number; // EUR
+  message?: string;
+  at: string; // ISO timestamp
+};
+
 export const bookingRequests = pgTable("booking_requests", {
   id: serial("id").primaryKey(),
   artistId: integer("artist_id")
     .references(() => artists.id, { onDelete: "cascade" })
     .notNull(),
+  /** Optional link to the client's event plan so artist bookings show up in
+   *  that plan's "Rezervări Artiști" tab and feed the budget. */
+  eventPlanId: integer("event_plan_id")
+    .references(() => eventPlans.id, { onDelete: "set null" }),
   clientUserId: uuid("client_user_id")
     .references(() => users.id, { onDelete: "cascade" }),
   clientName: text("client_name").notNull(),
@@ -621,6 +642,12 @@ export const bookingRequests = pgTable("booking_requests", {
   guestCount: integer("guest_count"),
   message: text("message"),
   status: bookingRequestStatusEnum("status").default("pending").notNull(),
+  /** Final negotiated price in EUR. Set when the artist posts their
+   *  accepted offer. Feeds the event plan budget. */
+  agreedPrice: integer("agreed_price"),
+  paidStatus: bookingPaidStatusEnum("paid_status").default("unpaid").notNull(),
+  /** Full history of price proposals between client and artist. */
+  priceOffers: jsonb("price_offers").$type<BookingPriceOffer[]>().default([]),
   artistReply: text("artist_reply"),
   adminNotes: text("admin_notes"),
   adminSeen: boolean("admin_seen").default(false).notNull(),
@@ -629,6 +656,44 @@ export const bookingRequests = pgTable("booking_requests", {
 }, (t) => [
   index("idx_booking_artist_status").on(t.artistId, t.status),
   index("idx_booking_client_user").on(t.clientUserId),
+  index("idx_booking_event_plan").on(t.eventPlanId),
+]);
+
+/**
+ * Venue bookings mirror artist bookingRequests but link to a venue. Kept
+ * in a separate table so existing artist-booking code stays untouched and
+ * because venues never contribute to the event plan budget.
+ */
+export const venueBookingRequests = pgTable("venue_booking_requests", {
+  id: serial("id").primaryKey(),
+  venueId: integer("venue_id")
+    .references(() => venues.id, { onDelete: "cascade" })
+    .notNull(),
+  eventPlanId: integer("event_plan_id")
+    .references(() => eventPlans.id, { onDelete: "set null" }),
+  clientUserId: uuid("client_user_id")
+    .references(() => users.id, { onDelete: "cascade" }),
+  clientName: text("client_name").notNull(),
+  clientPhone: text("client_phone").notNull(),
+  clientEmail: text("client_email"),
+  eventDate: date("event_date").notNull(),
+  startTime: text("start_time"),
+  endTime: text("end_time"),
+  eventType: text("event_type"),
+  guestCount: integer("guest_count"),
+  message: text("message"),
+  status: bookingRequestStatusEnum("status").default("pending").notNull(),
+  agreedPrice: integer("agreed_price"),
+  priceOffers: jsonb("price_offers").$type<BookingPriceOffer[]>().default([]),
+  venueReply: text("venue_reply"),
+  adminNotes: text("admin_notes"),
+  adminSeen: boolean("admin_seen").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("idx_venue_booking_venue_status").on(t.venueId, t.status),
+  index("idx_venue_booking_client_user").on(t.clientUserId),
+  index("idx_venue_booking_event_plan").on(t.eventPlanId),
 ]);
 
 // ═══════════════════════════════════════════════════════
@@ -705,6 +770,17 @@ export const checklistPriorityEnum = pgEnum("checklist_priority", [
   "high",
 ]);
 
+/**
+ * Lifecycle of an event plan. `active` — still being planned; `completed`
+ * — the event date passed and the user (or the auto-archive job) marked it
+ * done; `cancelled` — user abandoned the plan but kept the record.
+ */
+export const eventPlanStatusEnum = pgEnum("event_plan_status", [
+  "active",
+  "completed",
+  "cancelled",
+]);
+
 export const eventPlans = pgTable("event_plans", {
   id: serial("id").primaryKey(),
   userId: uuid("user_id")
@@ -719,13 +795,25 @@ export const eventPlans = pgTable("event_plans", {
   budgetTarget: integer("budget_target"),
   seatsPerTable: integer("seats_per_table").default(10),
   notes: text("notes"),
+  /** Whether the user indicated in the wizard they also need a venue.
+   *  When true the plan detail page surfaces the "Săli" tab. */
+  venueNeeded: boolean("venue_needed").default(false).notNull(),
+  /** Array of category IDs the user picked in the wizard (singer, DJ,
+   *  photographer, ...). Used to pre-filter the "Artiști disponibili"
+   *  section inside the Rezervări Artiști tab. */
+  selectedCategories: jsonb("selected_categories").$type<number[]>().default([]),
+  status: eventPlanStatusEnum("status").default("active").notNull(),
+  /** Set when the plan moves to the Arhivă section. */
+  archivedAt: timestamp("archived_at"),
   /** Event Moments (F-C8): unique slug guests use to reach the public
    *  upload page via QR code. Anonymous upload, no auth required. */
   momentsSlug: text("moments_slug").unique(),
   momentsEnabled: boolean("moments_enabled").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (t) => [
+  index("idx_event_plan_user_status").on(t.userId, t.status),
+]);
 
 // Planning checklist — seed from template on plan creation.
 export const checklistItems = pgTable("checklist_items", {
