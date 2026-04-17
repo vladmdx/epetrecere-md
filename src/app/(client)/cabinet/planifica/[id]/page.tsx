@@ -1,26 +1,53 @@
 "use client";
 
-// M4 — Client cabinet: single event plan detail view with sub-tabs for
-// Checklist, Invitați and Așezare mese. Data is fetched once from the
-// plan endpoint and split across child components that each manage their
-// own optimistic mutations.
+// M4 — Client planner dashboard — matches reference design:
+// Left vertical nav | Main content (Overview/Checklist/Budget/etc) | Right stats sidebar.
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  ArrowLeft,
+  LayoutDashboard,
   ClipboardList,
+  Wallet,
   Users,
   UtensilsCrossed,
-  Loader2,
+  Clock,
+  BookOpen,
+  Settings,
   Calendar,
   MapPin,
-  Wallet,
-  Trash2,
+  Loader2,
   Camera,
+  Trash2,
+  Plus,
+  ChevronRight,
+  ExternalLink,
+  Save,
+  Image,
 } from "lucide-react";
 import { ChecklistView, type ChecklistItem } from "@/components/planner/checklist-view";
 import { GuestsView, type Guest } from "@/components/planner/guests-view";
@@ -30,7 +57,7 @@ import {
   type SeatAssignment,
 } from "@/components/planner/seating-view";
 import { PhotosView } from "@/components/planner/photos-view";
-import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 interface Plan {
   id: number;
@@ -44,6 +71,57 @@ interface Plan {
   notes: string | null;
 }
 
+interface BookingRequest {
+  id: number;
+  artistId: number;
+  artistName: string | null;
+  artistSlug: string | null;
+  eventType: string | null;
+  eventDate: string;
+  status: string;
+}
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  wedding: "Nuntă",
+  baptism: "Botez",
+  cumatrie: "Cumătrie",
+  birthday: "Zi de naștere",
+  corporate: "Corporate",
+  other: "Alt tip",
+};
+
+const EVENT_TYPES = [
+  { value: "wedding", label: "Nuntă" },
+  { value: "baptism", label: "Botez" },
+  { value: "cumatrie", label: "Cumătrie" },
+  { value: "birthday", label: "Zi de naștere" },
+  { value: "corporate", label: "Corporate" },
+  { value: "other", label: "Alt tip" },
+];
+
+type TabKey =
+  | "overview"
+  | "checklist"
+  | "budget"
+  | "guests"
+  | "seating"
+  | "timeline"
+  | "bookings"
+  | "photos"
+  | "settings";
+
+const NAV_ITEMS: { key: TabKey; icon: typeof LayoutDashboard; label: string }[] = [
+  { key: "overview", icon: LayoutDashboard, label: "Prezentare" },
+  { key: "checklist", icon: ClipboardList, label: "Checklist" },
+  { key: "budget", icon: Wallet, label: "Budget" },
+  { key: "guests", icon: Users, label: "Invitați" },
+  { key: "seating", icon: UtensilsCrossed, label: "Așezare Mese" },
+  { key: "timeline", icon: Clock, label: "Cronologie" },
+  { key: "bookings", icon: BookOpen, label: "Rezervări" },
+  { key: "photos", icon: Camera, label: "Fotografii" },
+  { key: "settings", icon: Settings, label: "Setări" },
+];
+
 export default function PlanDetailPage({
   params,
 }: {
@@ -52,15 +130,20 @@ export default function PlanDetailPage({
   const { id } = use(params);
   const planId = Number(id);
   const router = useRouter();
+  const { user } = useUser();
 
   const [plan, setPlan] = useState<Plan | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [tables, setTables] = useState<SeatingTable[]>([]);
   const [seats, setSeats] = useState<SeatAssignment[]>([]);
+  const [bookings, setBookings] = useState<BookingRequest[]>([]);
+  const [photoCount, setPhotoCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
 
+  // Load plan data
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -77,6 +160,7 @@ export default function PlanDetailPage({
         setGuests(data.guests ?? []);
         setTables(data.tables ?? []);
         setSeats(data.seats ?? []);
+        setPhotoCount((data.photos ?? []).length);
       } catch {
         toast.error("Nu am putut încărca planul.");
       } finally {
@@ -86,10 +170,20 @@ export default function PlanDetailPage({
     if (Number.isFinite(planId)) load();
   }, [planId]);
 
+  // Load user's bookings
+  useEffect(() => {
+    if (!user?.primaryEmailAddress?.emailAddress) return;
+    const email = user.primaryEmailAddress.emailAddress;
+    fetch(`/api/booking-requests?client_email=${encodeURIComponent(email)}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (Array.isArray(data)) setBookings(data);
+      })
+      .catch(() => {});
+  }, [user]);
+
   async function deletePlan() {
-    if (!confirm("Sigur vrei să ștergi acest plan? Operațiunea este ireversibilă.")) {
-      return;
-    }
+    if (!confirm("Sigur vrei să ștergi acest plan? Operațiunea este ireversibilă.")) return;
     const res = await fetch(`/api/event-plans/${planId}`, { method: "DELETE" });
     if (!res.ok) {
       toast.error("Nu am putut șterge planul.");
@@ -101,128 +195,1029 @@ export default function PlanDetailPage({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Se încarcă…
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-gold" />
       </div>
     );
   }
 
   if (notFound || !plan) {
     return (
-      <div className="mx-auto max-w-md py-20 px-4 text-center">
+      <div className="mx-auto max-w-md py-20 text-center">
         <ClipboardList className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-        <p className="text-muted-foreground">Plan negăsit sau nu ai acces la el.</p>
-        <Link
-          href="/cabinet/planifica"
-          className="mt-4 inline-block text-sm text-gold hover:underline"
-        >
-          Înapoi la lista de planuri
+        <p className="text-muted-foreground">Plan negăsit sau nu ai acces.</p>
+        <Link href="/cabinet/planifica" className="mt-4 inline-block text-sm text-gold hover:underline">
+          Înapoi la planuri
         </Link>
       </div>
     );
   }
 
+  // Computed stats
+  const checklistDone = checklist.filter((c) => c.done).length;
+  const checklistTotal = checklist.length;
+  const guestTotal = guests.reduce((sum, g) => sum + 1 + (g.plusOnes || 0), 0);
+  const guestAccepted = guests.filter((g) => g.rsvp === "accepted").reduce((sum, g) => sum + 1 + (g.plusOnes || 0), 0);
+  const seatedGuests = new Set(seats.map((s) => s.guestId)).size;
+  const activeBookings = bookings.filter((b) => ["pending", "accepted", "confirmed_by_client"].includes(b.status));
+
   return (
-    <div className="mx-auto max-w-5xl py-8 px-4">
-      {/* Header */}
-      <div className="mb-6">
-        <Link
-          href="/cabinet/planifica"
-          className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
-        >
-          <ArrowLeft className="h-3 w-3" /> Toate planurile
-        </Link>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="font-heading text-2xl font-bold">{plan.title}</h1>
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+    <div className="flex gap-0 -m-6 min-h-[calc(100vh-4rem)]">
+      {/* Left Navigation */}
+      <nav className="hidden md:flex w-48 shrink-0 flex-col border-r border-border/30 bg-card/50 py-4">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.key;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setActiveTab(item.key)}
+              className={cn(
+                "flex items-center gap-2.5 px-5 py-2.5 text-sm transition-colors text-left",
+                isActive
+                  ? "border-l-2 border-gold text-gold font-medium bg-gold/5"
+                  : "border-l-2 border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/30",
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {item.label}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Mobile tab bar */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex overflow-x-auto border-t border-border/40 bg-background px-2 py-1.5 gap-1">
+        {NAV_ITEMS.slice(0, 6).map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => setActiveTab(item.key)}
+              className={cn(
+                "flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10px] min-w-[56px] transition-colors",
+                activeTab === item.key ? "text-gold" : "text-muted-foreground",
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Main Content + Right Sidebar */}
+      <div className="flex-1 flex overflow-y-auto">
+        <div className="flex-1 p-6 pb-20 md:pb-6">
+          {activeTab === "overview" && (
+            <OverviewTab
+              plan={plan}
+              checklist={checklist}
+              guests={guests}
+              tables={tables}
+              seats={seats}
+              bookings={activeBookings}
+              photoCount={photoCount}
+              guestTotal={guestTotal}
+              guestAccepted={guestAccepted}
+              checklistDone={checklistDone}
+              checklistTotal={checklistTotal}
+              seatedGuests={seatedGuests}
+              onCheckItem={async (itemId, done) => {
+                const res = await fetch(`/api/event-plans/${planId}/checklist/${itemId}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ done }),
+                });
+                if (res.ok) {
+                  setChecklist((prev) =>
+                    prev.map((c) => (c.id === itemId ? { ...c, done, doneAt: done ? new Date().toISOString() : null } : c)),
+                  );
+                }
+              }}
+              onSwitchTab={setActiveTab}
+            />
+          )}
+
+          {activeTab === "checklist" && (
+            <ChecklistView
+              planId={plan.id}
+              eventDate={plan.eventDate}
+              items={checklist}
+              onChange={setChecklist}
+            />
+          )}
+
+          {activeTab === "budget" && (
+            <BudgetTab plan={plan} />
+          )}
+
+          {activeTab === "guests" && (
+            <GuestsView
+              planId={plan.id}
+              guestCountTarget={plan.guestCountTarget}
+              guests={guests}
+              onChange={setGuests}
+            />
+          )}
+
+          {activeTab === "seating" && (
+            <SeatingView
+              planId={plan.id}
+              guests={guests}
+              tables={tables}
+              seats={seats}
+              onTablesChange={setTables}
+              onSeatsChange={setSeats}
+            />
+          )}
+
+          {activeTab === "timeline" && (
+            <TimelineTab checklist={checklist} eventDate={plan.eventDate} />
+          )}
+
+          {activeTab === "bookings" && (
+            <BookingsTab bookings={bookings} />
+          )}
+
+          {activeTab === "photos" && (
+            <PhotosView planId={plan.id} />
+          )}
+
+          {activeTab === "settings" && (
+            <SettingsTab plan={plan} onUpdate={setPlan} onDelete={deletePlan} />
+          )}
+        </div>
+
+        {/* Right Stats Sidebar — visible on overview */}
+        {activeTab === "overview" && (
+          <aside className="hidden lg:flex w-64 shrink-0 flex-col gap-4 border-l border-border/30 bg-card/30 p-4">
+            {/* Budget Widget */}
+            <Card>
+              <CardContent className="py-4">
+                <p className="text-2xl font-heading font-bold">
+                  {plan.budgetTarget ? `${plan.budgetTarget}€` : "—"}
+                </p>
+                <p className="text-xs text-muted-foreground">Budget</p>
+                <BudgetProgress plan={plan} />
+              </CardContent>
+            </Card>
+
+            {/* Files Widget */}
+            <Card>
+              <CardContent className="py-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-2xl font-heading font-bold">{photoCount}</p>
+                    <p className="text-xs text-muted-foreground">Fotografii</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1">
+                    <div className="h-8 w-8 rounded bg-accent/50 flex items-center justify-center">
+                      <Image className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div className="h-8 w-8 rounded bg-accent/50 flex items-center justify-center">
+                      <Camera className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("photos")}
+                  className="mt-2 text-xs text-gold hover:underline"
+                >
+                  Vezi mai mult
+                </button>
+              </CardContent>
+            </Card>
+
+            {/* General Info Widget */}
+            <Card>
+              <CardContent className="py-4">
+                <h4 className="font-heading font-semibold text-sm mb-3">Info General</h4>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Users className="h-4 w-4 text-gold" />
+                    <div>
+                      <p className="text-lg font-bold">{guestTotal}</p>
+                      <p className="text-[10px] text-muted-foreground">Invitați total</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <UtensilsCrossed className="h-4 w-4 text-gold" />
+                    <div>
+                      <p className="text-lg font-bold">{tables.length}</p>
+                      <p className="text-[10px] text-muted-foreground">Număr de mese</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Users className="h-4 w-4 text-gold" />
+                    <div>
+                      <p className="text-lg font-bold">{seatedGuests}</p>
+                      <p className="text-[10px] text-muted-foreground">Invitați așezați</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </aside>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Overview Tab ───────────────────────────────────────────────────
+
+function OverviewTab({
+  plan,
+  checklist,
+  guests,
+  tables,
+  seats,
+  bookings,
+  photoCount,
+  guestTotal,
+  guestAccepted,
+  checklistDone,
+  checklistTotal,
+  seatedGuests,
+  onCheckItem,
+  onSwitchTab,
+}: {
+  plan: Plan;
+  checklist: ChecklistItem[];
+  guests: Guest[];
+  tables: SeatingTable[];
+  seats: SeatAssignment[];
+  bookings: BookingRequest[];
+  photoCount: number;
+  guestTotal: number;
+  guestAccepted: number;
+  checklistDone: number;
+  checklistTotal: number;
+  seatedGuests: number;
+  onCheckItem: (id: number, done: boolean) => void;
+  onSwitchTab: (tab: TabKey) => void;
+}) {
+  return (
+    <div className="space-y-6">
+      {/* Event Hero Card */}
+      <Card className="overflow-hidden">
+        <CardContent className="py-5">
+          <div className="flex items-start gap-5">
+            {/* Event Photo / Avatar */}
+            <div className="hidden sm:flex h-24 w-24 shrink-0 items-center justify-center rounded-xl bg-gold/10 border border-gold/20">
+              <Calendar className="h-10 w-10 text-gold" />
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 flex-wrap mb-1">
+                <h1 className="font-heading text-xl font-bold">{plan.title}</h1>
+                {plan.eventType && (
+                  <Badge className="bg-gold/20 text-gold border-gold/30 text-xs">
+                    {EVENT_TYPE_LABELS[plan.eventType] ?? plan.eventType}
+                  </Badge>
+                )}
+              </div>
               {plan.eventDate && (
-                <span className="flex items-center gap-1.5">
+                <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-3">
                   <Calendar className="h-3.5 w-3.5" />
-                  {new Date(plan.eventDate).toLocaleDateString("ro-MD")}
-                </span>
+                  {new Date(plan.eventDate).toLocaleDateString("ro-MD", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                </p>
               )}
-              {plan.location && (
-                <span className="flex items-center gap-1.5">
-                  <MapPin className="h-3.5 w-3.5" />
-                  {plan.location}
-                </span>
-              )}
-              {plan.guestCountTarget && (
-                <span className="flex items-center gap-1.5">
-                  <Users className="h-3.5 w-3.5" />
-                  {plan.guestCountTarget} invitați
-                </span>
-              )}
-              {plan.budgetTarget && (
-                <span className="flex items-center gap-1.5">
-                  <Wallet className="h-3.5 w-3.5" />
-                  {plan.budgetTarget}€
-                </span>
-              )}
+
+              {/* Countdown */}
+              {plan.eventDate && <LiveCountdown targetDate={plan.eventDate} />}
             </div>
           </div>
+
+          {/* Vendor Tags */}
+          <div className="mt-4 pt-4 border-t border-border/20 flex flex-wrap gap-2">
+            {plan.location && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/30 bg-gold/5 px-3 py-1 text-xs font-medium text-gold">
+                <MapPin className="h-3 w-3" />
+                {plan.location}
+              </span>
+            )}
+            {bookings.map((b) =>
+              b.artistName ? (
+                <Link
+                  key={b.id}
+                  href={b.artistSlug ? `/artisti/${b.artistSlug}` : "#"}
+                  className="inline-flex items-center gap-1 rounded-full border border-border/40 bg-accent/30 px-3 py-1 text-xs font-medium text-foreground hover:border-gold/40 transition-colors"
+                >
+                  {b.artistName}
+                </Link>
+              ) : null,
+            )}
+            {bookings.length === 0 && !plan.location && (
+              <span className="text-xs text-muted-foreground">
+                Adaugă locația și furnizori pentru a apărea aici
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* My Tasks + Stats grid on mobile/tablet */}
+      <div className="grid gap-6 lg:grid-cols-1">
+        {/* My Tasks */}
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base font-heading">Sarcinile mele</CardTitle>
+              <span className="text-xs text-muted-foreground">
+                {checklistTotal > 0
+                  ? `Ai ${checklistTotal - checklistDone} sarcini de completat`
+                  : "Nicio sarcină"}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {checklistTotal === 0 ? (
+              <p className="py-4 text-sm text-muted-foreground text-center">
+                Checklist-ul este gol. Adaugă sarcini din tab-ul Checklist.
+              </p>
+            ) : (
+              <div className="space-y-1">
+                {checklist
+                  .sort((a, b) => {
+                    if (a.done !== b.done) return a.done ? 1 : -1;
+                    return (a.sortOrder ?? 999) - (b.sortOrder ?? 999);
+                  })
+                  .slice(0, 5)
+                  .map((item) => (
+                    <label
+                      key={item.id}
+                      className={cn(
+                        "flex items-center gap-3 rounded-lg px-3 py-2.5 cursor-pointer transition-colors hover:bg-accent/30",
+                        item.done && "opacity-50",
+                      )}
+                    >
+                      <Checkbox
+                        checked={item.done}
+                        onCheckedChange={(checked) => onCheckItem(item.id, !!checked)}
+                        className="data-[state=checked]:bg-gold data-[state=checked]:border-gold"
+                      />
+                      <span className={cn("text-sm flex-1", item.done && "line-through")}>
+                        {item.title}
+                      </span>
+                      {item.priority === "high" && !item.done && (
+                        <span className="text-[10px] text-warning font-medium">Urgent</span>
+                      )}
+                    </label>
+                  ))}
+              </div>
+            )}
+            {checklistTotal > 5 && (
+              <button
+                type="button"
+                onClick={() => onSwitchTab("checklist")}
+                className="mt-2 text-xs text-gold hover:underline flex items-center gap-1"
+              >
+                Vezi mai mult <ChevronRight className="h-3 w-3" />
+              </button>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Stats cards for mobile (hidden on lg since right sidebar shows them) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 lg:hidden">
+          <Card>
+            <CardContent className="py-4 text-center">
+              <p className="text-2xl font-heading font-bold text-gold">
+                {plan.budgetTarget ? `${plan.budgetTarget}€` : "—"}
+              </p>
+              <p className="text-xs text-muted-foreground">Budget</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-4 text-center">
+              <p className="text-2xl font-heading font-bold">{guestTotal}</p>
+              <p className="text-xs text-muted-foreground">Invitați</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="py-4 text-center">
+              <p className="text-2xl font-heading font-bold">{tables.length}</p>
+              <p className="text-xs text-muted-foreground">Mese</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Live Countdown ─────────────────────────────────────────────────
+
+function LiveCountdown({ targetDate }: { targetDate: string }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const target = new Date(targetDate).getTime();
+  const diff = Math.max(0, target - now);
+
+  if (diff === 0) {
+    return (
+      <p className="text-sm font-medium text-gold">Evenimentul a avut loc!</p>
+    );
+  }
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  const minutes = Math.floor((diff / (1000 * 60)) % 60);
+  const seconds = Math.floor((diff / 1000) % 60);
+
+  return (
+    <div className="flex gap-3">
+      {[
+        { value: days, label: "Zile" },
+        { value: hours, label: "Ore" },
+        { value: minutes, label: "Minute" },
+        { value: seconds, label: "Secunde" },
+      ].map((unit) => (
+        <div key={unit.label} className="text-center rounded-lg border border-border/40 bg-accent/30 px-3 py-2 min-w-[56px]">
+          <p className="text-xl font-heading font-bold">{unit.value}</p>
+          <p className="text-[10px] text-muted-foreground">{unit.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Budget Progress Widget ─────────────────────────────────────────
+
+function BudgetProgress({ plan }: { plan: Plan }) {
+  // Budget tracking from localStorage (same key as the budget page)
+  const [spent, setSpent] = useState(0);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`budget-expenses-${plan.id}`);
+      if (raw) {
+        const expenses = JSON.parse(raw);
+        if (Array.isArray(expenses)) {
+          setSpent(expenses.reduce((sum: number, e: { amount: number }) => sum + (e.amount || 0), 0));
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [plan.id]);
+
+  const total = plan.budgetTarget || 0;
+  const pct = total > 0 ? Math.min(100, Math.round((spent / total) * 100)) : 0;
+
+  return (
+    <div className="mt-2">
+      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+        <span>Folosit</span>
+        <span>{pct}%</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-border/30 overflow-hidden">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all",
+            pct > 90 ? "bg-destructive" : pct > 70 ? "bg-warning" : "bg-success",
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Budget Tab ─────────────────────────────────────────────────────
+
+interface BudgetExpense {
+  id: string;
+  category: string;
+  description: string;
+  amount: number;
+  paid: boolean;
+}
+
+const BUDGET_CATEGORIES = [
+  "Locație / Sală",
+  "Artiști / Muzică",
+  "Foto & Video",
+  "Decorațiuni & Flori",
+  "Meniu & Tort",
+  "Rochie & Costum",
+  "Transport",
+  "Invitații",
+  "Altele",
+];
+
+function BudgetTab({ plan }: { plan: Plan }) {
+  const storageKey = `budget-expenses-${plan.id}`;
+  const [expenses, setExpenses] = useState<BudgetExpense[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const [newCat, setNewCat] = useState(BUDGET_CATEGORIES[0]);
+  const [newDesc, setNewDesc] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) setExpenses(JSON.parse(raw));
+    } catch {
+      // ignore
+    }
+  }, [storageKey]);
+
+  function save(updated: BudgetExpense[]) {
+    setExpenses(updated);
+    localStorage.setItem(storageKey, JSON.stringify(updated));
+  }
+
+  function addExpense() {
+    if (!newDesc.trim() || !newAmount) return;
+    const item: BudgetExpense = {
+      id: crypto.randomUUID(),
+      category: newCat,
+      description: newDesc.trim(),
+      amount: Number(newAmount),
+      paid: false,
+    };
+    save([...expenses, item]);
+    setNewDesc("");
+    setNewAmount("");
+    setAddOpen(false);
+    toast.success("Cheltuială adăugată");
+  }
+
+  function togglePaid(id: string) {
+    save(expenses.map((e) => (e.id === id ? { ...e, paid: !e.paid } : e)));
+  }
+
+  function removeExpense(id: string) {
+    save(expenses.filter((e) => e.id !== id));
+  }
+
+  const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalPaid = expenses.filter((e) => e.paid).reduce((sum, e) => sum + e.amount, 0);
+  const budget = plan.budgetTarget || 0;
+  const remaining = budget - totalSpent;
+
+  // Group by category
+  const grouped = BUDGET_CATEGORIES.map((cat) => ({
+    category: cat,
+    items: expenses.filter((e) => e.category === cat),
+    total: expenses.filter((e) => e.category === cat).reduce((s, e) => s + e.amount, 0),
+  })).filter((g) => g.items.length > 0);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-heading text-xl font-bold">Budget & Cheltuieli</h2>
+          <p className="text-sm text-muted-foreground">
+            Buget total: {budget > 0 ? `${budget}€` : "Nesetat"}
+          </p>
+        </div>
+        <Button
+          onClick={() => setAddOpen(true)}
+          className="gap-1 bg-gold text-background hover:bg-gold-dark"
+          size="sm"
+        >
+          <Plus className="h-4 w-4" /> Adaugă cheltuială
+        </Button>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <Card>
+          <CardContent className="py-3 text-center">
+            <p className="text-lg font-bold">{budget}€</p>
+            <p className="text-[10px] text-muted-foreground">Budget total</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-3 text-center">
+            <p className="text-lg font-bold text-warning">{totalSpent}€</p>
+            <p className="text-[10px] text-muted-foreground">Planificat</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-3 text-center">
+            <p className="text-lg font-bold text-success">{totalPaid}€</p>
+            <p className="text-[10px] text-muted-foreground">Achitat</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="py-3 text-center">
+            <p className={cn("text-lg font-bold", remaining < 0 ? "text-destructive" : "text-foreground")}>
+              {remaining}€
+            </p>
+            <p className="text-[10px] text-muted-foreground">Rămas</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Progress */}
+      {budget > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+            <span>Utilizat {Math.round((totalSpent / budget) * 100)}%</span>
+            <span>{totalSpent}€ / {budget}€</span>
+          </div>
+          <div className="h-3 w-full rounded-full bg-border/30 overflow-hidden">
+            <div
+              className={cn(
+                "h-full rounded-full transition-all",
+                totalSpent > budget ? "bg-destructive" : totalSpent > budget * 0.7 ? "bg-warning" : "bg-gold",
+              )}
+              style={{ width: `${Math.min(100, (totalSpent / budget) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Expenses by category */}
+      {grouped.length === 0 ? (
+        <div className="py-12 text-center text-muted-foreground">
+          <Wallet className="mx-auto mb-3 h-8 w-8 opacity-40" />
+          <p>Nu ai cheltuieli încă.</p>
+          <p className="text-xs mt-1">Adaugă prima cheltuială pentru a urmări bugetul.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {grouped.map((g) => (
+            <Card key={g.category}>
+              <CardHeader className="py-3 pb-0">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium">{g.category}</CardTitle>
+                  <span className="text-sm font-bold">{g.total}€</span>
+                </div>
+              </CardHeader>
+              <CardContent className="py-2">
+                {g.items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-3 py-2 border-b border-border/20 last:border-0"
+                  >
+                    <Checkbox
+                      checked={item.paid}
+                      onCheckedChange={() => togglePaid(item.id)}
+                      className="data-[state=checked]:bg-success data-[state=checked]:border-success"
+                    />
+                    <span className={cn("flex-1 text-sm", item.paid && "line-through text-muted-foreground")}>
+                      {item.description}
+                    </span>
+                    <span className="text-sm font-medium">{item.amount}€</span>
+                    <button
+                      type="button"
+                      onClick={() => removeExpense(item.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Add expense dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cheltuială nouă</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Categorie</Label>
+              <Select value={newCat} onValueChange={(v) => { if (v) setNewCat(v); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {BUDGET_CATEGORIES.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Descriere</Label>
+              <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Ex: Sală Nuntă" />
+            </div>
+            <div className="space-y-2">
+              <Label>Sumă (EUR)</Label>
+              <Input type="number" min="0" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} placeholder="0" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Anulează</Button>
+            <Button onClick={addExpense} className="bg-gold text-background hover:bg-gold-dark" disabled={!newDesc.trim() || !newAmount}>
+              Adaugă
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ─── Timeline Tab ───────────────────────────────────────────────────
+
+function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eventDate: string | null }) {
+  if (!eventDate) {
+    return (
+      <div className="py-12 text-center text-muted-foreground">
+        <Clock className="mx-auto mb-3 h-8 w-8 opacity-40" />
+        <p>Setează data evenimentului pentru a vedea cronologia.</p>
+      </div>
+    );
+  }
+
+  const target = new Date(eventDate);
+  const now = new Date();
+  const daysUntil = Math.ceil((target.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+  // Group tasks by time period
+  const periods = [
+    { label: "Depășite", min: -Infinity, max: 0, color: "text-destructive", borderColor: "border-destructive/30" },
+    { label: "Această săptămână", min: 0, max: 7, color: "text-warning", borderColor: "border-warning/30" },
+    { label: "Această lună", min: 7, max: 30, color: "text-gold", borderColor: "border-gold/30" },
+    { label: "1-3 luni", min: 30, max: 90, color: "text-foreground", borderColor: "border-border/40" },
+    { label: "3-6 luni", min: 90, max: 180, color: "text-muted-foreground", borderColor: "border-border/30" },
+    { label: "6+ luni", min: 180, max: Infinity, color: "text-muted-foreground/60", borderColor: "border-border/20" },
+  ];
+
+  const itemsWithDue = checklist
+    .filter((c) => c.dueDaysBefore != null)
+    .map((c) => {
+      const daysBeforeEvent = c.dueDaysBefore!;
+      const dueInDays = daysUntil - daysBeforeEvent; // negative means overdue
+      return { ...c, dueInDays, daysBeforeEvent };
+    })
+    .sort((a, b) => a.dueInDays - b.dueInDays);
+
+  return (
+    <div>
+      <h2 className="font-heading text-xl font-bold mb-1">Cronologie</h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        {daysUntil > 0 ? `${daysUntil} zile până la eveniment` : "Evenimentul a trecut"}
+      </p>
+
+      {itemsWithDue.length === 0 ? (
+        <p className="py-8 text-center text-muted-foreground text-sm">
+          Nicio sarcină cu termen setat.
+        </p>
+      ) : (
+        <div className="space-y-6">
+          {periods.map((period) => {
+            const items = itemsWithDue.filter(
+              (i) => i.dueInDays >= period.min && i.dueInDays < period.max && !i.done,
+            );
+            if (items.length === 0) return null;
+            return (
+              <div key={period.label}>
+                <h3 className={cn("text-sm font-semibold mb-2", period.color)}>
+                  {period.label} ({items.length})
+                </h3>
+                <div className="space-y-1">
+                  {items.map((item) => (
+                    <div
+                      key={item.id}
+                      className={cn("flex items-center gap-3 rounded-lg border px-3 py-2.5", period.borderColor)}
+                    >
+                      <div className={cn("h-2 w-2 rounded-full shrink-0", period.color === "text-destructive" ? "bg-destructive" : period.color === "text-warning" ? "bg-warning" : "bg-gold")} />
+                      <span className="text-sm flex-1">{item.title}</span>
+                      <span className="text-[10px] text-muted-foreground shrink-0">
+                        {item.daysBeforeEvent > 0 ? `${item.daysBeforeEvent}z înainte` : "Ziua evenimentului"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Done items */}
+          {itemsWithDue.filter((i) => i.done).length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-success mb-2">
+                Completate ({itemsWithDue.filter((i) => i.done).length})
+              </h3>
+              <div className="space-y-1">
+                {itemsWithDue
+                  .filter((i) => i.done)
+                  .map((item) => (
+                    <div key={item.id} className="flex items-center gap-3 rounded-lg border border-success/20 bg-success/5 px-3 py-2 opacity-60">
+                      <div className="h-2 w-2 rounded-full bg-success shrink-0" />
+                      <span className="text-sm flex-1 line-through">{item.title}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Bookings Tab ───────────────────────────────────────────────────
+
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  pending: { label: "In așteptare", color: "text-warning border-warning/30 bg-warning/5" },
+  accepted: { label: "Acceptat", color: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5" },
+  confirmed_by_client: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
+  rejected: { label: "Refuzat", color: "text-destructive border-destructive/30 bg-destructive/5" },
+  cancelled: { label: "Anulat", color: "text-muted-foreground border-border/40 bg-muted/5" },
+  completed: { label: "Finalizat", color: "text-gold border-gold/30 bg-gold/5" },
+};
+
+function BookingsTab({ bookings }: { bookings: BookingRequest[] }) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="font-heading text-xl font-bold">Rezervările mele</h2>
+          <p className="text-sm text-muted-foreground">{bookings.length} rezervări</p>
+        </div>
+        <Link href="/artisti">
+          <Button variant="outline" size="sm" className="gap-1 text-xs">
+            <Plus className="h-3.5 w-3.5" /> Caută artiști
+          </Button>
+        </Link>
+      </div>
+
+      {bookings.length === 0 ? (
+        <div className="py-12 text-center text-muted-foreground">
+          <BookOpen className="mx-auto mb-3 h-8 w-8 opacity-40" />
+          <p>Nu ai rezervări încă.</p>
+          <p className="text-xs mt-1">Explorează artiști și trimite cereri de rezervare.</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {bookings.map((b) => {
+            const cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG.pending;
+            return (
+              <Card key={b.id} className="hover:border-gold/30 transition-all">
+                <CardContent className="py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-9 w-9 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                        <BookOpen className="h-4 w-4 text-gold" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {b.artistName || "Artist"}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {b.eventDate && new Date(b.eventDate).toLocaleDateString("ro-MD")}
+                          {b.eventType && ` · ${EVENT_TYPE_LABELS[b.eventType] || b.eventType}`}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={cn("text-xs shrink-0", cfg.color)}>
+                      {cfg.label}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Settings Tab ───────────────────────────────────────────────────
+
+function SettingsTab({
+  plan,
+  onUpdate,
+  onDelete,
+}: {
+  plan: Plan;
+  onUpdate: (p: Plan) => void;
+  onDelete: () => void;
+}) {
+  const [title, setTitle] = useState(plan.title);
+  const [eventType, setEventType] = useState(plan.eventType || "wedding");
+  const [eventDate, setEventDate] = useState(plan.eventDate || "");
+  const [location, setLocation] = useState(plan.location || "");
+  const [guestCount, setGuestCount] = useState(plan.guestCountTarget?.toString() || "");
+  const [budget, setBudget] = useState(plan.budgetTarget?.toString() || "");
+  const [notes, setNotes] = useState(plan.notes || "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/event-plans/${plan.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          eventType: eventType || null,
+          eventDate: eventDate || null,
+          location: location || null,
+          guestCountTarget: guestCount ? Number(guestCount) : null,
+          budgetTarget: budget ? Number(budget) : null,
+          notes: notes || null,
+        }),
+      });
+      if (!res.ok) {
+        toast.error("Eroare la salvare.");
+        return;
+      }
+      const data = await res.json();
+      onUpdate(data.plan);
+      toast.success("Setări salvate!");
+    } catch {
+      toast.error("Eroare la salvare.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="max-w-lg">
+      <h2 className="font-heading text-xl font-bold mb-6">Setări plan</h2>
+
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="s-title">Titlul planului</Label>
+          <Input id="s-title" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label>Tip eveniment</Label>
+            <Select value={eventType} onValueChange={(v) => { if (v) setEventType(v); }}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {EVENT_TYPES.map((t) => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="s-date">Data evenimentului</Label>
+            <Input id="s-date" type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="s-loc">Locație</Label>
+          <Input id="s-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Chișinău" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="s-guests">Invitați estimați</Label>
+            <Input id="s-guests" type="number" min="0" value={guestCount} onChange={(e) => setGuestCount(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="s-budget">Buget (EUR)</Label>
+            <Input id="s-budget" type="number" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="s-notes">Note</Label>
+          <Textarea id="s-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+        </div>
+
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-gold text-background hover:bg-gold-dark gap-2"
+        >
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+          Salvează setările
+        </Button>
+
+        <div className="pt-6 border-t border-border/20">
+          <h3 className="text-sm font-semibold text-destructive mb-2">Zona periculoasă</h3>
           <Button
-            onClick={deletePlan}
+            onClick={onDelete}
             variant="outline"
             size="sm"
-            className="gap-1 text-red-500 hover:bg-red-500/5 hover:text-red-500"
+            className="gap-1 text-destructive hover:bg-destructive/5 border-destructive/30"
           >
-            <Trash2 className="h-4 w-4" /> Șterge planul
+            <Trash2 className="h-4 w-4" /> Șterge planul complet
           </Button>
         </div>
       </div>
-
-      <Tabs defaultValue="checklist">
-        <TabsList>
-          <TabsTrigger value="checklist" className="gap-1.5">
-            <ClipboardList className="h-4 w-4" />
-            Checklist ({checklist.filter((i) => i.done).length}/{checklist.length})
-          </TabsTrigger>
-          <TabsTrigger value="guests" className="gap-1.5">
-            <Users className="h-4 w-4" /> Invitați ({guests.length})
-          </TabsTrigger>
-          <TabsTrigger value="seating" className="gap-1.5">
-            <UtensilsCrossed className="h-4 w-4" /> Așezare ({tables.length})
-          </TabsTrigger>
-          <TabsTrigger value="photos" className="gap-1.5">
-            <Camera className="h-4 w-4" /> Fotografii
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="checklist" className="mt-6">
-          <ChecklistView
-            planId={plan.id}
-            eventDate={plan.eventDate}
-            items={checklist}
-            onChange={setChecklist}
-          />
-        </TabsContent>
-
-        <TabsContent value="guests" className="mt-6">
-          <GuestsView
-            planId={plan.id}
-            guestCountTarget={plan.guestCountTarget}
-            guests={guests}
-            onChange={setGuests}
-          />
-        </TabsContent>
-
-        <TabsContent value="seating" className="mt-6">
-          <SeatingView
-            planId={plan.id}
-            guests={guests}
-            tables={tables}
-            seats={seats}
-            onTablesChange={setTables}
-            onSeatsChange={setSeats}
-          />
-        </TabsContent>
-
-        <TabsContent value="photos" className="mt-6">
-          <PhotosView planId={plan.id} />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
