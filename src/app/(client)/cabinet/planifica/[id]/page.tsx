@@ -52,6 +52,7 @@ import {
   Send,
   Check,
   X,
+  MessageCircle,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ChecklistView, type ChecklistItem } from "@/components/planner/checklist-view";
@@ -1380,7 +1381,22 @@ function BookingsTab({
 
   // Count existing bookings per category so the UI can show X/5 and
   // disable the booking button once the user maxes out a category.
-  const bookedArtistIds = new Set(bookings.map((b) => b.artistId));
+  // Rejected/cancelled bookings don't count — the client can try a
+  // different artist to fill that slot.
+  const ACTIVE_STATUSES = new Set([
+    "pending",
+    "accepted",
+    "confirmed_by_client",
+    "completed",
+  ]);
+  const bookingByArtistId = new Map<number, BookingRequest>();
+  for (const b of bookings) {
+    if (!ACTIVE_STATUSES.has(b.status)) continue;
+    // Keep the most recent active booking per artist
+    const existing = bookingByArtistId.get(b.artistId);
+    if (!existing) bookingByArtistId.set(b.artistId, b);
+  }
+  const bookedArtistIds = new Set(bookingByArtistId.keys());
   const bookingsPerCategory = new Map<number, number>();
   for (const section of byCategory) {
     const booked = section.artists.filter((a) =>
@@ -1504,7 +1520,7 @@ function BookingsTab({
           plan={plan}
           byCategory={byCategory}
           loading={discoveryLoading}
-          bookedArtistIds={bookedArtistIds}
+          bookingByArtistId={bookingByArtistId}
           bookingsPerCategory={bookingsPerCategory}
           clientName={user?.fullName ?? "Client"}
           clientPhone={user?.primaryPhoneNumber?.phoneNumber ?? ""}
@@ -1527,7 +1543,7 @@ function DiscoverySection({
   plan,
   byCategory,
   loading,
-  bookedArtistIds,
+  bookingByArtistId,
   bookingsPerCategory,
   clientName,
   clientPhone,
@@ -1537,7 +1553,7 @@ function DiscoverySection({
   plan: Plan;
   byCategory: Array<{ categoryId: number; categoryName: string; artists: DiscoveryArtist[] }>;
   loading: boolean;
-  bookedArtistIds: Set<number>;
+  bookingByArtistId: Map<number, BookingRequest>;
   bookingsPerCategory: Map<number, number>;
   clientName: string;
   clientPhone: string;
@@ -1666,12 +1682,12 @@ function DiscoverySection({
                     key={a.id}
                     artist={a}
                     plan={plan}
-                    alreadyBooked={bookedArtistIds.has(a.id)}
+                    existingBooking={bookingByArtistId.get(a.id)}
                     categoryLimitReached={limitReached}
                     clientName={clientName}
                     clientPhone={clientPhone}
                     clientEmail={clientEmail}
-                    onBookingSent={() => onRefresh()}
+                    onRefresh={() => onRefresh()}
                   />
                 ))}
               </div>
@@ -1700,25 +1716,26 @@ function DiscoverySection({
 function PlanArtistCard({
   artist,
   plan,
-  alreadyBooked,
+  existingBooking,
   categoryLimitReached,
   clientName,
   clientPhone,
   clientEmail,
-  onBookingSent,
+  onRefresh,
 }: {
   artist: DiscoveryArtist;
   plan: Plan;
-  alreadyBooked: boolean;
+  existingBooking?: BookingRequest;
   categoryLimitReached: boolean;
   clientName: string;
   clientPhone: string;
   clientEmail?: string;
-  onBookingSent: () => void;
+  onRefresh: () => void;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState("");
   // Separate start/end time input — can be filled manually or by clicking
   // one of the artist's declared slots as a preset.
@@ -1726,18 +1743,43 @@ function PlanArtistCard({
   const [endTime, setEndTime] = useState("");
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
 
+  // Chat modal state
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatSending, setChatSending] = useState(false);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [chatMessages, setChatMessages] = useState<Array<{
+    id: number;
+    senderType: string;
+    senderName: string;
+    message: string;
+  }>>([]);
+  const [chatDraft, setChatDraft] = useState("");
+
   useEffect(() => {
     setMounted(true);
   }, []);
 
   const cover = artist.coverImageUrl || artist.coverUrl || null;
   const slots = artist.availabilitySlots ?? [];
+
+  // Determine status-driven UI state
+  const status = existingBooking?.status;
+  const isPending = status === "pending";
+  const isAccepted = status === "accepted";
+  const isConfirmed = status === "confirmed_by_client" || status === "completed";
+  const alreadyBooked = isPending || isAccepted || isConfirmed;
+
   const disabled = alreadyBooked || categoryLimitReached;
-  const buttonLabel = alreadyBooked
-    ? "Cerere trimisă"
-    : categoryLimitReached
-      ? "Limită atinsă (5)"
-      : "Solicită rezervare";
+  const primaryLabel = isConfirmed
+    ? "Rezervat"
+    : isAccepted
+      ? "Confirmă rezervarea"
+      : isPending
+        ? "Cerere trimisă"
+        : categoryLimitReached
+          ? "Limită atinsă (5)"
+          : "Solicită rezervare";
 
   function pickSlot(slot: { id: number; startTime: string; endTime: string }) {
     if (selectedSlotId === slot.id) {
@@ -1794,11 +1836,82 @@ function PlanArtistCard({
       setSelectedSlotId(null);
       setStartTime("");
       setEndTime("");
-      onBookingSent();
+      onRefresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Eroare la trimitere");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function confirmBooking() {
+    if (!existingBooking || confirming) return;
+    setConfirming(true);
+    try {
+      const res = await fetch(`/api/booking-requests/${existingBooking.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "client_confirm" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Eroare");
+      }
+      toast.success(
+        `Ai confirmat rezervarea cu ${artist.nameRo}! Evenimentul este acum blocat în calendarul artistului.`,
+      );
+      onRefresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare la confirmare");
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  async function openChat() {
+    setChatOpen(true);
+    if (conversationId) return;
+    setChatLoading(true);
+    try {
+      const conv = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ artistId: artist.id }),
+      }).then((r) => (r.ok ? r.json() : null));
+      if (!conv?.id) throw new Error("failed");
+      setConversationId(conv.id);
+      const msgs = await fetch(`/api/conversations/${conv.id}/messages`).then(
+        (r) => (r.ok ? r.json() : []),
+      );
+      setChatMessages(Array.isArray(msgs) ? msgs : []);
+    } catch {
+      toast.error("Nu am putut deschide chatul.");
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
+  async function sendChatMessage() {
+    const text = chatDraft.trim();
+    if (!text || !conversationId || chatSending) return;
+    setChatSending(true);
+    try {
+      const res = await fetch(
+        `/api/conversations/${conversationId}/messages`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text }),
+        },
+      );
+      if (!res.ok) throw new Error();
+      const inserted = await res.json();
+      setChatMessages((prev) => [...prev, inserted]);
+      setChatDraft("");
+    } catch {
+      toast.error("Mesajul nu a fost trimis.");
+    } finally {
+      setChatSending(false);
     }
   }
 
@@ -1996,6 +2109,102 @@ function PlanArtistCard({
         )
       : null;
 
+  // Chat modal — available regardless of booking status so clients can
+  // start a conversation before requesting a booking, negotiate during
+  // review, or follow up afterwards.
+  const chatModal =
+    chatOpen && mounted
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-end justify-end bg-black/50 p-0 sm:p-6"
+            onClick={() => !chatSending && setChatOpen(false)}
+          >
+            <div
+              className="flex h-[100dvh] w-full flex-col overflow-hidden border border-border/40 bg-card shadow-2xl sm:h-[600px] sm:max-h-[80vh] sm:w-[420px] sm:rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <header className="flex items-center justify-between border-b border-border/40 bg-background/60 px-4 py-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Chat direct
+                  </p>
+                  <p className="font-heading text-sm font-bold">
+                    {artist.nameRo}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setChatOpen(false)}
+                  className="rounded-full p-1.5 text-muted-foreground hover:bg-accent"
+                  aria-label="Închide chat"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </header>
+              <div className="flex-1 space-y-2 overflow-y-auto bg-background/30 p-4">
+                {chatLoading ? (
+                  <div className="flex h-full items-center justify-center">
+                    <Loader2 className="h-5 w-5 animate-spin text-gold" />
+                  </div>
+                ) : chatMessages.length === 0 ? (
+                  <p className="py-8 text-center text-xs text-muted-foreground">
+                    Scrie primul mesaj — artistul va primi notificare.
+                  </p>
+                ) : (
+                  chatMessages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={cn(
+                        "flex flex-col gap-0.5 rounded-2xl px-3 py-2 text-sm",
+                        m.senderType === "client"
+                          ? "ml-8 bg-gold text-background"
+                          : "mr-8 bg-accent/60 text-foreground",
+                      )}
+                    >
+                      <span className="text-[10px] font-semibold opacity-70">
+                        {m.senderName}
+                      </span>
+                      <span className="whitespace-pre-wrap break-words">
+                        {m.message}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="flex items-center gap-2 border-t border-border/40 bg-background/60 p-3">
+                <input
+                  type="text"
+                  value={chatDraft}
+                  onChange={(e) => setChatDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      sendChatMessage();
+                    }
+                  }}
+                  placeholder="Scrie un mesaj..."
+                  className="flex-1 rounded-full border border-border/40 bg-background px-4 py-2 text-sm focus:border-gold/50 focus:outline-none"
+                  disabled={!conversationId || chatSending}
+                />
+                <Button
+                  type="button"
+                  size="icon"
+                  onClick={sendChatMessage}
+                  disabled={!chatDraft.trim() || !conversationId || chatSending}
+                  className="shrink-0 bg-gold text-background hover:bg-gold-dark"
+                >
+                  {chatSending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
   return (
     <>
       <div className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all hover:border-gold/40">
@@ -2070,22 +2279,85 @@ function PlanArtistCard({
             )}
           </div>
 
-          <Button
-            onClick={() => setModalOpen(true)}
-            disabled={disabled}
-            size="sm"
-            className="mt-4 w-full gap-2 bg-gold text-background hover:bg-gold-dark disabled:opacity-60"
-          >
-            {alreadyBooked ? (
-              <Check className="h-3.5 w-3.5" />
+          {/* Status banner (only when there's an active booking) */}
+          {existingBooking && (
+            <div
+              className={cn(
+                "mt-3 rounded-lg border px-3 py-2 text-xs",
+                isConfirmed
+                  ? "border-success/30 bg-success/5 text-success"
+                  : isAccepted
+                    ? "border-gold/30 bg-gold/5 text-gold"
+                    : "border-info/30 bg-info/5 text-info",
+              )}
+            >
+              {isConfirmed && (
+                <span>
+                  ✓ Rezervat {existingBooking.startTime && existingBooking.endTime ? `${existingBooking.startTime}–${existingBooking.endTime}` : ""}
+                  {existingBooking.agreedPrice ? ` · ${existingBooking.agreedPrice}€` : ""}
+                </span>
+              )}
+              {isAccepted && (
+                <span>
+                  Artist a acceptat — apasă <strong>Confirmă</strong> pentru a
+                  finaliza rezervarea
+                </span>
+              )}
+              {isPending && (
+                <span>Cerere trimisă, așteaptă răspunsul artistului</span>
+              )}
+            </div>
+          )}
+
+          {/* Primary action — depends on status */}
+          <div className="mt-3 flex gap-2">
+            {isAccepted ? (
+              <Button
+                onClick={confirmBooking}
+                disabled={confirming}
+                size="sm"
+                className="flex-1 gap-2 bg-success text-background hover:bg-success/90"
+              >
+                {confirming ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+                Confirmă rezervarea
+              </Button>
             ) : (
-              <Send className="h-3.5 w-3.5" />
+              <Button
+                onClick={() => setModalOpen(true)}
+                disabled={disabled}
+                size="sm"
+                className="flex-1 gap-2 bg-gold text-background hover:bg-gold-dark disabled:opacity-60"
+              >
+                {isConfirmed ? (
+                  <Check className="h-3.5 w-3.5" />
+                ) : isPending ? (
+                  <Clock className="h-3.5 w-3.5" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                {primaryLabel}
+              </Button>
             )}
-            {buttonLabel}
-          </Button>
+            {/* Chat button — always available */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openChat}
+              className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10"
+              title="Trimite mesaj artistului"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              Mesaj
+            </Button>
+          </div>
         </div>
       </div>
       {modal}
+      {chatModal}
     </>
   );
 }
