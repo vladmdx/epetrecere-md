@@ -4,6 +4,7 @@ import {
   artistImages,
   artistVideos,
   artistPackages,
+  artistAvailabilitySlots,
   reviews,
   calendarEvents,
   categories,
@@ -123,9 +124,52 @@ export async function getArtists(filters: ArtistFilters = {}) {
   }
 
   const coverMap = new Map(coverImages.map((c) => [c.artistId, c.url]));
+
+  // When an availableDate filter is set, fetch the artist's declared time
+  // slots for that exact day. Empty array means "declared no slots" (we
+  // render "Disponibil toată ziua" in the UI). isBooked=true slots are
+  // excluded so we only surface bookable windows.
+  let slotsByArtist = new Map<number, Array<{
+    id: number;
+    startTime: string;
+    endTime: string;
+    price: number | null;
+  }>>();
+  if (filters.availableDate && artistIds.length) {
+    const slotRows = await db
+      .select({
+        id: artistAvailabilitySlots.id,
+        artistId: artistAvailabilitySlots.artistId,
+        startTime: artistAvailabilitySlots.startTime,
+        endTime: artistAvailabilitySlots.endTime,
+        price: artistAvailabilitySlots.price,
+      })
+      .from(artistAvailabilitySlots)
+      .where(
+        and(
+          sql`${artistAvailabilitySlots.artistId} IN (${sql.join(artistIds.map((id) => sql`${id}`), sql`, `)})`,
+          eq(artistAvailabilitySlots.date, filters.availableDate),
+          eq(artistAvailabilitySlots.isBooked, false),
+        ),
+      )
+      .orderBy(asc(artistAvailabilitySlots.startTime));
+    slotsByArtist = slotRows.reduce((acc, s) => {
+      const list = acc.get(s.artistId) ?? [];
+      list.push({
+        id: s.id,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        price: s.price,
+      });
+      acc.set(s.artistId, list);
+      return acc;
+    }, new Map<number, Array<{ id: number; startTime: string; endTime: string; price: number | null }>>());
+  }
+
   const itemsWithCovers = items.map((a) => ({
     ...a,
     coverImageUrl: a.photoUrl || coverMap.get(a.id) || null,
+    availabilitySlots: slotsByArtist.get(a.id) ?? [],
   }));
 
   return {

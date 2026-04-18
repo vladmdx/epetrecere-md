@@ -48,7 +48,12 @@ import {
   ExternalLink,
   Save,
   Image,
+  Star,
+  Send,
+  Check,
+  X,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { ChecklistView, type ChecklistItem } from "@/components/planner/checklist-view";
 import { GuestsView, type Guest } from "@/components/planner/guests-view";
 import {
@@ -1259,17 +1264,34 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 // The discovery feed pre-filters by selectedCategories if the wizard set
 // any, otherwise shows the newest active artists.
 
+interface AvailabilitySlot {
+  id: number;
+  startTime: string;
+  endTime: string;
+  price: number | null;
+}
+
 interface DiscoveryArtist {
   id: number;
   slug: string;
   nameRo: string;
-  descriptionShortRo: string | null;
-  coverUrl: string | null;
+  descriptionRo?: string | null;
+  descriptionShortRo?: string | null;
+  /** The API returns coverImageUrl; we keep coverUrl as a legacy fallback. */
+  coverImageUrl?: string | null;
+  coverUrl?: string | null;
   priceFrom: number | null;
   ratingAvg: number;
   ratingCount: number;
+  categoryIds?: number[];
   categoryNames?: string[];
+  availabilitySlots?: AvailabilitySlot[];
+  /** Category id this artist was fetched under — we annotate this after
+   *  fetching so we can group the discovery list by category section. */
+  _fetchedForCategoryId?: number;
 }
+
+const MAX_PER_CATEGORY = 5;
 
 function BookingsTab({
   plan,
@@ -1282,50 +1304,80 @@ function BookingsTab({
    *  or status changes so the UI reflects the new state. */
   onRefresh: () => Promise<void> | void;
 }) {
-  const [discovery, setDiscovery] = useState<DiscoveryArtist[]>([]);
+  const { user } = useUser();
+  /** Discovery artists keyed by category id — each category gets its own
+   *  section in the UI so the user sees "Fotografi: 6 disponibili" etc. */
+  const [byCategory, setByCategory] = useState<
+    Array<{ categoryId: number; categoryName: string; artists: DiscoveryArtist[] }>
+  >([]);
   const [discoveryLoading, setDiscoveryLoading] = useState(false);
 
-  // Fetch artists whenever the event date or the selected-category set
-  // changes. Using Promise.all across categories keeps the query simple
-  // without cross-category pagination math.
+  // Fetch artists per selected category so the UI can render a dedicated
+  // section per category with its name header. When no categories were
+  // selected in the wizard we fall back to a single "Toți artiștii"
+  // section populated with recent active artists.
   useEffect(() => {
     if (!plan.eventDate) return;
     setDiscoveryLoading(true);
-    const categories = plan.selectedCategories ?? [];
-    const queries = categories.length > 0
-      ? categories.map((catId) =>
-          fetch(`/api/artists?date=${plan.eventDate}&category=${catId}&limit=6`, {
-            cache: "no-store",
-          })
-            .then((r) => (r.ok ? r.json() : { artists: [] }))
-            .catch(() => ({ artists: [] })),
-        )
-      : [
-          fetch(`/api/artists?date=${plan.eventDate}&limit=12`, { cache: "no-store" })
-            .then((r) => (r.ok ? r.json() : { artists: [] }))
-            .catch(() => ({ artists: [] })),
-        ];
-    Promise.all(queries)
-      .then((results) => {
-        // Flatten + dedupe by id so the same artist doesn't appear twice
-        // when they match multiple selected categories.
-        const seen = new Set<number>();
-        const merged: DiscoveryArtist[] = [];
-        for (const r of results) {
-          // The public /api/artists route returns {items, total, page, totalPages},
-          // while a few older internal callers used {artists}. Accept both.
-          const list: DiscoveryArtist[] = (r.items ?? r.artists ?? []) as DiscoveryArtist[];
-          for (const a of list) {
-            if (!seen.has(a.id)) {
-              seen.add(a.id);
-              merged.push(a);
-            }
-          }
+    (async () => {
+      try {
+        // Fetch category metadata once so we can label sections nicely.
+        const catsRes = await fetch("/api/categories", { cache: "no-store" }).then(
+          (r) => (r.ok ? r.json() : []),
+        );
+        const cats: Array<{ id: number; nameRo: string }> = Array.isArray(catsRes)
+          ? catsRes
+          : catsRes.items ?? [];
+        const catNameById = new Map(cats.map((c) => [c.id, c.nameRo]));
+
+        const categories = plan.selectedCategories ?? [];
+        if (categories.length === 0) {
+          const res = await fetch(
+            `/api/artists?date=${plan.eventDate}&limit=12`,
+            { cache: "no-store" },
+          ).then((r) => (r.ok ? r.json() : { items: [] }));
+          setByCategory([
+            {
+              categoryId: 0,
+              categoryName: "Toți artiștii",
+              artists: (res.items ?? []) as DiscoveryArtist[],
+            },
+          ]);
+          return;
         }
-        setDiscovery(merged);
-      })
-      .finally(() => setDiscoveryLoading(false));
+
+        const sections = await Promise.all(
+          categories.map(async (catId) => {
+            const res = await fetch(
+              `/api/artists?date=${plan.eventDate}&category=${catId}&limit=12`,
+              { cache: "no-store" },
+            ).then((r) => (r.ok ? r.json() : { items: [] }));
+            return {
+              categoryId: catId,
+              categoryName: catNameById.get(catId) ?? `Categorie #${catId}`,
+              artists: (res.items ?? []) as DiscoveryArtist[],
+            };
+          }),
+        );
+        setByCategory(sections);
+      } catch {
+        setByCategory([]);
+      } finally {
+        setDiscoveryLoading(false);
+      }
+    })();
   }, [plan.eventDate, plan.selectedCategories]);
+
+  // Count existing bookings per category so the UI can show X/5 and
+  // disable the booking button once the user maxes out a category.
+  const bookedArtistIds = new Set(bookings.map((b) => b.artistId));
+  const bookingsPerCategory = new Map<number, number>();
+  for (const section of byCategory) {
+    const booked = section.artists.filter((a) =>
+      bookedArtistIds.has(a.id),
+    ).length;
+    bookingsPerCategory.set(section.categoryId, booked);
+  }
 
   // Scope bookings to this plan only. Older bookings without eventPlanId
   // (pre-Faza 1) still show up because we fall back to email-matching
@@ -1430,10 +1482,10 @@ function BookingsTab({
         )}
       </section>
 
-      {/* ─── Section 2: Discover available artists ──────────────── */}
+      {/* ─── Section 2: Discover available artists, grouped by category ── */}
       {plan.eventDate && (
-        <section>
-          <div className="mb-4">
+        <section className="space-y-10">
+          <div className="mb-2">
             <h2 className="font-heading text-xl font-bold">
               Artiști disponibili pentru data ta
             </h2>
@@ -1446,6 +1498,7 @@ function BookingsTab({
               {plan.selectedCategories && plan.selectedCategories.length > 0 && (
                 <span> · {plan.selectedCategories.length} categorii selectate</span>
               )}
+              {" · max 5 cereri per categorie"}
             </p>
           </div>
 
@@ -1453,7 +1506,7 @@ function BookingsTab({
             <div className="py-10 text-center">
               <Loader2 className="mx-auto h-6 w-6 animate-spin text-gold" />
             </div>
-          ) : discovery.length === 0 ? (
+          ) : byCategory.length === 0 || byCategory.every((s) => s.artists.length === 0) ? (
             <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
               <p className="text-sm">
                 {plan.selectedCategories && plan.selectedCategories.length > 0
@@ -1467,50 +1520,360 @@ function BookingsTab({
               </Link>
             </div>
           ) : (
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-              {discovery.slice(0, 9).map((a) => (
-                <Link
-                  key={a.id}
-                  href={`/artisti/${a.slug}?plan=${plan.id}`}
-                  className="group rounded-xl border border-border/40 bg-card p-4 transition-all hover:border-gold/40"
-                >
-                  <div className="flex items-start gap-3">
-                    {a.coverUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={a.coverUrl}
-                        alt=""
-                        className="h-14 w-14 rounded-lg object-cover shrink-0"
-                      />
-                    ) : (
-                      <div className="h-14 w-14 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
-                        <BookOpen className="h-5 w-5 text-gold" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate group-hover:text-gold">
-                        {a.nameRo}
+            byCategory.map((section) => {
+              if (section.artists.length === 0) return null;
+              const used = bookingsPerCategory.get(section.categoryId) ?? 0;
+              const limitReached = used >= MAX_PER_CATEGORY;
+              return (
+                <div key={section.categoryId}>
+                  <div className="mb-3 flex items-end justify-between gap-3">
+                    <div>
+                      <h3 className="font-heading text-lg font-bold">
+                        {section.categoryName}
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        {section.artists.length} artiști disponibili · {used}/
+                        {MAX_PER_CATEGORY} cereri trimise
                       </p>
-                      {a.ratingCount > 0 && (
-                        <p className="text-xs text-muted-foreground">
-                          ★ {a.ratingAvg.toFixed(1)} ({a.ratingCount})
-                        </p>
-                      )}
-                      {a.priceFrom != null && (
-                        <p className="mt-1 text-xs">
-                          <span className="text-muted-foreground">de la </span>
-                          <span className="text-gold font-medium">{a.priceFrom}€</span>
-                        </p>
-                      )}
                     </div>
                   </div>
-                </Link>
-              ))}
-            </div>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    {section.artists.map((a) => (
+                      <PlanArtistCard
+                        key={a.id}
+                        artist={a}
+                        plan={plan}
+                        alreadyBooked={bookedArtistIds.has(a.id)}
+                        categoryLimitReached={limitReached}
+                        clientName={user?.fullName ?? "Client"}
+                        clientPhone={
+                          user?.primaryPhoneNumber?.phoneNumber ?? ""
+                        }
+                        clientEmail={
+                          user?.primaryEmailAddress?.emailAddress ?? undefined
+                        }
+                        onBookingSent={() => onRefresh()}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })
           )}
         </section>
       )}
     </div>
+  );
+}
+
+// Artist card rendered inside the planner dashboard. Richer than the old
+// mini card: cover image + profile link + price + real hourly availability
+// slots for the plan's event date + inline "Solicită rezervare" modal.
+function PlanArtistCard({
+  artist,
+  plan,
+  alreadyBooked,
+  categoryLimitReached,
+  clientName,
+  clientPhone,
+  clientEmail,
+  onBookingSent,
+}: {
+  artist: DiscoveryArtist;
+  plan: Plan;
+  alreadyBooked: boolean;
+  categoryLimitReached: boolean;
+  clientName: string;
+  clientPhone: string;
+  clientEmail?: string;
+  onBookingSent: () => void;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState("");
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const cover = artist.coverImageUrl || artist.coverUrl || null;
+  const slots = artist.availabilitySlots ?? [];
+  const disabled = alreadyBooked || categoryLimitReached;
+  const buttonLabel = alreadyBooked
+    ? "Cerere trimisă"
+    : categoryLimitReached
+      ? "Limită atinsă (5)"
+      : "Solicită rezervare";
+
+  async function submit() {
+    if (submitting) return;
+    const slot = slots.find((s) => s.id === selectedSlotId) ?? null;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/booking-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artistId: artist.id,
+          clientName: clientName || "Client",
+          clientPhone: clientPhone || "000000",
+          clientEmail: clientEmail,
+          eventDate: plan.eventDate,
+          eventType: plan.eventType ?? undefined,
+          guestCount: plan.guestCountTarget ?? undefined,
+          startTime: slot?.startTime,
+          endTime: slot?.endTime,
+          message: message.trim() || undefined,
+          eventPlanId: plan.id,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Eroare la trimitere");
+      }
+      toast.success(`Cerere trimisă către ${artist.nameRo}!`);
+      setModalOpen(false);
+      setMessage("");
+      setSelectedSlotId(null);
+      onBookingSent();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare la trimitere");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const modal =
+    modalOpen && mounted
+      ? createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4"
+            onClick={() => !submitting && setModalOpen(false)}
+          >
+            <div
+              className="w-full max-w-md rounded-2xl border border-border/40 bg-card shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <header className="flex items-center justify-between border-b border-border/40 px-5 py-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Solicită rezervare
+                  </p>
+                  <p className="font-heading text-lg font-bold">{artist.nameRo}</p>
+                </div>
+                <button
+                  onClick={() => !submitting && setModalOpen(false)}
+                  className="rounded-full p-1.5 text-muted-foreground hover:bg-accent"
+                  aria-label="Închide"
+                  disabled={submitting}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </header>
+
+              <div className="space-y-4 px-5 py-4">
+                <div className="space-y-1 rounded-lg border border-border/40 bg-muted/30 p-3 text-sm">
+                  <p className="text-xs font-semibold text-muted-foreground">
+                    Eveniment
+                  </p>
+                  {plan.eventDate && (
+                    <p>
+                      <span className="text-muted-foreground">Data:</span>{" "}
+                      {new Date(plan.eventDate + "T00:00:00").toLocaleDateString(
+                        "ro-RO",
+                        { day: "numeric", month: "long", year: "numeric" },
+                      )}
+                    </p>
+                  )}
+                  {plan.guestCountTarget ? (
+                    <p>
+                      <span className="text-muted-foreground">Invitați:</span>{" "}
+                      {plan.guestCountTarget}
+                    </p>
+                  ) : null}
+                </div>
+
+                {slots.length > 0 && (
+                  <div>
+                    <Label>Interval orar</Label>
+                    <p className="text-xs text-muted-foreground mb-2">
+                      Alege un interval (opțional) sau lasă gol pentru "toată ziua"
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {slots.map((s) => {
+                        const selected = selectedSlotId === s.id;
+                        return (
+                          <button
+                            key={s.id}
+                            type="button"
+                            onClick={() =>
+                              setSelectedSlotId(selected ? null : s.id)
+                            }
+                            className={cn(
+                              "rounded-lg border px-3 py-1.5 text-xs transition-all",
+                              selected
+                                ? "border-gold bg-gold/10 text-gold font-medium"
+                                : "border-border/40 hover:border-gold/30",
+                            )}
+                          >
+                            {s.startTime}–{s.endTime}
+                            {s.price != null && (
+                              <span className="ml-1 text-gold/80">
+                                · {s.price}€
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor={`msg-${artist.id}`}>Mesaj (opțional)</Label>
+                  <Textarea
+                    id={`msg-${artist.id}`}
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={3}
+                    placeholder="Alte detalii despre eveniment..."
+                    className="mt-1"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+
+              <footer className="flex items-center justify-between gap-2 border-t border-border/40 px-5 py-3">
+                <Link
+                  href={`/artisti/${artist.slug}`}
+                  target="_blank"
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
+                >
+                  Vezi profil <ExternalLink className="h-3 w-3" />
+                </Link>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setModalOpen(false)}
+                    disabled={submitting}
+                  >
+                    Anulează
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={submit}
+                    disabled={submitting}
+                    className="gap-2 bg-gold text-background hover:bg-gold-dark"
+                  >
+                    {submitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    Trimite cerere
+                  </Button>
+                </div>
+              </footer>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <>
+      <div className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all hover:border-gold/40">
+        <Link
+          href={`/artisti/${artist.slug}`}
+          target="_blank"
+          className="relative aspect-[4/3] overflow-hidden bg-muted"
+        >
+          {cover ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={cover}
+              alt={artist.nameRo}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center">
+              <BookOpen className="h-10 w-10 text-gold/30" />
+            </div>
+          )}
+        </Link>
+
+        <div className="flex flex-1 flex-col p-4">
+          <div className="flex items-start justify-between gap-2">
+            <Link
+              href={`/artisti/${artist.slug}`}
+              target="_blank"
+              className="font-heading text-base font-bold line-clamp-1 hover:text-gold"
+            >
+              {artist.nameRo}
+            </Link>
+            {artist.priceFrom != null && artist.priceFrom > 0 && (
+              <span className="shrink-0 text-sm font-semibold text-gold">
+                de la {artist.priceFrom}€
+              </span>
+            )}
+          </div>
+
+          {artist.ratingCount > 0 && (
+            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+              <Star className="h-3 w-3 fill-gold text-gold" />
+              {artist.ratingAvg.toFixed(1)} ({artist.ratingCount})
+            </p>
+          )}
+
+          {/* Available time slots for the event date */}
+          <div className="mt-3">
+            <p className="text-xs font-semibold text-muted-foreground">
+              Disponibil pe {plan.eventDate ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", { day: "numeric", month: "short" }) : "data evenimentului"}:
+            </p>
+            {slots.length === 0 ? (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Toată ziua (nu are intervale definite)
+              </p>
+            ) : (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {slots.slice(0, 4).map((s) => (
+                  <span
+                    key={s.id}
+                    className="inline-flex items-center gap-1 rounded-md border border-border/40 bg-background px-1.5 py-0.5 text-[11px]"
+                  >
+                    <Clock className="h-2.5 w-2.5 text-gold" />
+                    {s.startTime}–{s.endTime}
+                  </span>
+                ))}
+                {slots.length > 4 && (
+                  <span className="text-[11px] text-muted-foreground">
+                    +{slots.length - 4}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          <Button
+            onClick={() => setModalOpen(true)}
+            disabled={disabled}
+            size="sm"
+            className="mt-4 w-full gap-2 bg-gold text-background hover:bg-gold-dark disabled:opacity-60"
+          >
+            {alreadyBooked ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <Send className="h-3.5 w-3.5" />
+            )}
+            {buttonLabel}
+          </Button>
+        </div>
+      </div>
+      {modal}
+    </>
   );
 }
 
