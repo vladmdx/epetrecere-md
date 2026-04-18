@@ -127,13 +127,19 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
     }
   }, [isLoaded, isSignedIn, router, adminMode]);
 
-  // Create event plan
+  // Create event plan and redirect authenticated non-admin users to their
+  // plan's "Rezervări Artiști" tab so they see the discovery grid in
+  // their own dashboard. Admins stay on this page.
   useEffect(() => {
     if (!isLoaded || !wizard) return;
     if (!adminMode && !isSignedIn) return;
 
     const cached = sessionStorage.getItem(planIdKey);
     if (cached) {
+      if (!adminMode) {
+        router.replace(`/cabinet/planifica/${cached}?tab=bookings`);
+        return;
+      }
       setPlanId(Number(cached));
       return;
     }
@@ -149,13 +155,17 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
         const data = await res.json();
         if (data?.plan?.id) {
           sessionStorage.setItem(planIdKey, String(data.plan.id));
+          if (!adminMode) {
+            router.replace(`/cabinet/planifica/${data.plan.id}?tab=bookings`);
+            return;
+          }
           setPlanId(data.plan.id);
         }
       } catch {
         /* non-fatal */
       }
     })();
-  }, [isLoaded, isSignedIn, wizard, adminMode, planIdKey]);
+  }, [isLoaded, isSignedIn, wizard, adminMode, planIdKey, router]);
 
   // Load categories
   useEffect(() => {

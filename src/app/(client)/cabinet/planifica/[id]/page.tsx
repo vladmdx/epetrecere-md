@@ -5,7 +5,7 @@
 
 import { useEffect, useState, useCallback, use } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -177,7 +177,12 @@ export default function PlanDetailPage({
   const [photoCount, setPhotoCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  // Allow ?tab=bookings (or any other TabKey) to deep-link into a specific
+  // tab — used after the wizard completes so the user lands directly on
+  // the artist discovery list for their event date.
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams?.get("tab") as TabKey) || "overview";
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
 
   // Load plan data
   useEffect(() => {

@@ -151,7 +151,8 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
 
   async function handleSubmit() {
     // Public login gate (M0a #5). Admin mode skips this — admin is already
-    // authenticated via the admin layout.
+    // authenticated via the admin layout. Unauthenticated public users are
+    // sent to sign-in and /planifica/rezultate takes over after login.
     if (!adminMode && !isSignedIn) {
       sessionStorage.setItem(storageKey, JSON.stringify(data));
       router.push(`/sign-in?redirect_url=${encodeURIComponent("/planifica/rezultate")}`);
@@ -160,15 +161,17 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
 
     setSubmitting(true);
     try {
-      // Admin flow: skip /api/leads (no need for CRM lead from admin-created
-      // events) and go straight to results. The results page will create the
-      // event plan from wizard data.
+      // Admin flow: skip /api/leads and land on the admin results page.
       if (adminMode) {
         router.push("/admin/eveniment-nou/rezultate");
         return;
       }
 
-      const res = await fetch("/api/leads", {
+      // Authenticated client flow: record the lead (fire-and-forget so the
+      // user isn't blocked if the CRM insert fails), then materialize the
+      // event plan and deep-link into its "Rezervări Artiști" tab so the
+      // user immediately sees the available artists for their date.
+      fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -188,9 +191,26 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
             timeSlot: data.timeSlot,
           },
         }),
-      });
-      if (!res.ok) throw new Error("Failed");
+      }).catch(() => { /* non-fatal */ });
 
+      const planRes = await fetch("/api/event-plans/from-wizard", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (planRes.ok) {
+        const payload = await planRes.json();
+        const planId = payload?.plan?.id;
+        if (planId) {
+          sessionStorage.setItem(planIdKey, String(planId));
+          toast.success(t("form.submit_success"));
+          router.push(`/cabinet/planifica/${planId}?tab=bookings`);
+          return;
+        }
+      }
+
+      // Fallback — couldn't create plan, still show the old results page.
       toast.success(t("form.submit_success"));
       router.push("/planifica/rezultate");
     } catch {
