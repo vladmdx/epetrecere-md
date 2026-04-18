@@ -25,6 +25,13 @@ interface WizardData {
   eventType: string;
   eventDate: string;
   location: string;
+  /** Start hour "HH:MM" — replaces the older timeSlot enum. */
+  startTime: string;
+  /** Total duration in hours, defaulted per event type but user-editable. */
+  durationHours: number;
+  /** Legacy string ("dimineață" / "după-amiază" / "seară"). We keep it
+   *  derived so older API callers (CRM message preview, email subject
+   *  templates) don't have to change shape. Derived on every update. */
   timeSlot: string;
   guestCount: number;
   venueNeeded: "" | "yes" | "no"; // do they need a venue
@@ -35,10 +42,47 @@ interface WizardData {
   email: string;
 }
 
+/** Typical event durations in hours. The user still picks a start hour
+ *  and can override the duration, but we default to realistic windows
+ *  so the "rezervare artist" modal auto-fills sensible start/end times. */
+const DEFAULT_DURATION_HOURS: Record<string, number> = {
+  wedding: 10,
+  baptism: 6,
+  cumatrie: 6,
+  cumpatrie: 6,
+  birthday: 5,
+  corporate: 4,
+  concert: 3,
+  other: 5,
+};
+
+/** Reasonable default start hour per event type. */
+const DEFAULT_START_TIME: Record<string, string> = {
+  wedding: "14:00",
+  baptism: "12:00",
+  cumatrie: "17:00",
+  cumpatrie: "17:00",
+  birthday: "18:00",
+  corporate: "18:00",
+  concert: "19:00",
+  other: "18:00",
+};
+
+function deriveTimeSlot(startTime: string): string {
+  if (!startTime) return "";
+  const [h] = startTime.split(":").map(Number);
+  if (Number.isNaN(h)) return "";
+  if (h < 12) return "dimineață";
+  if (h < 18) return "după-amiază";
+  return "seară";
+}
+
 const initialData: WizardData = {
   eventType: "",
   eventDate: "",
   location: "",
+  startTime: "",
+  durationHours: 5,
   timeSlot: "",
   guestCount: 100,
   venueNeeded: "",
@@ -116,14 +160,41 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
   }, [isSignedIn, user]);
 
   function update(partial: Partial<WizardData>) {
-    setData((prev) => ({ ...prev, ...partial }));
+    setData((prev) => {
+      const next = { ...prev, ...partial };
+      // When the event type changes, suggest a start time and duration.
+      // Don't overwrite values the user already typed manually.
+      if (partial.eventType && partial.eventType !== prev.eventType) {
+        if (!prev.startTime) {
+          next.startTime = DEFAULT_START_TIME[partial.eventType] ?? "18:00";
+        }
+        // Always refresh the duration on event-type change so the default
+        // for the new type takes effect (user can still override).
+        next.durationHours =
+          DEFAULT_DURATION_HOURS[partial.eventType] ?? 5;
+      }
+      // Keep the legacy timeSlot derived so email templates and CRM
+      // previews ("seară", "după-amiază") keep working.
+      if (partial.startTime !== undefined) {
+        next.timeSlot = deriveTimeSlot(partial.startTime);
+      } else if (!next.timeSlot && next.startTime) {
+        next.timeSlot = deriveTimeSlot(next.startTime);
+      }
+      return next;
+    });
   }
 
   // All fields mandatory per M0a #4
   function canAdvance(): boolean {
     switch (step) {
       case 0: return !!data.eventType;
-      case 1: return !!data.eventDate && !!data.location && !!data.timeSlot;
+      case 1:
+        return (
+          !!data.eventDate &&
+          !!data.location &&
+          !!data.startTime &&
+          data.durationHours > 0
+        );
       case 2: return data.guestCount > 0;
       case 3: return data.venueNeeded === "yes" || data.venueNeeded === "no";
       case 4: return data.services.length > 0;
@@ -357,8 +428,34 @@ function StepEventType({ data, update, autoNext }: StepProps) {
 
 const cities = ["Chișinău", "Bălți", "Cahul", "Orhei", "Ungheni", "Soroca", "Comrat", "Edineț"];
 
-function StepDate({ data, update, autoNext }: StepProps) {
+/** Shown below the duration field as quick-pick presets. Wedding gets
+ *  the "all day" helper; everything else shows sensible alternatives so
+ *  the user doesn't have to type. */
+const DURATION_PRESETS: Record<string, number[]> = {
+  wedding: [8, 10, 12],
+  baptism: [4, 5, 6, 8],
+  cumatrie: [4, 6, 8],
+  cumpatrie: [4, 6, 8],
+  birthday: [3, 4, 5, 6, 8],
+  corporate: [2, 3, 4, 6],
+  concert: [2, 3, 4],
+  other: [3, 5, 7, 10],
+};
+
+function computeEndTime(startTime: string, durationHours: number): string {
+  if (!startTime || !durationHours) return "";
+  const [h, m] = startTime.split(":").map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return "";
+  const endH = (h + durationHours) % 24;
+  return `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+function StepDate({ data, update }: StepProps) {
   const { t } = useLocale();
+  const presets =
+    DURATION_PRESETS[data.eventType] ?? DURATION_PRESETS.other;
+  const endTime = computeEndTime(data.startTime, data.durationHours);
+
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_date")}</h2>
@@ -370,7 +467,6 @@ function StepDate({ data, update, autoNext }: StepProps) {
             <CustomCalendar
               value={data.eventDate ? new Date(data.eventDate + "T00:00:00") : null}
               onChange={(d) => {
-                // Format to YYYY-MM-DD without timezone shift
                 const y = d.getFullYear();
                 const m = String(d.getMonth() + 1).padStart(2, "0");
                 const day = String(d.getDate()).padStart(2, "0");
@@ -380,17 +476,14 @@ function StepDate({ data, update, autoNext }: StepProps) {
             />
           </div>
         </div>
+
         <div>
           <Label>{t("form.location")} *</Label>
           <div className="mt-2 flex flex-wrap gap-2">
             {cities.map((city) => (
               <button
                 key={city}
-                onClick={() => {
-                  update({ location: city });
-                  // Advance only once all three mandatory fields are filled
-                  if (data.eventDate && data.timeSlot) autoNext?.();
-                }}
+                onClick={() => update({ location: city })}
                 className={cn(
                   "rounded-lg border px-4 py-2 text-sm transition-all",
                   data.location === city
@@ -403,28 +496,64 @@ function StepDate({ data, update, autoNext }: StepProps) {
             ))}
           </div>
         </div>
-        <div>
-          <Label>Interval orar *</Label>
-          <div className="mt-2 flex gap-2">
-            {["dimineață", "după-amiază", "seară"].map((slot) => (
-              <button
-                key={slot}
-                onClick={() => {
-                  update({ timeSlot: slot });
-                  if (data.eventDate && data.location) autoNext?.();
-                }}
-                className={cn(
-                  "rounded-lg border px-4 py-2 text-sm capitalize transition-all",
-                  data.timeSlot === slot
-                    ? "border-gold bg-gold/10 text-gold font-medium"
-                    : "border-border/40 hover:border-gold/30",
-                )}
-              >
-                {slot}
-              </button>
-            ))}
+
+        {/* Start time + duration replace the old morning/afternoon/evening
+            picker. Defaults auto-fill when the user selects an event type
+            in step 1 (wedding → 14:00 / 10h, birthday → 18:00 / 5h, etc.). */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <Label>Ora începerii *</Label>
+            <Input
+              type="time"
+              value={data.startTime}
+              onChange={(e) => update({ startTime: e.target.value })}
+              className="mt-1"
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              De la ce oră începe evenimentul?
+            </p>
+          </div>
+          <div>
+            <Label>Durata (ore) *</Label>
+            <Input
+              type="number"
+              min={1}
+              max={24}
+              value={data.durationHours}
+              onChange={(e) =>
+                update({ durationHours: Number(e.target.value) || 0 })
+              }
+              className="mt-1"
+            />
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {presets.map((h) => (
+                <button
+                  key={h}
+                  type="button"
+                  onClick={() => update({ durationHours: h })}
+                  className={cn(
+                    "rounded-md border px-2 py-1 text-xs transition-all",
+                    data.durationHours === h
+                      ? "border-gold bg-gold/10 text-gold font-medium"
+                      : "border-border/40 hover:border-gold/30",
+                  )}
+                >
+                  {h}h
+                </button>
+              ))}
+            </div>
           </div>
         </div>
+
+        {endTime && (
+          <div className="rounded-lg border border-gold/20 bg-gold/5 px-4 py-3 text-sm">
+            <span className="text-muted-foreground">Interval eveniment: </span>
+            <span className="font-semibold text-gold">
+              {data.startTime} – {endTime}
+            </span>
+            <span className="text-muted-foreground"> ({data.durationHours}h)</span>
+          </div>
+        )}
       </div>
     </div>
   );

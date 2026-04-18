@@ -76,6 +76,10 @@ interface Plan {
   title: string;
   eventType: string | null;
   eventDate: string | null;
+  /** Wizard step 2 — start hour "HH:MM", used to pre-fill booking modal. */
+  startTime?: string | null;
+  /** Wizard step 2 — total event duration in hours. */
+  durationHours?: number | null;
   location: string | null;
   guestCountTarget: number | null;
   budgetTarget: number | null;
@@ -1743,6 +1747,29 @@ function PlanArtistCard({
   const [endTime, setEndTime] = useState("");
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
 
+  // When the booking modal opens for the first time, pre-fill start/end
+  // from the plan's wizard answers (step 2) so the client doesn't retype
+  // the obvious. Wedding: 14:00–00:00 (+10h), birthday: 18:00–23:00 (+5h).
+  // Users can still edit before submitting.
+  useEffect(() => {
+    if (!modalOpen) return;
+    if (startTime || endTime) return;
+    if (plan.startTime) {
+      const [h, m] = plan.startTime.split(":").map(Number);
+      if (!Number.isNaN(h)) {
+        const hh = String(h).padStart(2, "0");
+        const mm = String(m || 0).padStart(2, "0");
+        setStartTime(`${hh}:${mm}`);
+        if (plan.durationHours && plan.durationHours > 0) {
+          const endH = (h + plan.durationHours) % 24;
+          setEndTime(
+            `${String(endH).padStart(2, "0")}:${mm}`,
+          );
+        }
+      }
+    }
+  }, [modalOpen, plan.startTime, plan.durationHours, startTime, endTime]);
+
   // Chat modal state
   const [chatOpen, setChatOpen] = useState(false);
   const [chatLoading, setChatLoading] = useState(false);
@@ -1957,6 +1984,16 @@ function PlanArtistCard({
                       )}
                     </p>
                   )}
+                  {plan.startTime && plan.durationHours ? (
+                    <p>
+                      <span className="text-muted-foreground">Durata eveniment:</span>{" "}
+                      {plan.startTime} – {(() => {
+                        const [h, m] = plan.startTime.split(":").map(Number);
+                        const endH = (h + plan.durationHours) % 24;
+                        return `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+                      })()} ({plan.durationHours}h)
+                    </p>
+                  ) : null}
                   {plan.guestCountTarget ? (
                     <p>
                       <span className="text-muted-foreground">Invitați:</span>{" "}

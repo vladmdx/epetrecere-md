@@ -821,6 +821,11 @@ export const eventPlans = pgTable("event_plans", {
   title: text("title").notNull(),
   eventType: text("event_type"),
   eventDate: date("event_date"),
+  /** Wizard step 2: start time "HH:MM" chosen by the client. */
+  startTime: text("start_time"),
+  /** Wizard step 2: total duration in hours. Auto-derived from event
+   *  type (wedding=10, birthday=5, etc.) but editable in the wizard. */
+  durationHours: integer("duration_hours"),
   location: text("location"),
   guestCountTarget: integer("guest_count_target"),
   budgetTarget: integer("budget_target"),
