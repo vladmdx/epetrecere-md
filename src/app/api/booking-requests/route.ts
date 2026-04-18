@@ -36,9 +36,13 @@ export async function GET(req: NextRequest) {
 
   const artistId = req.nextUrl.searchParams.get("artist_id");
   const clientEmail = req.nextUrl.searchParams.get("client_email");
+  const eventPlanId = req.nextUrl.searchParams.get("event_plan_id");
 
-  if (!artistId && !clientEmail) {
-    return NextResponse.json({ error: "artist_id or client_email required" }, { status: 400 });
+  if (!artistId && !clientEmail && !eventPlanId) {
+    return NextResponse.json(
+      { error: "artist_id, client_email or event_plan_id required" },
+      { status: 400 },
+    );
   }
 
   // Check if the caller is admin — admins can query any data
@@ -74,16 +78,24 @@ export async function GET(req: NextRequest) {
     if (clientEmail && clientEmail !== appUser.email) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+
+    // If querying by event_plan_id only, verify ownership
+    if (eventPlanId && !artistId && !clientEmail) {
+      const { eventPlans } = await import("@/lib/db/schema");
+      const [plan] = await db
+        .select({ userId: eventPlans.userId })
+        .from(eventPlans)
+        .where(eq(eventPlans.id, Number(eventPlanId)))
+        .limit(1);
+      if (!plan || plan.userId !== appUser.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
   }
 
   const conditions = [];
   if (artistId) conditions.push(eq(bookingRequests.artistId, Number(artistId)));
   if (clientEmail) conditions.push(eq(bookingRequests.clientEmail, clientEmail));
-
-  // Optional filter — scope to a single event plan so the planner dashboard
-  // only sees bookings tied to the current event. Other callers (artist
-  // dashboard, client overall bookings list) omit this and get everything.
-  const eventPlanId = req.nextUrl.searchParams.get("event_plan_id");
   if (eventPlanId) {
     conditions.push(eq(bookingRequests.eventPlanId, Number(eventPlanId)));
   }
@@ -151,6 +163,55 @@ export async function POST(req: NextRequest) {
   // Create booking request — keep the eventPlanId through so in-plan
   // requests surface in the dashboard "Rezervări Artiști" tab.
   const { eventPlanId, ...bookingBase } = parsed.data;
+
+  // Max 5 artists per category per event plan
+  if (eventPlanId) {
+    // Get the category of the artist being booked
+    const [targetArtist] = await db
+      .select({ categoryIds: artists.categoryIds })
+      .from(artists)
+      .where(eq(artists.id, parsed.data.artistId))
+      .limit(1);
+    const targetCategoryIds = targetArtist?.categoryIds ?? [];
+
+    if (targetCategoryIds.length > 0) {
+      // Fetch existing bookings for this plan with their artist categories
+      const existingBookings = await db
+        .select({
+          artistId: bookingRequests.artistId,
+          status: bookingRequests.status,
+          categoryIds: artists.categoryIds,
+        })
+        .from(bookingRequests)
+        .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
+        .where(eq(bookingRequests.eventPlanId, eventPlanId));
+
+      // Prevent duplicate booking for the same artist on same plan
+      if (existingBookings.some((b) => b.artistId === parsed.data.artistId)) {
+        return NextResponse.json(
+          { error: "Ai trimis deja o cerere către acest artist pentru acest eveniment." },
+          { status: 409 },
+        );
+      }
+
+      // Count bookings per category, enforce max 5 per category
+      for (const catId of targetCategoryIds) {
+        const countInCategory = existingBookings.filter((b) =>
+          (b.categoryIds ?? []).includes(catId),
+        ).length;
+        if (countInCategory >= 5) {
+          return NextResponse.json(
+            {
+              error:
+                "Ai atins limita de 5 artiști per categorie pentru acest eveniment.",
+            },
+            { status: 409 },
+          );
+        }
+      }
+    }
+  }
+
   const [booking] = await db.insert(bookingRequests).values({
     ...bookingBase,
     eventPlanId: eventPlanId ?? null,

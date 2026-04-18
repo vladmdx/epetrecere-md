@@ -69,7 +69,13 @@ const SUMMARY_INDEX = TOTAL_STEPS - 1; // 6
 // WIZARD COMPONENT
 // ═══════════════════════════════════════════════
 
-export function WizardClient() {
+interface WizardClientProps {
+  /** When true, this is the admin-side wizard: skips auth gate and
+   *  redirects to /admin/eveniment-nou/rezultate on completion. */
+  adminMode?: boolean;
+}
+
+export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
   const { t } = useLocale();
   const router = useRouter();
   const { isSignedIn, user } = useUser();
@@ -77,17 +83,25 @@ export function WizardClient() {
   const [data, setData] = useState<WizardData>(initialData);
   const [submitting, setSubmitting] = useState(false);
 
+  // Use a separate storage key for admin so both wizards can coexist
+  const storageKey = adminMode ? "admin-wizard-data" : "wizard-data";
+  const planIdKey = adminMode ? "admin-wizard-plan-id" : "wizard-plan-id";
+
   // Persist in sessionStorage
   useEffect(() => {
-    const saved = sessionStorage.getItem("wizard-data");
+    const saved = sessionStorage.getItem(storageKey);
     if (saved) {
       try { setData(JSON.parse(saved)); } catch { /* ignore */ }
     }
-  }, []);
+    // Reset any stale plan id when wizard starts fresh
+    if (!saved) {
+      sessionStorage.removeItem(planIdKey);
+    }
+  }, [storageKey, planIdKey]);
 
   useEffect(() => {
-    sessionStorage.setItem("wizard-data", JSON.stringify(data));
-  }, [data]);
+    sessionStorage.setItem(storageKey, JSON.stringify(data));
+  }, [data, storageKey]);
 
   // Pre-fill name/email/phone when user is signed in
   useEffect(() => {
@@ -136,17 +150,24 @@ export function WizardClient() {
   }
 
   async function handleSubmit() {
-    // Login gate (M0a #5): final "see results" CTA requires authenticated
-    // client. If not signed in we send them to sign-in and bring them back to
-    // the results page which will pick up the wizard payload from storage.
-    if (!isSignedIn) {
-      sessionStorage.setItem("wizard-data", JSON.stringify(data));
+    // Public login gate (M0a #5). Admin mode skips this — admin is already
+    // authenticated via the admin layout.
+    if (!adminMode && !isSignedIn) {
+      sessionStorage.setItem(storageKey, JSON.stringify(data));
       router.push(`/sign-in?redirect_url=${encodeURIComponent("/planifica/rezultate")}`);
       return;
     }
 
     setSubmitting(true);
     try {
+      // Admin flow: skip /api/leads (no need for CRM lead from admin-created
+      // events) and go straight to results. The results page will create the
+      // event plan from wizard data.
+      if (adminMode) {
+        router.push("/admin/eveniment-nou/rezultate");
+        return;
+      }
+
       const res = await fetch("/api/leads", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -170,7 +191,6 @@ export function WizardClient() {
       });
       if (!res.ok) throw new Error("Failed");
 
-      // Keep wizard-data in sessionStorage so results page can reuse filters
       toast.success(t("form.submit_success"));
       router.push("/planifica/rezultate");
     } catch {
@@ -248,7 +268,7 @@ export function WizardClient() {
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
-              ) : isSignedIn ? (
+              ) : adminMode || isSignedIn ? (
                 <>
                   <Send className="h-4 w-4" /> Vezi rezultatele
                 </>

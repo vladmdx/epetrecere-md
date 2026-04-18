@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
-import { ArtistCard } from "@/components/public/artist-card";
+import { BookingArtistCard } from "@/components/public/booking-artist-card";
 import { VenueCard } from "@/components/public/venue-card";
 import {
   Loader2,
@@ -37,8 +37,6 @@ interface WizardData {
   email: string;
 }
 
-// Map wizard "service" ids to DB category slugs (see scripts/seed.ts).
-// Keep this in sync if categories change.
 const SERVICE_TO_CATEGORY_SLUG: Record<string, string> = {
   singer: "cantareti",
   mc: "moderatori",
@@ -50,12 +48,8 @@ const SERVICE_TO_CATEGORY_SLUG: Record<string, string> = {
   decor: "decor",
   animators: "animatori",
   equipment: "echipament",
-  // candy_bar and fireworks have no matching category yet — fall through to
-  // "other" and simply show nothing for those sub-lists.
 };
 
-// Human-readable labels for the section headings — duplicates the map in
-// client.tsx so we don't need to import from the wizard file.
 const SERVICE_LABELS: Record<string, string> = {
   singer: "Cântăreți",
   mc: "Moderatori / MC",
@@ -71,9 +65,10 @@ const SERVICE_LABELS: Record<string, string> = {
   equipment: "Echipament tehnic",
 };
 
-// Minimal shape we accept from /api/artists and /api/venues for the cards.
-// These loosely mirror ArtistCardProps/VenueCardProps.
-type ArtistItem = Parameters<typeof ArtistCard>[0]["artist"];
+// Card props type for artist with categoryIds
+type ArtistItem = Parameters<typeof BookingArtistCard>[0]["artist"] & {
+  categoryIds?: number[];
+};
 type VenueItem = Parameters<typeof VenueCard>[0]["venue"];
 
 interface Category {
@@ -82,13 +77,18 @@ interface Category {
   nameRo: string;
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
+const MAX_PER_CATEGORY = 5;
 
-export function ResultsClient() {
+interface ResultsClientProps {
+  adminMode?: boolean;
+}
+
+export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
   const router = useRouter();
   const { isSignedIn, isLoaded } = useUser();
+  const storageKey = adminMode ? "admin-wizard-data" : "wizard-data";
+  const planIdKey = adminMode ? "admin-wizard-plan-id" : "wizard-plan-id";
+  const backRoute = adminMode ? "/admin/eveniment-nou" : "/planifica";
   const [wizard, setWizard] = useState<WizardData | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [artistsByService, setArtistsByService] = useState<
@@ -97,46 +97,42 @@ export function ResultsClient() {
   const [venues, setVenues] = useState<VenueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  /** The event plan row created (or looked up) from the wizard data. All
-   *  artist/venue cards use this id so their booking forms link the
-   *  resulting requests back to this plan automatically. */
   const [planId, setPlanId] = useState<number | null>(null);
+  /** Set of artist IDs that already have a booking request for this plan. */
+  const [bookedArtistIds, setBookedArtistIds] = useState<Set<number>>(new Set());
+  /** Count of bookings per category — used to enforce MAX_PER_CATEGORY limit. */
+  const [bookingsPerCategory, setBookingsPerCategory] = useState<Map<number, number>>(new Map());
 
   // Read wizard data from sessionStorage on mount
   useEffect(() => {
-    const raw = sessionStorage.getItem("wizard-data");
+    const raw = sessionStorage.getItem(storageKey);
     if (!raw) {
-      // Nothing in storage — the user probably came here directly. Send them
-      // back to start the wizard.
-      router.replace("/planifica");
+      router.replace(backRoute);
       return;
     }
     try {
       setWizard(JSON.parse(raw));
     } catch {
-      router.replace("/planifica");
+      router.replace(backRoute);
     }
-  }, [router]);
+  }, [router, storageKey, backRoute]);
 
-  // Auth gate — Clerk can take a tick to hydrate. Once we know the user is
-  // signed-out, bounce them to sign-in with a redirect back to this page.
+  // Auth gate — admin mode is already protected by the admin layout
   useEffect(() => {
+    if (adminMode) return;
     if (isLoaded && !isSignedIn) {
       router.replace(
         `/sign-in?redirect_url=${encodeURIComponent("/planifica/rezultate")}`,
       );
     }
-  }, [isLoaded, isSignedIn, router]);
+  }, [isLoaded, isSignedIn, router, adminMode]);
 
-  // Once authenticated, materialize the wizard answers into a real event
-  // plan so every booking request sent from these results lands in that
-  // plan's "Rezervări Artiști" tab. Stashes the id in sessionStorage so
-  // artist profile pages can pick it up when the user clicks through.
+  // Create event plan
   useEffect(() => {
-    if (!isLoaded || !isSignedIn || !wizard) return;
+    if (!isLoaded || !wizard) return;
+    if (!adminMode && !isSignedIn) return;
 
-    // If a plan was already created during this wizard run, reuse it.
-    const cached = sessionStorage.getItem("wizard-plan-id");
+    const cached = sessionStorage.getItem(planIdKey);
     if (cached) {
       setPlanId(Number(cached));
       return;
@@ -152,33 +148,27 @@ export function ResultsClient() {
         if (!res.ok) return;
         const data = await res.json();
         if (data?.plan?.id) {
-          sessionStorage.setItem("wizard-plan-id", String(data.plan.id));
+          sessionStorage.setItem(planIdKey, String(data.plan.id));
           setPlanId(data.plan.id);
         }
       } catch {
-        // Non-fatal — the results page still renders; the booking form will
-        // fall back to /api/leads when planId is missing.
+        /* non-fatal */
       }
     })();
-  }, [isLoaded, isSignedIn, wizard]);
+  }, [isLoaded, isSignedIn, wizard, adminMode, planIdKey]);
 
-  // Load categories once so we can translate service ids → category ids
+  // Load categories
   useEffect(() => {
     let alive = true;
     fetch("/api/categories")
       .then((r) => r.json())
       .then((data) => {
         if (!alive) return;
-        // /api/categories may return an array or { items }
         const list: Category[] = Array.isArray(data) ? data : data.items ?? [];
         setCategories(list);
       })
-      .catch(() => {
-        /* ignore — we'll just show no categorised grids */
-      });
-    return () => {
-      alive = false;
-    };
+      .catch(() => { /* ignore */ });
+    return () => { alive = false; };
   }, []);
 
   const serviceToCategoryId = useMemo(() => {
@@ -191,13 +181,28 @@ export function ResultsClient() {
     return map;
   }, [categories]);
 
-  // Fetch artists (per selected service) + venues once we have wizard + categories
+  // Load existing bookings for this plan (to enforce limits and show "already booked")
+  const refreshPlanBookings = useCallback(async () => {
+    if (!planId) return;
+    try {
+      const res = await fetch(`/api/booking-requests?event_plan_id=${planId}`);
+      if (!res.ok) return;
+      const bookings = await res.json();
+      const idSet = new Set<number>();
+      for (const b of bookings) {
+        if (b?.artistId) idSet.add(Number(b.artistId));
+      }
+      setBookedArtistIds(idSet);
+    } catch { /* ignore */ }
+  }, [planId]);
+
+  useEffect(() => { refreshPlanBookings(); }, [refreshPlanBookings]);
+
+  // Fetch artists & venues
   useEffect(() => {
-    if (!wizard || !isSignedIn) return;
-    if (wizard.services.length > 0 && serviceToCategoryId.size === 0) {
-      // categories still loading
-      return;
-    }
+    if (!wizard) return;
+    if (!adminMode && !isSignedIn) return;
+    if (wizard.services.length > 0 && serviceToCategoryId.size === 0) return;
 
     let alive = true;
     setLoading(true);
@@ -205,16 +210,12 @@ export function ResultsClient() {
 
     async function loadAll() {
       try {
-        // 1. Artists — one request per selected service so we can render
-        // separate grids per category.
         const artistRequests = wizard!.services.map(async (svc) => {
           const categoryId = serviceToCategoryId.get(svc);
           const qs = new URLSearchParams();
           qs.set("limit", "12");
           qs.set("date", wizard!.eventDate);
           if (categoryId !== undefined) qs.set("category", String(categoryId));
-          // Budget acts as a soft upper bound per artist — the total budget
-          // usually covers several vendors so we don't try to split it here.
           if (wizard!.budget > 0) qs.set("price_max", String(wizard!.budget));
 
           const res = await fetch(`/api/artists?${qs.toString()}`);
@@ -223,7 +224,6 @@ export function ResultsClient() {
           return [svc, (json.items ?? []) as ArtistItem[]] as const;
         });
 
-        // 2. Venues — only if the user said they need one
         const venuePromise =
           wizard!.venueNeeded === "yes"
             ? (async () => {
@@ -259,12 +259,29 @@ export function ResultsClient() {
     }
 
     loadAll();
-    return () => {
-      alive = false;
-    };
-  }, [wizard, isSignedIn, serviceToCategoryId]);
+    return () => { alive = false; };
+  }, [wizard, isSignedIn, serviceToCategoryId, adminMode]);
 
-  // Early returns for loading / auth states
+  // Recompute bookings per category from current state
+  useEffect(() => {
+    const counts = new Map<number, number>();
+    for (const [svc, list] of Object.entries(artistsByService)) {
+      const catId = serviceToCategoryId.get(svc);
+      if (catId === undefined) continue;
+      const booked = list.filter((a) => bookedArtistIds.has(a.id)).length;
+      counts.set(catId, (counts.get(catId) ?? 0) + booked);
+    }
+    setBookingsPerCategory(counts);
+  }, [artistsByService, bookedArtistIds, serviceToCategoryId]);
+
+  const handleBookingSent = useCallback((artistId: number) => {
+    setBookedArtistIds((prev) => {
+      const next = new Set(prev);
+      next.add(artistId);
+      return next;
+    });
+  }, []);
+
   if (!isLoaded || !wizard) {
     return (
       <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center">
@@ -273,8 +290,7 @@ export function ResultsClient() {
     );
   }
 
-  if (!isSignedIn) {
-    // redirect effect will handle navigation; show a placeholder in the meantime
+  if (!adminMode && !isSignedIn) {
     return (
       <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-gold" />
@@ -292,24 +308,17 @@ export function ResultsClient() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">
-      {/* Summary header */}
       <div className="border-b border-border/40 bg-card/50">
         <div className="mx-auto max-w-6xl px-4 py-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="font-heading text-2xl font-bold">
-                Rezultatele tale
-              </h1>
+              <h1 className="font-heading text-2xl font-bold">Rezultatele tale</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Doar artiști și săli disponibile pentru data ta, filtrate după
-                preferințele alese în planificator.
+                Doar artiști și săli disponibile pentru data ta. Trimite cereri de
+                rezervare direct de aici (max 5 artiști per categorie).
               </p>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => router.push("/planifica")}
-              className="gap-2"
-            >
+            <Button variant="outline" onClick={() => router.push(backRoute)} className="gap-2">
               <ArrowLeft className="h-4 w-4" /> Modifică planificarea
             </Button>
           </div>
@@ -328,21 +337,20 @@ export function ResultsClient() {
             <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-gold/30 bg-gold/5 px-4 py-2.5 text-sm">
               <ClipboardList className="h-4 w-4 text-gold shrink-0" />
               <p className="flex-1 text-foreground/90">
-                Planul tău a fost creat automat. Cererile trimise de aici vor
-                apărea în tabul <span className="font-medium text-gold">Rezervări Artiști</span>.
+                Planul tău a fost creat automat. Cererile trimise vor apărea în
+                tabul <span className="font-medium text-gold">Rezervări Artiști</span>.
               </p>
               <Link
-                href={`/cabinet/planifica/${planId}`}
+                href={adminMode ? `/admin/crm` : `/cabinet/planifica/${planId}`}
                 className="inline-flex items-center gap-1 text-xs font-medium text-gold hover:underline"
               >
-                Deschide planul <ExternalLink className="h-3 w-3" />
+                {adminMode ? "Vezi în CRM" : "Deschide planul"} <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
           )}
         </div>
       </div>
 
-      {/* Results */}
       <div className="mx-auto max-w-6xl px-4 py-10">
         {loading && (
           <div className="flex items-center justify-center py-20">
@@ -358,7 +366,6 @@ export function ResultsClient() {
 
         {!loading && !error && (
           <div className="space-y-14">
-            {/* Venues (if requested) */}
             {wizard.venueNeeded === "yes" && (
               <section>
                 <SectionHeader
@@ -378,37 +385,60 @@ export function ResultsClient() {
               </section>
             )}
 
-            {/* Artists by selected category */}
             {wizard.services.map((svc) => {
               const items = artistsByService[svc] ?? [];
+              const catId = serviceToCategoryId.get(svc);
+              const usedInCategory =
+                catId !== undefined ? (bookingsPerCategory.get(catId) ?? 0) : 0;
+              const remaining = MAX_PER_CATEGORY - usedInCategory;
+              const categoryLimitReached = remaining <= 0;
+
               return (
                 <section key={svc}>
                   <SectionHeader
                     title={SERVICE_LABELS[svc] ?? svc}
-                    subtitle={`Artiști liberi pe ${formattedDate} din această categorie`}
+                    subtitle={`${items.length} artiști liberi · ${usedInCategory}/${MAX_PER_CATEGORY} cereri trimise`}
                     count={items.length}
                   />
                   {items.length === 0 ? (
                     <EmptyState message="Niciun artist disponibil în această categorie pentru data aleasă." />
                   ) : (
-                    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-                      {items.map((a) => (
-                        <ArtistCard key={a.id} artist={a} />
-                      ))}
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                      {items.map((a) => {
+                        const alreadyBooked = bookedArtistIds.has(a.id);
+                        return (
+                          <BookingArtistCard
+                            key={a.id}
+                            artist={a}
+                            eventContext={{
+                              eventDate: wizard.eventDate,
+                              eventType: wizard.eventType,
+                              guestCount: wizard.guestCount,
+                              clientName: wizard.name,
+                              clientPhone: wizard.phone,
+                              clientEmail: wizard.email || undefined,
+                              eventPlanId: planId,
+                            }}
+                            alreadyBooked={alreadyBooked}
+                            categoryLimitReached={
+                              !alreadyBooked && categoryLimitReached
+                            }
+                            onBookingSent={handleBookingSent}
+                          />
+                        );
+                      })}
                     </div>
                   )}
                 </section>
               );
             })}
 
-            {/* No selection at all — shouldn't happen thanks to validation, but render a CTA just in case */}
             {wizard.services.length === 0 && wizard.venueNeeded !== "yes" && (
               <EmptyState message="Nu ai selectat nicio categorie. Revino și alege cel puțin una." />
             )}
           </div>
         )}
 
-        {/* Footer CTA */}
         <div className="mt-16 flex flex-col items-center gap-3 rounded-xl border border-gold/20 bg-gold/5 p-8 text-center">
           <p className="font-heading text-lg">Nu găsești ce cauți?</p>
           <p className="text-sm text-muted-foreground">
@@ -424,10 +454,6 @@ export function ResultsClient() {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Small helpers
-// ---------------------------------------------------------------------------
 
 function SummaryChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (

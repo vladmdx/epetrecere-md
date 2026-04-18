@@ -23,12 +23,14 @@ import {
   Star,
   Camera,
   UserCheck,
+  PartyPopper,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/admin/eveniment-nou", icon: PartyPopper, label: "Eveniment Nou" },
   { href: "/admin/cereri-inregistrare", icon: UserCheck, label: "Cereri Înregistrare" },
   { href: "/admin/cereri-oferte", icon: Star, label: "Cereri Oferte" },
   { href: "/admin/crm", icon: MessageSquare, label: "CRM" },
