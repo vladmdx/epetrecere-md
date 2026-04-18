@@ -1312,7 +1312,10 @@ function BookingsTab({
         const seen = new Set<number>();
         const merged: DiscoveryArtist[] = [];
         for (const r of results) {
-          for (const a of r.artists ?? []) {
+          // The public /api/artists route returns {items, total, page, totalPages},
+          // while a few older internal callers used {artists}. Accept both.
+          const list: DiscoveryArtist[] = (r.items ?? r.artists ?? []) as DiscoveryArtist[];
+          for (const a of list) {
             if (!seen.has(a.id)) {
               seen.add(a.id);
               merged.push(a);
@@ -1453,7 +1456,9 @@ function BookingsTab({
           ) : discovery.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
               <p className="text-sm">
-                Niciun artist disponibil în categoriile selectate pentru această dată.
+                {plan.selectedCategories && plan.selectedCategories.length > 0
+                  ? "Niciun artist disponibil în categoriile selectate pentru această dată."
+                  : "Niciun artist disponibil pentru această dată."}
               </p>
               <Link href="/artisti">
                 <Button variant="outline" size="sm" className="mt-4">
