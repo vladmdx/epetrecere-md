@@ -1647,8 +1647,7 @@ function DiscoverySection({
         <div className="py-10 text-center">
           <Loader2 className="mx-auto h-6 w-6 animate-spin text-gold" />
         </div>
-      ) : byCategory.length === 0 ||
-        byCategory.every((s) => s.artists.length === 0) ? (
+      ) : byCategory.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
           <p className="text-sm">
             {plan.selectedCategories && plan.selectedCategories.length > 0
@@ -1662,20 +1661,33 @@ function DiscoverySection({
           </Link>
         </div>
       ) : (
-        byCategory.map((section) => {
-          if (section.artists.length === 0) return null;
+        // Render every selected category as its own section in the order
+        // the user picked them. Empty sections still render so the user
+        // sees all their selections and knows where to look next. Each
+        // section starts with INITIAL_VISIBLE=8 artists and a "Încarcă
+        // mai mulți" button; sections flow one after another so you
+        // naturally scroll to the next category after exhausting the
+        // current one.
+        byCategory.map((section, idx) => {
           const used = bookingsPerCategory.get(section.categoryId) ?? 0;
           const limitReached = used >= MAX_PER_CATEGORY;
           const visible = visibleByCategory[section.categoryId] ?? INITIAL_VISIBLE;
           const shown = section.artists.slice(0, visible);
           const hasMore = section.artists.length > visible;
+          const isEmpty = section.artists.length === 0;
 
           return (
             <div key={section.categoryId}>
+              {/* Subtle divider between sections so the eye finds the
+                  next category quickly after a long "Încarcă mai mulți"
+                  list of cards. */}
+              {idx > 0 && (
+                <div className="mb-8 mt-2 border-t border-border/30" />
+              )}
               <div className="mb-3 flex items-end justify-between gap-3">
                 <div>
                   <h3 className="font-heading text-lg font-bold">
-                    {section.categoryName}
+                    {idx + 1}. {section.categoryName}
                   </h3>
                   <p className="text-xs text-muted-foreground">
                     {section.artists.length} artiști disponibili · {used}/
@@ -1683,31 +1695,39 @@ function DiscoverySection({
                   </p>
                 </div>
               </div>
-              <div className={cn("grid gap-4", gridCols)}>
-                {shown.map((a) => (
-                  <PlanArtistCard
-                    key={a.id}
-                    artist={a}
-                    plan={plan}
-                    existingBooking={bookingByArtistId.get(a.id)}
-                    categoryLimitReached={limitReached}
-                    clientName={clientName}
-                    clientPhone={clientPhone}
-                    clientEmail={clientEmail}
-                    onRefresh={() => onRefresh()}
-                  />
-                ))}
-              </div>
-              {hasMore && (
-                <div className="mt-4 flex justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={() => showMore(section.categoryId)}
-                    className="gap-2"
-                  >
-                    Încarcă mai mulți ({section.artists.length - visible} rămași)
-                  </Button>
+              {isEmpty ? (
+                <div className="rounded-xl border border-dashed border-border/40 py-8 text-center text-xs text-muted-foreground">
+                  Niciun artist disponibil în această categorie pentru data aleasă.
                 </div>
+              ) : (
+                <>
+                  <div className={cn("grid gap-4", gridCols)}>
+                    {shown.map((a) => (
+                      <PlanArtistCard
+                        key={a.id}
+                        artist={a}
+                        plan={plan}
+                        existingBooking={bookingByArtistId.get(a.id)}
+                        categoryLimitReached={limitReached}
+                        clientName={clientName}
+                        clientPhone={clientPhone}
+                        clientEmail={clientEmail}
+                        onRefresh={() => onRefresh()}
+                      />
+                    ))}
+                  </div>
+                  {hasMore && (
+                    <div className="mt-4 flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={() => showMore(section.categoryId)}
+                        className="gap-2"
+                      >
+                        Încarcă mai mulți {section.categoryName.toLowerCase()} ({section.artists.length - visible} rămași)
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           );
