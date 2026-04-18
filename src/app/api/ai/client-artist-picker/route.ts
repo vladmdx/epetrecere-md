@@ -19,7 +19,8 @@ import {
   users,
   artistAvailabilitySlots,
 } from "@/lib/db/schema";
-import { and, eq, gte, lte, inArray, sql } from "drizzle-orm";
+import { and, eq, gte, lte, inArray } from "drizzle-orm";
+import { rateLimit } from "@/lib/rate-limit";
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -92,6 +93,18 @@ export async function POST(req: NextRequest) {
   if (!clerkId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Rate limit per Clerk user — 20 calls/hour. Client-side chat is
+  // cheaper than artist-side (usually one or two tool loops) but still
+  // can rack up cost if left open in a tab.
+  const rl = await rateLimit(`ai-client-pick:${clerkId}`, 20, 60 * 60 * 1000);
+  if (!rl.success) {
+    return NextResponse.json(
+      { error: "Prea multe cereri. Încearcă din nou mai târziu." },
+      { status: 429 },
+    );
+  }
+
   const [appUser] = await db
     .select({ id: users.id, email: users.email, name: users.name, phone: users.phone })
     .from(users)
@@ -152,19 +165,31 @@ Reguli:
 
   while (iterations < 6) {
     iterations++;
-    const resp = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      system: [
-        {
-          type: "text",
-          text: systemPrompt,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      tools: TOOLS,
-      messages: conversation,
-    });
+    let resp: Anthropic.Messages.Message;
+    try {
+      resp = await client.messages.create({
+        model: MODEL,
+        max_tokens: 2048,
+        system: [
+          {
+            type: "text",
+            text: systemPrompt,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        tools: TOOLS,
+        messages: conversation,
+      });
+    } catch (err) {
+      const e = err as { status?: number; error?: { type?: string } };
+      console.error(
+        `[ai/client-artist-picker] Anthropic error status=${e.status} type=${e.error?.type} plan=${plan.id}`,
+      );
+      return NextResponse.json(
+        { error: "Serviciul AI e temporar indisponibil. Încearcă din nou." },
+        { status: 502 },
+      );
+    }
 
     conversation.push({ role: "assistant", content: resp.content });
 

@@ -17,15 +17,21 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  // AuthZ — on Vercel, crons send the Authorization header automatically
-  // when CRON_SECRET is set in env. Refuse otherwise so the endpoint isn't
-  // externally invokable.
+  // AuthZ — fail-closed. CRON_SECRET MUST be set in env and the caller
+  // MUST send a matching `Authorization: Bearer …` header. Vercel crons
+  // attach this automatically when the env var is defined. Without the
+  // env var set, any anonymous caller could trigger the archive sweep.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const header = req.headers.get("authorization");
-    if (header !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  if (!secret) {
+    console.error("[cron/archive-plans] CRON_SECRET not configured — refusing to run");
+    return NextResponse.json(
+      { error: "Cron not configured" },
+      { status: 503 },
+    );
+  }
+  const header = req.headers.get("authorization");
+  if (header !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const cutoff = new Date();

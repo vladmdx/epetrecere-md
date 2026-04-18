@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,21 @@ export default function TestLoginPage() {
   const router = useRouter();
   const [busy, setBusy] = useState<WhoKey | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Probe the sign-in-token API first — if it's gated off in this env,
+  // render 404 instead of leaking which test emails the app uses.
+  const [enabled, setEnabled] = useState<null | boolean>(null);
+  useEffect(() => {
+    fetch("/api/dev/sign-in-token?user=__probe__")
+      .then((r) => r.json())
+      .then((d) => {
+        // 400 "unknown user" → endpoint is reachable & enabled (the
+        // persona just doesn't exist). 403 "disabled" → hide UI.
+        if (d.error === "disabled") setEnabled(false);
+        else setEnabled(true);
+      })
+      .catch(() => setEnabled(false));
+  }, []);
 
   async function loginAs(who: WhoKey) {
     setBusy(who);
@@ -77,6 +92,28 @@ export default function TestLoginPage() {
     }
   }
 
+  // Don't paint the persona emails until we know the endpoint is live.
+  if (enabled === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-gold" />
+      </div>
+    );
+  }
+  if (enabled === false) {
+    // Mimic Next's default 404 so the page doesn't hint what's hidden.
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background p-4 text-center">
+        <div>
+          <h1 className="font-heading text-2xl">404</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This page could not be found.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md border-gold/30">
@@ -116,7 +153,8 @@ export default function TestLoginPage() {
           )}
 
           <p className="pt-2 text-center text-xs text-muted-foreground">
-            Gated by <code className="text-gold">NODE_ENV !== production</code>
+            Gated by <code className="text-gold">ENABLE_TEST_LOGIN=1</code> env var.
+            Unset it on Vercel to hide these accounts from the public.
           </p>
         </CardContent>
       </Card>

@@ -18,6 +18,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { artistAvailabilitySlots, artists, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { rateLimit } from "@/lib/rate-limit";
 
 // Client is created per-request — the SDK is cheap to instantiate and
 // avoiding a module-level singleton keeps edge/serverless cold starts
@@ -105,6 +106,20 @@ export async function POST(req: NextRequest) {
   if (!clerkId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  // Rate limit per Clerk user — 20 calls/hour. Each tool loop can burn
+  // multiple Anthropic calls, so we cap the outer endpoint tightly to
+  // prevent a runaway chat from draining the monthly quota.
+  const rl = await rateLimit(`ai-artist-cal:${clerkId}`, 20, 60 * 60 * 1000);
+  if (!rl.success) {
+    return NextResponse.json(
+      {
+        error: "Prea multe cereri. Încearcă din nou în câteva minute.",
+      },
+      { status: 429 },
+    );
+  }
+
   const [appUser] = await db
     .select({ id: users.id })
     .from(users)
@@ -145,21 +160,36 @@ export async function POST(req: NextRequest) {
 
   while (iterations < 5) {
     iterations++;
-    const resp = await client.messages.create({
-      model: MODEL,
-      max_tokens: 2048,
-      system: [
-        {
-          type: "text",
-          text: SYSTEM_PROMPT,
-          // Cache the system prompt across turns — cuts ~80% of input
-          // cost on back-and-forth chats.
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      tools: [CREATE_SLOTS_TOOL],
-      messages: conversation,
-    });
+    let resp: Anthropic.Messages.Message;
+    try {
+      resp = await client.messages.create({
+        model: MODEL,
+        max_tokens: 2048,
+        system: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT,
+            // Cache the system prompt across turns — cuts ~80% of input
+            // cost on back-and-forth chats.
+            cache_control: { type: "ephemeral" },
+          },
+        ],
+        tools: [CREATE_SLOTS_TOOL],
+        messages: conversation,
+      });
+    } catch (err) {
+      // Anthropic SDK throws with structured error info — log the status
+      // code + type so we can debug 429/overloaded/invalid key etc. from
+      // Vercel logs without needing the raw message exposed to the client.
+      const e = err as { status?: number; error?: { type?: string } };
+      console.error(
+        `[ai/artist-calendar-fill] Anthropic error status=${e.status} type=${e.error?.type} user=${clerkId}`,
+      );
+      return NextResponse.json(
+        { error: "Serviciul AI e temporar indisponibil. Încearcă din nou." },
+        { status: 502 },
+      );
+    }
 
     // Append the full assistant reply (text + any tool_use blocks) so
     // subsequent turns see the same context Claude saw.
