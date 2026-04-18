@@ -95,6 +95,8 @@ interface BookingRequest {
   artistSlug: string | null;
   eventType: string | null;
   eventDate: string;
+  startTime?: string | null;
+  endTime?: string | null;
   status: string;
   agreedPrice?: number | null;
   paidStatus?: "unpaid" | "partial" | "paid";
@@ -1336,9 +1338,12 @@ function BookingsTab({
         const catNameById = new Map(cats.map((c) => [c.id, c.nameRo]));
 
         const categories = plan.selectedCategories ?? [];
+        // Fetch up to 60 per category so "Încarcă mai mulți" can reveal
+        // several batches without refetching; the initial grid only shows
+        // INITIAL_VISIBLE, the rest stays in memory.
         if (categories.length === 0) {
           const res = await fetch(
-            `/api/artists?date=${plan.eventDate}&limit=12`,
+            `/api/artists?date=${plan.eventDate}&limit=60`,
             { cache: "no-store" },
           ).then((r) => (r.ok ? r.json() : { items: [] }));
           setByCategory([
@@ -1354,7 +1359,7 @@ function BookingsTab({
         const sections = await Promise.all(
           categories.map(async (catId) => {
             const res = await fetch(
-              `/api/artists?date=${plan.eventDate}&category=${catId}&limit=12`,
+              `/api/artists?date=${plan.eventDate}&category=${catId}&limit=60`,
               { cache: "no-store" },
             ).then((r) => (r.ok ? r.json() : { items: [] }));
             return {
@@ -1439,6 +1444,12 @@ function BookingsTab({
                           </p>
                           <p className="text-xs text-muted-foreground">
                             {b.eventDate && new Date(b.eventDate).toLocaleDateString("ro-MD")}
+                            {b.startTime && b.endTime && (
+                              <span className="text-gold">
+                                {" · "}
+                                <Clock className="inline h-3 w-3" /> {b.startTime}–{b.endTime}
+                              </span>
+                            )}
                             {b.eventType && ` · ${EVENT_TYPE_LABELS[b.eventType] || b.eventType}`}
                           </p>
                         </div>
@@ -1489,85 +1500,197 @@ function BookingsTab({
 
       {/* ─── Section 2: Discover available artists, grouped by category ── */}
       {plan.eventDate && (
-        <section className="space-y-10">
-          <div className="mb-2">
-            <h2 className="font-heading text-xl font-bold">
-              Artiști disponibili pentru data ta
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {new Date(plan.eventDate).toLocaleDateString("ro-MD", {
-                day: "numeric",
-                month: "long",
-                year: "numeric",
-              })}
-              {plan.selectedCategories && plan.selectedCategories.length > 0 && (
-                <span> · {plan.selectedCategories.length} categorii selectate</span>
-              )}
-              {" · max 5 cereri per categorie"}
-            </p>
-          </div>
-
-          {discoveryLoading ? (
-            <div className="py-10 text-center">
-              <Loader2 className="mx-auto h-6 w-6 animate-spin text-gold" />
-            </div>
-          ) : byCategory.length === 0 || byCategory.every((s) => s.artists.length === 0) ? (
-            <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
-              <p className="text-sm">
-                {plan.selectedCategories && plan.selectedCategories.length > 0
-                  ? "Niciun artist disponibil în categoriile selectate pentru această dată."
-                  : "Niciun artist disponibil pentru această dată."}
-              </p>
-              <Link href="/artisti">
-                <Button variant="outline" size="sm" className="mt-4">
-                  Explorează toți artiștii
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            byCategory.map((section) => {
-              if (section.artists.length === 0) return null;
-              const used = bookingsPerCategory.get(section.categoryId) ?? 0;
-              const limitReached = used >= MAX_PER_CATEGORY;
-              return (
-                <div key={section.categoryId}>
-                  <div className="mb-3 flex items-end justify-between gap-3">
-                    <div>
-                      <h3 className="font-heading text-lg font-bold">
-                        {section.categoryName}
-                      </h3>
-                      <p className="text-xs text-muted-foreground">
-                        {section.artists.length} artiști disponibili · {used}/
-                        {MAX_PER_CATEGORY} cereri trimise
-                      </p>
-                    </div>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {section.artists.map((a) => (
-                      <PlanArtistCard
-                        key={a.id}
-                        artist={a}
-                        plan={plan}
-                        alreadyBooked={bookedArtistIds.has(a.id)}
-                        categoryLimitReached={limitReached}
-                        clientName={user?.fullName ?? "Client"}
-                        clientPhone={
-                          user?.primaryPhoneNumber?.phoneNumber ?? ""
-                        }
-                        clientEmail={
-                          user?.primaryEmailAddress?.emailAddress ?? undefined
-                        }
-                        onBookingSent={() => onRefresh()}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </section>
+        <DiscoverySection
+          plan={plan}
+          byCategory={byCategory}
+          loading={discoveryLoading}
+          bookedArtistIds={bookedArtistIds}
+          bookingsPerCategory={bookingsPerCategory}
+          clientName={user?.fullName ?? "Client"}
+          clientPhone={user?.primaryPhoneNumber?.phoneNumber ?? ""}
+          clientEmail={user?.primaryEmailAddress?.emailAddress ?? undefined}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
+  );
+}
+
+// Default number of cards shown per category before the user hits "Load more".
+const INITIAL_VISIBLE = 8;
+const LOAD_MORE_STEP = 8;
+const COLUMN_OPTIONS = [3, 4, 5] as const;
+type ColumnCount = (typeof COLUMN_OPTIONS)[number];
+const COLUMN_STORAGE_KEY = "plan-bookings-columns";
+
+function DiscoverySection({
+  plan,
+  byCategory,
+  loading,
+  bookedArtistIds,
+  bookingsPerCategory,
+  clientName,
+  clientPhone,
+  clientEmail,
+  onRefresh,
+}: {
+  plan: Plan;
+  byCategory: Array<{ categoryId: number; categoryName: string; artists: DiscoveryArtist[] }>;
+  loading: boolean;
+  bookedArtistIds: Set<number>;
+  bookingsPerCategory: Map<number, number>;
+  clientName: string;
+  clientPhone: string;
+  clientEmail?: string;
+  onRefresh: () => Promise<void> | void;
+}) {
+  // Columns preference — persisted per user in localStorage so the layout
+  // stays consistent between plan visits.
+  const [columns, setColumns] = useState<ColumnCount>(4);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(COLUMN_STORAGE_KEY);
+      const n = Number(stored);
+      if (COLUMN_OPTIONS.includes(n as ColumnCount)) {
+        setColumns(n as ColumnCount);
+      }
+    } catch { /* ignore */ }
+  }, []);
+  function changeColumns(n: ColumnCount) {
+    setColumns(n);
+    try { localStorage.setItem(COLUMN_STORAGE_KEY, String(n)); } catch { /* ignore */ }
+  }
+
+  // Visible-count per category id — starts at INITIAL_VISIBLE, bumped by
+  // LOAD_MORE_STEP when the user clicks "Încarcă mai mulți".
+  const [visibleByCategory, setVisibleByCategory] = useState<Record<number, number>>({});
+  const showMore = (catId: number) => {
+    setVisibleByCategory((prev) => ({
+      ...prev,
+      [catId]: (prev[catId] ?? INITIAL_VISIBLE) + LOAD_MORE_STEP,
+    }));
+  };
+
+  // Tailwind can't safely interpolate arbitrary lg:grid-cols-N at runtime
+  // because it purges unused classes. Map to a static class per column count.
+  const gridCols =
+    columns === 3
+      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+      : columns === 4
+        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
+
+  return (
+    <section className="space-y-10">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="font-heading text-xl font-bold">
+            Artiști disponibili pentru data ta
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })}
+            {plan.selectedCategories && plan.selectedCategories.length > 0 && (
+              <span> · {plan.selectedCategories.length} categorii selectate</span>
+            )}
+            {" · max 5 cereri per categorie"}
+          </p>
+        </div>
+        {/* Column picker — 3/4/5 cards per row */}
+        <div className="hidden lg:flex items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
+          <span className="px-2 text-xs text-muted-foreground">Coloane:</span>
+          {COLUMN_OPTIONS.map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => changeColumns(n)}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                columns === n
+                  ? "bg-gold text-background"
+                  : "text-muted-foreground hover:bg-accent",
+              )}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center">
+          <Loader2 className="mx-auto h-6 w-6 animate-spin text-gold" />
+        </div>
+      ) : byCategory.length === 0 ||
+        byCategory.every((s) => s.artists.length === 0) ? (
+        <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
+          <p className="text-sm">
+            {plan.selectedCategories && plan.selectedCategories.length > 0
+              ? "Niciun artist disponibil în categoriile selectate pentru această dată."
+              : "Niciun artist disponibil pentru această dată."}
+          </p>
+          <Link href="/artisti">
+            <Button variant="outline" size="sm" className="mt-4">
+              Explorează toți artiștii
+            </Button>
+          </Link>
+        </div>
+      ) : (
+        byCategory.map((section) => {
+          if (section.artists.length === 0) return null;
+          const used = bookingsPerCategory.get(section.categoryId) ?? 0;
+          const limitReached = used >= MAX_PER_CATEGORY;
+          const visible = visibleByCategory[section.categoryId] ?? INITIAL_VISIBLE;
+          const shown = section.artists.slice(0, visible);
+          const hasMore = section.artists.length > visible;
+
+          return (
+            <div key={section.categoryId}>
+              <div className="mb-3 flex items-end justify-between gap-3">
+                <div>
+                  <h3 className="font-heading text-lg font-bold">
+                    {section.categoryName}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {section.artists.length} artiști disponibili · {used}/
+                    {MAX_PER_CATEGORY} cereri trimise
+                  </p>
+                </div>
+              </div>
+              <div className={cn("grid gap-4", gridCols)}>
+                {shown.map((a) => (
+                  <PlanArtistCard
+                    key={a.id}
+                    artist={a}
+                    plan={plan}
+                    alreadyBooked={bookedArtistIds.has(a.id)}
+                    categoryLimitReached={limitReached}
+                    clientName={clientName}
+                    clientPhone={clientPhone}
+                    clientEmail={clientEmail}
+                    onBookingSent={() => onRefresh()}
+                  />
+                ))}
+              </div>
+              {hasMore && (
+                <div className="mt-4 flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => showMore(section.categoryId)}
+                    className="gap-2"
+                  >
+                    Încarcă mai mulți ({section.artists.length - visible} rămași)
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </section>
   );
 }
 
@@ -1597,6 +1720,10 @@ function PlanArtistCard({
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+  // Separate start/end time input — can be filled manually or by clicking
+  // one of the artist's declared slots as a preset.
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -1612,9 +1739,30 @@ function PlanArtistCard({
       ? "Limită atinsă (5)"
       : "Solicită rezervare";
 
+  function pickSlot(slot: { id: number; startTime: string; endTime: string }) {
+    if (selectedSlotId === slot.id) {
+      // Toggle off
+      setSelectedSlotId(null);
+      setStartTime("");
+      setEndTime("");
+      return;
+    }
+    setSelectedSlotId(slot.id);
+    setStartTime(slot.startTime);
+    setEndTime(slot.endTime);
+  }
+
+  function timesValid() {
+    if (!startTime || !endTime) return false;
+    return startTime < endTime;
+  }
+
   async function submit() {
     if (submitting) return;
-    const slot = slots.find((s) => s.id === selectedSlotId) ?? null;
+    if (!timesValid()) {
+      toast.error("Alege ora de început și ora de sfârșit.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/booking-requests", {
@@ -1628,8 +1776,8 @@ function PlanArtistCard({
           eventDate: plan.eventDate,
           eventType: plan.eventType ?? undefined,
           guestCount: plan.guestCountTarget ?? undefined,
-          startTime: slot?.startTime,
-          endTime: slot?.endTime,
+          startTime,
+          endTime,
           message: message.trim() || undefined,
           eventPlanId: plan.id,
         }),
@@ -1638,10 +1786,14 @@ function PlanArtistCard({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Eroare la trimitere");
       }
-      toast.success(`Cerere trimisă către ${artist.nameRo}!`);
+      toast.success(
+        `Cerere trimisă către ${artist.nameRo} pentru ${startTime}–${endTime}!`,
+      );
       setModalOpen(false);
       setMessage("");
       setSelectedSlotId(null);
+      setStartTime("");
+      setEndTime("");
       onBookingSent();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Eroare la trimitere");
@@ -1702,20 +1854,17 @@ function PlanArtistCard({
 
                 {slots.length > 0 && (
                   <div>
-                    <Label>Interval orar</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Alege un interval (opțional) sau lasă gol pentru "toată ziua"
-                    </p>
-                    <div className="flex flex-wrap gap-2">
+                    <Label className="text-xs text-muted-foreground">
+                      Intervale oferite de artist (apasă pentru a prelua)
+                    </Label>
+                    <div className="mt-1 flex flex-wrap gap-2">
                       {slots.map((s) => {
                         const selected = selectedSlotId === s.id;
                         return (
                           <button
                             key={s.id}
                             type="button"
-                            onClick={() =>
-                              setSelectedSlotId(selected ? null : s.id)
-                            }
+                            onClick={() => pickSlot(s)}
                             className={cn(
                               "rounded-lg border px-3 py-1.5 text-xs transition-all",
                               selected
@@ -1735,6 +1884,65 @@ function PlanArtistCard({
                     </div>
                   </div>
                 )}
+
+                {/* Custom time picker — client decides exactly when to book */}
+                <div>
+                  <Label>Interval orar rezervare *</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    De la ce oră până la ce oră dorești artistul?
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label
+                        htmlFor={`start-${artist.id}`}
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        De la
+                      </Label>
+                      <Input
+                        id={`start-${artist.id}`}
+                        type="time"
+                        value={startTime}
+                        onChange={(e) => {
+                          setStartTime(e.target.value);
+                          setSelectedSlotId(null);
+                        }}
+                        disabled={submitting}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label
+                        htmlFor={`end-${artist.id}`}
+                        className="text-[11px] text-muted-foreground"
+                      >
+                        Până la
+                      </Label>
+                      <Input
+                        id={`end-${artist.id}`}
+                        type="time"
+                        value={endTime}
+                        onChange={(e) => {
+                          setEndTime(e.target.value);
+                          setSelectedSlotId(null);
+                        }}
+                        disabled={submitting}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                  {startTime && endTime && !timesValid() && (
+                    <p className="mt-1 text-[11px] text-destructive">
+                      Ora de sfârșit trebuie să fie după ora de început.
+                    </p>
+                  )}
+                  {timesValid() && (
+                    <p className="mt-2 rounded-lg bg-gold/5 border border-gold/20 px-3 py-2 text-xs text-gold/90">
+                      Rezervare artist de la ora <strong>{startTime}</strong>{" "}
+                      până la ora <strong>{endTime}</strong>
+                    </p>
+                  )}
+                </div>
 
                 <div>
                   <Label htmlFor={`msg-${artist.id}`}>Mesaj (opțional)</Label>
@@ -1770,7 +1978,7 @@ function PlanArtistCard({
                   <Button
                     size="sm"
                     onClick={submit}
-                    disabled={submitting}
+                    disabled={submitting || !timesValid()}
                     className="gap-2 bg-gold text-background hover:bg-gold-dark"
                   >
                     {submitting ? (
