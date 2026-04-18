@@ -35,6 +35,10 @@ interface WizardData {
   timeSlot: string;
   guestCount: number;
   venueNeeded: "" | "yes" | "no"; // do they need a venue
+  /** When venueNeeded === "yes", the maximum radius (km) from the
+   *  event city the user is willing to travel for the venue. 0 = only
+   *  the selected city, 999 = no limit. */
+  venueRadiusKm: number;
   services: string[]; // selected category ids
   budget: number;
   name: string;
@@ -86,6 +90,7 @@ const initialData: WizardData = {
   timeSlot: "",
   guestCount: 100,
   venueNeeded: "",
+  venueRadiusKm: 25,
   services: [],
   budget: 2000,
   name: "",
@@ -606,18 +611,25 @@ function StepGuests({ data, update, autoNext }: StepProps) {
 // Venue question — simple yes/no. If "yes" the results page will show
 // available venues filtered by guestCount + city + date. If "no" we skip
 // venue listings on results and focus on artists.
-function StepVenue({ data, update, autoNext }: StepProps) {
+const VENUE_RADIUS_PRESETS: Array<{ value: number; label: string; sub?: string }> = [
+  { value: 0, label: "Doar în oraș", sub: "Venue-uri din orașul evenimentului" },
+  { value: 25, label: "Până la 25 km", sub: "Oraș + suburbiile apropiate" },
+  { value: 50, label: "Până la 50 km", sub: "Județul extins" },
+  { value: 100, label: "Până la 100 km", sub: "Destinație apropiată" },
+  { value: 999, label: "Toată Moldova", sub: "Fără limită de distanță" },
+];
+
+function StepVenue({ data, update }: StepProps) {
   const { t } = useLocale();
+  // Auto-advance removed — when user picks "Yes" they must also choose a
+  // radius, so we keep them on this step until they hit "Continuă".
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_venue")}</h2>
       <p className="mb-8 text-muted-foreground">Ai nevoie de o sală sau restaurant?</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <button
-          onClick={() => {
-            update({ venueNeeded: "yes" });
-            autoNext?.();
-          }}
+          onClick={() => update({ venueNeeded: "yes" })}
           className={cn(
             "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
             data.venueNeeded === "yes"
@@ -630,10 +642,7 @@ function StepVenue({ data, update, autoNext }: StepProps) {
           <span className="text-xs text-muted-foreground">Vom afișa sălile disponibile pentru data ta</span>
         </button>
         <button
-          onClick={() => {
-            update({ venueNeeded: "no" });
-            autoNext?.();
-          }}
+          onClick={() => update({ venueNeeded: "no" })}
           className={cn(
             "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
             data.venueNeeded === "no"
@@ -646,6 +655,40 @@ function StepVenue({ data, update, autoNext }: StepProps) {
           <span className="text-xs text-muted-foreground">Am sala rezervată sau eveniment outdoor</span>
         </button>
       </div>
+
+      {/* Radius picker — only when the user wants a venue. We use radius
+          brackets instead of a real slider because Moldovan cities are
+          well-covered by a handful of distance buckets and this keeps
+          the UI honest (we don't have lat/lng on venue rows). */}
+      {data.venueNeeded === "yes" && (
+        <div className="mt-8">
+          <Label>Rază de căutare *</Label>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Cât de departe de {data.location || "orașul ales"} ești dispus să
+            mergi pentru sală? Sălile nu influențează bugetul artiștilor.
+          </p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {VENUE_RADIUS_PRESETS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => update({ venueRadiusKm: opt.value })}
+                className={cn(
+                  "rounded-lg border-2 px-3 py-3 text-left transition-all",
+                  data.venueRadiusKm === opt.value
+                    ? "border-gold bg-gold/10 text-gold"
+                    : "border-border/40 hover:border-gold/30",
+                )}
+              >
+                <p className="text-sm font-medium">{opt.label}</p>
+                {opt.sub && (
+                  <p className="text-[11px] text-muted-foreground">{opt.sub}</p>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

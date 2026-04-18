@@ -5,11 +5,23 @@ import { getVenues } from "@/lib/db/queries/venues";
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
 
+  // `cities` (comma-separated) overrides `city` so callers can pass an
+  // expanded list — e.g. the plan's Săli tab sends
+  // "Chișinău,Ialoveni,Strășeni" when the user picked a 25 km radius.
+  const citiesParam = params.get("cities");
+  const citiesList = citiesParam
+    ? citiesParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+    : undefined;
+
   const filters = {
     capacityMin: params.get("capacity_min") ? Number(params.get("capacity_min")) : undefined,
     capacityMax: params.get("capacity_max") ? Number(params.get("capacity_max")) : undefined,
     priceMax: params.get("price_max") ? Number(params.get("price_max")) : undefined,
-    city: params.get("city") || undefined,
+    city: citiesList ? undefined : (params.get("city") || undefined),
+    cityKeywords: citiesList,
     availableDate: params.get("date") || undefined,
     featured: params.get("featured") === "true" ? true : undefined,
     sort: (params.get("sort") as "popular" | "price_asc" | "price_desc" | "rating" | "capacity") || undefined,

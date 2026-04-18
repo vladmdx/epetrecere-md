@@ -38,6 +38,7 @@ const wizardSchema = z.object({
   durationHours: z.number().int().min(1).max(24).optional(),
   guestCount: z.number().int().nonnegative().optional(),
   venueNeeded: z.enum(["", "yes", "no"]).optional(),
+  venueRadiusKm: z.number().int().min(0).max(9999).optional(),
   services: z.array(z.string()).optional(),
   budget: z.number().int().nonnegative().optional(),
   name: z.string().optional(),
@@ -104,6 +105,7 @@ export async function POST(req: NextRequest) {
       guestCountTarget: w.guestCount ?? null,
       budgetTarget: w.budget ?? null,
       venueNeeded: w.venueNeeded === "yes",
+      venueRadiusKm: w.venueRadiusKm ?? 25,
       selectedCategories: categoryIds,
     })
     .returning();

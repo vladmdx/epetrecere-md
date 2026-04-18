@@ -3,7 +3,8 @@
 // M4 — Client planner dashboard — matches reference design:
 // Left vertical nav | Main content (Overview/Checklist/Budget/etc) | Right stats sidebar.
 
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback, useMemo, use } from "react";
+import { citiesWithinRadius } from "@/lib/geo/city-proximity";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
@@ -88,6 +89,8 @@ interface Plan {
   /** Wizard-supplied: whether the plan also needs a venue — drives the
    *  conditional "Săli" tab. */
   venueNeeded?: boolean;
+  /** Max radius (km) from the event city for the Săli tab filter. */
+  venueRadiusKm?: number | null;
   /** Wizard-supplied category IDs for pre-filtering the artist discovery. */
   selectedCategories?: number[];
   status?: "active" | "completed" | "cancelled";
@@ -2420,19 +2423,33 @@ interface DiscoveryVenue {
 function VenuesTab({ plan }: { plan: Plan }) {
   const [venues, setVenues] = useState<DiscoveryVenue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [radius, setRadius] = useState<number>(plan.venueRadiusKm ?? 25);
+
+  // Expand the selected city into all towns within `radius` km using the
+  // hardcoded Moldovan city-proximity table. 999 = no filter (all cities).
+  const expandedCities = useMemo(() => {
+    if (!plan.location) return [] as string[];
+    if (radius >= 999) return [] as string[]; // no city filter at all
+    return citiesWithinRadius(plan.location, radius);
+  }, [plan.location, radius]);
 
   useEffect(() => {
+    setLoading(true);
     const params = new URLSearchParams();
     if (plan.eventDate) params.set("date", plan.eventDate);
-    if (plan.location) params.set("city", plan.location);
+    if (expandedCities.length > 0) {
+      params.set("cities", expandedCities.join(","));
+    } else if (plan.location && radius < 999) {
+      params.set("city", plan.location);
+    }
     if (plan.guestCountTarget) params.set("capacity_min", String(plan.guestCountTarget));
-    params.set("limit", "12");
+    params.set("limit", "24");
     fetch(`/api/venues?${params.toString()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { venues: [] }))
-      .then((data) => setVenues(data.venues ?? data ?? []))
+      .then((data) => setVenues(data.items ?? data.venues ?? data ?? []))
       .catch(() => setVenues([]))
       .finally(() => setLoading(false));
-  }, [plan.eventDate, plan.location, plan.guestCountTarget]);
+  }, [plan.eventDate, plan.location, plan.guestCountTarget, expandedCities, radius]);
 
   return (
     <div className="space-y-8">
@@ -2449,11 +2466,44 @@ function VenuesTab({ plan }: { plan: Plan }) {
             </>
           )}
           {plan.location && <> · {plan.location}</>}
+          {radius > 0 && radius < 999 && <> · rază {radius} km</>}
+          {radius >= 999 && <> · toată Moldova</>}
           {plan.guestCountTarget && <> · min. {plan.guestCountTarget} invitați</>}
         </p>
         <p className="mt-2 text-xs text-muted-foreground/80">
           Rezervările de săli nu sunt incluse în buget — bugetul e format doar din artiști.
         </p>
+
+        {/* Radius override — so the user can tweak after the wizard. */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            { value: 0, label: "Doar în oraș" },
+            { value: 25, label: "25 km" },
+            { value: 50, label: "50 km" },
+            { value: 100, label: "100 km" },
+            { value: 999, label: "Toată Moldova" },
+          ].map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setRadius(opt.value)}
+              className={cn(
+                "rounded-lg border px-3 py-1.5 text-xs transition-all",
+                radius === opt.value
+                  ? "border-gold bg-gold/10 text-gold font-medium"
+                  : "border-border/40 hover:border-gold/30",
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {expandedCities.length > 1 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Orașe incluse: {expandedCities.join(", ")}
+          </p>
+        )}
       </section>
 
       {loading ? (

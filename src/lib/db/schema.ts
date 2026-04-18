@@ -834,6 +834,12 @@ export const eventPlans = pgTable("event_plans", {
   /** Whether the user indicated in the wizard they also need a venue.
    *  When true the plan detail page surfaces the "Săli" tab. */
   venueNeeded: boolean("venue_needed").default(false).notNull(),
+  /** Max radius (km) from the event city the user is willing to travel
+   *  for a venue. 0 = only the selected city, 999 = no limit. Used to
+   *  expand the city filter on the Săli tab via a city-proximity map.
+   *  Does not affect the budget — venue fees are excluded from artist
+   *  totals per product spec. */
+  venueRadiusKm: integer("venue_radius_km").default(25),
   /** Array of category IDs the user picked in the wizard (singer, DJ,
    *  photographer, ...). Used to pre-filter the "Artiști disponibili"
    *  section inside the Rezervări Artiști tab. */
