@@ -30,6 +30,11 @@ interface FormBaseProps {
   // M1 #5 — allows package cards to prefill the booking message field so the
   // artist receives context on which package the client is interested in.
   presetMessage?: string;
+  /** When set, the booking is linked to the user's event plan via
+   *  event_plan_id so it shows up in the Rezervări Artiști tab and
+   *  feeds the plan budget once the artist accepts. Only used on the
+   *  artist flow; venues keep using /api/leads. */
+  eventPlanId?: number;
 }
 
 // ─── Price Request (simple: name + phone) ────────────────
@@ -133,7 +138,7 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
 }
 
 // ─── Booking Request (full form) ─────────────────────────
-export function RequestBookingForm({ artistId, venueId, preselectedDate, className, label = "Solicită Rezervare", variant = "outline", icon, presetMessage, capacityMax }: FormBaseProps & { capacityMax?: number | null }) {
+export function RequestBookingForm({ artistId, venueId, eventPlanId, preselectedDate, className, label = "Solicită Rezervare", variant = "outline", icon, presetMessage, capacityMax }: FormBaseProps & { capacityMax?: number | null }) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -155,26 +160,55 @@ export function RequestBookingForm({ artistId, venueId, preselectedDate, classNa
     const form = new FormData(e.currentTarget);
 
     try {
-      const res = await fetch("/api/leads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.get("name") as string,
-          phone: form.get("phone") as string,
-          phonePrefix: "+373",
-          email: (form.get("email") as string) || undefined,
-          eventType: (form.get("eventType") as string) || undefined,
-          eventDate: eventDate ? eventDate.toISOString().split("T")[0] : undefined,
-          location: (form.get("location") as string) || undefined,
-          guestCount: form.get("guestCount") ? Number(form.get("guestCount")) : undefined,
-          message: (form.get("message") as string) || undefined,
-          source: "form",
-          artistId,
-          venueId,
-        }),
-      });
+      // When we have both artistId AND eventPlanId, hit the planner-linked
+      // booking endpoint so the request lands directly in the user's plan.
+      // Otherwise fall back to the legacy /api/leads flow for anonymous /
+      // out-of-plan submissions.
+      const usePlanFlow = !!(artistId && eventPlanId);
+      const payload = usePlanFlow
+        ? {
+            artistId: artistId!,
+            eventPlanId,
+            clientName: form.get("name") as string,
+            clientPhone: `+373${form.get("phone") as string}`,
+            clientEmail: (form.get("email") as string) || undefined,
+            eventType: (form.get("eventType") as string) || undefined,
+            eventDate: eventDate ? eventDate.toISOString().split("T")[0] : undefined,
+            guestCount: form.get("guestCount")
+              ? Number(form.get("guestCount"))
+              : undefined,
+            message: (form.get("message") as string) || undefined,
+          }
+        : {
+            name: form.get("name") as string,
+            phone: form.get("phone") as string,
+            phonePrefix: "+373",
+            email: (form.get("email") as string) || undefined,
+            eventType: (form.get("eventType") as string) || undefined,
+            eventDate: eventDate ? eventDate.toISOString().split("T")[0] : undefined,
+            location: (form.get("location") as string) || undefined,
+            guestCount: form.get("guestCount")
+              ? Number(form.get("guestCount"))
+              : undefined,
+            message: (form.get("message") as string) || undefined,
+            source: "form",
+            artistId,
+            venueId,
+          };
+      const res = await fetch(
+        usePlanFlow ? "/api/booking-requests" : "/api/leads",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        },
+      );
       if (!res.ok) throw new Error();
-      toast.success("Cererea de rezervare a fost trimisă! Vă vom contacta în curând.");
+      toast.success(
+        usePlanFlow
+          ? "Cererea a fost trimisă și legată de planul tău!"
+          : "Cererea de rezervare a fost trimisă! Vă vom contacta în curând.",
+      );
       setOpen(false);
     } catch {
       toast.error("A apărut o eroare. Încercați din nou.");

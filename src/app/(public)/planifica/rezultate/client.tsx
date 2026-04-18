@@ -7,7 +7,17 @@ import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { ArtistCard } from "@/components/public/artist-card";
 import { VenueCard } from "@/components/public/venue-card";
-import { Loader2, Calendar, MapPin, Users, Wallet, Sparkles, ArrowLeft } from "lucide-react";
+import {
+  Loader2,
+  Calendar,
+  MapPin,
+  Users,
+  Wallet,
+  Sparkles,
+  ArrowLeft,
+  ClipboardList,
+  ExternalLink,
+} from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -87,6 +97,10 @@ export function ResultsClient() {
   const [venues, setVenues] = useState<VenueItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** The event plan row created (or looked up) from the wizard data. All
+   *  artist/venue cards use this id so their booking forms link the
+   *  resulting requests back to this plan automatically. */
+  const [planId, setPlanId] = useState<number | null>(null);
 
   // Read wizard data from sessionStorage on mount
   useEffect(() => {
@@ -113,6 +127,40 @@ export function ResultsClient() {
       );
     }
   }, [isLoaded, isSignedIn, router]);
+
+  // Once authenticated, materialize the wizard answers into a real event
+  // plan so every booking request sent from these results lands in that
+  // plan's "Rezervări Artiști" tab. Stashes the id in sessionStorage so
+  // artist profile pages can pick it up when the user clicks through.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || !wizard) return;
+
+    // If a plan was already created during this wizard run, reuse it.
+    const cached = sessionStorage.getItem("wizard-plan-id");
+    if (cached) {
+      setPlanId(Number(cached));
+      return;
+    }
+
+    (async () => {
+      try {
+        const res = await fetch("/api/event-plans/from-wizard", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(wizard),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data?.plan?.id) {
+          sessionStorage.setItem("wizard-plan-id", String(data.plan.id));
+          setPlanId(data.plan.id);
+        }
+      } catch {
+        // Non-fatal — the results page still renders; the booking form will
+        // fall back to /api/leads when planId is missing.
+      }
+    })();
+  }, [isLoaded, isSignedIn, wizard]);
 
   // Load categories once so we can translate service ids → category ids
   useEffect(() => {
@@ -275,6 +323,22 @@ export function ResultsClient() {
               <SummaryChip icon={<Sparkles className="h-3.5 w-3.5" />} label="Cu sală" />
             )}
           </div>
+
+          {planId && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-gold/30 bg-gold/5 px-4 py-2.5 text-sm">
+              <ClipboardList className="h-4 w-4 text-gold shrink-0" />
+              <p className="flex-1 text-foreground/90">
+                Planul tău a fost creat automat. Cererile trimise de aici vor
+                apărea în tabul <span className="font-medium text-gold">Rezervări Artiști</span>.
+              </p>
+              <Link
+                href={`/cabinet/planifica/${planId}`}
+                className="inline-flex items-center gap-1 text-xs font-medium text-gold hover:underline"
+              >
+                Deschide planul <ExternalLink className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Star, BadgeCheck, Crown, MapPin, Globe, CalendarDays, X, ZoomIn, Lock, Camera } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { CalendarWidget } from "@/components/public/calendar-widget";
@@ -93,9 +94,28 @@ interface Props {
 export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
+  const searchParams = useSearchParams();
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
   const [avatarOpen, setAvatarOpen] = useState(false);
+
+  // Resolve the event plan this booking should attach to. Priority order:
+  // explicit `?plan=X` URL param (used by dashboard discovery links) →
+  // sessionStorage.wizard-plan-id (set by /planifica/rezultate after the
+  // wizard flow creates a plan) → null (anonymous / no plan; falls back
+  // to /api/leads in the form).
+  const [eventPlanId, setEventPlanId] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    const fromUrl = searchParams.get("plan");
+    if (fromUrl && !Number.isNaN(Number(fromUrl))) {
+      setEventPlanId(Number(fromUrl));
+      return;
+    }
+    const fromSession = typeof window !== "undefined"
+      ? sessionStorage.getItem("wizard-plan-id")
+      : null;
+    if (fromSession) setEventPlanId(Number(fromSession));
+  }, [searchParams]);
   // Profile photo: prefer dedicated photoUrl, fallback to first gallery image
   const profilePhotoUrl = artist.photoUrl || artist.images?.[0]?.url || null;
   const isPlaceholder = profilePhotoUrl?.includes("placeholder.svg") ?? false;
@@ -305,6 +325,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                         <div className="mt-4">
                           <RequestBookingForm
                             artistId={artist.id}
+                            eventPlanId={eventPlanId}
                             label="Solicită pachetul"
                             variant="primary"
                             presetMessage={presetMessage}
@@ -389,8 +410,14 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             <RequestPriceForm artistId={artist.id} />
             <RequestBookingForm
               artistId={artist.id}
+              eventPlanId={eventPlanId}
               icon={<CalendarDays className="h-4 w-4" />}
             />
+            {eventPlanId && (
+              <p className="text-center text-[11px] text-gold/70">
+                Rezervarea va fi legată de planul tău.
+              </p>
+            )}
             <ChatWidget
               artistId={artist.id}
               artistName={name}

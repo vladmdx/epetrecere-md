@@ -5,6 +5,32 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2, Music, Building2, PartyPopper } from "lucide-react";
 
+/**
+ * If the user just came through the public /planifica wizard, their answers
+ * are sitting in sessionStorage. POST them to /api/event-plans/from-wizard
+ * so the dashboard opens with the plan already populated, then redirect
+ * into that plan. Returns `null` if no wizard data (or on failure) so the
+ * caller falls back to the default routing.
+ */
+async function consumeWizardData(): Promise<string | null> {
+  try {
+    const raw = sessionStorage.getItem("wizard-data");
+    if (!raw) return null;
+    const wizard = JSON.parse(raw);
+    const res = await fetch("/api/event-plans/from-wizard", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(wizard),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    sessionStorage.removeItem("wizard-data");
+    return data?.plan?.id ? `/cabinet/planifica/${data.plan.id}?tab=bookings` : null;
+  } catch {
+    return null;
+  }
+}
+
 type RoleChoice = "client" | "artist" | "venue" | null;
 
 export default function AuthRedirectPage() {
@@ -50,13 +76,23 @@ export default function AuthRedirectPage() {
             router.replace("/dashboard/onboarding");
           }
         } else if (data.isNewUser === true) {
-          // New user without a role — show role selection
-          setShowRoleSelect(true);
-          setChecking(false);
+          // New user without a role — try wizard flow first, else show picker.
+          const planUrl = await consumeWizardData();
+          if (planUrl) {
+            // Also mark onboarding complete so the picker never shows next.
+            await fetch("/api/auth/complete-onboarding", { method: "POST" }).catch(() => {});
+            router.replace(planUrl);
+          } else {
+            setShowRoleSelect(true);
+            setChecking(false);
+          }
         } else if (data.hasVenue) {
           router.replace("/dashboard");
         } else {
-          router.replace("/cabinet");
+          // Existing client — if they just finished the wizard flow, take
+          // them straight into the new plan. Otherwise send to /cabinet.
+          const planUrl = await consumeWizardData();
+          router.replace(planUrl ?? "/cabinet");
         }
       } catch {
         // On error, show role picker as safe fallback
@@ -75,7 +111,9 @@ export default function AuthRedirectPage() {
     if (selectedRole === "client") {
       // Mark onboarding complete so the role picker doesn't show again
       await fetch("/api/auth/complete-onboarding", { method: "POST" }).catch(() => {});
-      router.replace("/cabinet");
+      // If the client just came from the wizard, open their new plan.
+      const planUrl = await consumeWizardData();
+      router.replace(planUrl ?? "/cabinet");
     } else if (selectedRole === "artist") {
       router.replace("/dashboard/onboarding");
     } else if (selectedRole === "venue") {
