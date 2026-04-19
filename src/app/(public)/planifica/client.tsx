@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { CustomCalendar } from "@/components/public/custom-calendar";
 import { TimePicker } from "@/components/ui/time-picker";
 import { useLocale } from "@/hooks/use-locale";
@@ -42,9 +49,15 @@ interface WizardData {
   venueRadiusKm: number;
   services: string[]; // selected category ids
   budget: number;
+  /** Event title — used as the plan title ("Nunta Ana & Ion"). Labelled
+   *  "Nume eveniment" in the UI. Kept as `name` for back-compat with the
+   *  leads + plan endpoints that already consumed this field. */
   name: string;
+  phonePrefix: string;
   phone: string;
   email: string;
+  /** GDPR checkbox — must be true before the wizard can submit. */
+  gdprAccepted: boolean;
 }
 
 /** Typical event durations in hours. The user still picks a start hour
@@ -95,9 +108,28 @@ const initialData: WizardData = {
   services: [],
   budget: 2000,
   name: "",
+  phonePrefix: "+373",
   phone: "",
   email: "",
+  gdprAccepted: false,
 };
+
+/** Country prefixes shown in the phone picker. Moldova first, then the
+ *  most common diaspora destinations for MD clients. */
+const PHONE_PREFIXES: Array<{ value: string; label: string; flag: string }> = [
+  { value: "+373", label: "Moldova", flag: "🇲🇩" },
+  { value: "+40", label: "România", flag: "🇷🇴" },
+  { value: "+380", label: "Ucraina", flag: "🇺🇦" },
+  { value: "+7", label: "Rusia", flag: "🇷🇺" },
+  { value: "+39", label: "Italia", flag: "🇮🇹" },
+  { value: "+49", label: "Germania", flag: "🇩🇪" },
+  { value: "+33", label: "Franța", flag: "🇫🇷" },
+  { value: "+44", label: "UK", flag: "🇬🇧" },
+  { value: "+1", label: "USA / Canada", flag: "🇺🇸" },
+  { value: "+34", label: "Spania", flag: "🇪🇸" },
+  { value: "+351", label: "Portugalia", flag: "🇵🇹" },
+  { value: "+420", label: "Cehia", flag: "🇨🇿" },
+];
 
 // Reordered per requirements: Sală (venue) BEFORE Servicii (categories)
 // StepArtists removed — clients only pick categories, the artists are
@@ -205,7 +237,13 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
       case 3: return data.venueNeeded === "yes" || data.venueNeeded === "no";
       case 4: return data.services.length > 0;
       case 5: return data.budget > 0;
-      case 6: return !!data.name && !!data.phone;
+      case 6:
+        return (
+          !!data.name.trim() &&
+          !!data.phone.trim() &&
+          !!data.phonePrefix &&
+          data.gdprAccepted
+        );
       default: return false;
     }
   }
@@ -227,6 +265,25 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
   }
 
   async function handleSubmit() {
+    // Field-level validation — tell the user exactly what's missing
+    // instead of a generic "eroare" toast later.
+    if (!data.name.trim()) {
+      toast.error("Introduceți numele evenimentului (ex: Nunta Ana & Ion).");
+      return;
+    }
+    if (!data.phonePrefix) {
+      toast.error("Alegeți prefixul telefonic.");
+      return;
+    }
+    if (!data.phone.trim()) {
+      toast.error("Introduceți numărul de telefon.");
+      return;
+    }
+    if (!data.gdprAccepted) {
+      toast.error("Trebuie să acceptați Politica de Confidențialitate.");
+      return;
+    }
+
     // Public login gate (M0a #5). Admin mode skips this — admin is already
     // authenticated via the admin layout. Unauthenticated public users are
     // sent to sign-in and /planifica/rezultate takes over after login.
@@ -244,6 +301,9 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         return;
       }
 
+      // Full phone with the user-selected prefix.
+      const fullPhone = `${data.phonePrefix}${data.phone.replace(/^\+?\d+\s*/, "").trim()}`;
+
       // Authenticated client flow: record the lead (fire-and-forget so the
       // user isn't blocked if the CRM insert fails), then materialize the
       // event plan and deep-link into its "Rezervări Artiști" tab so the
@@ -253,7 +313,7 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: data.name,
-          phone: data.phone,
+          phone: fullPhone,
           email: data.email || undefined,
           eventType: data.eventType,
           eventDate: data.eventDate,
@@ -840,21 +900,42 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
       {/* Contact Form */}
       <div className="space-y-4">
         <div>
-          <Label>{t("form.name")} *</Label>
+          <Label>Nume eveniment *</Label>
           <Input
             value={data.name}
             onChange={(e) => update({ name: e.target.value })}
+            placeholder="Ex: Nunta Ana & Ion"
             required
           />
+          <p className="mt-1 text-xs text-muted-foreground">
+            Acest nume va fi titlul planului tău de eveniment.
+          </p>
         </div>
         <div>
           <Label>{t("form.phone")} *</Label>
           <div className="flex gap-2">
-            <Input value="+373" disabled className="w-20" />
+            <Select
+              value={data.phonePrefix}
+              onValueChange={(v) => {
+                if (v) update({ phonePrefix: v });
+              }}
+            >
+              <SelectTrigger className="w-[130px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PHONE_PREFIXES.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    {p.flag} {p.value}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Input
               value={data.phone}
               onChange={(e) => update({ phone: e.target.value })}
               type="tel"
+              placeholder="60 000 000"
               required
               className="flex-1"
             />
@@ -869,9 +950,27 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
           />
         </div>
         <div className="flex items-start gap-2">
-          <Checkbox id="gdpr-wizard" required />
-          <Label htmlFor="gdpr-wizard" className="text-xs text-muted-foreground leading-tight">
-            {t("form.gdpr_consent")}
+          <Checkbox
+            id="gdpr-wizard"
+            checked={data.gdprAccepted}
+            onCheckedChange={(v) => update({ gdprAccepted: v === true })}
+            required
+          />
+          <Label
+            htmlFor="gdpr-wizard"
+            className="text-xs text-muted-foreground leading-tight cursor-pointer"
+          >
+            Sunt de acord cu prelucrarea datelor personale conform{" "}
+            <a
+              href="/confidentialitate"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-gold underline hover:text-gold-dark"
+            >
+              Politicii de Confidențialitate
+            </a>{" "}
+            *
           </Label>
         </div>
       </div>

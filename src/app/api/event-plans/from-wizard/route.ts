@@ -71,13 +71,15 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Build a human-readable title from event type + owner name so it shows up
-  // nicely in the sidebar ("Nunta Ana & Ion" kind of vibe).
+  // `name` in the wizard is the event title the user typed in the summary
+  // step ("Nunta Ana & Ion"). Use it directly as the plan title; fall back
+  // to the event type label when the user left the field blank (shouldn't
+  // happen because the wizard requires it, but keeps us safe against
+  // pre-migration saved drafts).
   const eventLabel = w.eventType
     ? EVENT_TYPE_LABELS[w.eventType] ?? "Eveniment"
     : "Eveniment";
-  const ownerHint = w.name?.trim() || "";
-  const title = ownerHint ? `${eventLabel} — ${ownerHint}` : eventLabel;
+  const title = w.name?.trim() || eventLabel;
 
   const [plan] = await db
     .insert(eventPlans)
