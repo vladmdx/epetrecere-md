@@ -56,6 +56,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { createPortal } from "react-dom";
+import { TimePicker } from "@/components/ui/time-picker";
 import { ChecklistView, type ChecklistItem } from "@/components/planner/checklist-view";
 import { GuestsView, type Guest } from "@/components/planner/guests-view";
 import {
@@ -2066,42 +2067,34 @@ function PlanArtistCard({
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label
-                        htmlFor={`start-${artist.id}`}
-                        className="text-[11px] text-muted-foreground"
-                      >
+                      <Label className="text-[11px] text-muted-foreground">
                         De la
                       </Label>
-                      <Input
-                        id={`start-${artist.id}`}
-                        type="time"
-                        value={startTime}
-                        onChange={(e) => {
-                          setStartTime(e.target.value);
-                          setSelectedSlotId(null);
-                        }}
-                        disabled={submitting}
-                        className="mt-1"
-                      />
+                      <div className="mt-1">
+                        <TimePicker
+                          value={startTime}
+                          disabled={submitting}
+                          onChange={(v) => {
+                            setStartTime(v);
+                            setSelectedSlotId(null);
+                          }}
+                        />
+                      </div>
                     </div>
                     <div>
-                      <Label
-                        htmlFor={`end-${artist.id}`}
-                        className="text-[11px] text-muted-foreground"
-                      >
+                      <Label className="text-[11px] text-muted-foreground">
                         Până la
                       </Label>
-                      <Input
-                        id={`end-${artist.id}`}
-                        type="time"
-                        value={endTime}
-                        onChange={(e) => {
-                          setEndTime(e.target.value);
-                          setSelectedSlotId(null);
-                        }}
-                        disabled={submitting}
-                        className="mt-1"
-                      />
+                      <div className="mt-1">
+                        <TimePicker
+                          value={endTime}
+                          disabled={submitting}
+                          onChange={(v) => {
+                            setEndTime(v);
+                            setSelectedSlotId(null);
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                   {startTime && endTime && !timesValid() && (

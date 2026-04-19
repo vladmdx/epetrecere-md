@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CustomCalendar } from "@/components/public/custom-calendar";
+import { TimePicker } from "@/components/ui/time-picker";
 import { useLocale } from "@/hooks/use-locale";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -508,12 +509,12 @@ function StepDate({ data, update }: StepProps) {
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <Label>Ora începerii *</Label>
-            <Input
-              type="time"
-              value={data.startTime}
-              onChange={(e) => update({ startTime: e.target.value })}
-              className="mt-1"
-            />
+            <div className="mt-1">
+              <TimePicker
+                value={data.startTime}
+                onChange={(v) => update({ startTime: v })}
+              />
+            </div>
             <p className="mt-1 text-xs text-muted-foreground">
               De la ce oră începe evenimentul?
             </p>
