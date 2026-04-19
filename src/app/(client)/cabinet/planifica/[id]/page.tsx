@@ -54,6 +54,8 @@ import {
   Check,
   X,
   MessageCircle,
+  LayoutGrid,
+  List,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { TimePicker } from "@/components/ui/time-picker";
@@ -1545,7 +1547,9 @@ const INITIAL_VISIBLE = 8;
 const LOAD_MORE_STEP = 8;
 const COLUMN_OPTIONS = [3, 4, 5] as const;
 type ColumnCount = (typeof COLUMN_OPTIONS)[number];
+type ViewMode = "grid" | "list";
 const COLUMN_STORAGE_KEY = "plan-bookings-columns";
+const VIEW_MODE_STORAGE_KEY = "plan-bookings-view-mode";
 
 function DiscoverySection({
   plan,
@@ -1571,6 +1575,7 @@ function DiscoverySection({
   // Columns preference — persisted per user in localStorage so the layout
   // stays consistent between plan visits.
   const [columns, setColumns] = useState<ColumnCount>(4);
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
   useEffect(() => {
     try {
       const stored = localStorage.getItem(COLUMN_STORAGE_KEY);
@@ -1578,11 +1583,19 @@ function DiscoverySection({
       if (COLUMN_OPTIONS.includes(n as ColumnCount)) {
         setColumns(n as ColumnCount);
       }
+      const storedView = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+      if (storedView === "list" || storedView === "grid") {
+        setViewMode(storedView);
+      }
     } catch { /* ignore */ }
   }, []);
   function changeColumns(n: ColumnCount) {
     setColumns(n);
     try { localStorage.setItem(COLUMN_STORAGE_KEY, String(n)); } catch { /* ignore */ }
+  }
+  function changeViewMode(mode: ViewMode) {
+    setViewMode(mode);
+    try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode); } catch { /* ignore */ }
   }
 
   // Visible-count per category id — starts at INITIAL_VISIBLE, bumped by
@@ -1598,11 +1611,13 @@ function DiscoverySection({
   // Tailwind can't safely interpolate arbitrary lg:grid-cols-N at runtime
   // because it purges unused classes. Map to a static class per column count.
   const gridCols =
-    columns === 3
-      ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
-      : columns === 4
-        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-        : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
+    viewMode === "list"
+      ? "grid-cols-1"
+      : columns === 3
+        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+        : columns === 4
+          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
 
   return (
     <section className="space-y-10">
@@ -1623,24 +1638,59 @@ function DiscoverySection({
             {" · max 5 cereri per categorie"}
           </p>
         </div>
-        {/* Column picker — 3/4/5 cards per row */}
-        <div className="hidden lg:flex items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
-          <span className="px-2 text-xs text-muted-foreground">Coloane:</span>
-          {COLUMN_OPTIONS.map((n) => (
+        <div className="flex items-center gap-2">
+          {/* View mode toggle — grid / list */}
+          <div className="flex items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
             <button
-              key={n}
               type="button"
-              onClick={() => changeColumns(n)}
+              onClick={() => changeViewMode("grid")}
               className={cn(
-                "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                columns === n
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                viewMode === "grid"
                   ? "bg-gold text-background"
                   : "text-muted-foreground hover:bg-accent",
               )}
+              title="Vizualizare grilă"
             >
-              {n}
+              <LayoutGrid className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Grilă</span>
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => changeViewMode("list")}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                viewMode === "list"
+                  ? "bg-gold text-background"
+                  : "text-muted-foreground hover:bg-accent",
+              )}
+              title="Vizualizare listă"
+            >
+              <List className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Listă</span>
+            </button>
+          </div>
+          {/* Column picker — 3/4/5 cards per row (only in grid mode) */}
+          {viewMode === "grid" && (
+            <div className="hidden lg:flex items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
+              <span className="px-2 text-xs text-muted-foreground">Coloane:</span>
+              {COLUMN_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onClick={() => changeColumns(n)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    columns === n
+                      ? "bg-gold text-background"
+                      : "text-muted-foreground hover:bg-accent",
+                  )}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1713,6 +1763,7 @@ function DiscoverySection({
                         clientName={clientName}
                         clientPhone={clientPhone}
                         clientEmail={clientEmail}
+                        viewMode={viewMode}
                         onRefresh={() => onRefresh()}
                       />
                     ))}
@@ -1749,6 +1800,7 @@ function PlanArtistCard({
   clientName,
   clientPhone,
   clientEmail,
+  viewMode = "grid",
   onRefresh,
 }: {
   artist: DiscoveryArtist;
@@ -1758,6 +1810,7 @@ function PlanArtistCard({
   clientName: string;
   clientPhone: string;
   clientEmail?: string;
+  viewMode?: ViewMode;
   onRefresh: () => void;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
@@ -2260,11 +2313,23 @@ function PlanArtistCard({
 
   return (
     <>
-      <div className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all hover:border-gold/40">
+      <div
+        className={cn(
+          "@container/card group overflow-hidden rounded-xl border border-border/40 bg-card transition-all hover:border-gold/40",
+          viewMode === "list"
+            ? "flex flex-col sm:flex-row"
+            : "flex flex-col",
+        )}
+      >
         <Link
           href={`/artisti/${artist.slug}`}
           target="_blank"
-          className="relative aspect-[4/3] overflow-hidden bg-muted"
+          className={cn(
+            "relative overflow-hidden bg-muted",
+            viewMode === "list"
+              ? "aspect-[4/3] sm:aspect-auto sm:w-48 sm:shrink-0"
+              : "aspect-[4/3]",
+          )}
         >
           {cover ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -2363,48 +2428,50 @@ function PlanArtistCard({
           )}
 
           {/* Primary action — depends on status */}
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-col gap-2 @[280px]/card:flex-row">
             {isAccepted ? (
               <Button
                 onClick={confirmBooking}
                 disabled={confirming}
                 size="sm"
-                className="flex-1 gap-2 bg-success text-background hover:bg-success/90"
+                className="w-full min-w-0 flex-1 gap-1.5 bg-success text-background hover:bg-success/90"
               >
                 {confirming ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
                 ) : (
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-3.5 w-3.5 shrink-0" />
                 )}
-                Confirmă rezervarea
+                <span className="truncate">Confirmă rezervarea</span>
               </Button>
             ) : (
               <Button
                 onClick={() => setModalOpen(true)}
                 disabled={disabled}
                 size="sm"
-                className="flex-1 gap-2 bg-gold text-background hover:bg-gold-dark disabled:opacity-60"
+                className="w-full min-w-0 flex-1 gap-1.5 bg-gold text-background hover:bg-gold-dark disabled:opacity-60"
               >
                 {isConfirmed ? (
-                  <Check className="h-3.5 w-3.5" />
+                  <Check className="h-3.5 w-3.5 shrink-0" />
                 ) : isPending ? (
-                  <Clock className="h-3.5 w-3.5" />
+                  <Clock className="h-3.5 w-3.5 shrink-0" />
                 ) : (
-                  <Send className="h-3.5 w-3.5" />
+                  <Send className="h-3.5 w-3.5 shrink-0" />
                 )}
-                {primaryLabel}
+                <span className="truncate">{primaryLabel}</span>
               </Button>
             )}
-            {/* Chat button — always available */}
+            {/* Chat button — icon only on narrow cards, icon+text on wider */}
             <Button
               variant="outline"
               size="sm"
               onClick={openChat}
-              className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10"
+              className="w-full gap-1.5 border-gold/40 text-gold hover:bg-gold/10 @[280px]/card:w-auto @[280px]/card:shrink-0"
               title="Trimite mesaj artistului"
             >
-              <MessageCircle className="h-3.5 w-3.5" />
-              Mesaj
+              <MessageCircle className="h-3.5 w-3.5 shrink-0" />
+              <span className="@[320px]/card:inline @[280px]/card:hidden">
+                Mesaj
+              </span>
             </Button>
           </div>
         </div>

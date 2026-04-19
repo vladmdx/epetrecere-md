@@ -162,13 +162,23 @@ export function TimePicker({
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex h-10 w-full items-center gap-2 rounded-lg border border-border/50 bg-background px-3 text-left text-sm transition-colors",
-          "hover:border-gold/40 focus:border-gold/60 focus:outline-none focus:ring-2 focus:ring-gold/20",
+          "group flex h-11 w-full items-center gap-2.5 rounded-lg border border-border/60 bg-background/80 px-3 text-left text-sm transition-all",
+          "hover:border-gold/50 hover:bg-background focus:border-gold/70 focus:outline-none focus:ring-2 focus:ring-gold/20",
+          open && "border-gold/70 ring-2 ring-gold/20",
           disabled && "cursor-not-allowed opacity-60",
           className,
         )}
       >
-        <Clock className="h-4 w-4 shrink-0 text-gold" />
+        <div
+          className={cn(
+            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
+            open || displayValue
+              ? "bg-gold/15 text-gold"
+              : "bg-accent/40 text-foreground/70 group-hover:bg-gold/10 group-hover:text-gold",
+          )}
+        >
+          <Clock className="h-3.5 w-3.5" />
+        </div>
         <input
           type="text"
           inputMode="numeric"
@@ -186,11 +196,13 @@ export function TimePicker({
           onClick={(e) => e.stopPropagation()}
           disabled={disabled}
           placeholder={placeholder}
-          className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          className="flex-1 bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
           aria-label="Selector oră"
         />
         {!displayValue && (
-          <span className="text-xs text-muted-foreground">HH:MM</span>
+          <span className="font-mono text-xs text-muted-foreground/60">
+            HH:MM
+          </span>
         )}
       </button>
 
@@ -206,11 +218,14 @@ export function TimePicker({
               width: 240,
               zIndex: 9999,
             }}
-            className="overflow-hidden rounded-xl border border-gold/30 bg-card shadow-2xl"
+            className="overflow-hidden rounded-xl border border-gold/30 bg-card shadow-[0_20px_60px_-10px_rgba(201,168,76,0.25)] backdrop-blur-sm"
           >
-            <div className="flex items-center justify-between border-b border-border/40 bg-background/60 px-3 py-2 text-xs">
-              <span className="text-muted-foreground">Alege ora</span>
-              <span className="font-mono font-semibold text-gold">
+            <div className="flex items-center justify-between border-b border-border/40 bg-gradient-to-r from-gold/5 to-transparent px-3 py-2.5 text-xs">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                Alege ora
+              </span>
+              <span className="rounded-md bg-gold/10 px-2 py-0.5 font-mono text-sm font-bold text-gold">
                 {displayValue || "--:--"}
               </span>
             </div>
