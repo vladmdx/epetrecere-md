@@ -56,6 +56,7 @@ import {
   MessageCircle,
   LayoutGrid,
   List,
+  Pencil,
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { TimePicker } from "@/components/ui/time-picker";
@@ -543,6 +544,86 @@ export default function PlanDetailPage({
   );
 }
 
+// ─── Editable Plan Title ────────────────────────────────────────────
+// Inline-editable plan title. Click the pencil to edit, Enter/blur to save.
+
+function EditablePlanTitle({ plan }: { plan: Plan }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(plan.title);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setValue(plan.title);
+  }, [plan.title]);
+
+  async function save() {
+    const next = value.trim();
+    if (!next || next === plan.title) {
+      setValue(plan.title);
+      setEditing(false);
+      return;
+    }
+    if (next.length < 2) {
+      toast.error("Numele trebuie să aibă cel puțin 2 caractere");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/event-plans/${plan.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: next }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("Nume eveniment actualizat");
+      setEditing(false);
+      router.refresh();
+    } catch {
+      toast.error("Nu s-a putut salva numele");
+      setValue(plan.title);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            save();
+          } else if (e.key === "Escape") {
+            setValue(plan.title);
+            setEditing(false);
+          }
+        }}
+        disabled={saving}
+        maxLength={120}
+        className="font-heading text-xl font-bold bg-transparent border-b-2 border-gold/50 focus:border-gold focus:outline-none px-1 min-w-0 max-w-full"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      className="group inline-flex items-center gap-1.5 font-heading text-xl font-bold text-left hover:text-gold transition-colors"
+      title="Click pentru a redenumi evenimentul"
+    >
+      <span>{plan.title}</span>
+      <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
+    </button>
+  );
+}
+
 // ─── Overview Tab ───────────────────────────────────────────────────
 
 function OverviewTab({
@@ -588,7 +669,7 @@ function OverviewTab({
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <h1 className="font-heading text-xl font-bold">{plan.title}</h1>
+                <EditablePlanTitle plan={plan} />
                 {plan.eventType && (
                   <Badge className="bg-gold/20 text-gold border-gold/30 text-xs">
                     {EVENT_TYPE_LABELS[plan.eventType] ?? plan.eventType}
@@ -2327,7 +2408,7 @@ function PlanArtistCard({
           className={cn(
             "relative overflow-hidden bg-muted",
             viewMode === "list"
-              ? "aspect-[4/3] sm:aspect-auto sm:w-48 sm:shrink-0"
+              ? "aspect-[4/3] sm:aspect-auto sm:h-36 sm:w-52 sm:shrink-0 sm:self-start sm:m-3 sm:rounded-lg"
               : "aspect-[4/3]",
           )}
         >
@@ -2428,7 +2509,12 @@ function PlanArtistCard({
           )}
 
           {/* Primary action — depends on status */}
-          <div className="mt-3 flex flex-col gap-2 @[280px]/card:flex-row">
+          <div
+            className={cn(
+              "mt-3 flex flex-col gap-2 @[280px]/card:flex-row",
+              viewMode === "list" && "sm:max-w-md",
+            )}
+          >
             {isAccepted ? (
               <Button
                 onClick={confirmBooking}
