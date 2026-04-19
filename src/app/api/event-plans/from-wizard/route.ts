@@ -14,20 +14,7 @@ import {
 import { getPlannerTemplate } from "@/lib/planner/templates";
 import { requireAppUser } from "@/lib/planner/ownership";
 
-const SERVICE_TO_CATEGORY_SLUG: Record<string, string> = {
-  singer: "cantareti",
-  dj: "dj",
-  photographer: "fotografi",
-  videographer: "videografi",
-  mc: "moderatori",
-  band: "formatii",
-  show: "show",
-  decor: "decor",
-  animators: "animatori",
-  equipment: "echipament",
-  candy_bar: "candy-bar",
-  fireworks: "artificii",
-};
+import { SERVICE_TO_CATEGORY_SLUG } from "@/lib/wizard/service-mapping";
 
 const wizardSchema = z.object({
   eventType: z.string().optional(),

@@ -18,6 +18,10 @@ import {
   ClipboardList,
   ExternalLink,
 } from "lucide-react";
+import {
+  SERVICE_TO_CATEGORY_SLUG,
+  SERVICE_LABELS,
+} from "@/lib/wizard/service-mapping";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,34 +40,6 @@ interface WizardData {
   phone: string;
   email: string;
 }
-
-const SERVICE_TO_CATEGORY_SLUG: Record<string, string> = {
-  singer: "cantareti",
-  mc: "moderatori",
-  dj: "dj",
-  photographer: "fotografi",
-  videographer: "videografi",
-  band: "formatii",
-  show: "show-program",
-  decor: "decor",
-  animators: "animatori",
-  equipment: "echipament",
-};
-
-const SERVICE_LABELS: Record<string, string> = {
-  singer: "Cântăreți",
-  mc: "Moderatori / MC",
-  dj: "DJ",
-  photographer: "Fotografi",
-  videographer: "Videografi",
-  band: "Formații / Band",
-  show: "Show / Dans",
-  decor: "Decor / Floristică",
-  candy_bar: "Candy Bar / Tort",
-  fireworks: "Foc de artificii",
-  animators: "Animatori",
-  equipment: "Echipament tehnic",
-};
 
 // Card props type for artist with categoryIds
 type ArtistItem = Parameters<typeof BookingArtistCard>[0]["artist"] & {

@@ -2598,9 +2598,37 @@ function SettingsTab({
   const [budget, setBudget] = useState(plan.budgetTarget?.toString() || "");
   const [notes, setNotes] = useState(plan.notes || "");
   const [venueNeeded, setVenueNeeded] = useState(plan.venueNeeded ?? false);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>(
+    plan.selectedCategories ?? [],
+  );
+  const [allCategories, setAllCategories] = useState<
+    Array<{ id: number; nameRo: string; type: string }>
+  >([]);
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const router = useRouter();
+
+  // Load the full category list so the user can toggle on the categories
+  // the wizard missed (e.g. Show Program, Echipament Tehnic — the wizard
+  // used to send slugs that didn't match the DB, so plans created before
+  // the fix ended up with only a subset of what the user actually chose).
+  useEffect(() => {
+    fetch("/api/categories", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data.items ?? [];
+        setAllCategories(
+          list.filter((c: { type: string }) => c.type === "artist" || c.type === "service"),
+        );
+      })
+      .catch(() => setAllCategories([]));
+  }, []);
+
+  function toggleCategory(id: number) {
+    setSelectedCategoryIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   async function handleSave() {
     setSaving(true);
@@ -2617,6 +2645,7 @@ function SettingsTab({
           budgetTarget: budget ? Number(budget) : null,
           notes: notes || null,
           venueNeeded,
+          selectedCategories: selectedCategoryIds,
         }),
       });
       if (!res.ok) {
@@ -2708,6 +2737,46 @@ function SettingsTab({
         <div className="space-y-2">
           <Label htmlFor="s-notes">Note</Label>
           <Textarea id="s-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
+        </div>
+
+        {/* Category picker — populated from the live categories list so
+            the user can fix a plan that was saved with missing categories
+            (happened when the wizard's service→slug map was incomplete). */}
+        <div className="space-y-2">
+          <Label>Categorii de artiști dorite</Label>
+          <p className="text-xs text-muted-foreground">
+            Apasă pentru a adăuga sau scoate o categorie. Acestea conduc
+            secțiunile din tabul <span className="text-gold">Rezervări Artiști</span>.
+          </p>
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {allCategories.length === 0 ? (
+              <Loader2 className="h-4 w-4 animate-spin text-gold" />
+            ) : (
+              allCategories.map((c) => {
+                const selected = selectedCategoryIds.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => toggleCategory(c.id)}
+                    className={cn(
+                      "rounded-lg border px-3 py-1.5 text-xs transition-all",
+                      selected
+                        ? "border-gold bg-gold/10 text-gold font-medium"
+                        : "border-border/40 text-muted-foreground hover:border-gold/40 hover:text-foreground",
+                    )}
+                  >
+                    {c.nameRo}
+                  </button>
+                );
+              })
+            )}
+          </div>
+          {selectedCategoryIds.length > 0 && (
+            <p className="text-[11px] text-muted-foreground">
+              {selectedCategoryIds.length} categorii selectate
+            </p>
+          )}
         </div>
 
         <label className="flex items-start gap-3 rounded-lg border border-border/30 bg-card/50 p-3 cursor-pointer hover:border-gold/30 transition-colors">
