@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { TimePicker } from "@/components/ui/time-picker";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -892,19 +893,21 @@ export default function VendorCalendarPage() {
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <Label>Ora început</Label>
-                        <Input
-                          type="time"
-                          value={selectedStartTime}
-                          onChange={(e) => setSelectedStartTime(e.target.value)}
-                        />
+                        <div className="mt-1">
+                          <TimePicker
+                            value={selectedStartTime}
+                            onChange={setSelectedStartTime}
+                          />
+                        </div>
                       </div>
                       <div>
                         <Label>Ora sfârșit</Label>
-                        <Input
-                          type="time"
-                          value={selectedEndTime}
-                          onChange={(e) => setSelectedEndTime(e.target.value)}
-                        />
+                        <div className="mt-1">
+                          <TimePicker
+                            value={selectedEndTime}
+                            onChange={setSelectedEndTime}
+                          />
+                        </div>
                       </div>
                     </div>
                     <div>
@@ -992,27 +995,27 @@ export default function VendorCalendarPage() {
                     />
                     {day.isWorking ? (
                       <>
-                        <Input
-                          type="time"
-                          value={day.startTime}
-                          onChange={(e) => {
-                            const copy = [...schedule];
-                            copy[i] = { ...copy[i], startTime: e.target.value };
-                            setSchedule(copy);
-                          }}
-                          className="w-28"
-                        />
+                        <div className="w-32">
+                          <TimePicker
+                            value={day.startTime}
+                            onChange={(v) => {
+                              const copy = [...schedule];
+                              copy[i] = { ...copy[i], startTime: v };
+                              setSchedule(copy);
+                            }}
+                          />
+                        </div>
                         <span className="text-muted-foreground">—</span>
-                        <Input
-                          type="time"
-                          value={day.endTime}
-                          onChange={(e) => {
-                            const copy = [...schedule];
-                            copy[i] = { ...copy[i], endTime: e.target.value };
-                            setSchedule(copy);
-                          }}
-                          className="w-28"
-                        />
+                        <div className="w-32">
+                          <TimePicker
+                            value={day.endTime}
+                            onChange={(v) => {
+                              const copy = [...schedule];
+                              copy[i] = { ...copy[i], endTime: v };
+                              setSchedule(copy);
+                            }}
+                          />
+                        </div>
                       </>
                     ) : (
                       <span className="text-sm text-destructive/70 font-medium">
