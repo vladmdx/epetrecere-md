@@ -219,10 +219,22 @@ export default function VendorBookingsPage() {
     );
   }
 
-  const activeStatuses = ["pending", "accepted", "confirmed_by_client"];
+  // Three buckets:
+  //   active   — new pending cereri; the artist must act
+  //   accepted — already accepted (awaiting client confirm or confirmed)
+  //   past     — finished/cancelled/refused
+  const activeStatuses = ["pending"];
+  const acceptedStatuses = ["accepted", "confirmed_by_client"];
   const pastStatuses = ["rejected", "cancelled", "completed"];
-  const activeBookings = bookings.filter(b => activeStatuses.includes(b.status));
-  const pastBookings = bookings.filter(b => pastStatuses.includes(b.status));
+  const activeBookings = bookings.filter((b) =>
+    activeStatuses.includes(b.status),
+  );
+  const acceptedBookings = bookings.filter((b) =>
+    acceptedStatuses.includes(b.status),
+  );
+  const pastBookings = bookings.filter((b) =>
+    pastStatuses.includes(b.status),
+  );
 
   return (
     <div className="space-y-6">
@@ -250,17 +262,38 @@ export default function VendorBookingsPage() {
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="past">Trecute ({pastBookings.length})</TabsTrigger>
+            <TabsTrigger value="accepted" className="gap-1.5">
+              Acceptate
+              {acceptedBookings.length > 0 && (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[10px] font-bold text-emerald-400">
+                  {acceptedBookings.length}
+                </span>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="past">
+              Trecute ({pastBookings.length})
+            </TabsTrigger>
           </TabsList>
 
-          {["active", "past"].map(tabKey => {
-            const list = tabKey === "active" ? activeBookings : pastBookings;
+          {(["active", "accepted", "past"] as const).map((tabKey) => {
+            const list =
+              tabKey === "active"
+                ? activeBookings
+                : tabKey === "accepted"
+                  ? acceptedBookings
+                  : pastBookings;
+            const emptyMessage =
+              tabKey === "active"
+                ? "Nu aveți cereri noi de aprobat."
+                : tabKey === "accepted"
+                  ? "Nu aveți rezervări acceptate."
+                  : "Nu aveți rezervări trecute.";
             return (
               <TabsContent key={tabKey} value={tabKey} className="mt-4">
                 {list.length === 0 ? (
                   <Card>
                     <CardContent className="py-12 text-center text-muted-foreground">
-                      {tabKey === "active" ? "Nu aveți rezervări active." : "Nu aveți rezervări trecute."}
+                      {emptyMessage}
                     </CardContent>
                   </Card>
                 ) : (

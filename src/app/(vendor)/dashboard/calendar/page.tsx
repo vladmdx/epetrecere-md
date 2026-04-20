@@ -19,7 +19,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { DurationPricingManager } from "@/components/vendor/duration-pricing-manager";
 
 const DAYS = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"];
 const MONTHS = [
@@ -173,6 +172,25 @@ export default function VendorCalendarPage() {
   const [blockWeekdayMonths, setBlockWeekdayMonths] = useState(3);
   const [blockingWeekdays, setBlockingWeekdays] = useState(false);
 
+  // Full bookings list so the day detail panel can show cereri/rezervări
+  // that match the clicked date (with client name, slot, price, etc).
+  interface DayBooking {
+    id: number;
+    status: string;
+    clientName: string;
+    clientPhone: string | null;
+    clientEmail: string | null;
+    eventDate: string;
+    eventType: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    guestCount: number | null;
+    message: string | null;
+    agreedPrice: number | null;
+  }
+  const [dayBookings, setDayBookings] = useState<DayBooking[]>([]);
+  const [dayBookingsLoading, setDayBookingsLoading] = useState(false);
+
   // Resolve entity on mount — venue first, fallback to artist.
   useEffect(() => {
     let cancelled = false;
@@ -268,6 +286,37 @@ export default function VendorCalendarPage() {
   const startDay = (firstDay.getDay() + 6) % 7;
   const daysInMonth = lastDay.getDate();
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+  // When the artist clicks a date we also fetch the booking-request rows
+  // that target that date so we can show full details (client, slot, price).
+  useEffect(() => {
+    if (!entity || entity.type !== "artist" || !selectedDate) {
+      setDayBookings([]);
+      return;
+    }
+    let cancelled = false;
+    setDayBookingsLoading(true);
+    fetch(`/api/booking-requests?artist_id=${entity.id}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: DayBooking[]) => {
+        if (cancelled) return;
+        setDayBookings(
+          (Array.isArray(rows) ? rows : []).filter(
+            (b) => b.eventDate === selectedDate,
+          ),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setDayBookings([]);
+      })
+      .finally(() => {
+        if (!cancelled) setDayBookingsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entity, selectedDate]);
 
   function handleDayClick(dateStr: string) {
     if (dateStr < todayStr) return; // past days are read-only
@@ -542,18 +591,10 @@ export default function VendorCalendarPage() {
         <TabsList>
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
           {entity.type === "artist" && (
-            <>
-              <TabsTrigger value="slots">Tarife</TabsTrigger>
-              <TabsTrigger value="schedule">Grafic de Lucru</TabsTrigger>
-            </>
+            <TabsTrigger value="schedule">Grafic de Lucru</TabsTrigger>
           )}
         </TabsList>
 
-        {entity.type === "artist" && (
-          <TabsContent value="slots" className="mt-6 space-y-4">
-            <ArtistSlotsPanel artistId={entity.id} />
-          </TabsContent>
-        )}
 
         <TabsContent value="calendar" className="mt-6 space-y-4">
           {/* Status legend */}
@@ -705,6 +746,109 @@ export default function VendorCalendarPage() {
               <CardContent>
                 {selectedDate ? (
                   <div className="space-y-4">
+                    {/* Bookings for this date (only for artists) */}
+                    {entity?.type === "artist" && (
+                      <div className="rounded-lg border border-border/40 bg-background/40 p-3">
+                        <div className="mb-2 flex items-center justify-between">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            Rezervări pe {selectedDate}
+                          </span>
+                          {!dayBookingsLoading && (
+                            <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
+                              {dayBookings.length}
+                            </span>
+                          )}
+                        </div>
+                        {dayBookingsLoading ? (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Se încarcă…
+                          </div>
+                        ) : dayBookings.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            Nicio rezervare pe această zi.
+                          </p>
+                        ) : (
+                          <ul className="space-y-2">
+                            {dayBookings.map((b) => {
+                              const statusLabel =
+                                b.status === "pending"
+                                  ? "În așteptare"
+                                  : b.status === "accepted"
+                                    ? "Acceptată"
+                                    : b.status === "confirmed_by_client"
+                                      ? "Confirmată"
+                                      : b.status === "rejected"
+                                        ? "Refuzată"
+                                        : b.status === "cancelled"
+                                          ? "Anulată"
+                                          : b.status === "completed"
+                                            ? "Finalizată"
+                                            : b.status;
+                              const statusColor =
+                                b.status === "pending"
+                                  ? "text-amber-400 bg-amber-500/10"
+                                  : b.status === "accepted" ||
+                                      b.status === "confirmed_by_client"
+                                    ? "text-emerald-400 bg-emerald-500/10"
+                                    : b.status === "completed"
+                                      ? "text-blue-400 bg-blue-500/10"
+                                      : "text-destructive bg-destructive/10";
+                              return (
+                                <li
+                                  key={b.id}
+                                  className="rounded-md border border-border/30 bg-card/60 p-2.5 text-xs"
+                                >
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="font-heading font-bold text-sm">
+                                      {b.clientName}
+                                    </span>
+                                    <span
+                                      className={cn(
+                                        "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                                        statusColor,
+                                      )}
+                                    >
+                                      {statusLabel}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
+                                    {b.startTime && b.endTime && (
+                                      <span>
+                                        🕐 {b.startTime}–{b.endTime}
+                                      </span>
+                                    )}
+                                    {b.eventType && <span>📋 {b.eventType}</span>}
+                                    {b.guestCount != null && (
+                                      <span>👥 {b.guestCount} invitați</span>
+                                    )}
+                                    {b.agreedPrice != null && (
+                                      <span className="font-bold text-gold">
+                                        {b.agreedPrice}€
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground/80">
+                                    {b.clientPhone && (
+                                      <span>📞 {b.clientPhone}</span>
+                                    )}
+                                    {b.clientEmail && (
+                                      <span>✉️ {b.clientEmail}</span>
+                                    )}
+                                  </div>
+                                  {b.message && (
+                                    <p className="mt-1 text-muted-foreground/80 italic">
+                                      “{b.message}”
+                                    </p>
+                                  )}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+
                     <div>
                       <Label>Status</Label>
                       <div className="mt-2 flex flex-wrap gap-2">
@@ -1043,88 +1187,6 @@ export default function VendorCalendarPage() {
         )}
       </Tabs>
 
-      {entity.type === "artist" && <IcalSubscribeCard />}
     </div>
-  );
-}
-
-/**
- * Stitches the slot editor and the AI chat together. Kept local to the
- * page so the simple refresh-counter pattern doesn't leak into shared
- * components — we just bump a number whenever the AI writes new slots.
- */
-function ArtistSlotsPanel({ artistId }: { artistId: number }) {
-  return (
-    <div className="space-y-4">
-      <DurationPricingManager artistId={artistId} />
-    </div>
-  );
-}
-
-// M5 — iCal subscription URL widget. Fetches the HMAC-signed personal URL
-// from /api/vendor/ical-info and lets the vendor copy it into Google /
-// Apple / Outlook calendar.
-function IcalSubscribeCard() {
-  const [path, setPath] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/vendor/ical-info")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!cancelled && data?.path) setPath(data.path);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (loading || !path) return null;
-  const fullUrl =
-    typeof window !== "undefined" ? `${window.location.origin}${path}` : path;
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(fullUrl);
-      setCopied(true);
-      toast.success("Link copiat!");
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      toast.error("Nu am putut copia linkul.");
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <CalendarIcon className="h-4 w-4 text-gold" /> Sincronizează cu
-          calendarul tău
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <p className="text-xs text-muted-foreground">
-          Abonează-te la acest link în Google Calendar, Apple Calendar sau
-          Outlook și toate rezervările tale confirmate vor apărea automat.
-          Linkul este personal — nu-l da nimănui.
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <Input readOnly value={fullUrl} className="flex-1 font-mono text-xs" />
-          <Button onClick={copy} variant="outline" className="gap-1.5">
-            {copied ? (
-              <Check className="h-4 w-4 text-success" />
-            ) : (
-              <Copy className="h-4 w-4" />
-            )}
-            {copied ? "Copiat" : "Copiază"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

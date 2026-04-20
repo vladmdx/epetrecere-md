@@ -14,11 +14,10 @@ import {
   Bot,
   Globe,
   Sparkles,
-  Package,
-  Flame,
   Building2,
   BarChart3,
   Settings,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -26,9 +25,8 @@ const artistNav = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Panoul Meu" },
   { href: "/dashboard/calendar", icon: CalendarDays, label: "Calendar" },
   { href: "/dashboard/rezervari", icon: BookOpen, label: "Rezervări" },
-  { href: "/dashboard/lead-uri", icon: Flame, label: "Lead-uri noi" },
+  { href: "/dashboard/tarife", icon: Clock, label: "Tarife" },
   { href: "/dashboard/profil", icon: User, label: "Profil" },
-  { href: "/dashboard/pachete", icon: Package, label: "Pachete" },
   { href: "/dashboard/mesaje", icon: MessageSquare, label: "Mesaje" },
   { href: "/dashboard/financiar", icon: DollarSign, label: "Financiar" },
   { href: "/dashboard/analytics", icon: BarChart3, label: "Analitice" },

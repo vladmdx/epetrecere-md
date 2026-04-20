@@ -29,6 +29,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save, Loader2, SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
+import { IcalSubscribeCard } from "@/components/vendor/ical-subscribe-card";
 
 type ArtistSettings = {
   kind: "artist";
@@ -260,6 +261,10 @@ export default function VendorSettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* iCal subscription — moved here from the Calendar page so all
+          integration/sync settings live together. */}
+      <IcalSubscribeCard />
 
       {state.kind === "artist" && (
         <Card>
