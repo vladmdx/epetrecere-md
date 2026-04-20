@@ -166,11 +166,54 @@ export async function getArtists(filters: ArtistFilters = {}) {
     }, new Map<number, Array<{ id: number; startTime: string; endTime: string; price: number | null }>>());
   }
 
-  const itemsWithCovers = items.map((a) => ({
-    ...a,
-    coverImageUrl: a.photoUrl || coverMap.get(a.id) || null,
-    availabilitySlots: slotsByArtist.get(a.id) ?? [],
-  }));
+  // Aggregate pricing tiers per artist so the card can decide "de la X€"
+  // (multiple packages) vs "X€" (single package) vs hiding the label.
+  const pricingByArtist = new Map<
+    number,
+    { tierCount: number; minPrice: number | null; maxPrice: number | null }
+  >();
+  if (artistIds.length) {
+    const pkgRows = await db
+      .select({
+        artistId: artistPackages.artistId,
+        price: artistPackages.price,
+        durationHours: artistPackages.durationHours,
+      })
+      .from(artistPackages)
+      .where(
+        and(
+          sql`${artistPackages.artistId} IN (${sql.join(artistIds.map((id) => sql`${id}`), sql`, `)})`,
+          eq(artistPackages.isVisible, true),
+        ),
+      );
+    for (const r of pkgRows) {
+      if (r.price == null || r.durationHours == null || r.durationHours <= 0)
+        continue;
+      const entry = pricingByArtist.get(r.artistId) ?? {
+        tierCount: 0,
+        minPrice: null,
+        maxPrice: null,
+      };
+      entry.tierCount += 1;
+      entry.minPrice =
+        entry.minPrice == null ? r.price : Math.min(entry.minPrice, r.price);
+      entry.maxPrice =
+        entry.maxPrice == null ? r.price : Math.max(entry.maxPrice, r.price);
+      pricingByArtist.set(r.artistId, entry);
+    }
+  }
+
+  const itemsWithCovers = items.map((a) => {
+    const pricing = pricingByArtist.get(a.id);
+    return {
+      ...a,
+      coverImageUrl: a.photoUrl || coverMap.get(a.id) || null,
+      availabilitySlots: slotsByArtist.get(a.id) ?? [],
+      packageCount: pricing?.tierCount ?? 0,
+      packageMinPrice: pricing?.minPrice ?? null,
+      packageMaxPrice: pricing?.maxPrice ?? null,
+    };
+  });
 
   return {
     items: itemsWithCovers,

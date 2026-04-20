@@ -25,6 +25,12 @@ const bookingSchema = z.object({
   /** Optional — when the client sends the request from inside an event
    *  plan we link the booking so its agreed price flows into the budget. */
   eventPlanId: z.number().int().positive().optional(),
+  /** Optional — price in EUR the client picked (via artist package). */
+  agreedPrice: z.number().int().min(0).optional(),
+  /** Optional — artist package id selected by the client. */
+  packageId: z.number().int().positive().optional(),
+  /** Optional — duration in hours (from the selected package). */
+  durationHours: z.number().positive().optional(),
 });
 
 // GET booking requests — requires auth; scoped to caller's own data.
@@ -162,7 +168,15 @@ export async function POST(req: NextRequest) {
 
   // Create booking request — keep the eventPlanId through so in-plan
   // requests surface in the dashboard "Rezervări Artiști" tab.
-  const { eventPlanId, ...bookingBase } = parsed.data;
+  // Extract fields that aren't columns of `booking_requests` so we can
+  // pass them separately to the insert.
+  const {
+    eventPlanId,
+    agreedPrice,
+    packageId: _packageId,
+    durationHours: _durationHours,
+    ...bookingBase
+  } = parsed.data;
 
   // Max 5 artists per category per event plan
   if (eventPlanId) {
@@ -216,6 +230,7 @@ export async function POST(req: NextRequest) {
     ...bookingBase,
     eventPlanId: eventPlanId ?? null,
     clientUserId: clientUserId ?? null,
+    agreedPrice: agreedPrice ?? null,
     status: "pending",
   }).returning();
 

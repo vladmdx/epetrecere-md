@@ -1380,6 +1380,12 @@ interface DiscoveryArtist {
   coverImageUrl?: string | null;
   coverUrl?: string | null;
   priceFrom: number | null;
+  /** Number of visible priced packages (1h=100€, 2h=150€, ...). */
+  packageCount?: number;
+  /** Lowest package price — same as priceFrom when it's the floor. */
+  packageMinPrice?: number | null;
+  /** Highest package price. */
+  packageMaxPrice?: number | null;
   ratingAvg: number;
   ratingCount: number;
   categoryIds?: number[];
@@ -1905,28 +1911,76 @@ function PlanArtistCard({
   const [endTime, setEndTime] = useState("");
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
 
-  // When the booking modal opens for the first time, pre-fill start/end
-  // from the plan's wizard answers (step 2) so the client doesn't retype
-  // the obvious. Wedding: 14:00–00:00 (+10h), birthday: 18:00–23:00 (+5h).
-  // Users can still edit before submitting.
+  // Artist pricing tiers (durata + preț). Loaded on demand when the booking
+  // modal opens so the client picks a duration package defined by the artist.
+  type ArtistPackage = {
+    id: number;
+    nameRo?: string | null;
+    price: number | null;
+    durationHours: number | null;
+    isVisible?: boolean;
+  };
+  const [packages, setPackages] = useState<ArtistPackage[]>([]);
+  const [packagesLoading, setPackagesLoading] = useState(false);
+  const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null);
+
+  // When the booking modal opens for the first time, pre-fill start
+  // from the plan's wizard answers so the client doesn't retype the obvious.
   useEffect(() => {
     if (!modalOpen) return;
-    if (startTime || endTime) return;
+    if (startTime) return;
     if (plan.startTime) {
       const [h, m] = plan.startTime.split(":").map(Number);
       if (!Number.isNaN(h)) {
         const hh = String(h).padStart(2, "0");
         const mm = String(m || 0).padStart(2, "0");
         setStartTime(`${hh}:${mm}`);
-        if (plan.durationHours && plan.durationHours > 0) {
-          const endH = (h + plan.durationHours) % 24;
-          setEndTime(
-            `${String(endH).padStart(2, "0")}:${mm}`,
-          );
-        }
       }
     }
-  }, [modalOpen, plan.startTime, plan.durationHours, startTime, endTime]);
+  }, [modalOpen, plan.startTime, startTime]);
+
+  // Load artist's pricing packages when modal opens. Packages define the
+  // durations & prices the artist offers (e.g., 1h=100€, 2h=150€, 5h=300€).
+  useEffect(() => {
+    if (!modalOpen) return;
+    if (packages.length > 0) return;
+    let cancelled = false;
+    setPackagesLoading(true);
+    fetch(`/api/artist-packages?artist_id=${artist.id}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: ArtistPackage[]) => {
+        if (cancelled) return;
+        // Only keep packages that actually describe a duration tier.
+        const valid = (Array.isArray(data) ? data : []).filter(
+          (p) => p.durationHours != null && p.durationHours > 0,
+        );
+        setPackages(valid);
+      })
+      .catch(() => {
+        if (!cancelled) setPackages([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPackagesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modalOpen, artist.id]);
+
+  // When a package is selected, recompute endTime from startTime + duration.
+  useEffect(() => {
+    if (selectedPackageId == null) return;
+    const pkg = packages.find((p) => p.id === selectedPackageId);
+    if (!pkg || pkg.durationHours == null) return;
+    if (!startTime) return;
+    const [h, m] = startTime.split(":").map(Number);
+    if (Number.isNaN(h)) return;
+    const totalMinutes = h * 60 + (m || 0) + pkg.durationHours * 60;
+    const endH = Math.floor(totalMinutes / 60) % 24;
+    const endM = Math.round(totalMinutes % 60);
+    setEndTime(`${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`);
+  }, [selectedPackageId, startTime, packages]);
 
   // Chat modal state
   const [chatOpen, setChatOpen] = useState(false);
@@ -1977,17 +2031,35 @@ function PlanArtistCard({
     setSelectedSlotId(slot.id);
     setStartTime(slot.startTime);
     setEndTime(slot.endTime);
+    setSelectedPackageId(null);
   }
 
   function timesValid() {
     if (!startTime || !endTime) return false;
-    return startTime < endTime;
+    // endTime < startTime is allowed when the event crosses midnight
+    // (e.g., 22:00 → 02:00). We only reject equal times as invalid.
+    return startTime !== endTime;
   }
+
+  const selectedPackage = packages.find((p) => p.id === selectedPackageId);
+  const canSubmit =
+    (!!selectedPackage && !!startTime) || (timesValid() && packages.length === 0);
+
+  // Compute the price to show/send: from selected package, else from selected slot.
+  const slotForSelection = slots.find((s) => s.id === selectedSlotId);
+  const computedPrice =
+    selectedPackage?.price != null
+      ? selectedPackage.price
+      : slotForSelection?.price ?? null;
 
   async function submit() {
     if (submitting) return;
-    if (!timesValid()) {
-      toast.error("Alege ora de început și ora de sfârșit.");
+    if (!canSubmit) {
+      if (packages.length > 0 && !selectedPackageId) {
+        toast.error("Alege durata de participare a artistului.");
+      } else {
+        toast.error("Alege ora de început și durata.");
+      }
       return;
     }
     setSubmitting(true);
@@ -2005,6 +2077,9 @@ function PlanArtistCard({
           guestCount: plan.guestCountTarget ?? undefined,
           startTime,
           endTime,
+          agreedPrice: computedPrice ?? undefined,
+          packageId: selectedPackageId ?? undefined,
+          durationHours: selectedPackage?.durationHours ?? undefined,
           message: message.trim() || undefined,
           eventPlanId: plan.id,
         }),
@@ -2013,12 +2088,15 @@ function PlanArtistCard({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Eroare la trimitere");
       }
-      toast.success(
-        `Cerere trimisă către ${artist.nameRo} pentru ${startTime}–${endTime}!`,
-      );
+      const summary =
+        selectedPackage && computedPrice != null
+          ? `${selectedPackage.durationHours}h · ${computedPrice}€`
+          : `${startTime}–${endTime}`;
+      toast.success(`Cerere trimisă către ${artist.nameRo} (${summary})`);
       setModalOpen(false);
       setMessage("");
       setSelectedSlotId(null);
+      setSelectedPackageId(null);
       setStartTime("");
       setEndTime("");
       onRefresh();
@@ -2193,56 +2271,152 @@ function PlanArtistCard({
                   </div>
                 )}
 
-                {/* Custom time picker — client decides exactly when to book */}
+                {/* Start time picker */}
                 <div>
-                  <Label>Interval orar rezervare *</Label>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    De la ce oră până la ce oră dorești artistul?
+                  <Label>Ora de început *</Label>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    La ce oră dorești să înceapă artistul?
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-[11px] text-muted-foreground">
-                        De la
-                      </Label>
-                      <div className="mt-1">
-                        <TimePicker
-                          value={startTime}
-                          disabled={submitting}
-                          onChange={(v) => {
-                            setStartTime(v);
-                            setSelectedSlotId(null);
-                          }}
-                        />
-                      </div>
+                  <TimePicker
+                    value={startTime}
+                    disabled={submitting}
+                    onChange={(v) => {
+                      setStartTime(v);
+                      setSelectedSlotId(null);
+                    }}
+                  />
+                </div>
+
+                {/* Package / duration picker — artist-defined pricing tiers */}
+                <div>
+                  <Label>Durata de participare *</Label>
+                  <p className="mb-2 text-xs text-muted-foreground">
+                    {packages.length > 0
+                      ? "Alege pachetul oferit de artist"
+                      : "Artistul nu a definit pachete. Alege manual ora de sfârșit."}
+                  </p>
+                  {packagesLoading ? (
+                    <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Se încarcă pachetele…
                     </div>
-                    <div>
-                      <Label className="text-[11px] text-muted-foreground">
-                        Până la
-                      </Label>
-                      <div className="mt-1">
-                        <TimePicker
-                          value={endTime}
-                          disabled={submitting}
-                          onChange={(v) => {
-                            setEndTime(v);
-                            setSelectedSlotId(null);
-                          }}
-                        />
-                      </div>
+                  ) : packages.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {packages
+                        .slice()
+                        .sort(
+                          (a, b) =>
+                            (a.durationHours ?? 0) - (b.durationHours ?? 0),
+                        )
+                        .map((p) => {
+                          const selected = selectedPackageId === p.id;
+                          const hours = p.durationHours ?? 0;
+                          const hoursLabel =
+                            hours === Math.floor(hours)
+                              ? `${hours}h`
+                              : `${hours}h`;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              disabled={submitting}
+                              onClick={() => {
+                                setSelectedPackageId(selected ? null : p.id);
+                                setSelectedSlotId(null);
+                              }}
+                              className={cn(
+                                "flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all",
+                                selected
+                                  ? "border-gold bg-gold/10 shadow-[0_0_0_1px_rgba(201,168,76,0.4)]"
+                                  : "border-border/40 hover:border-gold/40",
+                              )}
+                            >
+                              <div className="flex items-baseline justify-between gap-2">
+                                <span
+                                  className={cn(
+                                    "font-heading text-base font-bold",
+                                    selected ? "text-gold" : "text-foreground",
+                                  )}
+                                >
+                                  {hoursLabel}
+                                </span>
+                                {p.price != null ? (
+                                  <span
+                                    className={cn(
+                                      "text-sm font-bold",
+                                      selected
+                                        ? "text-gold"
+                                        : "text-muted-foreground",
+                                    )}
+                                  >
+                                    {p.price}€
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] uppercase text-muted-foreground">
+                                    preț la cerere
+                                  </span>
+                                )}
+                              </div>
+                              {p.nameRo && (
+                                <span className="text-[11px] text-muted-foreground line-clamp-1">
+                                  {p.nameRo}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
                     </div>
-                  </div>
-                  {startTime && endTime && !timesValid() && (
-                    <p className="mt-1 text-[11px] text-destructive">
-                      Ora de sfârșit trebuie să fie după ora de început.
-                    </p>
-                  )}
-                  {timesValid() && (
-                    <p className="mt-2 rounded-lg bg-gold/5 border border-gold/20 px-3 py-2 text-xs text-gold/90">
-                      Rezervare artist de la ora <strong>{startTime}</strong>{" "}
-                      până la ora <strong>{endTime}</strong>
-                    </p>
+                  ) : (
+                    <TimePicker
+                      value={endTime}
+                      disabled={submitting}
+                      onChange={(v) => {
+                        setEndTime(v);
+                        setSelectedSlotId(null);
+                      }}
+                      placeholder="Ora de sfârșit"
+                    />
                   )}
                 </div>
+
+                {/* Reservation summary */}
+                {startTime && endTime && (
+                  <div
+                    className={cn(
+                      "rounded-lg border px-3 py-2.5 text-sm",
+                      canSubmit
+                        ? "border-gold/30 bg-gold/5 text-foreground"
+                        : "border-destructive/30 bg-destructive/5 text-destructive",
+                    )}
+                  >
+                    {canSubmit ? (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="flex items-center gap-1.5">
+                          <Clock className="h-3.5 w-3.5 text-gold" />
+                          <span>
+                            <strong>{startTime}</strong>
+                            {" – "}
+                            <strong>{endTime}</strong>
+                            {selectedPackage?.durationHours != null && (
+                              <span className="ml-1 text-xs text-muted-foreground">
+                                ({selectedPackage.durationHours}h)
+                              </span>
+                            )}
+                          </span>
+                        </span>
+                        {computedPrice != null && (
+                          <span className="font-heading text-base font-bold text-gold">
+                            {computedPrice}€
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-xs">
+                        Ora de început și durata trebuie să fie setate.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <Label htmlFor={`msg-${artist.id}`}>Mesaj (opțional)</Label>
@@ -2278,7 +2452,7 @@ function PlanArtistCard({
                   <Button
                     size="sm"
                     onClick={submit}
-                    disabled={submitting || !timesValid()}
+                    disabled={submitting || !canSubmit}
                     className="gap-2 bg-gold text-background hover:bg-gold-dark"
                   >
                     {submitting ? (
@@ -2435,11 +2609,20 @@ function PlanArtistCard({
             >
               {artist.nameRo}
             </Link>
-            {artist.priceFrom != null && artist.priceFrom > 0 && (
-              <span className="shrink-0 text-sm font-semibold text-gold">
-                de la {artist.priceFrom}€
-              </span>
-            )}
+            {(() => {
+              // Decide between "de la X€" (multiple tiers or a ranged floor)
+              // and "X€" (single package price). Fall back to priceFrom.
+              const count = artist.packageCount ?? 0;
+              const min = artist.packageMinPrice ?? artist.priceFrom ?? null;
+              const max = artist.packageMaxPrice ?? null;
+              if (min == null || min <= 0) return null;
+              const multiple = count > 1 || (max != null && max > min);
+              return (
+                <span className="shrink-0 text-sm font-semibold text-gold">
+                  {multiple ? `de la ${min}€` : `${min}€`}
+                </span>
+              );
+            })()}
           </div>
 
           {artist.ratingCount > 0 && (
