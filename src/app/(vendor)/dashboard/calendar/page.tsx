@@ -19,8 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { SlotManager } from "@/components/vendor/slot-manager";
-import { AICalendarChat } from "@/components/vendor/ai-calendar-chat";
+import { DurationPricingManager } from "@/components/vendor/duration-pricing-manager";
 
 const DAYS = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"];
 const MONTHS = [
@@ -544,7 +543,7 @@ export default function VendorCalendarPage() {
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
           {entity.type === "artist" && (
             <>
-              <TabsTrigger value="slots">Sloturi &amp; Prețuri</TabsTrigger>
+              <TabsTrigger value="slots">Tarife</TabsTrigger>
               <TabsTrigger value="schedule">Grafic de Lucru</TabsTrigger>
             </>
           )}
@@ -1055,11 +1054,9 @@ export default function VendorCalendarPage() {
  * components — we just bump a number whenever the AI writes new slots.
  */
 function ArtistSlotsPanel({ artistId }: { artistId: number }) {
-  const [refreshKey, setRefreshKey] = useState(0);
   return (
     <div className="space-y-4">
-      <AICalendarChat onSlotsCreated={() => setRefreshKey((k) => k + 1)} />
-      <SlotManager artistId={artistId} refreshKey={refreshKey} />
+      <DurationPricingManager artistId={artistId} />
     </div>
   );
 }
