@@ -10,7 +10,7 @@ import {
   getUgcPhotosForArtist,
 } from "@/lib/db/queries/artists";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { artistJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { artistJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized } from "@/i18n";
 import { ArtistDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
@@ -103,7 +103,7 @@ export default async function ArtistPage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(artistJsonLd({
+          __html: safeJsonLd(artistJsonLd({
             name,
             description: desc,
             slug,
@@ -114,7 +114,7 @@ export default async function ArtistPage({ params }: Props) {
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(breadcrumbs)) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd(breadcrumbs)) }}
       />
       <ArtistDetailClient
         artist={gatedArtist}

@@ -6,7 +6,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Calendar, Tag } from "lucide-react";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 
 export const metadata: Metadata = generateMeta({
   title: "Blog",
@@ -32,7 +32,7 @@ export default async function BlogListingPage() {
     <div className="min-h-screen">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(crumbs) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(crumbs) }}
       />
 
       {/* Hero */}

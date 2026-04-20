@@ -5,7 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
 import { getCategoryBySlug, getAllCategories } from "@/lib/db/queries/categories";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getCityBySlug, CITIES } from "@/lib/seo/cities";
 import { ArtistCard } from "@/components/public/artist-card";
 
@@ -100,11 +100,11 @@ export default async function CityCategoryPage({ params, searchParams }: Props) 
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(breadcrumbs)) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd(breadcrumbs)) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(itemList) }}
       />
 
       <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">

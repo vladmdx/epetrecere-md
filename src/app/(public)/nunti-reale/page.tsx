@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, artists, venues } from "@/lib/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Camera, Calendar, MapPin, ArrowRight } from "lucide-react";
 
 // M10 Intern #3 — Real Weddings Gallery (Feature 10).
@@ -157,12 +157,12 @@ export default async function RealWeddingsPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd(breadcrumbs)),
+          __html: safeJsonLd(breadcrumbJsonLd(breadcrumbs)),
         }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(itemList) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(itemList) }}
       />
 
       <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">

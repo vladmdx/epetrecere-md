@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, organizationJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Sparkles, Users, Calendar, Shield } from "lucide-react";
 
 export const metadata: Metadata = generateMeta({
@@ -22,7 +22,7 @@ export default function AboutPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify([
+          __html: safeJsonLd([
             breadcrumbJsonLd([
               { name: "Acasă", url: "https://epetrecere.md" },
               { name: "Despre Noi", url: "https://epetrecere.md/despre" },

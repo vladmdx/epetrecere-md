@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getVenues } from "@/lib/db/queries/venues";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { VenuesListClient } from "./client";
 
 export const metadata: Metadata = generateMeta({
@@ -48,7 +48,7 @@ export default async function VenuesPage({ searchParams }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd([
+          __html: safeJsonLd(breadcrumbJsonLd([
             { name: "Acasă", url: "https://epetrecere.md" },
             { name: "Săli", url: "https://epetrecere.md/sali" },
           ])),
@@ -57,7 +57,7 @@ export default async function VenuesPage({ searchParams }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(itemListJsonLd(jsonLdItems, "Săli pentru Evenimente")),
+          __html: safeJsonLd(itemListJsonLd(jsonLdItems, "Săli pentru Evenimente")),
         }}
       />
       <VenuesListClient

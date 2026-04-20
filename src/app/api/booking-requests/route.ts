@@ -16,7 +16,17 @@ const bookingSchema = z.object({
   clientName: z.string().min(2),
   clientPhone: z.string().min(6),
   clientEmail: z.string().optional(),
-  eventDate: z.string(),
+  eventDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "eventDate must be YYYY-MM-DD")
+    .refine((d) => {
+      // Reject dates strictly before today (event can still be booked for "today").
+      // Compared against UTC date so a client in +3 doesn't accidentally reject
+      // today-in-their-zone.
+      const today = new Date();
+      const todayStr = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
+      return d >= todayStr;
+    }, "Event date cannot be in the past"),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   eventType: z.string().optional(),

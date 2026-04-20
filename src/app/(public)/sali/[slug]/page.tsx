@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getVenueBySlug } from "@/lib/db/queries/venues";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { venueJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { venueJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized } from "@/i18n";
 import { VenueDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
@@ -49,7 +49,7 @@ export default async function VenuePage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(venueJsonLd({
+          __html: safeJsonLd(venueJsonLd({
             name,
             description: venue.descriptionRo || "",
             slug,
@@ -62,7 +62,7 @@ export default async function VenuePage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd([
+          __html: safeJsonLd(breadcrumbJsonLd([
             { name: "Acasă", url: "/" },
             { name: "Săli", url: "/sali" },
             { name, url: `/sali/${slug}` },

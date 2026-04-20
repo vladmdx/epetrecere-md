@@ -11,7 +11,7 @@ import { BlogPreviewSection } from "@/components/public/sections/blog-preview";
 import { PackagesSection } from "@/components/public/sections/packages";
 import { CTASection } from "@/components/public/sections/cta";
 import { FloatingCTA } from "@/components/shared/floating-cta";
-import { websiteJsonLd, organizationJsonLd } from "@/lib/seo/jsonld";
+import { websiteJsonLd, organizationJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getFeaturedArtists } from "@/lib/db/queries/artists";
 import { getFeaturedVenues } from "@/lib/db/queries/venues";
 import { generateMeta } from "@/lib/seo/generate-meta";
@@ -109,11 +109,11 @@ export default async function HomePage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(websiteJsonLd()) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd()) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(organizationJsonLd()) }}
       />
       <div className="noise-overlay">
         {visibleSections.map((type) => {

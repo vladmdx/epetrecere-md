@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { getCategoryBySlug } from "@/lib/db/queries/categories";
 import { getArtists } from "@/lib/db/queries/artists";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized } from "@/i18n";
 import { CategoryPageClient } from "./client";
 
@@ -57,7 +57,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(breadcrumbs)) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd(breadcrumbs)) }}
       />
       <CategoryPageClient
         category={category}

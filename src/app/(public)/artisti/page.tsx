@@ -3,7 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
 import { getAllCategories } from "@/lib/db/queries/categories";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd, itemListJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { ArtistsListClient } from "./client";
 
 export const metadata: Metadata = generateMeta({
@@ -52,7 +52,7 @@ export default async function ArtistsPage({ searchParams }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd([
+          __html: safeJsonLd(breadcrumbJsonLd([
             { name: "Acasă", url: "https://epetrecere.md" },
             { name: "Artiști", url: "https://epetrecere.md/artisti" },
           ])),
@@ -61,7 +61,7 @@ export default async function ArtistsPage({ searchParams }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(itemListJsonLd(jsonLdItems, "Artiști pentru Evenimente")),
+          __html: safeJsonLd(itemListJsonLd(jsonLdItems, "Artiști pentru Evenimente")),
         }}
       />
     <ArtistsListClient

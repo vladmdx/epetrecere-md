@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, artists, venues } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Calendar, MapPin, ArrowLeft, Users } from "lucide-react";
 import { RealWeddingGallery } from "./gallery";
 
@@ -106,7 +106,7 @@ export default async function RealWeddingPage({ params }: Props) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd(breadcrumbs)),
+          __html: safeJsonLd(breadcrumbJsonLd(breadcrumbs)),
         }}
       />
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { MenuCalculatorClient } from "./client";
 
 // M3 #4 — Menu / food calculator.
@@ -24,7 +24,7 @@ export default function MenuCalculatorPage() {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(breadcrumbs)) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(breadcrumbJsonLd(breadcrumbs)) }}
       />
       <div className="mx-auto max-w-4xl px-4 py-10 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">

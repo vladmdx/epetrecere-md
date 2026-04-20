@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { WeddingCostCalculatorClient } from "./client";
 
 // M7 Feature 8 — Dedicated Wedding Cost Calculator.
@@ -28,7 +28,7 @@ export default function WeddingCostPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd(breadcrumbs)),
+          __html: safeJsonLd(breadcrumbJsonLd(breadcrumbs)),
         }}
       />
       <div className="mx-auto max-w-5xl px-4 py-12 lg:px-8">

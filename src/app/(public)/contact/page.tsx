@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { ContactPageClient } from "./client";
 
 export const metadata: Metadata = generateMeta({
@@ -15,7 +15,7 @@ export default function ContactPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify([
+          __html: safeJsonLd([
             breadcrumbJsonLd([
               { name: "Acasă", url: "https://epetrecere.md" },
               { name: "Contact", url: "https://epetrecere.md/contact" },

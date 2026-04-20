@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { DarNuntaClient } from "./client";
 
 // M10 Intern #2 — "Cât să dau dar la nuntă?" calculator (Feature 3).
@@ -27,7 +27,7 @@ export default function DarNuntaPage() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(breadcrumbJsonLd(breadcrumbs)),
+          __html: safeJsonLd(breadcrumbJsonLd(breadcrumbs)),
         }}
       />
       <DarNuntaClient />

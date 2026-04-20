@@ -7,7 +7,7 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, Tag, Edit } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { articleJsonLd, breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { articleJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -70,11 +70,11 @@ export default async function BlogPostPage({ params }: Props) {
     <div className="min-h-screen">
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(jsonLd) }}
       />
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(crumbs) }}
+        dangerouslySetInnerHTML={{ __html: safeJsonLd(crumbs) }}
       />
       {post.coverImageUrl && (
         <div className="relative h-[40vh] overflow-hidden">

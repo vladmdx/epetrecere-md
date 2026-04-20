@@ -1,5 +1,28 @@
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
 
+/**
+ * Serialize an object for embedding inside a <script type="application/ld+json">
+ * tag safely. `JSON.stringify` does not escape `</` sequences, which means a
+ * malicious string containing "</script>" can break out of the script block
+ * and execute arbitrary HTML. Standard fix is to replace `<`, `>`, and `&` so
+ * the payload stays inside the script tag — the JSON parser reverses the
+ * backslash escape on the way back.
+ *
+ * Use this helper everywhere we render JSON-LD:
+ *   <script
+ *     type="application/ld+json"
+ *     dangerouslySetInnerHTML={{ __html: safeJsonLd(obj) }}
+ *   />
+ */
+export function safeJsonLd(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 export function websiteJsonLd() {
   return {
     "@context": "https://schema.org",
