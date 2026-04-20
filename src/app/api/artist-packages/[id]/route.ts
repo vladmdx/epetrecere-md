@@ -70,6 +70,12 @@ export async function PUT(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
+  // Anonymous probes should stop at 401 before any DB lookup or body parsing.
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const { id } = await params;
   const pkgId = Number(id);
   if (!Number.isFinite(pkgId)) {

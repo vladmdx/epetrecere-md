@@ -161,6 +161,13 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  // Auth FIRST — don't leak existence / source of a booking row to
+  // unauthenticated probes. Only after we know the caller is a valid
+  // signed-in user do we look up the row and check ownership + source.
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const url = new URL(req.url);
   const id = Number(url.searchParams.get("id"));
   if (!Number.isFinite(id)) {
@@ -174,15 +181,17 @@ export async function DELETE(req: Request) {
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const owner = await requireArtistOwner(row.artistId);
+  if (!owner.ok) {
+    // Same status for "not owner" and "unknown row" so attackers can't
+    // distinguish existence via the response.
+    return NextResponse.json({ error: "Forbidden" }, { status: owner.status });
+  }
   if (row.source !== "manual") {
     return NextResponse.json(
       { error: "Only manual bookings can be deleted here" },
       { status: 400 },
     );
-  }
-  const owner = await requireArtistOwner(row.artistId);
-  if (!owner.ok) {
-    return NextResponse.json({ error: "Forbidden" }, { status: owner.status });
   }
   await db.delete(bookingRequests).where(eq(bookingRequests.id, id));
   return NextResponse.json({ success: true });

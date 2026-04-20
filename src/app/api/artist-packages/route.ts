@@ -110,6 +110,13 @@ export async function GET(req: NextRequest) {
 
 // POST /api/artist-packages → create a new package. Owner-only.
 export async function POST(req: Request) {
+  // Short-circuit anonymous callers BEFORE validating the body so we
+  // don't leak schema details to unauth probes.
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const body = await req.json().catch(() => ({}));
   const parsed = packageSchema.safeParse(body);
   if (!parsed.success) {
