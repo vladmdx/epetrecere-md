@@ -89,6 +89,11 @@ export default function VendorBookingsPage() {
   );
   const [proposeAmount, setProposeAmount] = useState("");
   const [proposeMessage, setProposeMessage] = useState("");
+  const [messageDialog, setMessageDialog] = useState<BookingRequest | null>(
+    null,
+  );
+  const [messageText, setMessageText] = useState("");
+  const [messageSending, setMessageSending] = useState(false);
 
   // Load artistId for the signed-in user
   const [error, setError] = useState<string | null>(null);
@@ -249,6 +254,66 @@ export default function VendorBookingsPage() {
       toast.error("Eroare la trimitere");
     } finally {
       setBusy(null);
+    }
+  }
+
+  // Open the message dialog AND eagerly load chat history so the artist
+  // can see what's already been said with this specific client.
+  async function openMessageDialog(b: BookingRequest) {
+    setMessageDialog(b);
+    setMessageText("");
+    try {
+      const r = await fetch(`/api/chat?booking_request_id=${b.id}`);
+      if (r.ok) {
+        const data = await r.json();
+        setChats((prev) => ({
+          ...prev,
+          [b.id]: Array.isArray(data) ? data : [],
+        }));
+      }
+    } catch {
+      // silent
+    }
+  }
+
+  async function sendMessageFromDialog() {
+    if (!messageDialog) return;
+    const msg = messageText.trim();
+    if (!msg) {
+      toast.error("Scrie un mesaj înainte să trimiți.");
+      return;
+    }
+    setMessageSending(true);
+    try {
+      const res = await fetch(`/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bookingRequestId: messageDialog.id,
+          message: msg,
+        }),
+      });
+      if (!res.ok) {
+        toast.error("Nu s-a putut trimite mesajul");
+        return;
+      }
+      toast.success("Mesaj trimis");
+      setMessageText("");
+      // Refresh history in-place so the just-sent message appears instantly.
+      const r = await fetch(
+        `/api/chat?booking_request_id=${messageDialog.id}`,
+      );
+      if (r.ok) {
+        const data = await r.json();
+        setChats((prev) => ({
+          ...prev,
+          [messageDialog.id]: Array.isArray(data) ? data : [],
+        }));
+      }
+    } catch {
+      toast.error("Eroare la trimitere");
+    } finally {
+      setMessageSending(false);
     }
   }
 
@@ -517,6 +582,16 @@ export default function VendorBookingsPage() {
                           size="sm"
                           variant="outline"
                           disabled={busy === booking.id}
+                          onClick={() => openMessageDialog(booking)}
+                          className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10"
+                        >
+                          <MessageSquare className="h-3.5 w-3.5" />
+                          Trimite mesaj
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy === booking.id}
                           onClick={() => {
                             setRejectDialog(booking);
                             setRejectReply(
@@ -777,6 +852,124 @@ export default function VendorBookingsPage() {
                 <ArrowLeftRight className="h-4 w-4" />
               )}
               Trimite oferta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Message dialog (chat with the client) ─────────────── */}
+      <Dialog
+        open={!!messageDialog}
+        onOpenChange={(v) => !v && setMessageDialog(null)}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Mesaj către {messageDialog?.clientName ?? "client"}
+            </DialogTitle>
+          </DialogHeader>
+          {messageDialog && (
+            <div className="space-y-3 py-2">
+              {/* Booking summary */}
+              <div className="rounded-lg border border-border/40 bg-background/60 p-3 text-xs">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {formatDate(messageDialog.eventDate)}
+                  </span>
+                  {messageDialog.startTime && messageDialog.endTime && (
+                    <span className="flex items-center gap-1 text-gold/90">
+                      <Clock className="h-3 w-3" />
+                      {messageDialog.startTime}–{messageDialog.endTime}
+                    </span>
+                  )}
+                  {messageDialog.agreedPrice != null &&
+                    messageDialog.agreedPrice > 0 && (
+                      <span className="flex items-center gap-1 font-bold text-gold">
+                        <Euro className="h-3 w-3" />
+                        {messageDialog.agreedPrice}€
+                      </span>
+                    )}
+                </div>
+              </div>
+
+              {/* Chat history */}
+              <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-border/30 bg-background/30 p-2">
+                {(chats[messageDialog.id] || []).length === 0 ? (
+                  <p className="py-6 text-center text-xs text-muted-foreground">
+                    Niciun mesaj încă. Scrie primul mesaj clientului.
+                  </p>
+                ) : (
+                  (chats[messageDialog.id] || []).map((m) => (
+                    <div
+                      key={m.id}
+                      className={cn(
+                        "flex flex-col gap-0.5 rounded-lg p-2 text-sm",
+                        m.senderType === "artist"
+                          ? "ml-8 bg-gold/10 text-foreground"
+                          : "mr-8 bg-accent/40 text-foreground",
+                      )}
+                    >
+                      <span className="text-[10px] font-semibold opacity-80">
+                        {m.senderName}
+                        {" · "}
+                        {new Date(m.createdAt).toLocaleString("ro-RO", {
+                          day: "numeric",
+                          month: "short",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                      <span className="whitespace-pre-wrap break-words">
+                        {m.message}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Composer */}
+              <div>
+                <Label htmlFor="msg-compose">Scrie un mesaj</Label>
+                <Textarea
+                  id="msg-compose"
+                  value={messageText}
+                  onChange={(e) => setMessageText(e.target.value)}
+                  rows={3}
+                  className="mt-1"
+                  placeholder="Ex: Bună! Aș putea afla mai multe despre eveniment…"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      sendMessageFromDialog();
+                    }
+                  }}
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Apasă ⌘/Ctrl + Enter pentru a trimite
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setMessageDialog(null)}
+              disabled={messageSending}
+            >
+              Închide
+            </Button>
+            <Button
+              onClick={sendMessageFromDialog}
+              disabled={messageSending || !messageText.trim()}
+              className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+            >
+              {messageSending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Trimite
             </Button>
           </DialogFooter>
         </DialogContent>
