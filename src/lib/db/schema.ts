@@ -244,6 +244,15 @@ export const artistVideos = pgTable("artist_videos", {
   sortOrder: integer("sort_order").default(0),
 });
 
+// Duration-based pricing tiers. Each row is a (duration, price, scope) triplet.
+// scope decides WHEN the tier applies:
+//   - "base"          → default rate, used unless a more specific override wins
+//   - "weekend"       → Sat + Sun
+//   - "weekday"       → Mon–Fri
+//   - "evening"       → any day when the start time is >= scopeFromTime
+//   - "specific_day"  → only on scopeDayOfWeek (0=Sun … 6=Sat)
+// Resolution priority when several rows match: specific_day → evening →
+// weekend/weekday → base. Client picks the minimum applicable price.
 export const artistPackages = pgTable("artist_packages", {
   id: serial("id").primaryKey(),
   artistId: integer("artist_id")
@@ -257,6 +266,13 @@ export const artistPackages = pgTable("artist_packages", {
   descriptionEn: text("description_en"),
   price: integer("price"),
   durationHours: real("duration_hours"),
+  durationMinutes: integer("duration_minutes").default(0).notNull(),
+  /** base | weekend | weekday | evening | specific_day */
+  scope: text("scope").default("base").notNull(),
+  /** 0 (Sunday) – 6 (Saturday); used when scope="specific_day" */
+  scopeDayOfWeek: integer("scope_day_of_week"),
+  /** "HH:MM" cut-off; used when scope="evening" */
+  scopeFromTime: text("scope_from_time"),
   isVisible: boolean("is_visible").default(true).notNull(),
 });
 

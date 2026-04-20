@@ -60,6 +60,12 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { TimePicker } from "@/components/ui/time-picker";
+import {
+  resolvePriceForDuration,
+  tierDurationMinutes,
+  formatDuration,
+  type PricingTier,
+} from "@/lib/pricing/resolve";
 import { ChecklistView, type ChecklistItem } from "@/components/planner/checklist-view";
 import { GuestsView, type Guest } from "@/components/planner/guests-view";
 import {
@@ -1911,18 +1917,15 @@ function PlanArtistCard({
   const [endTime, setEndTime] = useState("");
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
 
-  // Artist pricing tiers (durata + preț). Loaded on demand when the booking
-  // modal opens so the client picks a duration package defined by the artist.
-  type ArtistPackage = {
-    id: number;
-    nameRo?: string | null;
-    price: number | null;
-    durationHours: number | null;
-    isVisible?: boolean;
-  };
-  const [packages, setPackages] = useState<ArtistPackage[]>([]);
+  // Artist pricing tiers (durata + preț + scope). Loaded on demand when the
+  // booking modal opens. The client picks a DURATION (e.g. "1h 30m"); the
+  // resolver then picks the applicable price for the event date + start time
+  // (base / weekend / evening / specific-day override).
+  const [packages, setPackages] = useState<PricingTier[]>([]);
   const [packagesLoading, setPackagesLoading] = useState(false);
-  const [selectedPackageId, setSelectedPackageId] = useState<number | null>(null);
+  const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<
+    number | null
+  >(null);
 
   // When the booking modal opens for the first time, pre-fill start
   // from the plan's wizard answers so the client doesn't retype the obvious.
@@ -1939,8 +1942,9 @@ function PlanArtistCard({
     }
   }, [modalOpen, plan.startTime, startTime]);
 
-  // Load artist's pricing packages when modal opens. Packages define the
-  // durations & prices the artist offers (e.g., 1h=100€, 2h=150€, 5h=300€).
+  // Load artist's pricing tiers when modal opens. Each tier is a (duration,
+  // price, scope) row. We keep all scope variants so the resolver can pick
+  // the right one when the client is on a weekend/evening/specific day.
   useEffect(() => {
     if (!modalOpen) return;
     if (packages.length > 0) return;
@@ -1948,11 +1952,10 @@ function PlanArtistCard({
     setPackagesLoading(true);
     fetch(`/api/artist-packages?artist_id=${artist.id}`)
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: ArtistPackage[]) => {
+      .then((data: PricingTier[]) => {
         if (cancelled) return;
-        // Only keep packages that actually describe a duration tier.
         const valid = (Array.isArray(data) ? data : []).filter(
-          (p) => p.durationHours != null && p.durationHours > 0,
+          (p) => p.price != null && tierDurationMinutes(p) != null,
         );
         setPackages(valid);
       })
@@ -1968,19 +1971,19 @@ function PlanArtistCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalOpen, artist.id]);
 
-  // When a package is selected, recompute endTime from startTime + duration.
+  // When a duration is selected, recompute endTime from startTime + duration.
   useEffect(() => {
-    if (selectedPackageId == null) return;
-    const pkg = packages.find((p) => p.id === selectedPackageId);
-    if (!pkg || pkg.durationHours == null) return;
+    if (selectedDurationMinutes == null) return;
     if (!startTime) return;
     const [h, m] = startTime.split(":").map(Number);
     if (Number.isNaN(h)) return;
-    const totalMinutes = h * 60 + (m || 0) + pkg.durationHours * 60;
+    const totalMinutes = h * 60 + (m || 0) + selectedDurationMinutes;
     const endH = Math.floor(totalMinutes / 60) % 24;
     const endM = Math.round(totalMinutes % 60);
-    setEndTime(`${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`);
-  }, [selectedPackageId, startTime, packages]);
+    setEndTime(
+      `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
+    );
+  }, [selectedDurationMinutes, startTime]);
 
   // Chat modal state
   const [chatOpen, setChatOpen] = useState(false);
@@ -2031,7 +2034,7 @@ function PlanArtistCard({
     setSelectedSlotId(slot.id);
     setStartTime(slot.startTime);
     setEndTime(slot.endTime);
-    setSelectedPackageId(null);
+    setSelectedDurationMinutes(null);
   }
 
   function timesValid() {
@@ -2041,21 +2044,46 @@ function PlanArtistCard({
     return startTime !== endTime;
   }
 
-  const selectedPackage = packages.find((p) => p.id === selectedPackageId);
-  const canSubmit =
-    (!!selectedPackage && !!startTime) || (timesValid() && packages.length === 0);
+  // Group available tiers by duration — the client picks a duration, the
+  // resolver picks the right (base/weekend/evening/…) price for it.
+  const durationOptions = (() => {
+    const map = new Map<number, PricingTier[]>();
+    for (const p of packages) {
+      const d = tierDurationMinutes(p);
+      if (d == null) continue;
+      const arr = map.get(d) ?? [];
+      arr.push(p);
+      map.set(d, arr);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([durationMinutes, tiers]) => ({ durationMinutes, tiers }));
+  })();
 
-  // Compute the price to show/send: from selected package, else from selected slot.
+  const resolvedForSelection =
+    selectedDurationMinutes != null
+      ? resolvePriceForDuration(
+          packages,
+          selectedDurationMinutes,
+          {
+            eventDate: plan.eventDate,
+            startTime: startTime || null,
+          },
+        )
+      : null;
+
   const slotForSelection = slots.find((s) => s.id === selectedSlotId);
   const computedPrice =
-    selectedPackage?.price != null
-      ? selectedPackage.price
-      : slotForSelection?.price ?? null;
+    resolvedForSelection?.price ?? slotForSelection?.price ?? null;
+
+  const canSubmit =
+    (selectedDurationMinutes != null && !!startTime) ||
+    (timesValid() && packages.length === 0);
 
   async function submit() {
     if (submitting) return;
     if (!canSubmit) {
-      if (packages.length > 0 && !selectedPackageId) {
+      if (packages.length > 0 && selectedDurationMinutes == null) {
         toast.error("Alege durata de participare a artistului.");
       } else {
         toast.error("Alege ora de început și durata.");
@@ -2078,8 +2106,11 @@ function PlanArtistCard({
           startTime,
           endTime,
           agreedPrice: computedPrice ?? undefined,
-          packageId: selectedPackageId ?? undefined,
-          durationHours: selectedPackage?.durationHours ?? undefined,
+          packageId: resolvedForSelection?.tier.id ?? undefined,
+          durationHours:
+            selectedDurationMinutes != null
+              ? selectedDurationMinutes / 60
+              : undefined,
           message: message.trim() || undefined,
           eventPlanId: plan.id,
         }),
@@ -2089,14 +2120,14 @@ function PlanArtistCard({
         throw new Error(err.error || "Eroare la trimitere");
       }
       const summary =
-        selectedPackage && computedPrice != null
-          ? `${selectedPackage.durationHours}h · ${computedPrice}€`
+        selectedDurationMinutes != null && computedPrice != null
+          ? `${formatDuration(selectedDurationMinutes)} · ${computedPrice}€`
           : `${startTime}–${endTime}`;
       toast.success(`Cerere trimisă către ${artist.nameRo} (${summary})`);
       setModalOpen(false);
       setMessage("");
       setSelectedSlotId(null);
-      setSelectedPackageId(null);
+      setSelectedDurationMinutes(null);
       setStartTime("");
       setEndTime("");
       onRefresh();
@@ -2287,84 +2318,101 @@ function PlanArtistCard({
                   />
                 </div>
 
-                {/* Package / duration picker — artist-defined pricing tiers */}
+                {/* Duration picker — the resolver picks the right price */}
                 <div>
                   <Label>Durata de participare *</Label>
                   <p className="mb-2 text-xs text-muted-foreground">
-                    {packages.length > 0
-                      ? "Alege pachetul oferit de artist"
-                      : "Artistul nu a definit pachete. Alege manual ora de sfârșit."}
+                    {durationOptions.length > 0
+                      ? "Alege durata. Prețul se calculează în funcție de dată și oră."
+                      : "Artistul nu a definit tarife. Alege manual ora de sfârșit."}
                   </p>
                   {packagesLoading ? (
                     <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       Se încarcă pachetele…
                     </div>
-                  ) : packages.length > 0 ? (
+                  ) : durationOptions.length > 0 ? (
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {packages
-                        .slice()
-                        .sort(
-                          (a, b) =>
-                            (a.durationHours ?? 0) - (b.durationHours ?? 0),
-                        )
-                        .map((p) => {
-                          const selected = selectedPackageId === p.id;
-                          const hours = p.durationHours ?? 0;
-                          const hoursLabel =
-                            hours === Math.floor(hours)
-                              ? `${hours}h`
-                              : `${hours}h`;
-                          return (
-                            <button
-                              key={p.id}
-                              type="button"
-                              disabled={submitting}
-                              onClick={() => {
-                                setSelectedPackageId(selected ? null : p.id);
-                                setSelectedSlotId(null);
-                              }}
-                              className={cn(
-                                "flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all",
-                                selected
-                                  ? "border-gold bg-gold/10 shadow-[0_0_0_1px_rgba(201,168,76,0.4)]"
-                                  : "border-border/40 hover:border-gold/40",
-                              )}
-                            >
-                              <div className="flex items-baseline justify-between gap-2">
+                      {durationOptions.map(({ durationMinutes, tiers }) => {
+                        const selected =
+                          selectedDurationMinutes === durationMinutes;
+                        // Preview the price for this duration at the current
+                        // date/time so the client sees how overrides kick in.
+                        const preview = resolvePriceForDuration(
+                          tiers,
+                          durationMinutes,
+                          {
+                            eventDate: plan.eventDate,
+                            startTime: startTime || null,
+                          },
+                        );
+                        // Surface whether a weekend/evening/specific-day
+                        // override applies so the client understands the
+                        // price jump.
+                        const overrideLabel =
+                          preview && preview.tier.scope !== "base"
+                            ? preview.tier.scope === "weekend"
+                              ? "weekend"
+                              : preview.tier.scope === "weekday"
+                                ? "zi lucr."
+                                : preview.tier.scope === "evening"
+                                  ? "seara"
+                                  : preview.tier.scope === "specific_day"
+                                    ? "zi specială"
+                                    : ""
+                            : "";
+                        return (
+                          <button
+                            key={durationMinutes}
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => {
+                              setSelectedDurationMinutes(
+                                selected ? null : durationMinutes,
+                              );
+                              setSelectedSlotId(null);
+                            }}
+                            className={cn(
+                              "flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all",
+                              selected
+                                ? "border-gold bg-gold/10 shadow-[0_0_0_1px_rgba(201,168,76,0.4)]"
+                                : "border-border/40 hover:border-gold/40",
+                            )}
+                          >
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span
+                                className={cn(
+                                  "font-heading text-base font-bold",
+                                  selected ? "text-gold" : "text-foreground",
+                                )}
+                              >
+                                {formatDuration(durationMinutes)}
+                              </span>
+                              {preview ? (
                                 <span
                                   className={cn(
-                                    "font-heading text-base font-bold",
-                                    selected ? "text-gold" : "text-foreground",
+                                    "text-sm font-bold",
+                                    selected
+                                      ? "text-gold"
+                                      : "text-muted-foreground",
                                   )}
                                 >
-                                  {hoursLabel}
+                                  {preview.price}€
                                 </span>
-                                {p.price != null ? (
-                                  <span
-                                    className={cn(
-                                      "text-sm font-bold",
-                                      selected
-                                        ? "text-gold"
-                                        : "text-muted-foreground",
-                                    )}
-                                  >
-                                    {p.price}€
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] uppercase text-muted-foreground">
-                                    preț la cerere
-                                  </span>
-                                )}
-                              </div>
-                              {p.nameRo && (
-                                <span className="text-[11px] text-muted-foreground line-clamp-1">
-                                  {p.nameRo}
+                              ) : (
+                                <span className="text-[10px] uppercase text-muted-foreground">
+                                  preț la cerere
                                 </span>
                               )}
-                            </button>
-                          );
-                        })}
+                            </div>
+                            {overrideLabel && (
+                              <span className="text-[10px] uppercase tracking-wide text-purple-400">
+                                Tarif {overrideLabel}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : (
                     <TimePicker
@@ -2397,9 +2445,9 @@ function PlanArtistCard({
                             <strong>{startTime}</strong>
                             {" – "}
                             <strong>{endTime}</strong>
-                            {selectedPackage?.durationHours != null && (
+                            {selectedDurationMinutes != null && (
                               <span className="ml-1 text-xs text-muted-foreground">
-                                ({selectedPackage.durationHours}h)
+                                ({formatDuration(selectedDurationMinutes)})
                               </span>
                             )}
                           </span>

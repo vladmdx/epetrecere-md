@@ -167,7 +167,9 @@ export async function getArtists(filters: ArtistFilters = {}) {
   }
 
   // Aggregate pricing tiers per artist so the card can decide "de la X€"
-  // (multiple packages) vs "X€" (single package) vs hiding the label.
+  // (multiple tiers) vs "X€" (single tier) vs hiding the label.
+  // We count unique DURATIONS (not rows) so that a base + weekend row for
+  // the same duration still counts as a single tier for display purposes.
   const pricingByArtist = new Map<
     number,
     { tierCount: number; minPrice: number | null; maxPrice: number | null }
@@ -178,6 +180,7 @@ export async function getArtists(filters: ArtistFilters = {}) {
         artistId: artistPackages.artistId,
         price: artistPackages.price,
         durationHours: artistPackages.durationHours,
+        durationMinutes: artistPackages.durationMinutes,
       })
       .from(artistPackages)
       .where(
@@ -186,20 +189,36 @@ export async function getArtists(filters: ArtistFilters = {}) {
           eq(artistPackages.isVisible, true),
         ),
       );
+
+    // Track unique durations per artist to compute tierCount correctly.
+    const uniqueDurations = new Map<number, Set<number>>();
+
     for (const r of pkgRows) {
-      if (r.price == null || r.durationHours == null || r.durationHours <= 0)
-        continue;
+      if (r.price == null) continue;
+      const totalMin =
+        Math.round((r.durationHours ?? 0) * 60) + (r.durationMinutes ?? 0);
+      if (totalMin <= 0) continue;
+
+      const durations = uniqueDurations.get(r.artistId) ?? new Set<number>();
+      durations.add(totalMin);
+      uniqueDurations.set(r.artistId, durations);
+
       const entry = pricingByArtist.get(r.artistId) ?? {
         tierCount: 0,
         minPrice: null,
         maxPrice: null,
       };
-      entry.tierCount += 1;
       entry.minPrice =
         entry.minPrice == null ? r.price : Math.min(entry.minPrice, r.price);
       entry.maxPrice =
         entry.maxPrice == null ? r.price : Math.max(entry.maxPrice, r.price);
       pricingByArtist.set(r.artistId, entry);
+    }
+
+    // Fill in tierCount from the unique-durations tracker.
+    for (const [artistId, durations] of uniqueDurations) {
+      const entry = pricingByArtist.get(artistId);
+      if (entry) entry.tierCount = durations.size;
     }
   }
 

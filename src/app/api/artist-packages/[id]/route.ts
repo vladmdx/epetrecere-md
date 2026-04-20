@@ -7,6 +7,14 @@ import { eq } from "drizzle-orm";
 
 // M1 #2 — Update / delete a single artist package. Owner-only.
 
+const scopeEnum = z.enum([
+  "base",
+  "weekend",
+  "weekday",
+  "evening",
+  "specific_day",
+]);
+
 const updateSchema = z.object({
   nameRo: z.string().min(2).max(200).optional(),
   nameRu: z.string().max(200).nullable().optional(),
@@ -16,6 +24,14 @@ const updateSchema = z.object({
   descriptionEn: z.string().max(2000).nullable().optional(),
   price: z.number().int().min(0).nullable().optional(),
   durationHours: z.number().min(0).max(240).nullable().optional(),
+  durationMinutes: z.number().int().min(0).max(59).nullable().optional(),
+  scope: scopeEnum.optional(),
+  scopeDayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
+  scopeFromTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .nullable()
+    .optional(),
   isVisible: z.boolean().optional(),
 });
 
@@ -74,9 +90,14 @@ export async function PUT(
     return NextResponse.json({ error: owner.error }, { status: owner.status });
   }
 
+  // durationMinutes is NOT NULL on the column — coerce null → 0 so
+  // drizzle's typed .set() accepts it.
+  const updates: Record<string, unknown> = { ...parsed.data };
+  if (updates.durationMinutes === null) updates.durationMinutes = 0;
+
   await db
     .update(artistPackages)
-    .set(parsed.data)
+    .set(updates)
     .where(eq(artistPackages.id, pkgId));
 
   const [updated] = await db

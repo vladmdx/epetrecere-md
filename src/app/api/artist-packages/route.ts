@@ -9,6 +9,14 @@ import { and, asc, eq } from "drizzle-orm";
 // Public GET (listing for a single artist) so the profile page stays fast.
 // POST requires the caller to own the artist (artists.userId = users.id via Clerk).
 
+const scopeEnum = z.enum([
+  "base",
+  "weekend",
+  "weekday",
+  "evening",
+  "specific_day",
+]);
+
 const packageSchema = z.object({
   artistId: z.number().int().positive(),
   nameRo: z.string().min(2).max(200),
@@ -19,6 +27,14 @@ const packageSchema = z.object({
   descriptionEn: z.string().max(2000).optional().nullable(),
   price: z.number().int().min(0).optional().nullable(),
   durationHours: z.number().min(0).max(240).optional().nullable(),
+  durationMinutes: z.number().int().min(0).max(59).optional().nullable(),
+  scope: scopeEnum.optional().default("base"),
+  scopeDayOfWeek: z.number().int().min(0).max(6).optional().nullable(),
+  scopeFromTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/)
+    .optional()
+    .nullable(),
   isVisible: z.boolean().default(true),
 });
 
@@ -120,6 +136,10 @@ export async function POST(req: Request) {
       descriptionEn: parsed.data.descriptionEn ?? null,
       price: parsed.data.price ?? null,
       durationHours: parsed.data.durationHours ?? null,
+      durationMinutes: parsed.data.durationMinutes ?? 0,
+      scope: parsed.data.scope ?? "base",
+      scopeDayOfWeek: parsed.data.scopeDayOfWeek ?? null,
+      scopeFromTime: parsed.data.scopeFromTime ?? null,
       isVisible: parsed.data.isVisible,
     })
     .returning();
