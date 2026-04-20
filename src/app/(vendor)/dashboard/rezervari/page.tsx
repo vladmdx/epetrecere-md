@@ -6,11 +6,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, User, MapPin, CheckCircle, XCircle, Loader2, MessageSquare, Send } from "lucide-react";
+import { Calendar, User, Phone, Clock, Euro, CheckCircle, XCircle, Loader2, MessageSquare, Send, HandCoins, ArrowLeftRight } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-import { PriceNegotiationPanel, type BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
+import { type BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
 
 type BookingRequest = {
   id: number;
@@ -64,6 +74,21 @@ export default function VendorBookingsPage() {
   const [chats, setChats] = useState<Record<number, ChatMessage[]>>({});
   const [newMsg, setNewMsg] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
+
+  // Pending-action dialogs (shown per booking).
+  const [acceptDialog, setAcceptDialog] = useState<BookingRequest | null>(null);
+  const [acceptReply, setAcceptReply] = useState(
+    "Mulțumesc pentru rezervare! Accept cu plăcere.",
+  );
+  const [rejectDialog, setRejectDialog] = useState<BookingRequest | null>(null);
+  const [rejectReply, setRejectReply] = useState(
+    "Ne pare rău, nu sunt disponibil la data respectivă.",
+  );
+  const [proposeDialog, setProposeDialog] = useState<BookingRequest | null>(
+    null,
+  );
+  const [proposeAmount, setProposeAmount] = useState("");
+  const [proposeMessage, setProposeMessage] = useState("");
 
   // Load artistId for the signed-in user
   const [error, setError] = useState<string | null>(null);
@@ -129,27 +154,99 @@ export default function VendorBookingsPage() {
     }
   }
 
-  async function handleAction(id: number, action: "accept" | "reject") {
-    const reply = action === "accept"
-      ? "Mulțumesc pentru rezervare! Accept cu plăcere."
-      : "Ne pare rău, nu sunt disponibil la data respectivă.";
-    setBusy(id);
+  async function refreshBookings() {
+    if (artistId == null) return;
+    const r = await fetch(`/api/booking-requests?artist_id=${artistId}`);
+    if (r.ok) setBookings(await r.json());
+  }
+
+  // Accept with the price the client already chose (no price input — the
+  // artist is confirming the package the client picked).
+  async function confirmAccept() {
+    if (!acceptDialog) return;
+    setBusy(acceptDialog.id);
     try {
-      const res = await fetch(`/api/booking-requests/${id}`, {
+      const res = await fetch(`/api/booking-requests/${acceptDialog.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, reply }),
+        body: JSON.stringify({
+          action: "accept",
+          reply: acceptReply.trim() || "Cererea a fost acceptată!",
+        }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut actualiza rezervarea");
+        toast.error("Nu s-a putut accepta rezervarea");
         return;
       }
-      toast.success(action === "accept" ? "Rezervare acceptată!" : "Rezervare respinsă");
-      // Refresh
-      const r = await fetch(`/api/booking-requests?artist_id=${artistId}`);
-      if (r.ok) setBookings(await r.json());
+      toast.success("Rezervare acceptată!");
+      setAcceptDialog(null);
+      setAcceptReply("Mulțumesc pentru rezervare! Accept cu plăcere.");
+      await refreshBookings();
     } catch {
-      toast.error("Eroare la actualizarea rezervării");
+      toast.error("Eroare la acceptare");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirmReject() {
+    if (!rejectDialog) return;
+    setBusy(rejectDialog.id);
+    try {
+      const res = await fetch(`/api/booking-requests/${rejectDialog.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reject",
+          reply:
+            rejectReply.trim() ||
+            "Ne pare rău, nu sunt disponibil la data respectivă.",
+        }),
+      });
+      if (!res.ok) {
+        toast.error("Nu s-a putut respinge rezervarea");
+        return;
+      }
+      toast.success("Rezervare respinsă");
+      setRejectDialog(null);
+      setRejectReply("Ne pare rău, nu sunt disponibil la data respectivă.");
+      await refreshBookings();
+    } catch {
+      toast.error("Eroare la respingere");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirmPropose() {
+    if (!proposeDialog) return;
+    const amt = Number(proposeAmount);
+    if (!Number.isFinite(amt) || amt <= 0) {
+      toast.error("Introdu o sumă validă.");
+      return;
+    }
+    setBusy(proposeDialog.id);
+    try {
+      const res = await fetch(`/api/booking-requests/${proposeDialog.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "propose_price",
+          agreedPrice: amt,
+          reply: proposeMessage.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        toast.error("Nu s-a putut trimite oferta");
+        return;
+      }
+      toast.success("Ofertă trimisă clientului");
+      setProposeDialog(null);
+      setProposeAmount("");
+      setProposeMessage("");
+      await refreshBookings();
+    } catch {
+      toast.error("Eroare la trimitere");
     } finally {
       setBusy(null);
     }
@@ -307,16 +404,27 @@ export default function VendorBookingsPage() {
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-heading font-bold">{booking.eventType || "Eveniment"}</span>
                         <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>
+                        {booking.agreedPrice != null && booking.agreedPrice > 0 && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-xs font-bold text-gold">
+                            <Euro className="h-3 w-3" />
+                            {booking.agreedPrice}€
+                          </span>
+                        )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {formatDate(booking.eventDate)}</span>
+                        {booking.startTime && booking.endTime && (
+                          <span className="flex items-center gap-1 text-gold/90">
+                            <Clock className="h-3.5 w-3.5" />
+                            {booking.startTime}–{booking.endTime}
+                          </span>
+                        )}
                         <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> {booking.clientName}</span>
-                        {booking.clientPhone && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {booking.clientPhone}</span>}
+                        {booking.clientPhone && <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {booking.clientPhone}</span>}
                         {booking.guestCount != null && <span>{booking.guestCount} invitați</span>}
-                        {booking.startTime && booking.endTime && <span>{booking.startTime}–{booking.endTime}</span>}
                       </div>
                       {booking.message && (
                         <p className="text-sm text-muted-foreground italic">&ldquo;{booking.message}&rdquo;</p>
@@ -333,33 +441,94 @@ export default function VendorBookingsPage() {
                   </div>
 
                   {booking.status === "pending" && (
-                    <div className="mt-4 space-y-3 border-t border-border/40 pt-3">
-                      <PriceNegotiationPanel
-                        booking={{
-                          id: booking.id,
-                          status: booking.status,
-                          agreedPrice: booking.agreedPrice,
-                          priceOffers: booking.priceOffers,
-                        }}
-                        perspective="artist"
-                        onUpdate={async () => {
-                          if (artistId != null) {
-                            const r = await fetch(
-                              `/api/booking-requests?artist_id=${artistId}`,
+                    <div className="mt-4 space-y-2 border-t border-border/40 pt-3">
+                      {/* Price history, if any prior counter-offers */}
+                      {booking.priceOffers && booking.priceOffers.length > 0 && (
+                        <div className="rounded-md border border-border/30 bg-background/40 p-2">
+                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                            Istoric oferte
+                          </p>
+                          <div className="space-y-1">
+                            {booking.priceOffers.map((o, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center gap-2 text-xs"
+                              >
+                                <HandCoins
+                                  className={cn(
+                                    "h-3 w-3",
+                                    o.from === "artist"
+                                      ? "text-gold"
+                                      : "text-muted-foreground",
+                                  )}
+                                />
+                                <span className="text-muted-foreground">
+                                  {o.from === "artist" ? "Tu" : "Client"}:
+                                </span>
+                                <span className="font-bold text-gold">
+                                  {o.amount}€
+                                </span>
+                                {o.message && (
+                                  <span className="text-muted-foreground italic">
+                                    “{o.message}”
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Three actions in a single row */}
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          disabled={busy === booking.id}
+                          onClick={() => {
+                            setAcceptDialog(booking);
+                            setAcceptReply(
+                              "Mulțumesc pentru rezervare! Accept cu plăcere.",
                             );
-                            if (r.ok) setBookings(await r.json());
-                          }
-                        }}
-                      />
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        disabled={busy === booking.id}
-                        onClick={() => handleAction(booking.id, "reject")}
-                        className="gap-1 text-destructive"
-                      >
-                        <XCircle className="h-3.5 w-3.5" /> Refuză
-                      </Button>
+                          }}
+                          className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          <CheckCircle className="h-3.5 w-3.5" />
+                          Acceptă
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy === booking.id}
+                          onClick={() => {
+                            setProposeDialog(booking);
+                            setProposeAmount(
+                              booking.agreedPrice
+                                ? String(booking.agreedPrice)
+                                : "",
+                            );
+                            setProposeMessage("");
+                          }}
+                          className="gap-1.5"
+                        >
+                          <ArrowLeftRight className="h-3.5 w-3.5" />
+                          Propune preț
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy === booking.id}
+                          onClick={() => {
+                            setRejectDialog(booking);
+                            setRejectReply(
+                              "Ne pare rău, nu sunt disponibil la data respectivă.",
+                            );
+                          }}
+                          className="gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10"
+                        >
+                          <XCircle className="h-3.5 w-3.5" />
+                          Refuză
+                        </Button>
+                      </div>
                     </div>
                   )}
 
@@ -437,6 +606,235 @@ export default function VendorBookingsPage() {
           })}
         </Tabs>
       )}
+
+      {/* ─── Accept confirmation dialog ─────────────────────────── */}
+      <Dialog
+        open={!!acceptDialog}
+        onOpenChange={(v) => !v && setAcceptDialog(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirmă acceptarea</DialogTitle>
+          </DialogHeader>
+          {acceptDialog && (
+            <div className="space-y-3 py-2">
+              <div className="rounded-lg border border-border/40 bg-background/60 p-3 text-sm">
+                <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
+                  <span className="text-muted-foreground">Client:</span>
+                  <span className="font-medium">{acceptDialog.clientName}</span>
+
+                  <span className="text-muted-foreground">Eveniment:</span>
+                  <span>{acceptDialog.eventType || "—"}</span>
+
+                  <span className="text-muted-foreground">Data:</span>
+                  <span>{formatDate(acceptDialog.eventDate)}</span>
+
+                  {acceptDialog.startTime && acceptDialog.endTime && (
+                    <>
+                      <span className="text-muted-foreground">Interval:</span>
+                      <span className="font-medium text-gold">
+                        {acceptDialog.startTime}–{acceptDialog.endTime}
+                      </span>
+                    </>
+                  )}
+
+                  {acceptDialog.guestCount != null && (
+                    <>
+                      <span className="text-muted-foreground">Invitați:</span>
+                      <span>{acceptDialog.guestCount}</span>
+                    </>
+                  )}
+
+                  {acceptDialog.agreedPrice != null &&
+                    acceptDialog.agreedPrice > 0 && (
+                      <>
+                        <span className="text-muted-foreground">Preț:</span>
+                        <span className="font-heading text-base font-bold text-gold">
+                          {acceptDialog.agreedPrice}€
+                        </span>
+                      </>
+                    )}
+
+                  {acceptDialog.clientPhone && (
+                    <>
+                      <span className="text-muted-foreground">Telefon:</span>
+                      <span>{acceptDialog.clientPhone}</span>
+                    </>
+                  )}
+                </div>
+                {acceptDialog.message && (
+                  <p className="mt-3 border-t border-border/30 pt-2 text-xs italic text-muted-foreground">
+                    “{acceptDialog.message}”
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <Label htmlFor="accept-reply">Mesaj pentru client</Label>
+                <Textarea
+                  id="accept-reply"
+                  value={acceptReply}
+                  onChange={(e) => setAcceptReply(e.target.value)}
+                  rows={3}
+                  className="mt-1"
+                  placeholder="Mesajul tău către client…"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAcceptDialog(null)}
+              disabled={busy === acceptDialog?.id}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={confirmAccept}
+              disabled={busy === acceptDialog?.id}
+              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              {busy === acceptDialog?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4" />
+              )}
+              Confirmă acceptarea
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Propose price dialog ──────────────────────────────── */}
+      <Dialog
+        open={!!proposeDialog}
+        onOpenChange={(v) => !v && setProposeDialog(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Propune un alt preț</DialogTitle>
+          </DialogHeader>
+          {proposeDialog && (
+            <div className="space-y-4 py-2">
+              <div className="rounded-lg border border-border/40 bg-background/60 p-3 text-xs text-muted-foreground">
+                Preț cerut de client:{" "}
+                <span className="font-bold text-gold">
+                  {proposeDialog.agreedPrice
+                    ? `${proposeDialog.agreedPrice}€`
+                    : "neprecizat"}
+                </span>
+                {proposeDialog.startTime && proposeDialog.endTime && (
+                  <>
+                    {" · "}Interval:{" "}
+                    <span className="font-medium text-foreground">
+                      {proposeDialog.startTime}–{proposeDialog.endTime}
+                    </span>
+                  </>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="propose-amount">Sumă propusă (€)</Label>
+                <Input
+                  id="propose-amount"
+                  type="number"
+                  min="0"
+                  value={proposeAmount}
+                  onChange={(e) => setProposeAmount(e.target.value)}
+                  className="mt-1"
+                  placeholder="Ex: 250"
+                />
+              </div>
+              <div>
+                <Label htmlFor="propose-msg">Mesaj (opțional)</Label>
+                <Textarea
+                  id="propose-msg"
+                  value={proposeMessage}
+                  onChange={(e) => setProposeMessage(e.target.value)}
+                  rows={2}
+                  className="mt-1"
+                  placeholder="Ex: Prețul include 2 ore + echipament."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setProposeDialog(null)}
+              disabled={busy === proposeDialog?.id}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={confirmPropose}
+              disabled={busy === proposeDialog?.id || !proposeAmount}
+              className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+            >
+              {busy === proposeDialog?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ArrowLeftRight className="h-4 w-4" />
+              )}
+              Trimite oferta
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Reject confirmation dialog ────────────────────────── */}
+      <Dialog
+        open={!!rejectDialog}
+        onOpenChange={(v) => !v && setRejectDialog(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Refuză rezervarea</DialogTitle>
+          </DialogHeader>
+          {rejectDialog && (
+            <div className="space-y-3 py-2">
+              <p className="text-sm text-muted-foreground">
+                Clientul{" "}
+                <span className="font-medium text-foreground">
+                  {rejectDialog.clientName}
+                </span>{" "}
+                va fi notificat că cererea a fost refuzată.
+              </p>
+              <div>
+                <Label htmlFor="reject-reply">Motiv pentru client</Label>
+                <Textarea
+                  id="reject-reply"
+                  value={rejectReply}
+                  onChange={(e) => setRejectReply(e.target.value)}
+                  rows={3}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRejectDialog(null)}
+              disabled={busy === rejectDialog?.id}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={confirmReject}
+              disabled={busy === rejectDialog?.id}
+              className="gap-1.5 bg-destructive text-white hover:bg-destructive/90"
+            >
+              {busy === rejectDialog?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <XCircle className="h-4 w-4" />
+              )}
+              Refuză rezervarea
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
