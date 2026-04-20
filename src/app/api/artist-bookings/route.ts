@@ -30,6 +30,8 @@ const schema = z.object({
   price: z.number().int().min(0).nullable().optional(),
   /** Free-form note shown on the calendar (e.g. "Nuntă Popescu, Codru"). */
   note: z.string().max(500).optional(),
+  /** Event type — drives the colored dot on the calendar grid. */
+  eventType: z.string().max(60).optional(),
 });
 
 function addMinutes(hhmm: string, totalMinutes: number): string {
@@ -130,7 +132,7 @@ export async function POST(req: Request) {
       eventDate: parsed.data.eventDate,
       startTime: parsed.data.startTime,
       endTime,
-      eventType: null,
+      eventType: parsed.data.eventType ?? null,
       guestCount: null,
       message: parsed.data.note?.trim() || null,
       status: "accepted",

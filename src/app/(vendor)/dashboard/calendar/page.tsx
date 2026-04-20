@@ -200,6 +200,9 @@ export default function VendorCalendarPage() {
   }
   const [dayBookings, setDayBookings] = useState<DayBooking[]>([]);
   const [dayBookingsLoading, setDayBookingsLoading] = useState(false);
+  const [monthBookingsByDate, setMonthBookingsByDate] = useState<
+    Record<string, DayBooking[]>
+  >({});
 
   // Manual-booking dialog state
   interface ArtistPackage {
@@ -215,6 +218,7 @@ export default function VendorCalendarPage() {
   const [manualPackageId, setManualPackageId] = useState<number | null>(null);
   const [manualPrice, setManualPrice] = useState<string>("");
   const [manualNote, setManualNote] = useState("");
+  const [manualEventType, setManualEventType] = useState<string>("altele");
   const [manualSaving, setManualSaving] = useState(false);
 
   // Resolve entity on mount — venue first, fallback to artist.
@@ -339,6 +343,44 @@ export default function VendorCalendarPage() {
     loadEvents();
   }, [loadEvents]);
 
+  // Load ALL bookings for the visible month so the calendar grid can show
+  // a colored dot per booking (multiple dots on busy days).
+  useEffect(() => {
+    if (!entity || entity.type !== "artist") {
+      setMonthBookingsByDate({});
+      return;
+    }
+    const firstStr = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, "0")}-01`;
+    const lastDate = new Date(
+      currentMonth.year,
+      currentMonth.month + 1,
+      0,
+    ).getDate();
+    const lastStr = `${currentMonth.year}-${String(currentMonth.month + 1).padStart(2, "0")}-${String(lastDate).padStart(2, "0")}`;
+    let cancelled = false;
+    fetch(`/api/booking-requests?artist_id=${entity.id}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: DayBooking[]) => {
+        if (cancelled) return;
+        const grouped: Record<string, DayBooking[]> = {};
+        for (const b of Array.isArray(rows) ? rows : []) {
+          if (!b.eventDate) continue;
+          if (b.eventDate < firstStr || b.eventDate > lastStr) continue;
+          // Ignore cancelled/rejected — they don't occupy the day
+          if (b.status === "rejected" || b.status === "cancelled") continue;
+          (grouped[b.eventDate] = grouped[b.eventDate] || []).push(b);
+        }
+        setMonthBookingsByDate(grouped);
+      })
+      .catch(() => {
+        if (!cancelled) setMonthBookingsByDate({});
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entity, currentMonth, dayBookings]);
+
   const { year, month } = currentMonth;
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
@@ -447,6 +489,7 @@ export default function VendorCalendarPage() {
           packageId: manualPackageId,
           price: priceNum,
           note: manualNote.trim() || undefined,
+          eventType: manualEventType || undefined,
         }),
       });
       if (!res.ok) {
@@ -833,13 +876,26 @@ export default function VendorCalendarPage() {
                     const day = i + 1;
                     const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                     const entry = events[dateStr];
+                    const bookingsForDay = monthBookingsByDate[dateStr] ?? [];
                     const statusCfg = entry ? statusColors[entry.status] : null;
-                    const evCfg = entry?.eventType
-                      ? EVENT_TYPES[entry.eventType]
-                      : null;
+                    const isBlocked = entry?.status === "blocked";
                     const isSelected = selectedDate === dateStr;
                     const isPast = dateStr < todayStr;
                     const isToday = dateStr === todayStr;
+
+                    // Build the list of dots — one per booking, colored by
+                    // event type. Cap at 4; render a "+N" bubble for the rest.
+                    const dots = bookingsForDay
+                      .map((b) => {
+                        const key = b.eventType && EVENT_TYPES[b.eventType]
+                          ? b.eventType
+                          : "altele";
+                        return EVENT_TYPES[key];
+                      })
+                      .filter(Boolean);
+                    const visibleDots = dots.slice(0, 4);
+                    const extraDots = dots.length - visibleDots.length;
+
                     return (
                       <button
                         key={day}
@@ -851,28 +907,60 @@ export default function VendorCalendarPage() {
                           !isPast && isSelected &&
                             "ring-2 ring-gold ring-offset-1 ring-offset-background",
                           !isPast && isToday && "ring-1 ring-gold/50",
-                          statusCfg
-                            ? statusCfg.bg
-                            : isPast
-                              ? "border-border/10"
-                              : "border-border/20 hover:border-gold/30",
-                          // F-S6 — left-border accent for event type
-                          evCfg && `border-l-4 ${evCfg.border}`,
+                          isBlocked
+                            ? "bg-muted/40 border-muted-foreground/40"
+                            : bookingsForDay.length > 0
+                              ? "bg-gold/5 border-gold/30"
+                              : isPast
+                                ? "border-border/10"
+                                : "border-border/20 hover:border-gold/30",
                         )}
                         title={
                           isPast
                             ? "Zilele trecute nu pot fi modificate"
-                            : entry
-                              ? `${statusCfg?.label}${evCfg ? ` · ${evCfg.label}` : ""}${entry.note ? ` — ${entry.note}` : ""}`
-                              : undefined
+                            : isBlocked
+                              ? "Zi blocată"
+                              : bookingsForDay.length > 0
+                                ? `${bookingsForDay.length} ${bookingsForDay.length === 1 ? "rezervare" : "rezervări"}`
+                                : undefined
                         }
                       >
-                        <span className={cn(statusCfg?.color, isToday && !statusCfg && "text-gold font-bold")}>{day}</span>
-                        {evCfg && (
+                        <span
+                          className={cn(
+                            isBlocked && "text-muted-foreground line-through",
+                            !isBlocked && bookingsForDay.length > 0 && "text-gold font-bold",
+                            isToday && !isBlocked && bookingsForDay.length === 0 && "text-gold font-bold",
+                          )}
+                        >
+                          {day}
+                        </span>
+                        {/* Dots for each booking (colored by event type). */}
+                        {visibleDots.length > 0 && (
+                          <div className="mt-1 flex items-center gap-0.5">
+                            {visibleDots.map((cfg, idx) => (
+                              <span
+                                key={idx}
+                                className={cn(
+                                  "h-1.5 w-1.5 rounded-full",
+                                  cfg.dot,
+                                )}
+                              />
+                            ))}
+                            {extraDots > 0 && (
+                              <span className="ml-0.5 text-[9px] font-bold text-gold/80">
+                                +{extraDots}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {/* Fallback: legacy event-type dot from calendar_events
+                            when no bookings exist but the day has a manual
+                            status (e.g. "Blocked"). */}
+                        {visibleDots.length === 0 && statusCfg && !isBlocked && (
                           <span
                             className={cn(
                               "mt-0.5 h-1.5 w-1.5 rounded-full",
-                              evCfg.dot,
+                              "bg-muted-foreground/50",
                             )}
                           />
                         )}
@@ -1019,112 +1107,51 @@ export default function VendorCalendarPage() {
                       </div>
                     )}
 
-                    <div>
-                      <Label>Status</Label>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {Object.entries(statusColors).map(([key, cfg]) => (
-                          <button
-                            key={key}
-                            onClick={() => setSelectedStatus(key)}
-                            className={cn(
-                              "rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
-                              selectedStatus === key
-                                ? `${cfg.bg} ring-1 ring-offset-1`
-                                : "border-border/40",
-                              cfg.color,
-                            )}
-                          >
-                            {cfg.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* F-S6 — Event type picker (only relevant for booked/tentative) */}
-                    {(selectedStatus === "booked" ||
-                      selectedStatus === "tentative") && (
-                      <div>
-                        <Label>Tip eveniment</Label>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {Object.entries(EVENT_TYPES).map(([key, cfg]) => (
-                            <button
-                              key={key}
-                              onClick={() => setSelectedEventType(key)}
-                              className={cn(
-                                "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all",
-                                selectedEventType === key
-                                  ? `border-l-4 ${cfg.border} bg-accent/50`
-                                  : "border-border/40",
-                              )}
-                            >
-                              <span
-                                className={cn("h-2 w-2 rounded-full", cfg.dot)}
-                              />
-                              {cfg.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <Label>Ora început</Label>
-                        <div className="mt-1">
-                          <TimePicker
-                            value={selectedStartTime}
-                            onChange={setSelectedStartTime}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <Label>Ora sfârșit</Label>
-                        <div className="mt-1">
-                          <TimePicker
-                            value={selectedEndTime}
-                            onChange={setSelectedEndTime}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Detalii / Note</Label>
-                      <Input
-                        value={selectedNote}
-                        onChange={(e) => setSelectedNote(e.target.value)}
-                        placeholder="Ex: Nuntă Popescu, Restaurant Codru"
-                      />
-                    </div>
-                    <div className="flex gap-2">
+                    {/* Block-day toggle. Rezervările individuale se adaugă
+                        direct din lista de mai sus; restul controalelor au
+                        fost scoase ca să rămână flow-ul simplu. */}
+                    {events[selectedDate]?.status === "blocked" ? (
                       <Button
-                        onClick={saveDay}
+                        onClick={removeDay}
                         disabled={saving}
-                        className="flex-1 bg-gold text-background hover:bg-gold-dark"
+                        variant="outline"
+                        className="w-full gap-2 border-muted-foreground/40"
                       >
                         {saving ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          <>
-                            <Save className="mr-1 h-4 w-4" /> Salvează Ziua
-                          </>
-                        )}
-                      </Button>
-                      {events[selectedDate] && (
-                        <Button
-                          variant="outline"
-                          className="text-destructive"
-                          onClick={removeDay}
-                          disabled={saving}
-                        >
                           <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
+                        )}
+                        Deblochează ziua
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={async () => {
+                          setSelectedStatus("blocked");
+                          setSelectedEventType("");
+                          setSelectedNote("Zi blocată");
+                          setSelectedStartTime("00:00");
+                          setSelectedEndTime("23:59");
+                          // Defer actual save to the next tick so state is current
+                          setTimeout(saveDay, 0);
+                        }}
+                        disabled={saving}
+                        variant="outline"
+                        className="w-full gap-2 border-destructive/40 text-destructive hover:bg-destructive/10"
+                      >
+                        {saving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
+                        Blochează ziua (vacanță)
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Click pe o zi din calendar pentru a seta disponibilitatea,
-                    tipul evenimentului și detaliile.
+                    Click pe o zi din calendar pentru a vedea rezervările și
+                    pentru a adăuga altele noi.
                   </p>
                 )}
               </CardContent>
@@ -1446,6 +1473,34 @@ export default function VendorCalendarPage() {
                   placeholder="Preluat automat din pachet"
                   className="mt-1"
                 />
+              </div>
+
+              {/* Event type — drives the dot color on the calendar grid */}
+              <div>
+                <Label className="text-xs">Tip eveniment</Label>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {Object.entries(EVENT_TYPES).map(([key, cfg]) => {
+                    const selected = manualEventType === key;
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setManualEventType(key)}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs transition-all",
+                          selected
+                            ? "border-gold bg-gold/10"
+                            : "border-border/40 hover:border-gold/40",
+                        )}
+                      >
+                        <span
+                          className={cn("h-2 w-2 rounded-full", cfg.dot)}
+                        />
+                        {cfg.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Note */}
