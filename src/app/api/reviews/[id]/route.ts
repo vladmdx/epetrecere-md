@@ -1,9 +1,50 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { reviews, artists, users } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { reviews, artists, venues, users } from "@/lib/db/schema";
+import { eq, and, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
+
+/**
+ * Recompute rating_avg + rating_count for the artist or venue this review
+ * belongs to, based on ONLY approved reviews. Called after approve / delete
+ * so the public card reflects the latest aggregate immediately.
+ */
+async function refreshRatingAggregate(review: {
+  artistId: number | null;
+  venueId: number | null;
+}) {
+  if (review.artistId) {
+    await db.execute(sql`
+      UPDATE artists
+      SET rating_avg = COALESCE((
+        SELECT AVG(rating)::numeric(3,2)
+        FROM reviews
+        WHERE artist_id = ${review.artistId} AND is_approved = true
+      ), 0),
+      rating_count = COALESCE((
+        SELECT COUNT(*) FROM reviews
+        WHERE artist_id = ${review.artistId} AND is_approved = true
+      ), 0)
+      WHERE id = ${review.artistId}
+    `);
+  }
+  if (review.venueId) {
+    await db.execute(sql`
+      UPDATE venues
+      SET rating_avg = COALESCE((
+        SELECT AVG(rating)::numeric(3,2)
+        FROM reviews
+        WHERE venue_id = ${review.venueId} AND is_approved = true
+      ), 0),
+      rating_count = COALESCE((
+        SELECT COUNT(*) FROM reviews
+        WHERE venue_id = ${review.venueId} AND is_approved = true
+      ), 0)
+      WHERE id = ${review.venueId}
+    `);
+  }
+}
 
 // Approve / reject review — admin only; Reply — admin OR artist owner
 export async function PUT(
@@ -19,11 +60,27 @@ export async function PUT(
     const admin = await requireAdmin();
     if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
 
+    // Capture the target before mutation so we know which aggregate to refresh.
+    const [target] = await db
+      .select({
+        artistId: reviews.artistId,
+        venueId: reviews.venueId,
+      })
+      .from(reviews)
+      .where(eq(reviews.id, Number(id)))
+      .limit(1);
+    if (!target) {
+      return NextResponse.json({ error: "Review not found" }, { status: 404 });
+    }
+
     if (action === "approve") {
       await db.update(reviews).set({ isApproved: true }).where(eq(reviews.id, Number(id)));
     } else {
       await db.delete(reviews).where(eq(reviews.id, Number(id)));
     }
+    // Recompute aggregate so the artist/venue card shows the new rating
+    // immediately, no manual job or re-index needed.
+    await refreshRatingAggregate(target);
     return NextResponse.json({ success: true });
   }
 
@@ -65,6 +122,15 @@ export async function DELETE(
   if (!admin.ok) return NextResponse.json({ error: admin.error }, { status: admin.status });
 
   const { id } = await params;
+  const [target] = await db
+    .select({ artistId: reviews.artistId, venueId: reviews.venueId })
+    .from(reviews)
+    .where(eq(reviews.id, Number(id)))
+    .limit(1);
+  if (!target) {
+    return NextResponse.json({ error: "Review not found" }, { status: 404 });
+  }
   await db.delete(reviews).where(eq(reviews.id, Number(id)));
+  await refreshRatingAggregate(target);
   return NextResponse.json({ success: true });
 }
