@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, User, Phone, Clock, Euro, CheckCircle, XCircle, Loader2, MessageSquare, Send, HandCoins, ArrowLeftRight } from "lucide-react";
+import { Calendar, User, Clock, Euro, CheckCircle, XCircle, Loader2, MessageSquare, Send, HandCoins, ArrowLeftRight } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -488,7 +488,6 @@ export default function VendorBookingsPage() {
                           </span>
                         )}
                         <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> {booking.clientName}</span>
-                        {booking.clientPhone && <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" /> {booking.clientPhone}</span>}
                         {booking.guestCount != null && <span>{booking.guestCount} invitați</span>}
                       </div>
                       {booking.message && (
@@ -730,12 +729,6 @@ export default function VendorBookingsPage() {
                       </>
                     )}
 
-                  {acceptDialog.clientPhone && (
-                    <>
-                      <span className="text-muted-foreground">Telefon:</span>
-                      <span>{acceptDialog.clientPhone}</span>
-                    </>
-                  )}
                 </div>
                 {acceptDialog.message && (
                   <p className="mt-3 border-t border-border/30 pt-2 text-xs italic text-muted-foreground">

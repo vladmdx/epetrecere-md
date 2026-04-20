@@ -139,7 +139,19 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(bookingRequests.createdAt))
     .limit(50);
 
-  return NextResponse.json(result);
+  // Privacy: hide client contact from the artist. All communication between
+  // the parties must happen through the in-app chat. Only admins (and the
+  // client themselves, via client_email query) see real contact data.
+  const redact = !isAdmin && !!artistId;
+  const payload = redact
+    ? result.map((row) => ({
+        ...row,
+        clientPhone: null,
+        clientEmail: null,
+      }))
+    : result;
+
+  return NextResponse.json(payload);
 }
 
 // CREATE booking request

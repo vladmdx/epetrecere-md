@@ -828,14 +828,6 @@ export default function VendorCalendarPage() {
                                       </span>
                                     )}
                                   </div>
-                                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-muted-foreground/80">
-                                    {b.clientPhone && (
-                                      <span>📞 {b.clientPhone}</span>
-                                    )}
-                                    {b.clientEmail && (
-                                      <span>✉️ {b.clientEmail}</span>
-                                    )}
-                                  </div>
                                   {b.message && (
                                     <p className="mt-1 text-muted-foreground/80 italic">
                                       “{b.message}”
