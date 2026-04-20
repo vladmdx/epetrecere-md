@@ -667,6 +667,11 @@ export const bookingRequests = pgTable("booking_requests", {
   artistReply: text("artist_reply"),
   adminNotes: text("admin_notes"),
   adminSeen: boolean("admin_seen").default(false).notNull(),
+  /** Who created the row.
+   *   "client"  — standard client-submitted request (default)
+   *   "manual"  — artist added it directly on the calendar (private block
+   *                with a note and preset duration/price from their tarife) */
+  source: text("source").default("client").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [

@@ -128,6 +128,7 @@ export async function GET(req: NextRequest) {
       artistReply: bookingRequests.artistReply,
       adminNotes: bookingRequests.adminNotes,
       adminSeen: bookingRequests.adminSeen,
+      source: bookingRequests.source,
       createdAt: bookingRequests.createdAt,
       updatedAt: bookingRequests.updatedAt,
       artistName: artists.nameRo,

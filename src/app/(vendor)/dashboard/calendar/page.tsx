@@ -9,6 +9,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
   ChevronLeft,
   ChevronRight,
   Save,
@@ -188,9 +196,26 @@ export default function VendorCalendarPage() {
     guestCount: number | null;
     message: string | null;
     agreedPrice: number | null;
+    source?: string;
   }
   const [dayBookings, setDayBookings] = useState<DayBooking[]>([]);
   const [dayBookingsLoading, setDayBookingsLoading] = useState(false);
+
+  // Manual-booking dialog state
+  interface ArtistPackage {
+    id: number;
+    nameRo: string | null;
+    price: number | null;
+    durationHours: number | null;
+    durationMinutes: number | null;
+  }
+  const [packages, setPackages] = useState<ArtistPackage[]>([]);
+  const [manualDialog, setManualDialog] = useState(false);
+  const [manualStartTime, setManualStartTime] = useState("18:00");
+  const [manualPackageId, setManualPackageId] = useState<number | null>(null);
+  const [manualPrice, setManualPrice] = useState<string>("");
+  const [manualNote, setManualNote] = useState("");
+  const [manualSaving, setManualSaving] = useState(false);
 
   // Resolve entity on mount — venue first, fallback to artist.
   useEffect(() => {
@@ -227,6 +252,39 @@ export default function VendorCalendarPage() {
       cancelled = true;
     };
   }, []);
+
+  // Load the artist's pricing packages so the manual-booking dialog can
+  // offer durations & auto-priced tiers.
+  useEffect(() => {
+    if (!entity || entity.type !== "artist") return;
+    let cancelled = false;
+    fetch(`/api/artist-packages?artist_id=${entity.id}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: ArtistPackage[]) => {
+        if (cancelled) return;
+        const valid = (Array.isArray(rows) ? rows : []).filter((p) => {
+          const total =
+            Math.round((p.durationHours ?? 0) * 60) +
+            (p.durationMinutes ?? 0);
+          return total > 0;
+        });
+        valid.sort((a, b) => {
+          const am =
+            Math.round((a.durationHours ?? 0) * 60) +
+            (a.durationMinutes ?? 0);
+          const bm =
+            Math.round((b.durationHours ?? 0) * 60) +
+            (b.durationMinutes ?? 0);
+          return am - bm;
+        });
+        setPackages(valid);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entity]);
 
   // Load work schedule from server when entity is resolved
   useEffect(() => {
@@ -335,6 +393,94 @@ export default function VendorCalendarPage() {
       setSelectedNote("");
       setSelectedStartTime("10:00");
       setSelectedEndTime("22:00");
+    }
+  }
+
+  // Selected package → auto-fill price in the manual booking form
+  const selectedManualPackage = packages.find((p) => p.id === manualPackageId);
+  useEffect(() => {
+    if (selectedManualPackage?.price != null) {
+      setManualPrice(String(selectedManualPackage.price));
+    }
+  }, [selectedManualPackage]);
+
+  async function refreshDayBookings() {
+    if (!entity || entity.type !== "artist" || !selectedDate) return;
+    try {
+      const r = await fetch(`/api/booking-requests?artist_id=${entity.id}`);
+      if (!r.ok) return;
+      const rows: DayBooking[] = await r.json();
+      setDayBookings(
+        (Array.isArray(rows) ? rows : []).filter(
+          (b) => b.eventDate === selectedDate,
+        ),
+      );
+    } catch {
+      // silent
+    }
+  }
+
+  async function submitManualBooking() {
+    if (!entity || entity.type !== "artist" || !selectedDate) return;
+    if (manualPackageId == null) {
+      toast.error("Alege durata (pachetul).");
+      return;
+    }
+    if (!/^\d{2}:\d{2}$/.test(manualStartTime)) {
+      toast.error("Setează ora de început.");
+      return;
+    }
+    const priceNum = manualPrice === "" ? null : Number(manualPrice);
+    if (priceNum != null && (!Number.isFinite(priceNum) || priceNum < 0)) {
+      toast.error("Preț invalid.");
+      return;
+    }
+    setManualSaving(true);
+    try {
+      const res = await fetch("/api/artist-bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          artistId: entity.id,
+          eventDate: selectedDate,
+          startTime: manualStartTime,
+          packageId: manualPackageId,
+          price: priceNum,
+          note: manualNote.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut adăuga rezervarea");
+        return;
+      }
+      toast.success("Rezervare adăugată");
+      setManualDialog(false);
+      setManualNote("");
+      setManualPackageId(null);
+      setManualPrice("");
+      await Promise.all([refreshDayBookings(), loadEvents()]);
+    } catch {
+      toast.error("Eroare la salvare");
+    } finally {
+      setManualSaving(false);
+    }
+  }
+
+  async function deleteManualBooking(id: number) {
+    if (!confirm("Sigur ștergi această rezervare manuală?")) return;
+    try {
+      const res = await fetch(`/api/artist-bookings?id=${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        toast.error("Nu s-a putut șterge rezervarea");
+        return;
+      }
+      toast.success("Rezervare ștearsă");
+      await refreshDayBookings();
+    } catch {
+      toast.error("Eroare la ștergere");
     }
   }
 
@@ -750,15 +896,29 @@ export default function VendorCalendarPage() {
                     {/* Bookings for this date (only for artists) */}
                     {entity?.type === "artist" && (
                       <div className="rounded-lg border border-border/40 bg-background/40 p-3">
-                        <div className="mb-2 flex items-center justify-between">
-                          <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             Rezervări pe {selectedDate}
+                            {!dayBookingsLoading && (
+                              <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
+                                {dayBookings.length}
+                              </span>
+                            )}
                           </span>
-                          {!dayBookingsLoading && (
-                            <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
-                              {dayBookings.length}
-                            </span>
-                          )}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              // Prefill time from currently-selected range or default
+                              setManualStartTime(
+                                selectedStartTime || "18:00",
+                              );
+                              setManualDialog(true);
+                            }}
+                            className="gap-1 border-gold/40 text-gold hover:bg-gold/10"
+                          >
+                            + Adaugă rezervare
+                          </Button>
                         </div>
                         {dayBookingsLoading ? (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -801,17 +961,34 @@ export default function VendorCalendarPage() {
                                   className="rounded-md border border-border/30 bg-card/60 p-2.5 text-xs"
                                 >
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="font-heading font-bold text-sm">
+                                    <span className="flex items-center gap-2 font-heading font-bold text-sm">
                                       {b.clientName}
-                                    </span>
-                                    <span
-                                      className={cn(
-                                        "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                                        statusColor,
+                                      {b.source === "manual" && (
+                                        <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
+                                          Manual
+                                        </span>
                                       )}
-                                    >
-                                      {statusLabel}
                                     </span>
+                                    <div className="flex items-center gap-1.5">
+                                      <span
+                                        className={cn(
+                                          "rounded-full px-2 py-0.5 text-[10px] font-bold",
+                                          statusColor,
+                                        )}
+                                      >
+                                        {statusLabel}
+                                      </span>
+                                      {b.source === "manual" && (
+                                        <button
+                                          type="button"
+                                          onClick={() => deleteManualBooking(b.id)}
+                                          className="rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                          title="Șterge rezervarea manuală"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      )}
+                                    </div>
                                   </div>
                                   <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-muted-foreground">
                                     {b.startTime && b.endTime && (
@@ -1182,6 +1359,168 @@ export default function VendorCalendarPage() {
         )}
       </Tabs>
 
+      {/* ─── Manual booking dialog ─────────────────────────────── */}
+      <Dialog open={manualDialog} onOpenChange={setManualDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adaugă rezervare manuală</DialogTitle>
+          </DialogHeader>
+          {selectedDate && (
+            <div className="space-y-3 py-2">
+              <div className="rounded-md border border-border/40 bg-background/60 px-3 py-2 text-xs">
+                <span className="text-muted-foreground">Ziua:</span>{" "}
+                <span className="font-medium">{selectedDate}</span>
+              </div>
+
+              {/* Start time */}
+              <div>
+                <Label className="text-xs">Ora de început *</Label>
+                <div className="mt-1">
+                  <TimePicker
+                    value={manualStartTime}
+                    onChange={setManualStartTime}
+                  />
+                </div>
+              </div>
+
+              {/* Duration — pick a package */}
+              <div>
+                <Label className="text-xs">Durata (pachet) *</Label>
+                {packages.length === 0 ? (
+                  <p className="mt-1 rounded-md border border-dashed border-border/40 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
+                    Nu ai pachete definite. Adaugă tarife la{" "}
+                    <a
+                      href="/dashboard/tarife"
+                      className="text-gold underline"
+                    >
+                      /dashboard/tarife
+                    </a>
+                    .
+                  </p>
+                ) : (
+                  <div className="mt-1 grid grid-cols-2 gap-1.5">
+                    {packages.map((p) => {
+                      const totalMin =
+                        Math.round((p.durationHours ?? 0) * 60) +
+                        (p.durationMinutes ?? 0);
+                      const label =
+                        totalMin < 60
+                          ? `${totalMin} min`
+                          : totalMin % 60 === 0
+                            ? `${Math.floor(totalMin / 60)}h`
+                            : `${Math.floor(totalMin / 60)}h ${totalMin % 60}m`;
+                      const selected = manualPackageId === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setManualPackageId(p.id)}
+                          className={cn(
+                            "flex items-baseline justify-between gap-2 rounded-md border px-3 py-2 text-sm transition-all",
+                            selected
+                              ? "border-gold bg-gold/10 text-gold"
+                              : "border-border/40 hover:border-gold/40",
+                          )}
+                        >
+                          <span className="font-heading font-bold">
+                            {label}
+                          </span>
+                          {p.price != null && (
+                            <span className="text-xs">{p.price}€</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Price (auto-filled, editable) */}
+              <div>
+                <Label className="text-xs">Preț (€)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={manualPrice}
+                  onChange={(e) => setManualPrice(e.target.value)}
+                  placeholder="Preluat automat din pachet"
+                  className="mt-1"
+                />
+              </div>
+
+              {/* Note */}
+              <div>
+                <Label className="text-xs">
+                  Note (ex: Nuntă Popescu, Restaurant Codru)
+                </Label>
+                <Textarea
+                  value={manualNote}
+                  onChange={(e) => setManualNote(e.target.value)}
+                  rows={2}
+                  maxLength={500}
+                  className="mt-1"
+                  placeholder="Detalii despre rezervare…"
+                />
+              </div>
+
+              {/* Summary */}
+              {manualPackageId != null && (() => {
+                const pkg = packages.find((p) => p.id === manualPackageId);
+                if (!pkg) return null;
+                const totalMin =
+                  Math.round((pkg.durationHours ?? 0) * 60) +
+                  (pkg.durationMinutes ?? 0);
+                const [h, m] = manualStartTime.split(":").map(Number);
+                const endMin = h * 60 + m + totalMin;
+                const eh = Math.floor(endMin / 60) % 24;
+                const em = endMin % 60;
+                const endStr = `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
+                return (
+                  <div className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs">
+                    Interval:{" "}
+                    <strong>{manualStartTime}</strong>
+                    {" – "}
+                    <strong>{endStr}</strong>
+                    {manualPrice && (
+                      <>
+                        {" · "}
+                        <span className="font-bold text-gold">
+                          {manualPrice}€
+                        </span>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setManualDialog(false)}
+              disabled={manualSaving}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={submitManualBooking}
+              disabled={
+                manualSaving ||
+                manualPackageId == null ||
+                !manualStartTime
+              }
+              className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+            >
+              {manualSaving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Save className="h-4 w-4" />
+              )}
+              Salvează
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
