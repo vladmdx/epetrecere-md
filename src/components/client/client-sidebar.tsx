@@ -21,6 +21,7 @@ import {
   PartyPopper,
   Archive,
   ChevronRight,
+  Settings,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -42,6 +43,7 @@ const toolsNav = [
   { href: "/cabinet/moments", icon: Camera, label: "Momente Eveniment" },
   { href: "/cabinet/furnizori", icon: Armchair, label: "Furnizori" },
   { href: "/cabinet/date", icon: Shield, label: "Confidențialitate" },
+  { href: "/cabinet/setari", icon: Settings, label: "Setări" },
 ] as const;
 
 interface PlanSummary {

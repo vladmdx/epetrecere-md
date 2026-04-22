@@ -155,6 +155,8 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--user-font, var(--font-sans));
+    font-size: calc(16px * var(--user-text-scale, 1));
   }
   html {
     @apply font-sans;

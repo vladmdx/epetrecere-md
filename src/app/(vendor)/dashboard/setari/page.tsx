@@ -30,6 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Save, Loader2, SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
 import { IcalSubscribeCard } from "@/components/vendor/ical-subscribe-card";
+import { AppearanceSettings } from "@/components/shared/appearance-settings";
 
 type ArtistSettings = {
   kind: "artist";
@@ -320,6 +321,8 @@ export default function VendorSettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      <AppearanceSettings />
     </div>
   );
 }

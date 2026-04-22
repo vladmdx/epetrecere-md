@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Save, Palette, Globe, BarChart3, Mail, Loader2, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
+import { AppearanceSettings } from "@/components/shared/appearance-settings";
 
 type Settings = Record<string, string>;
 
@@ -263,6 +264,8 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AppearanceSettings />
     </div>
   );
 }

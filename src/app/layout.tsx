@@ -3,6 +3,7 @@ import "@/lib/env"; // Validate env vars at startup
 import { Playfair_Display, DM_Sans, Cormorant_Garamond } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { LocaleProvider } from "@/hooks/use-locale";
+import { PreferencesProvider } from "@/hooks/use-preferences";
 import { ClerkProvider } from "@clerk/nextjs";
 import { roRO } from "@clerk/localizations";
 import { CookieConsent } from "@/components/shared/cookie-consent";
@@ -57,11 +58,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" localization={roRO}><ThemeProvider><LocaleProvider>
+        <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" localization={roRO}><ThemeProvider><LocaleProvider><PreferencesProvider>
           {children}
           <CookieConsent />
           <Toaster />
-        </LocaleProvider></ThemeProvider></ClerkProvider>
+        </PreferencesProvider></LocaleProvider></ThemeProvider></ClerkProvider>
       </body>
     </html>
   );
