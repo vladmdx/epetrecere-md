@@ -17,10 +17,10 @@ import {
   bookingRequests,
   eventPlans,
   users,
-  artistAvailabilitySlots,
+  calendarEvents,
   categories,
 } from "@/lib/db/schema";
-import { and, eq, gte, lte, inArray } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 
 function getClient() {
@@ -185,14 +185,15 @@ ${artistCategoriesList}
 
 Reguli:
 1. Limba română. Răspunsuri scurte și prietenoase.
-2. Când clientul cere recomandări, apelează \`list_available_artists\` cu filtre explicite. Poți filtra pe \`categoryNames\` (ex: ['DJ', 'Fotograf']) — este mai natural decât ID-uri.
-3. Rezultatele includ: nume, rating, preț, categorii (nume complet), locație, status verificat/premium, descriere. Folosește aceste date pentru a ordona și recomanda.
-4. După ce primești lista, prezintă top 3-5 alegeri relevante CA TEXT (nume, categorie, rating, preț, motiv scurt). NU trimite cereri automat.
-5. Cere confirmarea clientului: "Să trimit cererile?". Doar apoi apelezi \`send_booking_requests\`.
-6. Dacă rezultatele sunt puține sau nepotrivite, sugerează ajustări (alt preț, categorii diferite, scade ratingul minim).
-7. Mesajul din send_booking_requests trebuie să includă data evenimentului și tipul. Ex: "Salut! Plan ${plan.title} pe ${plan.eventDate}."
-8. NU rezerva pentru date din trecut.
-9. Artiști **verificați** (isVerified=true) sau **premium** (isPremium=true) sunt un semnal de încredere — menționează-i în recomandări.`;
+2. Când clientul cere recomandări, apelează \`list_available_artists\` cu filtre explicite. Poți filtra pe \`categoryNames\` (ex: ['Fotograf']) — este mai natural decât ID-uri.
+3. **IMPORTANT**: Dacă clientul cere artiști din MAI MULTE categorii (ex: "2 fotografi și 3 artiști de show program"), apelează \`list_available_artists\` o dată per categorie (cu un singur \`categoryNames\`). Nu încerca să le combini într-un singur apel.
+4. Rezultatele sunt deja sortate după preț ascendent și includ: nume, rating, preț, categorii (nume complet), locație, status verificat/premium, descriere. Lista returnată arată EXACT artiștii disponibili pentru data evenimentului clientului — lista este identică cu ce vede clientul pe pagina "Artiști disponibili".
+5. După ce primești listele, prezintă top alegeri relevante CA TEXT (nume, categorie, rating, preț, motiv scurt). NU trimite cereri automat.
+6. Cere confirmarea clientului: "Să trimit cererile?". Doar apoi apelezi \`send_booking_requests\`.
+7. Dacă rezultatele sunt puține sau nepotrivite, sugerează ajustări (alt preț, categorii diferite, scade ratingul minim).
+8. Mesajul din send_booking_requests trebuie să includă data evenimentului și tipul. Ex: "Salut! Plan ${plan.title} pe ${plan.eventDate}."
+9. NU rezerva pentru date din trecut.
+10. Artiști **verificați** (isVerified=true) sau **premium** (isPremium=true) sunt un semnal de încredere — menționează-i în recomandări.`;
 
   const client = getClient();
   const conversation: Anthropic.Messages.MessageParam[] = incoming.map((m) => ({
@@ -203,7 +204,7 @@ Reguli:
   let requestsSent = 0;
   let iterations = 0;
 
-  while (iterations < 6) {
+  while (iterations < 10) {
     iterations++;
     let resp: Anthropic.Messages.Message;
     try {
@@ -267,13 +268,27 @@ Reguli:
         }
       }
 
-      // Fetch artists
+      // Fetch artists — use the SAME availability filter as /api/artists
+      // (exclude artists with calendar_events.status booked/blocked on the
+      // plan's date). This matches what the client sees on the "Artiști
+      // disponibili" discovery page.
       const where = [eq(artists.isActive, true)];
       if (typeof input.minRating === "number") {
         where.push(gte(artists.ratingAvg, input.minRating));
       }
       if (typeof input.maxPrice === "number") {
         where.push(lte(artists.priceFrom, input.maxPrice));
+      }
+      if (plan.eventDate) {
+        const dateStr = plan.eventDate;
+        where.push(
+          sql`${artists.id} NOT IN (
+            SELECT ${calendarEvents.entityId} FROM ${calendarEvents}
+            WHERE ${calendarEvents.entityType} = 'artist'
+            AND ${calendarEvents.date} = ${dateStr}
+            AND ${calendarEvents.status} IN ('booked', 'blocked')
+          )`,
+        );
       }
 
       let found = await db
@@ -293,7 +308,7 @@ Reguli:
         })
         .from(artists)
         .where(and(...where))
-        .limit(60);
+        .limit(200); // allow larger pool so category filter can narrow down
 
       // Filter by resolved category IDs (if any requested)
       if (resolvedCategoryIds.size > 0) {
@@ -302,26 +317,8 @@ Reguli:
         );
       }
 
-      // Intersect with slot availability when we have a date.
-      if (plan.eventDate && found.length > 0) {
-        const freeArtistIds = await db
-          .select({ artistId: artistAvailabilitySlots.artistId })
-          .from(artistAvailabilitySlots)
-          .where(
-            and(
-              eq(artistAvailabilitySlots.date, plan.eventDate),
-              eq(artistAvailabilitySlots.isBooked, false),
-              inArray(
-                artistAvailabilitySlots.artistId,
-                found.map((f) => f.id),
-              ),
-            ),
-          );
-        const freeSet = new Set(freeArtistIds.map((x) => x.artistId));
-        if (freeSet.size > 0) {
-          found = found.filter((a) => freeSet.has(a.id));
-        }
-      }
+      // Sort by price ascending by default (AI often asks for "cei mai ieftini")
+      found.sort((a, b) => (a.priceFrom ?? Number.POSITIVE_INFINITY) - (b.priceFrom ?? Number.POSITIVE_INFINITY));
 
       // Truncate description to keep tokens reasonable
       const truncate = (s: string | null, n: number) =>
@@ -329,7 +326,7 @@ Reguli:
 
       toolResult = JSON.stringify({
         count: found.length,
-        artists: found.slice(0, 15).map((a) => ({
+        artists: found.slice(0, 30).map((a) => ({
           id: a.id,
           name: a.name,
           rating: Number(a.ratingAvg ?? 0).toFixed(1),
