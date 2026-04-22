@@ -257,159 +257,167 @@ Reguli:
 
     if (resp.stop_reason !== "tool_use") break;
 
-    const toolUse = resp.content.find(
+    // Handle ALL tool_use blocks in this assistant message (Claude can make
+    // parallel calls). Anthropic requires a tool_result for every tool_use id.
+    const toolUses = resp.content.filter(
       (b): b is Anthropic.Messages.ToolUseBlock => b.type === "tool_use",
     );
-    if (!toolUse) break;
+    if (toolUses.length === 0) break;
 
-    // ─── Tool dispatch ────────────────────────────────────────
-    let toolResult: string;
+    const toolResults: Anthropic.Messages.ToolResultBlockParam[] = [];
 
-    if (toolUse.name === "list_available_artists") {
-      const input = toolUse.input as {
-        maxPrice?: number;
-        minRating?: number;
-        categoryIds?: number[];
-        categoryNames?: string[];
-      };
+    for (const toolUse of toolUses) {
+      let toolResult: string;
 
-      // Resolve categoryNames to IDs (case-insensitive partial match)
-      const resolvedCategoryIds = new Set<number>(input.categoryIds ?? []);
-      if (input.categoryNames && input.categoryNames.length > 0) {
-        const namesLower = input.categoryNames.map((n) => n.toLowerCase().trim());
-        for (const c of allCategories) {
-          if (
-            c.type === "artist" &&
-            namesLower.some(
-              (n) => c.nameRo.toLowerCase().includes(n) || n.includes(c.nameRo.toLowerCase()),
-            )
-          ) {
-            resolvedCategoryIds.add(c.id);
+      if (toolUse.name === "list_available_artists") {
+        const input = toolUse.input as {
+          maxPrice?: number;
+          minRating?: number;
+          categoryIds?: number[];
+          categoryNames?: string[];
+        };
+
+        // Resolve categoryNames to IDs (case-insensitive partial match)
+        const resolvedCategoryIds = new Set<number>(input.categoryIds ?? []);
+        if (input.categoryNames && input.categoryNames.length > 0) {
+          const namesLower = input.categoryNames.map((n) => n.toLowerCase().trim());
+          for (const c of allCategories) {
+            if (
+              c.type === "artist" &&
+              namesLower.some(
+                (n) => c.nameRo.toLowerCase().includes(n) || n.includes(c.nameRo.toLowerCase()),
+              )
+            ) {
+              resolvedCategoryIds.add(c.id);
+            }
           }
         }
-      }
 
-      // Fetch artists — use the SAME availability filter as /api/artists
-      // (exclude artists with calendar_events.status booked/blocked on the
-      // plan's date). This matches what the client sees on the "Artiști
-      // disponibili" discovery page.
-      const where = [eq(artists.isActive, true)];
-      if (typeof input.minRating === "number") {
-        where.push(gte(artists.ratingAvg, input.minRating));
-      }
-      if (typeof input.maxPrice === "number") {
-        where.push(lte(artists.priceFrom, input.maxPrice));
-      }
-      if (plan.eventDate) {
-        // Normalise Date -> "YYYY-MM-DD" in case drizzle returns a Date
-        const dateStr = typeof plan.eventDate === "string"
-          ? plan.eventDate
-          : new Date(plan.eventDate).toISOString().split("T")[0];
-        where.push(
-          sql`${artists.id} NOT IN (
-            SELECT ${calendarEvents.entityId} FROM ${calendarEvents}
-            WHERE ${calendarEvents.entityType} = 'artist'
-            AND ${calendarEvents.date} = ${dateStr}
-            AND ${calendarEvents.status} IN ('booked', 'blocked')
-          )`,
+        // Fetch artists — use the SAME availability filter as /api/artists
+        const where = [eq(artists.isActive, true)];
+        if (typeof input.minRating === "number") {
+          where.push(gte(artists.ratingAvg, input.minRating));
+        }
+        if (typeof input.maxPrice === "number") {
+          where.push(lte(artists.priceFrom, input.maxPrice));
+        }
+        if (plan.eventDate) {
+          const dateStr =
+            typeof plan.eventDate === "string"
+              ? plan.eventDate
+              : new Date(plan.eventDate).toISOString().split("T")[0];
+          where.push(
+            sql`${artists.id} NOT IN (
+              SELECT ${calendarEvents.entityId} FROM ${calendarEvents}
+              WHERE ${calendarEvents.entityType} = 'artist'
+              AND ${calendarEvents.date} = ${dateStr}
+              AND ${calendarEvents.status} IN ('booked', 'blocked')
+            )`,
+          );
+        }
+
+        let found = await db
+          .select({
+            id: artists.id,
+            name: artists.nameRo,
+            slug: artists.slug,
+            priceFrom: artists.priceFrom,
+            ratingAvg: artists.ratingAvg,
+            ratingCount: artists.ratingCount,
+            categoryIds: artists.categoryIds,
+            location: artists.location,
+            isVerified: artists.isVerified,
+            isPremium: artists.isPremium,
+            isFeatured: artists.isFeatured,
+            description: artists.descriptionRo,
+          })
+          .from(artists)
+          .where(and(...where))
+          .limit(200);
+
+        if (resolvedCategoryIds.size > 0) {
+          found = found.filter((a) =>
+            (a.categoryIds ?? []).some((cid) => resolvedCategoryIds.has(cid)),
+          );
+        }
+
+        found.sort(
+          (a, b) =>
+            (a.priceFrom ?? Number.POSITIVE_INFINITY) -
+            (b.priceFrom ?? Number.POSITIVE_INFINITY),
         );
-      }
 
-      let found = await db
-        .select({
-          id: artists.id,
-          name: artists.nameRo,
-          slug: artists.slug,
-          priceFrom: artists.priceFrom,
-          ratingAvg: artists.ratingAvg,
-          ratingCount: artists.ratingCount,
-          categoryIds: artists.categoryIds,
-          location: artists.location,
-          isVerified: artists.isVerified,
-          isPremium: artists.isPremium,
-          isFeatured: artists.isFeatured,
-          description: artists.descriptionRo,
-        })
-        .from(artists)
-        .where(and(...where))
-        .limit(200); // allow larger pool so category filter can narrow down
+        const truncate = (s: string | null, n: number) =>
+          s ? (s.length > n ? s.slice(0, n) + "…" : s) : null;
 
-      // Filter by resolved category IDs (if any requested)
-      if (resolvedCategoryIds.size > 0) {
-        found = found.filter((a) =>
-          (a.categoryIds ?? []).some((cid) => resolvedCategoryIds.has(cid)),
-        );
-      }
-
-      // Sort by price ascending by default (AI often asks for "cei mai ieftini")
-      found.sort((a, b) => (a.priceFrom ?? Number.POSITIVE_INFINITY) - (b.priceFrom ?? Number.POSITIVE_INFINITY));
-
-      // Truncate description to keep tokens reasonable
-      const truncate = (s: string | null, n: number) =>
-        s ? (s.length > n ? s.slice(0, n) + "…" : s) : null;
-
-      toolResult = JSON.stringify({
-        count: found.length,
-        artists: found.slice(0, 30).map((a) => ({
-          id: a.id,
-          name: a.name,
-          rating: Number(a.ratingAvg ?? 0).toFixed(1),
-          ratingCount: a.ratingCount ?? 0,
-          priceFrom: a.priceFrom,
-          categories: (a.categoryIds ?? [])
-            .map((cid) => categoryMap.get(cid)?.nameRo)
-            .filter(Boolean),
-          location: a.location,
-          isVerified: a.isVerified,
-          isPremium: a.isPremium,
-          isFeatured: a.isFeatured,
-          description: truncate(a.description, 200),
-        })),
-      });
-    } else if (toolUse.name === "send_booking_requests") {
-      const input = toolUse.input as {
-        artistIds?: number[];
-        message?: string;
-      };
-      const ids = (input.artistIds ?? []).filter(
-        (x) => typeof x === "number" && x > 0,
-      );
-      const msg = input.message ?? `Cerere din planul "${plan.title}".`;
-      if (ids.length === 0 || !plan.eventDate) {
-        toolResult = "Eroare: niciun artist sau lipsește data planului.";
-      } else {
-        const clientName = appUser.name ?? "Client ePetrecere";
-        await db.insert(bookingRequests).values(
-          ids.map((artistId) => ({
-            artistId,
-            eventPlanId: plan.id,
-            clientUserId: appUser.id,
-            clientName,
-            clientPhone: appUser.phone ?? "—",
-            clientEmail: appUser.email ?? null,
-            eventDate: plan.eventDate!,
-            eventType: plan.eventType ?? null,
-            guestCount: plan.guestCountTarget ?? null,
-            message: msg,
-            status: "pending" as const,
+        toolResult = JSON.stringify({
+          count: found.length,
+          artists: found.slice(0, 30).map((a) => ({
+            id: a.id,
+            name: a.name,
+            rating: Number(a.ratingAvg ?? 0).toFixed(1),
+            ratingCount: a.ratingCount ?? 0,
+            priceFrom: a.priceFrom,
+            categories: (a.categoryIds ?? [])
+              .map((cid) => categoryMap.get(cid)?.nameRo)
+              .filter(Boolean),
+            location: a.location,
+            isVerified: a.isVerified,
+            isPremium: a.isPremium,
+            isFeatured: a.isFeatured,
+            description: truncate(a.description, 200),
           })),
+        });
+      } else if (toolUse.name === "send_booking_requests") {
+        const input = toolUse.input as {
+          artistIds?: number[];
+          message?: string;
+        };
+        const ids = (input.artistIds ?? []).filter(
+          (x) => typeof x === "number" && x > 0,
         );
-        requestsSent += ids.length;
-        toolResult = `Am trimis ${ids.length} cereri de rezervare. Artiștii vor răspunde cu ofertele lor.`;
+        const msg = input.message ?? `Cerere din planul "${plan.title}".`;
+        if (ids.length === 0 || !plan.eventDate) {
+          toolResult = "Eroare: niciun artist sau lipsește data planului.";
+        } else {
+          const clientName = appUser.name ?? "Client ePetrecere";
+          const dateStr =
+            typeof plan.eventDate === "string"
+              ? plan.eventDate
+              : new Date(plan.eventDate).toISOString().split("T")[0];
+          await db.insert(bookingRequests).values(
+            ids.map((artistId) => ({
+              artistId,
+              eventPlanId: plan.id,
+              clientUserId: appUser.id,
+              clientName,
+              clientPhone: appUser.phone ?? "—",
+              clientEmail: appUser.email ?? null,
+              eventDate: dateStr,
+              eventType: plan.eventType ?? null,
+              guestCount: plan.guestCountTarget ?? null,
+              message: msg,
+              status: "pending" as const,
+            })),
+          );
+          requestsSent += ids.length;
+          toolResult = `Am trimis ${ids.length} cereri de rezervare. Artiștii vor răspunde cu ofertele lor.`;
+        }
+      } else {
+        toolResult = `Tool necunoscut: ${toolUse.name}`;
       }
-    } else {
-      toolResult = `Tool necunoscut: ${toolUse.name}`;
+
+      toolResults.push({
+        type: "tool_result",
+        tool_use_id: toolUse.id,
+        content: toolResult,
+      });
     }
 
+    // Single user message with ALL tool_results (Anthropic requirement)
     conversation.push({
       role: "user",
-      content: [
-        {
-          type: "tool_result",
-          tool_use_id: toolUse.id,
-          content: toolResult,
-        },
-      ],
+      content: toolResults,
     });
   }
 
