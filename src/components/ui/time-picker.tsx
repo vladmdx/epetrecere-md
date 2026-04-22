@@ -25,6 +25,10 @@ export interface TimePickerProps {
   placeholder?: string;
   /** Minutes step — defaults to 15 (00, 15, 30, 45). Use 5 or 1 for finer grain. */
   minuteStep?: number;
+  /** Already-booked time ranges (HH:MM). Matching slots are hidden/disabled. */
+  bookedRanges?: Array<{ startTime: string; endTime: string }>;
+  /** If true, the whole day is unavailable (all slots disabled). */
+  wholeDayBlocked?: boolean;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -40,6 +44,25 @@ function parseTime(value: string): { h: number; m: number } | null {
   return { h, m };
 }
 
+/** Check if a given HH:MM is inside any of the booked ranges (inclusive of start, exclusive of end). */
+function isTimeBooked(
+  h: number,
+  m: number,
+  bookedRanges: Array<{ startTime: string; endTime: string }> | undefined,
+): boolean {
+  if (!bookedRanges || bookedRanges.length === 0) return false;
+  const minutes = h * 60 + m;
+  for (const r of bookedRanges) {
+    const s = parseTime(r.startTime);
+    const e = parseTime(r.endTime);
+    if (!s || !e) continue;
+    const sMin = s.h * 60 + s.m;
+    const eMin = e.h * 60 + e.m;
+    if (minutes >= sMin && minutes < eMin) return true;
+  }
+  return false;
+}
+
 export function TimePicker({
   value,
   onChange,
@@ -47,6 +70,8 @@ export function TimePicker({
   className,
   placeholder = "--:--",
   minuteStep = 15,
+  bookedRanges,
+  wholeDayBlocked,
 }: TimePickerProps) {
   const parsed = parseTime(value);
   const [open, setOpen] = useState(false);
@@ -131,13 +156,43 @@ export function TimePicker({
     });
   }, [open]);
 
-  const hours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
-  const minutes = useMemo(() => {
+  const allHours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+  const allMinutes = useMemo(() => {
     const step = Math.max(1, Math.min(30, minuteStep));
     const out: number[] = [];
     for (let m = 0; m < 60; m += step) out.push(m);
     return out;
   }, [minuteStep]);
+
+  // An hour is fully booked if every minute step inside it is booked.
+  const fullyBookedHours = useMemo(() => {
+    if (wholeDayBlocked) return new Set(allHours);
+    const set = new Set<number>();
+    if (!bookedRanges?.length) return set;
+    for (const h of allHours) {
+      const allMinutesBlocked = allMinutes.every((m) =>
+        isTimeBooked(h, m, bookedRanges),
+      );
+      if (allMinutesBlocked) set.add(h);
+    }
+    return set;
+  }, [allHours, allMinutes, bookedRanges, wholeDayBlocked]);
+
+  // For the currently-selected hour, which minutes are booked?
+  const bookedMinutesForHour = useMemo(() => {
+    if (wholeDayBlocked) return new Set(allMinutes);
+    const set = new Set<number>();
+    if (!bookedRanges?.length) return set;
+    const h = parsed?.h;
+    if (h === undefined) return set;
+    for (const m of allMinutes) {
+      if (isTimeBooked(h, m, bookedRanges)) set.add(m);
+    }
+    return set;
+  }, [allMinutes, bookedRanges, wholeDayBlocked, parsed?.h]);
+
+  const hours = allHours;
+  const minutes = allMinutes;
 
   function setHM(h: number, m: number) {
     onChange(`${pad2(h)}:${pad2(m)}`);
@@ -237,6 +292,7 @@ export function TimePicker({
                 format={pad2}
                 onPick={(h) => setHM(h, parsed?.m ?? 0)}
                 dataKey="active-hour"
+                disabledItems={fullyBookedHours}
               />
               <TimeColumn
                 label="Min"
@@ -245,6 +301,7 @@ export function TimePicker({
                 format={pad2}
                 onPick={(m) => setHM(parsed?.h ?? 0, m)}
                 dataKey="active-minute"
+                disabledItems={bookedMinutesForHour}
               />
             </div>
             {/* Quick-pick strip — common event start times. */}
@@ -258,13 +315,15 @@ export function TimePicker({
                 "19:00",
                 "20:00",
               ].map((q) => {
+                const p = parseTime(q)!;
+                const isBooked = wholeDayBlocked || isTimeBooked(p.h, p.m, bookedRanges);
+                if (isBooked) return null; // hide booked quick picks
                 const selected = displayValue === q;
                 return (
                   <button
                     key={q}
                     type="button"
                     onClick={() => {
-                      const p = parseTime(q)!;
                       setHM(p.h, p.m);
                       setOpen(false);
                     }}
@@ -280,6 +339,16 @@ export function TimePicker({
                 );
               })}
             </div>
+            {(bookedRanges?.length ?? 0) > 0 && !wholeDayBlocked && (
+              <div className="border-t border-border/30 bg-amber-500/5 px-3 py-1.5 text-[10px] text-amber-600 dark:text-amber-400">
+                Intervale indisponibile: {bookedRanges?.map((r) => `${r.startTime}–${r.endTime}`).join(", ")}
+              </div>
+            )}
+            {wholeDayBlocked && (
+              <div className="border-t border-border/30 bg-red-500/5 px-3 py-1.5 text-[10px] text-red-600 dark:text-red-400">
+                Această zi este complet indisponibilă.
+              </div>
+            )}
           </div>,
           document.body,
         )}
@@ -294,6 +363,7 @@ function TimeColumn({
   onPick,
   format,
   dataKey,
+  disabledItems,
 }: {
   label: string;
   items: number[];
@@ -301,6 +371,7 @@ function TimeColumn({
   onPick: (n: number) => void;
   format: (n: number) => string;
   dataKey: string;
+  disabledItems?: Set<number>;
 }) {
   return (
     <div className="flex flex-col">
@@ -310,6 +381,8 @@ function TimeColumn({
       <div className="max-h-56 overflow-y-auto">
         {items.map((n) => {
           const isActive = active === n;
+          const isDisabled = disabledItems?.has(n) ?? false;
+          if (isDisabled) return null; // hide booked times entirely
           return (
             <button
               key={n}

@@ -52,6 +52,49 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [bookedRanges, setBookedRanges] = useState<
+    Array<{ startTime: string; endTime: string }>
+  >([]);
+  const [wholeDayBlocked, setWholeDayBlocked] = useState(false);
+
+  // Fetch booked ranges when a date is selected (artist only)
+  useEffect(() => {
+    if (!selectedDate || entityType !== "artist") {
+      setBookedRanges([]);
+      setWholeDayBlocked(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(
+      `/api/artist-availability?artist_id=${entityId}&date=${selectedDate}`,
+    )
+      .then((r) => (r.ok ? r.json() : { bookedRanges: [] }))
+      .then((d) => {
+        if (cancelled) return;
+        setBookedRanges(d.bookedRanges || []);
+        setWholeDayBlocked(!!d.wholeDayBlocked);
+      })
+      .catch(() => {
+        /* silent */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedDate, entityId, entityType]);
+
+  // Compute which hours 8..22 are fully unavailable
+  function isHourBooked(hour: number): boolean {
+    if (wholeDayBlocked) return true;
+    const slotStart = hour * 60;
+    const slotEnd = (hour + 1) * 60;
+    return bookedRanges.some((r) => {
+      const [sh, sm] = r.startTime.split(":").map(Number);
+      const [eh, em] = r.endTime.split(":").map(Number);
+      const rs = sh * 60 + (sm || 0);
+      const re = eh * 60 + (em || 0);
+      return rs < slotEnd && slotStart < re;
+    });
+  }
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -317,6 +360,16 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
               Ocupat: {getDayStatus(selectedDate).bookedSlots.join(", ")}
             </p>
           )}
+          {bookedRanges.length > 0 && !wholeDayBlocked && (
+            <p className="text-[10px] text-amber-500 text-center mt-1">
+              Interval(e) indisponibil(e): {bookedRanges.map((r) => `${r.startTime}–${r.endTime}`).join(", ")}
+            </p>
+          )}
+          {wholeDayBlocked && (
+            <p className="text-[10px] text-red-500 text-center mt-1">
+              Această zi este complet rezervată.
+            </p>
+          )}
 
           {!showForm ? (
             <Button
@@ -363,11 +416,13 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
                   <select name="startTime" required
                     className="form-input !h-9 !text-xs appearance-none cursor-pointer">
                     <option value="">Ora</option>
-                    {Array.from({ length: 15 }, (_, i) => i + 8).map(h => (
-                      <option key={h} value={`${String(h).padStart(2, "0")}:00`}>
-                        {String(h).padStart(2, "0")}:00
-                      </option>
-                    ))}
+                    {Array.from({ length: 15 }, (_, i) => i + 8)
+                      .filter((h) => !isHourBooked(h))
+                      .map(h => (
+                        <option key={h} value={`${String(h).padStart(2, "0")}:00`}>
+                          {String(h).padStart(2, "0")}:00
+                        </option>
+                      ))}
                   </select>
                 </MiniField>
                 <MiniField icon={Clock} label="Durată (ore)" required>

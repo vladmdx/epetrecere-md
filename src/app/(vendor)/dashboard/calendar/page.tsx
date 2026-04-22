@@ -1406,6 +1406,20 @@ export default function VendorCalendarPage() {
                   <TimePicker
                     value={manualStartTime}
                     onChange={setManualStartTime}
+                    bookedRanges={dayBookings
+                      .filter(
+                        (b) =>
+                          b.eventDate === selectedDate &&
+                          b.startTime &&
+                          b.endTime &&
+                          ["pending", "accepted", "confirmed_by_client"].includes(
+                            b.status,
+                          ),
+                      )
+                      .map((b) => ({
+                        startTime: b.startTime!,
+                        endTime: b.endTime!,
+                      }))}
                   />
                 </div>
               </div>
