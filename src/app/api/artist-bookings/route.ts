@@ -117,6 +117,29 @@ export async function POST(req: Request) {
 
   const endTime = addMinutes(parsed.data.startTime, durationMinutes);
 
+  // Conflict check — refuse if artist already has a booking that overlaps
+  // with this time slot on the same date.
+  {
+    const { checkArtistAvailability, formatConflictMessage } = await import(
+      "@/lib/booking/availability"
+    );
+    const result = await checkArtistAvailability({
+      artistId: parsed.data.artistId,
+      eventDate: parsed.data.eventDate,
+      startTime: parsed.data.startTime,
+      endTime,
+    });
+    if (!result.available) {
+      return NextResponse.json(
+        {
+          error: formatConflictMessage(result),
+          conflict: result.conflict,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   // Create the booking row. We reuse booking_requests so the calendar
   // day-detail panel (which already reads this table) renders it.
   const [booking] = await db

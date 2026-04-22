@@ -249,6 +249,29 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Time-slot conflict check — refuse if artist already has a pending or
+  // confirmed booking that overlaps this request.
+  {
+    const { checkArtistAvailability, formatConflictMessage } = await import(
+      "@/lib/booking/availability"
+    );
+    const result = await checkArtistAvailability({
+      artistId: parsed.data.artistId,
+      eventDate: parsed.data.eventDate,
+      startTime: parsed.data.startTime,
+      endTime: parsed.data.endTime,
+    });
+    if (!result.available) {
+      return NextResponse.json(
+        {
+          error: formatConflictMessage(result),
+          conflict: result.conflict,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   const [booking] = await db.insert(bookingRequests).values({
     ...bookingBase,
     eventPlanId: eventPlanId ?? null,

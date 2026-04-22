@@ -76,6 +76,31 @@ export async function PUT(
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
+    // Block accepting if this booking conflicts with another accepted/confirmed
+    // booking on the same date/time. Exclude self (we're updating this row).
+    {
+      const { checkArtistAvailability, formatConflictMessage } = await import(
+        "@/lib/booking/availability"
+      );
+      const result = await checkArtistAvailability({
+        artistId: booking.artistId,
+        eventDate: booking.eventDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        excludeBookingId: booking.id,
+      });
+      if (!result.available) {
+        return NextResponse.json(
+          {
+            error:
+              "Nu poți accepta această rezervare — " +
+              formatConflictMessage(result).toLowerCase(),
+            conflict: result.conflict,
+          },
+          { status: 409 },
+        );
+      }
+    }
     // When the artist accepts, they may also declare the final agreed price.
     // That price flows straight into the event plan's budget.
     const priceUpdate =
