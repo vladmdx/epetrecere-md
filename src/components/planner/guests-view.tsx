@@ -14,9 +14,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2, Users, UserCheck, UserX, UserMinus, FileUp } from "lucide-react";
+import { Plus, Trash2, Loader2, Users, UserCheck, UserX, UserMinus, FileUp, Send, Mail, Phone as PhoneIcon, MessageCircle, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
+import { INVITATION_DESIGN_LIST, type InvitationDesignId } from "@/lib/invitations/templates";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export interface Guest {
   id: number;
@@ -30,8 +40,18 @@ export interface Guest {
   notes: string | null;
 }
 
+interface PlanContext {
+  id: number;
+  title: string;
+  eventType: string | null;
+  eventDate: string | null;
+  startTime?: string | null;
+  location: string | null;
+}
+
 interface Props {
   planId: number;
+  plan?: PlanContext;
   guestCountTarget: number | null;
   guests: Guest[];
   onChange: (guests: Guest[]) => void;
@@ -56,15 +76,123 @@ const GROUP_LABELS: Record<string, string> = {
   other: "Altele",
 };
 
-export function GuestsView({ planId, guestCountTarget, guests, onChange }: Props) {
+export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
   const [group, setGroup] = useState("friends");
   const [plusOnes, setPlusOnes] = useState("0");
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Invitation sending dialog state
+  const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [invData, setInvData] = useState({
+    designId: "elegant-gold" as InvitationDesignId,
+    coupleNames: "",
+    eventDate: "",
+    ceremonyTime: "",
+    receptionTime: "",
+    ceremonyLocation: "",
+    receptionLocation: "",
+    message: "Cu drag vă invităm să ne fiți alături...",
+    dressCode: "",
+    rsvpDeadline: "",
+  });
+
+  function openSendDialog() {
+    if (!plan) {
+      toast.error("Date insuficiente despre eveniment.");
+      return;
+    }
+    // Auto-fill from the event plan
+    setInvData({
+      designId: "elegant-gold",
+      coupleNames: plan.title || "",
+      eventDate: plan.eventDate || "",
+      ceremonyTime: plan.startTime || "",
+      receptionTime: "",
+      ceremonyLocation: plan.location || "",
+      receptionLocation: plan.location || "",
+      message: "Cu drag vă invităm să ne fiți alături...",
+      dressCode: "",
+      rsvpDeadline: "",
+    });
+    setSendDialogOpen(true);
+  }
+
+  async function createAndSendInvitation() {
+    if (!plan) return;
+    const guestsWithContact = guests.filter(
+      (g) => g.email || g.phone,
+    );
+    if (guestsWithContact.length === 0) {
+      toast.error("Niciun invitat nu are un contact (email/telefon).");
+      return;
+    }
+    setSending(true);
+    try {
+      // 1. Create the invitation with the event data
+      const createRes = await fetch("/api/invitations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventType: (plan.eventType as "wedding" | "birthday" | "baptism" | "corporate") ?? "wedding",
+          coupleNames: invData.coupleNames,
+          hostName: invData.coupleNames,
+          eventDate: invData.eventDate,
+          ceremonyTime: invData.ceremonyTime || undefined,
+          receptionTime: invData.receptionTime || undefined,
+          ceremonyLocation: invData.ceremonyLocation || undefined,
+          receptionLocation: invData.receptionLocation || undefined,
+          message: invData.message || undefined,
+          dressCode: invData.dressCode || undefined,
+          rsvpDeadline: invData.rsvpDeadline || undefined,
+          designId: invData.designId,
+          customColors: { designId: invData.designId },
+          guests: guestsWithContact.map((g) => ({
+            name: g.fullName,
+            email: g.email || undefined,
+            phone: g.phone || undefined,
+            group: g.group || undefined,
+          })),
+        }),
+      });
+      if (!createRes.ok) {
+        const err = await createRes.json().catch(() => ({}));
+        throw new Error(err.error || "Nu s-a putut crea invitația");
+      }
+      const invitation = await createRes.json();
+
+      // 2. Publish it
+      await fetch(`/api/invitations/${invitation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "published" }),
+      });
+
+      // 3. Send emails
+      const sendRes = await fetch(`/api/invitations/${invitation.id}/send`, {
+        method: "POST",
+      });
+      if (sendRes.ok) {
+        const d = await sendRes.json();
+        toast.success(`${d.sent} invitații trimise!`);
+      } else {
+        toast.success("Invitație creată. Emailurile vor fi trimise.");
+      }
+      setSendDialogOpen(false);
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Eroare la trimitere",
+      );
+    } finally {
+      setSending(false);
+    }
+  }
 
   /** C-20 — Parse an Excel/CSV file and POST each row to the guests API. */
   async function importFromFile(file: File) {
@@ -216,6 +344,30 @@ export function GuestsView({ planId, guestCountTarget, guests, onChange }: Props
         <StatCard icon={UserMinus} label="Posibil" value={stats.maybe} color="text-amber-500" />
         <StatCard icon={UserX} label="Refuzați" value={stats.declined} color="text-red-500" />
       </div>
+
+      {/* Send invitations CTA */}
+      {plan && guests.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4">
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-gold/10 p-2 text-gold">
+              <Mail className="h-4 w-4" />
+            </div>
+            <div>
+              <p className="font-heading font-bold">Trimite invitații electronice</p>
+              <p className="text-xs text-muted-foreground">
+                Alege un design și trimite invitația cu RSVP la toți invitații.
+              </p>
+            </div>
+          </div>
+          <Button
+            onClick={openSendDialog}
+            className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+          >
+            <Send className="h-4 w-4" />
+            Configurează și trimite
+          </Button>
+        </div>
+      )}
 
       {/* Add guest */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
@@ -372,6 +524,219 @@ export function GuestsView({ planId, guestCountTarget, guests, onChange }: Props
           </table>
         </div>
       )}
+
+      {/* Send invitations dialog */}
+      <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Configurează invitația</DialogTitle>
+            <DialogDescription>
+              Alege designul și verifică informațiile care vor apărea pe invitație.
+              Datele sunt precompletate din evenimentul tău.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            {/* Design picker */}
+            <div>
+              <Label className="mb-2 block">Design invitație</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {INVITATION_DESIGN_LIST.map((d) => {
+                  const active = invData.designId === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() =>
+                        setInvData((s) => ({ ...s, designId: d.id }))
+                      }
+                      className={cn(
+                        "overflow-hidden rounded-lg border-2 text-left transition-all",
+                        active
+                          ? "border-gold shadow"
+                          : "border-border/40 hover:border-gold/30",
+                      )}
+                    >
+                      <div
+                        className="p-4"
+                        style={{ background: d.preview.bg, color: d.preview.text }}
+                      >
+                        <div
+                          className="text-center text-lg"
+                          style={{ color: d.preview.accent }}
+                        >
+                          {d.decorStyle === "sparkles"
+                            ? "✦"
+                            : d.decorStyle === "flowers"
+                              ? "❀"
+                              : d.decorStyle === "minimal"
+                                ? "—"
+                                : "❦"}
+                        </div>
+                        <div
+                          className="text-center text-[10px] uppercase tracking-widest"
+                          style={{ color: d.preview.accent }}
+                        >
+                          Ești invitat
+                        </div>
+                        <div
+                          className="mt-1 text-center text-sm font-bold"
+                          style={{
+                            fontFamily: d.fontHeading
+                              ? `"${d.fontHeading}", serif`
+                              : undefined,
+                          }}
+                        >
+                          {invData.coupleNames || "Ana & Ion"}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between bg-card px-3 py-2">
+                        <div>
+                          <div className="text-xs font-medium">{d.name}</div>
+                        </div>
+                        {active && <Check className="h-4 w-4 text-gold" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Editable fields */}
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Nume afișat pe invitație</Label>
+                <Input
+                  className="mt-1"
+                  value={invData.coupleNames}
+                  onChange={(e) =>
+                    setInvData((s) => ({ ...s, coupleNames: e.target.value }))
+                  }
+                  placeholder="Ana & Ion"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs">Data evenimentului</Label>
+                  <Input
+                    type="date"
+                    className="mt-1 [color-scheme:dark]"
+                    value={invData.eventDate}
+                    onChange={(e) =>
+                      setInvData((s) => ({ ...s, eventDate: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Termen limită RSVP</Label>
+                  <Input
+                    type="date"
+                    className="mt-1 [color-scheme:dark]"
+                    value={invData.rsvpDeadline}
+                    onChange={(e) =>
+                      setInvData((s) => ({ ...s, rsvpDeadline: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label className="text-xs">Ora ceremoniei</Label>
+                  <Input
+                    type="time"
+                    className="mt-1 [color-scheme:dark]"
+                    value={invData.ceremonyTime}
+                    onChange={(e) =>
+                      setInvData((s) => ({ ...s, ceremonyTime: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Ora petrecerii</Label>
+                  <Input
+                    type="time"
+                    className="mt-1 [color-scheme:dark]"
+                    value={invData.receptionTime}
+                    onChange={(e) =>
+                      setInvData((s) => ({ ...s, receptionTime: e.target.value }))
+                    }
+                  />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Locația ceremoniei</Label>
+                <Input
+                  className="mt-1"
+                  value={invData.ceremonyLocation}
+                  onChange={(e) =>
+                    setInvData((s) => ({
+                      ...s,
+                      ceremonyLocation: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Locația petrecerii</Label>
+                <Input
+                  className="mt-1"
+                  value={invData.receptionLocation}
+                  onChange={(e) =>
+                    setInvData((s) => ({
+                      ...s,
+                      receptionLocation: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Mesaj personal</Label>
+                <Textarea
+                  className="mt-1"
+                  value={invData.message}
+                  onChange={(e) =>
+                    setInvData((s) => ({ ...s, message: e.target.value }))
+                  }
+                  rows={2}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Cod vestimentar (opțional)</Label>
+                <Input
+                  className="mt-1"
+                  value={invData.dressCode}
+                  onChange={(e) =>
+                    setInvData((s) => ({ ...s, dressCode: e.target.value }))
+                  }
+                  placeholder="Ținută elegantă"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setSendDialogOpen(false)}
+              disabled={sending}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={createAndSendInvitation}
+              disabled={sending || !invData.eventDate || !invData.coupleNames}
+              className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+            >
+              {sending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+              Trimite invitațiile ({guests.filter((g) => g.email || g.phone).length})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

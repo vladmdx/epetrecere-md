@@ -6,6 +6,7 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   Plus,
@@ -13,7 +14,6 @@ import {
   Loader2,
   UtensilsCrossed,
   UserMinus,
-  Download,
   Circle,
   Square,
   RectangleHorizontal,
@@ -21,9 +21,18 @@ import {
   Sparkles,
   Printer,
   Users,
+  Settings2,
 } from "lucide-react";
 import type { Guest } from "./guests-view";
 import { cn } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 export interface SeatingTable {
   id: number;
@@ -88,6 +97,11 @@ export function SeatingView({
   const [search, setSearch] = useState("");
   const [autoPlacing, setAutoPlacing] = useState(false);
   const [dragGuest, setDragGuest] = useState<number | null>(null);
+  const [customDialogOpen, setCustomDialogOpen] = useState(false);
+  const [customName, setCustomName] = useState("");
+  const [customSeats, setCustomSeats] = useState("10");
+  const [customShape, setCustomShape] = useState<TableShape>("round");
+  const [addingCustom, setAddingCustom] = useState(false);
 
   const guestById = useMemo(() => {
     const m = new Map<number, Guest>();
@@ -103,6 +117,12 @@ export function SeatingView({
   // Only show confirmed or pending guests (decliners are hidden)
   const eligibleGuests = useMemo(
     () => guests.filter((g) => g.rsvp !== "declined"),
+    [guests],
+  );
+
+  // Guests who actually confirmed RSVP — primary audience for seating
+  const acceptedGuests = useMemo(
+    () => guests.filter((g) => g.rsvp === "accepted"),
     [guests],
   );
 
@@ -123,10 +143,16 @@ export function SeatingView({
   }, [seats]);
 
   const placedCount = seats.length;
-  const totalGuests = eligibleGuests.reduce(
+  const totalGuests = guests.reduce(
     (sum, g) => sum + 1 + (g.plusOnes || 0),
     0,
   );
+  const acceptedTotal = acceptedGuests.reduce(
+    (sum, g) => sum + 1 + (g.plusOnes || 0),
+    0,
+  );
+  const acceptedPct = totalGuests > 0 ? Math.round((acceptedTotal / totalGuests) * 100) : 0;
+  const placedPct = acceptedTotal > 0 ? Math.round((placedCount / acceptedTotal) * 100) : 0;
 
   async function addTable(shape: TableShape) {
     const config = SHAPE_CONFIG[shape];
@@ -151,6 +177,41 @@ export function SeatingView({
       toast.error("Eroare la adăugare masă.");
     } finally {
       setAdding(null);
+    }
+  }
+
+  async function addCustomTable() {
+    const seatsNum = Number(customSeats);
+    if (!customName.trim()) {
+      toast.error("Numele mesei este obligatoriu.");
+      return;
+    }
+    if (!Number.isFinite(seatsNum) || seatsNum < 1 || seatsNum > 30) {
+      toast.error("Numărul de locuri trebuie între 1 și 30.");
+      return;
+    }
+    setAddingCustom(true);
+    try {
+      const res = await fetch(`/api/event-plans/${planId}/tables`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: customName.trim(), seats: seatsNum }),
+      });
+      if (!res.ok) {
+        toast.error("Eroare la adăugare masă.");
+        return;
+      }
+      const data = await res.json();
+      onTablesChange([...tables, data.table]);
+      toast.success(`${customName} adăugată (${seatsNum} locuri)`);
+      setCustomDialogOpen(false);
+      setCustomName("");
+      setCustomSeats("10");
+      setCustomShape("round");
+    } catch {
+      toast.error("Eroare la adăugare masă.");
+    } finally {
+      setAddingCustom(false);
     }
   }
 
@@ -310,44 +371,81 @@ export function SeatingView({
 
   return (
     <div className="space-y-5">
-      {/* Stats + Actions bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/40 bg-card p-4">
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2">
+      {/* Progress bars — accepted RSVPs + seated */}
+      <div className="rounded-xl border border-border/40 bg-card p-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm">
             <Users className="h-4 w-4 text-gold" />
-            <span>
-              <strong>{placedCount}</strong> așezați / <strong>{totalGuests}</strong> total
-            </span>
+            <span className="font-medium">Progres așezare</span>
           </div>
-          <div className="text-muted-foreground">
-            {unassigned.length} rămași
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={autoPlace}
-            disabled={autoPlacing || unassigned.length === 0 || tables.length === 0}
-            className="gap-1.5"
-          >
-            {autoPlacing ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Sparkles className="h-3.5 w-3.5" />
-            )}
-            Sugestie Automată
-          </Button>
-          {tables.length > 0 && (
+          <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
               variant="outline"
-              onClick={exportSeatingPDF}
-              className="gap-1.5 border-gold/30 text-gold hover:bg-gold/10"
+              onClick={autoPlace}
+              disabled={autoPlacing || unassigned.length === 0 || tables.length === 0}
+              className="gap-1.5"
             >
-              <Printer className="h-3.5 w-3.5" /> Export / Print
+              {autoPlacing ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="h-3.5 w-3.5" />
+              )}
+              Sugestie Automată
             </Button>
-          )}
+            {tables.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exportSeatingPDF}
+                className="gap-1.5 border-gold/30 text-gold hover:bg-gold/10"
+              >
+                <Printer className="h-3.5 w-3.5" /> Export / Print
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {/* Bar 1: Accepted RSVPs */}
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Au confirmat prezența
+              </span>
+              <span className="font-medium">
+                <strong>{acceptedTotal}</strong>
+                <span className="text-muted-foreground"> / {totalGuests} invitați</span>
+                <span className="ml-2 text-emerald-500">({acceptedPct}%)</span>
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-emerald-500 transition-all"
+                style={{ width: `${acceptedPct}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Bar 2: Seated from accepted */}
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">
+                Așezați la mese
+              </span>
+              <span className="font-medium">
+                <strong>{placedCount}</strong>
+                <span className="text-muted-foreground"> / {acceptedTotal} confirmați</span>
+                <span className="ml-2 text-gold">({placedPct}%)</span>
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full bg-gold transition-all"
+                style={{ width: `${placedPct}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
@@ -382,8 +480,110 @@ export function SeatingView({
               </button>
             );
           })}
+          {/* Custom table */}
+          <button
+            onClick={() => setCustomDialogOpen(true)}
+            disabled={adding !== null}
+            className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gold/40 bg-gold/5 p-3 text-left transition-all hover:border-gold/60 hover:bg-gold/10 disabled:opacity-50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gold/20 text-gold">
+              <Settings2 className="h-5 w-5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium">Masă Personalizată</p>
+              <p className="text-xs text-muted-foreground">Alege forma și numărul de locuri</p>
+            </div>
+            <Plus className="h-4 w-4 text-muted-foreground" />
+          </button>
         </div>
       </div>
+
+      {/* Custom table dialog */}
+      <Dialog open={customDialogOpen} onOpenChange={setCustomDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adaugă masă personalizată</DialogTitle>
+            <DialogDescription>
+              Alege forma mesei și numărul de locuri. Potrivit pentru sălile cu
+              configurări speciale.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="custom-name" className="text-xs">Nume masă</Label>
+              <Input
+                id="custom-name"
+                className="mt-1"
+                value={customName}
+                onChange={(e) => setCustomName(e.target.value)}
+                placeholder="Ex: Masa Nașilor, Masa Copiilor..."
+                autoFocus
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Forma mesei</Label>
+              <div className="mt-1 grid grid-cols-3 gap-2">
+                {(Object.keys(SHAPE_CONFIG) as TableShape[]).map((shape) => {
+                  const cfg = SHAPE_CONFIG[shape];
+                  const Icon = cfg.icon;
+                  const active = customShape === shape;
+                  return (
+                    <button
+                      key={shape}
+                      type="button"
+                      onClick={() => setCustomShape(shape)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 rounded-lg border p-3 text-center transition-all",
+                        active
+                          ? "border-gold bg-gold/10 text-gold"
+                          : "border-border/40 hover:border-gold/30",
+                      )}
+                    >
+                      <Icon className="h-5 w-5" />
+                      <span className="text-xs">{cfg.label.replace("Masă ", "").replace("Masa de ", "")}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="custom-seats" className="text-xs">
+                Număr de locuri (1-30)
+              </Label>
+              <Input
+                id="custom-seats"
+                type="number"
+                min="1"
+                max="30"
+                className="mt-1"
+                value={customSeats}
+                onChange={(e) => setCustomSeats(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCustomDialogOpen(false)}
+              disabled={addingCustom}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={addCustomTable}
+              disabled={addingCustom || !customName.trim()}
+              className="bg-gold text-background hover:bg-gold-dark"
+            >
+              {addingCustom ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Plus className="h-4 w-4" />
+              )}
+              Adaugă masa
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
         {/* Sidebar — unassigned guests */}

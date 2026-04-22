@@ -1287,6 +1287,7 @@ export const invitationGuests = pgTable("invitation_guests", {
   name: text("name").notNull(),
   email: text("email"),
   phone: text("phone"),
+  whatsapp: text("whatsapp"),
   group: text("group"), // "family", "friends", "colleagues"
   // RSVP response
   rsvpStatus: invitationRsvpStatusEnum("rsvp_status").default("pending").notNull(),

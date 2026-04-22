@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { INVITATION_DESIGN_LIST, type InvitationDesignId } from "@/lib/invitations/templates";
+import { TimePicker } from "@/components/ui/time-picker";
+import { Calendar as CalendarIcon, Phone as PhoneIcon, MessageCircle, Mail } from "lucide-react";
 
 interface Template {
   id: number;
@@ -35,6 +37,7 @@ interface Guest {
   name: string;
   email?: string;
   phone?: string;
+  whatsapp?: string;
   group?: string;
 }
 
@@ -51,6 +54,34 @@ const STEPS = [
   "Lista de invitați",
   "Revizuire & publicare",
 ];
+
+function ThemedDateInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="group flex h-11 w-full items-center gap-2.5 rounded-lg border border-border/60 bg-background/80 px-3 text-left text-sm transition-all hover:border-gold/50 focus-within:border-gold/70 focus-within:ring-2 focus-within:ring-gold/20">
+      <div
+        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
+          value
+            ? "bg-gold/15 text-gold"
+            : "bg-accent/40 text-foreground/70 group-hover:bg-gold/10 group-hover:text-gold"
+        }`}
+      >
+        <CalendarIcon className="h-3.5 w-3.5" />
+      </div>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60 [color-scheme:dark]"
+      />
+    </div>
+  );
+}
 
 export function InvitationWizard() {
   const router = useRouter();
@@ -98,8 +129,18 @@ export function InvitationWizard() {
 
   function addGuest() {
     if (!newGuest.name.trim()) return;
+    const hasContact =
+      (newGuest.email && newGuest.email.trim().length > 0) ||
+      (newGuest.phone && newGuest.phone.trim().length > 0) ||
+      (newGuest.whatsapp && newGuest.whatsapp.trim().length > 0);
+    if (!hasContact) {
+      alert(
+        "Adaugă cel puțin un contact (email, telefon sau WhatsApp) pentru ca invitatul să poată confirma prezența.",
+      );
+      return;
+    }
     setData((d) => ({ ...d, guests: [...d.guests, { ...newGuest }] }));
-    setNewGuest({ name: "", email: "" });
+    setNewGuest({ name: "", email: "", phone: "", whatsapp: "" });
   }
 
   function removeGuest(index: number) {
@@ -321,41 +362,41 @@ export function InvitationWizard() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Data evenimentului</Label>
-                <Input
-                  type="date"
-                  value={data.eventDate}
-                  onChange={(e) => update("eventDate", e.target.value)}
-                  className="mt-2"
-                />
+                <div className="mt-2">
+                  <ThemedDateInput
+                    value={data.eventDate}
+                    onChange={(v) => update("eventDate", v)}
+                  />
+                </div>
               </div>
               <div>
                 <Label>Termen limită RSVP</Label>
-                <Input
-                  type="date"
-                  value={data.rsvpDeadline}
-                  onChange={(e) => update("rsvpDeadline", e.target.value)}
-                  className="mt-2"
-                />
+                <div className="mt-2">
+                  <ThemedDateInput
+                    value={data.rsvpDeadline}
+                    onChange={(v) => update("rsvpDeadline", v)}
+                  />
+                </div>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label>Ora cununiei / ceremoniei</Label>
-                <Input
-                  type="time"
-                  value={data.ceremonyTime}
-                  onChange={(e) => update("ceremonyTime", e.target.value)}
-                  className="mt-2"
-                />
+                <div className="mt-2">
+                  <TimePicker
+                    value={data.ceremonyTime}
+                    onChange={(v) => update("ceremonyTime", v)}
+                  />
+                </div>
               </div>
               <div>
                 <Label>Ora petrecerii</Label>
-                <Input
-                  type="time"
-                  value={data.receptionTime}
-                  onChange={(e) => update("receptionTime", e.target.value)}
-                  className="mt-2"
-                />
+                <div className="mt-2">
+                  <TimePicker
+                    value={data.receptionTime}
+                    onChange={(v) => update("receptionTime", v)}
+                  />
+                </div>
               </div>
             </div>
             <div>
@@ -406,28 +447,60 @@ export function InvitationWizard() {
               link RSVP unic.
             </p>
             <div className="rounded-xl border border-border/40 bg-card p-4">
-              <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
+              <div className="grid gap-3">
                 <Input
-                  placeholder="Nume"
+                  placeholder="Nume și prenume *"
                   value={newGuest.name}
                   onChange={(e) =>
                     setNewGuest({ ...newGuest, name: e.target.value })
                   }
                 />
-                <Input
-                  placeholder="Email (opțional)"
-                  value={newGuest.email || ""}
-                  onChange={(e) =>
-                    setNewGuest({ ...newGuest, email: e.target.value })
-                  }
-                />
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="relative">
+                    <Mail className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Email"
+                      type="email"
+                      value={newGuest.email || ""}
+                      onChange={(e) =>
+                        setNewGuest({ ...newGuest, email: e.target.value })
+                      }
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="relative">
+                    <PhoneIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Telefon"
+                      value={newGuest.phone || ""}
+                      onChange={(e) =>
+                        setNewGuest({ ...newGuest, phone: e.target.value })
+                      }
+                      className="pl-9"
+                    />
+                  </div>
+                  <div className="relative">
+                    <MessageCircle className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-green-500" />
+                    <Input
+                      placeholder="WhatsApp"
+                      value={newGuest.whatsapp || ""}
+                      onChange={(e) =>
+                        setNewGuest({ ...newGuest, whatsapp: e.target.value })
+                      }
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Cel puțin un contact (email, telefon sau WhatsApp) este obligatoriu pentru ca invitatul să poată confirma prezența.
+                </p>
                 <Button
                   type="button"
                   onClick={addGuest}
                   disabled={!newGuest.name.trim()}
-                  className="gap-1 bg-gold text-background hover:bg-gold-dark"
+                  className="w-full gap-1 bg-gold text-background hover:bg-gold-dark sm:w-auto sm:ml-auto"
                 >
-                  <Plus className="h-4 w-4" /> Adaugă
+                  <Plus className="h-4 w-4" /> Adaugă invitat
                 </Button>
               </div>
             </div>
@@ -440,15 +513,27 @@ export function InvitationWizard() {
                   {data.guests.map((g, i) => (
                     <li
                       key={i}
-                      className="flex items-center justify-between p-3 text-sm"
+                      className="flex items-center justify-between gap-3 p-3 text-sm"
                     >
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <div className="font-medium">{g.name}</div>
-                        {g.email && (
-                          <div className="text-xs text-muted-foreground">
-                            {g.email}
-                          </div>
-                        )}
+                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                          {g.email && (
+                            <span className="flex items-center gap-1">
+                              <Mail className="h-3 w-3" /> {g.email}
+                            </span>
+                          )}
+                          {g.phone && (
+                            <span className="flex items-center gap-1">
+                              <PhoneIcon className="h-3 w-3" /> {g.phone}
+                            </span>
+                          )}
+                          {g.whatsapp && (
+                            <span className="flex items-center gap-1 text-green-500">
+                              <MessageCircle className="h-3 w-3" /> {g.whatsapp}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <button
                         type="button"

@@ -52,6 +52,7 @@ const createSchema = z.object({
         name: z.string().min(1),
         email: z.string().optional(),
         phone: z.string().optional(),
+        whatsapp: z.string().optional(),
         group: z.string().optional(),
       }),
     )
@@ -131,6 +132,7 @@ export async function POST(req: NextRequest) {
         name: g.name,
         email: g.email,
         phone: g.phone,
+        whatsapp: g.whatsapp,
         group: g.group,
         rsvpToken: genToken(),
       })),

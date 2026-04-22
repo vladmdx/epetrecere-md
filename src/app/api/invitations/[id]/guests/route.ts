@@ -48,6 +48,7 @@ const addGuestSchema = z.object({
   name: z.string().min(1),
   email: z.string().optional(),
   phone: z.string().optional(),
+  whatsapp: z.string().optional(),
   group: z.string().optional(),
 });
 
@@ -69,6 +70,21 @@ export async function POST(
     );
   }
 
+  // Require at least one contact method (email/phone/whatsapp)
+  const hasContact =
+    !!(parsed.data.email && parsed.data.email.trim()) ||
+    !!(parsed.data.phone && parsed.data.phone.trim()) ||
+    !!(parsed.data.whatsapp && parsed.data.whatsapp.trim());
+  if (!hasContact) {
+    return NextResponse.json(
+      {
+        error:
+          "Adaugă cel puțin un contact (email, telefon sau WhatsApp) pentru ca invitatul să poată confirma prezența.",
+      },
+      { status: 400 },
+    );
+  }
+
   const [guest] = await db
     .insert(invitationGuests)
     .values({
@@ -76,6 +92,7 @@ export async function POST(
       name: parsed.data.name,
       email: parsed.data.email,
       phone: parsed.data.phone,
+      whatsapp: parsed.data.whatsapp,
       group: parsed.data.group,
       rsvpToken: genToken(),
     })

@@ -179,6 +179,15 @@
   }
 }
 
+/* Dark-theme fix: native date/time input indicator icons must be light */
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.2);
+  opacity: 0.85;
+  cursor: pointer;
+}
+
 /* Clerk auth pages — make placeholders visible on dark inputs */
 .cl-formFieldInput::placeholder,
 .cl-formFieldInput::-webkit-input-placeholder,

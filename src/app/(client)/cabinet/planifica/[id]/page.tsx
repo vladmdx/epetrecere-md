@@ -406,6 +406,7 @@ export default function PlanDetailPage({
           {activeTab === "guests" && (
             <GuestsView
               planId={plan.id}
+              plan={plan}
               guestCountTarget={plan.guestCountTarget}
               guests={guests}
               onChange={setGuests}
