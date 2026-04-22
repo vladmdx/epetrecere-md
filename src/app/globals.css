@@ -179,6 +179,22 @@
   }
 }
 
+/* Clerk auth pages — make placeholders visible on dark inputs */
+.cl-formFieldInput::placeholder,
+.cl-formFieldInput::-webkit-input-placeholder,
+input.cl-formFieldInput::placeholder {
+  color: #7A7A90 !important;
+  opacity: 1 !important;
+}
+
+.cl-formFieldInput {
+  color: #FAF8F2 !important;
+}
+
+.cl-formFieldLabel {
+  color: #FAF8F2 !important;
+}
+
 /* ═══════════════════════════════════════════════════════
    ANIMATIONS
    ═══════════════════════════════════════════════════════ */

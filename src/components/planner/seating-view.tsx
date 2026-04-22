@@ -1,22 +1,27 @@
 "use client";
 
-// M4 — Seating sub-view: create tables, assign guests, see who isn't
-// seated yet. Minimal text-based layout (full drag canvas would be a
-// follow-up). Honors table capacity via the API.
+// Seating planner — drag & drop guests onto tables, quick-add shape buttons,
+// auto-assignment by group, color-coded table fill states.
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2, UtensilsCrossed, UserMinus, Download } from "lucide-react";
+import {
+  Plus,
+  Trash2,
+  Loader2,
+  UtensilsCrossed,
+  UserMinus,
+  Download,
+  Circle,
+  Square,
+  RectangleHorizontal,
+  Search,
+  Sparkles,
+  Printer,
+  Users,
+} from "lucide-react";
 import type { Guest } from "./guests-view";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +50,32 @@ interface Props {
   onSeatsChange: (seats: SeatAssignment[]) => void;
 }
 
+type TableShape = "round" | "rectangular" | "long";
+
+const SHAPE_CONFIG: Record<TableShape, { label: string; seats: number; icon: typeof Circle }> = {
+  round: { label: "Masă Rotundă", seats: 10, icon: Circle },
+  rectangular: { label: "Masă Dreptunghiulară", seats: 8, icon: Square },
+  long: { label: "Masa de Onoare", seats: 14, icon: RectangleHorizontal },
+};
+
+const GROUP_LABELS: Record<string, string> = {
+  bride: "Partea miresei",
+  groom: "Partea mirelui",
+  family: "Familie",
+  friends: "Prieteni",
+  work: "Colegi",
+  other: "Altele",
+};
+
+const GROUP_COLORS: Record<string, string> = {
+  bride: "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  groom: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  family: "bg-purple-500/15 text-purple-300 border-purple-500/30",
+  friends: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  work: "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  other: "bg-slate-500/15 text-slate-300 border-slate-500/30",
+};
+
 export function SeatingView({
   planId,
   guests,
@@ -53,11 +84,11 @@ export function SeatingView({
   onTablesChange,
   onSeatsChange,
 }: Props) {
-  const [tableName, setTableName] = useState("");
-  const [tableSeats, setTableSeats] = useState("10");
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<TableShape | null>(null);
+  const [search, setSearch] = useState("");
+  const [autoPlacing, setAutoPlacing] = useState(false);
+  const [dragGuest, setDragGuest] = useState<number | null>(null);
 
-  // Guest lookup by id + who's seated
   const guestById = useMemo(() => {
     const m = new Map<number, Guest>();
     for (const g of guests) m.set(g.id, g);
@@ -69,10 +100,18 @@ export function SeatingView({
     [seats],
   );
 
-  const unassigned = useMemo(
-    () => guests.filter((g) => !assignedGuestIds.has(g.id) && g.rsvp !== "declined"),
-    [guests, assignedGuestIds],
+  // Only show confirmed or pending guests (decliners are hidden)
+  const eligibleGuests = useMemo(
+    () => guests.filter((g) => g.rsvp !== "declined"),
+    [guests],
   );
+
+  const unassigned = useMemo(() => {
+    const list = eligibleGuests.filter((g) => !assignedGuestIds.has(g.id));
+    if (!search.trim()) return list;
+    const q = search.trim().toLowerCase();
+    return list.filter((g) => g.fullName.toLowerCase().includes(q));
+  }, [eligibleGuests, assignedGuestIds, search]);
 
   const seatsByTable = useMemo(() => {
     const m = new Map<number, SeatAssignment[]>();
@@ -83,17 +122,23 @@ export function SeatingView({
     return m;
   }, [seats]);
 
-  async function addTable() {
-    if (tableName.trim().length < 1) return;
-    setAdding(true);
+  const placedCount = seats.length;
+  const totalGuests = eligibleGuests.reduce(
+    (sum, g) => sum + 1 + (g.plusOnes || 0),
+    0,
+  );
+
+  async function addTable(shape: TableShape) {
+    const config = SHAPE_CONFIG[shape];
+    const tableNumber = tables.length + 1;
+    const name =
+      shape === "long" ? "Masa de Onoare" : `${config.label.split(" ")[1]} ${tableNumber}`;
+    setAdding(shape);
     try {
       const res = await fetch(`/api/event-plans/${planId}/tables`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: tableName.trim(),
-          seats: Number(tableSeats) || 10,
-        }),
+        body: JSON.stringify({ name, seats: config.seats }),
       });
       if (!res.ok) {
         toast.error("Eroare la adăugare masă.");
@@ -101,13 +146,32 @@ export function SeatingView({
       }
       const data = await res.json();
       onTablesChange([...tables, data.table]);
-      setTableName("");
+      toast.success(`${name} adăugată (${config.seats} locuri)`);
+    } catch {
+      toast.error("Eroare la adăugare masă.");
     } finally {
-      setAdding(false);
+      setAdding(null);
+    }
+  }
+
+  async function renameTable(table: SeatingTable) {
+    const newName = prompt("Nume nou pentru masă:", table.name);
+    if (!newName || newName.trim() === table.name) return;
+    const prev = tables;
+    onTablesChange(tables.map((t) => (t.id === table.id ? { ...t, name: newName.trim() } : t)));
+    const res = await fetch(`/api/event-plans/${planId}/tables/${table.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    if (!res.ok) {
+      toast.error("Nu am putut redenumi masa.");
+      onTablesChange(prev);
     }
   }
 
   async function deleteTable(table: SeatingTable) {
+    if (!confirm(`Ștergi masa "${table.name}"? Toți invitații așezați vor fi eliberați.`)) return;
     const prev = { tables, seats };
     onTablesChange(tables.filter((t) => t.id !== table.id));
     onSeatsChange(seats.filter((s) => s.tableId !== table.id));
@@ -122,6 +186,13 @@ export function SeatingView({
   }
 
   async function assignGuest(guestId: number, tableId: number) {
+    const table = tables.find((t) => t.id === tableId);
+    if (!table) return;
+    const current = seatsByTable.get(tableId)?.length ?? 0;
+    if (current >= table.seats) {
+      toast.error(`${table.name} este plină!`);
+      return;
+    }
     const res = await fetch(`/api/event-plans/${planId}/seats`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -150,206 +221,343 @@ export function SeatingView({
     }
   }
 
-  // C-40 — Export seating plan as PDF
+  // Auto-placement: group guests by their `group` field and fill tables sequentially
+  async function autoPlace() {
+    if (tables.length === 0) {
+      toast.error("Adaugă cel puțin o masă mai întâi.");
+      return;
+    }
+    if (!confirm("Sugestia automată va așeza toți invitații neașezați pe mese în funcție de grupurile lor. Continui?")) return;
+    setAutoPlacing(true);
+    try {
+      const groupedUnassigned = new Map<string, Guest[]>();
+      for (const g of unassigned) {
+        const key = g.group || "other";
+        if (!groupedUnassigned.has(key)) groupedUnassigned.set(key, []);
+        groupedUnassigned.get(key)!.push(g);
+      }
+
+      const freeSeats = tables.map((t) => ({
+        id: t.id,
+        name: t.name,
+        free: t.seats - (seatsByTable.get(t.id)?.length ?? 0),
+      }));
+
+      let assigned = 0;
+      for (const [, guestList] of groupedUnassigned) {
+        for (const guest of guestList) {
+          const target = freeSeats.find((t) => t.free > 0);
+          if (!target) break;
+          const res = await fetch(`/api/event-plans/${planId}/seats`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ guestId: guest.id, tableId: target.id }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            seats.push(data.assignment);
+            target.free -= 1;
+            assigned += 1;
+          }
+        }
+      }
+      onSeatsChange([...seats]);
+      toast.success(`${assigned} invitați așezați automat!`);
+    } finally {
+      setAutoPlacing(false);
+    }
+  }
+
   function exportSeatingPDF() {
     const tableRows = tables.map((table) => {
       const assigned = seats.filter((s) => s.tableId === table.id);
       const guestNames = assigned.map((s) => {
         const g = guests.find((gg) => gg.id === s.guestId);
-        return g ? g.fullName : `Invitat #${s.guestId}`;
+        return g ? g.fullName + (g.plusOnes > 0 ? ` (+${g.plusOnes})` : "") : `Invitat #${s.guestId}`;
       });
-      return `<div style="background:#1A1A2E;border:1px solid rgba(201,168,76,0.15);border-radius:12px;padding:16px;break-inside:avoid">
-        <h3 style="color:#C9A84C;margin:0 0 8px;font-size:16px">${table.name}</h3>
-        <p style="color:#A0A0B0;font-size:12px;margin:0 0 8px">${assigned.length}/${table.seats} locuri</p>
+      return `<div style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;break-inside:avoid;margin-bottom:16px">
+        <h3 style="color:#A08839;margin:0 0 8px;font-size:16px">${table.name}</h3>
+        <p style="color:#666;font-size:12px;margin:0 0 8px">${assigned.length}/${table.seats} locuri</p>
         ${guestNames.length > 0
-          ? `<ul style="margin:0;padding-left:18px;color:#FAF8F2;font-size:13px">${guestNames.map((n) => `<li style="margin-bottom:2px">${n}</li>`).join("")}</ul>`
-          : `<p style="color:#6B6B7B;font-size:12px;font-style:italic">Niciun invitat asignat</p>`}
+          ? `<ul style="margin:0;padding-left:18px;font-size:13px">${guestNames.map((n) => `<li style="margin-bottom:2px">${n}</li>`).join("")}</ul>`
+          : `<p style="color:#999;font-size:12px;font-style:italic">Niciun invitat asignat</p>`}
       </div>`;
     });
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plan Mese — ePetrecere.md</title>
-      <style>body{font-family:system-ui,sans-serif;background:#0D0D0D;color:#FAF8F2;padding:40px}
-      h1{color:#C9A84C}h2{color:#A0A0B0;font-size:14px;font-weight:normal}
-      .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:16px;margin-top:20px}
-      @media print{body{background:white;color:black}h3{color:#333}}</style></head>
-      <body><h1>Plan Așezare Mese</h1><h2>ePetrecere.md — ${new Date().toLocaleDateString("ro-RO")} · ${unassigned.length} neasignați din ${guests.length} total</h2>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plan Așezare Mese</title>
+      <style>body{font-family:system-ui,sans-serif;padding:40px;background:#fff;color:#222}
+      h1{color:#A08839}h2{color:#666;font-size:14px;font-weight:normal}
+      .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px}
+      @media print{@page{margin:20mm}}</style></head>
+      <body><h1>Plan Așezare Mese</h1><h2>ePetrecere.md · ${new Date().toLocaleDateString("ro-RO")} · ${placedCount} așezați din ${totalGuests} total</h2>
       <div class="grid">${tableRows.join("")}</div></body></html>`;
     const w = window.open("", "_blank");
     if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
   }
 
+  // HTML5 Drag & Drop handlers
+  function handleDragStart(guestId: number) {
+    setDragGuest(guestId);
+  }
+  function handleDragEnd() {
+    setDragGuest(null);
+  }
+  function handleDrop(tableId: number) {
+    if (dragGuest !== null) {
+      assignGuest(dragGuest, tableId);
+      setDragGuest(null);
+    }
+  }
+
   return (
     <div className="space-y-5">
-      {/* Export button */}
-      {tables.length > 0 && (
-        <div className="flex justify-end">
-          <Button variant="outline" size="sm" className="gap-2 border-gold/30 text-gold hover:bg-gold/10" onClick={exportSeatingPDF}>
-            <Download className="h-4 w-4" /> Export PDF
-          </Button>
+      {/* Stats + Actions bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/40 bg-card p-4">
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-gold" />
+            <span>
+              <strong>{placedCount}</strong> așezați / <strong>{totalGuests}</strong> total
+            </span>
+          </div>
+          <div className="text-muted-foreground">
+            {unassigned.length} rămași
+          </div>
         </div>
-      )}
-      {/* Add table */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={autoPlace}
+            disabled={autoPlacing || unassigned.length === 0 || tables.length === 0}
+            className="gap-1.5"
+          >
+            {autoPlacing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="h-3.5 w-3.5" />
+            )}
+            Sugestie Automată
+          </Button>
+          {tables.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={exportSeatingPDF}
+              className="gap-1.5 border-gold/30 text-gold hover:bg-gold/10"
+            >
+              <Printer className="h-3.5 w-3.5" /> Export / Print
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Quick-add table shapes */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
         <p className="mb-3 text-xs font-medium uppercase text-muted-foreground">
           Adaugă masă
         </p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1">
-            <Label htmlFor="tname" className="text-xs">
-              Nume masă
-            </Label>
-            <Input
-              id="tname"
-              value={tableName}
-              onChange={(e) => setTableName(e.target.value)}
-              placeholder="Masa 1 / Masa mirilor"
-              onKeyDown={(e) => e.key === "Enter" && addTable()}
-            />
-          </div>
-          <div>
-            <Label htmlFor="tseats" className="text-xs">
-              Locuri
-            </Label>
-            <Input
-              id="tseats"
-              type="number"
-              min="2"
-              max="30"
-              value={tableSeats}
-              onChange={(e) => setTableSeats(e.target.value)}
-              className="w-24"
-            />
-          </div>
-          <Button
-            onClick={addTable}
-            disabled={adding}
-            className="gap-1 bg-gold text-background hover:bg-gold-dark"
-          >
-            {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Adaugă masă
-          </Button>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          {(Object.keys(SHAPE_CONFIG) as TableShape[]).map((shape) => {
+            const cfg = SHAPE_CONFIG[shape];
+            const Icon = cfg.icon;
+            return (
+              <button
+                key={shape}
+                onClick={() => addTable(shape)}
+                disabled={adding !== null}
+                className="flex items-center gap-3 rounded-lg border border-border/40 bg-background/50 p-3 text-left transition-all hover:border-gold/40 hover:bg-gold/5 disabled:opacity-50"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gold/10 text-gold">
+                  {adding === shape ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    <Icon className="h-5 w-5" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{cfg.label}</p>
+                  <p className="text-xs text-muted-foreground">{cfg.seats} locuri</p>
+                </div>
+                <Plus className="h-4 w-4 text-muted-foreground" />
+              </button>
+            );
+          })}
         </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
-        {/* Unassigned column */}
+        {/* Sidebar — unassigned guests */}
         <div className="rounded-xl border border-border/40 bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-heading text-base font-semibold">Neașezați</h3>
+            <h3 className="font-heading text-base font-semibold">Invitați</h3>
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
               {unassigned.length}
             </span>
           </div>
+          <div className="relative mb-3">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Caută invitat..."
+              className="h-8 pl-8 text-sm"
+            />
+          </div>
           {unassigned.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
-              Toți invitații sunt la mese.
+              {search
+                ? "Niciun rezultat."
+                : "Toți invitații sunt așezați."}
             </p>
           ) : (
-            <ul className="space-y-2">
-              {unassigned.map((g) => (
-                <li
-                  key={g.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border/20 px-3 py-2 text-sm"
-                >
-                  <span className="min-w-0 flex-1 truncate">{g.fullName}</span>
-                  <Select onValueChange={(v) => assignGuest(g.id, Number(v))}>
-                    <SelectTrigger className="h-8 w-[140px]">
-                      <SelectValue placeholder="Așează la..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tables.length === 0 ? (
-                        <div className="p-2 text-xs text-muted-foreground">
-                          Adaugă o masă mai întâi.
-                        </div>
-                      ) : (
-                        tables.map((t) => {
-                          const used = seatsByTable.get(t.id)?.length ?? 0;
-                          const full = used >= t.seats;
-                          return (
-                            <SelectItem key={t.id} value={String(t.id)} disabled={full}>
-                              {t.name} ({used}/{t.seats})
-                            </SelectItem>
-                          );
-                        })
-                      )}
-                    </SelectContent>
-                  </Select>
-                </li>
-              ))}
+            <ul className="max-h-[500px] space-y-1.5 overflow-y-auto pr-1">
+              {unassigned.map((g) => {
+                const groupColor = g.group ? GROUP_COLORS[g.group] : GROUP_COLORS.other;
+                return (
+                  <li
+                    key={g.id}
+                    draggable
+                    onDragStart={() => handleDragStart(g.id)}
+                    onDragEnd={handleDragEnd}
+                    className={cn(
+                      "flex cursor-grab items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-all active:cursor-grabbing active:scale-95",
+                      groupColor,
+                      dragGuest === g.id && "opacity-50",
+                    )}
+                    title={`Trage pe o masă · Grup: ${g.group ? GROUP_LABELS[g.group] || g.group : "—"}`}
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {g.fullName}
+                      {g.plusOnes > 0 && ` +${g.plusOnes}`}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
 
-        {/* Tables grid */}
-        <div className="grid gap-4 md:grid-cols-2">
+        {/* Main canvas — tables */}
+        <div>
           {tables.length === 0 ? (
-            <div className="col-span-full rounded-xl border border-dashed border-border/40 bg-card py-12 text-center">
-              <UtensilsCrossed className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">
-                Niciun aranjament încă. Adaugă prima masă deasupra.
+            <div className="rounded-xl border border-dashed border-border/40 bg-card py-16 text-center">
+              <UtensilsCrossed className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+              <p className="text-sm font-medium">Niciun aranjament încă</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Adaugă prima masă folosind butoanele de mai sus
               </p>
             </div>
           ) : (
-            tables.map((table) => {
-              const assigned = seatsByTable.get(table.id) ?? [];
-              const full = assigned.length >= table.seats;
-              return (
-                <div
-                  key={table.id}
-                  className="rounded-xl border border-border/40 bg-card p-4"
-                >
-                  <div className="mb-3 flex items-center justify-between">
-                    <div>
-                      <h3 className="font-heading text-base font-semibold">{table.name}</h3>
-                      <p
-                        className={cn(
-                          "text-xs",
-                          full ? "text-red-500" : "text-muted-foreground",
-                        )}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {tables.map((table) => {
+                const assigned = seatsByTable.get(table.id) ?? [];
+                const fillRatio = assigned.length / table.seats;
+                const isEmpty = assigned.length === 0;
+                const isFull = assigned.length >= table.seats;
+                const isPartial = !isEmpty && !isFull;
+
+                return (
+                  <div
+                    key={table.id}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={() => handleDrop(table.id)}
+                    className={cn(
+                      "rounded-xl border-2 bg-card p-4 transition-all",
+                      isEmpty && "border-border/40",
+                      isPartial && "border-amber-500/40 bg-amber-500/5",
+                      isFull && "border-emerald-500/40 bg-emerald-500/5",
+                      dragGuest !== null && "border-gold/60 shadow-lg shadow-gold/20",
+                    )}
+                  >
+                    <div className="mb-3 flex items-start justify-between">
+                      <div className="min-w-0 flex-1">
+                        <button
+                          onClick={() => renameTable(table)}
+                          className="text-left font-heading text-base font-semibold hover:text-gold"
+                        >
+                          {table.name}
+                        </button>
+                        <p
+                          className={cn(
+                            "text-xs",
+                            isFull && "text-emerald-500",
+                            isPartial && "text-amber-500",
+                            isEmpty && "text-muted-foreground",
+                          )}
+                        >
+                          {assigned.length} / {table.seats} locuri
+                          {isFull && " · Completă"}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => deleteTable(table)}
+                        className="text-muted-foreground transition-colors hover:text-red-500"
+                        aria-label="Șterge masa"
                       >
-                        {assigned.length} / {table.seats} locuri
-                      </p>
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => deleteTable(table)}
-                      className="text-muted-foreground transition-colors hover:text-red-500"
-                      aria-label="Șterge masa"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  {assigned.length === 0 ? (
-                    <p className="py-2 text-xs text-muted-foreground">
-                      Nimeni la această masă.
-                    </p>
-                  ) : (
-                    <ul className="space-y-1.5">
-                      {assigned.map((s) => {
-                        const g = guestById.get(s.guestId);
-                        if (!g) return null;
-                        return (
-                          <li
-                            key={s.id}
-                            className="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1 text-xs"
-                          >
-                            <span className="truncate">
-                              {g.fullName}
-                              {g.plusOnes > 0 && ` +${g.plusOnes}`}
-                            </span>
-                            <button
-                              onClick={() => unassign(g.id)}
-                              className="text-muted-foreground transition-colors hover:text-red-500"
-                              aria-label="Elibereză locul"
+
+                    {/* Visual table representation */}
+                    <div className="relative mb-3 flex h-20 items-center justify-center rounded-lg bg-muted/30">
+                      <div
+                        className={cn(
+                          "rounded-full border-2 transition-all",
+                          table.seats > 12 ? "h-12 w-20 rounded-lg" : "h-14 w-14",
+                          isFull
+                            ? "border-emerald-500 bg-emerald-500/20"
+                            : isPartial
+                              ? "border-amber-500 bg-amber-500/10"
+                              : "border-muted-foreground/40 bg-muted/40",
+                        )}
+                      />
+                      <div
+                        className="absolute inset-0 flex items-center justify-center text-xs font-medium text-muted-foreground"
+                        style={{ opacity: 0.8 }}
+                      >
+                        {Math.round(fillRatio * 100)}%
+                      </div>
+                    </div>
+
+                    {/* Guest list */}
+                    {assigned.length === 0 ? (
+                      <p className="rounded-lg border border-dashed border-border/30 py-2 text-center text-xs text-muted-foreground">
+                        Trage un invitat aici
+                      </p>
+                    ) : (
+                      <ul className="space-y-1">
+                        {assigned.map((s) => {
+                          const g = guestById.get(s.guestId);
+                          if (!g) return null;
+                          const groupColor = g.group ? GROUP_COLORS[g.group] : GROUP_COLORS.other;
+                          return (
+                            <li
+                              key={s.id}
+                              className={cn(
+                                "group flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-xs",
+                                groupColor,
+                              )}
                             >
-                              <UserMinus className="h-3.5 w-3.5" />
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              );
-            })
+                              <span className="truncate">
+                                {g.fullName}
+                                {g.plusOnes > 0 && ` +${g.plusOnes}`}
+                              </span>
+                              <button
+                                onClick={() => unassign(g.id)}
+                                className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
+                                aria-label="Elimină de la masă"
+                              >
+                                <UserMinus className="h-3 w-3" />
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>

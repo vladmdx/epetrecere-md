@@ -63,5 +63,13 @@ export default async function PublicInvitationPage({
     }
   }
 
-  return <PublicInvitationView invitation={invitation} guest={guest} />;
+  return (
+    <PublicInvitationView
+      invitation={{
+        ...invitation,
+        customColors: (invitation.customColors as { designId?: string } | null) || null,
+      }}
+      guest={guest}
+    />
+  );
 }

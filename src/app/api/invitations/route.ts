@@ -31,7 +31,9 @@ export async function GET() {
 }
 
 const createSchema = z.object({
-  templateId: z.number().int().positive(),
+  templateId: z.number().int().optional(),
+  designId: z.string().optional(),
+  customColors: z.record(z.string(), z.unknown()).optional(),
   eventType: z.enum(["wedding", "birthday", "baptism", "corporate"]),
   coupleNames: z.string().optional(),
   hostName: z.string().optional(),
@@ -91,11 +93,18 @@ export async function POST(req: NextRequest) {
   );
   const slug = `${baseSlug}-${genToken().slice(0, 6)}`;
 
+  // Store design selection in customColors JSON. Merge with any custom colors
+  // passed by the client.
+  const customColors = {
+    ...(data.customColors || {}),
+    ...(data.designId ? { designId: data.designId } : {}),
+  };
+
   const [invitation] = await db
     .insert(invitations)
     .values({
       userId: appUser.userId,
-      templateId: data.templateId,
+      templateId: data.templateId && data.templateId > 0 ? data.templateId : null,
       slug,
       status: "draft",
       eventType: data.eventType,
@@ -110,6 +119,7 @@ export async function POST(req: NextRequest) {
       dressCode: data.dressCode,
       rsvpDeadline: data.rsvpDeadline || null,
       allowPlusOne: data.allowPlusOne,
+      customColors: Object.keys(customColors).length > 0 ? customColors : null,
     })
     .returning();
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Heart, Calendar, MapPin, Clock, Check, X, HelpCircle, Sparkles } from "lucide-react";
+import { Heart, Calendar, MapPin, Check, X, HelpCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { getInvitationDesign, googleFontsUrl } from "@/lib/invitations/templates";
 
 interface Invitation {
   id: number;
@@ -23,6 +24,7 @@ interface Invitation {
   rsvpDeadline: string | null;
   allowPlusOne: boolean;
   coverImageUrl: string | null;
+  customColors?: { designId?: string } | null;
 }
 
 interface Guest {
@@ -58,6 +60,29 @@ export function PublicInvitationView({
   const title =
     invitation.coupleNames || invitation.hostName || "Invitație";
 
+  const design = getInvitationDesign(invitation.customColors?.designId);
+
+  // Inject Google Fonts for the selected design
+  useEffect(() => {
+    const fontsUrl = googleFontsUrl(design);
+    if (!fontsUrl) return;
+    const id = `invitation-font-${design.id}`;
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = fontsUrl;
+    document.head.appendChild(link);
+  }, [design]);
+
+  const decorations: Record<string, string> = {
+    sparkles: "✦",
+    flowers: "❀",
+    minimal: "—",
+    ornate: "❦",
+  };
+  const decor = decorations[design.decorStyle] || "✦";
+
   async function submitRsvp(status: "yes" | "no" | "maybe") {
     if (!guest?.rsvpToken) {
       alert(
@@ -88,7 +113,17 @@ export function PublicInvitationView({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-gold/5">
+    <div
+      className="min-h-screen"
+      style={{
+        ...(design.cssVars as React.CSSProperties),
+        background: "var(--inv-bg)",
+        color: "var(--inv-text)",
+        fontFamily: design.fontFamily
+          ? `"${design.fontFamily}", serif`
+          : undefined,
+      }}
+    >
       {/* Hero */}
       <section className="relative overflow-hidden">
         {invitation.coverImageUrl ? (
@@ -100,15 +135,34 @@ export function PublicInvitationView({
           />
         ) : null}
         <div className="relative mx-auto max-w-3xl px-4 py-20 text-center lg:px-8">
-          <Sparkles className="mx-auto h-10 w-10 text-gold" />
-          <p className="mt-4 text-sm font-medium uppercase tracking-[4px] text-gold">
+          <div
+            className="text-4xl"
+            style={{ color: "var(--inv-accent)" }}
+          >
+            {decor}
+          </div>
+          <p
+            className="mt-4 text-sm font-medium uppercase tracking-[4px]"
+            style={{ color: "var(--inv-accent)" }}
+          >
             Ești invitat
           </p>
-          <h1 className="mt-4 font-heading text-4xl font-bold md:text-6xl">
+          <h1
+            className="mt-4 text-4xl font-bold md:text-6xl"
+            style={{
+              fontFamily: design.fontHeading
+                ? `"${design.fontHeading}", serif`
+                : undefined,
+              color: "var(--inv-text)",
+            }}
+          >
             {title}
           </h1>
           {invitation.eventDate && (
-            <p className="mt-4 font-accent text-lg text-muted-foreground">
+            <p
+              className="mt-4 text-lg italic"
+              style={{ color: "var(--inv-muted)" }}
+            >
               {new Date(invitation.eventDate).toLocaleDateString("ro-RO", {
                 weekday: "long",
                 year: "numeric",

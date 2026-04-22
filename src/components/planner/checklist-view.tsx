@@ -15,7 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Clock, Loader2 } from "lucide-react";
+import { Plus, Trash2, Clock, Loader2, RefreshCw, Sparkles } from "lucide-react";
 import { CATEGORY_LABELS } from "@/lib/planner/templates";
 import { cn } from "@/lib/utils";
 
@@ -33,9 +33,20 @@ export interface ChecklistItem {
 interface Props {
   planId: number;
   eventDate: string | null;
+  eventType?: string | null;
   items: ChecklistItem[];
   onChange: (items: ChecklistItem[]) => void;
 }
+
+const EVENT_TYPE_LABELS: Record<string, string> = {
+  wedding: "Nuntă",
+  baptism: "Cumătrie / Botez",
+  cumatrie: "Cumătrie",
+  cumpatrie: "Cumătrie",
+  birthday: "Aniversare",
+  corporate: "Eveniment Corporativ",
+  other: "Eveniment",
+};
 
 const PRIORITY_COLOR: Record<ChecklistItem["priority"], string> = {
   high: "border-red-500/40 bg-red-500/5 text-red-500",
@@ -49,11 +60,36 @@ const PRIORITY_LABEL: Record<ChecklistItem["priority"], string> = {
   low: "Relaxat",
 };
 
-export function ChecklistView({ planId, eventDate, items, onChange }: Props) {
+export function ChecklistView({ planId, eventDate, eventType, items, onChange }: Props) {
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState<string>("logistics");
   const [newPriority, setNewPriority] = useState<ChecklistItem["priority"]>("medium");
   const [adding, setAdding] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+
+  const eventTypeLabel = eventType
+    ? EVENT_TYPE_LABELS[eventType.toLowerCase()] || eventType
+    : "Eveniment";
+
+  async function regenerateFromTemplate() {
+    if (!confirm(`Vrei să regenerezi checklist-ul cu template pentru ${eventTypeLabel}? Aceasta va șterge elementele existente și le va înlocui cu template-ul standard.`)) {
+      return;
+    }
+    setRegenerating(true);
+    try {
+      const res = await fetch(`/api/event-plans/${planId}/checklist/regenerate`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      onChange(data.items || []);
+      toast.success(`Checklist pentru ${eventTypeLabel} a fost regenerat!`);
+    } catch {
+      toast.error("Nu s-a putut regenera checklist-ul");
+    } finally {
+      setRegenerating(false);
+    }
+  }
 
   // Compute days-to-event so we can flag overdue items.
   const daysToEvent = useMemo(() => {
@@ -138,6 +174,35 @@ export function ChecklistView({ planId, eventDate, items, onChange }: Props) {
 
   return (
     <div className="space-y-5">
+      {/* Event type header + regenerate button */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4">
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-gold/10 p-2 text-gold">
+            <Sparkles className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Checklist personalizat pentru
+            </p>
+            <p className="font-heading font-bold">{eventTypeLabel}</p>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={regenerateFromTemplate}
+          disabled={regenerating}
+          className="gap-1.5"
+        >
+          {regenerating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="h-3.5 w-3.5" />
+          )}
+          Regenerează din template
+        </Button>
+      </div>
+
       {/* Progress bar */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
         <div className="flex items-center justify-between text-sm">

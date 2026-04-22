@@ -47,6 +47,15 @@ const RSVP_CONFIG: Record<
   maybe: { label: "Posibil", color: "text-amber-500", icon: UserMinus },
 };
 
+const GROUP_LABELS: Record<string, string> = {
+  bride: "Partea miresei",
+  groom: "Partea mirelui",
+  family: "Familie",
+  friends: "Prieteni",
+  work: "Colegi",
+  other: "Altele",
+};
+
 export function GuestsView({ planId, guestCountTarget, guests, onChange }: Props) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -233,7 +242,9 @@ export function GuestsView({ planId, guestCountTarget, guests, onChange }: Props
           <div className="flex gap-2">
             <Select value={group} onValueChange={(v) => setGroup(v ?? "friends")}>
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Categorie">
+                  {GROUP_LABELS[group] || group}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="bride">Partea miresei</SelectItem>
@@ -321,7 +332,7 @@ export function GuestsView({ planId, guestCountTarget, guests, onChange }: Props
                     className="border-b border-border/20 last:border-0 hover:bg-muted/30"
                   >
                     <td className="p-3 font-medium">{g.fullName}</td>
-                    <td className="p-3 text-muted-foreground">{g.group || "—"}</td>
+                    <td className="p-3 text-muted-foreground">{g.group ? (GROUP_LABELS[g.group] || g.group) : "—"}</td>
                     <td className="p-3 text-muted-foreground">
                       {g.phone || g.email || "—"}
                     </td>

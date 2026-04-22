@@ -77,13 +77,9 @@ export default function VendorBookingsPage() {
 
   // Pending-action dialogs (shown per booking).
   const [acceptDialog, setAcceptDialog] = useState<BookingRequest | null>(null);
-  const [acceptReply, setAcceptReply] = useState(
-    "Mulțumesc pentru rezervare! Accept cu plăcere.",
-  );
+  const [acceptReply, setAcceptReply] = useState("");
   const [rejectDialog, setRejectDialog] = useState<BookingRequest | null>(null);
-  const [rejectReply, setRejectReply] = useState(
-    "Ne pare rău, nu sunt disponibil la data respectivă.",
-  );
+  const [rejectReply, setRejectReply] = useState("");
   const [proposeDialog, setProposeDialog] = useState<BookingRequest | null>(
     null,
   );
@@ -185,7 +181,7 @@ export default function VendorBookingsPage() {
       }
       toast.success("Rezervare acceptată!");
       setAcceptDialog(null);
-      setAcceptReply("Mulțumesc pentru rezervare! Accept cu plăcere.");
+      setAcceptReply("");
       await refreshBookings();
     } catch {
       toast.error("Eroare la acceptare");
@@ -214,7 +210,7 @@ export default function VendorBookingsPage() {
       }
       toast.success("Rezervare respinsă");
       setRejectDialog(null);
-      setRejectReply("Ne pare rău, nu sunt disponibil la data respectivă.");
+      setRejectReply("");
       await refreshBookings();
     } catch {
       toast.error("Eroare la respingere");
@@ -550,9 +546,7 @@ export default function VendorBookingsPage() {
                           disabled={busy === booking.id}
                           onClick={() => {
                             setAcceptDialog(booking);
-                            setAcceptReply(
-                              "Mulțumesc pentru rezervare! Accept cu plăcere.",
-                            );
+                            setAcceptReply("");
                           }}
                           className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
                         >
@@ -593,9 +587,7 @@ export default function VendorBookingsPage() {
                           disabled={busy === booking.id}
                           onClick={() => {
                             setRejectDialog(booking);
-                            setRejectReply(
-                              "Ne pare rău, nu sunt disponibil la data respectivă.",
-                            );
+                            setRejectReply("");
                           }}
                           className="gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10"
                         >
@@ -745,7 +737,7 @@ export default function VendorBookingsPage() {
                   onChange={(e) => setAcceptReply(e.target.value)}
                   rows={3}
                   className="mt-1"
-                  placeholder="Mesajul tău către client…"
+                  placeholder="Mulțumesc pentru rezervare! Accept cu plăcere."
                 />
               </div>
             </div>
@@ -994,6 +986,7 @@ export default function VendorBookingsPage() {
                   onChange={(e) => setRejectReply(e.target.value)}
                   rows={3}
                   className="mt-1"
+                  placeholder="Ne pare rău, nu sunt disponibil la data respectivă."
                 />
               </div>
             </div>

@@ -173,8 +173,6 @@ const NAV_ITEMS: NavItem[] = [
   { key: "budget", icon: Wallet, label: "Budget" },
   { key: "guests", icon: Users, label: "Invitați" },
   { key: "seating", icon: UtensilsCrossed, label: "Așezare Mese" },
-  { key: "timeline", icon: Clock, label: "Cronologie" },
-  { key: "photos", icon: Camera, label: "Fotografii" },
   { key: "settings", icon: Settings, label: "Setări" },
 ];
 
@@ -387,6 +385,7 @@ export default function PlanDetailPage({
             <ChecklistView
               planId={plan.id}
               eventDate={plan.eventDate}
+              eventType={plan.eventType}
               items={checklist}
               onChange={setChecklist}
             />

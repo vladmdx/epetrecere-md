@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { INVITATION_DESIGN_LIST, type InvitationDesignId } from "@/lib/invitations/templates";
 
 interface Template {
   id: number;
@@ -60,6 +61,7 @@ export function InvitationWizard() {
 
   const [data, setData] = useState({
     templateId: 0,
+    designId: "elegant-gold" as InvitationDesignId,
     eventType: "wedding" as "wedding" | "birthday" | "baptism" | "corporate",
     coupleNames: "",
     hostName: "",
@@ -110,7 +112,7 @@ export function InvitationWizard() {
   function canAdvance(): boolean {
     switch (step) {
       case 0:
-        return !!data.eventType && data.templateId > 0;
+        return !!data.eventType && !!data.designId;
       case 1:
         return (
           !!data.eventDate &&
@@ -129,10 +131,15 @@ export function InvitationWizard() {
   async function handleSubmit() {
     setSaving(true);
     try {
+      // Map designId into customColors JSON so the public view can pick it up
+      const body = {
+        ...data,
+        customColors: { designId: data.designId },
+      };
       const res = await fetch("/api/invitations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -229,45 +236,60 @@ export function InvitationWizard() {
             </div>
 
             <div>
-              <Label className="mb-3 block">Template de design</Label>
-              {filteredTemplates.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Nu sunt template-uri pentru acest tip încă.
-                </p>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {filteredTemplates.map((t) => {
-                    const active = data.templateId === t.id;
-                    const tokens = t.designTokens ?? {};
-                    return (
-                      <button
-                        key={t.id}
-                        type="button"
-                        onClick={() => update("templateId", t.id)}
-                        className={`rounded-xl border p-4 text-left transition-all ${
-                          active
-                            ? "border-gold bg-gold/10"
-                            : "border-border/40 bg-card hover:border-gold/30"
-                        }`}
+              <Label className="mb-3 block">Design invitație</Label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {INVITATION_DESIGN_LIST.map((d) => {
+                  const active = data.designId === d.id;
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => update("designId", d.id)}
+                      className={`overflow-hidden rounded-xl border-2 text-left transition-all ${
+                        active
+                          ? "border-gold shadow-lg"
+                          : "border-border/40 hover:border-gold/30"
+                      }`}
+                    >
+                      <div
+                        className="p-6"
+                        style={{
+                          background: d.preview.bg,
+                          color: d.preview.text,
+                        }}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="font-medium">{t.nameRo}</div>
-                          {active && <Check className="h-4 w-4 text-gold" />}
+                        <div
+                          className="text-center text-2xl"
+                          style={{ color: d.preview.accent }}
+                        >
+                          {d.decorStyle === "sparkles" ? "✦" : d.decorStyle === "flowers" ? "❀" : d.decorStyle === "minimal" ? "—" : "❦"}
                         </div>
-                        <div className="mt-2 flex gap-1.5">
-                          {(["primary", "secondary"] as const).map((k) => (
-                            <div
-                              key={k}
-                              className="h-4 w-4 rounded-full border border-border/40"
-                              style={{ background: tokens[k] || "#ccc" }}
-                            />
-                          ))}
+                        <div
+                          className="text-center text-xs uppercase tracking-widest"
+                          style={{ color: d.preview.accent }}
+                        >
+                          Ești invitat
                         </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                        <div
+                          className="mt-1 text-center text-xl font-bold"
+                          style={{
+                            fontFamily: d.fontHeading ? `"${d.fontHeading}", serif` : undefined,
+                          }}
+                        >
+                          Ana & Ion
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between bg-card p-3">
+                        <div>
+                          <div className="text-sm font-medium">{d.name}</div>
+                          <div className="text-xs text-muted-foreground">{d.description}</div>
+                        </div>
+                        {active && <Check className="h-5 w-5 shrink-0 text-gold" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}

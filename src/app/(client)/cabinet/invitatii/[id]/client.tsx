@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Loader2,
   Trash2,
+  Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,6 +60,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
   const [newGuestName, setNewGuestName] = useState("");
   const [newGuestEmail, setNewGuestEmail] = useState("");
   const [publishing, setPublishing] = useState(false);
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     fetch(`/api/invitations/${id}`)
@@ -112,6 +114,31 @@ export function InvitationDetailClient({ id }: { id: number }) {
       toast.success("Invitație publicată!");
     }
     setPublishing(false);
+  }
+
+  async function sendInvitations() {
+    const guestsWithEmail = guests.filter((g) => g.email);
+    if (guestsWithEmail.length === 0) {
+      toast.error("Niciun invitat nu are email setat");
+      return;
+    }
+    if (!confirm(`Trimiți invitații pe email la ${guestsWithEmail.length} invitați?`)) return;
+    setSending(true);
+    try {
+      const res = await fetch(`/api/invitations/${id}/send`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Eroare la trimitere");
+      }
+      const data = await res.json();
+      toast.success(`${data.sent} invitații trimise cu succes!`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare la trimitere");
+    } finally {
+      setSending(false);
+    }
   }
 
   function copyRsvpLink(token: string | null) {
@@ -168,14 +195,28 @@ export function InvitationDetailClient({ id }: { id: number }) {
         </div>
         <div className="flex gap-2">
           {invitation.status === "published" && (
-            <Link
-              href={`/i/${invitation.slug}`}
-              target="_blank"
-              rel="noopener"
-              className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-4 py-2 text-sm font-medium hover:bg-muted"
-            >
-              <ExternalLink className="h-3 w-3" /> Previzualizare
-            </Link>
+            <>
+              <Link
+                href={`/i/${invitation.slug}`}
+                target="_blank"
+                rel="noopener"
+                className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-4 py-2 text-sm font-medium hover:bg-muted"
+              >
+                <ExternalLink className="h-3 w-3" /> Previzualizare
+              </Link>
+              <Button
+                onClick={sendInvitations}
+                disabled={sending}
+                className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+              >
+                {sending ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                Trimite invitații
+              </Button>
+            </>
           )}
           {invitation.status === "draft" && (
             <Button
