@@ -18,6 +18,7 @@ import {
   eventPlans,
   users,
   artistAvailabilitySlots,
+  categories,
 } from "@/lib/db/schema";
 import { and, eq, gte, lte, inArray } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
@@ -40,8 +41,9 @@ const TOOLS: Anthropic.Messages.Tool[] = [
     name: "list_available_artists",
     description:
       "Caută artiști disponibili pentru data evenimentului clientului. " +
-      "Returnează listă cu id, nume, rating, preț minim și categorie. " +
-      "Filtrele sunt opționale — fără ele primești primii 30 artiști activi.",
+      "Returnează pentru fiecare artist: id, name, rating, ratingCount, priceFrom, " +
+      "categories (array cu numele categoriilor), location, isVerified, isPremium, " +
+      "isFeatured, description. Filtrele sunt opționale.",
     input_schema: {
       type: "object",
       properties: {
@@ -58,6 +60,12 @@ const TOOLS: Anthropic.Messages.Tool[] = [
           items: { type: "number" },
           description:
             "ID-urile categoriilor preferate (ex. cântăreț, DJ). Opțional.",
+        },
+        categoryNames: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Alternative la categoryIds: caută artiști după numele categoriei (case-insensitive). Ex: ['DJ', 'Fotograf'].",
         },
       },
     },
@@ -134,6 +142,33 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  // Pre-fetch ALL active categories so we can resolve IDs to names in both
+  // the system prompt and tool responses.
+  const allCategories = await db
+    .select({
+      id: categories.id,
+      nameRo: categories.nameRo,
+      type: categories.type,
+    })
+    .from(categories)
+    .where(eq(categories.isActive, true));
+
+  const categoryMap = new Map<number, { nameRo: string; type: string | null }>();
+  for (const c of allCategories) {
+    categoryMap.set(c.id, { nameRo: c.nameRo, type: c.type });
+  }
+
+  // Selected category names from the plan (resolved from IDs)
+  const selectedCategoryNames = (plan.selectedCategories ?? [])
+    .map((id) => categoryMap.get(id)?.nameRo)
+    .filter((n): n is string => !!n);
+
+  // Full list of artist categories with IDs + names for the AI
+  const artistCategoriesList = allCategories
+    .filter((c) => c.type === "artist")
+    .map((c) => `#${c.id} ${c.nameRo}`)
+    .join(", ");
+
   const systemPrompt = `Ești asistentul de rezervări pentru un client pe ePetrecere.md care planifică un eveniment.
 
 Plan curent:
@@ -143,16 +178,21 @@ Plan curent:
 - Locație: ${plan.location ?? "nespecificată"}
 - Invitați: ${plan.guestCountTarget ?? "n/a"}
 - Buget total: ${plan.budgetTarget ? `${plan.budgetTarget}€` : "nespecificat"}
-- Categorii selectate: ${JSON.stringify(plan.selectedCategories ?? [])}
+- Categorii selectate de client: ${selectedCategoryNames.length > 0 ? selectedCategoryNames.join(", ") : "niciuna"}
+
+Toate categoriile de artiști disponibile:
+${artistCategoriesList}
 
 Reguli:
 1. Limba română. Răspunsuri scurte și prietenoase.
-2. Când clientul cere recomandări, apelează \`list_available_artists\` cu filtrele explicite din cerere (preț, rating, categorii).
-3. După ce primești lista, prezintă top 3-5 alegeri relevante CA TEXT (nume, rating, preț, motiv). NU trimite cereri automat.
-4. Cere confirmarea clientului: "Să trimit cererile?". Doar apoi apelezi \`send_booking_requests\`.
-5. Dacă rezultatele sunt puține sau nepotrivite, spune sincer și sugerează ajustări.
-6. Mesajul din send_booking_requests trebuie să includă data evenimentului și tipul. Ex: "Salut! Plan ${plan.title} pe ${plan.eventDate}."
-7. NU rezerva pentru date din trecut.`;
+2. Când clientul cere recomandări, apelează \`list_available_artists\` cu filtre explicite. Poți filtra pe \`categoryNames\` (ex: ['DJ', 'Fotograf']) — este mai natural decât ID-uri.
+3. Rezultatele includ: nume, rating, preț, categorii (nume complet), locație, status verificat/premium, descriere. Folosește aceste date pentru a ordona și recomanda.
+4. După ce primești lista, prezintă top 3-5 alegeri relevante CA TEXT (nume, categorie, rating, preț, motiv scurt). NU trimite cereri automat.
+5. Cere confirmarea clientului: "Să trimit cererile?". Doar apoi apelezi \`send_booking_requests\`.
+6. Dacă rezultatele sunt puține sau nepotrivite, sugerează ajustări (alt preț, categorii diferite, scade ratingul minim).
+7. Mesajul din send_booking_requests trebuie să includă data evenimentului și tipul. Ex: "Salut! Plan ${plan.title} pe ${plan.eventDate}."
+8. NU rezerva pentru date din trecut.
+9. Artiști **verificați** (isVerified=true) sau **premium** (isPremium=true) sunt un semnal de încredere — menționează-i în recomandări.`;
 
   const client = getClient();
   const conversation: Anthropic.Messages.MessageParam[] = incoming.map((m) => ({
@@ -208,10 +248,26 @@ Reguli:
         maxPrice?: number;
         minRating?: number;
         categoryIds?: number[];
+        categoryNames?: string[];
       };
-      // Fetch artists; optionally filter to those with a free slot on
-      // the plan's date (plan.eventDate). If plan has no date set, skip
-      // the slot join entirely.
+
+      // Resolve categoryNames to IDs (case-insensitive partial match)
+      const resolvedCategoryIds = new Set<number>(input.categoryIds ?? []);
+      if (input.categoryNames && input.categoryNames.length > 0) {
+        const namesLower = input.categoryNames.map((n) => n.toLowerCase().trim());
+        for (const c of allCategories) {
+          if (
+            c.type === "artist" &&
+            namesLower.some(
+              (n) => c.nameRo.toLowerCase().includes(n) || n.includes(c.nameRo.toLowerCase()),
+            )
+          ) {
+            resolvedCategoryIds.add(c.id);
+          }
+        }
+      }
+
+      // Fetch artists
       const where = [eq(artists.isActive, true)];
       if (typeof input.minRating === "number") {
         where.push(gte(artists.ratingAvg, input.minRating));
@@ -228,10 +284,23 @@ Reguli:
           priceFrom: artists.priceFrom,
           ratingAvg: artists.ratingAvg,
           ratingCount: artists.ratingCount,
+          categoryIds: artists.categoryIds,
+          location: artists.location,
+          isVerified: artists.isVerified,
+          isPremium: artists.isPremium,
+          isFeatured: artists.isFeatured,
+          description: artists.descriptionRo,
         })
         .from(artists)
         .where(and(...where))
-        .limit(30);
+        .limit(60);
+
+      // Filter by resolved category IDs (if any requested)
+      if (resolvedCategoryIds.size > 0) {
+        found = found.filter((a) =>
+          (a.categoryIds ?? []).some((cid) => resolvedCategoryIds.has(cid)),
+        );
+      }
 
       // Intersect with slot availability when we have a date.
       if (plan.eventDate && found.length > 0) {
@@ -249,22 +318,31 @@ Reguli:
             ),
           );
         const freeSet = new Set(freeArtistIds.map((x) => x.artistId));
-        // Only enforce the "has a free slot" filter when we actually
-        // have slots for the queried artists — otherwise we'd return
-        // empty results for every older artist that never opted in.
         if (freeSet.size > 0) {
           found = found.filter((a) => freeSet.has(a.id));
         }
       }
 
+      // Truncate description to keep tokens reasonable
+      const truncate = (s: string | null, n: number) =>
+        s ? (s.length > n ? s.slice(0, n) + "…" : s) : null;
+
       toolResult = JSON.stringify({
         count: found.length,
-        artists: found.slice(0, 12).map((a) => ({
+        artists: found.slice(0, 15).map((a) => ({
           id: a.id,
           name: a.name,
           rating: Number(a.ratingAvg ?? 0).toFixed(1),
-          ratingCount: a.ratingCount,
+          ratingCount: a.ratingCount ?? 0,
           priceFrom: a.priceFrom,
+          categories: (a.categoryIds ?? [])
+            .map((cid) => categoryMap.get(cid)?.nameRo)
+            .filter(Boolean),
+          location: a.location,
+          isVerified: a.isVerified,
+          isPremium: a.isPremium,
+          isFeatured: a.isFeatured,
+          description: truncate(a.description, 200),
         })),
       });
     } else if (toolUse.name === "send_booking_requests") {
