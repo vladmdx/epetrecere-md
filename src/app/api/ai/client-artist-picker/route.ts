@@ -96,6 +96,19 @@ const TOOLS: Anthropic.Messages.Tool[] = [
 ];
 
 export async function POST(req: NextRequest) {
+  try {
+    return await handleRequest(req);
+  } catch (err) {
+    const e = err as { message?: string; stack?: string };
+    console.error("[ai/client-artist-picker] Uncaught error:", e.message, e.stack);
+    return NextResponse.json(
+      { error: "Eroare internă în asistentul AI. " + (e.message || "") },
+      { status: 500 },
+    );
+  }
+}
+
+async function handleRequest(req: NextRequest) {
   // ─── AuthN ─────────────────────────────────────────────────────
   const { userId: clerkId } = await auth();
   if (!clerkId) {
@@ -222,12 +235,20 @@ Reguli:
         messages: conversation,
       });
     } catch (err) {
-      const e = err as { status?: number; error?: { type?: string } };
+      const e = err as { status?: number; message?: string; error?: { type?: string; message?: string } };
       console.error(
-        `[ai/client-artist-picker] Anthropic error status=${e.status} type=${e.error?.type} plan=${plan.id}`,
+        `[ai/client-artist-picker] Anthropic error status=${e.status} type=${e.error?.type} msg=${e.error?.message || e.message} plan=${plan.id}`,
       );
+      // Surface more detail in dev / preview so we can debug
       return NextResponse.json(
-        { error: "Serviciul AI e temporar indisponibil. Încearcă din nou." },
+        {
+          error: "Serviciul AI e temporar indisponibil. Încearcă din nou.",
+          debug: process.env.NODE_ENV === "production" ? undefined : {
+            status: e.status,
+            type: e.error?.type,
+            message: e.error?.message || e.message,
+          },
+        },
         { status: 502 },
       );
     }
@@ -280,7 +301,10 @@ Reguli:
         where.push(lte(artists.priceFrom, input.maxPrice));
       }
       if (plan.eventDate) {
-        const dateStr = plan.eventDate;
+        // Normalise Date -> "YYYY-MM-DD" in case drizzle returns a Date
+        const dateStr = typeof plan.eventDate === "string"
+          ? plan.eventDate
+          : new Date(plan.eventDate).toISOString().split("T")[0];
         where.push(
           sql`${artists.id} NOT IN (
             SELECT ${calendarEvents.entityId} FROM ${calendarEvents}
