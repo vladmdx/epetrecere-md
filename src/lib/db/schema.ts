@@ -517,6 +517,10 @@ export const reviews = pgTable("reviews", {
   reply: text("reply"),
   replyAt: timestamp("reply_at"),
   isApproved: boolean("is_approved").default(false).notNull(),
+  /** M-UGC — up to 5 photo URLs uploaded with the review. Stored as a
+   *  JSONB array of strings so adding/removing one doesn't require a
+   *  separate table. Empty array = text-only review. */
+  photos: jsonb("photos").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -787,6 +791,12 @@ export const bookingRequests = pgTable("booking_requests", {
   artistReply: text("artist_reply"),
   adminNotes: text("admin_notes"),
   adminSeen: boolean("admin_seen").default(false).notNull(),
+  /** E-signature: the typed-name / drawn-signature base64 captured when the
+   *  client signs the contract. Empty = not signed yet. */
+  clientSignature: text("client_signature"),
+  clientSignedAt: timestamp("client_signed_at"),
+  /** Generated PDF URL (Vercel Blob) with both parties' details + signature. */
+  contractPdfUrl: text("contract_pdf_url"),
   /** Who created the row.
    *   "client"  — standard client-submitted request (default)
    *   "manual"  — artist added it directly on the calendar (private block

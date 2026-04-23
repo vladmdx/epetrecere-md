@@ -5,6 +5,7 @@ import { VenueCard } from "@/components/public/venue-card";
 import { SortBar } from "@/components/public/sort-bar";
 import { PaginationBar } from "@/components/public/pagination-bar";
 import { CityFilter, CapacityFilter, ActiveFiltersReset } from "@/components/public/filter-bar";
+import { CompareBar } from "@/components/public/compare-bar";
 import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
@@ -61,6 +62,7 @@ export function VenuesListClient({ venues, total, page, totalPages, currentSort,
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
+      <CompareBar entityType="venue" />
       <div className="mb-8">
         <h1 className="font-heading text-3xl font-bold md:text-4xl">{t("nav.venues")}</h1>
         <p className="mt-2 text-muted-foreground">{total} rezultate</p>

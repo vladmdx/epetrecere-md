@@ -20,7 +20,9 @@ import {
   Star,
   MessageCircle,
   ArrowRight,
+  FileSignature,
 } from "lucide-react";
+import { SignContractDialog } from "@/components/client/sign-contract-dialog";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -284,6 +286,22 @@ export default function ClientCabinetPage() {
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" /> Confirmă
                         </Button>
+                      )}
+                      {(b.status === "accepted" ||
+                        b.status === "confirmed_by_client") && (
+                        <SignContractDialog
+                          bookingId={b.id}
+                          trigger={
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1 text-xs w-full"
+                            >
+                              <FileSignature className="h-3.5 w-3.5" />
+                              Contract
+                            </Button>
+                          }
+                        />
                       )}
                       {b.artistSlug && (
                         <Link href={`/artisti/${b.artistSlug}`}>

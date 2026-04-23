@@ -28,6 +28,7 @@ export async function GET(req: NextRequest) {
       text: reviews.text,
       eventType: reviews.eventType,
       reply: reviews.reply,
+      photos: reviews.photos,
       createdAt: reviews.createdAt,
     })
     .from(reviews)
@@ -45,6 +46,8 @@ const reviewSchema = z.object({
   eventType: z.string().optional(),
   rating: z.number().min(1).max(5),
   text: z.string().min(10).max(1000),
+  /** Up to 5 photo URLs attached to the review. */
+  photos: z.array(z.string().url()).max(5).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -60,10 +63,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
   }
 
-  const [review] = await db.insert(reviews).values({
-    ...parsed.data,
-    isApproved: false, // Needs admin approval
-  }).returning();
+  const [review] = await db
+    .insert(reviews)
+    .values({
+      ...parsed.data,
+      photos: parsed.data.photos ?? [],
+      isApproved: false, // Needs admin approval
+    })
+    .returning();
 
   // M5 — dispatch in-app + email notifications (non-blocking)
   void (async () => {

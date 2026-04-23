@@ -7,6 +7,7 @@ import { useUser } from "@clerk/nextjs";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { WishlistButton } from "@/components/public/wishlist-button";
+import { CompareButton } from "@/components/public/compare-button";
 
 interface VenueCardProps {
   venue: {
@@ -49,13 +50,14 @@ export function VenueCard({ venue }: VenueCardProps) {
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
         />
-        <div className="absolute right-2 top-2">
+        <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
           <WishlistButton
             entityType="venue"
             entityId={venue.id}
             size="sm"
             className="bg-background/80 backdrop-blur-sm"
           />
+          <CompareButton entityType="venue" entityId={venue.id} />
         </div>
       </div>
 

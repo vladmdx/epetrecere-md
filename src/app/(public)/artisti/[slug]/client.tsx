@@ -59,6 +59,7 @@ interface ArtistData {
     text: string | null;
     eventType: string | null;
     reply: string | null;
+    photos: string[] | null;
     createdAt: Date;
   }>;
 }
@@ -389,6 +390,27 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                         </div>
                       </div>
                       {review.text && <p className="mt-2 text-sm text-muted-foreground">{review.text}</p>}
+                      {review.photos && review.photos.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {review.photos.map((url, i) => (
+                            <a
+                              key={url}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="block h-20 w-20 overflow-hidden rounded-lg border border-border/40 transition-transform hover:scale-105"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={url}
+                                alt={`Fotografie recenzie ${i + 1}`}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                       {review.reply && (
                         <div className="mt-3 rounded bg-accent/50 p-3 text-xs text-muted-foreground">
                           <span className="font-medium">Răspuns:</span> {review.reply}

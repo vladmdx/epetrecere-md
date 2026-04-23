@@ -9,6 +9,7 @@ import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { ShareButtons } from "@/components/public/share-buttons";
+import { ReviewPhotoUploader } from "@/components/public/review-photo-uploader";
 import { CalendarWidget } from "@/components/public/calendar-widget";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
@@ -47,6 +48,7 @@ interface VenueData {
     rating: number;
     text: string | null;
     reply: string | null;
+    photos: string[] | null;
     createdAt: Date;
   }>;
 }
@@ -292,6 +294,27 @@ export function VenueDetailClient({
                       </div>
                     </div>
                     {review.text && <p className="mt-2 text-sm text-muted-foreground">{review.text}</p>}
+                    {review.photos && review.photos.length > 0 && (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {review.photos.map((url, i) => (
+                          <a
+                            key={url}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block h-20 w-20 overflow-hidden rounded-lg border border-border/40 transition-transform hover:scale-105"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={url}
+                              alt={`Fotografie recenzie ${i + 1}`}
+                              className="h-full w-full object-cover"
+                              loading="lazy"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -429,6 +452,7 @@ function VenueReviewForm({ venueId }: { venueId: number }) {
   const [name, setName] = useState("");
   const [text, setText] = useState("");
   const [eventType, setEventType] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
@@ -446,6 +470,7 @@ function VenueReviewForm({ venueId }: { venueId: number }) {
           rating,
           text,
           eventType: eventType || undefined,
+          photos,
         }),
       });
       if (!res.ok) throw new Error();
@@ -519,6 +544,15 @@ function VenueReviewForm({ venueId }: { venueId: number }) {
         rows={3}
         className="mt-3 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
       />
+
+      {/* Photos */}
+      <div className="mt-3">
+        <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Fotografii (opțional)
+        </p>
+        <ReviewPhotoUploader value={photos} onChange={setPhotos} max={5} />
+      </div>
+
       <button
         type="submit"
         disabled={submitting || !name || text.length < 10}

@@ -24,6 +24,7 @@ const schema = z.object({
   bookingRequestId: z.number().int().positive(),
   rating: z.number().int().min(1).max(5),
   text: z.string().min(10).max(1000),
+  photos: z.array(z.string().url()).max(5).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
         eventDate: booking.eventDate,
         rating: parsed.data.rating,
         text: parsed.data.text,
+        photos: parsed.data.photos ?? [],
         isApproved: false,
       })
       .returning();

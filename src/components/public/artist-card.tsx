@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { WishlistButton } from "@/components/public/wishlist-button";
+import { CompareButton } from "@/components/public/compare-button";
 
 interface ArtistCardProps {
   artist: {
@@ -73,14 +74,15 @@ export function ArtistCard({ artist }: ArtistCardProps) {
             </Badge>
           )}
         </div>
-        {/* Wishlist heart — positioned in top-right, doesn't affect card nav */}
-        <div className="absolute right-2 top-2">
+        {/* Wishlist heart + Compare — positioned top-right, stacked */}
+        <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
           <WishlistButton
             entityType="artist"
             entityId={artist.id}
             size="sm"
             className="bg-background/80 backdrop-blur-sm"
           />
+          <CompareButton entityType="artist" entityId={artist.id} />
         </div>
       </div>
 

@@ -18,6 +18,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ReviewPhotoUploader } from "@/components/public/review-photo-uploader";
 
 interface ReviewableBooking {
   id: number;
@@ -127,6 +128,7 @@ function ReviewCard({
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [text, setText] = useState("");
+  const [photos, setPhotos] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   async function submit() {
@@ -147,6 +149,7 @@ function ReviewCard({
           bookingRequestId: booking.id,
           rating,
           text: text.trim(),
+          photos,
         }),
       });
       if (!res.ok) {
@@ -221,6 +224,14 @@ function ReviewCard({
         <div className="mt-1 text-right text-[10px] text-muted-foreground">
           {text.length}/1000
         </div>
+      </div>
+
+      {/* Photos */}
+      <div className="mt-3">
+        <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          Fotografii de la eveniment (opțional)
+        </p>
+        <ReviewPhotoUploader value={photos} onChange={setPhotos} max={5} />
       </div>
 
       <div className="mt-3 flex justify-end">
