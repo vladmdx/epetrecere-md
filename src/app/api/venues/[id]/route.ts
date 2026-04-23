@@ -65,6 +65,10 @@ const updateSchema = z.object({
   calendarEnabled: z.boolean().optional(),
   isActive: z.boolean().optional(),
   isFeatured: z.boolean().optional(),
+  lat: z.number().nullable().optional(),
+  lng: z.number().nullable().optional(),
+  seoTitleRo: z.string().optional(),
+  seoDescRo: z.string().optional(),
 });
 
 export async function PUT(

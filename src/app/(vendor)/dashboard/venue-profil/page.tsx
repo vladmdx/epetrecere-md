@@ -51,6 +51,8 @@ interface Venue {
   descriptionEn: string | null;
   address: string | null;
   city: string | null;
+  lat: number | null;
+  lng: number | null;
   capacityMin: number | null;
   capacityMax: number | null;
   pricePerPerson: number | null;
@@ -62,6 +64,8 @@ interface Venue {
   virtualTourUrl: string | null;
   calendarEnabled: boolean;
   isActive: boolean;
+  seoTitleRo: string | null;
+  seoDescRo: string | null;
 }
 
 export default function VenueProfilePage() {
@@ -227,6 +231,8 @@ export default function VenueProfilePage() {
           <TabsTrigger value="info">Informații</TabsTrigger>
           <TabsTrigger value="capacity">Capacitate & Preț</TabsTrigger>
           <TabsTrigger value="facilities">Facilități</TabsTrigger>
+          <TabsTrigger value="location">Locație</TabsTrigger>
+          <TabsTrigger value="seo">SEO</TabsTrigger>
           <TabsTrigger value="extras">Meniu & Tur 360°</TabsTrigger>
         </TabsList>
 
@@ -460,6 +466,166 @@ export default function VenueProfilePage() {
                   >
                     <Plus className="h-4 w-4" /> Adaugă
                   </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="location" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Locație pe hartă</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Setează coordonatele exacte. Harta va apărea pe profilul public
+                ca embed interactiv. Obține coordonatele din{" "}
+                <a
+                  href="https://www.google.com/maps"
+                  target="_blank"
+                  rel="noopener"
+                  className="text-gold hover:underline"
+                >
+                  Google Maps
+                </a>{" "}
+                (click dreapta pe locație → „What's here?” → copiază numerele).
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="address">Adresă completă</Label>
+                <Input
+                  id="address"
+                  className="mt-1"
+                  value={venue.address ?? ""}
+                  onChange={(e) => setVenue({ ...venue, address: e.target.value })}
+                  placeholder="Str. Florilor 25, Chișinău"
+                />
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="lat">Latitudine</Label>
+                  <Input
+                    id="lat"
+                    type="number"
+                    step="0.0000001"
+                    className="mt-1"
+                    value={venue.lat ?? ""}
+                    onChange={(e) =>
+                      setVenue({
+                        ...venue,
+                        lat: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    placeholder="47.0105"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lng">Longitudine</Label>
+                  <Input
+                    id="lng"
+                    type="number"
+                    step="0.0000001"
+                    className="mt-1"
+                    value={venue.lng ?? ""}
+                    onChange={(e) =>
+                      setVenue({
+                        ...venue,
+                        lng: e.target.value ? Number(e.target.value) : null,
+                      })
+                    }
+                    placeholder="28.8638"
+                  />
+                </div>
+              </div>
+              {venue.lat !== null && venue.lng !== null && (
+                <div className="overflow-hidden rounded-lg border border-border/40">
+                  <iframe
+                    title="Preview hartă"
+                    width="100%"
+                    height="300"
+                    loading="lazy"
+                    src={`https://www.google.com/maps?q=${venue.lat},${venue.lng}&hl=ro&z=16&output=embed`}
+                    style={{ border: 0 }}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="seo" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Optimizare SEO</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Controlează cum apare sala în rezultatele Google și pe social
+                media. Un titlu bun + descriere clară cresc rata de click.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="seo-title">
+                  Titlu SEO (meta title)
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {(venue.seoTitleRo?.length ?? 0)} / 60 caractere
+                  </span>
+                </Label>
+                <Input
+                  id="seo-title"
+                  className="mt-1"
+                  value={venue.seoTitleRo ?? ""}
+                  onChange={(e) =>
+                    setVenue({ ...venue, seoTitleRo: e.target.value })
+                  }
+                  placeholder={`${venue.nameRo} — Sală Nunți ${venue.city || "Chișinău"} | ePetrecere.md`}
+                />
+                {(venue.seoTitleRo?.length ?? 0) > 60 && (
+                  <p className="mt-1 text-xs text-amber-500">
+                    ⚠ Titlul e prea lung — Google va trunchia după ~60 caractere
+                  </p>
+                )}
+              </div>
+              <div>
+                <Label htmlFor="seo-desc">
+                  Meta description
+                  <span className="ml-2 text-xs text-muted-foreground">
+                    {(venue.seoDescRo?.length ?? 0)} / 160 caractere
+                  </span>
+                </Label>
+                <Textarea
+                  id="seo-desc"
+                  className="mt-1"
+                  rows={3}
+                  value={venue.seoDescRo ?? ""}
+                  onChange={(e) =>
+                    setVenue({ ...venue, seoDescRo: e.target.value })
+                  }
+                  placeholder={`Sală de evenimente în ${venue.city || "Chișinău"}, capacitate ${venue.capacityMin ?? "?"}–${venue.capacityMax ?? "?"} persoane. Rezervă online pe ePetrecere.md.`}
+                />
+                {(venue.seoDescRo?.length ?? 0) > 160 && (
+                  <p className="mt-1 text-xs text-amber-500">
+                    ⚠ Descrierea e prea lungă — Google va trunchia după ~160 caractere
+                  </p>
+                )}
+              </div>
+
+              {/* SERP Preview */}
+              <div>
+                <Label className="mb-2 block">Previzualizare Google</Label>
+                <div className="rounded-lg border border-border/40 bg-background p-4">
+                  <div className="text-xs text-muted-foreground">
+                    epetrecere.md › sali › {venue.slug}
+                  </div>
+                  <div className="mt-1 text-lg text-blue-400 hover:underline cursor-pointer">
+                    {venue.seoTitleRo ||
+                      `${venue.nameRo} — Sală Nunți ${venue.city || "Chișinău"} | ePetrecere.md`}
+                  </div>
+                  <div className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                    {venue.seoDescRo ||
+                      (venue.descriptionRo
+                        ? venue.descriptionRo.slice(0, 160)
+                        : `Sală de evenimente în ${venue.city || "Chișinău"} — rezervă online pe ePetrecere.md`)}
+                  </div>
                 </div>
               </div>
             </CardContent>
