@@ -1,24 +1,19 @@
-// F-S1 / M12 — Venue dashboard stats.
+// Venue dashboard stats + activity feed helpers.
 //
-// Mirrors `artist-stats.ts` for venue owners. The vendor dashboard home
-// now resolves the signed-in user's entity (artist OR venue) and picks
-// the matching stats helper, so venue owners no longer see a row of
-// dashes on first login.
-//
-// Venues don't flow through `booking_requests` (that table is artist-
-// only). Venue bookings live in the legacy `bookings` table which also
-// backs the admin CRM view. We summarize:
-//   - pendingBookings      bookings.venue_id with status='pending'
-//   - profileViews30d      profile_views in the last 30 days
-//   - ratingAvg/Count      the rollup stored on venues
-//   - bookingsThisMonth    bookings confirmed or completed since the
-//                          start of the current calendar month — this
-//                          is the closest we have to "Venituri luna"
-//                          until agreed price is always persisted.
+// Venues don't yet flow through `booking_requests` (artist-only) — they
+// use the legacy `bookings` table. When we migrate venues to
+// booking_requests (Phase 2), swap the source here.
 
 import { db } from "@/lib/db";
-import { bookings, profileViews, venues } from "@/lib/db/schema";
-import { and, count, eq, gte, inArray } from "drizzle-orm";
+import {
+  bookings,
+  profileViews,
+  venues,
+  calendarEvents,
+  notifications,
+  leads,
+} from "@/lib/db/schema";
+import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 export type VenueStats = {
   pendingBookings: number;
@@ -26,14 +21,38 @@ export type VenueStats = {
   ratingAvg: number | null;
   ratingCount: number;
   bookingsThisMonth: number;
+  /** Percent of days in the current month that are booked or blocked. */
+  occupancyRate: number;
+  occupancyBusyDays: number;
+  occupancyTotalDays: number;
+  /** Sum of agreed prices for confirmed/completed bookings this month (EUR). */
+  revenueThisMonth: number;
+  /** Change vs last month for revenue (absolute EUR). */
+  revenueLastMonth: number;
 };
 
 export async function getVenueStats(venueId: number): Promise<VenueStats> {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of month
+  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
-  const [pendingRow, viewsRow, ratingRow, bookedRow] = await Promise.all([
+  const monthStartIso = monthStart.toISOString().split("T")[0];
+  const monthEndIso = monthEnd.toISOString().split("T")[0];
+
+  const daysInMonth = monthEnd.getDate();
+
+  const [
+    pendingRow,
+    viewsRow,
+    ratingRow,
+    bookedRow,
+    occupancyRow,
+    revenueRow,
+    revenueLastRow,
+  ] = await Promise.all([
     db
       .select({ value: count() })
       .from(bookings)
@@ -67,7 +86,51 @@ export async function getVenueStats(venueId: number): Promise<VenueStats> {
           gte(bookings.updatedAt, monthStart),
         ),
       ),
+    // Occupancy: distinct busy days in current month from calendar_events
+    db
+      .select({ value: count(sql`DISTINCT ${calendarEvents.date}`) })
+      .from(calendarEvents)
+      .where(
+        and(
+          eq(calendarEvents.entityType, "venue"),
+          eq(calendarEvents.entityId, venueId),
+          gte(calendarEvents.date, monthStartIso),
+          lte(calendarEvents.date, monthEndIso),
+          inArray(calendarEvents.status, ["booked", "blocked"]),
+        ),
+      ),
+    // Revenue this month: sum of agreed prices for confirmed/completed
+    db
+      .select({
+        value: sql<number>`COALESCE(SUM(${bookings.priceAgreed}), 0)`,
+      })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.venueId, venueId),
+          inArray(bookings.status, ["confirmed", "completed"]),
+          gte(bookings.updatedAt, monthStart),
+        ),
+      ),
+    // Revenue last month
+    db
+      .select({
+        value: sql<number>`COALESCE(SUM(${bookings.priceAgreed}), 0)`,
+      })
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.venueId, venueId),
+          inArray(bookings.status, ["confirmed", "completed"]),
+          gte(bookings.updatedAt, lastMonthStart),
+          lte(bookings.updatedAt, lastMonthEnd),
+        ),
+      ),
   ]);
+
+  const occupancyBusyDays = Number(occupancyRow[0]?.value ?? 0);
+  const occupancyRate =
+    daysInMonth > 0 ? Math.round((occupancyBusyDays / daysInMonth) * 100) : 0;
 
   return {
     pendingBookings: Number(pendingRow[0]?.value ?? 0),
@@ -75,5 +138,82 @@ export async function getVenueStats(venueId: number): Promise<VenueStats> {
     ratingAvg: ratingRow[0]?.ratingAvg ?? null,
     ratingCount: Number(ratingRow[0]?.ratingCount ?? 0),
     bookingsThisMonth: Number(bookedRow[0]?.value ?? 0),
+    occupancyRate,
+    occupancyBusyDays,
+    occupancyTotalDays: daysInMonth,
+    revenueThisMonth: Number(revenueRow[0]?.value ?? 0),
+    revenueLastMonth: Number(revenueLastRow[0]?.value ?? 0),
   };
+}
+
+export type VenueActivityItem = {
+  id: number;
+  type: string;
+  title: string;
+  message: string | null;
+  actionUrl: string | null;
+  createdAt: Date;
+  isRead: boolean;
+};
+
+/** Recent activity feed for the venue — mapped from notifications dispatched
+ *  to the venue owner's user account. */
+export async function getVenueActivity(
+  userId: string,
+  limit = 10,
+): Promise<VenueActivityItem[]> {
+  const rows = await db
+    .select({
+      id: notifications.id,
+      type: notifications.type,
+      title: notifications.title,
+      message: notifications.message,
+      actionUrl: notifications.actionUrl,
+      createdAt: notifications.createdAt,
+      isRead: notifications.isRead,
+    })
+    .from(notifications)
+    .where(eq(notifications.userId, userId))
+    .orderBy(desc(notifications.createdAt))
+    .limit(limit);
+
+  return rows;
+}
+
+export type VenueRecentBooking = {
+  id: number;
+  clientName: string;
+  eventType: string | null;
+  eventDate: string | null;
+  guestCount: number | null;
+  status: string;
+  priceAgreed: number | null;
+};
+
+/** Most recent bookings (any status) for quick action on the home page.
+ *  Client info comes from the linked lead row. */
+export async function getVenueRecentBookings(
+  venueId: number,
+  limit = 5,
+): Promise<VenueRecentBooking[]> {
+  const rows = await db
+    .select({
+      id: bookings.id,
+      clientName: leads.name,
+      eventType: bookings.eventType,
+      eventDate: bookings.eventDate,
+      guestCount: leads.guestCount,
+      status: bookings.status,
+      priceAgreed: bookings.priceAgreed,
+    })
+    .from(bookings)
+    .leftJoin(leads, eq(bookings.leadId, leads.id))
+    .where(eq(bookings.venueId, venueId))
+    .orderBy(desc(bookings.createdAt))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    ...r,
+    clientName: r.clientName ?? "Client necunoscut",
+  }));
 }

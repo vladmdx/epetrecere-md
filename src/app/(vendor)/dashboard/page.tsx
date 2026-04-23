@@ -11,6 +11,7 @@
 // with dashes, so mid-onboarding flows aren't locked out.
 
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -82,6 +83,34 @@ function formatRating(ratingAvg: number | null, ratingCount: number): string {
 }
 
 export default async function VendorDashboard() {
+  // Redirect venue owners (without an artist profile) to the dedicated
+  // venue dashboard. Artists and users with both profiles stay here.
+  const { userId: clerkId } = await auth();
+  if (clerkId) {
+    const [appUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    if (appUser) {
+      const [artistCheck] = await db
+        .select({ id: artists.id })
+        .from(artists)
+        .where(eq(artists.userId, appUser.id))
+        .limit(1);
+      if (!artistCheck) {
+        const [venueCheck] = await db
+          .select({ id: venues.id })
+          .from(venues)
+          .where(eq(venues.userId, appUser.id))
+          .limit(1);
+        if (venueCheck) {
+          redirect("/dashboard/sala");
+        }
+      }
+    }
+  }
+
   const loaded = await loadStats();
 
   // Same four slots for both entity types — different data sources.

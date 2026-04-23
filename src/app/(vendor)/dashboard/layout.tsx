@@ -1,10 +1,9 @@
-import { VendorSidebar } from "@/components/vendor/vendor-sidebar";
-import { AdminTopbar } from "@/components/admin/admin-topbar";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
+import { VendorLayoutChrome } from "@/components/vendor/vendor-layout-chrome";
 
 export default async function VendorLayout({
   children,
@@ -38,17 +37,13 @@ export default async function VendorLayout({
     .where(eq(venues.userId, appUser.id))
     .limit(1);
 
-  if (!artistRecord && !venueRecord && appUser.role !== "admin" && appUser.role !== "super_admin") {
+  const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
+
+  if (!artistRecord && !venueRecord && !isAdmin) {
     redirect("/");
   }
 
-  return (
-    <div className="flex h-screen overflow-hidden">
-      <VendorSidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <AdminTopbar />
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
-      </div>
-    </div>
-  );
+  // The chrome component decides whether to render the artist sidebar
+  // or pass through to the venue-specific layout at /dashboard/sala/*.
+  return <VendorLayoutChrome>{children}</VendorLayoutChrome>;
 }
