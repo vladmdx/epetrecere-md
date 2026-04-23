@@ -112,6 +112,7 @@ export async function GET() {
   const vendors: VendorEntry[] = [];
 
   for (const b of userBookings) {
+    if (b.artistId === null) continue;
     const a = artistById.get(b.artistId);
     if (!a) continue;
     vendors.push({

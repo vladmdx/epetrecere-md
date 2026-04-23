@@ -160,14 +160,15 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
     const form = new FormData(e.currentTarget);
 
     try {
-      // When we have both artistId AND eventPlanId, hit the planner-linked
-      // booking endpoint so the request lands directly in the user's plan.
-      // Otherwise fall back to the legacy /api/leads flow for anonymous /
-      // out-of-plan submissions.
-      const usePlanFlow = !!(artistId && eventPlanId);
+      // Use /api/booking-requests when targeting a specific vendor (artist or
+      // venue). For venues we always use this path so the request lands in the
+      // venue's "Rezervări" inbox. Falls back to /api/leads for form-only
+      // inquiries without a vendor target.
+      const usePlanFlow = !!((artistId && eventPlanId) || venueId);
       const payload = usePlanFlow
         ? {
-            artistId: artistId!,
+            artistId: artistId ?? undefined,
+            venueId: venueId ?? undefined,
             eventPlanId,
             clientName: form.get("name") as string,
             clientPhone: `+373${form.get("phone") as string}`,

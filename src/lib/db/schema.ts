@@ -639,9 +639,11 @@ export type BookingPriceOffer = {
 
 export const bookingRequests = pgTable("booking_requests", {
   id: serial("id").primaryKey(),
+  /** Either artistId OR venueId is set — a booking targets one entity. */
   artistId: integer("artist_id")
-    .references(() => artists.id, { onDelete: "cascade" })
-    .notNull(),
+    .references(() => artists.id, { onDelete: "cascade" }),
+  venueId: integer("venue_id")
+    .references(() => venues.id, { onDelete: "set null" }),
   /** Optional link to the client's event plan so artist bookings show up in
    *  that plan's "Rezervări Artiști" tab and feed the budget. */
   eventPlanId: integer("event_plan_id")

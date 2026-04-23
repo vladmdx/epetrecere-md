@@ -24,12 +24,15 @@ async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
   if (booking.clientUserId === appUser.id) return true;
 
   // Artist side
-  const [artist] = await db
-    .select({ id: artists.id })
-    .from(artists)
-    .where(and(eq(artists.id, booking.artistId), eq(artists.userId, appUser.id)))
-    .limit(1);
-  return !!artist;
+  if (booking.artistId) {
+    const [artist] = await db
+      .select({ id: artists.id })
+      .from(artists)
+      .where(and(eq(artists.id, booking.artistId), eq(artists.userId, appUser.id)))
+      .limit(1);
+    if (artist) return true;
+  }
+  return false;
 }
 
 // GET chat messages for a booking request
@@ -86,7 +89,7 @@ export async function POST(req: Request) {
       .where(eq(bookingRequests.id, Number(bookingRequestId)))
       .limit(1);
 
-    if (booking) {
+    if (booking && booking.artistId) {
       const [artist] = await db
         .select({ id: artists.id, nameRo: artists.nameRo })
         .from(artists)

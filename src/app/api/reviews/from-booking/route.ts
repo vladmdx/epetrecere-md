@@ -126,19 +126,21 @@ export async function POST(req: NextRequest) {
           message: `${parsed.data.rating}★ — rezervare #${booking.id}`,
           actionUrl: "/admin/recenzii",
         });
-        const [artist] = await db
-          .select({ userId: artists.userId })
-          .from(artists)
-          .where(eq(artists.id, booking.artistId))
-          .limit(1);
-        if (artist?.userId) {
-          await dispatchNotification({
-            userId: artist.userId,
-            type: "review_new",
-            title: "Ai o recenzie verificată nouă",
-            message: `${parsed.data.rating}★ de la un client real`,
-            actionUrl: "/dashboard/recenzii",
-          });
+        if (booking.artistId) {
+          const [artist] = await db
+            .select({ userId: artists.userId })
+            .from(artists)
+            .where(eq(artists.id, booking.artistId))
+            .limit(1);
+          if (artist?.userId) {
+            await dispatchNotification({
+              userId: artist.userId,
+              type: "review_new",
+              title: "Ai o recenzie verificată nouă",
+              message: `${parsed.data.rating}★ de la un client real`,
+              actionUrl: "/dashboard/recenzii",
+            });
+          }
         }
       } catch (err) {
         console.error("[notifications] verified review", err);

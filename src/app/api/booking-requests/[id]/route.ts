@@ -42,11 +42,8 @@ export async function PUT(
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  // Ownership helper — for artist-side actions (accept/reject), resolve the
-  // signed-in user to the artist that owns the target booking. Surfaced as
-  // a vulnerability by the E2E BOOK-02 pass: previously any unauthenticated
-  // caller could flip a booking to accepted/rejected and mutate the
-  // artist's calendar.
+  // Ownership helper — resolves whether the signed-in user owns the target
+  // booking's vendor entity (artist OR venue).
   async function requireBookingArtistOwner() {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
@@ -60,15 +57,32 @@ export async function PUT(
     if (!appUser) {
       return { ok: false as const, status: 401, error: "Unauthorized" };
     }
-    const [artist] = await db
-      .select({ id: artists.id, userId: artists.userId })
-      .from(artists)
-      .where(eq(artists.id, booking.artistId))
-      .limit(1);
-    if (!artist || artist.userId !== appUser.id) {
-      return { ok: false as const, status: 403, error: "Forbidden" };
+    // Venue booking — check venue ownership
+    if (booking.venueId) {
+      const { venues } = await import("@/lib/db/schema");
+      const [venue] = await db
+        .select({ id: venues.id, userId: venues.userId })
+        .from(venues)
+        .where(eq(venues.id, booking.venueId))
+        .limit(1);
+      if (!venue || venue.userId !== appUser.id) {
+        return { ok: false as const, status: 403, error: "Forbidden" };
+      }
+      return { ok: true as const };
     }
-    return { ok: true as const };
+    // Artist booking
+    if (booking.artistId) {
+      const [artist] = await db
+        .select({ id: artists.id, userId: artists.userId })
+        .from(artists)
+        .where(eq(artists.id, booking.artistId))
+        .limit(1);
+      if (!artist || artist.userId !== appUser.id) {
+        return { ok: false as const, status: 403, error: "Forbidden" };
+      }
+      return { ok: true as const };
+    }
+    return { ok: false as const, status: 404, error: "Booking has no vendor" };
   }
 
   if (action === "accept") {
@@ -76,9 +90,9 @@ export async function PUT(
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
-    // Block accepting if this booking conflicts with another accepted/confirmed
-    // booking on the same date/time. Exclude self (we're updating this row).
-    {
+    // Artist conflict check — skip for venue bookings (venues currently allow
+    // multiple events per day; conflict logic will come in a later phase).
+    if (booking.artistId) {
       const { checkArtistAvailability, formatConflictMessage } = await import(
         "@/lib/booking/availability"
       );
@@ -114,17 +128,21 @@ export async function PUT(
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
-    // Tentatively block the artist's date — confirmed_by_client will promote
-    // the event to a fully-confirmed booking in the calendar.
+    // Block the vendor's calendar — works for either artist OR venue.
     if (booking.eventDate) {
-      await db.insert(calendarEvents).values({
-        entityType: "artist",
-        entityId: booking.artistId,
-        date: booking.eventDate,
-        status: "booked",
-        source: "booking",
-        note: `Rezervare: ${booking.clientName} - ${booking.eventType || "Eveniment"}`,
-      });
+      const entityType = booking.venueId ? "venue" : "artist";
+      const entityId = booking.venueId ?? booking.artistId;
+      if (entityId) {
+        await db.insert(calendarEvents).values({
+          entityType,
+          entityId,
+          date: booking.eventDate,
+          status: "booked",
+          source: "booking",
+          eventType: booking.eventType ?? null,
+          note: `Rezervare: ${booking.clientName} - ${booking.eventType || "Eveniment"}`,
+        });
+      }
     }
   } else if (action === "reject") {
     const owner = await requireBookingArtistOwner();
@@ -137,20 +155,23 @@ export async function PUT(
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
-    // If the booking had already been accepted, the calendar has a
-    // source="booking" block on that date — remove it so the artist is
-    // bookable again.
+    // If the booking had already been accepted, remove the source="booking"
+    // block from whichever calendar it targeted.
     if (booking.status === "accepted" && booking.eventDate) {
-      await db
-        .delete(calendarEvents)
-        .where(
-          and(
-            eq(calendarEvents.entityType, "artist"),
-            eq(calendarEvents.entityId, booking.artistId),
-            eq(calendarEvents.date, booking.eventDate),
-            eq(calendarEvents.source, "booking"),
-          ),
-        );
+      const entityType = booking.venueId ? "venue" : "artist";
+      const entityId = booking.venueId ?? booking.artistId;
+      if (entityId) {
+        await db
+          .delete(calendarEvents)
+          .where(
+            and(
+              eq(calendarEvents.entityType, entityType),
+              eq(calendarEvents.entityId, entityId),
+              eq(calendarEvents.date, booking.eventDate),
+              eq(calendarEvents.source, "booking"),
+            ),
+          );
+      }
     }
   } else if (action === "client_confirm") {
     // Only the original client (matched via users.clerkId → clientUserId) may
@@ -196,22 +217,25 @@ export async function PUT(
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
-    // Same cleanup as reject: if the artist had already accepted, release
-    // the calendar block so they become bookable again.
+    // Same cleanup as reject: release the calendar block.
     if (
       (booking.status === "accepted" || booking.status === "confirmed_by_client") &&
       booking.eventDate
     ) {
-      await db
-        .delete(calendarEvents)
-        .where(
-          and(
-            eq(calendarEvents.entityType, "artist"),
-            eq(calendarEvents.entityId, booking.artistId),
-            eq(calendarEvents.date, booking.eventDate),
-            eq(calendarEvents.source, "booking"),
-          ),
-        );
+      const entityType = booking.venueId ? "venue" : "artist";
+      const entityId = booking.venueId ?? booking.artistId;
+      if (entityId) {
+        await db
+          .delete(calendarEvents)
+          .where(
+            and(
+              eq(calendarEvents.entityType, entityType),
+              eq(calendarEvents.entityId, entityId),
+              eq(calendarEvents.date, booking.eventDate),
+              eq(calendarEvents.source, "booking"),
+            ),
+          );
+      }
     }
   } else if (action === "complete") {
     const owner = await requireBookingArtistOwner();
@@ -244,18 +268,27 @@ export async function PUT(
     if (!appUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    // Client must own the booking OR be the artist owner.
+    // Client must own the booking OR be the artist/venue owner.
     const isClient = appUser.id === booking.clientUserId;
-    let isArtistOwner = false;
-    if (!isClient) {
+    let isVendorOwner = false;
+    if (!isClient && booking.artistId) {
       const [artist] = await db
         .select({ userId: artists.userId })
         .from(artists)
         .where(eq(artists.id, booking.artistId))
         .limit(1);
-      isArtistOwner = artist?.userId === appUser.id;
+      isVendorOwner = artist?.userId === appUser.id;
     }
-    if (!isClient && !isArtistOwner) {
+    if (!isClient && !isVendorOwner && booking.venueId) {
+      const { venues } = await import("@/lib/db/schema");
+      const [venue] = await db
+        .select({ userId: venues.userId })
+        .from(venues)
+        .where(eq(venues.id, booking.venueId))
+        .limit(1);
+      isVendorOwner = venue?.userId === appUser.id;
+    }
+    if (!isClient && !isVendorOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (!paidStatus || !["unpaid", "partial", "paid"].includes(paidStatus)) {
@@ -286,13 +319,22 @@ export async function PUT(
     }
     const isClient = appUser.id === booking.clientUserId;
     let isArtistOwner = false;
-    if (!isClient) {
+    if (!isClient && booking.artistId) {
       const [artist] = await db
         .select({ userId: artists.userId })
         .from(artists)
         .where(eq(artists.id, booking.artistId))
         .limit(1);
       isArtistOwner = artist?.userId === appUser.id;
+    }
+    if (!isClient && !isArtistOwner && booking.venueId) {
+      const { venues } = await import("@/lib/db/schema");
+      const [venue] = await db
+        .select({ userId: venues.userId })
+        .from(venues)
+        .where(eq(venues.id, booking.venueId))
+        .limit(1);
+      isArtistOwner = venue?.userId === appUser.id;
     }
     if (!isClient && !isArtistOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -321,19 +363,33 @@ export async function PUT(
   void (async () => {
     try {
       if (action === "accept" || action === "reject") {
-        const [artist] = await db
-          .select({ nameRo: artists.nameRo })
-          .from(artists)
-          .where(eq(artists.id, booking.artistId))
-          .limit(1);
+        // Look up the vendor name — could be an artist OR a venue
+        let vendorName = "Sala/Artist";
+        if (booking.artistId) {
+          const [artist] = await db
+            .select({ nameRo: artists.nameRo })
+            .from(artists)
+            .where(eq(artists.id, booking.artistId))
+            .limit(1);
+          if (artist) vendorName = artist.nameRo;
+        } else if (booking.venueId) {
+          const { venues } = await import("@/lib/db/schema");
+          const [venue] = await db
+            .select({ nameRo: venues.nameRo })
+            .from(venues)
+            .where(eq(venues.id, booking.venueId))
+            .limit(1);
+          if (venue) vendorName = venue.nameRo;
+        }
+        const artist = { nameRo: vendorName };
         const { notificationEmail } = await import("@/lib/email/templates/notification-email");
 
         const timePart = booking.startTime
           ? `<br>Ora: ${booking.startTime}${booking.endTime ? ` – ${booking.endTime}` : ""}`
           : "";
         const emailBody = action === "accept"
-          ? `<strong>${artist?.nameRo ?? "Artist"}</strong> a acceptat cererea ta de rezervare pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Mesajul artistului: <em>${reply}</em>` : ""}`
-          : `<strong>${artist?.nameRo ?? "Artist"}</strong> a răspuns la cererea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Motivul: <em>${reply}</em>` : ""}`;
+          ? `<strong>${vendorName}</strong> a acceptat cererea ta de rezervare pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Mesaj: <em>${reply}</em>` : ""}`
+          : `<strong>${vendorName}</strong> a răspuns la cererea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Motivul: <em>${reply}</em>` : ""}`;
 
         // In-app notification (requires clientUserId)
         if (booking.clientUserId) {
@@ -381,11 +437,24 @@ export async function PUT(
           });
         }
       } else if (action === "client_confirm") {
-        const [artist] = await db
-          .select({ userId: artists.userId, nameRo: artists.nameRo, slug: artists.slug, email: artists.email })
-          .from(artists)
-          .where(eq(artists.id, booking.artistId))
-          .limit(1);
+        // Resolve the vendor — artist or venue
+        let artist: { userId: string | null; nameRo: string; slug: string; email: string | null } | null = null;
+        if (booking.artistId) {
+          const [a] = await db
+            .select({ userId: artists.userId, nameRo: artists.nameRo, slug: artists.slug, email: artists.email })
+            .from(artists)
+            .where(eq(artists.id, booking.artistId))
+            .limit(1);
+          artist = a ?? null;
+        } else if (booking.venueId) {
+          const { venues } = await import("@/lib/db/schema");
+          const [v] = await db
+            .select({ userId: venues.userId, nameRo: venues.nameRo, slug: venues.slug, email: venues.email })
+            .from(venues)
+            .where(eq(venues.id, booking.venueId))
+            .limit(1);
+          artist = v ?? null;
+        }
         if (artist?.userId) {
           const { notificationEmail } = await import("@/lib/email/templates/notification-email");
           await dispatchNotification({

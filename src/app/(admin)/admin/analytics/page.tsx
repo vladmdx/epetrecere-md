@@ -158,19 +158,24 @@ export default async function AnalyticsPage() {
     currency: string;
   }> = [];
   if (topBookingRows.length > 0) {
-    const topIds = topBookingRows.map((r) => r.artistId);
-    const artistRows = await db
-      .select({
-        id: artists.id,
-        nameRo: artists.nameRo,
-        priceFrom: artists.priceFrom,
-        priceCurrency: artists.priceCurrency,
-      })
-      .from(artists)
-      .where(inArray(artists.id, topIds));
+    const topIds = topBookingRows
+      .map((r) => r.artistId)
+      .filter((id): id is number => id !== null);
+    const artistRows = topIds.length > 0
+      ? await db
+          .select({
+            id: artists.id,
+            nameRo: artists.nameRo,
+            priceFrom: artists.priceFrom,
+            priceCurrency: artists.priceCurrency,
+          })
+          .from(artists)
+          .where(inArray(artists.id, topIds))
+      : [];
     const byId = new Map(artistRows.map((a) => [a.id, a]));
     topArtistsWithNames = topBookingRows
       .map((r) => {
+        if (r.artistId === null) return null;
         const a = byId.get(r.artistId);
         if (!a) return null;
         return {

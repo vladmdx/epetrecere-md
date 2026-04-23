@@ -204,6 +204,12 @@ export async function DELETE(req: Request) {
   if (!row) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  if (row.artistId === null) {
+    return NextResponse.json(
+      { error: "Endpoint supports only artist bookings" },
+      { status: 400 },
+    );
+  }
   const owner = await requireArtistOwner(row.artistId);
   if (!owner.ok) {
     // Same status for "not owner" and "unknown row" so attackers can't

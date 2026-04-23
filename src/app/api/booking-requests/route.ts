@@ -12,7 +12,9 @@ import { sendEmail } from "@/lib/email/send";
 import { bookingRequestNewEmail } from "@/lib/email/templates/booking-request-new";
 
 const bookingSchema = z.object({
-  artistId: z.number(),
+  /** Either artistId or venueId must be set. */
+  artistId: z.number().optional(),
+  venueId: z.number().optional(),
   clientName: z.string().min(2),
   clientPhone: z.string().min(6),
   clientEmail: z.string().optional(),
@@ -176,6 +178,12 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
   }
+  if (!parsed.data.artistId && !parsed.data.venueId) {
+    return NextResponse.json(
+      { error: "artistId or venueId required" },
+      { status: 400 },
+    );
+  }
 
   // Resolve the authenticated user so we can link booking to their account
   const { userId: clerkId } = await auth();
@@ -201,8 +209,8 @@ export async function POST(req: NextRequest) {
     ...bookingBase
   } = parsed.data;
 
-  // Max 5 artists per category per event plan
-  if (eventPlanId) {
+  // Max 5 artists per category per event plan (artist bookings only)
+  if (eventPlanId && parsed.data.artistId) {
     // Get the category of the artist being booked
     const [targetArtist] = await db
       .select({ categoryIds: artists.categoryIds })
@@ -249,9 +257,8 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Time-slot conflict check — refuse if artist already has a pending or
-  // confirmed booking that overlaps this request.
-  {
+  // Artist conflict check — only for artist bookings.
+  if (parsed.data.artistId) {
     const { checkArtistAvailability, formatConflictMessage } = await import(
       "@/lib/booking/availability"
     );
@@ -292,22 +299,59 @@ export async function POST(req: NextRequest) {
     status: "new",
   });
 
-  // M5 — fire-and-forget notifications. Looks up the artist owner so the
-  // dashboard bell lights up immediately. Never blocks the response.
+  // M5 — fire-and-forget notifications. Looks up the vendor owner (artist
+  // or venue) so the dashboard bell lights up immediately.
   void (async () => {
     try {
-      const [artist] = await db
-        .select({
-          userId: artists.userId,
-          nameRo: artists.nameRo,
-          slug: artists.slug,
-          email: artists.email,
-          autoReplyEnabled: artists.autoReplyEnabled,
-          autoReplyMessage: artists.autoReplyMessage,
-        })
-        .from(artists)
-        .where(eq(artists.id, parsed.data.artistId))
-        .limit(1);
+      let artist: {
+        userId: string | null;
+        nameRo: string;
+        slug: string;
+        email: string | null;
+        autoReplyEnabled: boolean;
+        autoReplyMessage: string | null;
+      } | null = null;
+      let dashboardUrl = "/dashboard/rezervari";
+
+      if (parsed.data.artistId) {
+        const [a] = await db
+          .select({
+            userId: artists.userId,
+            nameRo: artists.nameRo,
+            slug: artists.slug,
+            email: artists.email,
+            autoReplyEnabled: artists.autoReplyEnabled,
+            autoReplyMessage: artists.autoReplyMessage,
+          })
+          .from(artists)
+          .where(eq(artists.id, parsed.data.artistId))
+          .limit(1);
+        artist = a ?? null;
+      } else if (parsed.data.venueId) {
+        const { venues } = await import("@/lib/db/schema");
+        const [v] = await db
+          .select({
+            userId: venues.userId,
+            nameRo: venues.nameRo,
+            slug: venues.slug,
+            email: venues.email,
+          })
+          .from(venues)
+          .where(eq(venues.id, parsed.data.venueId))
+          .limit(1);
+        if (v) {
+          artist = {
+            userId: v.userId,
+            nameRo: v.nameRo,
+            slug: v.slug,
+            email: v.email,
+            autoReplyEnabled: false,
+            autoReplyMessage: null,
+          };
+          dashboardUrl = "/dashboard/sala/rezervari";
+        }
+      }
+
       if (artist?.userId) {
         const timePart = parsed.data.startTime
           ? ` · ${parsed.data.startTime}${parsed.data.endTime ? `–${parsed.data.endTime}` : ""}`
@@ -317,7 +361,7 @@ export async function POST(req: NextRequest) {
           type: "booking_request_new",
           title: "Cerere nouă de rezervare",
           message: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} · ${parsed.data.eventDate}${timePart}`,
-          actionUrl: "/dashboard/rezervari",
+          actionUrl: dashboardUrl,
         });
       }
       const { notificationEmail } = await import("@/lib/email/templates/notification-email");
