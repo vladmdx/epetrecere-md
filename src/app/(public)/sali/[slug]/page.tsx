@@ -1,6 +1,13 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
+import { asc, eq, inArray } from "drizzle-orm";
+import { db } from "@/lib/db";
+import {
+  venueMenuCategories,
+  venueMenuItems,
+  venueMenuPackages,
+} from "@/lib/db/schema";
 import { getVenueBySlug } from "@/lib/db/queries/venues";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { venueJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
@@ -44,6 +51,30 @@ export default async function VenuePage({ params }: Props) {
 
   const name = getLocalized(venue, "name", "ro");
 
+  // Load digital menu data (packages, categories, items)
+  const [menuCategories, menuPackages] = await Promise.all([
+    db
+      .select()
+      .from(venueMenuCategories)
+      .where(eq(venueMenuCategories.venueId, venue.id))
+      .orderBy(asc(venueMenuCategories.sortOrder), asc(venueMenuCategories.id)),
+    db
+      .select()
+      .from(venueMenuPackages)
+      .where(eq(venueMenuPackages.venueId, venue.id))
+      .orderBy(asc(venueMenuPackages.sortOrder), asc(venueMenuPackages.id)),
+  ]);
+
+  const catIds = menuCategories.map((c) => c.id);
+  const menuItems =
+    catIds.length > 0
+      ? await db
+          .select()
+          .from(venueMenuItems)
+          .where(inArray(venueMenuItems.categoryId, catIds))
+          .orderBy(asc(venueMenuItems.sortOrder), asc(venueMenuItems.id))
+      : [];
+
   return (
     <>
       <script
@@ -69,7 +100,14 @@ export default async function VenuePage({ params }: Props) {
           ])),
         }}
       />
-      <VenueDetailClient venue={gatedVenue} />
+      <VenueDetailClient
+        venue={gatedVenue}
+        menu={{
+          categories: menuCategories,
+          items: menuItems,
+          packages: menuPackages,
+        }}
+      />
       <ViewTracker kind="venue" id={venue.id} />
     </>
   );

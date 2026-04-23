@@ -1,7 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { Star, MapPin, Users, Check, Lock } from "lucide-react";
+import { Star, MapPin, Users, Check, Lock, ChevronDown } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { ImageGallery } from "@/components/public/image-gallery";
@@ -9,6 +10,7 @@ import { RequestPriceForm, RequestBookingForm } from "@/components/public/reques
 import { CalendarWidget } from "@/components/public/calendar-widget";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
+import { cn } from "@/lib/utils";
 
 interface VenueData {
   id: number;
@@ -46,7 +48,40 @@ interface VenueData {
   }>;
 }
 
-export function VenueDetailClient({ venue }: { venue: VenueData }) {
+interface MenuCategory {
+  id: number;
+  nameRo: string;
+  icon: string | null;
+}
+interface MenuItem {
+  id: number;
+  categoryId: number;
+  nameRo: string;
+  descriptionRo: string | null;
+  priceEur: number | null;
+}
+interface MenuPackage {
+  id: number;
+  nameRo: string;
+  pricePerPerson: number;
+  currency: string | null;
+  includes: string | null;
+  excludes: string | null;
+  minGuests: number | null;
+  isRecommended: boolean;
+}
+
+export function VenueDetailClient({
+  venue,
+  menu,
+}: {
+  venue: VenueData;
+  menu?: {
+    categories: MenuCategory[];
+    items: MenuItem[];
+    packages: MenuPackage[];
+  };
+}) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(venue, "name", locale);
@@ -132,20 +167,96 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
             </div>
           )}
 
-          {/* F-S4 — Meniu digital */}
-          {venue.menuUrl && (
+          {/* F-S4 — Meniu digital (spec section 5) */}
+          {(menu?.packages.length || menu?.categories.length || venue.menuUrl) ? (
             <div className="mt-6">
               <h2 className="mb-3 font-heading text-lg font-bold">Meniu</h2>
-              <a
-                href={venue.menuUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
-              >
-                Vezi meniu complet
-              </a>
+
+              {/* Packages */}
+              {menu && menu.packages.length > 0 && (
+                <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {menu.packages.map((p) => (
+                    <div
+                      key={p.id}
+                      className={cn(
+                        "relative rounded-xl border bg-card p-5",
+                        p.isRecommended
+                          ? "border-gold ring-2 ring-gold/30"
+                          : "border-border/40",
+                      )}
+                    >
+                      {p.isRecommended && (
+                        <div className="absolute -top-2 right-4 rounded-full bg-gold px-3 py-0.5 text-[10px] font-bold text-background">
+                          RECOMANDAT
+                        </div>
+                      )}
+                      <h3 className="font-heading text-lg font-bold">
+                        {p.nameRo}
+                      </h3>
+                      <div className="mt-2 flex items-baseline gap-1">
+                        <span className="font-accent text-3xl font-bold text-gold">
+                          {p.pricePerPerson}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {p.currency || "EUR"} / persoană
+                        </span>
+                      </div>
+                      {p.minGuests && (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Min. {p.minGuests} persoane
+                        </p>
+                      )}
+                      {p.includes && (
+                        <div className="mt-3">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-emerald-500">
+                            Include
+                          </p>
+                          <p className="mt-0.5 whitespace-pre-wrap text-xs">
+                            {p.includes}
+                          </p>
+                        </div>
+                      )}
+                      {p.excludes && (
+                        <div className="mt-2">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-red-400">
+                            Nu include
+                          </p>
+                          <p className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">
+                            {p.excludes}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Categories + Items accordion */}
+              {menu && menu.categories.length > 0 && (
+                <div className="mb-4 space-y-2">
+                  {menu.categories.map((c) => (
+                    <CategoryAccordion
+                      key={c.id}
+                      category={c}
+                      items={menu.items.filter((i) => i.categoryId === c.id)}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* PDF menu link (fallback/complement) */}
+              {venue.menuUrl && (
+                <a
+                  href={venue.menuUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
+                >
+                  Descarcă meniu PDF
+                </a>
+              )}
             </div>
-          )}
+          ) : null}
 
           {/* F-S5 — Virtual tour 360° */}
           {venue.virtualTourUrl && (
@@ -229,6 +340,61 @@ export function VenueDetailClient({ venue }: { venue: VenueData }) {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function CategoryAccordion({
+  category,
+  items,
+}: {
+  category: MenuCategory;
+  items: MenuItem[];
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="overflow-hidden rounded-xl border border-border/40">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-3 bg-card px-4 py-3 text-left hover:bg-accent/30"
+      >
+        <span className="flex items-center gap-2 text-sm font-medium">
+          {category.nameRo}
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
+            {items.length}
+          </span>
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-4 w-4 text-muted-foreground transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && items.length > 0 && (
+        <ul className="divide-y divide-border/20 bg-background/50">
+          {items.map((item) => (
+            <li
+              key={item.id}
+              className="flex items-start justify-between gap-3 px-4 py-2.5"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">{item.nameRo}</p>
+                {item.descriptionRo && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {item.descriptionRo}
+                  </p>
+                )}
+              </div>
+              {item.priceEur !== null && (
+                <span className="shrink-0 font-medium text-gold">
+                  {item.priceEur}€
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -334,6 +334,56 @@ export const venueImages = pgTable("venue_images", {
 });
 
 // ═══════════════════════════════════════════════════════
+// VENUE DIGITAL MENU (Phase 3 — spec section 5)
+// ═══════════════════════════════════════════════════════
+
+export const venueMenuCategories = pgTable("venue_menu_categories", {
+  id: serial("id").primaryKey(),
+  venueId: integer("venue_id")
+    .references(() => venues.id, { onDelete: "cascade" })
+    .notNull(),
+  nameRo: text("name_ro").notNull(),
+  nameRu: text("name_ru"),
+  nameEn: text("name_en"),
+  icon: text("icon"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const venueMenuItems = pgTable("venue_menu_items", {
+  id: serial("id").primaryKey(),
+  categoryId: integer("category_id")
+    .references(() => venueMenuCategories.id, { onDelete: "cascade" })
+    .notNull(),
+  nameRo: text("name_ro").notNull(),
+  nameRu: text("name_ru"),
+  nameEn: text("name_en"),
+  descriptionRo: text("description_ro"),
+  priceMdl: integer("price_mdl"),
+  priceEur: integer("price_eur"),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const venueMenuPackages = pgTable("venue_menu_packages", {
+  id: serial("id").primaryKey(),
+  venueId: integer("venue_id")
+    .references(() => venues.id, { onDelete: "cascade" })
+    .notNull(),
+  nameRo: text("name_ro").notNull(),
+  nameRu: text("name_ru"),
+  nameEn: text("name_en"),
+  pricePerPerson: integer("price_per_person").notNull(),
+  currency: varchar("currency", { length: 3 }).default("EUR"),
+  includes: text("includes"),
+  excludes: text("excludes"),
+  minGuests: integer("min_guests"),
+  isRecommended: boolean("is_recommended").default(false).notNull(),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
 // CALENDAR
 // ═══════════════════════════════════════════════════════
 
