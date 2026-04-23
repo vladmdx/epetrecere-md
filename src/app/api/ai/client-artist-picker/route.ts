@@ -176,9 +176,10 @@ async function handleRequest(req: NextRequest) {
     .map((id) => categoryMap.get(id)?.nameRo)
     .filter((n): n is string => !!n);
 
-  // Full list of artist categories with IDs + names for the AI
+  // Full list of bookable categories (artist + service, e.g. Fotografi is "service")
+  // The discovery page treats both as bookable through the artist flow.
   const artistCategoriesList = allCategories
-    .filter((c) => c.type === "artist")
+    .filter((c) => c.type === "artist" || c.type === "service")
     .map((c) => `#${c.id} ${c.nameRo}`)
     .join(", ");
 
@@ -277,15 +278,18 @@ Reguli:
           categoryNames?: string[];
         };
 
-        // Resolve categoryNames to IDs (case-insensitive partial match)
+        // Resolve categoryNames to IDs (case-insensitive partial match).
+        // Match across BOTH artist and service categories — the discovery
+        // page groups photographers/MC/etc (type="service") alongside artists.
         const resolvedCategoryIds = new Set<number>(input.categoryIds ?? []);
         if (input.categoryNames && input.categoryNames.length > 0) {
           const namesLower = input.categoryNames.map((n) => n.toLowerCase().trim());
           for (const c of allCategories) {
+            if (c.type !== "artist" && c.type !== "service") continue;
+            const catLower = c.nameRo.toLowerCase();
             if (
-              c.type === "artist" &&
               namesLower.some(
-                (n) => c.nameRo.toLowerCase().includes(n) || n.includes(c.nameRo.toLowerCase()),
+                (n) => catLower.includes(n) || n.includes(catLower),
               )
             ) {
               resolvedCategoryIds.add(c.id);
