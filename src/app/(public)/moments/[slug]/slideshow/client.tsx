@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import QRCode from "qrcode";
 
 interface Photo {
   id: number;
@@ -12,7 +13,25 @@ interface Photo {
 export function SlideshowClient({ slug, title }: { slug: string; title: string }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [index, setIndex] = useState(0);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
   const seenIds = useRef<Set<number>>(new Set());
+
+  // Generate the upload-page QR so guests on TV can scan it with their phone
+  useEffect(() => {
+    const uploadUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/moments/${slug}`
+        : `/moments/${slug}`;
+    QRCode.toDataURL(uploadUrl, {
+      width: 240,
+      margin: 1,
+      color: { dark: "#0D0D0D", light: "#FFFFFF" },
+    })
+      .then(setQrUrl)
+      .catch(() => {
+        /* ignore */
+      });
+  }, [slug]);
 
   // Poll the gallery every 10s so new uploads appear within ~15s.
   useEffect(() => {
@@ -75,6 +94,10 @@ export function SlideshowClient({ slug, title }: { slug: string; title: string }
               </span>
             )}
           </div>
+          {/* Photo counter */}
+          <div className="absolute left-8 top-8 rounded-full bg-black/60 px-4 py-1.5 text-xs text-white/80 backdrop-blur">
+            {index + 1} / {photos.length}
+          </div>
         </>
       ) : (
         <div className="text-center">
@@ -86,6 +109,19 @@ export function SlideshowClient({ slug, title }: { slug: string; title: string }
           </p>
           <p className="mt-2 text-sm text-white/50">
             Scanează QR-ul și trimite momentele tale
+          </p>
+        </div>
+      )}
+
+      {/* Always-visible QR corner — guests can scan from across the room */}
+      {qrUrl && (
+        <div className="absolute right-8 top-8 flex flex-col items-center gap-2 rounded-2xl bg-white/95 p-3 shadow-2xl backdrop-blur">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={qrUrl} alt="Scan pentru upload poze" className="h-32 w-32" />
+          <p className="text-center text-[11px] font-semibold text-black">
+            📸 Scanează
+            <br />
+            trimite poze
           </p>
         </div>
       )}

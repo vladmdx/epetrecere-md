@@ -204,6 +204,13 @@ export function InvitationDetailClient({ id }: { id: number }) {
               >
                 <ExternalLink className="h-3 w-3" /> Previzualizare
               </Link>
+              <Link
+                href={`/cabinet/invitatii/${invitation.id}/checkin`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/15"
+              >
+                <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                Check-in live
+              </Link>
               <Button
                 onClick={sendInvitations}
                 disabled={sending}

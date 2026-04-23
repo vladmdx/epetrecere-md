@@ -30,6 +30,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { EventTimeline } from "@/components/client/event-timeline";
 import {
   LayoutDashboard,
   ClipboardList,
@@ -104,6 +105,8 @@ interface Plan {
   /** Wizard-supplied category IDs for pre-filtering the artist discovery. */
   selectedCategories?: number[];
   status?: "active" | "completed" | "cancelled";
+  /** AI-generated event timeline (editable). */
+  timeline?: Array<{ time: string; label: string; durationMin: number }>;
 }
 
 interface BookingRequest {
@@ -352,23 +355,24 @@ export default function PlanDetailPage({
       <div className="flex-1 flex overflow-y-auto">
         <div className="flex-1 p-6 pb-20 md:pb-6">
           {activeTab === "overview" && (
-            <OverviewTab
-              plan={plan}
-              checklist={checklist}
-              guests={guests}
-              tables={tables}
-              seats={seats}
-              bookings={activeBookings}
-              photoCount={photoCount}
-              guestTotal={guestTotal}
-              guestAccepted={guestAccepted}
-              checklistDone={checklistDone}
-              checklistTotal={checklistTotal}
-              seatedGuests={seatedGuests}
-              onCheckItem={async (itemId, done) => {
-                const res = await fetch(`/api/event-plans/${planId}/checklist/${itemId}`, {
-                  method: "PUT",
-                  headers: { "Content-Type": "application/json" },
+            <div className="space-y-6">
+              <OverviewTab
+                plan={plan}
+                checklist={checklist}
+                guests={guests}
+                tables={tables}
+                seats={seats}
+                bookings={activeBookings}
+                photoCount={photoCount}
+                guestTotal={guestTotal}
+                guestAccepted={guestAccepted}
+                checklistDone={checklistDone}
+                checklistTotal={checklistTotal}
+                seatedGuests={seatedGuests}
+                onCheckItem={async (itemId, done) => {
+                  const res = await fetch(`/api/event-plans/${planId}/checklist/${itemId}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ done }),
                 });
                 if (res.ok) {
@@ -379,6 +383,11 @@ export default function PlanDetailPage({
               }}
               onSwitchTab={setActiveTab}
             />
+              <EventTimeline
+                planId={plan.id}
+                initial={plan.timeline ?? []}
+              />
+            </div>
           )}
 
           {activeTab === "checklist" && (

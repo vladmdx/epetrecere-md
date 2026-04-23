@@ -966,6 +966,11 @@ export const eventPlans = pgTable("event_plans", {
    *  section inside the Rezervări Artiști tab. */
   selectedCategories: jsonb("selected_categories").$type<number[]>().default([]),
   status: eventPlanStatusEnum("status").default("active").notNull(),
+  /** AI-generated (or user-edited) ordered list of timeline items.
+   *  Each item: { time: "14:00", label: "...", durationMin: 45 }. */
+  timeline: jsonb("timeline").$type<
+    Array<{ time: string; label: string; durationMin: number }>
+  >().default([]),
   /** Set when the plan moves to the Arhivă section. */
   archivedAt: timestamp("archived_at"),
   /** Event Moments (F-C8): unique slug guests use to reach the public
@@ -1400,6 +1405,10 @@ export const invitationGuests = pgTable("invitation_guests", {
   rsvpToken: text("rsvp_token").unique(),
   remindersSent: integer("reminders_sent").default(0).notNull(),
   lastReminderAt: timestamp("last_reminder_at"),
+  // Event-day check-in — when the guest scans their QR at the door the
+  // host's dashboard marks this timestamp so a live "142/200 sosit" counter
+  // can update. Null = not arrived yet.
+  checkedInAt: timestamp("checked_in_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
