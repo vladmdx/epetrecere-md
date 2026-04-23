@@ -335,6 +335,8 @@ export async function POST(req: NextRequest) {
             nameRo: venues.nameRo,
             slug: venues.slug,
             email: venues.email,
+            autoReplyEnabled: venues.autoReplyEnabled,
+            autoReplyMessage: venues.autoReplyMessage,
           })
           .from(venues)
           .where(eq(venues.id, parsed.data.venueId))
@@ -345,8 +347,8 @@ export async function POST(req: NextRequest) {
             nameRo: v.nameRo,
             slug: v.slug,
             email: v.email,
-            autoReplyEnabled: false,
-            autoReplyMessage: null,
+            autoReplyEnabled: v.autoReplyEnabled,
+            autoReplyMessage: v.autoReplyMessage,
           };
           dashboardUrl = "/dashboard/sala/rezervari";
         }

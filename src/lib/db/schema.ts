@@ -306,6 +306,11 @@ export const venues = pgTable("venues", {
    *  Rendered as an iframe on the public venue detail page. */
   virtualTourUrl: text("virtual_tour_url"),
   calendarEnabled: boolean("calendar_enabled").default(false).notNull(),
+  /** Phase 4 — auto-reply email sent the moment a venue booking lands. */
+  autoReplyEnabled: boolean("auto_reply_enabled").default(false).notNull(),
+  autoReplyMessage: text("auto_reply_message"),
+  /** Hours between bookings (venue might need setup/teardown time). */
+  bufferHours: integer("buffer_hours").default(0),
   isActive: boolean("is_active").default(false).notNull(),
   isFeatured: boolean("is_featured").default(false).notNull(),
   ratingAvg: real("rating_avg").default(0),

@@ -2920,42 +2920,7 @@ function VenuesTab({ plan }: { plan: Plan }) {
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {venues.map((v) => (
-            <Link
-              key={v.id}
-              href={`/sali/${v.slug}?plan=${plan.id}`}
-              className="group rounded-xl border border-border/40 bg-card p-4 transition-all hover:border-gold/40"
-            >
-              <div className="flex items-start gap-3">
-                {v.coverUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={v.coverUrl}
-                    alt=""
-                    className="h-16 w-16 rounded-lg object-cover shrink-0"
-                  />
-                ) : (
-                  <div className="h-16 w-16 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
-                    <MapPin className="h-6 w-6 text-gold" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold truncate group-hover:text-gold">
-                    {v.nameRo}
-                  </p>
-                  {v.city && (
-                    <p className="text-xs text-muted-foreground">{v.city}</p>
-                  )}
-                  <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                    {v.capacityMin && v.capacityMax && (
-                      <span>{v.capacityMin}–{v.capacityMax} locuri</span>
-                    )}
-                    {v.pricePerPerson != null && (
-                      <span>{v.pricePerPerson}€/pers</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </Link>
+            <VenueDiscoveryCard key={v.id} venue={v} plan={plan} />
           ))}
         </div>
       )}
@@ -3216,6 +3181,106 @@ function SettingsTab({
             </Button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function VenueDiscoveryCard({ venue: v, plan }: { venue: DiscoveryVenue; plan: Plan }) {
+  const { user } = useUser();
+  const [submitting, setSubmitting] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function sendRequest() {
+    if (!plan.eventDate) {
+      toast.error("Adaugă mai întâi data evenimentului în planul tău");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/booking-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venueId: v.id,
+          eventPlanId: plan.id,
+          clientName: user?.fullName || "Client",
+          clientPhone: user?.phoneNumbers?.[0]?.phoneNumber || "—",
+          clientEmail: user?.primaryEmailAddress?.emailAddress,
+          eventDate: plan.eventDate,
+          eventType: plan.eventType ?? undefined,
+          guestCount: plan.guestCountTarget ?? undefined,
+          message: `Cerere din planul ${plan.title}`,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Eroare la trimitere");
+      }
+      toast.success(`Cerere trimisă la ${v.nameRo}!`);
+      setSent(true);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="group rounded-xl border border-border/40 bg-card p-4 transition-all hover:border-gold/40">
+      <Link
+        href={`/sali/${v.slug}?plan=${plan.id}`}
+        className="flex items-start gap-3"
+      >
+        {v.coverUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={v.coverUrl}
+            alt=""
+            className="h-16 w-16 rounded-lg object-cover shrink-0"
+          />
+        ) : (
+          <div className="h-16 w-16 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
+            <MapPin className="h-6 w-6 text-gold" />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold truncate group-hover:text-gold">
+            {v.nameRo}
+          </p>
+          {v.city && <p className="text-xs text-muted-foreground">{v.city}</p>}
+          <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+            {v.capacityMin && v.capacityMax && (
+              <span>
+                {v.capacityMin}–{v.capacityMax} locuri
+              </span>
+            )}
+            {v.pricePerPerson != null && <span>{v.pricePerPerson}€/pers</span>}
+          </div>
+        </div>
+      </Link>
+      <div className="mt-3 flex gap-2 border-t border-border/30 pt-3">
+        <Button
+          onClick={sendRequest}
+          disabled={submitting || sent}
+          size="sm"
+          className="flex-1 gap-1.5 bg-gold text-background hover:bg-gold-dark"
+        >
+          {submitting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : sent ? (
+            <Check className="h-3.5 w-3.5" />
+          ) : (
+            <BookOpen className="h-3.5 w-3.5" />
+          )}
+          {sent ? "Cerere trimisă" : "Solicită rezervare"}
+        </Button>
+        <Link href={`/sali/${v.slug}?plan=${plan.id}`} target="_blank">
+          <Button size="sm" variant="outline" className="gap-1.5">
+            <ExternalLink className="h-3.5 w-3.5" />
+            Detalii
+          </Button>
+        </Link>
       </div>
     </div>
   );

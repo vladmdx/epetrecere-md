@@ -69,6 +69,9 @@ const updateSchema = z.object({
   lng: z.number().nullable().optional(),
   seoTitleRo: z.string().optional(),
   seoDescRo: z.string().optional(),
+  autoReplyEnabled: z.boolean().optional(),
+  autoReplyMessage: z.string().nullable().optional(),
+  bufferHours: z.number().int().min(0).max(24).nullable().optional(),
 });
 
 export async function PUT(

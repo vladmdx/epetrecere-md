@@ -14,7 +14,10 @@ import {
   Clock,
   Loader2,
   Inbox,
+  Music,
+  ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +44,7 @@ import type { VenueBookingTab } from "@/lib/db/queries/venue-bookings";
 interface Booking {
   id: number;
   venueId: number | null;
+  eventPlanId: number | null;
   clientUserId: string | null;
   clientName: string;
   clientPhone: string;
@@ -59,6 +63,12 @@ interface Booking {
   updatedAt: string;
   planTitle: string | null;
   userEmail: string | null;
+  linkedArtists: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    status: string;
+  }>;
 }
 
 interface Props {
@@ -354,6 +364,31 @@ export function VenueBookingsClient({
                             Mesaj client
                           </p>
                           <p className="text-sm">{b.message}</p>
+                        </div>
+                      )}
+
+                      {/* Linked artists from the same event plan */}
+                      {b.linkedArtists.length > 0 && (
+                        <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-3">
+                          <p className="mb-2 flex items-center gap-1 text-[10px] uppercase tracking-wider text-purple-300">
+                            <Music className="h-3 w-3" />
+                            {b.linkedArtists.length}{" "}
+                            {b.linkedArtists.length === 1 ? "artist confirmat" : "artiști confirmați"}{" "}
+                            pentru același eveniment
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {b.linkedArtists.map((a) => (
+                              <Link
+                                key={a.id}
+                                href={`/artisti/${a.slug}`}
+                                target="_blank"
+                                className="inline-flex items-center gap-1 rounded-full bg-purple-500/15 px-2 py-1 text-xs text-purple-300 hover:bg-purple-500/25"
+                              >
+                                {a.name}
+                                <ExternalLink className="h-2.5 w-2.5" />
+                              </Link>
+                            ))}
+                          </div>
                         </div>
                       )}
 

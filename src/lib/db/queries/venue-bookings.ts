@@ -2,8 +2,8 @@
 // Uses the unified booking_requests table with venueId set.
 
 import { db } from "@/lib/db";
-import { bookingRequests, users, eventPlans } from "@/lib/db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { bookingRequests, users, eventPlans, artists } from "@/lib/db/schema";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 
 export type VenueBookingTab = "noi" | "acceptate" | "finalizate" | "anulate";
 
@@ -25,6 +25,7 @@ const TAB_STATUSES: Record<VenueBookingTab, BookingStatus[]> = {
 export type VenueBooking = {
   id: number;
   venueId: number | null;
+  eventPlanId: number | null;
   clientUserId: string | null;
   clientName: string;
   clientPhone: string;
@@ -43,6 +44,13 @@ export type VenueBooking = {
   updatedAt: Date;
   planTitle: string | null;
   userEmail: string | null;
+  /** Other vendors (artists) confirmed for the same event plan. */
+  linkedArtists: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    status: string;
+  }>;
 };
 
 export async function getVenueBookings(
@@ -54,6 +62,7 @@ export async function getVenueBookings(
     .select({
       id: bookingRequests.id,
       venueId: bookingRequests.venueId,
+      eventPlanId: bookingRequests.eventPlanId,
       clientUserId: bookingRequests.clientUserId,
       clientName: bookingRequests.clientName,
       clientPhone: bookingRequests.clientPhone,
@@ -84,7 +93,51 @@ export async function getVenueBookings(
     )
     .orderBy(desc(bookingRequests.createdAt));
 
-  return rows;
+  // Fetch linked artists for bookings that are tied to an event plan
+  const planIds = Array.from(
+    new Set(rows.map((r) => r.eventPlanId).filter((x): x is number => x !== null)),
+  );
+
+  const linkedMap = new Map<number, VenueBooking["linkedArtists"]>();
+  if (planIds.length > 0) {
+    const linkedRows = await db
+      .select({
+        eventPlanId: bookingRequests.eventPlanId,
+        artistId: artists.id,
+        artistName: artists.nameRo,
+        artistSlug: artists.slug,
+        status: bookingRequests.status,
+      })
+      .from(bookingRequests)
+      .innerJoin(artists, eq(bookingRequests.artistId, artists.id))
+      .where(
+        and(
+          inArray(bookingRequests.eventPlanId, planIds),
+          isNotNull(bookingRequests.artistId),
+          inArray(bookingRequests.status, [
+            "accepted",
+            "confirmed_by_client",
+            "completed",
+          ]),
+        ),
+      );
+    for (const row of linkedRows) {
+      if (!row.eventPlanId) continue;
+      const list = linkedMap.get(row.eventPlanId) ?? [];
+      list.push({
+        id: row.artistId,
+        name: row.artistName,
+        slug: row.artistSlug,
+        status: row.status,
+      });
+      linkedMap.set(row.eventPlanId, list);
+    }
+  }
+
+  return rows.map((r) => ({
+    ...r,
+    linkedArtists: r.eventPlanId ? linkedMap.get(r.eventPlanId) ?? [] : [],
+  }));
 }
 
 /** Counts per tab so we can show badges. */

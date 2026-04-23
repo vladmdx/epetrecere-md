@@ -1,7 +1,52 @@
-// Phase 1 stub — redirect to existing shared settings page.
+// Venue-specific settings — spec section 11.
+//
+// Auto-reply, calendar visibility, notifications (placeholder), GDPR.
 
+import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { users, venues } from "@/lib/db/schema";
+import { VenueSettingsClient } from "./client";
 
-export default function VenueSettingsPage() {
-  redirect("/dashboard/setari");
+export const dynamic = "force-dynamic";
+
+export default async function VenueSettingsPage() {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) redirect("/sign-in?redirect_url=/dashboard/sala/setari");
+
+  const [appUser] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  if (!appUser) redirect("/");
+
+  const [venue] = await db
+    .select({
+      id: venues.id,
+      nameRo: venues.nameRo,
+      calendarEnabled: venues.calendarEnabled,
+      autoReplyEnabled: venues.autoReplyEnabled,
+      autoReplyMessage: venues.autoReplyMessage,
+      bufferHours: venues.bufferHours,
+    })
+    .from(venues)
+    .where(eq(venues.userId, appUser.id))
+    .limit(1);
+  if (!venue) redirect("/dashboard");
+
+  return (
+    <VenueSettingsClient
+      venue={{
+        id: venue.id,
+        nameRo: venue.nameRo,
+        calendarEnabled: venue.calendarEnabled,
+        autoReplyEnabled: venue.autoReplyEnabled,
+        autoReplyMessage: venue.autoReplyMessage,
+        bufferHours: venue.bufferHours,
+      }}
+      userEmail={appUser.email}
+    />
+  );
 }
