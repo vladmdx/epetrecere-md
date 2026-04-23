@@ -666,6 +666,25 @@ export const wishlistEntityType = pgEnum("wishlist_entity_type", [
   "venue",
 ]);
 
+// ═══════════════════════════════════════════════════════
+// PUSH SUBSCRIPTIONS — Web Push (VAPID). One user can have multiple
+// subscriptions (e.g. their phone + desktop browser); each browser
+// gives a unique endpoint URL. Endpoint is the PK so re-subscribes
+// are idempotent.
+// ═══════════════════════════════════════════════════════
+
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  endpoint: text("endpoint").primaryKey(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+}, (t) => [index("idx_push_sub_user").on(t.userId)]);
+
 export const wishlistItems = pgTable(
   "wishlist_items",
   {

@@ -7,6 +7,7 @@ import { PreferencesProvider } from "@/hooks/use-preferences";
 import { ClerkProvider } from "@clerk/nextjs";
 import { roRO } from "@clerk/localizations";
 import { CookieConsent } from "@/components/shared/cookie-consent";
+import { PwaManager } from "@/components/shared/pwa-manager";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -61,6 +62,7 @@ export default function RootLayout({
         <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" localization={roRO}><ThemeProvider><LocaleProvider><PreferencesProvider>
           {children}
           <CookieConsent />
+          <PwaManager />
           <Toaster />
         </PreferencesProvider></LocaleProvider></ThemeProvider></ClerkProvider>
       </body>

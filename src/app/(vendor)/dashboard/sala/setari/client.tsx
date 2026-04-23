@@ -22,6 +22,8 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
+import { PushSubscribeButton } from "@/components/shared/push-subscribe-button";
+import { WhatsAppPhoneInput } from "@/components/shared/whatsapp-phone-input";
 
 interface VenueSettings {
   id: number;
@@ -40,11 +42,13 @@ type DigestFrequency = "instant" | "daily" | "weekly";
 export function VenueSettingsClient({
   venue,
   userEmail,
+  userPhone,
   icalUrl,
   notificationDigestFrequency,
 }: {
   venue: VenueSettings;
   userEmail: string | null;
+  userPhone: string | null;
   icalUrl: string;
   notificationDigestFrequency: string;
 }) {
@@ -317,6 +321,30 @@ export function VenueSettingsClient({
             Notificările email sunt trimise automat la solicitări noi, mesaje,
             recenzii și plăți. Controlează mai jos cât de des le primești.
           </p>
+
+          {/* Push (browser / PWA) */}
+          <div className="rounded-lg bg-muted/30 p-3">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Notificări instant pe dispozitiv
+            </Label>
+            <p className="mt-1 mb-2 text-xs text-muted-foreground">
+              Primești un ping direct în browser / pe telefon (dacă ai instalat aplicația) când ai o solicitare nouă sau un mesaj.
+            </p>
+            <PushSubscribeButton />
+          </div>
+
+          {/* WhatsApp */}
+          <div className="rounded-lg bg-green-500/5 border border-green-500/15 p-3">
+            <Label className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-green-500">
+              <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
+            </Label>
+            <p className="mt-1 mb-3 text-xs text-muted-foreground">
+              Pentru clienții din Moldova, WhatsApp e cel mai rapid canal.
+              Setează-ți numărul aici pentru a primi notificări critice
+              (booking-uri noi, confirmări) direct pe WhatsApp.
+            </p>
+            <WhatsAppPhoneInput initialValue={userPhone} />
+          </div>
 
           <div>
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">

@@ -20,6 +20,7 @@ export default async function VenueSettingsPage() {
     .select({
       id: users.id,
       email: users.email,
+      phone: users.phone,
       notificationDigestFrequency: users.notificationDigestFrequency,
     })
     .from(users)
@@ -56,6 +57,7 @@ export default async function VenueSettingsPage() {
         bufferHours: venue.bufferHours,
       }}
       userEmail={appUser.email}
+      userPhone={appUser.phone}
       icalUrl={icalUrl}
       notificationDigestFrequency={appUser.notificationDigestFrequency}
     />

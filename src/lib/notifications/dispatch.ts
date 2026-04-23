@@ -71,6 +71,41 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
       actionUrl: input.actionUrl,
     });
 
+    // Web Push — fire-and-forget in parallel with email. No frequency gate:
+    // push is instant by nature (if user wanted quiet, they'd turn it off in
+    // the browser). Safe no-op when VAPID keys aren't configured or the user
+    // has no active subscriptions.
+    void (async () => {
+      try {
+        const { sendPushToUser } = await import("@/lib/push/send");
+        await sendPushToUser(input.userId, {
+          title: input.title,
+          body: input.message ?? "",
+          actionUrl: input.actionUrl ?? "/",
+          tag: String(input.type),
+        });
+      } catch (err) {
+        console.error("[notifications] push failed:", err);
+      }
+    })();
+
+    // WhatsApp — only for critical time-sensitive events. Fire-and-forget.
+    // Safe no-op when WhatsApp env vars or user.phone are missing.
+    if (CRITICAL_TYPES.has(String(input.type))) {
+      void (async () => {
+        try {
+          const { sendWhatsAppToUser } = await import("@/lib/whatsapp/send");
+          await sendWhatsAppToUser(input.userId, {
+            title: input.title,
+            body: input.message ?? "",
+            actionUrl: input.actionUrl,
+          });
+        } catch (err) {
+          console.error("[notifications] whatsapp failed:", err);
+        }
+      })();
+    }
+
     // Email — gated by the recipient's digest frequency preference, EXCEPT
     // for time-sensitive event types which always fire instantly.
     if (input.email && input.emailHtml) {
