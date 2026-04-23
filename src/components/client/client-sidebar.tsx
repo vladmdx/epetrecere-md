@@ -16,7 +16,6 @@ import {
   CheckSquare,
   Shield,
   Camera,
-  Armchair,
   Plus,
   PartyPopper,
   Archive,
@@ -41,7 +40,6 @@ const toolsNav = [
   { href: "/cabinet/invitatii", icon: Mail, label: "Invitații Electronice" },
   { href: "/cabinet/calculator-dar", icon: Calculator, label: "Calculator Dar" },
   { href: "/cabinet/moments", icon: Camera, label: "Momente Eveniment" },
-  { href: "/cabinet/furnizori", icon: Armchair, label: "Furnizori" },
   { href: "/cabinet/date", icon: Shield, label: "Confidențialitate" },
   { href: "/cabinet/setari", icon: Settings, label: "Setări" },
 ] as const;

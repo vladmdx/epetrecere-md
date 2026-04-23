@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { INVITATION_DESIGN_LIST, type InvitationDesignId } from "@/lib/invitations/templates";
 import { Textarea } from "@/components/ui/textarea";
+import { TimePicker } from "@/components/ui/time-picker";
+import { Calendar as CalendarIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -75,6 +77,35 @@ const GROUP_LABELS: Record<string, string> = {
   work: "Colegi",
   other: "Altele",
 };
+
+function ThemedDateInput({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="group flex h-11 w-full items-center gap-2.5 rounded-lg border border-border/60 bg-background/80 px-3 text-left text-sm transition-all hover:border-gold/50 focus-within:border-gold/70 focus-within:ring-2 focus-within:ring-gold/20">
+      <div
+        className={cn(
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
+          value
+            ? "bg-gold/15 text-gold"
+            : "bg-accent/40 text-foreground/70 group-hover:bg-gold/10 group-hover:text-gold",
+        )}
+      >
+        <CalendarIcon className="h-3.5 w-3.5" />
+      </div>
+      <input
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="flex-1 bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+      />
+    </div>
+  );
+}
 
 export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }: Props) {
   const [name, setName] = useState("");
@@ -618,49 +649,41 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <Label className="text-xs">Data evenimentului</Label>
-                  <Input
-                    type="date"
-                    className="mt-1 [color-scheme:dark]"
-                    value={invData.eventDate}
-                    onChange={(e) =>
-                      setInvData((s) => ({ ...s, eventDate: e.target.value }))
-                    }
-                  />
+                  <div className="mt-1">
+                    <ThemedDateInput
+                      value={invData.eventDate}
+                      onChange={(v) => setInvData((s) => ({ ...s, eventDate: v }))}
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs">Termen limită RSVP</Label>
-                  <Input
-                    type="date"
-                    className="mt-1 [color-scheme:dark]"
-                    value={invData.rsvpDeadline}
-                    onChange={(e) =>
-                      setInvData((s) => ({ ...s, rsvpDeadline: e.target.value }))
-                    }
-                  />
+                  <div className="mt-1">
+                    <ThemedDateInput
+                      value={invData.rsvpDeadline}
+                      onChange={(v) => setInvData((s) => ({ ...s, rsvpDeadline: v }))}
+                    />
+                  </div>
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <Label className="text-xs">Ora ceremoniei</Label>
-                  <Input
-                    type="time"
-                    className="mt-1 [color-scheme:dark]"
-                    value={invData.ceremonyTime}
-                    onChange={(e) =>
-                      setInvData((s) => ({ ...s, ceremonyTime: e.target.value }))
-                    }
-                  />
+                  <div className="mt-1">
+                    <TimePicker
+                      value={invData.ceremonyTime}
+                      onChange={(v) => setInvData((s) => ({ ...s, ceremonyTime: v }))}
+                    />
+                  </div>
                 </div>
                 <div>
                   <Label className="text-xs">Ora petrecerii</Label>
-                  <Input
-                    type="time"
-                    className="mt-1 [color-scheme:dark]"
-                    value={invData.receptionTime}
-                    onChange={(e) =>
-                      setInvData((s) => ({ ...s, receptionTime: e.target.value }))
-                    }
-                  />
+                  <div className="mt-1">
+                    <TimePicker
+                      value={invData.receptionTime}
+                      onChange={(v) => setInvData((s) => ({ ...s, receptionTime: v }))}
+                    />
+                  </div>
                 </div>
               </div>
               <div>
