@@ -7,6 +7,7 @@ import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
+import { WishlistButton } from "@/components/public/wishlist-button";
 
 interface ArtistCardProps {
   artist: {
@@ -71,6 +72,15 @@ export function ArtistCard({ artist }: ArtistCardProps) {
               <Crown className="h-3 w-3" /> Premium
             </Badge>
           )}
+        </div>
+        {/* Wishlist heart — positioned in top-right, doesn't affect card nav */}
+        <div className="absolute right-2 top-2">
+          <WishlistButton
+            entityType="artist"
+            entityId={artist.id}
+            size="sm"
+            className="bg-background/80 backdrop-blur-sm"
+          />
         </div>
       </div>
 

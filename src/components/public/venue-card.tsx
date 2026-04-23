@@ -6,6 +6,7 @@ import { Star, Users, MapPin, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
+import { WishlistButton } from "@/components/public/wishlist-button";
 
 interface VenueCardProps {
   venue: {
@@ -48,6 +49,14 @@ export function VenueCard({ venue }: VenueCardProps) {
           className="object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
         />
+        <div className="absolute right-2 top-2">
+          <WishlistButton
+            entityType="venue"
+            entityId={venue.id}
+            size="sm"
+            className="bg-background/80 backdrop-blur-sm"
+          />
+        </div>
       </div>
 
       <div className="flex flex-1 flex-col p-4">

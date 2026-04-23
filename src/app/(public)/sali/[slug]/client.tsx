@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { ChatWidget } from "@/components/public/chat-widget";
+import { ShareButtons } from "@/components/public/share-buttons";
 import { CalendarWidget } from "@/components/public/calendar-widget";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
@@ -331,6 +332,17 @@ export function VenueDetailClient({
               artistSlug={venue.slug}
               slugPrefix="sali"
             />
+
+            {/* Share buttons */}
+            <div className="rounded-xl border border-border/40 bg-card p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Partajează
+              </p>
+              <ShareButtons
+                title={`${name} — sală evenimente pe ePetrecere.md`}
+                compact
+              />
+            </div>
           </div>
 
           {/* M6 Intern #1 — calendar gated behind login */}

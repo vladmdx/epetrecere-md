@@ -13,6 +13,7 @@ import { ArtistCard } from "@/components/public/artist-card";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { ChatWidget } from "@/components/public/chat-widget";
+import { ShareButtons } from "@/components/public/share-buttons";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 
@@ -423,6 +424,17 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               artistName={name}
               artistSlug={artist.slug}
             />
+
+            {/* Share buttons */}
+            <div className="rounded-xl border border-border/40 bg-card p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Partajează
+              </p>
+              <ShareButtons
+                title={`${name} — rezervă pentru evenimentul tău pe ePetrecere.md`}
+                compact
+              />
+            </div>
 
             {/* Calendar: vizibil pentru useri logați, ascuns pentru nelogați */}
             {canSeeContact ? (

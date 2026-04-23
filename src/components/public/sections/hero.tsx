@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/hooks/use-locale";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
+import { SmartSearchBar } from "@/components/public/smart-search-bar";
 
 const stats = [
   { key: "stats_artists", value: "500+" },
@@ -64,7 +65,10 @@ export function HeroSection() {
         </ScrollReveal>
 
         <ScrollReveal delay={0.45}>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+          <div className="mx-auto mt-10 max-w-2xl">
+            <SmartSearchBar />
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
             <Link href="/artisti">
               <Button size="lg" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark px-8 text-base font-medium shadow-[0_4px_20px_rgba(201,168,76,0.3)]">
                 {t("hero.cta_primary")}

@@ -234,9 +234,103 @@ export const invitationRsvpReminders = inngest.createFunction(
   },
 );
 
+// ─────────────────────────────────────────────────────────
+// Tentative-hold auto-expiry — spec F21.
+//
+// Bookings that land in status "pending" are effectively blocking the
+// vendor's attention. If the vendor doesn't accept or reject within
+// 48h, we auto-mark them as "expired" so:
+//   - The client gets notified their request timed out and can retry
+//   - The vendor's inbox stays clean (clear signal: this one is dead)
+//   - The calendar/occupancy reports don't count zombie pending requests
+//
+// The "expired" status is introduced as a terminal state — no further
+// transitions. Clients CAN create a new booking request for the same
+// date; this is just moving dust out of the pending pile.
+//
+// Runs hourly to keep the cron cheap; since the action is idempotent
+// (no-op if already expired) an occasional double-tick is fine.
+// ─────────────────────────────────────────────────────────
+export const expirePendingBookings = inngest.createFunction(
+  {
+    id: "expire-pending-bookings-48h",
+    triggers: [{ cron: "0 * * * *" }], // top of every hour
+  },
+  async ({ step }) => {
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
+
+    return await step.run("expire-stale-pending", async () => {
+      // Select pending bookings older than 48h.
+      // Using sql template for the interval arithmetic; Drizzle's
+      // relative-time helpers don't cover PostgreSQL `INTERVAL`.
+      const stale = await db
+        .select({
+          id: bookingRequests.id,
+          clientEmail: bookingRequests.clientEmail,
+          clientName: bookingRequests.clientName,
+          eventDate: bookingRequests.eventDate,
+          artistId: bookingRequests.artistId,
+          venueId: bookingRequests.venueId,
+        })
+        .from(bookingRequests)
+        .where(
+          and(
+            eq(bookingRequests.status, "pending"),
+            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '48 hours'`,
+          ),
+        );
+
+      if (stale.length === 0) return { expired: 0 };
+
+      // Flip to "expired" in one statement.
+      await db
+        .update(bookingRequests)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(
+          and(
+            eq(bookingRequests.status, "pending"),
+            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '48 hours'`,
+          ),
+        );
+
+      // Best-effort email to the client — continue on failure.
+      for (const b of stale) {
+        if (!b.clientEmail) continue;
+        try {
+          await sendEmail({
+            to: b.clientEmail,
+            subject: "Rezervarea ta a expirat — nu te descuraja",
+            html: `
+              <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px">
+                <h2 style="color:#C9A84C;">Hi ${b.clientName},</h2>
+                <p>Din păcate, rezervarea ta din <strong>${b.eventDate}</strong> nu a primit răspuns din partea furnizorului în 48 de ore, așa că am marcat-o ca expirată.</p>
+                <p>Nu te îngrijora — poți trimite o nouă cerere oricând (sau către alt furnizor disponibil):</p>
+                <p style="text-align:center;margin:24px 0">
+                  <a href="${appUrl}/artisti" style="display:inline-block;background:#C9A84C;color:#0D0D0D;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Explorează alți artiști</a>
+                </p>
+                <p style="color:#777;font-size:13px">Dacă ai primit deja un răspuns pe alt canal, poți ignora acest email.</p>
+              </div>
+            `,
+          });
+        } catch (err) {
+          console.error(
+            "[expire-pending] email notify failed for booking",
+            b.id,
+            err,
+          );
+        }
+      }
+
+      return { expired: stale.length };
+    });
+  },
+);
+
 export const functions = [
   onLeadCreated,
   leadFollowUp,
   eventReminder,
   invitationRsvpReminders,
+  expirePendingBookings,
 ];

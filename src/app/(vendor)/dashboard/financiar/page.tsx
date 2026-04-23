@@ -281,7 +281,7 @@ interface TransactionRowProps {
     clientName: string;
     eventDate: string;
     eventType: string | null;
-    status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled" | "completed";
+    status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled" | "completed" | "expired";
   };
   amount: number;
   currency: string;

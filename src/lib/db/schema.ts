@@ -12,6 +12,7 @@ import {
   serial,
   date,
   index,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -655,6 +656,33 @@ export const notifications = pgTable("notifications", {
 ]);
 
 // ═══════════════════════════════════════════════════════
+// WISHLIST — users save artists / venues to revisit later.
+// Composite primary key (userId, entityType, entityId) so the same
+// user can't add the same item twice, and we get a free index.
+// ═══════════════════════════════════════════════════════
+
+export const wishlistEntityType = pgEnum("wishlist_entity_type", [
+  "artist",
+  "venue",
+]);
+
+export const wishlistItems = pgTable(
+  "wishlist_items",
+  {
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    entityType: wishlistEntityType("entity_type").notNull(),
+    entityId: integer("entity_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.entityType, t.entityId] }),
+    index("idx_wishlist_user").on(t.userId),
+  ],
+);
+
+// ═══════════════════════════════════════════════════════
 // WORK SCHEDULE (artist working hours)
 // ═══════════════════════════════════════════════════════
 
@@ -686,6 +714,9 @@ export const bookingRequestStatusEnum = pgEnum("booking_request_status", [
   "rejected",
   "cancelled",
   "completed",
+  // Auto-set by the `expire-pending-bookings-48h` Inngest cron when a
+  // pending booking sits unanswered for 48h. Terminal state.
+  "expired",
 ]);
 
 export const bookingPaidStatusEnum = pgEnum("booking_paid_status", [

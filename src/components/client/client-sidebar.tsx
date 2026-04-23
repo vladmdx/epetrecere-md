@@ -23,6 +23,7 @@ import {
   Settings,
   Menu,
   X,
+  Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +31,7 @@ import { cn } from "@/lib/utils";
 const topNav = [
   { href: "/cabinet", icon: LayoutDashboard, label: "Panoul Meu" },
   { href: "/cabinet/rezervari", icon: BookOpen, label: "Rezervările Mele" },
+  { href: "/cabinet/favorite", icon: Heart, label: "Favorite" },
   { href: "/cabinet/mesaje", icon: MessageSquare, label: "Mesaje" },
   { href: "/cabinet/recenzii", icon: Star, label: "Recenziile Mele" },
   { href: "/cabinet/profil", icon: User, label: "Contul Meu" },

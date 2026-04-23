@@ -90,4 +90,21 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry config — wraps the Next.js config. Only active when SENTRY_DSN
+// env is set; otherwise it's a no-op wrapper. Upload of source maps
+// requires SENTRY_AUTH_TOKEN (via Vercel env var), org, and project —
+// fall back gracefully if missing so local dev works without Sentry.
+import { withSentryConfig } from "@sentry/nextjs";
+
+export default withSentryConfig(nextConfig, {
+  // Suppresses source-map upload logs during build
+  silent: true,
+  // These can also be set via env; hardcoding for a single-project setup.
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  // Only upload source maps in production builds to save time + quota
+  widenClientFileUpload: true,
+  disableLogger: true,
+  automaticVercelMonitors: false,
+});
