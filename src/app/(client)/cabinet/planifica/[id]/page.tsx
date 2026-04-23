@@ -1055,7 +1055,7 @@ function BudgetTab({
         </div>
         <Button
           onClick={() => setAddOpen(true)}
-          className="gap-1 bg-gold text-background hover:bg-gold-dark"
+          className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           size="sm"
         >
           <Plus className="h-4 w-4" /> Adaugă cheltuială
@@ -1242,7 +1242,7 @@ function BudgetTab({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>Anulează</Button>
-            <Button onClick={addExpense} className="bg-gold text-background hover:bg-gold-dark" disabled={!newDesc.trim() || !newAmount}>
+            <Button onClick={addExpense} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark" disabled={!newDesc.trim() || !newAmount}>
               Adaugă
             </Button>
           </DialogFooter>
@@ -1740,7 +1740,7 @@ function DiscoverySection({
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
                 viewMode === "grid"
-                  ? "bg-gold text-background"
+                  ? "bg-gold text-[#0D0D0D]"
                   : "text-muted-foreground hover:bg-accent",
               )}
               title="Vizualizare grilă"
@@ -1754,7 +1754,7 @@ function DiscoverySection({
               className={cn(
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
                 viewMode === "list"
-                  ? "bg-gold text-background"
+                  ? "bg-gold text-[#0D0D0D]"
                   : "text-muted-foreground hover:bg-accent",
               )}
               title="Vizualizare listă"
@@ -1775,7 +1775,7 @@ function DiscoverySection({
                   className={cn(
                     "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
                     columns === n
-                      ? "bg-gold text-background"
+                      ? "bg-gold text-[#0D0D0D]"
                       : "text-muted-foreground hover:bg-accent",
                   )}
                 >
@@ -2213,31 +2213,42 @@ function PlanArtistCard({
     modalOpen && mounted
       ? createPortal(
           <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4"
+            // Overscroll-contain prevents iOS Safari's bounce from leaking to
+            // the underlying page; fixed + inset-0 keeps the backdrop locked
+            // to the visual viewport regardless of browser chrome changes.
+            className="fixed inset-0 z-[9999] overflow-hidden overscroll-contain bg-black/60"
             onClick={() => !submitting && setModalOpen(false)}
           >
-            <div
-              className="w-full max-w-md rounded-2xl border border-border/40 bg-card shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <header className="flex items-center justify-between border-b border-border/40 px-5 py-4">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Solicită rezervare
-                  </p>
-                  <p className="font-heading text-lg font-bold">{artist.nameRo}</p>
-                </div>
-                <button
-                  onClick={() => !submitting && setModalOpen(false)}
-                  className="rounded-full p-1.5 text-muted-foreground hover:bg-accent"
-                  aria-label="Închide"
-                  disabled={submitting}
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </header>
+            <div className="flex h-full w-full items-start justify-center sm:items-center sm:p-4">
+              <div
+                // `min-h-0` on a flex COLUMN is the critical piece — without
+                // it, children with `overflow-y-auto` get auto min-height and
+                // never actually scroll, they just grow the parent. With it,
+                // the header + footer keep their size and the middle pane is
+                // the only scrollable region.
+                className="flex h-full min-h-0 w-full max-w-md flex-col border border-border/40 bg-card shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:rounded-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <header className="flex shrink-0 items-center justify-between border-b border-border/40 px-5 py-4">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Solicită rezervare
+                    </p>
+                    <p className="truncate font-heading text-lg font-bold">
+                      {artist.nameRo}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => !submitting && setModalOpen(false)}
+                    className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-accent"
+                    aria-label="Închide"
+                    disabled={submitting}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </header>
 
-              <div className="space-y-4 px-5 py-4">
+                <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
                 <div className="space-y-1 rounded-lg border border-border/40 bg-muted/30 p-3 text-sm">
                   <p className="text-xs font-semibold text-muted-foreground">
                     Eveniment
@@ -2332,7 +2343,7 @@ function PlanArtistCard({
                       Se încarcă pachetele…
                     </div>
                   ) : durationOptions.length > 0 ? (
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="grid grid-cols-2 gap-2">
                       {durationOptions.map(({ durationMinutes, tiers }) => {
                         const selected =
                           selectedDurationMinutes === durationMinutes;
@@ -2480,38 +2491,39 @@ function PlanArtistCard({
                 </div>
               </div>
 
-              <footer className="flex items-center justify-between gap-2 border-t border-border/40 px-5 py-3">
-                <Link
-                  href={`/artisti/${artist.slug}`}
-                  target="_blank"
-                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
-                >
-                  Vezi profil <ExternalLink className="h-3 w-3" />
-                </Link>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setModalOpen(false)}
-                    disabled={submitting}
+                <footer className="flex shrink-0 items-center justify-between gap-2 border-t border-border/40 bg-card px-5 py-3">
+                  <Link
+                    href={`/artisti/${artist.slug}`}
+                    target="_blank"
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
                   >
-                    Anulează
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={submit}
-                    disabled={submitting || !canSubmit}
-                    className="gap-2 bg-gold text-background hover:bg-gold-dark"
-                  >
-                    {submitting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    Trimite cerere
-                  </Button>
-                </div>
-              </footer>
+                    Vezi profil <ExternalLink className="h-3 w-3" />
+                  </Link>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setModalOpen(false)}
+                      disabled={submitting}
+                    >
+                      Anulează
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={submit}
+                      disabled={submitting || !canSubmit}
+                      className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+                    >
+                      {submitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Send className="h-4 w-4" />
+                      )}
+                      Trimite cerere
+                    </Button>
+                  </div>
+                </footer>
+              </div>
             </div>
           </div>,
           document.body,
@@ -2565,7 +2577,7 @@ function PlanArtistCard({
                       className={cn(
                         "flex flex-col gap-0.5 rounded-2xl px-3 py-2 text-sm",
                         m.senderType === "client"
-                          ? "ml-8 bg-gold text-background"
+                          ? "ml-8 bg-gold text-[#0D0D0D]"
                           : "mr-8 bg-accent/60 text-foreground",
                       )}
                     >
@@ -2597,9 +2609,10 @@ function PlanArtistCard({
                 <Button
                   type="button"
                   size="icon"
+                  aria-label="Trimite mesaj"
                   onClick={sendChatMessage}
                   disabled={!chatDraft.trim() || !conversationId || chatSending}
-                  className="shrink-0 bg-gold text-background hover:bg-gold-dark"
+                  className="shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                 >
                   {chatSending ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -2751,7 +2764,7 @@ function PlanArtistCard({
                 onClick={confirmBooking}
                 disabled={confirming}
                 size="sm"
-                className="w-full min-w-0 flex-1 gap-1.5 bg-success text-background hover:bg-success/90"
+                className="w-full min-w-0 flex-1 gap-1.5 bg-success text-[#0D0D0D] hover:bg-success/90"
               >
                 {confirming ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
@@ -2765,7 +2778,7 @@ function PlanArtistCard({
                 onClick={() => setModalOpen(true)}
                 disabled={disabled}
                 size="sm"
-                className="w-full min-w-0 flex-1 gap-1.5 bg-gold text-background hover:bg-gold-dark disabled:opacity-60"
+                className="w-full min-w-0 flex-1 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-60"
               >
                 {isConfirmed ? (
                   <Check className="h-3.5 w-3.5 shrink-0" />
@@ -3145,7 +3158,7 @@ function SettingsTab({
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="bg-gold text-background hover:bg-gold-dark gap-2"
+          className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvează setările
@@ -3264,7 +3277,7 @@ function VenueDiscoveryCard({ venue: v, plan }: { venue: DiscoveryVenue; plan: P
           onClick={sendRequest}
           disabled={submitting || sent}
           size="sm"
-          className="flex-1 gap-1.5 bg-gold text-background hover:bg-gold-dark"
+          className="flex-1 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
         >
           {submitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
