@@ -29,3 +29,21 @@ export function verifyIcalToken(artistId: number, token: string): boolean {
   }
   return ok === 0;
 }
+
+/** Venue-specific iCal token (separate namespace from artist). */
+export function getVenueIcalToken(venueId: number): string {
+  return createHmac("sha256", SECRET)
+    .update(`ical-feed|venue|${venueId}`)
+    .digest("base64url")
+    .slice(0, 24);
+}
+
+export function verifyVenueIcalToken(venueId: number, token: string): boolean {
+  const expected = getVenueIcalToken(venueId);
+  if (expected.length !== token.length) return false;
+  let ok = 0;
+  for (let i = 0; i < expected.length; i++) {
+    ok |= expected.charCodeAt(i) ^ token.charCodeAt(i);
+  }
+  return ok === 0;
+}

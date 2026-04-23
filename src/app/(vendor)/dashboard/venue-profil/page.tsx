@@ -24,6 +24,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RichEditor } from "@/components/shared/rich-editor";
+import { MapPicker } from "@/components/shared/map-picker";
 
 const CANONICAL_FACILITIES = [
   "Parcare",
@@ -306,22 +308,25 @@ export default function VenueProfilePage() {
           <Card>
             <CardHeader>
               <CardTitle>Descriere</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Editor rich-text: bold, italic, titluri, liste, link-uri.
+              </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Descriere (RO)</Label>
-                <Textarea
-                  rows={5}
-                  value={venue.descriptionRo ?? ""}
-                  onChange={(e) => update({ descriptionRo: e.target.value })}
+                <Label className="mb-2 block">Descriere (RO)</Label>
+                <RichEditor
+                  content={venue.descriptionRo ?? ""}
+                  onChange={(html) => update({ descriptionRo: html })}
+                  placeholder="Descrie sala ta — atmosferă, ce o face specială, evenimente potrivite..."
                 />
               </div>
               <div>
-                <Label>Descriere (RU)</Label>
-                <Textarea
-                  rows={4}
-                  value={venue.descriptionRu ?? ""}
-                  onChange={(e) => update({ descriptionRu: e.target.value })}
+                <Label className="mb-2 block">Descriere (RU)</Label>
+                <RichEditor
+                  content={venue.descriptionRu ?? ""}
+                  onChange={(html) => update({ descriptionRu: html })}
+                  placeholder="Опишите ваш зал..."
                 />
               </div>
             </CardContent>
@@ -477,17 +482,8 @@ export default function VenueProfilePage() {
             <CardHeader>
               <CardTitle>Locație pe hartă</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Setează coordonatele exacte. Harta va apărea pe profilul public
-                ca embed interactiv. Obține coordonatele din{" "}
-                <a
-                  href="https://www.google.com/maps"
-                  target="_blank"
-                  rel="noopener"
-                  className="text-gold hover:underline"
-                >
-                  Google Maps
-                </a>{" "}
-                (click dreapta pe locație → „What's here?” → copiază numerele).
+                Click pe hartă sau trage pin-ul pentru a seta locația exactă a
+                sălii. Harta apare pe profilul public ca embed interactiv.
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -501,54 +497,71 @@ export default function VenueProfilePage() {
                   placeholder="Str. Florilor 25, Chișinău"
                 />
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="lat">Latitudine</Label>
-                  <Input
-                    id="lat"
-                    type="number"
-                    step="0.0000001"
-                    className="mt-1"
-                    value={venue.lat ?? ""}
-                    onChange={(e) =>
-                      setVenue({
-                        ...venue,
-                        lat: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                    placeholder="47.0105"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="lng">Longitudine</Label>
-                  <Input
-                    id="lng"
-                    type="number"
-                    step="0.0000001"
-                    className="mt-1"
-                    value={venue.lng ?? ""}
-                    onChange={(e) =>
-                      setVenue({
-                        ...venue,
-                        lng: e.target.value ? Number(e.target.value) : null,
-                      })
-                    }
-                    placeholder="28.8638"
-                  />
-                </div>
+
+              <div>
+                <Label className="mb-2 block">Hartă interactivă</Label>
+                <MapPicker
+                  lat={venue.lat}
+                  lng={venue.lng}
+                  onChange={(newLat, newLng) =>
+                    setVenue({ ...venue, lat: newLat, lng: newLng })
+                  }
+                />
+                {venue.lat !== null && venue.lng !== null ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Coordonate:{" "}
+                    <span className="font-mono text-gold">
+                      {venue.lat.toFixed(6)}, {venue.lng.toFixed(6)}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-amber-500">
+                    Click pe hartă pentru a seta locația sălii.
+                  </p>
+                )}
               </div>
-              {venue.lat !== null && venue.lng !== null && (
-                <div className="overflow-hidden rounded-lg border border-border/40">
-                  <iframe
-                    title="Preview hartă"
-                    width="100%"
-                    height="300"
-                    loading="lazy"
-                    src={`https://www.google.com/maps?q=${venue.lat},${venue.lng}&hl=ro&z=16&output=embed`}
-                    style={{ border: 0 }}
-                  />
+
+              <details className="rounded-lg border border-border/40 bg-muted/20">
+                <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
+                  Editare manuală coordonate
+                </summary>
+                <div className="grid gap-3 p-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="lat" className="text-xs">Latitudine</Label>
+                    <Input
+                      id="lat"
+                      type="number"
+                      step="0.0000001"
+                      className="mt-1"
+                      value={venue.lat ?? ""}
+                      onChange={(e) =>
+                        setVenue({
+                          ...venue,
+                          lat: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      placeholder="47.0105"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lng" className="text-xs">Longitudine</Label>
+                    <Input
+                      id="lng"
+                      type="number"
+                      step="0.0000001"
+                      className="mt-1"
+                      value={venue.lng ?? ""}
+                      onChange={(e) =>
+                        setVenue({
+                          ...venue,
+                          lng: e.target.value ? Number(e.target.value) : null,
+                        })
+                      }
+                      placeholder="28.8638"
+                    />
+                  </div>
                 </div>
-              )}
+              </details>
             </CardContent>
           </Card>
         </TabsContent>

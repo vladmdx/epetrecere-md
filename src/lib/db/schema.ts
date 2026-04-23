@@ -768,42 +768,9 @@ export const artistAvailabilitySlots = pgTable("artist_availability_slots", {
   index("idx_slot_artist_booked").on(t.artistId, t.isBooked),
 ]);
 
-/**
- * Venue bookings mirror artist bookingRequests but link to a venue. Kept
- * in a separate table so existing artist-booking code stays untouched and
- * because venues never contribute to the event plan budget.
- */
-export const venueBookingRequests = pgTable("venue_booking_requests", {
-  id: serial("id").primaryKey(),
-  venueId: integer("venue_id")
-    .references(() => venues.id, { onDelete: "cascade" })
-    .notNull(),
-  eventPlanId: integer("event_plan_id")
-    .references(() => eventPlans.id, { onDelete: "set null" }),
-  clientUserId: uuid("client_user_id")
-    .references(() => users.id, { onDelete: "cascade" }),
-  clientName: text("client_name").notNull(),
-  clientPhone: text("client_phone").notNull(),
-  clientEmail: text("client_email"),
-  eventDate: date("event_date").notNull(),
-  startTime: text("start_time"),
-  endTime: text("end_time"),
-  eventType: text("event_type"),
-  guestCount: integer("guest_count"),
-  message: text("message"),
-  status: bookingRequestStatusEnum("status").default("pending").notNull(),
-  agreedPrice: integer("agreed_price"),
-  priceOffers: jsonb("price_offers").$type<BookingPriceOffer[]>().default([]),
-  venueReply: text("venue_reply"),
-  adminNotes: text("admin_notes"),
-  adminSeen: boolean("admin_seen").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (t) => [
-  index("idx_venue_booking_venue_status").on(t.venueId, t.status),
-  index("idx_venue_booking_client_user").on(t.clientUserId),
-  index("idx_venue_booking_event_plan").on(t.eventPlanId),
-]);
+// Phase 5 — venue_booking_requests legacy table dropped. Venue bookings
+// now live in the unified booking_requests table (same as artists) with
+// bookingRequests.venueId set. See src/lib/db/queries/venue-bookings.ts.
 
 // ═══════════════════════════════════════════════════════
 // CONVERSATIONS (M0b #10)

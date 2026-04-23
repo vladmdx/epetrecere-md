@@ -11,6 +11,8 @@ import {
   Mail,
   Shield,
   ExternalLink,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,12 +38,26 @@ const DEFAULT_AUTO_REPLY =
 export function VenueSettingsClient({
   venue,
   userEmail,
+  icalUrl,
 }: {
   venue: VenueSettings;
   userEmail: string | null;
+  icalUrl: string;
 }) {
   const [state, setState] = useState<VenueSettings>(venue);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function copyIcal() {
+    try {
+      await navigator.clipboard.writeText(icalUrl);
+      setCopied(true);
+      toast.success("Link copiat!");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Nu am putut copia");
+    }
+  }
 
   async function save() {
     setSaving(true);
@@ -149,6 +165,54 @@ export function VenueSettingsClient({
               }
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* iCal feed / Google Calendar sync */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CalendarDays className="h-4 w-4 text-gold" />
+            Sincronizare Google / Apple Calendar
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Copiază link-ul de mai jos și adaugă-l ca „calendar abonat” în
+            Google Calendar, Apple Calendar sau Outlook. Rezervările confirmate
+            și zilele blocate vor apărea automat — update la fiecare câteva
+            minute.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2">
+            <Input
+              readOnly
+              value={icalUrl}
+              className="font-mono text-xs"
+              onFocus={(e) => e.target.select()}
+            />
+            <Button
+              onClick={copyIcal}
+              size="icon"
+              variant="outline"
+              className="shrink-0"
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-emerald-400" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <details className="rounded-lg bg-muted/20 p-3 text-xs">
+            <summary className="cursor-pointer font-medium">
+              Cum adaug link-ul în Google Calendar?
+            </summary>
+            <ol className="mt-2 space-y-1 pl-4 text-muted-foreground">
+              <li>1. Deschide Google Calendar pe desktop</li>
+              <li>2. În stânga: „Alte calendare” → „+” → „De la URL”</li>
+              <li>3. Lipește link-ul și apasă „Adaugă calendarul”</li>
+            </ol>
+          </details>
         </CardContent>
       </Card>
 
