@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { sendEmail } from "@/lib/email/send";
 import { reviewRequestEmail } from "@/lib/email/templates/review-request";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
@@ -144,6 +144,85 @@ export async function PUT(
         });
       }
     }
+
+    // Phase 6 — Cross-notify other confirmed vendors on the same event plan.
+    // If this accepted booking is part of a multi-vendor event, let the other
+    // already-confirmed vendors know ("the venue / artist X just joined your
+    // event"). Non-blocking.
+    void (async () => {
+      if (!booking.eventPlanId) return;
+      try {
+        const { venues } = await import("@/lib/db/schema");
+        const siblings = await db
+          .select({
+            id: bookingRequests.id,
+            artistId: bookingRequests.artistId,
+            venueId: bookingRequests.venueId,
+            status: bookingRequests.status,
+          })
+          .from(bookingRequests)
+          .where(
+            and(
+              eq(bookingRequests.eventPlanId, booking.eventPlanId),
+              inArray(bookingRequests.status, [
+                "accepted",
+                "confirmed_by_client",
+              ]),
+            ),
+          );
+
+        // Determine the accepting vendor's display name
+        let actorName = "Un partener";
+        if (booking.venueId) {
+          const [v] = await db
+            .select({ nameRo: venues.nameRo })
+            .from(venues)
+            .where(eq(venues.id, booking.venueId))
+            .limit(1);
+          if (v) actorName = `Sala ${v.nameRo}`;
+        } else if (booking.artistId) {
+          const [a] = await db
+            .select({ nameRo: artists.nameRo })
+            .from(artists)
+            .where(eq(artists.id, booking.artistId))
+            .limit(1);
+          if (a) actorName = `Artistul ${a.nameRo}`;
+        }
+
+        for (const s of siblings) {
+          if (s.id === booking.id) continue; // skip self
+          // Find the owner userId of the sibling vendor
+          let targetUserId: string | null = null;
+          let targetDashboardUrl = "/dashboard/rezervari";
+          if (s.artistId) {
+            const [a] = await db
+              .select({ userId: artists.userId })
+              .from(artists)
+              .where(eq(artists.id, s.artistId))
+              .limit(1);
+            targetUserId = a?.userId ?? null;
+          } else if (s.venueId) {
+            const [v] = await db
+              .select({ userId: venues.userId })
+              .from(venues)
+              .where(eq(venues.id, s.venueId))
+              .limit(1);
+            targetUserId = v?.userId ?? null;
+            targetDashboardUrl = "/dashboard/sala/rezervari";
+          }
+          if (!targetUserId) continue;
+          await dispatchNotification({
+            userId: targetUserId,
+            type: "booking_status_changed",
+            title: `${actorName} s-a confirmat pentru evenimentul tău`,
+            message: `Pe ${booking.eventDate}${booking.eventType ? ` · ${booking.eventType}` : ""}`,
+            actionUrl: targetDashboardUrl,
+          });
+        }
+      } catch (err) {
+        console.error("[cross-notify] failed:", err);
+      }
+    })();
   } else if (action === "reject") {
     const owner = await requireBookingArtistOwner();
     if (!owner.ok) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { chatMessages, conversations, users, artists } from "@/lib/db/schema";
+import { chatMessages, conversations, users, artists, venues } from "@/lib/db/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 
@@ -26,17 +26,23 @@ async function loadContext(conversationId: number, clerkId: string) {
     .limit(1);
   if (!conv) return null;
 
-  let side: "client" | "artist" | null = null;
+  let side: "client" | "artist" | "venue" | null = null;
   if (conv.clientUserId === appUser.id) {
     side = "client";
-  } else {
-    // Check if the caller owns the artist on this conversation.
+  } else if (conv.artistId) {
     const [ownsArtist] = await db
       .select({ id: artists.id })
       .from(artists)
       .where(and(eq(artists.id, conv.artistId), eq(artists.userId, appUser.id)))
       .limit(1);
     if (ownsArtist) side = "artist";
+  } else if (conv.venueId) {
+    const [ownsVenue] = await db
+      .select({ id: venues.id })
+      .from(venues)
+      .where(and(eq(venues.id, conv.venueId), eq(venues.userId, appUser.id)))
+      .limit(1);
+    if (ownsVenue) side = "venue";
   }
 
   if (!side) return null;
@@ -76,7 +82,10 @@ export async function GET(
       .update(conversations)
       .set({ clientUnread: 0 })
       .where(eq(conversations.id, conversationId));
-  } else if (ctx.side === "artist" && ctx.conv.artistUnread > 0) {
+  } else if (
+    (ctx.side === "artist" || ctx.side === "venue") &&
+    ctx.conv.artistUnread > 0
+  ) {
     await db
       .update(conversations)
       .set({ artistUnread: 0 })
@@ -121,7 +130,11 @@ export async function POST(
   const senderName =
     appUserFull?.name ||
     appUserFull?.email ||
-    (ctx.side === "artist" ? "Artist" : "Client");
+    (ctx.side === "artist"
+      ? "Artist"
+      : ctx.side === "venue"
+        ? "Sală"
+        : "Client");
 
   const [inserted] = await db
     .insert(chatMessages)
@@ -152,32 +165,65 @@ export async function POST(
     try {
       const { notificationEmail } = await import("@/lib/email/templates/notification-email");
 
-      if (ctx.side === "artist") {
-        // Artist sent a message → notify the client
+      // Resolve the vendor (artist OR venue)
+      let vendorName = "Vendor";
+      let vendorUserId: string | null = null;
+      let vendorEmail: string | null = null;
+      let vendorDashboardUrl = "/dashboard/mesaje";
+
+      if (ctx.conv.artistId) {
+        const [artist] = await db
+          .select({
+            userId: artists.userId,
+            email: artists.email,
+            nameRo: artists.nameRo,
+          })
+          .from(artists)
+          .where(eq(artists.id, ctx.conv.artistId))
+          .limit(1);
+        if (artist) {
+          vendorName = artist.nameRo;
+          vendorUserId = artist.userId;
+          vendorEmail = artist.email;
+        }
+      } else if (ctx.conv.venueId) {
+        const [venue] = await db
+          .select({
+            userId: venues.userId,
+            email: venues.email,
+            nameRo: venues.nameRo,
+          })
+          .from(venues)
+          .where(eq(venues.id, ctx.conv.venueId))
+          .limit(1);
+        if (venue) {
+          vendorName = venue.nameRo;
+          vendorUserId = venue.userId;
+          vendorEmail = venue.email;
+          vendorDashboardUrl = "/dashboard/sala/mesaje";
+        }
+      }
+
+      if (ctx.side === "artist" || ctx.side === "venue") {
+        // Vendor sent a message → notify the client
         const [clientUser] = await db
           .select({ id: users.id, email: users.email, name: users.name })
           .from(users)
           .where(eq(users.id, ctx.conv.clientUserId))
           .limit(1);
-        const [artist] = await db
-          .select({ nameRo: artists.nameRo, slug: artists.slug })
-          .from(artists)
-          .where(eq(artists.id, ctx.conv.artistId))
-          .limit(1);
-        const artistName = artist?.nameRo ?? "Artist";
 
         if (clientUser) {
           await dispatchNotification({
             userId: clientUser.id,
             type: "booking_status_changed",
-            title: `Mesaj nou de la ${artistName}`,
+            title: `Mesaj nou de la ${vendorName}`,
             message: preview,
             actionUrl: `/cabinet/mesaje?conversation=${conversationId}`,
             email: clientUser.email ?? undefined,
-            emailSubject: `💬 Mesaj nou de la ${artistName} pe ePetrecere.md`,
+            emailSubject: `💬 Mesaj nou de la ${vendorName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
-              title: `Mesaj nou de la ${artistName}`,
-              message: `<strong>${artistName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
+              title: `Mesaj nou de la ${vendorName}`,
+              message: `<strong>${vendorName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
               ctaUrl: `https://epetrecere.md/cabinet/mesaje?conversation=${conversationId}`,
               ctaText: "Răspunde →",
               emoji: "💬",
@@ -185,26 +231,20 @@ export async function POST(
           });
         }
       } else {
-        // Client sent a message → notify the artist
-        const [artist] = await db
-          .select({ userId: artists.userId, email: artists.email, nameRo: artists.nameRo })
-          .from(artists)
-          .where(eq(artists.id, ctx.conv.artistId))
-          .limit(1);
-
-        if (artist?.userId) {
+        // Client sent a message → notify the vendor
+        if (vendorUserId) {
           await dispatchNotification({
-            userId: artist.userId,
+            userId: vendorUserId,
             type: "booking_request_new",
             title: `Mesaj nou de la ${senderName}`,
             message: preview,
-            actionUrl: `/dashboard/mesaje?conversation=${conversationId}`,
-            email: artist.email ?? undefined,
+            actionUrl: `${vendorDashboardUrl}?conversation=${conversationId}`,
+            email: vendorEmail ?? undefined,
             emailSubject: `💬 Mesaj nou de la ${senderName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
               message: `<strong>${senderName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
-              ctaUrl: `https://epetrecere.md/dashboard/mesaje?conversation=${conversationId}`,
+              ctaUrl: `https://epetrecere.md${vendorDashboardUrl}?conversation=${conversationId}`,
               ctaText: "Răspunde →",
               emoji: "💬",
             }),

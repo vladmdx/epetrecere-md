@@ -52,7 +52,7 @@ export default function VendorMessagesPage() {
   async function loadList() {
     setLoading(true);
     try {
-      const res = await fetch("/api/conversations?role=artist");
+      const res = await fetch("/api/conversations?role=vendor");
       const data = await res.json();
       const list: Conversation[] = Array.isArray(data) ? data : [];
       setConversations(list);

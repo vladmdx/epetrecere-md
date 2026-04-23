@@ -19,12 +19,24 @@ type ChatMessage = {
 };
 
 interface Props {
-  artistId: number;
+  /** Either artistId or venueId — exactly one. */
+  artistId?: number;
+  venueId?: number;
+  /** Display name shown in the chat header + empty state. */
   artistName: string;
+  /** Slug used for the sign-in redirect link. */
   artistSlug: string;
+  /** Override the route prefix used in the sign-in redirect (defaults to /artisti/). */
+  slugPrefix?: "artisti" | "sali";
 }
 
-export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
+export function ChatWidget({
+  artistId,
+  venueId,
+  artistName,
+  artistSlug,
+  slugPrefix = "artisti",
+}: Props) {
   const { isSignedIn, isLoaded } = useUser();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -48,7 +60,9 @@ export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
       const res = await fetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ artistId }),
+        body: JSON.stringify(
+          artistId ? { artistId } : { venueId },
+        ),
       });
       if (!res.ok) throw new Error("Failed to start conversation");
       const data = await res.json();
@@ -93,7 +107,7 @@ export function ChatWidget({ artistId, artistName, artistSlug }: Props) {
   if (!isSignedIn) {
     return (
       <a
-        href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artistSlug}`)}`}
+        href={`/sign-in?redirect_url=${encodeURIComponent(`/${slugPrefix}/${artistSlug}`)}`}
         className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2.5 text-sm font-medium text-gold hover:bg-gold/20"
       >
         <Lock className="h-4 w-4" /> Chat cu artistul (autentifică-te)

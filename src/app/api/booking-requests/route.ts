@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, offerRequests, artists } from "@/lib/db/schema";
 import { users } from "@/lib/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
@@ -156,13 +156,49 @@ export async function GET(req: NextRequest) {
   // the parties must happen through the in-app chat. Only admins (and the
   // client themselves, via client_email query) see real contact data.
   const redact = !isAdmin && !!artistId;
-  const payload = redact
-    ? result.map((row) => ({
-        ...row,
-        clientPhone: null,
-        clientEmail: null,
-      }))
-    : result;
+
+  // Phase 6 — enrich artist bookings with the venue on the same event plan
+  // (if any). Lets the artist see "Eveniment la Sala X" on their rezervări.
+  const planIds = Array.from(
+    new Set(result.map((r) => r.eventPlanId).filter((x): x is number => x !== null)),
+  );
+  const planToVenue = new Map<number, { id: number; nameRo: string; slug: string }>();
+  if (planIds.length > 0 && artistId) {
+    const { venues } = await import("@/lib/db/schema");
+    const venueBookings = await db
+      .select({
+        eventPlanId: bookingRequests.eventPlanId,
+        venueId: venues.id,
+        venueName: venues.nameRo,
+        venueSlug: venues.slug,
+      })
+      .from(bookingRequests)
+      .innerJoin(venues, eq(venues.id, bookingRequests.venueId))
+      .where(
+        and(
+          inArray(
+            bookingRequests.eventPlanId,
+            planIds as [number, ...number[]],
+          ),
+        ),
+      );
+    for (const vb of venueBookings) {
+      if (vb.eventPlanId && vb.venueId) {
+        planToVenue.set(vb.eventPlanId, {
+          id: vb.venueId,
+          nameRo: vb.venueName,
+          slug: vb.venueSlug,
+        });
+      }
+    }
+  }
+
+  const payload = result.map((row) => ({
+    ...row,
+    clientPhone: redact ? null : row.clientPhone,
+    clientEmail: redact ? null : row.clientEmail,
+    linkedVenue: row.eventPlanId ? planToVenue.get(row.eventPlanId) ?? null : null,
+  }));
 
   return NextResponse.json(payload);
 }

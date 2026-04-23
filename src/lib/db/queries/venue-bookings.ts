@@ -51,6 +51,8 @@ export type VenueBooking = {
     slug: string;
     status: string;
   }>;
+  /** How many accepted/confirmed venue bookings exist on the same date (incl. self). */
+  sameDayBookingsCount: number;
 };
 
 export async function getVenueBookings(
@@ -134,9 +136,31 @@ export async function getVenueBookings(
     }
   }
 
+  // Count accepted bookings per date (for same-day conflict warnings).
+  const sameDateCounts = new Map<string, number>();
+  const acceptedSameDayRows = await db
+    .select({
+      eventDate: bookingRequests.eventDate,
+    })
+    .from(bookingRequests)
+    .where(
+      and(
+        eq(bookingRequests.venueId, venueId),
+        inArray(bookingRequests.status, ["accepted", "confirmed_by_client"]),
+      ),
+    );
+  // Manual aggregation (simple + avoids SQL complexity)
+  for (const row of acceptedSameDayRows) {
+    sameDateCounts.set(
+      row.eventDate,
+      (sameDateCounts.get(row.eventDate) ?? 0) + 1,
+    );
+  }
+
   return rows.map((r) => ({
     ...r,
     linkedArtists: r.eventPlanId ? linkedMap.get(r.eventPlanId) ?? [] : [],
+    sameDayBookingsCount: (sameDateCounts.get(r.eventDate) ?? 0),
   }));
 }
 

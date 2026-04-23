@@ -39,6 +39,7 @@ type BookingRequest = {
   agreedPrice: number | null;
   priceOffers: BookingPriceOffer[] | null;
   createdAt: string;
+  linkedVenue: { id: number; nameRo: string; slug: string } | null;
 };
 
 type ChatMessage = {
@@ -486,6 +487,19 @@ export default function VendorBookingsPage() {
                         <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> {booking.clientName}</span>
                         {booking.guestCount != null && <span>{booking.guestCount} invitați</span>}
                       </div>
+                      {booking.linkedVenue && (
+                        <a
+                          href={`/sali/${booking.linkedVenue.slug}`}
+                          target="_blank"
+                          rel="noopener"
+                          className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-300 hover:bg-blue-500/20"
+                        >
+                          📍 Eveniment la{" "}
+                          <strong className="underline">
+                            {booking.linkedVenue.nameRo}
+                          </strong>
+                        </a>
+                      )}
                       {booking.message && (
                         <p className="text-sm text-muted-foreground italic">&ldquo;{booking.message}&rdquo;</p>
                       )}

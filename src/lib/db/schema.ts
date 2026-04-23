@@ -788,9 +788,11 @@ export const conversations = pgTable("conversations", {
   clientUserId: uuid("client_user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
+  /** Either artistId OR venueId is set — a conversation targets one vendor. */
   artistId: integer("artist_id")
-    .references(() => artists.id, { onDelete: "cascade" })
-    .notNull(),
+    .references(() => artists.id, { onDelete: "cascade" }),
+  venueId: integer("venue_id")
+    .references(() => venues.id, { onDelete: "cascade" }),
   lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
   lastMessagePreview: text("last_message_preview"),
   clientUnread: integer("client_unread").default(0).notNull(),
@@ -799,6 +801,7 @@ export const conversations = pgTable("conversations", {
 }, (t) => [
   index("idx_conv_client_artist").on(t.clientUserId, t.artistId),
   index("idx_conv_artist").on(t.artistId),
+  index("idx_conv_client_venue").on(t.clientUserId, t.venueId),
 ]);
 
 // ═══════════════════════════════════════════════════════

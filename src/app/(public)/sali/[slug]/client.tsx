@@ -7,6 +7,7 @@ import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
+import { ChatWidget } from "@/components/public/chat-widget";
 import { CalendarWidget } from "@/components/public/calendar-widget";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
@@ -294,6 +295,11 @@ export function VenueDetailClient({
               </div>
             </div>
           )}
+
+          {/* Review form */}
+          <div className="mt-8">
+            <VenueReviewForm venueId={venue.id} />
+          </div>
         </div>
 
         {/* Sidebar */}
@@ -318,6 +324,12 @@ export function VenueDetailClient({
             )}
             <RequestPriceForm venueId={venue.id} />
             <RequestBookingForm venueId={venue.id} capacityMax={venue.capacityMax} />
+            <ChatWidget
+              venueId={venue.id}
+              artistName={getLocalized(venue, "name", locale) || venue.nameRo}
+              artistSlug={venue.slug}
+              slugPrefix="sali"
+            />
           </div>
 
           {/* M6 Intern #1 — calendar gated behind login */}
@@ -396,5 +408,111 @@ function CategoryAccordion({
         </ul>
       )}
     </div>
+  );
+}
+
+function VenueReviewForm({ venueId }: { venueId: number }) {
+  const [rating, setRating] = useState(5);
+  const [name, setName] = useState("");
+  const [text, setText] = useState("");
+  const [eventType, setEventType] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name || text.length < 10) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venueId,
+          authorName: name,
+          rating,
+          text,
+          eventType: eventType || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setSubmitted(true);
+    } catch {
+      // silent
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="rounded-xl border border-success/30 bg-success/10 p-6 text-center">
+        <p className="font-heading font-bold text-success">
+          Mulțumim pentru recenzie!
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Recenzia va fi publicată după verificare.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="rounded-xl border border-border/40 bg-card p-5"
+    >
+      <h3 className="mb-4 font-heading text-base font-bold">Lasă o recenzie</h3>
+      <div className="mb-4 flex gap-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <button key={i} type="button" onClick={() => setRating(i + 1)}>
+            <Star
+              className={cn(
+                "h-6 w-6 cursor-pointer transition-colors",
+                i < rating
+                  ? "fill-gold text-gold"
+                  : "text-muted hover:text-gold/50",
+              )}
+            />
+          </button>
+        ))}
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Numele tău *"
+          required
+          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        <select
+          value={eventType}
+          onChange={(e) => setEventType(e.target.value)}
+          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          <option value="">Tip eveniment</option>
+          <option value="Nuntă">Nuntă</option>
+          <option value="Botez">Botez</option>
+          <option value="Corporate">Corporate</option>
+          <option value="Aniversare">Aniversare</option>
+        </select>
+      </div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Scrie recenzia ta (min 10 caractere) *"
+        required
+        minLength={10}
+        rows={3}
+        className="mt-3 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+      />
+      <button
+        type="submit"
+        disabled={submitting || !name || text.length < 10}
+        className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-6 py-2 text-sm font-medium text-background hover:bg-gold-dark disabled:opacity-50"
+      >
+        {submitting ? "Se trimite..." : "Trimite recenzia"}
+      </button>
+    </form>
   );
 }

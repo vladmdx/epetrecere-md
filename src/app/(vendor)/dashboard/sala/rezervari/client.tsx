@@ -69,6 +69,7 @@ interface Booking {
     slug: string;
     status: string;
   }>;
+  sameDayBookingsCount: number;
 }
 
 interface Props {
@@ -352,6 +353,21 @@ export function VenueBookingsClient({
                           <span>
                             <strong>{b.guestCount} persoane</strong> — depășește
                             capacitatea sălii (max {venueCapacityMax})
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Same-day conflict warning (only in "Noi" tab) */}
+                      {initialTab === "noi" && b.sameDayBookingsCount > 0 && (
+                        <div className="flex items-center gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-500">
+                          <AlertTriangle className="h-4 w-4 shrink-0" />
+                          <span>
+                            Ai deja <strong>{b.sameDayBookingsCount}</strong>{" "}
+                            {b.sameDayBookingsCount === 1
+                              ? "rezervare confirmată"
+                              : "rezervări confirmate"}{" "}
+                            pe data aceasta. Acceptă doar dacă sala permite
+                            evenimente multiple simultan.
                           </span>
                         </div>
                       )}
