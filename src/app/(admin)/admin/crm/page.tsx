@@ -101,10 +101,10 @@ export default function CRMPage() {
             <Download className="h-4 w-4" /> Export CSV
           </Button>
         <div className="flex gap-1 rounded-lg border border-border/40 p-1">
-          <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className={view === "kanban" ? "bg-gold text-background hover:bg-gold-dark" : ""} onClick={() => setView("kanban")}>
+          <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className={view === "kanban" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""} onClick={() => setView("kanban")}>
             <LayoutGrid className="h-4 w-4" />
           </Button>
-          <Button variant={view === "list" ? "default" : "ghost"} size="sm" className={view === "list" ? "bg-gold text-background hover:bg-gold-dark" : ""} onClick={() => setView("list")}>
+          <Button variant={view === "list" ? "default" : "ghost"} size="sm" className={view === "list" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""} onClick={() => setView("list")}>
             <List className="h-4 w-4" />
           </Button>
         </div>
@@ -119,7 +119,7 @@ export default function CRMPage() {
         <Button
           variant={statusFilter === "all" ? "default" : "outline"}
           size="sm"
-          className={statusFilter === "all" ? "bg-gold text-background hover:bg-gold-dark" : ""}
+          className={statusFilter === "all" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
           onClick={() => setStatusFilter("all")}
         >
           Toate ({leads.length})
@@ -132,7 +132,7 @@ export default function CRMPage() {
               key={key}
               variant={statusFilter === key ? "default" : "outline"}
               size="sm"
-              className={statusFilter === key ? "bg-gold text-background hover:bg-gold-dark" : ""}
+              className={statusFilter === key ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
               onClick={() => setStatusFilter(key)}
             >
               {cfg.label} ({count})

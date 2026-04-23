@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -355,7 +356,7 @@ export default function VendorProfilePage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> Preview</Button>
-          <Button onClick={handleSave} disabled={saving || !artistId} className="bg-gold text-background hover:bg-gold-dark gap-2">
+          <Button onClick={handleSave} disabled={saving || !artistId} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Salvează
           </Button>
@@ -379,7 +380,13 @@ export default function VendorProfilePage() {
               <div className="flex items-center gap-6">
                 <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border-2 border-gold/30 bg-muted">
                   {data.photoUrl ? (
-                    <img src={data.photoUrl} alt="Profil" className="h-full w-full object-cover" />
+                    <Image
+                      src={data.photoUrl}
+                      alt="Profil"
+                      fill
+                      sizes="112px"
+                      className="object-cover"
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-3xl text-muted-foreground">
                       <Camera className="h-8 w-8" />

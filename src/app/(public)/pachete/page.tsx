@@ -135,7 +135,7 @@ export default function PacketsPage() {
               }`}
             >
               {tier.highlight && (
-                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gold text-background">
+                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gold text-[#0D0D0D]">
                   Cel mai popular
                 </Badge>
               )}
@@ -172,7 +172,7 @@ export default function PacketsPage() {
                 href={`/contact?subject=${tier.id}`}
                 className={`mt-6 inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium ${
                   tier.highlight
-                    ? "bg-gold text-background hover:bg-gold-dark"
+                    ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                     : "border border-border bg-background hover:bg-muted"
                 }`}
               >
@@ -221,7 +221,7 @@ export default function PacketsPage() {
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link
             href="/sign-up?role=vendor"
-            className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+            className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
             Creează profil gratuit
           </Link>

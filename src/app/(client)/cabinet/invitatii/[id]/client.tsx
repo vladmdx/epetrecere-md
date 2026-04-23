@@ -164,7 +164,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
         </h1>
         <Link
           href="/cabinet/invitatii"
-          className="mt-4 inline-flex items-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+          className="mt-4 inline-flex items-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
           Înapoi la lista
         </Link>
@@ -207,7 +207,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
               <Button
                 onClick={sendInvitations}
                 disabled={sending}
-                className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+                className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
                 {sending ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -222,7 +222,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
             <Button
               onClick={publish}
               disabled={publishing}
-              className="gap-1 bg-gold text-background hover:bg-gold-dark"
+              className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {publishing ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -299,7 +299,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
             <Button
               onClick={addGuest}
               disabled={!newGuestName.trim()}
-              className="gap-1 bg-gold text-background hover:bg-gold-dark"
+              className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               <Plus className="h-4 w-4" /> Adaugă
             </Button>

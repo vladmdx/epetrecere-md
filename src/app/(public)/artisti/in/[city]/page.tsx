@@ -143,7 +143,7 @@ export default async function ArtistsByCityPage({ params, searchParams }: Props)
               <a
                 key={p}
                 href={`/artisti/in/${citySlug}?page=${p}`}
-                className={`rounded-md border px-3 py-1.5 text-sm ${p === page ? "border-gold bg-gold text-background" : "border-border/40 hover:border-gold/40"}`}
+                className={`rounded-md border px-3 py-1.5 text-sm ${p === page ? "border-gold bg-gold text-[#0D0D0D]" : "border-border/40 hover:border-gold/40"}`}
               >
                 {p}
               </a>

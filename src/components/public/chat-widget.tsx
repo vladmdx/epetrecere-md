@@ -161,7 +161,7 @@ export function ChatWidget({
                     className={cn(
                       "flex flex-col gap-0.5 rounded-2xl px-3 py-2 text-sm",
                       m.senderType === "client"
-                        ? "ml-8 bg-gold text-background"
+                        ? "ml-8 bg-gold text-[#0D0D0D]"
                         : "mr-8 bg-accent/60 text-foreground",
                     )}
                   >
@@ -194,9 +194,10 @@ export function ChatWidget({
               <Button
                 type="button"
                 size="icon"
+                aria-label="Trimite mesaj"
                 onClick={send}
                 disabled={!draft.trim() || !conversationId || sending}
-                className="shrink-0 bg-gold text-background hover:bg-gold-dark"
+                className="shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
                 {sending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />

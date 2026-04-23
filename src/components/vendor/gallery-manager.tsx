@@ -210,7 +210,7 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
                 unoptimized
               />
               {img.isCover && (
-                <span className="absolute left-1 top-1 rounded bg-gold px-1.5 py-0.5 text-[10px] font-semibold text-background">
+                <span className="absolute left-1 top-1 rounded bg-gold px-1.5 py-0.5 text-[10px] font-semibold text-[#0D0D0D]">
                   Copertă
                 </span>
               )}

@@ -572,7 +572,7 @@ export function SeatingView({
             <Button
               onClick={addCustomTable}
               disabled={addingCustom || !customName.trim()}
-              className="bg-gold text-background hover:bg-gold-dark"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {addingCustom ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

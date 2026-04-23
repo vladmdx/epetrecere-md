@@ -135,6 +135,10 @@ export const users = pgTable("users", {
   languagePref: varchar("language_pref", { length: 2 }).default("ro"),
   // Google Calendar OAuth tokens for calendar sync
   onboardingComplete: boolean("onboarding_complete").default(false).notNull(),
+  /** Notification digest frequency: 'instant' (default), 'daily', 'weekly'. */
+  notificationDigestFrequency: varchar("notification_digest_frequency", { length: 16 })
+    .default("instant")
+    .notNull(),
   googleRefreshToken: text("google_refresh_token"),
   googleAccessToken: text("google_access_token"),
   googleTokenExpiresAt: timestamp("google_token_expires_at"),
@@ -177,7 +181,11 @@ export const categories = pgTable("categories", {
 
 export const artists = pgTable("artists", {
   id: serial("id").primaryKey(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  // One user owns at most one artist profile. Enforced via partial UNIQUE
+  // index at the migration level (the text here is advisory — see migration).
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "set null" })
+    .unique(),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),
@@ -282,7 +290,10 @@ export const artistPackages = pgTable("artist_packages", {
 
 export const venues = pgTable("venues", {
   id: serial("id").primaryKey(),
-  userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
+  // One user owns at most one venue. Enforced via UNIQUE constraint.
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "set null" })
+    .unique(),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),
@@ -302,6 +313,8 @@ export const venues = pgTable("venues", {
   website: text("website"),
   facilities: jsonb("facilities").$type<string[]>().default([]),
   menuUrl: text("menu_url"),
+  /** Optional uploaded PDF menu (R2). Alternative to the digital menu editor. */
+  menuPdfUrl: text("menu_pdf_url"),
   /** M12 — URL to an embeddable virtual tour (Matterport, Kuula, YouTube 360).
    *  Rendered as an iframe on the public venue detail page. */
   virtualTourUrl: text("virtual_tour_url"),

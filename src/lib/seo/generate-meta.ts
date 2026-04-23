@@ -63,12 +63,13 @@ export function generateMeta(opts: GenerateMetaOptions): Metadata {
     },
     alternates: {
       canonical: url,
-      languages: {
-        "ro": `${BASE_URL}${opts.path || ""}?lang=ro`,
-        "ru": `${BASE_URL}${opts.path || ""}?lang=ru`,
-        "en": `${BASE_URL}${opts.path || ""}?lang=en`,
-        "x-default": `${BASE_URL}${opts.path || ""}`,
-      },
+      // NOTE: hreflang intentionally omitted for now. The site serves the
+      // same HTML for every locale (switching happens client-side via
+      // `useLocale`), so signaling distinct language alternates with
+      // `?lang=X` query params would mislead search engines into indexing
+      // duplicate pages. Once we ship path-based i18n routing
+      // (`/ro/...`, `/ru/...`, `/en/...`) or a locale-prefixed domain,
+      // re-introduce `languages` here with the proper URLs.
     },
     ...(opts.noindex && { robots: { index: false, follow: false } }),
   };

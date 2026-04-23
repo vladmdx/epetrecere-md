@@ -107,7 +107,7 @@ export default function RegistrationRequestsPage() {
             variant={filter === f ? "default" : "outline"}
             size="sm"
             onClick={() => setFilter(f)}
-            className={cn(filter === f && "bg-gold text-background hover:bg-gold-dark")}
+            className={cn(filter === f && "bg-gold text-[#0D0D0D] hover:bg-gold-dark")}
           >
             {f === "all" ? "Toate" : f === "artist" ? "Artiști" : "Săli"}
             {f === "all"

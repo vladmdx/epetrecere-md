@@ -201,7 +201,7 @@ export default function VendorSettingsPage() {
         <Button
           onClick={handleSave}
           disabled={saving}
-          className="bg-gold text-background hover:bg-gold-dark gap-2"
+          className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />

@@ -104,8 +104,11 @@ export default function AdminVenuesPage() {
                   checked={venue.isActive}
                   onCheckedChange={() => toggleActive(venue.id, venue.isActive)}
                 />
+                <Link href={`/admin/sali/${venue.id}`}>
+                  <Button variant="ghost" size="icon" aria-label="Editează sala"><Edit className="h-4 w-4" /></Button>
+                </Link>
                 <Link href={`/sali/${venue.slug}`} target="_blank">
-                  <Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" aria-label="Vezi profil public sală"><Eye className="h-4 w-4" /></Button>
                 </Link>
               </CardContent>
             </Card>

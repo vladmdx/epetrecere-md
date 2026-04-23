@@ -252,7 +252,7 @@ export default function ProfilePage() {
           <Button
             onClick={handleSave}
             disabled={saving}
-            className="bg-gold text-background hover:bg-gold-dark"
+            className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             {saving ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -315,7 +315,7 @@ export default function ProfilePage() {
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="gap-1 bg-gold text-background hover:bg-gold-dark"
+                  className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                   onClick={handleSavePhone}
                   disabled={savingPhone || !phoneValue.trim()}
                 >
@@ -389,7 +389,7 @@ export default function ProfilePage() {
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="gap-1 bg-gold text-background hover:bg-gold-dark"
+                  className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                   onClick={handleStartEmailChange}
                   disabled={savingEmail || !newEmail.trim()}
                 >
@@ -431,7 +431,7 @@ export default function ProfilePage() {
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  className="gap-1 bg-gold text-background hover:bg-gold-dark"
+                  className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                   onClick={handleVerifyEmail}
                   disabled={savingEmail || !emailOtp.trim()}
                 >

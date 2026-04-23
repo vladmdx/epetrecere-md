@@ -149,7 +149,7 @@ export default function CalculatorDarPage() {
           <Button
             onClick={calculate}
             disabled={!allFilled}
-            className="w-full h-11 bg-gold text-background hover:bg-gold-dark text-sm font-semibold"
+            className="w-full h-11 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-sm font-semibold"
           >
             <Calculator className="mr-2 h-4 w-4" />
             Calculează suma
@@ -173,7 +173,7 @@ export default function CalculatorDarPage() {
                 <p className="text-[10px] text-muted-foreground mt-1">Să nu fie jenă</p>
               </div>
               <div className="rounded-xl border-2 border-gold/40 bg-gold/5 p-4 text-center relative">
-                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-gold px-2 py-0.5 text-[9px] font-bold text-background">
+                <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-gold px-2 py-0.5 text-[9px] font-bold text-[#0D0D0D]">
                   RECOMANDAT
                 </div>
                 <p className="text-xs text-muted-foreground mb-1 mt-1">Standard</p>
@@ -201,7 +201,7 @@ export default function CalculatorDarPage() {
               </p>
               <a
                 href="/planifica"
-                className="inline-block rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-background hover:bg-gold-dark"
+                className="inline-block rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark"
               >
                 Planifică Eveniment →
               </a>

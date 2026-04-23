@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
@@ -79,9 +80,15 @@ export function BlogPreviewSection() {
                 href={`/blog/${post.slug}`}
                 className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all hover:border-gold/30 hover:shadow-[0_4px_20px_rgba(201,168,76,0.1)]"
               >
-                <div className="aspect-[16/9] overflow-hidden bg-muted">
+                <div className="relative aspect-[16/9] overflow-hidden bg-muted">
                   {post.coverImage ? (
-                    <img src={post.coverImage} alt={post.titleRo} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" loading="lazy" />
+                    <Image
+                      src={post.coverImage}
+                      alt={post.titleRo}
+                      fill
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-muted-foreground">
                       <Calendar className="h-8 w-8" />

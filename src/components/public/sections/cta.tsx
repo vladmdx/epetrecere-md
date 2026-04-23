@@ -28,7 +28,7 @@ export function CTASection() {
           <Link href="/planifica">
             <Button
               size="lg"
-              className="bg-gold text-background hover:bg-gold-dark gap-2 px-8 text-base font-medium shadow-[0_4px_20px_rgba(201,168,76,0.3)]"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2 px-8 text-base font-medium shadow-[0_4px_20px_rgba(201,168,76,0.3)]"
             >
               Planifică Evenimentul
               <ArrowRight className="h-4 w-4" />

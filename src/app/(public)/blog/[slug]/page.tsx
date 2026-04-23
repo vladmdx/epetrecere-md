@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Calendar, Tag, Edit } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
@@ -78,7 +79,14 @@ export default async function BlogPostPage({ params }: Props) {
       />
       {post.coverImageUrl && (
         <div className="relative h-[40vh] overflow-hidden">
-          <img src={post.coverImageUrl} alt={post.titleRo} className="h-full w-full object-cover" />
+          <Image
+            src={post.coverImageUrl}
+            alt={post.titleRo}
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover"
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-[#0D0D0D] via-black/50 to-transparent" />
           <div className="absolute bottom-0 left-0 right-0 p-8">
             <div className="mx-auto max-w-3xl">

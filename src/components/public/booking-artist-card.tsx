@@ -195,7 +195,7 @@ export function BookingArtistCard({
                   size="sm"
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className="gap-2 bg-gold text-background hover:bg-gold-dark"
+                  className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                 >
                   {submitting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -232,7 +232,7 @@ export function BookingArtistCard({
           )}
           <div className="absolute left-2 top-2 flex gap-1">
             {artist.isVerified && (
-              <Badge className="bg-gold/90 text-background text-xs gap-1">
+              <Badge className="bg-gold/90 text-[#0D0D0D] text-xs gap-1">
                 <BadgeCheck className="h-3 w-3" /> Verificat
               </Badge>
             )}
@@ -282,7 +282,7 @@ export function BookingArtistCard({
             onClick={() => setOpen(true)}
             disabled={disabled}
             size="sm"
-            className="mt-3 w-full gap-2 bg-gold text-background hover:bg-gold-dark disabled:opacity-60"
+            className="mt-3 w-full gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-60"
           >
             {alreadyBooked ? (
               <Check className="h-3.5 w-3.5" />

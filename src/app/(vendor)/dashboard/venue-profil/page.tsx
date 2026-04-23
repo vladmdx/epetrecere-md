@@ -6,6 +6,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -24,7 +25,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RichEditor } from "@/components/shared/rich-editor";
+// Lazy-load the heavy TipTap editor; venues often edit descriptions rarely,
+// and the editor pulls in a large Prosemirror bundle.
+const RichEditor = dynamic(
+  () => import("@/components/shared/rich-editor").then((m) => m.RichEditor),
+  { ssr: false },
+);
 import { MapPicker } from "@/components/shared/map-picker";
 
 const CANONICAL_FACILITIES = [
@@ -63,11 +69,16 @@ interface Venue {
   website: string | null;
   facilities: string[] | null;
   menuUrl: string | null;
+  menuPdfUrl: string | null;
   virtualTourUrl: string | null;
   calendarEnabled: boolean;
   isActive: boolean;
   seoTitleRo: string | null;
+  seoTitleRu: string | null;
+  seoTitleEn: string | null;
   seoDescRo: string | null;
+  seoDescRu: string | null;
+  seoDescEn: string | null;
 }
 
 export default function VenueProfilePage() {
@@ -130,8 +141,15 @@ export default function VenueProfilePage() {
           website: venue.website ?? "",
           facilities: venue.facilities ?? [],
           menuUrl: venue.menuUrl ?? "",
+          menuPdfUrl: venue.menuPdfUrl ?? "",
           virtualTourUrl: venue.virtualTourUrl ?? "",
           calendarEnabled: venue.calendarEnabled,
+          seoTitleRo: venue.seoTitleRo ?? "",
+          seoTitleRu: venue.seoTitleRu ?? "",
+          seoTitleEn: venue.seoTitleEn ?? "",
+          seoDescRo: venue.seoDescRo ?? "",
+          seoDescRu: venue.seoDescRu ?? "",
+          seoDescEn: venue.seoDescEn ?? "",
         }),
       });
       if (!res.ok) throw new Error();
@@ -164,7 +182,7 @@ export default function VenueProfilePage() {
         </p>
         <Link
           href="/dashboard/venue-onboarding"
-          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-medium text-background hover:bg-gold-dark"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
           Înregistrează sala
         </Link>
@@ -206,7 +224,7 @@ export default function VenueProfilePage() {
           <Button
             onClick={save}
             disabled={saving}
-            className="gap-2 bg-gold text-background hover:bg-gold-dark"
+            className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -567,82 +585,7 @@ export default function VenueProfilePage() {
         </TabsContent>
 
         <TabsContent value="seo" className="mt-6 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Optimizare SEO</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Controlează cum apare sala în rezultatele Google și pe social
-                media. Un titlu bun + descriere clară cresc rata de click.
-              </p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="seo-title">
-                  Titlu SEO (meta title)
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {(venue.seoTitleRo?.length ?? 0)} / 60 caractere
-                  </span>
-                </Label>
-                <Input
-                  id="seo-title"
-                  className="mt-1"
-                  value={venue.seoTitleRo ?? ""}
-                  onChange={(e) =>
-                    setVenue({ ...venue, seoTitleRo: e.target.value })
-                  }
-                  placeholder={`${venue.nameRo} — Sală Nunți ${venue.city || "Chișinău"} | ePetrecere.md`}
-                />
-                {(venue.seoTitleRo?.length ?? 0) > 60 && (
-                  <p className="mt-1 text-xs text-amber-500">
-                    ⚠ Titlul e prea lung — Google va trunchia după ~60 caractere
-                  </p>
-                )}
-              </div>
-              <div>
-                <Label htmlFor="seo-desc">
-                  Meta description
-                  <span className="ml-2 text-xs text-muted-foreground">
-                    {(venue.seoDescRo?.length ?? 0)} / 160 caractere
-                  </span>
-                </Label>
-                <Textarea
-                  id="seo-desc"
-                  className="mt-1"
-                  rows={3}
-                  value={venue.seoDescRo ?? ""}
-                  onChange={(e) =>
-                    setVenue({ ...venue, seoDescRo: e.target.value })
-                  }
-                  placeholder={`Sală de evenimente în ${venue.city || "Chișinău"}, capacitate ${venue.capacityMin ?? "?"}–${venue.capacityMax ?? "?"} persoane. Rezervă online pe ePetrecere.md.`}
-                />
-                {(venue.seoDescRo?.length ?? 0) > 160 && (
-                  <p className="mt-1 text-xs text-amber-500">
-                    ⚠ Descrierea e prea lungă — Google va trunchia după ~160 caractere
-                  </p>
-                )}
-              </div>
-
-              {/* SERP Preview */}
-              <div>
-                <Label className="mb-2 block">Previzualizare Google</Label>
-                <div className="rounded-lg border border-border/40 bg-background p-4">
-                  <div className="text-xs text-muted-foreground">
-                    epetrecere.md › sali › {venue.slug}
-                  </div>
-                  <div className="mt-1 text-lg text-blue-400 hover:underline cursor-pointer">
-                    {venue.seoTitleRo ||
-                      `${venue.nameRo} — Sală Nunți ${venue.city || "Chișinău"} | ePetrecere.md`}
-                  </div>
-                  <div className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                    {venue.seoDescRo ||
-                      (venue.descriptionRo
-                        ? venue.descriptionRo.slice(0, 160)
-                        : `Sală de evenimente în ${venue.city || "Chișinău"} — rezervă online pe ePetrecere.md`)}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <SeoTabContent venue={venue} setVenue={setVenue} />
         </TabsContent>
 
         <TabsContent value="extras" className="mt-6 space-y-6">
@@ -696,5 +639,200 @@ export default function VenueProfilePage() {
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+/** SEO editor: multi-language + SERP preview + AI auto-generate. */
+function SeoTabContent({
+  venue,
+  setVenue,
+}: {
+  venue: Venue;
+  setVenue: (v: Venue) => void;
+}) {
+  const [lang, setLang] = useState<"ro" | "ru" | "en">("ro");
+  const [generating, setGenerating] = useState(false);
+
+  const titleField = (`seoTitle${lang === "ro" ? "Ro" : lang === "ru" ? "Ru" : "En"}`) as
+    | "seoTitleRo"
+    | "seoTitleRu"
+    | "seoTitleEn";
+  const descField = (`seoDesc${lang === "ro" ? "Ro" : lang === "ru" ? "Ru" : "En"}`) as
+    | "seoDescRo"
+    | "seoDescRu"
+    | "seoDescEn";
+  const nameField = (`name${lang === "ro" ? "Ro" : lang === "ru" ? "Ru" : "En"}`) as
+    | "nameRo"
+    | "nameRu"
+    | "nameEn";
+  const descrField = (`description${lang === "ro" ? "Ro" : lang === "ru" ? "Ru" : "En"}`) as
+    | "descriptionRo"
+    | "descriptionRu"
+    | "descriptionEn";
+
+  const title = (venue[titleField] as string | null) ?? "";
+  const desc = (venue[descField] as string | null) ?? "";
+  const name = (venue[nameField] as string | null) ?? venue.nameRo;
+  const description = (venue[descrField] as string | null) ?? venue.descriptionRo ?? "";
+
+  const placeholderTitle =
+    lang === "ro"
+      ? `${name} — Sală Nunți ${venue.city || "Chișinău"} | ePetrecere.md`
+      : lang === "ru"
+        ? `${name} — Банкетный зал ${venue.city || "Кишинёв"} | ePetrecere.md`
+        : `${name} — Wedding Venue ${venue.city || "Chișinău"} | ePetrecere.md`;
+  const placeholderDesc =
+    lang === "ro"
+      ? `Sală de evenimente în ${venue.city || "Chișinău"}, capacitate ${venue.capacityMin ?? "?"}–${venue.capacityMax ?? "?"} persoane. Rezervă online pe ePetrecere.md.`
+      : lang === "ru"
+        ? `Банкетный зал в ${venue.city || "Кишинёв"}, вместимость ${venue.capacityMin ?? "?"}–${venue.capacityMax ?? "?"} человек. Бронируйте онлайн на ePetrecere.md.`
+        : `Event venue in ${venue.city || "Chișinău"}, capacity ${venue.capacityMin ?? "?"}–${venue.capacityMax ?? "?"} guests. Book online at ePetrecere.md.`;
+
+  async function generateSeo() {
+    setGenerating(true);
+    try {
+      const res = await fetch("/api/ai/venue-seo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venueId: venue.id,
+          lang,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut genera");
+        return;
+      }
+      const data = (await res.json()) as { title?: string; description?: string };
+      if (data.title || data.description) {
+        setVenue({
+          ...venue,
+          [titleField]: data.title ?? title,
+          [descField]: data.description ?? desc,
+        });
+        toast.success("SEO generat — nu uita să salvezi");
+      } else {
+        toast.error("Răspuns invalid de la AI");
+      }
+    } catch {
+      toast.error("Eroare la generare");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle>Optimizare SEO</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Titlu + descriere pentru Google și social media. Un titlu bun crește rata de click.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={generateSeo}
+            disabled={generating}
+            className="gap-2"
+          >
+            {generating ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <span className="text-base">✨</span>
+            )}
+            Generează cu AI
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Language tabs */}
+        <div className="flex gap-1 rounded-lg bg-muted/40 p-1 text-xs">
+          {(["ro", "ru", "en"] as const).map((l) => (
+            <button
+              key={l}
+              type="button"
+              onClick={() => setLang(l)}
+              className={
+                lang === l
+                  ? "flex-1 rounded-md bg-gold px-3 py-1.5 font-medium text-[#0D0D0D]"
+                  : "flex-1 rounded-md px-3 py-1.5 text-muted-foreground hover:text-foreground"
+              }
+            >
+              {l === "ro" ? "🇷🇴 Română" : l === "ru" ? "🇷🇺 Русский" : "🇬🇧 English"}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          <Label htmlFor="seo-title">
+            Titlu SEO (meta title)
+            <span className="ml-2 text-xs text-muted-foreground">
+              {title.length} / 60 caractere
+            </span>
+          </Label>
+          <Input
+            id="seo-title"
+            className="mt-1"
+            value={title}
+            onChange={(e) => setVenue({ ...venue, [titleField]: e.target.value })}
+            placeholder={placeholderTitle}
+          />
+          {title.length > 60 && (
+            <p className="mt-1 text-xs text-amber-500">
+              ⚠ Titlul e prea lung — Google va trunchia după ~60 caractere
+            </p>
+          )}
+        </div>
+
+        <div>
+          <Label htmlFor="seo-desc">
+            Meta description
+            <span className="ml-2 text-xs text-muted-foreground">
+              {desc.length} / 160 caractere
+            </span>
+          </Label>
+          <Textarea
+            id="seo-desc"
+            className="mt-1"
+            rows={3}
+            value={desc}
+            onChange={(e) => setVenue({ ...venue, [descField]: e.target.value })}
+            placeholder={placeholderDesc}
+          />
+          {desc.length > 160 && (
+            <p className="mt-1 text-xs text-amber-500">
+              ⚠ Descrierea e prea lungă — Google va trunchia după ~160 caractere
+            </p>
+          )}
+        </div>
+
+        {/* SERP Preview */}
+        <div>
+          <Label className="mb-2 block">Previzualizare Google</Label>
+          <div className="rounded-lg border border-border/40 bg-background p-4">
+            <div className="text-xs text-muted-foreground">
+              epetrecere.md › sali › {venue.slug}
+            </div>
+            <div className="mt-1 cursor-pointer text-lg text-blue-400 hover:underline">
+              {title || placeholderTitle}
+            </div>
+            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+              {desc ||
+                (description
+                  ? description.replace(/<[^>]+>/g, "").slice(0, 160)
+                  : placeholderDesc)}
+            </div>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Textul real pe Google poate diferi — acesta e o aproximare fidelă.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

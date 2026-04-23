@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
     "image/webp",
     "image/gif",
     "image/svg+xml",
+    // PDFs are whitelisted only for the "venues" folder (digital menu uploads).
+    ...(folder === "venues" ? ["application/pdf"] : []),
   ];
   if (!allowedTypes.includes(file.type)) {
     return NextResponse.json({ error: "File type not allowed" }, { status: 400 });

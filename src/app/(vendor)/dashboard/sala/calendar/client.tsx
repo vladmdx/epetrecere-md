@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -10,7 +10,6 @@ import {
   Ban,
   Check,
   Loader2,
-  X,
   Users,
   Clock,
 } from "lucide-react";
@@ -77,6 +76,8 @@ const EVENT_TYPE_CONFIG: Record<string, { label: string; bg: string; text: strin
   aniversare: { label: "Aniversare", bg: "bg-orange-500/25 border-orange-500/60", text: "text-orange-400" },
 };
 
+const TENTATIVE_STYLE = { label: "Tentativ", bg: "bg-yellow-500/25 border-yellow-500/60", text: "text-yellow-400" };
+
 const STATUS_CONFIG: Record<string, { label: string; bg: string }> = {
   available: { label: "Disponibil", bg: "bg-emerald-500/20 border-emerald-500/50" },
   tentative: { label: "Tentativ", bg: "bg-yellow-500/20 border-yellow-500/50" },
@@ -85,6 +86,22 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string }> = {
 
 function toDateStr(y: number, m: number, d: number): string {
   return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** Enumerate every ISO date string between start and end inclusive (dates already sorted). */
+function enumerateRange(start: string, end: string): string[] {
+  const a = start <= end ? start : end;
+  const b = start <= end ? end : start;
+  const out: string[] = [];
+  const cur = new Date(a + "T00:00:00Z");
+  const last = new Date(b + "T00:00:00Z");
+  while (cur <= last) {
+    out.push(
+      `${cur.getUTCFullYear()}-${String(cur.getUTCMonth() + 1).padStart(2, "0")}-${String(cur.getUTCDate()).padStart(2, "0")}`,
+    );
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return out;
 }
 
 export function VenueCalendarClient({
@@ -103,6 +120,15 @@ export function VenueCalendarClient({
   const [newStatus, setNewStatus] = useState<"available" | "blocked" | "tentative">(
     "available",
   );
+
+  // Drag-select state
+  const [dragStart, setDragStart] = useState<string | null>(null);
+  const [dragEnd, setDragEnd] = useState<string | null>(null);
+  const [rangeDialog, setRangeDialog] = useState<{ start: string; end: string } | null>(null);
+  const [rangeStatus, setRangeStatus] = useState<"available" | "blocked" | "tentative">(
+    "blocked",
+  );
+  const [rangeNote, setRangeNote] = useState("");
 
   // Build lookup maps
   const eventsByDate = useMemo(() => {
@@ -138,6 +164,30 @@ export function VenueCalendarClient({
 
   const today = new Date();
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
+
+  // Compute currently-highlighted drag range
+  const dragRange = useMemo(() => {
+    if (!dragStart || !dragEnd) return new Set<string>();
+    return new Set(enumerateRange(dragStart, dragEnd));
+  }, [dragStart, dragEnd]);
+
+  // Release drag on pointer-up anywhere (guards against mouseup outside grid)
+  useEffect(() => {
+    function onUp() {
+      if (dragStart && dragEnd && dragStart !== dragEnd) {
+        setRangeDialog({
+          start: dragStart <= dragEnd ? dragStart : dragEnd,
+          end: dragStart <= dragEnd ? dragEnd : dragStart,
+        });
+        setRangeStatus("blocked");
+        setRangeNote("");
+      }
+      setDragStart(null);
+      setDragEnd(null);
+    }
+    window.addEventListener("pointerup", onUp);
+    return () => window.removeEventListener("pointerup", onUp);
+  }, [dragStart, dragEnd]);
 
   function navigateMonth(delta: number) {
     let y = monthYear;
@@ -188,7 +238,53 @@ export function VenueCalendarClient({
     }
   }
 
-  const dayEvents = dayDialog ? eventsByDate.get(dayDialog) : null;
+  async function saveRangeStatus() {
+    if (!rangeDialog) return;
+    setSaving(true);
+    try {
+      const all = enumerateRange(rangeDialog.start, rangeDialog.end);
+      // Filter out dates that already have accepted/confirmed bookings (never overwrite real bookings)
+      const dates = all.filter((d) => {
+        const books = bookingsByDate.get(d);
+        if (!books) return true;
+        return !books.some(
+          (b) => b.status === "accepted" || b.status === "confirmed_by_client",
+        );
+      });
+      if (dates.length === 0) {
+        toast.error("Toate zilele din interval au rezervări confirmate — nu pot fi modificate");
+        return;
+      }
+      const res = await fetch("/api/calendar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          entity_type: "venue",
+          entity_id: venueId,
+          dates,
+          status: rangeStatus,
+          note: rangeNote.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut salva");
+        return;
+      }
+      const skipped = all.length - dates.length;
+      toast.success(
+        skipped > 0
+          ? `${dates.length} zile actualizate · ${skipped} sărite (au rezervări)`
+          : `${dates.length} zile actualizate`,
+      );
+      setRangeDialog(null);
+      setRangeNote("");
+      router.refresh();
+    } finally {
+      setSaving(false);
+    }
+  }
+
   const dayBookings = dayDialog ? bookingsByDate.get(dayDialog) ?? [] : [];
 
   return (
@@ -198,6 +294,9 @@ export function VenueCalendarClient({
           <h1 className="font-heading text-2xl font-bold">Calendar & Disponibilitate</h1>
           <p className="text-muted-foreground">
             Gestionează disponibilitatea sălii <strong>{venueName}</strong>
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            💡 <strong>Sfat:</strong> Apasă și trage peste mai multe zile pentru a le seta rapid (ex: vacanță, renovare)
           </p>
         </div>
         <div className="flex gap-2">
@@ -232,7 +331,7 @@ export function VenueCalendarClient({
           <LegendChip color="bg-cyan-500/40" label="Cumătrie" />
           <LegendChip color="bg-purple-500/40" label="Corporate" />
           <LegendChip color="bg-orange-500/40" label="Aniversare" />
-          <LegendChip color="bg-yellow-500/40" label="Tentativ" />
+          <LegendChip color="bg-yellow-500/40" label="Tentativ (pending)" />
           <LegendChip color="bg-slate-500/50" label="Blocat" />
         </CardContent>
       </Card>
@@ -252,20 +351,25 @@ export function VenueCalendarClient({
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1.5">
+          <div className="grid grid-cols-7 gap-1.5 select-none">
             {cells.map((c, i) => {
               if (!c.dateStr || c.day === null) return <div key={i} />;
               const event = eventsByDate.get(c.dateStr);
               const dayBook = bookingsByDate.get(c.dateStr) ?? [];
-              const primaryBooking = dayBook[0];
+              // Prefer a confirmed/accepted booking visual, fall back to pending (tentative)
+              const confirmed = dayBook.find(
+                (b) => b.status === "accepted" || b.status === "confirmed_by_client",
+              );
+              const pending = dayBook.find((b) => b.status === "pending");
+              const primaryBooking = confirmed || pending;
 
               // Determine cell visual
               let cellClass = "border-border/30 bg-background/50";
               let labelText = "";
 
-              if (primaryBooking) {
+              if (confirmed) {
                 const cfg =
-                  EVENT_TYPE_CONFIG[(primaryBooking.eventType || "").toLowerCase()];
+                  EVENT_TYPE_CONFIG[(confirmed.eventType || "").toLowerCase()];
                 if (cfg) {
                   cellClass = cfg.bg;
                   labelText = cfg.label;
@@ -273,6 +377,10 @@ export function VenueCalendarClient({
                   cellClass = "bg-red-500/20 border-red-500/50";
                   labelText = "Rezervat";
                 }
+              } else if (pending) {
+                // Pending = Tentativ (yellow) per spec
+                cellClass = TENTATIVE_STYLE.bg;
+                labelText = TENTATIVE_STYLE.label;
               } else if (event?.status) {
                 const cfg = STATUS_CONFIG[event.status];
                 if (cfg) cellClass = cfg.bg;
@@ -287,23 +395,44 @@ export function VenueCalendarClient({
 
               const isToday = c.dateStr === todayStr;
               const isPast = new Date(c.dateStr) < new Date(todayStr);
+              const isInDragRange = dragRange.has(c.dateStr);
+              const disabled = isPast && !primaryBooking && !event;
 
               return (
                 <button
                   key={i}
-                  onClick={() => {
+                  onPointerDown={(e) => {
+                    if (disabled) return;
+                    // Only left-button drag on non-booked cells (range blocks/available)
+                    if (e.button !== 0) return;
+                    if (confirmed) return; // Never start a drag on a confirmed day
+                    setDragStart(c.dateStr!);
+                    setDragEnd(c.dateStr!);
+                  }}
+                  onPointerEnter={() => {
+                    if (dragStart && !isPast) {
+                      setDragEnd(c.dateStr!);
+                    }
+                  }}
+                  onClick={(e) => {
+                    // Only treat as click if no drag range (handled on pointerup)
+                    if (dragStart && dragEnd && dragStart !== dragEnd) {
+                      e.preventDefault();
+                      return;
+                    }
                     setDayDialog(c.dateStr!);
                     setNote(event?.note || "");
                     setNewStatus(
                       (event?.status as "available" | "blocked" | "tentative") || "available",
                     );
                   }}
-                  disabled={isPast && !primaryBooking && !event}
+                  disabled={disabled}
                   className={cn(
                     "group relative flex min-h-[80px] flex-col items-start rounded-lg border p-2 text-left text-xs transition-all hover:border-gold hover:shadow-lg hover:shadow-gold/10",
                     cellClass,
                     isToday && "ring-2 ring-gold",
                     isPast && "opacity-60",
+                    isInDragRange && "ring-2 ring-gold ring-offset-1 ring-offset-background scale-[0.97]",
                   )}
                 >
                   <span className="font-semibold">{c.day}</span>
@@ -325,7 +454,7 @@ export function VenueCalendarClient({
         </CardContent>
       </Card>
 
-      {/* Day dialog */}
+      {/* Single-day dialog */}
       <Dialog open={!!dayDialog} onOpenChange={(v) => !v && setDayDialog(null)}>
         <DialogContent>
           <DialogHeader>
@@ -350,7 +479,10 @@ export function VenueCalendarClient({
           {dayBookings.length > 0 && (
             <div className="space-y-2">
               {dayBookings.map((b) => {
-                const cfg = EVENT_TYPE_CONFIG[(b.eventType || "").toLowerCase()];
+                const isPending = b.status === "pending";
+                const cfg = isPending
+                  ? TENTATIVE_STYLE
+                  : EVENT_TYPE_CONFIG[(b.eventType || "").toLowerCase()];
                 return (
                   <div
                     key={b.id}
@@ -365,7 +497,9 @@ export function VenueCalendarClient({
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                           {cfg && (
                             <span className={cn("font-medium", cfg.text)}>
-                              {cfg.label}
+                              {isPending && b.eventType
+                                ? `Tentativ · ${EVENT_TYPE_CONFIG[b.eventType.toLowerCase()]?.label ?? b.eventType}`
+                                : cfg.label}
                             </span>
                           )}
                           {b.startTime && (
@@ -487,7 +621,7 @@ export function VenueCalendarClient({
               <Button
                 onClick={saveDayStatus}
                 disabled={saving}
-                className="bg-gold text-background hover:bg-gold-dark"
+                className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
                 {saving ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -497,6 +631,108 @@ export function VenueCalendarClient({
                 Salvează
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Range (drag-select) dialog */}
+      <Dialog open={!!rangeDialog} onOpenChange={(v) => !v && setRangeDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Setare interval</DialogTitle>
+            <DialogDescription>
+              {rangeDialog
+                ? `Setează status pentru ${enumerateRange(rangeDialog.start, rangeDialog.end).length} zile: ${new Date(
+                    rangeDialog.start,
+                  ).toLocaleDateString("ro-RO", { day: "numeric", month: "short" })} – ${new Date(
+                    rangeDialog.end,
+                  ).toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" })}`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs">Status pentru întregul interval</Label>
+              <div className="mt-1 grid grid-cols-3 gap-2">
+                {(["available", "tentative", "blocked"] as const).map((s) => {
+                  const cfg = {
+                    available: {
+                      label: "Disponibil",
+                      Icon: Check,
+                      bg: "bg-emerald-500/10 border-emerald-500/40 text-emerald-400",
+                    },
+                    tentative: {
+                      label: "Tentativ",
+                      Icon: Clock,
+                      bg: "bg-yellow-500/10 border-yellow-500/40 text-yellow-400",
+                    },
+                    blocked: {
+                      label: "Blocat",
+                      Icon: Ban,
+                      bg: "bg-slate-500/10 border-slate-500/40 text-slate-400",
+                    },
+                  }[s];
+                  const active = rangeStatus === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setRangeStatus(s)}
+                      className={cn(
+                        "flex flex-col items-center gap-1 rounded-lg border-2 p-2.5 text-xs transition-all",
+                        active
+                          ? cfg.bg + " ring-2 ring-gold"
+                          : "border-border/40 text-muted-foreground hover:border-gold/30",
+                      )}
+                    >
+                      <cfg.Icon className="h-4 w-4" />
+                      {cfg.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="range-note" className="text-xs">
+                Notă (opțional)
+              </Label>
+              <Textarea
+                id="range-note"
+                value={rangeNote}
+                onChange={(e) => setRangeNote(e.target.value)}
+                rows={2}
+                className="mt-1"
+                placeholder={
+                  rangeStatus === "blocked"
+                    ? "Ex: renovare, vacanță..."
+                    : "Aplicat la toate zilele din interval"
+                }
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              ℹ️ Zilele cu rezervări confirmate nu vor fi modificate.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRangeDialog(null)}
+              disabled={saving}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={saveRangeStatus}
+              disabled={saving}
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+            >
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CalendarIcon className="h-4 w-4" />
+              )}
+              Aplică interval
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

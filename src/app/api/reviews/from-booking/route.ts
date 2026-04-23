@@ -106,6 +106,7 @@ export async function POST(req: NextRequest) {
       .insert(reviews)
       .values({
         artistId: booking.artistId,
+        venueId: booking.venueId,
         bookingRequestId: booking.id,
         authorUserId: appUser.id,
         authorName: appUser.name || booking.clientName,

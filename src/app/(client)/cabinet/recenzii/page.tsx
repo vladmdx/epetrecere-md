@@ -227,7 +227,7 @@ function ReviewCard({
         <Button
           onClick={submit}
           disabled={submitting}
-          className="gap-1 bg-gold text-background hover:bg-gold-dark"
+          className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
           Trimite recenzia

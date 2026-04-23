@@ -252,7 +252,7 @@ export function MatchingQuizClient() {
           </Button>
           <Link
             href="/artisti"
-            className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+            className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
             Vezi toți artiștii
           </Link>
@@ -442,7 +442,7 @@ export function MatchingQuizClient() {
         <Button
           onClick={next}
           disabled={!canAdvance() || loading}
-          className="gap-2 bg-gold text-background hover:bg-gold-dark"
+          className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
         >
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />

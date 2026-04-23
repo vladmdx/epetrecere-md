@@ -17,7 +17,11 @@ export default async function VenueSettingsPage() {
   if (!clerkId) redirect("/sign-in?redirect_url=/dashboard/sala/setari");
 
   const [appUser] = await db
-    .select({ id: users.id, email: users.email })
+    .select({
+      id: users.id,
+      email: users.email,
+      notificationDigestFrequency: users.notificationDigestFrequency,
+    })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
@@ -53,6 +57,7 @@ export default async function VenueSettingsPage() {
       }}
       userEmail={appUser.email}
       icalUrl={icalUrl}
+      notificationDigestFrequency={appUser.notificationDigestFrequency}
     />
   );
 }

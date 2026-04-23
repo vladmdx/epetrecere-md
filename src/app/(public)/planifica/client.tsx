@@ -369,8 +369,8 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
                   onClick={() => i < step && setStep(i)}
                   className={cn(
                     "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium transition-all",
-                    i < step && "bg-gold text-background cursor-pointer",
-                    i === step && "bg-gold text-background ring-4 ring-gold/20",
+                    i < step && "bg-gold text-[#0D0D0D] cursor-pointer",
+                    i === step && "bg-gold text-[#0D0D0D] ring-4 ring-gold/20",
                     i > step && "bg-muted text-muted-foreground",
                   )}
                 >
@@ -413,7 +413,7 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
             <Button
               onClick={nextStep}
               disabled={!canAdvance()}
-              className="gap-2 bg-gold text-background hover:bg-gold-dark"
+              className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {t("common.next")} <ArrowRight className="h-4 w-4" />
             </Button>
@@ -421,7 +421,7 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
             <Button
               onClick={handleSubmit}
               disabled={!canAdvance() || submitting}
-              className="gap-2 bg-gold text-background hover:bg-gold-dark px-8"
+              className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark px-8"
             >
               {submitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

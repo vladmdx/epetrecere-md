@@ -36,7 +36,7 @@ export function PriceFilter({ currentMin, currentMax, onChange }: PriceFilterPro
           size="sm"
           className={cn(
             "h-7 text-xs",
-            isActive(range.min, range.max) && "bg-gold text-background hover:bg-gold-dark border-gold",
+            isActive(range.min, range.max) && "bg-gold text-[#0D0D0D] hover:bg-gold-dark border-gold",
           )}
           aria-pressed={isActive(range.min, range.max)}
           aria-label={`Filtru preț: ${range.label}`}
@@ -76,7 +76,7 @@ export function CategoryFilter({ categories, currentId, onChange }: CategoryFilt
           size="sm"
           className={cn(
             "h-7 text-xs",
-            currentId === String(cat.id) && "bg-gold text-background hover:bg-gold-dark border-gold",
+            currentId === String(cat.id) && "bg-gold text-[#0D0D0D] hover:bg-gold-dark border-gold",
           )}
           aria-pressed={currentId === String(cat.id)}
           aria-label={`Filtru categorie: ${cat.nameRo}`}
@@ -114,7 +114,7 @@ export function CityFilter({ cities, currentCity, onChange }: CityFilterProps) {
           size="sm"
           className={cn(
             "h-7 text-xs",
-            currentCity === city && "bg-gold text-background hover:bg-gold-dark border-gold",
+            currentCity === city && "bg-gold text-[#0D0D0D] hover:bg-gold-dark border-gold",
           )}
           aria-pressed={currentCity === city}
           aria-label={`Filtru oraș: ${city}`}
@@ -155,7 +155,7 @@ export function CapacityFilter({ currentMin, onChange }: CapacityFilterProps) {
           size="sm"
           className={cn(
             "h-7 text-xs",
-            currentMin === opt.min && "bg-gold text-background hover:bg-gold-dark border-gold",
+            currentMin === opt.min && "bg-gold text-[#0D0D0D] hover:bg-gold-dark border-gold",
           )}
           aria-pressed={currentMin === opt.min}
           aria-label={`Filtru capacitate: ${opt.label}`}

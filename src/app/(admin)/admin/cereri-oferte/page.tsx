@@ -145,7 +145,7 @@ export default function AdminOfferRequestsPage() {
             variant={filter === tab.key ? "default" : "outline"}
             size="sm"
             className={cn(
-              filter === tab.key && "bg-gold text-background hover:bg-gold-dark",
+              filter === tab.key && "bg-gold text-[#0D0D0D] hover:bg-gold-dark",
               tab.key === "new" && tab.count > 0 && filter !== tab.key && "border-warning/50 text-warning",
             )}
             onClick={() => setFilter(tab.key)}
@@ -272,7 +272,7 @@ function OfferCard({
             {editing && (
               <div className="flex gap-2">
                 <Input value={comment} onChange={e => setComment(e.target.value)} placeholder="Comentariu admin..." className="flex-1" />
-                <Button size="sm" className="bg-gold text-background hover:bg-gold-dark"
+                <Button size="sm" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                   onClick={() => { onComment(request.id, comment); setEditing(false); }}>
                   Salvează
                 </Button>
@@ -301,7 +301,7 @@ function OfferCard({
             {/* Accepted request actions */}
             {(request.status === "accepted") && (
               <>
-                <Button size="sm" className="gap-1.5 bg-gold hover:bg-gold-dark text-background" onClick={() => onSendToCRM(request.id)}>
+                <Button size="sm" className="gap-1.5 bg-gold hover:bg-gold-dark text-[#0D0D0D]" onClick={() => onSendToCRM(request.id)}>
                   <Send className="h-3.5 w-3.5" /> Trimite în CRM
                 </Button>
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(true)}>

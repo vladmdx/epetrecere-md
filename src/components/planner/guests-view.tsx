@@ -392,7 +392,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
           </div>
           <Button
             onClick={openSendDialog}
-            className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+            className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             <Send className="h-4 w-4" />
             Configurează și trimite
@@ -480,7 +480,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             <Button
               onClick={addGuest}
               disabled={adding}
-              className="gap-1 bg-gold text-background hover:bg-gold-dark"
+              className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
               Adaugă
@@ -748,7 +748,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             <Button
               onClick={createAndSendInvitation}
               disabled={sending || !invData.eventDate || !invData.coupleNames}
-              className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+              className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {sending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

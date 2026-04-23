@@ -61,6 +61,7 @@ const updateSchema = z.object({
   website: z.string().url().optional().or(z.literal("")),
   facilities: z.array(z.string()).optional(),
   menuUrl: z.string().url().optional().or(z.literal("")),
+  menuPdfUrl: z.string().url().optional().or(z.literal("")),
   virtualTourUrl: z.string().url().optional().or(z.literal("")),
   calendarEnabled: z.boolean().optional(),
   isActive: z.boolean().optional(),
@@ -68,7 +69,11 @@ const updateSchema = z.object({
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),
   seoTitleRo: z.string().optional(),
+  seoTitleRu: z.string().optional(),
+  seoTitleEn: z.string().optional(),
   seoDescRo: z.string().optional(),
+  seoDescRu: z.string().optional(),
+  seoDescEn: z.string().optional(),
   autoReplyEnabled: z.boolean().optional(),
   autoReplyMessage: z.string().nullable().optional(),
   bufferHours: z.number().int().min(0).max(24).nullable().optional(),
@@ -128,7 +133,13 @@ export async function PUT(
 
   // Strip empty strings to null for URL/email columns so we don't persist "".
   const data = { ...parsed.data };
-  for (const k of ["email", "website", "menuUrl", "virtualTourUrl"] as const) {
+  for (const k of [
+    "email",
+    "website",
+    "menuUrl",
+    "menuPdfUrl",
+    "virtualTourUrl",
+  ] as const) {
     if (data[k] === "") data[k] = undefined;
   }
 
@@ -143,4 +154,39 @@ export async function PUT(
     .where(eq(venues.id, venueId))
     .limit(1);
   return NextResponse.json(updated);
+}
+
+// Admin-only: hard-delete a venue. Cascades to venue_images / venue_menu_* /
+// reviews via DB FK constraints (ON DELETE CASCADE); booking_requests keep
+// their venueId null per spec (bookings shouldn't disappear when a venue is
+// removed — they remain as historical records).
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return NextResponse.json(
+      { error: admin.error },
+      { status: admin.status },
+    );
+  }
+
+  const { id } = await params;
+  const venueId = Number(id);
+  if (!Number.isFinite(venueId)) {
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+  }
+
+  const [venue] = await db
+    .select({ id: venues.id })
+    .from(venues)
+    .where(eq(venues.id, venueId))
+    .limit(1);
+  if (!venue) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  await db.delete(venues).where(eq(venues.id, venueId));
+  return NextResponse.json({ success: true });
 }

@@ -17,7 +17,7 @@ export default function PublicError({
       <p className="max-w-md text-muted-foreground">
         Ne cerem scuze pentru inconveniență. Încercați din nou sau reveniți mai târziu.
       </p>
-      <Button onClick={reset} className="bg-gold text-background hover:bg-gold-dark">
+      <Button onClick={reset} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
         Încearcă din nou
       </Button>
     </div>

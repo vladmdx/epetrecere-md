@@ -105,7 +105,7 @@ export function ChatBell() {
       >
         <MessageCircle className="h-5 w-5" />
         {totalUnread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-background">
+          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-[#0D0D0D]">
             {totalUnread > 9 ? "9+" : totalUnread}
           </span>
         )}

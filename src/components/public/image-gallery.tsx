@@ -83,6 +83,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
           <Button
             variant="ghost"
             size="icon"
+            aria-label="Închide galeria"
             onClick={() => setLightboxIndex(null)}
             className="absolute right-4 top-4 text-white hover:bg-white/10"
           >
@@ -93,6 +94,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Imagine precedentă"
               onClick={() => setLightboxIndex(lightboxIndex - 1)}
               className="absolute left-4 text-white hover:bg-white/10"
             >
@@ -120,6 +122,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             <Button
               variant="ghost"
               size="icon"
+              aria-label="Imagine următoare"
               onClick={() => setLightboxIndex(lightboxIndex + 1)}
               className="absolute right-4 text-white hover:bg-white/10"
             >

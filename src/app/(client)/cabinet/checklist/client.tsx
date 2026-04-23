@@ -156,7 +156,7 @@ export function ChecklistClient() {
                             }`}
                           >
                             {isChecked && (
-                              <Check className="h-3 w-3 text-background" />
+                              <Check className="h-3 w-3 text-[#0D0D0D]" />
                             )}
                           </span>
                           <span

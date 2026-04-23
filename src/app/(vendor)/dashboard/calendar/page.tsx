@@ -829,6 +829,7 @@ export default function VendorCalendarPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Luna precedentă"
                     onClick={() =>
                       setCurrentMonth((c) =>
                         c.month === 0
@@ -845,6 +846,7 @@ export default function VendorCalendarPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Luna următoare"
                     onClick={() =>
                       setCurrentMonth((c) =>
                         c.month === 11
@@ -1174,7 +1176,7 @@ export default function VendorCalendarPage() {
                   <Button
                     onClick={saveSchedule}
                     disabled={saving}
-                    className="gap-2 bg-gold text-background hover:bg-gold-dark"
+                    className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                   >
                     {saving ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1578,7 +1580,7 @@ export default function VendorCalendarPage() {
                 manualPackageId == null ||
                 !manualStartTime
               }
-              className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+              className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {manualSaving ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

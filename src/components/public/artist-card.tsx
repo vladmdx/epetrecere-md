@@ -62,7 +62,7 @@ export function ArtistCard({ artist }: ArtistCardProps) {
         {/* Badges */}
         <div className="absolute left-2 top-2 flex gap-1">
           {artist.isVerified && (
-            <Badge className="bg-gold/90 text-background text-xs gap-1">
+            <Badge className="bg-gold/90 text-[#0D0D0D] text-xs gap-1">
               <BadgeCheck className="h-3 w-3" /> Verificat
             </Badge>
           )}

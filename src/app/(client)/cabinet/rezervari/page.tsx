@@ -211,7 +211,7 @@ function renderBookingCard(
             {b.status === "accepted" && (
               <Button
                 size="sm"
-                className="gap-1 bg-gold text-background hover:bg-gold-dark text-xs"
+                className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs"
                 onClick={() => onConfirm(b.id)}
               >
                 <CheckCircle2 className="h-3.5 w-3.5" /> Confirmă

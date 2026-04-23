@@ -180,7 +180,7 @@ export function BudgetCalculatorClient() {
           </div>
           <div className="border-t border-border/40 p-4">
             <Link href="/planifica">
-              <Button className="w-full gap-2 bg-gold text-background hover:bg-gold-dark">
+              <Button className="w-full gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
                 Găsește vendori pentru acest buget <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>

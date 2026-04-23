@@ -843,7 +843,7 @@ export default function VendorBookingsPage() {
             <Button
               onClick={confirmPropose}
               disabled={busy === proposeDialog?.id || !proposeAmount}
-              className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+              className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {busy === proposeDialog?.id ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -961,7 +961,7 @@ export default function VendorBookingsPage() {
             <Button
               onClick={sendMessageFromDialog}
               disabled={messageSending || !messageText.trim()}
-              className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+              className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {messageSending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

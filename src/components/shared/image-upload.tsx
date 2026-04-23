@@ -122,6 +122,7 @@ export function ImageUpload({ images, onChange, maxFiles = 20, folder = "artists
                 <Button
                   size="icon"
                   variant="ghost"
+                  aria-label="Setează ca imagine principală"
                   className="h-8 w-8 text-white hover:bg-white/20"
                   onClick={() => setCover(img.id)}
                   title="Setează ca cover"
@@ -131,6 +132,7 @@ export function ImageUpload({ images, onChange, maxFiles = 20, folder = "artists
                 <Button
                   size="icon"
                   variant="ghost"
+                  aria-label="Șterge imaginea"
                   className="h-8 w-8 text-white hover:bg-destructive/50"
                   onClick={() => removeImage(img.id)}
                   title="Șterge"
@@ -140,7 +142,7 @@ export function ImageUpload({ images, onChange, maxFiles = 20, folder = "artists
               </div>
 
               {img.isCover && (
-                <span className="absolute left-1 top-1 rounded bg-gold px-1.5 py-0.5 text-[10px] font-bold text-background">
+                <span className="absolute left-1 top-1 rounded bg-gold px-1.5 py-0.5 text-[10px] font-bold text-[#0D0D0D]">
                   COVER
                 </span>
               )}

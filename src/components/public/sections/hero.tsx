@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/hooks/use-locale";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
@@ -33,7 +34,14 @@ export function HeroSection() {
         >
           <source src="/videos/hero-wedding.mp4" type="video/mp4" />
         </video>
-        <img src="/images/backgrounds/concert-lights.jpg" alt="" className="absolute inset-0 w-full h-full object-cover md:hidden" loading="eager" />
+        <Image
+          src="/images/backgrounds/concert-lights.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover md:hidden"
+        />
       </div>
 
       <div className="relative z-20 mx-auto max-w-7xl px-4 py-24 text-center lg:px-8">
@@ -58,7 +66,7 @@ export function HeroSection() {
         <ScrollReveal delay={0.45}>
           <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
             <Link href="/artisti">
-              <Button size="lg" className="bg-gold text-background hover:bg-gold-dark px-8 text-base font-medium shadow-[0_4px_20px_rgba(201,168,76,0.3)]">
+              <Button size="lg" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark px-8 text-base font-medium shadow-[0_4px_20px_rgba(201,168,76,0.3)]">
                 {t("hero.cta_primary")}
               </Button>
             </Link>

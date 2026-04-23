@@ -232,7 +232,7 @@ export function CategoryPageClient({
           <div className="absolute bottom-0 left-0 right-0 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-background border-t border-gold/20 p-6 space-y-4 animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-bold">Filtre</h3>
-              <button onClick={() => setMobileFiltersOpen(false)} className="text-muted-foreground hover:text-foreground">
+              <button onClick={() => setMobileFiltersOpen(false)} aria-label="Închide filtrele" className="text-muted-foreground hover:text-foreground">
                 <X className="h-5 w-5" />
               </button>
             </div>

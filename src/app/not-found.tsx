@@ -8,7 +8,7 @@ export default function NotFound() {
       <h1 className="font-heading text-2xl font-bold">Pagina nu a fost găsită</h1>
       <p className="text-muted-foreground">Pagina pe care o cauți nu există sau a fost mutată.</p>
       <Link href="/">
-        <Button className="bg-gold text-background hover:bg-gold-dark">
+        <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
           Înapoi la pagina principală
         </Button>
       </Link>

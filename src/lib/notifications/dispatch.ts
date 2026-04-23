@@ -2,9 +2,28 @@
 //
 // Enqueues an in-app notification row and optionally sends an email.
 // Swallows errors so notification failures never break the triggering action.
+//
+// Digest frequency: user-level setting in `users.notificationDigestFrequency`
+// controls email cadence:
+//   - "instant" (default) — email sent immediately
+//   - "daily"  — skip email now; a cron batches them into a daily digest
+//   - "weekly" — skip email now; cron batches weekly
+// The in-app notification row is ALWAYS inserted (it's the real source of
+// truth); only email delivery is gated by the frequency.
+//
+// Critical event types (booking confirmations, rejections, direct messages)
+// bypass the digest and always email instantly — they are time-sensitive.
 
 import { db } from "@/lib/db";
-import { notifications } from "@/lib/db/schema";
+import { notifications, users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+const CRITICAL_TYPES = new Set<string>([
+  "booking_request_status_changed",
+  "booking_status_changed",
+  "registration_approved",
+  "registration_rejected",
+]);
 
 export type NotificationType =
   // Vendor (Artist / Venue)
@@ -43,7 +62,7 @@ export interface DispatchInput {
 
 export async function dispatchNotification(input: DispatchInput): Promise<void> {
   try {
-    // In-app notification
+    // In-app notification — always inserted regardless of email preference.
     await db.insert(notifications).values({
       userId: input.userId,
       type: input.type,
@@ -52,16 +71,34 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
       actionUrl: input.actionUrl,
     });
 
-    // Email (if provided)
+    // Email — gated by the recipient's digest frequency preference, EXCEPT
+    // for time-sensitive event types which always fire instantly.
     if (input.email && input.emailHtml) {
-      const { sendEmail } = await import("@/lib/email/send");
-      await sendEmail({
-        to: input.email,
-        subject: input.emailSubject || input.title,
-        html: input.emailHtml,
-      }).catch((err) =>
-        console.error("[notifications] email failed:", err),
-      );
+      const isCritical = CRITICAL_TYPES.has(String(input.type));
+      let shouldEmailNow = true;
+      if (!isCritical) {
+        const [userRow] = await db
+          .select({ freq: users.notificationDigestFrequency })
+          .from(users)
+          .where(eq(users.id, input.userId))
+          .limit(1);
+        const freq = (userRow?.freq ?? "instant").toLowerCase();
+        if (freq === "daily" || freq === "weekly") {
+          // Queued for digest cron — skip immediate send. The notification row
+          // above is the source of truth the cron reads from.
+          shouldEmailNow = false;
+        }
+      }
+      if (shouldEmailNow) {
+        const { sendEmail } = await import("@/lib/email/send");
+        await sendEmail({
+          to: input.email,
+          subject: input.emailSubject || input.title,
+          html: input.emailHtml,
+        }).catch((err) =>
+          console.error("[notifications] email failed:", err),
+        );
+      }
     }
   } catch (err) {
     console.error("[notifications] dispatch failed", err);
@@ -73,8 +110,7 @@ export async function dispatchToAdmins(
   input: Omit<DispatchInput, "userId" | "email"> & { emailHtml?: string; emailSubject?: string },
 ): Promise<void> {
   try {
-    const { users } = await import("@/lib/db/schema");
-    const { or, eq } = await import("drizzle-orm");
+    const { or } = await import("drizzle-orm");
     const admins = await db
       .select({ id: users.id, email: users.email })
       .from(users)

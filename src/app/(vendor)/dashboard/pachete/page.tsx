@@ -242,7 +242,7 @@ export default function VendorPackagesPage() {
             {pkgs.length} {pkgs.length === 1 ? "pachet" : "pachete"} — apar pe profilul tău public în tab-ul &ldquo;Pachete&rdquo;.
           </p>
         </div>
-        <Button onClick={openCreate} className="gap-2 bg-gold text-background hover:bg-gold-dark">
+        <Button onClick={openCreate} className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
           <Plus className="h-4 w-4" /> Pachet nou
         </Button>
       </div>
@@ -404,7 +404,7 @@ export default function VendorPackagesPage() {
             <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
               Anulează
             </Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-gold text-background hover:bg-gold-dark">
+            <Button onClick={handleSave} disabled={saving} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvează"}
             </Button>
           </DialogFooter>

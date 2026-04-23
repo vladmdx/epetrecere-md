@@ -197,7 +197,7 @@ export default async function RealWeddingPage({ params }: Props) {
           </p>
           <Link
             href="/planifica"
-            className="inline-flex items-center gap-2 rounded-lg bg-gold px-6 py-2.5 text-sm font-medium text-background hover:bg-gold-dark"
+            className="inline-flex items-center gap-2 rounded-lg bg-gold px-6 py-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
             Planifică nunta ta
           </Link>

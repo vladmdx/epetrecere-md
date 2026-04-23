@@ -92,7 +92,7 @@ export default function MessagesPage() {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)]">
         <div className="flex items-center gap-3 mb-4">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedConv(null)} className="h-8 w-8">
+          <Button variant="ghost" size="icon" aria-label="Înapoi la lista de conversații" onClick={() => setSelectedConv(null)} className="h-8 w-8">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <h2 className="font-heading text-lg font-bold">{conv?.artistName || "Conversație"}</h2>
@@ -119,7 +119,7 @@ export default function MessagesPage() {
             placeholder="Scrie un mesaj..."
             onKeyDown={e => e.key === "Enter" && !e.shiftKey && sendMessage()}
           />
-          <Button onClick={sendMessage} disabled={sending || !draft.trim()} className="bg-gold text-background hover:bg-gold-dark">
+          <Button onClick={sendMessage} disabled={sending || !draft.trim()} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
             {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>

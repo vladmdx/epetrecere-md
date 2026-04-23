@@ -81,7 +81,7 @@ export function TestimonialsSection() {
 
           {/* Navigation */}
           <div className="mt-6 flex items-center justify-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => setCurrent((c) => (c - 1 + testimonials.length) % testimonials.length)}>
+            <Button variant="ghost" size="icon" aria-label="Testimonial precedent" onClick={() => setCurrent((c) => (c - 1 + testimonials.length) % testimonials.length)}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div className="flex gap-2">
@@ -89,11 +89,13 @@ export function TestimonialsSection() {
                 <button
                   key={i}
                   onClick={() => setCurrent(i)}
+                  aria-label={`Mergi la testimonial ${i + 1}`}
+                  aria-current={i === current ? "true" : undefined}
                   className={cn("h-2 w-2 rounded-full transition-all", i === current ? "w-6 bg-gold" : "bg-muted-foreground/30")}
                 />
               ))}
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setCurrent((c) => (c + 1) % testimonials.length)}>
+            <Button variant="ghost" size="icon" aria-label="Testimonial următor" onClick={() => setCurrent((c) => (c + 1) % testimonials.length)}>
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>

@@ -74,18 +74,19 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
 
   return (
     <>
-      <div
+      <button
+        type="button"
         onClick={() => setOpen(true)}
         className={cn(
           "w-full cursor-pointer rounded-xl py-3.5 text-center text-base font-semibold transition-colors",
           variant === "primary"
-            ? "bg-gold text-background hover:bg-gold-dark"
+            ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             : "border border-gold/30 text-gold hover:bg-gold/10",
           className,
         )}
       >
         {label}
-      </div>
+      </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="overflow-y-auto sm:max-w-md">
@@ -124,7 +125,7 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
               </div>
 
               <Button type="submit" disabled={loading}
-                className="w-full h-12 bg-gold text-background hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
+                className="w-full h-12 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                   <><Send className="mr-2 h-4 w-4" /> Trimite cererea</>
                 )}
@@ -229,19 +230,20 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
 
   return (
     <>
-      <div
+      <button
+        type="button"
         onClick={() => setOpen(true)}
         className={cn(
           "flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl py-3.5 text-center text-base font-semibold transition-colors",
           variant === "primary"
-            ? "bg-gold text-background hover:bg-gold-dark"
+            ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             : "border border-gold/30 text-gold hover:bg-gold/10",
           className,
         )}
       >
         {icon}
         {label}
-      </div>
+      </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="overflow-y-auto sm:max-w-md">
@@ -329,7 +331,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
               </div>
 
               <Button type="submit" disabled={loading}
-                className="w-full h-12 bg-gold text-background hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
+                className="w-full h-12 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                   <><Send className="mr-2 h-4 w-4" /> Trimite cererea de rezervare</>
                 )}
@@ -442,19 +444,19 @@ function MiniCalendar({
       </div>
 
       {open && (
-        <div className="absolute z-50 mt-2 left-0 right-0 rounded-xl border border-gold/20 bg-[#141428]/98 backdrop-blur-xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+        <div className="absolute z-50 mt-2 left-0 right-0 rounded-xl border border-gold/20 bg-popover/98 backdrop-blur-xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
           <div className="flex items-center justify-between mb-3">
             <button type="button"
               onClick={() => setViewDate(new Date(year, month - 1, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-gold transition-colors">
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-gold transition-colors">
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-sm font-semibold text-white">
+            <span className="text-sm font-semibold text-foreground">
               {monthNames[month]} {year}
             </span>
             <button type="button"
               onClick={() => setViewDate(new Date(year, month + 1, 1))}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-gold transition-colors">
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-gold transition-colors">
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
@@ -472,9 +474,9 @@ function MiniCalendar({
                 onClick={() => { onChange(cell.date); setOpen(false); }}
                 className={cn(
                   "h-8 w-full rounded-lg text-xs font-medium transition-all duration-150",
-                  !cell.current && "text-white/20",
-                  cell.current && !isPast(cell.date) && !isSelected(cell.date) && !isToday(cell.date) && "text-white/70 hover:bg-gold/15 hover:text-gold",
-                  cell.current && isPast(cell.date) && "text-white/15 cursor-not-allowed",
+                  !cell.current && "text-muted-foreground/40",
+                  cell.current && !isPast(cell.date) && !isSelected(cell.date) && !isToday(cell.date) && "text-foreground/80 hover:bg-gold/15 hover:text-gold",
+                  cell.current && isPast(cell.date) && "text-muted-foreground/30 cursor-not-allowed",
                   isToday(cell.date) && !isSelected(cell.date) && "border border-gold/40 text-gold",
                   isSelected(cell.date) && "bg-gold text-[#0D0D0D] font-bold shadow-[0_0_12px_rgba(201,168,76,0.3)]",
                 )}
@@ -484,7 +486,7 @@ function MiniCalendar({
             ))}
           </div>
 
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
             <button type="button"
               onClick={() => { const d = new Date(); d.setDate(d.getDate() + 1); onChange(d); setViewDate(d); setOpen(false); }}
               className="text-xs text-gold/70 hover:text-gold transition-colors">

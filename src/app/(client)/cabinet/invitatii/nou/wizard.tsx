@@ -77,7 +77,7 @@ function ThemedDateInput({
         type="date"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60 [color-scheme:dark]"
+        className="flex-1 bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
       />
     </div>
   );
@@ -219,7 +219,7 @@ export function InvitationWizard() {
         <h1 className="font-heading text-2xl font-bold">Autentifică-te</h1>
         <Link
           href="/sign-in?redirect_url=/cabinet/invitatii/nou"
-          className="mt-4 inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+          className="mt-4 inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
           Conectează-te
         </Link>
@@ -498,7 +498,7 @@ export function InvitationWizard() {
                   type="button"
                   onClick={addGuest}
                   disabled={!newGuest.name.trim()}
-                  className="w-full gap-1 bg-gold text-background hover:bg-gold-dark sm:w-auto sm:ml-auto"
+                  className="w-full gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark sm:w-auto sm:ml-auto"
                 >
                   <Plus className="h-4 w-4" /> Adaugă invitat
                 </Button>
@@ -613,7 +613,7 @@ export function InvitationWizard() {
         <Button
           onClick={next}
           disabled={!canAdvance() || saving}
-          className="gap-2 bg-gold text-background hover:bg-gold-dark"
+          className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />

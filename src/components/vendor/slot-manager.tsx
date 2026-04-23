@@ -180,7 +180,7 @@ export function SlotManager({
                 <Button
                   size="sm"
                   onClick={() => setAddOpen(true)}
-                  className="gap-1 bg-gold text-background hover:bg-gold-dark"
+                  className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                 >
                   <Plus className="h-3.5 w-3.5" /> Adaugă slot
                 </Button>
@@ -339,7 +339,7 @@ export function SlotManager({
             <Button
               disabled={saving}
               onClick={addSlot}
-              className="bg-gold text-background hover:bg-gold-dark"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvează slot"}
             </Button>

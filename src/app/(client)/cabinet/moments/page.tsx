@@ -48,7 +48,7 @@ export default function MomentsIndexPage() {
       </p>
       <Link
         href="/cabinet/planifica"
-        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-medium text-background hover:bg-gold-dark"
+        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
       >
         <Plus className="h-4 w-4" /> Creează plan
       </Link>

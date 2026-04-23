@@ -196,7 +196,7 @@ export default async function RealWeddingsPage() {
             </p>
             <Link
               href="/planifica"
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
             >
               Planifică-ți propria nuntă
               <ArrowRight className="h-4 w-4" />

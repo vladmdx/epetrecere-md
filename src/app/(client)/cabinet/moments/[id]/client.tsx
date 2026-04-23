@@ -151,7 +151,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
           <button
             onClick={enable}
             disabled={saving}
-            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-medium text-background hover:bg-gold-dark disabled:opacity-50"
+            className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-50"
           >
             {saving ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -223,7 +223,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                   href={slideshowUrl}
                   target="_blank"
                   rel="noopener"
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gold px-3 py-2 text-xs font-medium text-background hover:bg-gold-dark"
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gold px-3 py-2 text-xs font-medium text-[#0D0D0D] hover:bg-gold-dark"
                 >
                   <Monitor className="h-3.5 w-3.5" /> Deschide slideshow
                 </Link>

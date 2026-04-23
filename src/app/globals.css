@@ -59,6 +59,7 @@
    LIGHT MODE — Ivory & Gold
    ═══════════════════════════════════════════════════════ */
 :root {
+  color-scheme: light;
   --background: #FAF8F2;
   --foreground: #2C2C3A;
   --card: #F0EBE0;
@@ -107,6 +108,7 @@
    DARK MODE — Rich Black & Royal Gold (DEFAULT)
    ═══════════════════════════════════════════════════════ */
 .dark {
+  color-scheme: dark;
   --background: #0D0D0D;
   --foreground: #FAF8F2;
   --card: #1A1A2E;
@@ -188,20 +190,20 @@
   cursor: pointer;
 }
 
-/* Clerk auth pages — make placeholders visible on dark inputs */
+/* Clerk auth pages — theme-aware input colors */
 .cl-formFieldInput::placeholder,
 .cl-formFieldInput::-webkit-input-placeholder,
 input.cl-formFieldInput::placeholder {
-  color: #7A7A90 !important;
+  color: var(--muted-foreground) !important;
   opacity: 1 !important;
 }
 
 .cl-formFieldInput {
-  color: #FAF8F2 !important;
+  color: var(--foreground) !important;
 }
 
 .cl-formFieldLabel {
-  color: #FAF8F2 !important;
+  color: var(--foreground) !important;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -267,8 +269,13 @@ input.cl-formFieldInput::placeholder {
    VISUAL ENHANCEMENTS
    ═══════════════════════════════════════════════════════ */
 
-/* Improved text contrast */
-.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 { color: #FAF8F2 !important; }
+/* Improved text contrast — no !important so component overrides (text-gold, text-primary, etc.) still win */
+.dark h1:not([class*="text-"]),
+.dark h2:not([class*="text-"]),
+.dark h3:not([class*="text-"]),
+.dark h4:not([class*="text-"]),
+.dark h5:not([class*="text-"]),
+.dark h6:not([class*="text-"]) { color: #FAF8F2; }
 
 /* Ensure text readability on dark section backgrounds */
 .section-dark,
@@ -353,11 +360,7 @@ input.cl-formFieldInput::placeholder {
   100% { background-position: 200% 0; }
 }
 
-/* Date input styling for dark theme */
-input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  cursor: pointer;
-}
+/* Date input cursor (picker icon inversion handled in .dark block above only) */
 input[type="date"] {
   cursor: pointer;
 }

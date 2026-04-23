@@ -80,7 +80,7 @@ export default function BlogEditorPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Link href="/admin/blog"><Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button></Link>
+        <Link href="/admin/blog"><Button variant="ghost" size="icon" aria-label="Înapoi la listă articole"><ArrowLeft className="h-4 w-4" /></Button></Link>
         <div className="flex-1"><h1 className="font-heading text-2xl font-bold">{isNew ? "Articol Nou" : "Editare Articol"}</h1></div>
         {!isNew && <Button variant="outline" className="text-destructive gap-2" onClick={handleDelete}><Trash2 className="h-4 w-4" /> Șterge</Button>}
         <select value={post.status} onChange={e => update({ status: e.target.value })} className="rounded-md border border-input bg-background px-3 py-2 text-sm">
@@ -98,7 +98,7 @@ export default function BlogEditorPage() {
             min={new Date().toISOString().slice(0, 16)}
           />
         )}
-        <Button onClick={handleSave} disabled={saving} className="bg-gold text-background hover:bg-gold-dark gap-2">
+        <Button onClick={handleSave} disabled={saving} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvează
         </Button>
       </div>

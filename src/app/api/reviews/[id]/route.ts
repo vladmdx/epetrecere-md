@@ -100,14 +100,37 @@ export async function PUT(
     const [appUser] = await db.select({ id: users.id }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
     if (!appUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const [review] = await db.select({ artistId: reviews.artistId }).from(reviews).where(eq(reviews.id, Number(id))).limit(1);
+    const [review] = await db
+      .select({ artistId: reviews.artistId, venueId: reviews.venueId })
+      .from(reviews)
+      .where(eq(reviews.id, Number(id)))
+      .limit(1);
     if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
 
-    const [artist] = await db.select({ id: artists.id }).from(artists)
-      .where(and(eq(artists.id, review.artistId!), eq(artists.userId, appUser.id))).limit(1);
-    if (!artist) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // Owner can be either the artist owner or the venue owner
+    let owns = false;
+    if (review.artistId) {
+      const [artist] = await db
+        .select({ id: artists.id })
+        .from(artists)
+        .where(and(eq(artists.id, review.artistId), eq(artists.userId, appUser.id)))
+        .limit(1);
+      if (artist) owns = true;
+    }
+    if (!owns && review.venueId) {
+      const [venue] = await db
+        .select({ id: venues.id })
+        .from(venues)
+        .where(and(eq(venues.id, review.venueId), eq(venues.userId, appUser.id)))
+        .limit(1);
+      if (venue) owns = true;
+    }
+    if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-    await db.update(reviews).set({ reply }).where(eq(reviews.id, Number(id)));
+    await db
+      .update(reviews)
+      .set({ reply, replyAt: new Date() })
+      .where(eq(reviews.id, Number(id)));
     return NextResponse.json({ success: true });
   }
 

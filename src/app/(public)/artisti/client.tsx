@@ -102,7 +102,7 @@ export function ArtistsListClient({ artists, total, page, totalPages, currentSor
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("search.placeholder")}
           />
-          <Button type="submit" className="bg-gold text-background hover:bg-gold-dark">
+          <Button type="submit" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
             <Search className="h-4 w-4" />
           </Button>
         </form>

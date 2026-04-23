@@ -35,18 +35,48 @@ interface VenueSettings {
 const DEFAULT_AUTO_REPLY =
   "Mulțumim pentru interesul pentru sala noastră! Vă răspundem în 24h cu disponibilitatea exactă și oferta personalizată.";
 
+type DigestFrequency = "instant" | "daily" | "weekly";
+
 export function VenueSettingsClient({
   venue,
   userEmail,
   icalUrl,
+  notificationDigestFrequency,
 }: {
   venue: VenueSettings;
   userEmail: string | null;
   icalUrl: string;
+  notificationDigestFrequency: string;
 }) {
   const [state, setState] = useState<VenueSettings>(venue);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [digestFrequency, setDigestFrequency] = useState<DigestFrequency>(
+    (notificationDigestFrequency as DigestFrequency) || "instant",
+  );
+  const [savingDigest, setSavingDigest] = useState(false);
+
+  async function saveDigest(value: DigestFrequency) {
+    setSavingDigest(true);
+    const prev = digestFrequency;
+    setDigestFrequency(value);
+    try {
+      const res = await fetch("/api/me/notification-preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ digestFrequency: value }),
+      });
+      if (!res.ok) {
+        setDigestFrequency(prev);
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut salva");
+        return;
+      }
+      toast.success("Frecvență salvată");
+    } finally {
+      setSavingDigest(false);
+    }
+  }
 
   async function copyIcal() {
     try {
@@ -195,7 +225,7 @@ export function VenueSettingsClient({
               size="icon"
               variant="outline"
               className="shrink-0"
-            >
+             aria-label="Confirmă">
               {copied ? (
                 <Check className="h-4 w-4 text-emerald-400" />
               ) : (
@@ -282,12 +312,75 @@ export function VenueSettingsClient({
             Notificări
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
             Notificările email sunt trimise automat la solicitări noi, mesaje,
-            recenzii și plăți. Le poți vedea în panoul principal ca activitate
-            recentă.
+            recenzii și plăți. Controlează mai jos cât de des le primești.
           </p>
+
+          <div>
+            <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Frecvență digest email
+            </Label>
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {(
+                [
+                  {
+                    value: "instant" as const,
+                    title: "Instant",
+                    desc: "Un email pentru fiecare eveniment, imediat.",
+                  },
+                  {
+                    value: "daily" as const,
+                    title: "Zilnic",
+                    desc: "Rezumat zilnic al tuturor evenimentelor.",
+                  },
+                  {
+                    value: "weekly" as const,
+                    title: "Săptămânal",
+                    desc: "Rezumat săptămânal — mai puține emailuri.",
+                  },
+                ]
+              ).map((opt) => {
+                const active = digestFrequency === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => saveDigest(opt.value)}
+                    disabled={savingDigest}
+                    className={
+                      active
+                        ? "rounded-lg border-2 border-gold bg-gold/5 p-3 text-left transition-all"
+                        : "rounded-lg border-2 border-border/40 p-3 text-left transition-all hover:border-gold/50"
+                    }
+                  >
+                    <div className="flex items-center gap-2">
+                      {active && (
+                        <Check className="h-4 w-4 shrink-0 text-gold" />
+                      )}
+                      <p
+                        className={
+                          active
+                            ? "font-semibold text-foreground"
+                            : "font-medium text-foreground"
+                        }
+                      >
+                        {opt.title}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {opt.desc}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              ℹ️ Notificările critice (ex: booking confirmat) sunt trimise
+              mereu instant, indiferent de frecvență.
+            </p>
+          </div>
         </CardContent>
       </Card>
 
@@ -350,7 +443,7 @@ export function VenueSettingsClient({
         <Button
           onClick={save}
           disabled={saving}
-          className="gap-1.5 bg-gold text-background shadow-lg shadow-gold/20 hover:bg-gold-dark"
+          className="gap-1.5 bg-gold text-[#0D0D0D] shadow-lg shadow-gold/20 hover:bg-gold-dark"
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />

@@ -42,6 +42,27 @@ export async function PUT(
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  // Past-booking immutability guard (spec). Bookings whose event date is in
+  // the past are read-only — no new status transitions allowed. Exceptions:
+  //   - "complete" is explicitly the post-event action, so we allow it
+  //     regardless of date (a vendor may mark completed a day or week later).
+  //   - "set_paid" is also a post-event accounting action.
+  //   - Cancellation of a past event is not allowed (would strand the data).
+  if (booking.eventDate) {
+    const today = new Date().toISOString().slice(0, 10);
+    const isPast = booking.eventDate < today;
+    const postEventActions = new Set(["complete", "set_paid"]);
+    if (isPast && !postEventActions.has(action)) {
+      return NextResponse.json(
+        {
+          error:
+            "Rezervările din trecut nu mai pot fi modificate. Doar marcarea ca 'completat' sau actualizarea plății sunt permise.",
+        },
+        { status: 400 },
+      );
+    }
+  }
+
   // Ownership helper — resolves whether the signed-in user owns the target
   // booking's vendor entity (artist OR venue).
   async function requireBookingArtistOwner() {

@@ -240,7 +240,7 @@ export default function ImportPage() {
             <Button
               onClick={handleImport}
               disabled={!Object.values(mapping).some(Boolean)}
-              className="bg-gold text-background hover:bg-gold-dark gap-2"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
               Importă {preview.totalRows} artiști
@@ -293,7 +293,7 @@ export default function ImportPage() {
             <Button
               onClick={handleAIRegenerate}
               disabled={aiLoading}
-              className="bg-gold text-background hover:bg-gold-dark gap-2"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
             >
               {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
               Regenerează Descrieri cu AI

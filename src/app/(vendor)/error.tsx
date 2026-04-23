@@ -23,7 +23,7 @@ export default function VendorError({
         Ceva nu a funcționat corect. Încercați din nou sau contactați suportul.
       </p>
       <div className="flex gap-3">
-        <Button onClick={reset} className="bg-gold text-background hover:bg-gold-dark">
+        <Button onClick={reset} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
           Încearcă din nou
         </Button>
         <Button variant="outline" onClick={() => (window.location.href = "/dashboard")}>

@@ -76,7 +76,7 @@ export function PackagesSection() {
               }`}
             >
               {tier.highlight && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gold px-3 py-1 text-xs font-medium text-background">
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gold px-3 py-1 text-xs font-medium text-[#0D0D0D]">
                   Popular
                 </span>
               )}
@@ -112,7 +112,7 @@ export function PackagesSection() {
                 href={tier.href}
                 className={`mt-6 inline-flex items-center justify-center gap-1 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors ${
                   tier.highlight
-                    ? "bg-gold text-background hover:bg-gold-dark"
+                    ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                     : "border border-border/40 hover:border-gold/40 hover:text-gold"
                 }`}
               >

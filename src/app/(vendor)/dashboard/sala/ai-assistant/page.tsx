@@ -140,7 +140,7 @@ export default function VenueAIAssistantPage() {
                       className={cn(
                         "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap",
                         m.role === "user"
-                          ? "bg-gold text-background"
+                          ? "bg-gold text-[#0D0D0D]"
                           : "bg-accent/50",
                       )}
                     >
@@ -184,7 +184,7 @@ export default function VenueAIAssistantPage() {
             <Button
               onClick={() => send()}
               disabled={!input.trim() || loading}
-              className="bg-gold text-background hover:bg-gold-dark"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               size="icon"
             >
               {loading ? (

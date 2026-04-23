@@ -267,7 +267,7 @@ export function PriceNegotiationPanel({
                 onClick={() =>
                   proposePriceSameAs(theirPendingOffer.amount).catch(() => {})
                 }
-                className="gap-1 bg-gold text-background hover:bg-gold-dark"
+                className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
                 <Handshake className="h-3.5 w-3.5" />
                 Sunt de acord cu {theirPendingOffer.amount}€
@@ -292,7 +292,7 @@ export function PriceNegotiationPanel({
             size="sm"
             disabled={busy}
             onClick={clientConfirm}
-            className="gap-1 bg-gold text-background hover:bg-gold-dark"
+            className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
             Confirmă rezervarea
@@ -344,7 +344,7 @@ export function PriceNegotiationPanel({
             <Button
               disabled={busy || !amount}
               onClick={proposePrice}
-              className="bg-gold text-background hover:bg-gold-dark"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

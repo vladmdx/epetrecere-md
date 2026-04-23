@@ -10,7 +10,7 @@ export function FloatingCTA() {
     <div className="md:hidden fixed bottom-4 left-4 right-4 z-50">
       <Link
         href="/planifica"
-        className="block w-full bg-gold text-background text-center py-3 rounded-xl font-semibold shadow-[0_4px_20px_rgba(201,168,76,0.3)] text-sm"
+        className="block w-full bg-gold text-[#0D0D0D] text-center py-3 rounded-xl font-semibold shadow-[0_4px_20px_rgba(201,168,76,0.3)] text-sm"
       >
         {t("nav.planner")}
       </Link>

@@ -57,7 +57,7 @@ export default function RootLayout({
       className={`${playfair.variable} ${dmSans.variable} ${cormorant.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col overflow-x-hidden">
         <ClerkProvider signInUrl="/sign-in" signUpUrl="/sign-up" localization={roRO}><ThemeProvider><LocaleProvider><PreferencesProvider>
           {children}
           <CookieConsent />

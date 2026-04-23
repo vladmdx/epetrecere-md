@@ -130,7 +130,7 @@ export default function AdminUgcPhotosPage() {
             variant={filter === f ? "default" : "outline"}
             size="sm"
             className={
-              filter === f ? "bg-gold text-background hover:bg-gold-dark" : ""
+              filter === f ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""
             }
             onClick={() => setFilter(f)}
           >

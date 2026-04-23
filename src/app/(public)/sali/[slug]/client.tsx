@@ -32,6 +32,7 @@ interface VenueData {
   website: string | null;
   facilities: string[] | null;
   menuUrl: string | null;
+  menuPdfUrl: string | null;
   virtualTourUrl: string | null;
   lat: number | null;
   lng: number | null;
@@ -169,7 +170,7 @@ export function VenueDetailClient({
           )}
 
           {/* F-S4 — Meniu digital (spec section 5) */}
-          {(menu?.packages.length || menu?.categories.length || venue.menuUrl) ? (
+          {(menu?.packages.length || menu?.categories.length || venue.menuUrl || venue.menuPdfUrl) ? (
             <div className="mt-6">
               <h2 className="mb-3 font-heading text-lg font-bold">Meniu</h2>
 
@@ -187,7 +188,7 @@ export function VenueDetailClient({
                       )}
                     >
                       {p.isRecommended && (
-                        <div className="absolute -top-2 right-4 rounded-full bg-gold px-3 py-0.5 text-[10px] font-bold text-background">
+                        <div className="absolute -top-2 right-4 rounded-full bg-gold px-3 py-0.5 text-[10px] font-bold text-[#0D0D0D]">
                           RECOMANDAT
                         </div>
                       )}
@@ -245,10 +246,10 @@ export function VenueDetailClient({
                 </div>
               )}
 
-              {/* PDF menu link (fallback/complement) */}
-              {venue.menuUrl && (
+              {/* PDF menu link (fallback/complement) — either an uploaded PDF or an external URL */}
+              {(venue.menuPdfUrl || venue.menuUrl) && (
                 <a
-                  href={venue.menuUrl}
+                  href={venue.menuPdfUrl || venue.menuUrl || "#"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
@@ -509,7 +510,7 @@ function VenueReviewForm({ venueId }: { venueId: number }) {
       <button
         type="submit"
         disabled={submitting || !name || text.length < 10}
-        className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-6 py-2 text-sm font-medium text-background hover:bg-gold-dark disabled:opacity-50"
+        className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-6 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-50"
       >
         {submitting ? "Se trimite..." : "Trimite recenzia"}
       </button>

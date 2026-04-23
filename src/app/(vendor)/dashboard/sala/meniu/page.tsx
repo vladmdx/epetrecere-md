@@ -30,7 +30,12 @@ export default async function VenueMenuPage() {
   if (!appUser) redirect("/");
 
   const [venue] = await db
-    .select({ id: venues.id, nameRo: venues.nameRo, menuUrl: venues.menuUrl })
+    .select({
+      id: venues.id,
+      nameRo: venues.nameRo,
+      menuUrl: venues.menuUrl,
+      menuPdfUrl: venues.menuPdfUrl,
+    })
     .from(venues)
     .where(eq(venues.userId, appUser.id))
     .limit(1);
@@ -64,6 +69,7 @@ export default async function VenueMenuPage() {
       venueId={venue.id}
       venueName={venue.nameRo}
       existingMenuUrl={venue.menuUrl}
+      existingMenuPdfUrl={venue.menuPdfUrl}
       initialCategories={categories}
       initialItems={items}
       initialPackages={packages}

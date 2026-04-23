@@ -118,6 +118,72 @@ const DECLINE_REASONS = [
   "Alt motiv",
 ];
 
+/**
+ * Compute a simple Hot/Warm/Cold lead score for a venue booking.
+ * Signals: budget, guest fit, date proximity, completeness, source, linked plan.
+ */
+function computeLeadScore(
+  b: Booking,
+  venueCapacityMax: number | null,
+): { tier: "hot" | "warm" | "cold"; label: string; emoji: string; className: string } {
+  let score = 0;
+
+  // Budget
+  const price = b.agreedPrice ?? 0;
+  if (price >= 3000) score += 3;
+  else if (price >= 1500) score += 2;
+  else if (price >= 500) score += 1;
+
+  // Guest fit vs capacity
+  if (venueCapacityMax && b.guestCount) {
+    const ratio = b.guestCount / venueCapacityMax;
+    if (ratio >= 0.6 && ratio <= 1) score += 2;
+    else if (ratio >= 0.3) score += 1;
+  } else if (b.guestCount && b.guestCount >= 80) {
+    score += 2;
+  } else if (b.guestCount && b.guestCount >= 40) {
+    score += 1;
+  }
+
+  // Linked to full event plan → serious client
+  if (b.eventPlanId) score += 2;
+
+  // Completeness
+  if ((b.clientEmail || b.userEmail) && b.clientPhone) score += 1;
+  if (b.message && b.message.trim().length > 20) score += 1;
+
+  // Date proximity
+  const days = Math.floor(
+    (new Date(b.eventDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+  );
+  if (days >= 0 && days <= 30) score += 2;
+  else if (days > 30 && days <= 90) score += 1;
+
+  // Source (wizards and quotes are high-intent flows)
+  if (b.source === "wizard" || b.source === "quote") score += 1;
+
+  if (score >= 6)
+    return {
+      tier: "hot",
+      label: "Hot",
+      emoji: "🔥",
+      className: "bg-red-500/15 text-red-400 border-red-500/40",
+    };
+  if (score >= 3)
+    return {
+      tier: "warm",
+      label: "Warm",
+      emoji: "🌡️",
+      className: "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
+    };
+  return {
+    tier: "cold",
+    label: "Cold",
+    emoji: "❄️",
+    className: "bg-blue-500/15 text-blue-400 border-blue-500/40",
+  };
+}
+
 export function VenueBookingsClient({
   venueCapacityMax,
   initialTab,
@@ -267,6 +333,7 @@ export function VenueBookingsClient({
               b.guestCount > venueCapacityMax;
             const isNew = initialTab === "noi";
             const isAccepted = initialTab === "acceptate";
+            const leadScore = computeLeadScore(b, venueCapacityMax);
 
             return (
               <Card key={b.id} className={cn("border-l-4", borderColor)}>
@@ -275,6 +342,19 @@ export function VenueBookingsClient({
                     <div className="min-w-0 flex-1 space-y-3">
                       {/* Header row */}
                       <div className="flex flex-wrap items-center gap-2">
+                        {/* Lead score badge — only show on "Noi" & "Acceptate" tabs where it's actionable */}
+                        {(isNew || isAccepted) && (
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold",
+                              leadScore.className,
+                            )}
+                            title={`Lead Score: ${leadScore.label}`}
+                          >
+                            <span aria-hidden>{leadScore.emoji}</span>
+                            {leadScore.label}
+                          </span>
+                        )}
                         <span className="rounded-full bg-muted/50 px-2.5 py-0.5 text-xs font-medium">
                           {eventLabel}
                         </span>

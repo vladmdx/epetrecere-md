@@ -3,7 +3,10 @@
 // Home dashboard for the venue — KPI cards + mini calendar + activity feed
 // + recent bookings table. Server wrapper passes pre-computed data.
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Bell,
   TrendingUp,
@@ -20,9 +23,13 @@ import {
   Users,
   ArrowRight,
   ExternalLink,
+  Loader2,
+  Check,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import type { VenueStats } from "@/lib/db/queries/venue-stats";
 
 interface ActivityItem {
@@ -118,11 +125,68 @@ export function VenueHomeDashboard({
   venueSlug,
   stats,
   activity,
-  recentBookings,
+  recentBookings: initialBookings,
   monthCalendar,
   monthYear,
   monthIndex,
 }: Props) {
+  const router = useRouter();
+  const [recentBookings, setRecentBookings] =
+    useState<RecentBooking[]>(initialBookings);
+  const [actioning, setActioning] = useState<number | null>(null);
+
+  async function quickAccept(id: number) {
+    setActioning(id);
+    try {
+      const res = await fetch(`/api/booking-requests/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "accept" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut accepta");
+        return;
+      }
+      toast.success("Rezervare acceptată");
+      setRecentBookings((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, status: "accepted" } : b)),
+      );
+      router.refresh();
+    } finally {
+      setActioning(null);
+    }
+  }
+
+  async function quickDecline(id: number) {
+    if (!confirm("Refuzi această rezervare? Îi poți răspunde detaliat din pagina Rezervări.")) {
+      return;
+    }
+    setActioning(id);
+    try {
+      const res = await fetch(`/api/booking-requests/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "decline",
+          reply: "Refuzat rapid din panoul principal",
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut refuza");
+        return;
+      }
+      toast.success("Rezervare refuzată");
+      setRecentBookings((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, status: "rejected" } : b)),
+      );
+      router.refresh();
+    } finally {
+      setActioning(null);
+    }
+  }
+
   const revenueDiff = stats.revenueThisMonth - stats.revenueLastMonth;
   const revenueDiffPct =
     stats.revenueLastMonth > 0
@@ -395,46 +459,87 @@ export function VenueHomeDashboard({
                     <th className="pb-2 pr-3">Data</th>
                     <th className="pb-2 pr-3">Nr. pers</th>
                     <th className="pb-2 pr-3">Status</th>
-                    <th className="pb-2 text-right">Preț</th>
+                    <th className="pb-2 pr-3 text-right">Preț</th>
+                    <th className="pb-2 text-right">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recentBookings.map((b) => (
-                    <tr
-                      key={b.id}
-                      className="border-b border-border/20 last:border-0 hover:bg-accent/30"
-                    >
-                      <td className="py-3 pr-3 font-medium">{b.clientName}</td>
-                      <td className="py-3 pr-3 text-muted-foreground">
-                        {b.eventType || "—"}
-                      </td>
-                      <td className="py-3 pr-3 text-muted-foreground">
-                        {b.eventDate
-                          ? new Date(b.eventDate).toLocaleDateString("ro-RO", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "—"}
-                      </td>
-                      <td className="py-3 pr-3 text-muted-foreground">
-                        {b.guestCount ? (
-                          <span className="inline-flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {b.guestCount}
-                          </span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="py-3 pr-3">
-                        <StatusBadge status={b.status} />
-                      </td>
-                      <td className="py-3 text-right font-medium">
-                        {b.priceAgreed ? `${b.priceAgreed}€` : "—"}
-                      </td>
-                    </tr>
-                  ))}
+                  {recentBookings.map((b) => {
+                    const isPending = b.status === "pending";
+                    const isActioning = actioning === b.id;
+                    return (
+                      <tr
+                        key={b.id}
+                        className="border-b border-border/20 last:border-0 hover:bg-accent/30"
+                      >
+                        <td className="py-3 pr-3 font-medium">{b.clientName}</td>
+                        <td className="py-3 pr-3 text-muted-foreground">
+                          {b.eventType || "—"}
+                        </td>
+                        <td className="py-3 pr-3 text-muted-foreground">
+                          {b.eventDate
+                            ? new Date(b.eventDate).toLocaleDateString("ro-RO", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </td>
+                        <td className="py-3 pr-3 text-muted-foreground">
+                          {b.guestCount ? (
+                            <span className="inline-flex items-center gap-1">
+                              <Users className="h-3 w-3" />
+                              {b.guestCount}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="py-3 pr-3">
+                          <StatusBadge status={b.status} />
+                        </td>
+                        <td className="py-3 pr-3 text-right font-medium">
+                          {b.priceAgreed ? `${b.priceAgreed}€` : "—"}
+                        </td>
+                        <td className="py-3 text-right">
+                          {isPending ? (
+                            <div className="inline-flex gap-1">
+                              <Button
+                                size="icon-sm"
+                                aria-label="Acceptă"
+                                disabled={isActioning}
+                                onClick={() => quickAccept(b.id)}
+                                className="h-7 w-7 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
+                              >
+                                {isActioning ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <Check className="h-3.5 w-3.5" />
+                                )}
+                              </Button>
+                              <Button
+                                size="icon-sm"
+                                aria-label="Refuză"
+                                variant="ghost"
+                                disabled={isActioning}
+                                onClick={() => quickDecline(b.id)}
+                                className="h-7 w-7 text-red-400 hover:bg-red-500/15"
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Link
+                              href="/dashboard/sala/rezervari"
+                              className="text-xs text-muted-foreground hover:text-gold"
+                            >
+                              Vezi →
+                            </Link>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

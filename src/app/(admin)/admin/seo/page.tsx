@@ -1,125 +1,155 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Globe, CheckCircle, AlertTriangle, XCircle, Sparkles, RefreshCw, ArrowRight } from "lucide-react";
+// Admin SEO overview — links to the live SEO surfaces and documents where
+// the per-entity SEO fields live (on each artist / venue / blog post).
+// The old mock-data audit UI was removed because it wasn't backed by real
+// data; once we have a proper scanner (e.g. Lighthouse in CI or a DB view
+// over null seo_title_* columns), this page can be extended.
 
-const seoPages = [
-  { path: "/", title: "Homepage", score: 95, hasMeta: true, hasSchema: true, hasAlt: true },
-  { path: "/artisti", title: "Artiști", score: 90, hasMeta: true, hasSchema: true, hasAlt: true },
-  { path: "/sali", title: "Săli", score: 85, hasMeta: true, hasSchema: true, hasAlt: false },
-  { path: "/contact", title: "Contact", score: 70, hasMeta: true, hasSchema: false, hasAlt: true },
-  { path: "/despre", title: "Despre", score: 80, hasMeta: true, hasSchema: false, hasAlt: true },
-  { path: "/servicii", title: "Servicii", score: 75, hasMeta: true, hasSchema: false, hasAlt: true },
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Globe,
+  ExternalLink,
+  FileText,
+  Users,
+  Building2,
+  BookOpen,
+} from "lucide-react";
+
+const surfaces = [
+  {
+    title: "Sitemap",
+    description:
+      "Generat automat din DB — include toți artiștii, sălile și articolele active.",
+    href: "/sitemap.xml",
+    external: true,
+    Icon: Globe,
+  },
+  {
+    title: "Robots.txt",
+    description: "Regulile de crawl — blochează /dashboard/*, /admin/*, /api/*.",
+    href: "/robots.txt",
+    external: true,
+    Icon: FileText,
+  },
 ];
 
-function ScoreBadge({ score }: { score: number }) {
-  if (score >= 80) return <Badge className="bg-success/10 text-success border-success/30">{score}%</Badge>;
-  if (score >= 60) return <Badge className="bg-warning/10 text-warning border-warning/30">{score}%</Badge>;
-  return <Badge className="bg-destructive/10 text-destructive border-destructive/30">{score}%</Badge>;
-}
+const entitySeo = [
+  {
+    title: "SEO artiști",
+    description:
+      "Editează titlu + meta description multi-limbă per artist în pagina de editare.",
+    href: "/admin/artisti",
+    Icon: Users,
+  },
+  {
+    title: "SEO săli",
+    description: 'Tab „SEO" în editorul fiecărei săli (RO / RU / EN + SERP preview).',
+    href: "/admin/sali",
+    Icon: Building2,
+  },
+  {
+    title: "SEO articole blog",
+    description: "Titlu + meta description per articol, din editorul de blog.",
+    href: "/admin/blog",
+    Icon: BookOpen,
+  },
+];
 
 export default function SEOPage() {
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-heading text-2xl font-bold">SEO Engine</h1>
-          <p className="text-sm text-muted-foreground">Gestionează SEO pentru toate paginile</p>
-        </div>
-        <Button className="bg-gold text-background hover:bg-gold-dark gap-2"><Sparkles className="h-4 w-4" /> Auto-generează SEO</Button>
+      <div>
+        <h1 className="font-heading text-2xl font-bold">SEO</h1>
+        <p className="text-sm text-muted-foreground">
+          Suprafețele SEO ale platformei și unde se editează fiecare tip de
+          conținut.
+        </p>
       </div>
 
-      <Tabs defaultValue="overview">
-        <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="pages">Per Pagină</TabsTrigger>
-          <TabsTrigger value="redirects">Redirecturi</TabsTrigger>
-          <TabsTrigger value="sitemap">Sitemap</TabsTrigger>
-        </TabsList>
+      {/* Platform-level surfaces */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Fișiere platformă
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {surfaces.map(({ title, description, href, external, Icon }) => (
+            <Card key={href}>
+              <CardContent className="flex items-start gap-3 p-4">
+                <div className="rounded-lg bg-gold/10 p-2 text-gold">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm">{title}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {description}
+                  </p>
+                </div>
+                <Link
+                  href={href}
+                  target={external ? "_blank" : undefined}
+                  rel={external ? "noopener" : undefined}
+                  className="shrink-0"
+                >
+                  <Button variant="ghost" size="icon" aria-label={`Deschide ${title}`}>
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
 
-        <TabsContent value="overview" className="mt-6">
-          <div className="grid gap-4 sm:grid-cols-3 mb-6">
-            <Card><CardContent className="pt-6 text-center"><p className="text-3xl font-bold text-success">82%</p><p className="text-sm text-muted-foreground">Scor Mediu SEO</p></CardContent></Card>
-            <Card><CardContent className="pt-6 text-center"><p className="text-3xl font-bold">{seoPages.length}</p><p className="text-sm text-muted-foreground">Pagini Indexate</p></CardContent></Card>
-            <Card><CardContent className="pt-6 text-center"><p className="text-3xl font-bold text-gold">0</p><p className="text-sm text-muted-foreground">Imagini fără Alt</p></CardContent></Card>
-          </div>
-
-          <div className="space-y-2">
-            {seoPages.map((page) => (
-              <Card key={page.path}>
-                <CardContent className="flex items-center gap-4 py-3">
-                  <ScoreBadge score={page.score} />
-                  <div className="flex-1">
-                    <span className="font-medium text-sm">{page.title}</span>
-                    <span className="text-xs text-muted-foreground ml-2">{page.path}</span>
+      {/* Per-entity SEO navigation */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          SEO per entitate
+        </h2>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {entitySeo.map(({ title, description, href, Icon }) => (
+            <Link key={href} href={href}>
+              <Card className="h-full transition-all hover:border-gold/40">
+                <CardContent className="p-5">
+                  <div className="mb-3 inline-flex rounded-lg bg-gold/10 p-2 text-gold">
+                    <Icon className="h-4 w-4" />
                   </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    {page.hasMeta ? <CheckCircle className="h-3.5 w-3.5 text-success" /> : <XCircle className="h-3.5 w-3.5 text-destructive" />}
-                    <span className="text-muted-foreground">Meta</span>
-                    {page.hasSchema ? <CheckCircle className="h-3.5 w-3.5 text-success" /> : <AlertTriangle className="h-3.5 w-3.5 text-warning" />}
-                    <span className="text-muted-foreground">Schema</span>
-                  </div>
+                  <p className="font-medium">{title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {description}
+                  </p>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </TabsContent>
+            </Link>
+          ))}
+        </div>
+      </div>
 
-        <TabsContent value="pages" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle>Editare SEO — Selectează Pagina</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div><Label>Meta Title</Label><Input placeholder="Max 60 caractere" /><p className="text-xs text-muted-foreground mt-1">0/60</p></div>
-              <div><Label>Meta Description</Label><Textarea rows={2} placeholder="Max 155 caractere" /><p className="text-xs text-muted-foreground mt-1">0/155</p></div>
-              <div className="rounded-lg border border-border/40 p-4">
-                <p className="text-xs text-muted-foreground mb-2">SERP Preview:</p>
-                <p className="text-blue-600 text-sm">ePetrecere.md — Marketplace pentru Evenimente</p>
-                <p className="text-green-700 text-xs">epetrecere.md</p>
-                <p className="text-xs text-muted-foreground">Descrierea meta va apărea aici...</p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="redirects" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Redirecturi</CardTitle>
-                <Button variant="outline" size="sm">+ Adaugă Redirect</Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">Nu există redirecturi configurate.</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="sitemap" className="mt-6">
-          <Card>
-            <CardHeader><CardTitle>Sitemap & Robots.txt</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-lg bg-accent/50 p-4">
-                <div>
-                  <p className="text-sm font-medium">sitemap.xml</p>
-                  <p className="text-xs text-muted-foreground">Auto-generat la fiecare build</p>
-                </div>
-                <Button variant="outline" size="sm" className="gap-1"><RefreshCw className="h-3.5 w-3.5" /> Regenerează</Button>
-              </div>
-              <div>
-                <Label>robots.txt</Label>
-                <Textarea rows={6} defaultValue={`User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /dashboard\nDisallow: /api\nSitemap: https://epetrecere.md/sitemap.xml`} className="mt-1 font-mono text-xs" />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* Meta header fields reference */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Notă pentru redactori</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <p>
+            <strong className="text-foreground">Titlu SEO</strong> — max 60
+            caractere. Include cuvânt cheie la început + brand la final. Ex:
+            „Moderatori Nuntă Chișinău | ePetrecere.md".
+          </p>
+          <p>
+            <strong className="text-foreground">Meta description</strong> — max
+            160 caractere. Descriere atractivă + CTA implicit. Ex: „Cei mai
+            buni moderatori din Moldova pentru nuntă. Rezervă online".
+          </p>
+          <p>
+            <strong className="text-foreground">Schema.org JSON-LD</strong> —
+            generat automat pentru artist (PerformingGroup), sală
+            (LocalBusiness), articol blog (Article), homepage (Organization).
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

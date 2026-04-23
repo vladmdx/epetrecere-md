@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { bookingRequests, offerRequests, artists } from "@/lib/db/schema";
+import { bookingRequests, offerRequests, artists, venues } from "@/lib/db/schema";
 import { users } from "@/lib/db/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
@@ -122,6 +122,7 @@ export async function GET(req: NextRequest) {
     .select({
       id: bookingRequests.id,
       artistId: bookingRequests.artistId,
+      venueId: bookingRequests.venueId,
       eventPlanId: bookingRequests.eventPlanId,
       clientUserId: bookingRequests.clientUserId,
       clientName: bookingRequests.clientName,
@@ -145,9 +146,12 @@ export async function GET(req: NextRequest) {
       updatedAt: bookingRequests.updatedAt,
       artistName: artists.nameRo,
       artistSlug: artists.slug,
+      venueName: venues.nameRo,
+      venueSlug: venues.slug,
     })
     .from(bookingRequests)
     .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
+    .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
     .where(and(...conditions))
     .orderBy(desc(bookingRequests.createdAt))
     .limit(50);
@@ -164,7 +168,6 @@ export async function GET(req: NextRequest) {
   );
   const planToVenue = new Map<number, { id: number; nameRo: string; slug: string }>();
   if (planIds.length > 0 && artistId) {
-    const { venues } = await import("@/lib/db/schema");
     const venueBookings = await db
       .select({
         eventPlanId: bookingRequests.eventPlanId,

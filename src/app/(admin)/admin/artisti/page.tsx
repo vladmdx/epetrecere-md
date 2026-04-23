@@ -76,8 +76,8 @@ function SortableArtistCard({ artist, reorderMode }: { artist: Artist; reorderMo
           </div>
           {!reorderMode && (
             <>
-              <Link href={`/artisti/${artist.slug}`} target="_blank"><Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button></Link>
-              <Link href={`/admin/artisti/${artist.id}`}><Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button></Link>
+              <Link href={`/artisti/${artist.slug}`} target="_blank"><Button variant="ghost" size="icon" aria-label="Vezi profil public"><Eye className="h-4 w-4" /></Button></Link>
+              <Link href={`/admin/artisti/${artist.id}`}><Button variant="ghost" size="icon" aria-label="Editează artist"><Edit className="h-4 w-4" /></Button></Link>
             </>
           )}
         </CardContent>
@@ -157,13 +157,13 @@ export default function AdminArtistsPage() {
         <div className="flex gap-2">
           <Button
             variant={reorderMode ? "default" : "outline"}
-            className={reorderMode ? "bg-gold text-background hover:bg-gold-dark gap-2" : "gap-2"}
+            className={reorderMode ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2" : "gap-2"}
             onClick={() => setReorderMode(!reorderMode)}
           >
             <ArrowUpDown className="h-4 w-4" /> {reorderMode ? "Gata" : "Reordonează"}
           </Button>
           <Link href="/admin/import"><Button variant="outline" className="gap-2"><Sparkles className="h-4 w-4" /> Import</Button></Link>
-          <Link href="/admin/artisti/new"><Button className="bg-gold text-background hover:bg-gold-dark gap-2"><Plus className="h-4 w-4" /> Adaugă Artist</Button></Link>
+          <Link href="/admin/artisti/new"><Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"><Plus className="h-4 w-4" /> Adaugă Artist</Button></Link>
         </div>
       </div>
 

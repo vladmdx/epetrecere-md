@@ -150,7 +150,7 @@ export default function HomepageBuilderPage() {
             </Button>
           </a>
           <Button
-            className="bg-gold text-background hover:bg-gold-dark gap-2"
+            className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
             onClick={save}
             disabled={saving || !dirty}
           >
@@ -196,6 +196,7 @@ export default function HomepageBuilderPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Mută sus"
                     className="h-7 w-7"
                     onClick={() => moveUp(index)}
                     disabled={index === 0}
@@ -205,6 +206,7 @@ export default function HomepageBuilderPage() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    aria-label="Mută jos"
                     className="h-7 w-7"
                     onClick={() => moveDown(index)}
                     disabled={index === sections.length - 1}

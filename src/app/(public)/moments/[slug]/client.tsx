@@ -182,7 +182,7 @@ export function MomentsUploadClient({
         <button
           type="submit"
           disabled={uploading || files.length === 0 || !guestName.trim()}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-gold px-4 py-3 text-sm font-medium text-background hover:bg-gold-dark disabled:opacity-50"
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-gold px-4 py-3 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-50"
         >
           {uploading ? (
             <>

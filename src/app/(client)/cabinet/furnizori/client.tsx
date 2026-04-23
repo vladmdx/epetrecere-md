@@ -76,7 +76,7 @@ export function FurnizoriClient() {
         </h1>
         <Link
           href="/sign-in?redirect_url=/cabinet/furnizori"
-          className="mt-6 inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+          className="mt-6 inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
           Autentifică-te
         </Link>
@@ -135,7 +135,7 @@ export function FurnizoriClient() {
           </p>
           <Link
             href="/artisti"
-            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+            className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
             Explorează catalogul
           </Link>

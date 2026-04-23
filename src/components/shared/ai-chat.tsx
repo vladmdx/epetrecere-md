@@ -156,7 +156,7 @@ export function AIChat({ context }: AIChatProps) {
                 className={cn(
                   "max-w-[80%] rounded-xl px-4 py-2.5 text-sm",
                   msg.role === "user"
-                    ? "bg-gold text-background"
+                    ? "bg-gold text-[#0D0D0D]"
                     : "bg-accent text-foreground",
                 )}
               >
@@ -197,7 +197,8 @@ export function AIChat({ context }: AIChatProps) {
           <Button
             onClick={handleSend}
             disabled={!input.trim() || loading}
-            className="bg-gold text-background hover:bg-gold-dark shrink-0"
+            aria-label="Trimite mesaj"
+            className="bg-gold text-[#0D0D0D] hover:bg-gold-dark shrink-0"
             size="icon"
           >
             <Send className="h-4 w-4" />

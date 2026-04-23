@@ -27,7 +27,7 @@ export function SortBar({ options, current, onChange }: SortBarProps) {
           size="sm"
           className={
             current === opt.value
-              ? "bg-gold text-background hover:bg-gold-dark"
+              ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               : ""
           }
           onClick={() => onChange(opt.value)}

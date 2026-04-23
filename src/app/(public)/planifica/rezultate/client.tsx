@@ -431,7 +431,7 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
             Trimite-ne detaliile evenimentului și te ajutăm să găsim combinația perfectă.
           </p>
           <Link href="/contact">
-            <Button className="mt-2 bg-gold text-background hover:bg-gold-dark">
+            <Button className="mt-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
               Contactează-ne
             </Button>
           </Link>

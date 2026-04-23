@@ -86,7 +86,7 @@ export default function OnboardingPage() {
           <div key={i} className="flex items-center gap-2">
             <div className={cn(
               "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
-              i < step ? "bg-gold text-background" : i === step ? "bg-gold text-background ring-4 ring-gold/20" : "bg-muted text-muted-foreground",
+              i < step ? "bg-gold text-[#0D0D0D]" : i === step ? "bg-gold text-[#0D0D0D] ring-4 ring-gold/20" : "bg-muted text-muted-foreground",
             )}>
               {i < step ? <CheckCircle className="h-4 w-4" /> : i + 1}
             </div>
@@ -154,12 +154,12 @@ export default function OnboardingPage() {
           <Button
             onClick={() => setStep(step + 1)}
             disabled={step === 0 ? !data.categoryId : !data.name || !data.phone}
-            className="bg-gold text-background hover:bg-gold-dark gap-2"
+            className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
           >
             Continuă <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <Button onClick={handleSubmit} disabled={submitting} className="bg-gold text-background hover:bg-gold-dark gap-2">
+          <Button onClick={handleSubmit} disabled={submitting} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
             {submitting ? "Se trimite..." : <><CheckCircle className="h-4 w-4" /> Trimite pentru aprobare</>}
           </Button>
         )}

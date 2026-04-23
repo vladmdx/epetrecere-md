@@ -85,7 +85,7 @@ export default function PlannerIndexPage() {
         </p>
         <Link
           href="/sign-in"
-          className="mt-4 inline-block rounded-xl bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+          className="mt-4 inline-block rounded-xl bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
           Autentificare
         </Link>
@@ -107,7 +107,7 @@ export default function PlannerIndexPage() {
           liberi pentru data ta.
         </p>
         <Link href="/planifica" onClick={startFreshWizard}>
-          <Button className="mt-6 gap-2 bg-gold text-background hover:bg-gold-dark">
+          <Button className="mt-6 gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
             <Plus className="h-4 w-4" /> Planifică Eveniment
           </Button>
         </Link>
@@ -126,7 +126,7 @@ export default function PlannerIndexPage() {
           </p>
         </div>
         <Link href="/planifica" onClick={startFreshWizard}>
-          <Button className="gap-2 bg-gold text-background hover:bg-gold-dark">
+          <Button className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
             <Plus className="h-4 w-4" /> Planifică Eveniment
           </Button>
         </Link>

@@ -81,7 +81,7 @@ export function Footer() {
                 placeholder={t("footer.newsletter_placeholder")}
                 className="flex-1"
               />
-              <Button className="bg-gold text-background hover:bg-gold-dark">
+              <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
                 {t("footer.newsletter_button")}
               </Button>
             </form>

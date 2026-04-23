@@ -75,7 +75,7 @@ export default function AdminReviewsPage() {
             key={f}
             variant={filter === f ? "default" : "outline"}
             size="sm"
-            className={filter === f ? "bg-gold text-background hover:bg-gold-dark" : ""}
+            className={filter === f ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
             onClick={() => setFilter(f)}
           >
             {f === "pending" ? `De aprobat (${pendingCount})` : f === "approved" ? "Aprobate" : "Toate"}

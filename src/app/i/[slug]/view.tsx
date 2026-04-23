@@ -344,7 +344,7 @@ export function PublicInvitationView({
                 disabled={
                   !guest || rsvpStatus === "pending" || loading
                 }
-                className="mt-6 w-full bg-gold text-background hover:bg-gold-dark"
+                className="mt-6 w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
                 {loading ? "Se salvează..." : "Trimite răspunsul"}
               </Button>

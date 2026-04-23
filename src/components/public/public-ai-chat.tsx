@@ -143,7 +143,7 @@ export function PublicAiChat() {
         aria-label={open ? "Închide asistentul AI" : "Deschide asistentul AI"}
         className={cn(
           "fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all hover:scale-105",
-          "bg-gradient-to-br from-gold to-gold-dark text-background",
+          "bg-gradient-to-br from-gold to-gold-dark text-[#0D0D0D]",
           open && "rotate-90",
         )}
       >
@@ -196,7 +196,7 @@ export function PublicAiChat() {
                   className={cn(
                     "max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2",
                     m.role === "user"
-                      ? "bg-gold text-background"
+                      ? "bg-gold text-[#0D0D0D]"
                       : "bg-accent/60 text-foreground",
                   )}
                 >
@@ -251,8 +251,9 @@ export function PublicAiChat() {
             <Button
               type="submit"
               size="icon"
+              aria-label="Trimite mesaj"
               disabled={sending || !draft.trim()}
-              className="h-9 w-9 shrink-0 bg-gold text-background hover:bg-gold-dark"
+              className="h-9 w-9 shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {sending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

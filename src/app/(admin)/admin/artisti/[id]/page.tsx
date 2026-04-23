@@ -15,6 +15,7 @@ const RichEditor = dynamic(
   { ssr: false },
 );
 import { ImageUpload } from "@/components/shared/image-upload";
+import { PackagesManager } from "@/components/vendor/packages-manager";
 import { ArrowLeft, Save, Sparkles, Eye, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -136,7 +137,7 @@ export default function EditArtistPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/admin/artisti">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Înapoi la listă artiști"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div className="flex-1">
           <h1 className="font-heading text-2xl font-bold">{isNew ? "Artist Nou" : `Editare: ${artist.nameRo}`}</h1>
@@ -149,7 +150,7 @@ export default function EditArtistPage() {
             <Button variant="outline" className="text-destructive gap-2" onClick={handleDelete}><Trash2 className="h-4 w-4" /> Șterge</Button>
           </>
         )}
-        <Button onClick={handleSave} disabled={saving} className="bg-gold text-background hover:bg-gold-dark gap-2">
+        <Button onClick={handleSave} disabled={saving} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           Salvează
         </Button>
@@ -252,13 +253,13 @@ export default function EditArtistPage() {
         <TabsContent value="packages" className="mt-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Pachete</CardTitle>
-                <Button variant="outline" size="sm">+ Adaugă Pachet</Button>
-              </div>
+              <CardTitle>Pachete</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Ofertele artistului — apar pe profilul public sub tab-ul „Pachete".
+              </p>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground">Pachetele vor fi disponibile în curând.</p>
+              <PackagesManager artistId={artist.id ?? null} />
             </CardContent>
           </Card>
         </TabsContent>

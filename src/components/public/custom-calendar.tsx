@@ -111,37 +111,42 @@ export function CustomCalendar({
         onClick={() => setOpen(!open)}
         className={cn(
           "relative flex h-12 w-full items-center gap-3 rounded-xl border px-4 text-sm transition-all duration-200",
-          "bg-[#1A1A2E]/80 backdrop-blur-sm",
+          "bg-card/80 backdrop-blur-sm",
           open
             ? "border-gold/50 shadow-[0_0_15px_rgba(201,168,76,0.15)] ring-1 ring-gold/20"
-            : "border-white/10 hover:border-gold/30 hover:shadow-[0_0_10px_rgba(201,168,76,0.08)]"
+            : "border-border/60 hover:border-gold/30 hover:shadow-[0_0_10px_rgba(201,168,76,0.08)]"
         )}
       >
         <CalendarDays className="h-4 w-4 text-gold shrink-0" />
-        <span className={cn("flex-1 text-left", value ? "text-white/90" : "text-white/40")}>
+        <span
+          className={cn(
+            "flex-1 text-left",
+            value ? "text-foreground/90" : "text-muted-foreground",
+          )}
+        >
           {value ? formatDisplay(value) : placeholder}
         </span>
         <ChevronDown className={cn("h-4 w-4 text-gold/60 transition-transform duration-200", open && "rotate-180")} />
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-2 left-0 w-[300px] rounded-xl border border-gold/20 bg-[#141428]/98 backdrop-blur-xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
+        <div className="absolute z-50 mt-2 left-0 w-[300px] rounded-xl border border-gold/20 bg-popover/98 backdrop-blur-xl p-4 shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <button
               type="button"
               onClick={() => setMonthOffset((o) => o - 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-gold transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-gold transition-colors"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
-            <span className="text-sm font-semibold text-white">
+            <span className="text-sm font-semibold text-foreground">
               {monthNames[month]} {year}
             </span>
             <button
               type="button"
               onClick={() => setMonthOffset((o) => o + 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white/60 hover:bg-white/10 hover:text-gold transition-colors"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-gold transition-colors"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
@@ -170,9 +175,9 @@ export function CustomCalendar({
                 }}
                 className={cn(
                   "h-9 w-full rounded-lg text-xs font-medium transition-all duration-150",
-                  !cell.current && "text-white/20",
-                  cell.current && !isPast(cell.date) && !isSelected(cell.date) && !isToday(cell.date) && "text-white/70 hover:bg-gold/15 hover:text-gold",
-                  cell.current && isPast(cell.date) && "text-white/15 cursor-not-allowed",
+                  !cell.current && "text-muted-foreground/40",
+                  cell.current && !isPast(cell.date) && !isSelected(cell.date) && !isToday(cell.date) && "text-foreground/80 hover:bg-gold/15 hover:text-gold",
+                  cell.current && isPast(cell.date) && "text-muted-foreground/30 cursor-not-allowed",
                   isToday(cell.date) && !isSelected(cell.date) && "border border-gold/40 text-gold",
                   isSelected(cell.date) && "bg-gold text-[#0D0D0D] font-bold shadow-[0_0_12px_rgba(201,168,76,0.3)]",
                 )}
@@ -183,7 +188,7 @@ export function CustomCalendar({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/40">
             <button
               type="button"
               onClick={() => {

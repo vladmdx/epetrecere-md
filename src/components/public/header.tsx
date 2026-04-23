@@ -102,7 +102,7 @@ function UserMenu() {
     return (
       <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
         <Link href="/sign-in">
-          <Button variant="ghost" size="icon">
+          <Button variant="ghost" size="icon" aria-label="Autentificare">
             <User className="h-5 w-5" />
           </Button>
         </Link>
@@ -127,7 +127,7 @@ function UserMenu() {
 
   return (
     <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <Button variant="ghost" size="icon" className="relative">
+      <Button variant="ghost" size="icon" aria-label="Contul meu" className="relative">
         {user?.imageUrl ? (
           <img src={user.imageUrl} alt="" className="h-7 w-7 rounded-full" />
         ) : (
@@ -177,10 +177,10 @@ export function Header() {
   const { t } = useLocale();
 
   return (
-    <header className={`fixed top-0 z-50 w-full transition-all duration-300 ${scrolled ? "bg-[#0D0D0D]/90 backdrop-blur-md border-b border-gold/10 shadow-lg" : "bg-transparent border-b border-transparent"}`}>
+    <header className={`fixed top-0 z-50 w-full transition-all duration-300 backdrop-blur-md ${scrolled ? "bg-[#0D0D0D]/90 border-b border-gold/10 shadow-lg" : "bg-[#0D0D0D]/40 border-b border-transparent"}`}>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-2">
+        <Link href="/" className="flex shrink-0 items-center gap-2 text-white">
           <Sparkles className="h-6 w-6 text-gold" />
           <span className="font-heading text-xl font-bold tracking-tight">
             e<span className="text-gold">Petrecere</span>.md
@@ -205,8 +205,8 @@ export function Header() {
           </Link>
         </nav>
 
-        {/* Right Actions */}
-        <div className="flex items-center gap-2">
+        {/* Right Actions — always on dark header bg, so force light icon/text in both themes */}
+        <div className="flex items-center gap-2 text-white/90">
           <div className="hidden lg:block">
             <SearchAutocomplete />
           </div>
@@ -216,14 +216,16 @@ export function Header() {
           <LanguageSwitcher />
           <ThemeToggle />
           <Link href="/planifica" className="hidden lg:block">
-            <Button className="bg-gold text-background hover:bg-gold-dark font-medium">
+            <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark font-medium">
               {t("nav.planner")}
             </Button>
           </Link>
           <Button
             variant="ghost"
             size="icon"
-            className="xl:hidden"
+            aria-label={mobileOpen ? "Închide meniul" : "Deschide meniul"}
+            aria-expanded={mobileOpen}
+            className="text-white/90 hover:bg-white/10 hover:text-white xl:hidden"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -267,7 +269,7 @@ export function Header() {
               <Link href="/blog" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.blog")}</Link>
               <Link href="/contact" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.contact")}</Link>
               <Link href="/planifica" onClick={() => setMobileOpen(false)}>
-                <Button className="mt-2 w-full bg-gold text-background hover:bg-gold-dark">{t("nav.planner")}</Button>
+                <Button className="mt-2 w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark">{t("nav.planner")}</Button>
               </Link>
             </nav>
           </motion.div>

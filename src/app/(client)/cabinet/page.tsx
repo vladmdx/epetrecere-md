@@ -12,6 +12,7 @@ import {
   Clock,
   Users,
   Music,
+  Building2,
   ExternalLink,
   CheckCircle2,
   BookOpen,
@@ -25,7 +26,8 @@ import { toast } from "sonner";
 
 interface BookingRequest {
   id: number;
-  artistId: number;
+  artistId: number | null;
+  venueId: number | null;
   clientName: string;
   clientEmail: string | null;
   eventDate: string;
@@ -38,6 +40,8 @@ interface BookingRequest {
   artistReply: string | null;
   artistName: string | null;
   artistSlug: string | null;
+  venueName: string | null;
+  venueSlug: string | null;
   createdAt: string;
 }
 
@@ -160,7 +164,7 @@ export default function ClientCabinetPage() {
             </p>
             <Link
               href="/artisti"
-              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-background hover:bg-gold-dark"
+              className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
             >
               Explorează artiști
             </Link>
@@ -189,7 +193,7 @@ export default function ClientCabinetPage() {
                         </Badge>
                       </div>
 
-                      {/* Artist info */}
+                      {/* Vendor info — artist or venue */}
                       {b.artistName && (
                         <div className="flex items-center gap-2 text-sm">
                           <Music className="h-3.5 w-3.5 text-gold" />
@@ -203,6 +207,22 @@ export default function ClientCabinetPage() {
                             </Link>
                           ) : (
                             <span className="font-medium">{b.artistName}</span>
+                          )}
+                        </div>
+                      )}
+                      {b.venueName && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Building2 className="h-3.5 w-3.5 text-gold" />
+                          {b.venueSlug ? (
+                            <Link
+                              href={`/sali/${b.venueSlug}`}
+                              className="font-medium hover:text-gold flex items-center gap-1"
+                            >
+                              {b.venueName}
+                              <ExternalLink className="h-3 w-3 opacity-50" />
+                            </Link>
+                          ) : (
+                            <span className="font-medium">{b.venueName}</span>
                           )}
                         </div>
                       )}
@@ -259,7 +279,7 @@ export default function ClientCabinetPage() {
                       {b.status === "accepted" && (
                         <Button
                           size="sm"
-                          className="gap-1 bg-gold text-background hover:bg-gold-dark text-xs"
+                          className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs"
                           onClick={() => confirmBooking(b.id)}
                         >
                           <CheckCircle2 className="h-3.5 w-3.5" /> Confirmă
@@ -269,6 +289,13 @@ export default function ClientCabinetPage() {
                         <Link href={`/artisti/${b.artistSlug}`}>
                           <Button variant="outline" size="sm" className="gap-1 text-xs w-full">
                             <Music className="h-3.5 w-3.5" /> Profil
+                          </Button>
+                        </Link>
+                      )}
+                      {!b.artistSlug && b.venueSlug && (
+                        <Link href={`/sali/${b.venueSlug}`}>
+                          <Button variant="outline" size="sm" className="gap-1 text-xs w-full">
+                            <Building2 className="h-3.5 w-3.5" /> Profil
                           </Button>
                         </Link>
                       )}

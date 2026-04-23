@@ -418,7 +418,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
           size="sm"
           onClick={onSave}
           disabled={saving}
-          className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+          className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
         >
           {saving ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -469,7 +469,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
               }}
               className={cn(
                 "gap-1.5",
-                scope === "base" && "bg-gold text-background hover:bg-gold-dark",
+                scope === "base" && "bg-gold text-[#0D0D0D] hover:bg-gold-dark",
               )}
             >
               <Plus className="h-3.5 w-3.5" />

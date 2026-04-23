@@ -304,7 +304,7 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
 
           let dayClass = "";
           if (isPast) {
-            dayClass = "text-white/15 cursor-not-allowed";
+            dayClass = "text-muted-foreground/30 cursor-not-allowed";
           } else if (isFullyBlocked) {
             dayClass = "bg-destructive/25 text-destructive/90 cursor-not-allowed";
           } else if (status === "partial") {

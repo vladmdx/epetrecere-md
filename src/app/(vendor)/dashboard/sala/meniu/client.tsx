@@ -74,6 +74,7 @@ interface Props {
   venueId: number;
   venueName: string;
   existingMenuUrl: string | null;
+  existingMenuPdfUrl: string | null;
   initialCategories: Category[];
   initialItems: Item[];
   initialPackages: Package[];
@@ -97,6 +98,7 @@ export function VenueMenuClient({
   venueId,
   venueName,
   existingMenuUrl,
+  existingMenuPdfUrl,
   initialCategories,
   initialItems,
   initialPackages,
@@ -105,6 +107,67 @@ export function VenueMenuClient({
   const [items, setItems] = useState<Item[]>(initialItems);
   const [packages, setPackages] = useState<Package[]>(initialPackages);
   const [busy, setBusy] = useState(false);
+  const [menuPdfUrl, setMenuPdfUrl] = useState<string | null>(existingMenuPdfUrl);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
+
+  async function uploadMenuPdf(file: File) {
+    if (file.type !== "application/pdf") {
+      toast.error("Doar fișiere PDF sunt acceptate");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Fișierul e prea mare (max 10MB)");
+      return;
+    }
+    setUploadingPdf(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("folder", "venues");
+      const upRes = await fetch("/api/upload", { method: "POST", body: fd });
+      if (!upRes.ok) {
+        const err = await upRes.json().catch(() => ({}));
+        toast.error(err.error || "Upload eșuat");
+        return;
+      }
+      const upData = (await upRes.json()) as { url: string };
+
+      // Persist URL on the venue
+      const res = await fetch(`/api/venues/${venueId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ menuPdfUrl: upData.url }),
+      });
+      if (!res.ok) {
+        toast.error("Nu s-a putut salva pe sală");
+        return;
+      }
+      setMenuPdfUrl(upData.url);
+      toast.success("Meniu PDF încărcat");
+    } finally {
+      setUploadingPdf(false);
+    }
+  }
+
+  async function removeMenuPdf() {
+    if (!confirm("Sigur ștergi meniul PDF?")) return;
+    setUploadingPdf(true);
+    try {
+      const res = await fetch(`/api/venues/${venueId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ menuPdfUrl: "" }),
+      });
+      if (!res.ok) {
+        toast.error("Nu s-a putut șterge");
+        return;
+      }
+      setMenuPdfUrl(null);
+      toast.success("Meniu PDF șters");
+    } finally {
+      setUploadingPdf(false);
+    }
+  }
 
   // Category dialog state
   const [catDialogOpen, setCatDialogOpen] = useState(false);
@@ -382,31 +445,82 @@ export function VenueMenuClient({
       </div>
 
       {/* PDF upload alternative */}
-      {existingMenuUrl && (
-        <Card>
-          <CardContent className="flex items-center justify-between gap-4 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-gold/10 p-2 text-gold">
-                <FileText className="h-5 w-5" />
+      <Card>
+        <CardContent className="p-4">
+          {menuPdfUrl ? (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-gold/10 p-2 text-gold">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium">Meniu PDF încărcat</p>
+                  <p className="text-xs text-muted-foreground">
+                    Apare ca buton „Descarcă meniu PDF" pe profilul public.
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium">Meniu PDF încărcat</p>
-                <p className="text-xs text-muted-foreground">
-                  Meniul digital de mai jos e adițional — clientul le vede pe ambele.
-                </p>
+              <div className="flex gap-2">
+                <a
+                  href={menuPdfUrl}
+                  target="_blank"
+                  rel="noopener"
+                  className="rounded-md border border-border/60 px-3 py-1.5 text-xs hover:bg-muted"
+                >
+                  Deschide PDF
+                </a>
+                <button
+                  type="button"
+                  onClick={removeMenuPdf}
+                  disabled={uploadingPdf}
+                  className="rounded-md border border-red-500/40 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10"
+                >
+                  {uploadingPdf ? "..." : "Șterge"}
+                </button>
               </div>
             </div>
-            <a
-              href={existingMenuUrl}
-              target="_blank"
-              rel="noopener"
-              className="text-xs text-gold hover:underline"
-            >
-              Deschide PDF →
-            </a>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-lg bg-muted/40 p-2 text-muted-foreground">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-medium">Încarcă meniu PDF (opțional)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Alternativă rapidă: încarcă PDF-ul existent în loc de meniu digital item-by-item. Ambele opțiuni pot coexista.
+                  </p>
+                </div>
+              </div>
+              <label
+                className={cn(
+                  "cursor-pointer rounded-md bg-gold px-3 py-1.5 text-xs font-medium text-[#0D0D0D] hover:bg-gold-dark",
+                  uploadingPdf && "pointer-events-none opacity-60",
+                )}
+              >
+                {uploadingPdf ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Încarcă...
+                  </span>
+                ) : (
+                  "Alege PDF"
+                )}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  className="hidden"
+                  disabled={uploadingPdf}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadMenuPdf(f);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* PACKAGES SECTION */}
       <div>
@@ -419,7 +533,7 @@ export function VenueMenuClient({
           </div>
           <Button
             onClick={openAddPackage}
-            className="gap-1.5 bg-gold text-background hover:bg-gold-dark"
+            className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             <Plus className="h-4 w-4" /> Pachet nou
           </Button>
@@ -444,7 +558,7 @@ export function VenueMenuClient({
                 )}
               >
                 {p.isRecommended && (
-                  <div className="absolute -top-2 right-4 rounded-full bg-gold px-3 py-0.5 text-[10px] font-bold text-background">
+                  <div className="absolute -top-2 right-4 rounded-full bg-gold px-3 py-0.5 text-[10px] font-bold text-[#0D0D0D]">
                     RECOMANDAT
                   </div>
                 )}
@@ -691,7 +805,7 @@ export function VenueMenuClient({
             <Button
               onClick={saveCategory}
               disabled={busy}
-              className="bg-gold text-background hover:bg-gold-dark"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               Salvează
@@ -752,7 +866,7 @@ export function VenueMenuClient({
             <Button
               onClick={saveItem}
               disabled={busy}
-              className="bg-gold text-background hover:bg-gold-dark"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               Salvează
@@ -836,7 +950,7 @@ export function VenueMenuClient({
             <Button
               onClick={savePackage}
               disabled={busy}
-              className="bg-gold text-background hover:bg-gold-dark"
+              className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
               Salvează

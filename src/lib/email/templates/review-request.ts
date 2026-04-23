@@ -1,10 +1,15 @@
 // Email sent to the client after a completed booking, asking them to leave a review.
+// Works for both artists and venues — pass `artistName` as the venue name for venue flows.
+
+import { escapeHtml } from "@/lib/email/escape";
 
 interface ReviewRequestProps {
   clientName: string;
   artistName: string;
   eventDate: string;
   reviewUrl: string;
+  /** Optional subject qualifier — defaults to "artist". Use "sala" for venues. */
+  subjectType?: "artist" | "sala";
 }
 
 export function reviewRequestEmail({
@@ -12,7 +17,13 @@ export function reviewRequestEmail({
   artistName,
   eventDate,
   reviewUrl,
+  subjectType = "artist",
 }: ReviewRequestProps): string {
+  // User-supplied fields are escaped — the rest come from server-side i18n.
+  const safeClientName = escapeHtml(clientName);
+  const safeArtistName = escapeHtml(artistName);
+  const safeEventDate = escapeHtml(eventDate);
+  const subjectWord = subjectType === "sala" ? "sala" : "artistul";
   return `
 <!DOCTYPE html>
 <html>
@@ -25,14 +36,14 @@ export function reviewRequestEmail({
     <div style="background:#1A1A2E;border-radius:12px;padding:32px;border:1px solid rgba(201,168,76,0.15);">
       <h1 style="color:#FAF8F2;font-size:22px;margin:0 0 16px;">Cum a fost evenimentul?</h1>
       <p style="color:#A0A0B0;font-size:15px;line-height:1.6;margin:0 0 16px;">
-        Salut <strong style="color:#FAF8F2;">${clientName}</strong>,
+        Salut <strong style="color:#FAF8F2;">${safeClientName}</strong>,
       </p>
       <p style="color:#A0A0B0;font-size:15px;line-height:1.6;margin:0 0 24px;">
-        Sperăm că evenimentul tău din <strong style="color:#FAF8F2;">${eventDate}</strong> a fost de neuitat!
-        Ne-ar bucura enorm dacă ai lăsa o recenzie pentru <strong style="color:#C9A84C;">${artistName}</strong>.
+        Sperăm că evenimentul tău din <strong style="color:#FAF8F2;">${safeEventDate}</strong> a fost de neuitat!
+        Ne-ar bucura enorm dacă ai lăsa o recenzie pentru ${subjectWord} <strong style="color:#C9A84C;">${safeArtistName}</strong>.
       </p>
       <p style="color:#A0A0B0;font-size:15px;line-height:1.6;margin:0 0 24px;">
-        Recenzia ta ajută alți clienți să facă alegerea potrivită și îl motivează pe artist să continue la cel mai înalt nivel.
+        Recenzia ta ajută alți clienți să facă alegerea potrivită și motivează ${subjectWord} să continue la cel mai înalt nivel.
       </p>
       <div style="text-align:center;">
         <a href="${reviewUrl}" style="display:inline-block;background:#C9A84C;color:#0D0D0D;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:14px;">

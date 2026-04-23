@@ -132,7 +132,7 @@ export function ContactPageClient() {
             )}
             <Button
               type="submit"
-              className="w-full bg-gold text-background hover:bg-gold-dark"
+              className="w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               disabled={submitting}
             >
               {submitting ? (

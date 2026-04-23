@@ -60,7 +60,7 @@ export default function BlogPage() {
           <h1 className="font-heading text-2xl font-bold">Blog</h1>
           <p className="text-sm text-muted-foreground">{posts.length} articole</p>
         </div>
-        <Link href="/admin/blog/new"><Button className="bg-gold text-background hover:bg-gold-dark gap-2"><Plus className="h-4 w-4" /> Articol Nou</Button></Link>
+        <Link href="/admin/blog/new"><Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"><Plus className="h-4 w-4" /> Articol Nou</Button></Link>
       </div>
 
       {loading ? (
@@ -80,8 +80,8 @@ export default function BlogPage() {
                   </div>
                   <p className="text-xs text-muted-foreground mt-0.5">/{post.slug} · {new Date(post.createdAt).toLocaleDateString("ro-RO")}</p>
                 </div>
-                <Link href={`/admin/blog/${post.id}`}><Button variant="ghost" size="icon"><Edit className="h-4 w-4" /></Button></Link>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(post.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                <Link href={`/admin/blog/${post.id}`}><Button variant="ghost" size="icon" aria-label="Editează articol"><Edit className="h-4 w-4" /></Button></Link>
+                <Button variant="ghost" size="icon" aria-label="Șterge articol" onClick={() => handleDelete(post.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
               </CardContent>
             </Card>
           ))}

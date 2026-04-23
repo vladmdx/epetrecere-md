@@ -86,6 +86,69 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(rows);
   }
 
+  // Unified vendor role — returns conversations for BOTH the user's artist
+  // profile (if any) and their venue (if any). Used by the shared
+  // /dashboard/mesaje page where the same user might own both entities.
+  if (role === "vendor") {
+    const [artist] = await db
+      .select({ id: artists.id })
+      .from(artists)
+      .where(eq(artists.userId, appUser.id))
+      .limit(1);
+    const [venue] = await db
+      .select({ id: venues.id })
+      .from(venues)
+      .where(eq(venues.userId, appUser.id))
+      .limit(1);
+
+    const artistRows = artist
+      ? await db
+          .select({
+            id: conversations.id,
+            artistId: conversations.artistId,
+            venueId: conversations.venueId,
+            clientUserId: conversations.clientUserId,
+            lastMessageAt: conversations.lastMessageAt,
+            lastMessagePreview: conversations.lastMessagePreview,
+            clientUnread: conversations.clientUnread,
+            artistUnread: conversations.artistUnread,
+            createdAt: conversations.createdAt,
+            clientName: users.name,
+            clientEmail: users.email,
+          })
+          .from(conversations)
+          .leftJoin(users, eq(users.id, conversations.clientUserId))
+          .where(eq(conversations.artistId, artist.id))
+      : [];
+
+    const venueRows = venue
+      ? await db
+          .select({
+            id: conversations.id,
+            artistId: conversations.artistId,
+            venueId: conversations.venueId,
+            clientUserId: conversations.clientUserId,
+            lastMessageAt: conversations.lastMessageAt,
+            lastMessagePreview: conversations.lastMessagePreview,
+            clientUnread: conversations.clientUnread,
+            artistUnread: conversations.artistUnread,
+            createdAt: conversations.createdAt,
+            clientName: users.name,
+            clientEmail: users.email,
+          })
+          .from(conversations)
+          .leftJoin(users, eq(users.id, conversations.clientUserId))
+          .where(eq(conversations.venueId, venue.id))
+      : [];
+
+    const merged = [...artistRows, ...venueRows].sort(
+      (a, b) =>
+        new Date(b.lastMessageAt).getTime() -
+        new Date(a.lastMessageAt).getTime(),
+    );
+    return NextResponse.json(merged);
+  }
+
   // Default: client role — both artist and venue conversations they've opened.
   const artistRows = await db
     .select({

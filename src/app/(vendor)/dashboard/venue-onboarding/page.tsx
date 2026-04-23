@@ -82,9 +82,9 @@ export default function VenueOnboardingPage() {
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
                 i < step
-                  ? "bg-gold text-background"
+                  ? "bg-gold text-[#0D0D0D]"
                   : i === step
-                    ? "bg-gold text-background ring-4 ring-gold/20"
+                    ? "bg-gold text-[#0D0D0D] ring-4 ring-gold/20"
                     : "bg-muted text-muted-foreground",
               )}
             >
@@ -210,7 +210,7 @@ export default function VenueOnboardingPage() {
           <Button
             onClick={() => setStep(step + 1)}
             disabled={step === 0 ? !data.name || !data.phone : false}
-            className="gap-2 bg-gold text-background hover:bg-gold-dark"
+            className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             Continuă <ArrowRight className="h-4 w-4" />
           </Button>
@@ -218,7 +218,7 @@ export default function VenueOnboardingPage() {
           <Button
             onClick={handleSubmit}
             disabled={submitting}
-            className="gap-2 bg-gold text-background hover:bg-gold-dark"
+            className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             {submitting ? (
               "Se trimite..."

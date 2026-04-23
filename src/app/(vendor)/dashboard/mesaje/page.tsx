@@ -170,7 +170,7 @@ export default function VendorMessagesPage() {
                   )}
                 </div>
                 {thread.artistUnread > 0 && (
-                  <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-background">
+                  <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-gold px-1 text-[10px] font-bold text-[#0D0D0D]">
                     {thread.artistUnread}
                   </span>
                 )}
@@ -206,7 +206,7 @@ export default function VendorMessagesPage() {
                       <div
                         className={cn(
                           "max-w-[70%] rounded-xl px-4 py-2.5 text-sm",
-                          msg.senderType === "artist" ? "bg-gold text-background" : "bg-accent",
+                          msg.senderType === "artist" ? "bg-gold text-[#0D0D0D]" : "bg-accent",
                         )}
                       >
                         <p className="text-[10px] font-medium opacity-60 mb-1">{msg.senderName}</p>
@@ -236,7 +236,8 @@ export default function VendorMessagesPage() {
                 <Button
                   onClick={sendMessage}
                   disabled={sending || !draft.trim()}
-                  className="bg-gold text-background hover:bg-gold-dark shrink-0"
+                  aria-label="Trimite mesaj"
+                  className="bg-gold text-[#0D0D0D] hover:bg-gold-dark shrink-0"
                   size="icon"
                 >
                   {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}

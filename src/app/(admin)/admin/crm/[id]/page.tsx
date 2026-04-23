@@ -232,7 +232,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/admin/crm">
-          <Button variant="ghost" size="icon"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label="Înapoi la CRM"><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -262,7 +262,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           )}
           {/* Status dropdown */}
           <div className="relative">
-            <Button size="sm" className="bg-gold text-background hover:bg-gold-dark gap-1"
+            <Button size="sm" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1"
               onClick={() => setStatusOpen(!statusOpen)} disabled={updatingStatus}>
               {updatingStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
               Schimbă Status
@@ -325,7 +325,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   rows={2}
                 />
                 <div className="flex gap-2 mt-2">
-                  <Button size="sm" className="bg-gold text-background hover:bg-gold-dark gap-1"
+                  <Button size="sm" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1"
                     onClick={() => addNote("note")} disabled={addingNote || !note.trim()}>
                     {addingNote ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <StickyNote className="h-3.5 w-3.5" />}
                     Notă
@@ -499,7 +499,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   rows={4}
                 />
                 <div className="flex gap-2">
-                  <Button size="sm" className="bg-gold text-background hover:bg-gold-dark gap-1"
+                  <Button size="sm" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1"
                     onClick={handleSendEmail} disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}>
                     {sendingEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                     Trimite
