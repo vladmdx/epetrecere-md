@@ -38,8 +38,12 @@ export default async function VendorLayout({
     .limit(1);
 
   const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
+  // Artists who picked the role on the picker but haven't completed
+  // onboarding yet have role="artist" without an artist record. Let
+  // them through so the dashboard can prompt them to finish setup.
+  const isArtistRole = appUser.role === "artist";
 
-  if (!artistRecord && !venueRecord && !isAdmin) {
+  if (!artistRecord && !venueRecord && !isAdmin && !isArtistRole) {
     redirect("/");
   }
 
