@@ -2,11 +2,17 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArtistCard } from "@/components/public/artist-card";
+import { ArtistListCard } from "@/components/public/artist-list-card";
 import { SortBar } from "@/components/public/sort-bar";
 import { PaginationBar } from "@/components/public/pagination-bar";
 import { PriceFilter, CategoryFilter, ActiveFiltersReset } from "@/components/public/filter-bar";
 import { CompareBar } from "@/components/public/compare-bar";
 import { RecentlyViewed } from "@/components/public/recently-viewed";
+import {
+  ViewSwitcher,
+  useViewMode,
+  gridClassName,
+} from "@/components/public/view-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
@@ -56,6 +62,7 @@ export function ArtistsListClient({ artists, total, page, totalPages, currentSor
   const searchParams = useSearchParams();
   const { t } = useLocale();
   const [query, setQuery] = useState(searchQuery);
+  const [viewMode, setViewMode] = useViewMode();
 
   function updateParams(key: string, value: string | undefined) {
     const params = new URLSearchParams(searchParams.toString());
@@ -97,7 +104,7 @@ export function ArtistsListClient({ artists, total, page, totalPages, currentSor
         <p className="mt-2 text-muted-foreground">{total} rezultate</p>
       </div>
 
-      {/* Search + Sort */}
+      {/* Search + Sort + View */}
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <form onSubmit={handleSearch} className="flex gap-2 sm:max-w-sm">
           <Input
@@ -110,11 +117,14 @@ export function ArtistsListClient({ artists, total, page, totalPages, currentSor
           </Button>
         </form>
 
-        <SortBar
-          options={sortOptions}
-          current={currentSort}
-          onChange={(v) => updateParams("sort", v)}
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <SortBar
+            options={sortOptions}
+            current={currentSort}
+            onChange={(v) => updateParams("sort", v)}
+          />
+          <ViewSwitcher mode={viewMode} onChange={setViewMode} />
+        </div>
       </div>
 
       {/* Filters */}
@@ -132,13 +142,25 @@ export function ArtistsListClient({ artists, total, page, totalPages, currentSor
         <ActiveFiltersReset hasFilters={hasFilters} onReset={resetFilters} />
       </div>
 
-      {/* Grid */}
+      {/* Results */}
       {artists.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {artists.map((artist) => (
-            <ArtistCard key={artist.id} artist={artist} />
-          ))}
-        </div>
+        viewMode.kind === "grid" ? (
+          <div className={gridClassName(viewMode.cols)}>
+            {artists.map((artist) => (
+              <ArtistCard key={artist.id} artist={artist} />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {artists.map((artist) => (
+              <ArtistListCard
+                key={artist.id}
+                artist={artist}
+                density={viewMode.density}
+              />
+            ))}
+          </div>
+        )
       ) : (
         <div className="py-20 text-center">
           <p className="text-lg text-muted-foreground">{t("common.noResults")}</p>

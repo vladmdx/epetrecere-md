@@ -4,12 +4,18 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArtistCard } from "@/components/public/artist-card";
+import { ArtistListCard } from "@/components/public/artist-list-card";
 import { SortBar } from "@/components/public/sort-bar";
 import { PaginationBar } from "@/components/public/pagination-bar";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
-import { Star, CalendarDays, SlidersHorizontal, X } from "lucide-react";
+import { Star, SlidersHorizontal, X } from "lucide-react";
+import {
+  ViewSwitcher,
+  useViewMode,
+  gridClassName,
+} from "@/components/public/view-switcher";
 
 interface Props {
   category: {
@@ -40,6 +46,7 @@ interface Props {
     isFeatured: boolean;
     isPremium: boolean;
     location: string | null;
+    coverImageUrl?: string | null;
   }>;
   total: number;
   page: number;
@@ -56,7 +63,13 @@ const sortOptions = [
 ];
 
 /* Reusable filter controls for desktop and mobile sheet */
-function FilterControls({ searchParams, updateParams, clearParam, category, router }: {
+function FilterControls({
+  searchParams,
+  updateParams,
+  clearParam,
+  category,
+  router,
+}: {
   searchParams: ReturnType<typeof useSearchParams>;
   updateParams: (key: string, value: string) => void;
   clearParam: (key: string) => void;
@@ -64,7 +77,6 @@ function FilterControls({ searchParams, updateParams, clearParam, category, rout
   router: ReturnType<typeof useRouter>;
 }) {
   const activeRating = searchParams.get("rating_min");
-  const activeDate = searchParams.get("date");
 
   return (
     <>
@@ -76,28 +88,43 @@ function FilterControls({ searchParams, updateParams, clearParam, category, rout
             key={price}
             variant="outline"
             size="sm"
-            className={searchParams.get("price_max") === String(price) ? "bg-gold/10 border-gold/30 text-gold" : ""}
+            className={
+              searchParams.get("price_max") === String(price)
+                ? "bg-gold/10 border-gold/30 text-gold"
+                : ""
+            }
             onClick={() => updateParams("price_max", String(price))}
           >
             pînă la {price}€
           </Button>
         ))}
         {searchParams.get("price_max") && (
-          <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => clearParam("price_max")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive text-xs"
+            onClick={() => clearParam("price_max")}
+          >
             ✕
           </Button>
         )}
       </div>
 
-      {/* Rating filter (G-39) */}
+      {/* Rating filter */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground min-w-[36px]">Rating:</span>
+        <span className="text-xs text-muted-foreground min-w-[36px]">
+          Rating:
+        </span>
         {[3, 4, 4.5].map((rating) => (
           <Button
             key={rating}
             variant="outline"
             size="sm"
-            className={activeRating === String(rating) ? "bg-gold/10 border-gold/30 text-gold" : ""}
+            className={
+              activeRating === String(rating)
+                ? "bg-gold/10 border-gold/30 text-gold"
+                : ""
+            }
             onClick={() => updateParams("rating_min", String(rating))}
           >
             <Star className="h-3.5 w-3.5 fill-gold text-gold mr-1" />
@@ -105,43 +132,27 @@ function FilterControls({ searchParams, updateParams, clearParam, category, rout
           </Button>
         ))}
         {activeRating && (
-          <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => clearParam("rating_min")}>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive text-xs"
+            onClick={() => clearParam("rating_min")}
+          >
             ✕
           </Button>
         )}
       </div>
 
-      {/* Date availability filter (G-40) */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground min-w-[36px]">Data:</span>
-        <div className="relative">
-          <input
-            type="date"
-            value={activeDate ?? ""}
-            min={new Date().toISOString().split("T")[0]}
-            onChange={(e) => {
-              if (e.target.value) {
-                updateParams("date", e.target.value);
-              } else {
-                clearParam("date");
-              }
-            }}
-            className="h-9 rounded-md border border-input bg-background px-3 pr-8 text-sm text-foreground focus:border-gold focus:ring-1 focus:ring-gold"
-          />
-          <CalendarDays className="absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-        </div>
-        {activeDate && (
-          <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => clearParam("date")}>
-            ✕ {activeDate}
-          </Button>
-        )}
-      </div>
-
       {/* Clear all filters */}
-      {(searchParams.get("price_max") || activeRating || activeDate) && (
-        <Button variant="ghost" size="sm" className="text-destructive text-xs" onClick={() => {
-          router.push(`/categorie/${category.slug}`);
-        }}>
+      {(searchParams.get("price_max") || activeRating) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-destructive text-xs"
+          onClick={() => {
+            router.push(`/categorie/${category.slug}`);
+          }}
+        >
           Resetează toate filtrele
         </Button>
       )}
@@ -163,6 +174,7 @@ export function CategoryPageClient({
   const name = getLocalized(category, "name", locale);
   const description = getLocalized(category, "description", locale);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+  const [viewMode, setViewMode] = useViewMode();
 
   function updateParams(key: string, value: string) {
     const params = new URLSearchParams(searchParams.toString());
@@ -183,7 +195,9 @@ export function CategoryPageClient({
       {/* Hero */}
       <div className="mb-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">Acasă</Link>
+          <Link href="/" className="hover:text-gold">
+            Acasă
+          </Link>
           <span className="mx-2">/</span>
           <span className="text-foreground">{name}</span>
         </nav>
@@ -196,21 +210,24 @@ export function CategoryPageClient({
 
       {/* Filters + Sort bar */}
       <div className="mb-6 space-y-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <SortBar
             options={sortOptions}
             current={currentSort}
             onChange={(v) => updateParams("sort", v)}
           />
-          {/* Mobile filter toggle */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="md:hidden border-gold/30 text-gold gap-1.5"
-            onClick={() => setMobileFiltersOpen(true)}
-          >
-            <SlidersHorizontal className="h-4 w-4" /> Filtre
-          </Button>
+          <div className="flex items-center gap-2">
+            <ViewSwitcher mode={viewMode} onChange={setViewMode} />
+            {/* Mobile filter toggle */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="md:hidden border-gold/30 text-gold gap-1.5"
+              onClick={() => setMobileFiltersOpen(true)}
+            >
+              <SlidersHorizontal className="h-4 w-4" /> Filtre
+            </Button>
+          </div>
         </div>
 
         {/* Desktop filters — hidden on mobile */}
@@ -228,17 +245,27 @@ export function CategoryPageClient({
       {/* Mobile filter sheet */}
       {mobileFiltersOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setMobileFiltersOpen(false)} />
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setMobileFiltersOpen(false)}
+          />
           <div className="absolute bottom-0 left-0 right-0 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-background border-t border-gold/20 p-6 space-y-4 animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-bold">Filtre</h3>
-              <button onClick={() => setMobileFiltersOpen(false)} aria-label="Închide filtrele" className="text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => setMobileFiltersOpen(false)}
+                aria-label="Închide filtrele"
+                className="text-muted-foreground hover:text-foreground"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
             <FilterControls
               searchParams={searchParams}
-              updateParams={(k, v) => { updateParams(k, v); setMobileFiltersOpen(false); }}
+              updateParams={(k, v) => {
+                updateParams(k, v);
+                setMobileFiltersOpen(false);
+              }}
               clearParam={clearParam}
               category={category}
               router={router}
@@ -247,16 +274,30 @@ export function CategoryPageClient({
         </div>
       )}
 
-      {/* Grid */}
+      {/* Results */}
       {artists.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {artists.map((artist) => (
-            <ArtistCard key={artist.id} artist={artist} />
-          ))}
-        </div>
+        viewMode.kind === "grid" ? (
+          <div className={gridClassName(viewMode.cols)}>
+            {artists.map((artist) => (
+              <ArtistCard key={artist.id} artist={artist} />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {artists.map((artist) => (
+              <ArtistListCard
+                key={artist.id}
+                artist={artist}
+                density={viewMode.density}
+              />
+            ))}
+          </div>
+        )
       ) : (
         <div className="py-20 text-center">
-          <p className="text-lg text-muted-foreground">{t("common.noResults")}</p>
+          <p className="text-lg text-muted-foreground">
+            {t("common.noResults")}
+          </p>
         </div>
       )}
 
