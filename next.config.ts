@@ -50,7 +50,11 @@ const nextConfig: NextConfig = {
       {
         source: "/(.*)",
         headers: [
-          { key: "X-Frame-Options", value: "DENY" },
+          // SAMEORIGIN (not DENY) so same-origin iframes work — e.g. the
+          // contract-preview <iframe src="/api/booking-requests/:id/contract">
+          // in the sign-contract dialog. External framing is still blocked,
+          // so clickjacking protection stays intact.
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
@@ -81,7 +85,10 @@ const nextConfig: NextConfig = {
               "object-src 'none'",
               "base-uri 'self'",
               "form-action 'self'",
-              "frame-ancestors 'none'",
+              // 'self' matches the relaxed X-Frame-Options above — allows
+              // our own pages to embed our own endpoints (PDF preview, etc.)
+              // without giving third-party origins framing rights.
+              "frame-ancestors 'self'",
             ].join("; "),
           },
         ],
