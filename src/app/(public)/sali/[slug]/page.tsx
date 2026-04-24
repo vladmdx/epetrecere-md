@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { asc, eq, inArray } from "drizzle-orm";
@@ -7,8 +7,27 @@ import {
   venueMenuCategories,
   venueMenuItems,
   venueMenuPackages,
+  redirects,
 } from "@/lib/db/schema";
 import { getVenueBySlug } from "@/lib/db/queries/venues";
+
+/** When a venue slug is not found, check the redirects table — the
+ *  owner may have renamed their slug and we inserted a 301 row. Follows
+ *  the redirect chain up to 5 hops to guard against cycles. Mirrors
+ *  AD-29 on the artist page. */
+async function resolveLegacySlug(slug: string): Promise<string | null> {
+  let currentPath = `/sali/${slug}`;
+  for (let i = 0; i < 5; i++) {
+    const [row] = await db
+      .select({ toPath: redirects.toPath })
+      .from(redirects)
+      .where(eq(redirects.fromPath, currentPath))
+      .limit(1);
+    if (!row) break;
+    currentPath = row.toPath;
+  }
+  return currentPath === `/sali/${slug}` ? null : currentPath;
+}
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { venueJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized } from "@/i18n";
@@ -19,8 +38,15 @@ interface Props {
   params: Promise<{ slug: string }>;
 }
 
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
+
+  // Check redirects first — if slug was renamed, don't build metadata
+  // (page will 308 anyway; serving the target's canonical is enough).
+  const redirectTarget = await resolveLegacySlug(slug);
+  if (redirectTarget) return { alternates: { canonical: redirectTarget } };
+
   const venue = await getVenueBySlug(slug);
   if (!venue) return {};
 
@@ -40,6 +66,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function VenuePage({ params }: Props) {
   const { slug } = await params;
+
+  // Check redirects FIRST — if slug was renamed, 308 to the new path
+  // before loading any venue data.
+  const redirectTarget = await resolveLegacySlug(slug);
+  if (redirectTarget) permanentRedirect(redirectTarget);
+
   const venue = await getVenueBySlug(slug);
   if (!venue) notFound();
 

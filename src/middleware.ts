@@ -1,9 +1,81 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import { neon } from "@neondatabase/serverless";
 
 const isAdminRoute = createRouteMatcher(["/admin(.*)"]);
 const isVendorRoute = createRouteMatcher(["/dashboard(.*)"]);
 const isProtectedRoute = createRouteMatcher(["/admin(.*)", "/dashboard(.*)"]);
+
+/**
+ * DB-backed slug redirects (AD-29, spec 4.7).
+ *
+ * Previously the page-level `permanentRedirect` in /sali/[slug]/page.tsx
+ * and /artisti/[slug]/page.tsx returned HTTP 200 + skeleton loading HTML
+ * instead of 308, because Next 15 streaming commits the status header
+ * before the thrown redirect is processed. That broke SEO and any bot
+ * that follows the old URL.
+ *
+ * Fix: perform the redirect lookup here in middleware, which runs BEFORE
+ * any page rendering and can return `NextResponse.redirect(url, 301)`
+ * with correct headers.
+ *
+ * To avoid a DB query per request, we fetch the full redirects table
+ * once per Edge instance and cache it for 5 minutes. Table is small
+ * (~20 rows in practice) so the memory + bandwidth cost is trivial.
+ */
+let redirectsCache: Map<string, string> | null = null;
+let redirectsCacheLoadedAt = 0;
+// 60s is a pragmatic balance — slug renames are rare (monthly at most),
+// and a fresh rename only "misses" the redirect for up to a minute before
+// the cache refreshes on next request. Shorter TTL means more DB hits
+// but query is trivial (table is small).
+const REDIRECTS_CACHE_TTL_MS = 60 * 1000;
+
+async function getSlugRedirectsMap(): Promise<Map<string, string>> {
+  if (
+    redirectsCache &&
+    Date.now() - redirectsCacheLoadedAt < REDIRECTS_CACHE_TTL_MS
+  ) {
+    return redirectsCache;
+  }
+  try {
+    const sql = neon(process.env.DATABASE_URL!);
+    const rows = (await sql`
+      SELECT from_path, to_path FROM redirects
+      WHERE from_path LIKE '/sali/%' OR from_path LIKE '/artisti/%'
+    `) as Array<{ from_path: string; to_path: string }>;
+    const map = new Map<string, string>();
+    for (const r of rows) map.set(r.from_path, r.to_path);
+    redirectsCache = map;
+    redirectsCacheLoadedAt = Date.now();
+    return map;
+  } catch (err) {
+    // Never break middleware on DB hiccup — return last-known (possibly stale)
+    // map, or an empty one. The page-level fallback inside /sali/[slug]
+    // still handles the redirect (just without the 308 status).
+    console.warn("[middleware] redirects cache load failed", err);
+    return redirectsCache ?? new Map();
+  }
+}
+
+/** Follow the redirect chain up to 5 hops. Matches the per-page helper
+ *  used inside /sali/[slug] and /artisti/[slug]. */
+async function resolveSlugRedirect(
+  pathname: string,
+): Promise<string | null> {
+  if (!pathname.startsWith("/sali/") && !pathname.startsWith("/artisti/")) {
+    return null;
+  }
+  const map = await getSlugRedirectsMap();
+  if (map.size === 0) return null;
+  let current = pathname;
+  for (let i = 0; i < 5; i++) {
+    const next = map.get(current);
+    if (!next) break;
+    current = next;
+  }
+  return current === pathname ? null : current;
+}
 
 /**
  * M2 SEO legacy redirects — WARN #2 from the M5–F-S6 test pass.
@@ -129,12 +201,25 @@ function resolveLegacySeoSlug(pathname: string): string | null {
 }
 
 export default clerkMiddleware(async (auth, req) => {
+  const pathname = req.nextUrl.pathname;
+
   // Legacy SEO redirects must run BEFORE auth logic so public crawlers
   // hitting `/moderatori-nunta-chisinau` get a clean 301 to the canonical URL.
-  const canonical = resolveLegacySeoSlug(req.nextUrl.pathname);
+  const canonical = resolveLegacySeoSlug(pathname);
   if (canonical) {
     const url = req.nextUrl.clone();
     url.pathname = canonical;
+    return NextResponse.redirect(url, 301);
+  }
+
+  // DB-backed per-entity slug redirects (spec 4.7). Owner renamed their
+  // venue/artist slug → we inserted a row in `redirects` table → here we
+  // serve a proper 301 at HTTP level. Page-level `permanentRedirect`
+  // fallback still runs if this cache is stale.
+  const renamedPath = await resolveSlugRedirect(pathname);
+  if (renamedPath) {
+    const url = req.nextUrl.clone();
+    url.pathname = renamedPath;
     return NextResponse.redirect(url, 301);
   }
 

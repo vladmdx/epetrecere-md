@@ -410,18 +410,15 @@ export async function POST(req: NextRequest) {
         // knows to triage quickly. We only fire this extra notification
         // when the new request itself is the second (or later) competitor.
         try {
-          const { inArray: inArrayFn, and: andFn, eq: eqFn } = await import(
-            "drizzle-orm"
-          );
           const pendingCond = [
-            eqFn(bookingRequests.status, "pending"),
-            eqFn(bookingRequests.eventDate, parsed.data.eventDate),
+            eq(bookingRequests.status, "pending"),
+            eq(bookingRequests.eventDate, parsed.data.eventDate),
           ];
           if (parsed.data.venueId) {
-            pendingCond.push(eqFn(bookingRequests.venueId, parsed.data.venueId));
+            pendingCond.push(eq(bookingRequests.venueId, parsed.data.venueId));
           } else if (parsed.data.artistId) {
             pendingCond.push(
-              eqFn(bookingRequests.artistId, parsed.data.artistId),
+              eq(bookingRequests.artistId, parsed.data.artistId),
             );
           }
           const siblings = await db
@@ -430,32 +427,32 @@ export async function POST(req: NextRequest) {
               clientName: bookingRequests.clientName,
             })
             .from(bookingRequests)
-            .where(andFn(...pendingCond));
+            .where(and(...pendingCond));
           // Ignore the just-inserted request — compare other pending ones.
           const others = siblings.filter((s) => s.id !== booking.id);
           if (others.length > 0) {
             // Also check if the date is already blocked by an accepted/confirmed
             // booking — that's a harder conflict.
             const confirmedCond = [
-              inArrayFn(bookingRequests.status, [
+              inArray(bookingRequests.status, [
                 "accepted",
                 "confirmed_by_client",
               ]),
-              eqFn(bookingRequests.eventDate, parsed.data.eventDate),
+              eq(bookingRequests.eventDate, parsed.data.eventDate),
             ];
             if (parsed.data.venueId) {
               confirmedCond.push(
-                eqFn(bookingRequests.venueId, parsed.data.venueId),
+                eq(bookingRequests.venueId, parsed.data.venueId),
               );
             } else if (parsed.data.artistId) {
               confirmedCond.push(
-                eqFn(bookingRequests.artistId, parsed.data.artistId),
+                eq(bookingRequests.artistId, parsed.data.artistId),
               );
             }
             const confirmed = await db
               .select({ id: bookingRequests.id })
               .from(bookingRequests)
-              .where(andFn(...confirmedCond));
+              .where(and(...confirmedCond));
 
             const totalCompeting = others.length + confirmed.length;
             await dispatchNotification({
