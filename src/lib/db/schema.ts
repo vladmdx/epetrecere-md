@@ -140,6 +140,25 @@ export const users = pgTable("users", {
   notificationDigestFrequency: varchar("notification_digest_frequency", { length: 16 })
     .default("instant")
     .notNull(),
+  /** Per-channel toggles per notification type. Missing keys default to ON.
+   *  Shape: { [type]: { email: boolean, push: boolean } }. Types are the
+   *  values from dispatchNotification's `type` arg. Known types:
+   *   - booking_request_new     (cerere nouă)
+   *   - booking_status_changed  (booking acceptat/confirmat/anulat)
+   *   - booking_conflict        (conflict potențial pe dată)
+   *   - message_new             (chat mesaj)
+   *   - review_new              (recenzie nouă)
+   *   - reminder                (reminder generic)
+   *   - payment_received        (plată)
+   *  Clients edit this via /api/me/notification-preferences. */
+  notificationPrefs: jsonb("notification_prefs")
+    .$type<Record<string, { email?: boolean; push?: boolean }>>()
+    .default({}),
+  /** IANA tz name. Used by email formatting + Inngest date rendering so
+   *  reminders land at the user's wall-clock time. Default Europe/Chisinau. */
+  timezone: varchar("timezone", { length: 64 })
+    .default("Europe/Chisinau")
+    .notNull(),
   googleRefreshToken: text("google_refresh_token"),
   googleAccessToken: text("google_access_token"),
   googleTokenExpiresAt: timestamp("google_token_expires_at"),

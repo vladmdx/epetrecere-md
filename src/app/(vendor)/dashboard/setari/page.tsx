@@ -32,6 +32,8 @@ import { toast } from "sonner";
 import { IcalSubscribeCard } from "@/components/vendor/ical-subscribe-card";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
 import { ReferralCard } from "@/components/shared/referral-card";
+import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
+import { TimezoneSelector } from "@/components/shared/timezone-selector";
 
 type ArtistSettings = {
   kind: "artist";
@@ -324,6 +326,22 @@ export default function VendorSettingsPage() {
       )}
 
       <AppearanceSettings />
+
+      {/* Per-type notification toggles + timezone — spec 11.1 / 11.2 */}
+      <div className="space-y-4 rounded-xl border border-border/40 bg-card p-5">
+        <div>
+          <h2 className="font-heading text-lg font-bold">
+            Notificări & fus orar
+          </h2>
+          <p className="text-xs text-muted-foreground">
+            Controlează pe ce canal primești fiecare tip de notificare și
+            formatează orele conform fusului tău.
+          </p>
+        </div>
+        <TimezoneSelector />
+        <NotificationPrefsGrid />
+      </div>
+
       <ReferralCard />
     </div>
   );

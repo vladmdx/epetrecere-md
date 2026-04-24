@@ -22,6 +22,7 @@ export default async function VenueSettingsPage() {
       email: users.email,
       phone: users.phone,
       languagePref: users.languagePref,
+      timezone: users.timezone,
       notificationDigestFrequency: users.notificationDigestFrequency,
     })
     .from(users)
@@ -60,6 +61,7 @@ export default async function VenueSettingsPage() {
       userEmail={appUser.email}
       userPhone={appUser.phone}
       userLanguage={appUser.languagePref ?? "ro"}
+      userTimezone={appUser.timezone ?? "Europe/Chisinau"}
       icalUrl={icalUrl}
       notificationDigestFrequency={appUser.notificationDigestFrequency}
     />

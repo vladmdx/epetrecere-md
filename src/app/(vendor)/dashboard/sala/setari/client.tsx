@@ -39,6 +39,8 @@ import { AppearanceSettings } from "@/components/shared/appearance-settings";
 import { PushSubscribeButton } from "@/components/shared/push-subscribe-button";
 import { WhatsAppPhoneInput } from "@/components/shared/whatsapp-phone-input";
 import { ReferralCard } from "@/components/shared/referral-card";
+import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
+import { TimezoneSelector } from "@/components/shared/timezone-selector";
 
 interface VenueSettings {
   id: number;
@@ -61,6 +63,7 @@ export function VenueSettingsClient({
   userEmail,
   userPhone,
   userLanguage,
+  userTimezone,
   icalUrl,
   notificationDigestFrequency,
 }: {
@@ -68,6 +71,7 @@ export function VenueSettingsClient({
   userEmail: string | null;
   userPhone: string | null;
   userLanguage: string;
+  userTimezone: string;
   icalUrl: string;
   notificationDigestFrequency: string;
 }) {
@@ -277,15 +281,7 @@ export function VenueSettingsClient({
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 p-3">
-            <div>
-              <p className="text-sm font-medium">Fus orar</p>
-              <p className="text-xs text-muted-foreground">Europe/Chișinău</p>
-            </div>
-            <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-              Fix
-            </span>
-          </div>
+          <TimezoneSelector initialValue={userTimezone} />
         </CardContent>
       </Card>
 
@@ -484,6 +480,9 @@ export function VenueSettingsClient({
             </p>
             <WhatsAppPhoneInput initialValue={userPhone} />
           </div>
+
+          {/* Per-type toggles — spec 11.2 */}
+          <NotificationPrefsGrid />
 
           <div>
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
