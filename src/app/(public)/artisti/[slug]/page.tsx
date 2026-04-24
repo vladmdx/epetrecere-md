@@ -63,12 +63,11 @@ export default async function ArtistPage({ params }: Props) {
   const artist = await getArtistBySlug(slug);
   if (!artist) notFound();
 
-  // M0a #8 — server-side gate: redact price, phone, email and social handles
-  // when the visitor is not authenticated so the data never reaches the DOM.
+  // Phone and email are admin-only. Clients must use chat / booking
+  // form on the platform — no direct contact exposed.
   const { userId } = await auth();
-  // Phone is never shown publicly — only in admin panel
   const gatedArtist = userId
-    ? { ...artist, phone: null }
+    ? { ...artist, phone: null, email: null }
     : {
         ...artist,
         priceFrom: null,

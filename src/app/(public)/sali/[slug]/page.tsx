@@ -75,10 +75,11 @@ export default async function VenuePage({ params }: Props) {
   const venue = await getVenueBySlug(slug);
   if (!venue) notFound();
 
-  // M0a #8 — redact price/phone/email/website for unauthenticated visitors.
+  // Phone and email admin-only. Clients must communicate via platform.
+  // Price and website visible to authed users; all redacted for anon.
   const { userId } = await auth();
   const gatedVenue = userId
-    ? venue
+    ? { ...venue, phone: null, email: null }
     : {
         ...venue,
         pricePerPerson: null,

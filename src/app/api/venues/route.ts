@@ -1,13 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getVenues } from "@/lib/db/queries/venues";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+async function isAdmin(clerkId: string | null): Promise<boolean> {
+  if (!clerkId) return false;
+  const [u] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  return u?.role === "admin" || u?.role === "super_admin";
+}
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
 
-  // `cities` (comma-separated) overrides `city` so callers can pass an
-  // expanded list — e.g. the plan's Săli tab sends
-  // "Chișinău,Ialoveni,Strășeni" when the user picked a 25 km radius.
   const citiesParam = params.get("cities");
   const citiesList = citiesParam
     ? citiesParam
@@ -31,20 +41,23 @@ export async function GET(req: NextRequest) {
 
   const result = await getVenues(filters);
 
-  // M0a #8 — price gated behind login.
+  // Phone and email admin-only. Price and website visible to authed users.
   const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({
-      ...result,
-      items: result.items.map((v) => ({
+  const admin = await isAdmin(userId);
+
+  if (admin) {
+    return NextResponse.json(result);
+  }
+
+  const redacted = userId
+    ? result.items.map((v) => ({ ...v, phone: null, email: null }))
+    : result.items.map((v) => ({
         ...v,
         pricePerPerson: null,
         phone: null,
         email: null,
         website: null,
-      })),
-    });
-  }
+      }));
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, items: redacted });
 }

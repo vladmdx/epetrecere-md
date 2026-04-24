@@ -1,6 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+
+async function isAdmin(clerkId: string | null): Promise<boolean> {
+  if (!clerkId) return false;
+  const [u] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  return u?.role === "admin" || u?.role === "super_admin";
+}
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
@@ -20,12 +33,18 @@ export async function GET(req: NextRequest) {
 
   const result = await getArtists(filters);
 
-  // M0a #8 — price is only exposed to authenticated clients.
+  // Phone and email are admin-only (clients must communicate via platform).
+  // Price and socials are visible to authenticated users, hidden from anon.
   const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({
-      ...result,
-      items: result.items.map((a) => ({
+  const admin = await isAdmin(userId);
+
+  if (admin) {
+    return NextResponse.json(result);
+  }
+
+  const redacted = userId
+    ? result.items.map((a) => ({ ...a, phone: null, email: null }))
+    : result.items.map((a) => ({
         ...a,
         priceFrom: null,
         phone: null,
@@ -34,9 +53,7 @@ export async function GET(req: NextRequest) {
         facebook: null,
         youtube: null,
         tiktok: null,
-      })),
-    });
-  }
+      }));
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, items: redacted });
 }
