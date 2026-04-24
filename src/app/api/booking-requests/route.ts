@@ -404,6 +404,84 @@ export async function POST(req: NextRequest) {
           message: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} · ${parsed.data.eventDate}${timePart}`,
           actionUrl: dashboardUrl,
         });
+
+        // Spec 2.8 — pending-conflict alert: if 2+ pending requests now
+        // exist on the same (venue/artist, date), flag it so the vendor
+        // knows to triage quickly. We only fire this extra notification
+        // when the new request itself is the second (or later) competitor.
+        try {
+          const { inArray: inArrayFn, and: andFn, eq: eqFn } = await import(
+            "drizzle-orm"
+          );
+          const pendingCond = [
+            eqFn(bookingRequests.status, "pending"),
+            eqFn(bookingRequests.eventDate, parsed.data.eventDate),
+          ];
+          if (parsed.data.venueId) {
+            pendingCond.push(eqFn(bookingRequests.venueId, parsed.data.venueId));
+          } else if (parsed.data.artistId) {
+            pendingCond.push(
+              eqFn(bookingRequests.artistId, parsed.data.artistId),
+            );
+          }
+          const siblings = await db
+            .select({
+              id: bookingRequests.id,
+              clientName: bookingRequests.clientName,
+            })
+            .from(bookingRequests)
+            .where(andFn(...pendingCond));
+          // Ignore the just-inserted request — compare other pending ones.
+          const others = siblings.filter((s) => s.id !== booking.id);
+          if (others.length > 0) {
+            // Also check if the date is already blocked by an accepted/confirmed
+            // booking — that's a harder conflict.
+            const confirmedCond = [
+              inArrayFn(bookingRequests.status, [
+                "accepted",
+                "confirmed_by_client",
+              ]),
+              eqFn(bookingRequests.eventDate, parsed.data.eventDate),
+            ];
+            if (parsed.data.venueId) {
+              confirmedCond.push(
+                eqFn(bookingRequests.venueId, parsed.data.venueId),
+              );
+            } else if (parsed.data.artistId) {
+              confirmedCond.push(
+                eqFn(bookingRequests.artistId, parsed.data.artistId),
+              );
+            }
+            const confirmed = await db
+              .select({ id: bookingRequests.id })
+              .from(bookingRequests)
+              .where(andFn(...confirmedCond));
+
+            const totalCompeting = others.length + confirmed.length;
+            await dispatchNotification({
+              userId: artist.userId,
+              type: "booking_conflict",
+              title: `⚠️ Conflict potențial pe ${parsed.data.eventDate}`,
+              message:
+                confirmed.length > 0
+                  ? `Ai deja o rezervare confirmată pe această dată + ${others.length + 1} cereri tentative.`
+                  : `${totalCompeting + 1} cereri tentative pe aceeași dată. Acceptă pe cea mai potrivită.`,
+              actionUrl: `${dashboardUrl}?date=${parsed.data.eventDate}`,
+            });
+
+            // Loop in admins too — they mediate conflicts between vendor and clients.
+            void dispatchToAdmins({
+              type: "admin_lead_conflict",
+              title: "Conflict potențial la rezervare",
+              message: `${artist.nameRo ?? "Vendor"} — data ${parsed.data.eventDate} are ${totalCompeting + 1} cereri.`,
+              actionUrl: "/admin/cereri-oferte",
+            }).catch(() => {
+              /* non-blocking */
+            });
+          }
+        } catch (err) {
+          console.error("[booking conflict] check failed", err);
+        }
       }
       const { notificationEmail } = await import("@/lib/email/templates/notification-email");
       await dispatchToAdmins({

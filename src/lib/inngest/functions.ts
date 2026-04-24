@@ -4,8 +4,21 @@ import { leadConfirmationEmail } from "@/lib/email/templates/lead-confirmation";
 import { adminNotificationEmail } from "@/lib/email/templates/admin-notification";
 import { reviewRequestEmail } from "@/lib/email/templates/review-request";
 import { db } from "@/lib/db";
-import { bookingRequests, artists, invitations, invitationGuests } from "@/lib/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import {
+  bookingRequests,
+  artists,
+  invitations,
+  invitationGuests,
+  users,
+  venues,
+  calendarEvents,
+} from "@/lib/db/schema";
+import { and, eq, sql, isNotNull, inArray } from "drizzle-orm";
+import {
+  refreshAccessToken,
+  fetchUpcomingEvents,
+  expandDays,
+} from "@/lib/google/calendar";
 
 // Trigger 1: New lead → emails
 export const onLeadCreated = inngest.createFunction(
@@ -327,10 +340,168 @@ export const expirePendingBookings = inngest.createFunction(
   },
 );
 
+/**
+ * Google Calendar pull sync — spec section 2.6.
+ *
+ * Every 15 minutes, iterate over users with a refresh token, refresh their
+ * access token, fetch upcoming events, and upsert each day as a `blocked`
+ * row in `calendar_events` for every artist + venue they own.
+ *
+ * Strategy:
+ *  - Only rows with `source = 'google_sync'` are managed here. Manual
+ *    blocks and booking-created blocks are never touched.
+ *  - On each run we first delete the user's existing google_sync rows
+ *    for the sync window ([today, +90d]), then reinsert from the fresh
+ *    feed. This mirrors the upstream state exactly — cancelled/moved
+ *    events disappear, new events appear.
+ */
+export const googleCalendarSync = inngest.createFunction(
+  {
+    id: "google-calendar-sync",
+    triggers: [{ cron: "*/15 * * * *" }],
+    concurrency: { limit: 4 }, // throttle so we don't hammer Google's API
+  },
+  async ({ step }) => {
+    return await step.run("pull-google-events", async () => {
+      const connected = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(isNotNull(users.googleRefreshToken));
+
+      if (connected.length === 0) return { synced: 0 };
+
+      const today = new Date().toISOString().slice(0, 10);
+      const windowEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
+        .toISOString()
+        .slice(0, 10);
+
+      let totalEvents = 0;
+      let totalDays = 0;
+      let totalUsers = 0;
+      const failures: string[] = [];
+
+      for (const u of connected) {
+        try {
+          const token = await refreshAccessToken(u.id);
+          if (!token) continue; // refresh token revoked or missing creds
+          const events = await fetchUpcomingEvents(token);
+
+          // Resolve entities this user owns
+          const [ownedArtists, ownedVenues] = await Promise.all([
+            db
+              .select({ id: artists.id })
+              .from(artists)
+              .where(eq(artists.userId, u.id)),
+            db
+              .select({ id: venues.id })
+              .from(venues)
+              .where(eq(venues.userId, u.id)),
+          ]);
+
+          if (ownedArtists.length === 0 && ownedVenues.length === 0) continue;
+
+          // Clear existing google_sync rows in the window for each entity.
+          const artistIds = ownedArtists.map((a) => a.id);
+          const venueIds = ownedVenues.map((v) => v.id);
+          if (artistIds.length > 0) {
+            await db
+              .delete(calendarEvents)
+              .where(
+                and(
+                  eq(calendarEvents.entityType, "artist"),
+                  inArray(calendarEvents.entityId, artistIds),
+                  eq(calendarEvents.source, "google_sync"),
+                  sql`${calendarEvents.date} >= ${today}`,
+                  sql`${calendarEvents.date} <= ${windowEnd}`,
+                ),
+              );
+          }
+          if (venueIds.length > 0) {
+            await db
+              .delete(calendarEvents)
+              .where(
+                and(
+                  eq(calendarEvents.entityType, "venue"),
+                  inArray(calendarEvents.entityId, venueIds),
+                  eq(calendarEvents.source, "google_sync"),
+                  sql`${calendarEvents.date} >= ${today}`,
+                  sql`${calendarEvents.date} <= ${windowEnd}`,
+                ),
+              );
+          }
+
+          // Expand events to days, dedupe, bulk insert per entity.
+          const allDays = new Set<string>();
+          const noteByDay = new Map<string, string>();
+          for (const ev of events) {
+            const days = expandDays(ev.start, ev.end);
+            for (const d of days) {
+              if (d < today || d > windowEnd) continue;
+              allDays.add(d);
+              // First summary wins on a given day
+              if (!noteByDay.has(d)) noteByDay.set(d, ev.summary.slice(0, 200));
+            }
+          }
+
+          const rowsToInsert: Array<{
+            entityType: "artist" | "venue";
+            entityId: number;
+            date: string;
+            status: "blocked";
+            source: "google_sync";
+            note: string;
+          }> = [];
+          for (const d of allDays) {
+            for (const aid of artistIds) {
+              rowsToInsert.push({
+                entityType: "artist",
+                entityId: aid,
+                date: d,
+                status: "blocked",
+                source: "google_sync",
+                note: `Google: ${noteByDay.get(d) ?? "Ocupat"}`,
+              });
+            }
+            for (const vid of venueIds) {
+              rowsToInsert.push({
+                entityType: "venue",
+                entityId: vid,
+                date: d,
+                status: "blocked",
+                source: "google_sync",
+                note: `Google: ${noteByDay.get(d) ?? "Ocupat"}`,
+              });
+            }
+          }
+
+          if (rowsToInsert.length > 0) {
+            await db.insert(calendarEvents).values(rowsToInsert);
+          }
+
+          totalEvents += events.length;
+          totalDays += allDays.size;
+          totalUsers += 1;
+        } catch (err) {
+          console.error("[google-sync] user failed", u.id, err);
+          failures.push(u.id);
+        }
+      }
+
+      return {
+        synced: totalUsers,
+        events: totalEvents,
+        days: totalDays,
+        failures: failures.length,
+      };
+    });
+  },
+);
+
 export const functions = [
   onLeadCreated,
   leadFollowUp,
   eventReminder,
   invitationRsvpReminders,
   expirePendingBookings,
+  googleCalendarSync,
 ];

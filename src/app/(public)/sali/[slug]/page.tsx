@@ -24,11 +24,17 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const venue = await getVenueBySlug(slug);
   if (!venue) return {};
 
+  // Prefer explicit OG URL; fall back to the cover image from the gallery.
+  const coverImage = venue.images?.find((i) => i.isCover) ?? venue.images?.[0];
+  const image = venue.ogImageUrl ?? coverImage?.url ?? undefined;
+
   return generateMeta({
     title: `${venue.nameRo} — Sală Evenimente`,
     description: venue.seoDescRo || venue.descriptionRo?.substring(0, 155) || "",
     entity: venue,
     path: `/sali/${slug}`,
+    image,
+    type: "profile",
   });
 }
 

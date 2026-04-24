@@ -33,6 +33,10 @@ const RichEditor = dynamic(
 );
 import { MapPicker } from "@/components/shared/map-picker";
 import { VenueGalleryManager } from "@/components/vendor/venue-gallery-manager";
+import {
+  WorkingHoursEditor,
+  type WorkingHours,
+} from "@/components/vendor/working-hours-editor";
 
 const CANONICAL_FACILITIES = [
   "Parcare",
@@ -73,6 +77,7 @@ interface Venue {
   menuPdfUrl: string | null;
   virtualTourUrl: string | null;
   calendarEnabled: boolean;
+  workingHours: WorkingHours | null;
   isActive: boolean;
   seoTitleRo: string | null;
   seoTitleRu: string | null;
@@ -80,6 +85,7 @@ interface Venue {
   seoDescRo: string | null;
   seoDescRu: string | null;
   seoDescEn: string | null;
+  ogImageUrl: string | null;
 }
 
 export default function VenueProfilePage() {
@@ -182,12 +188,14 @@ export default function VenueProfilePage() {
           menuPdfUrl: venue.menuPdfUrl ?? "",
           virtualTourUrl: venue.virtualTourUrl ?? "",
           calendarEnabled: venue.calendarEnabled,
+          workingHours: venue.workingHours ?? null,
           seoTitleRo: venue.seoTitleRo ?? "",
           seoTitleRu: venue.seoTitleRu ?? "",
           seoTitleEn: venue.seoTitleEn ?? "",
           seoDescRo: venue.seoDescRo ?? "",
           seoDescRu: venue.seoDescRu ?? "",
           seoDescEn: venue.seoDescEn ?? "",
+          ogImageUrl: venue.ogImageUrl ?? null,
         }),
       });
       if (!res.ok) throw new Error();
@@ -367,6 +375,22 @@ export default function VenueProfilePage() {
                   />
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Program funcționare</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Apare pe profilul public sub formă de „Lu-Vi 10:00-22:00 ·
+                Sâ-Du 10:00-24:00". Lasă zilele închise dezactivate.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <WorkingHoursEditor
+                value={venue.workingHours}
+                onChange={(next) => update({ workingHours: next })}
+              />
             </CardContent>
           </Card>
 
@@ -967,8 +991,128 @@ function SeoTabContent({
             Textul real pe Google poate diferi — acesta e o aproximare fidelă.
           </p>
         </div>
+
+        {/* Open Graph image selector — spec 4.7 */}
+        <OgImageSelector venue={venue} setVenue={setVenue} />
       </CardContent>
     </Card>
+  );
+}
+
+/** OG image selector — pick from venue gallery or leave null to fall back
+ *  to the cover photo. Preview updates live. */
+function OgImageSelector({
+  venue,
+  setVenue,
+}: {
+  venue: Venue;
+  setVenue: (v: Venue) => void;
+}) {
+  const [gallery, setGallery] = useState<
+    Array<{ id: number; url: string; isCover: boolean; altRo: string | null }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`/api/venue-images?venue_id=${venue.id}`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => setGallery(Array.isArray(rows) ? rows : []))
+      .finally(() => setLoading(false));
+  }, [venue.id]);
+
+  const currentUrl = venue.ogImageUrl;
+  const coverUrl = gallery.find((g) => g.isCover)?.url ?? gallery[0]?.url ?? null;
+  const effectiveUrl = currentUrl ?? coverUrl ?? null;
+
+  return (
+    <div className="space-y-2">
+      <Label className="block">
+        OG Image (social share preview)
+        <span className="ml-2 text-xs text-muted-foreground">
+          Facebook / WhatsApp / Twitter
+        </span>
+      </Label>
+      {loading ? (
+        <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-border/40">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        </div>
+      ) : gallery.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-border/40 p-4 text-center text-xs text-muted-foreground">
+          Nu ai imagini încă — urcă câteva în tab-ul Galerie ca să poți alege OG image.
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+            {/* "Use cover" option — clears ogImageUrl */}
+            <button
+              type="button"
+              onClick={() => setVenue({ ...venue, ogImageUrl: null })}
+              className={
+                currentUrl === null
+                  ? "aspect-square overflow-hidden rounded-lg border-2 border-gold bg-gold/10"
+                  : "aspect-square overflow-hidden rounded-lg border-2 border-transparent hover:border-gold/40"
+              }
+              aria-label="Folosește coperta galeriei"
+            >
+              {coverUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={coverUrl}
+                  alt="Cover (default)"
+                  className="h-full w-full object-cover opacity-80"
+                />
+              ) : null}
+              <span className="block px-1 pb-1 text-center text-[10px] font-medium">
+                Auto (cover)
+              </span>
+            </button>
+            {gallery.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setVenue({ ...venue, ogImageUrl: g.url })}
+                className={
+                  currentUrl === g.url
+                    ? "aspect-square overflow-hidden rounded-lg border-2 border-gold"
+                    : "aspect-square overflow-hidden rounded-lg border-2 border-transparent hover:border-gold/40"
+                }
+                aria-label={`Selectează imaginea ${g.id}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={g.url}
+                  alt={g.altRo ?? ""}
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            ℹ️ {currentUrl
+              ? "Imagine explicită selectată. Va fi afișată când linkul e partajat pe rețele sociale."
+              : "Se folosește automat coperta galeriei. Alege explicit dacă vrei altă imagine."}
+          </p>
+          {effectiveUrl && (
+            <div className="overflow-hidden rounded-lg border border-border/40 bg-background">
+              <div className="relative aspect-[1200/630] w-full bg-muted">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={effectiveUrl}
+                  alt="OG preview"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="border-t border-border/40 p-3 text-xs">
+                <p className="font-medium">
+                  {venue.seoTitleRo || `${venue.nameRo} — Sală Evenimente`}
+                </p>
+                <p className="mt-0.5 text-muted-foreground">epetrecere.md</p>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 }
 

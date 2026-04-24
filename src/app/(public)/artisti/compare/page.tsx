@@ -5,9 +5,10 @@ import Image from "next/image";
 import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { artists } from "@/lib/db/schema";
-import { Star, MapPin, Phone, Mail, ArrowLeft, X, Check } from "lucide-react";
+import { Star, MapPin, Mail, ArrowLeft, X, Check } from "lucide-react";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { ClearCompareButton } from "./clear-button";
+import { TrackedPhoneLink } from "@/components/public/tracked-phone-link";
 
 export const dynamic = "force-dynamic";
 
@@ -138,13 +139,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
       label: "Telefon",
       render: (a) =>
         a.phone ? (
-          <a
-            href={`tel:${a.phone}`}
-            className="inline-flex items-center gap-1 hover:text-gold"
-          >
-            <Phone className="h-3 w-3" />
-            {a.phone}
-          </a>
+          <TrackedPhoneLink entityKind="artist" entityId={a.id} phone={a.phone} />
         ) : (
           "—"
         ),

@@ -81,9 +81,36 @@ const updateSchema = z.object({
   seoDescRo: z.string().optional(),
   seoDescRu: z.string().optional(),
   seoDescEn: z.string().optional(),
+  ogImageUrl: z.string().url().nullable().optional(),
   autoReplyEnabled: z.boolean().optional(),
   autoReplyMessage: z.string().nullable().optional(),
   bufferHours: z.number().int().min(0).max(24).nullable().optional(),
+  workingHours: z
+    .object({
+      mon: z
+        .object({ open: z.string(), close: z.string() })
+        .nullable(),
+      tue: z
+        .object({ open: z.string(), close: z.string() })
+        .nullable(),
+      wed: z
+        .object({ open: z.string(), close: z.string() })
+        .nullable(),
+      thu: z
+        .object({ open: z.string(), close: z.string() })
+        .nullable(),
+      fri: z
+        .object({ open: z.string(), close: z.string() })
+        .nullable(),
+      sat: z
+        .object({ open: z.string(), close: z.string() })
+        .nullable(),
+      sun: z
+        .object({ open: z.string(), close: z.string() })
+        .nullable(),
+    })
+    .nullable()
+    .optional(),
 });
 
 export async function PUT(

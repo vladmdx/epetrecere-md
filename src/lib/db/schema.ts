@@ -377,6 +377,18 @@ export const venues = pgTable("venues", {
     .default([]),
   /** Hours between bookings (venue might need setup/teardown time). */
   bufferHours: integer("buffer_hours").default(0),
+  /** Weekly opening hours keyed by ISO weekday (mon..sun). Each entry
+   *  is `{ open: "HH:mm", close: "HH:mm" }` or null meaning closed.
+   *  Null at the column level = not configured (public page shows "la cerere"). */
+  workingHours: jsonb("working_hours").$type<{
+    mon: { open: string; close: string } | null;
+    tue: { open: string; close: string } | null;
+    wed: { open: string; close: string } | null;
+    thu: { open: string; close: string } | null;
+    fri: { open: string; close: string } | null;
+    sat: { open: string; close: string } | null;
+    sun: { open: string; close: string } | null;
+  }>(),
   isActive: boolean("is_active").default(false).notNull(),
   isFeatured: boolean("is_featured").default(false).notNull(),
   ratingAvg: real("rating_avg").default(0),
@@ -387,6 +399,9 @@ export const venues = pgTable("venues", {
   seoDescRo: text("seo_desc_ro"),
   seoDescRu: text("seo_desc_ru"),
   seoDescEn: text("seo_desc_en"),
+  /** Explicit OG/Twitter preview image URL. If null, public page falls
+   *  back to the cover photo from venue_images. */
+  ogImageUrl: text("og_image_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

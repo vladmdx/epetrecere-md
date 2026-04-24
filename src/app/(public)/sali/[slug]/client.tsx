@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Star, MapPin, Users, Check, Lock, ChevronDown } from "lucide-react";
+import { Star, MapPin, Users, Check, Lock, ChevronDown, Clock } from "lucide-react";
+import { formatWorkingHours } from "@/components/vendor/working-hours-editor";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { ImageGallery } from "@/components/public/image-gallery";
@@ -40,6 +41,15 @@ interface VenueData {
   lat: number | null;
   lng: number | null;
   calendarEnabled: boolean;
+  workingHours: {
+    mon: { open: string; close: string } | null;
+    tue: { open: string; close: string } | null;
+    wed: { open: string; close: string } | null;
+    thu: { open: string; close: string } | null;
+    fri: { open: string; close: string } | null;
+    sat: { open: string; close: string } | null;
+    sun: { open: string; close: string } | null;
+  } | null;
   ratingAvg: number | null;
   ratingCount: number | null;
   images: Array<{ id: number; url: string; altRo: string | null }>;
@@ -131,6 +141,12 @@ export function VenueDetailClient({
                 <Star className="h-3.5 w-3.5 fill-gold text-gold" /> {venue.ratingAvg.toFixed(1)}
               </span>
             ) : null}
+            {venue.workingHours && (
+              <span className="flex items-center gap-1" title="Program funcționare">
+                <Clock className="h-3.5 w-3.5" />
+                {formatWorkingHours(venue.workingHours)}
+              </span>
+            )}
           </div>
 
           {/* Gallery — fires a single "gallery" beacon when the user first

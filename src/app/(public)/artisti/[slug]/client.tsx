@@ -14,6 +14,7 @@ import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { ShareButtons } from "@/components/public/share-buttons";
+import { trackClick } from "@/lib/analytics/track-click";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 
@@ -263,7 +264,11 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               )}
             </TabsContent>
 
-            <TabsContent value="gallery" className="mt-4">
+            <TabsContent
+              value="gallery"
+              className="mt-4"
+              onClickCapture={() => trackClick("artist", artist.id, "gallery")}
+            >
               <ImageGallery
                 images={artist.images.map((img) => ({
                   url: img.url,
