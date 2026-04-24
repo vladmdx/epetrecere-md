@@ -11,6 +11,7 @@ import { SearchAutocomplete } from "@/components/public/search-autocomplete";
 import { NotificationBell } from "@/components/public/notification-bell";
 import { ChatBell } from "@/components/public/chat-bell";
 import { useLocale } from "@/hooks/use-locale";
+import { useUserRole, isClientOrGuest } from "@/hooks/use-user-role";
 import { cn } from "@/lib/utils";
 import { useUser, useClerk } from "@clerk/nextjs";
 
@@ -84,19 +85,7 @@ function UserMenu() {
   const { isSignedIn, user } = useUser();
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
-  const [userRole, setUserRole] = useState<{
-    role: string;
-    hasVenue: boolean;
-    isNewUser: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    if (!isSignedIn) { setUserRole(null); return; }
-    fetch("/api/auth/check-role")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data) setUserRole(data); })
-      .catch(() => {});
-  }, [isSignedIn]);
+  const { userRole } = useUserRole();
 
   if (!isSignedIn) {
     return (
@@ -175,6 +164,10 @@ export function Header() {
   useEffect(() => { const h = () => setScrolled(window.scrollY > 50); window.addEventListener("scroll", h); return () => window.removeEventListener("scroll", h); }, []);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { t } = useLocale();
+  const { userRole } = useUserRole();
+  // Hide the "Plan event" CTA for vendors and admins — it's a client-
+  // facing action. Guests + clients still see it.
+  const showPlannerCta = isClientOrGuest(userRole);
 
   return (
     <header className={`fixed top-0 z-50 w-full transition-all duration-300 backdrop-blur-md ${scrolled ? "bg-[#0D0D0D]/90 border-b border-gold/10 shadow-lg" : "bg-[#0D0D0D]/40 border-b border-transparent"}`}>
@@ -215,11 +208,13 @@ export function Header() {
           <UserMenu />
           <LanguageSwitcher />
           <ThemeToggle />
-          <Link href="/planifica" className="hidden lg:block">
-            <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark font-medium">
-              {t("nav.planner")}
-            </Button>
-          </Link>
+          {showPlannerCta && (
+            <Link href="/planifica" className="hidden lg:block">
+              <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark font-medium">
+                {t("nav.planner")}
+              </Button>
+            </Link>
+          )}
           <Button
             variant="ghost"
             size="icon"
@@ -268,9 +263,11 @@ export function Header() {
               <Link href="/calculatoare" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">Calculatoare</Link>
               <Link href="/blog" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.blog")}</Link>
               <Link href="/contact" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.contact")}</Link>
-              <Link href="/planifica" onClick={() => setMobileOpen(false)}>
-                <Button className="mt-2 w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark">{t("nav.planner")}</Button>
-              </Link>
+              {showPlannerCta && (
+                <Link href="/planifica" onClick={() => setMobileOpen(false)}>
+                  <Button className="mt-2 w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark">{t("nav.planner")}</Button>
+                </Link>
+              )}
             </nav>
           </motion.div>
         )}
