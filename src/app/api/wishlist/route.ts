@@ -15,7 +15,9 @@ import {
   users,
   artists,
   venues,
+  venueImages,
   wishlistItems,
+  categories,
 } from "@/lib/db/schema";
 
 async function resolveUser() {
@@ -52,7 +54,7 @@ export async function GET() {
     .filter((r) => r.entityType === "venue")
     .map((r) => r.entityId);
 
-  const [artistRows, venueRows] = await Promise.all([
+  const [artistRows, venueRows, venueCoverRows, allCategories] = await Promise.all([
     artistIds.length
       ? db
           .select({
@@ -62,6 +64,7 @@ export async function GET() {
             coverImageUrl: artists.photoUrl,
             priceFrom: artists.priceFrom,
             city: artists.location,
+            categoryIds: artists.categoryIds,
           })
           .from(artists)
           .where(inArray(artists.id, artistIds))
@@ -78,16 +81,42 @@ export async function GET() {
           .from(venues)
           .where(inArray(venues.id, venueIds))
       : Promise.resolve([]),
+    venueIds.length
+      ? db
+          .select({
+            venueId: venueImages.venueId,
+            url: venueImages.url,
+          })
+          .from(venueImages)
+          .where(
+            and(
+              inArray(venueImages.venueId, venueIds),
+              eq(venueImages.isCover, true),
+            ),
+          )
+      : Promise.resolve([]),
+    db
+      .select({ id: categories.id, nameRo: categories.nameRo, slug: categories.slug, type: categories.type })
+      .from(categories),
   ]);
+
+  const venueCoverMap = new Map(
+    venueCoverRows.map((r) => [r.venueId, r.url]),
+  );
 
   const artistMap = new Map(artistRows.map((a) => [a.id, a]));
   const venueMap = new Map(venueRows.map((v) => [v.id, v]));
+  const catMap = new Map(allCategories.map((c) => [c.id, c]));
 
   const items = rows
     .map((r) => {
       if (r.entityType === "artist") {
         const a = artistMap.get(r.entityId);
         if (!a) return null;
+        const cats = (a.categoryIds ?? [])
+          .map((id) => catMap.get(id))
+          .filter(Boolean)
+          .map((c) => ({ id: c!.id, name: c!.nameRo, slug: c!.slug }));
         return {
           entityType: "artist" as const,
           entityId: r.entityId,
@@ -96,6 +125,7 @@ export async function GET() {
           coverImageUrl: a.coverImageUrl,
           priceFrom: a.priceFrom,
           city: a.city,
+          categories: cats,
           addedAt: r.createdAt,
         };
       }
@@ -106,9 +136,10 @@ export async function GET() {
         entityId: r.entityId,
         name: v.nameRo,
         slug: v.slug,
-        coverImageUrl: null,
+        coverImageUrl: venueCoverMap.get(r.entityId) ?? null,
         priceFrom: v.pricePerPerson,
         city: v.city,
+        categories: [],
         addedAt: r.createdAt,
       };
     })
