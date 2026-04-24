@@ -1,8 +1,8 @@
 "use client";
 
 // Client's wishlist — artists + venues they've hearted.
-// Features: grid view (3/4/5 cols responsive), list view, category filter,
-// and type filter (all/artists/venues).
+// Features: grid view (3/4/5 cols selectable), list view (compact/detailed),
+// category filter, and type filter (all/artists/venues).
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -14,13 +14,17 @@ import {
   Music,
   Building2,
   Trash2,
-  LayoutGrid,
-  List as ListIcon,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  ViewSwitcher,
+  useViewMode,
+  gridClassName,
+  type ListDensity,
+} from "@/components/public/view-switcher";
 
 interface Category {
   id: number;
@@ -40,14 +44,13 @@ interface WishlistItem {
   addedAt: string;
 }
 
-type ViewMode = "grid" | "list";
 type TypeFilter = "all" | "artist" | "venue";
 
 export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
-  const [view, setView] = useState<ViewMode>("grid");
+  const [viewMode, setViewMode] = useViewMode();
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [categoryId, setCategoryId] = useState<number | null>(null);
 
@@ -137,36 +140,7 @@ export default function WishlistPage() {
           </p>
         </div>
         {items.length > 0 && (
-          <div className="flex items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
-            <button
-              type="button"
-              onClick={() => setView("grid")}
-              aria-label="Grid view"
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
-                view === "grid"
-                  ? "bg-gold text-[#0D0D0D]"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Grid
-            </button>
-            <button
-              type="button"
-              onClick={() => setView("list")}
-              aria-label="List view"
-              className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-all",
-                view === "list"
-                  ? "bg-gold text-[#0D0D0D]"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <ListIcon className="h-3.5 w-3.5" />
-              Listă
-            </button>
-          </div>
+          <ViewSwitcher mode={viewMode} onChange={setViewMode} />
         )}
       </div>
 
@@ -303,15 +277,17 @@ export default function WishlistPage() {
                 </Button>
               </CardContent>
             </Card>
-          ) : view === "grid" ? (
+          ) : viewMode.kind === "grid" ? (
             <GridView
               items={filtered}
+              cols={viewMode.cols}
               onRemove={remove}
               removing={removing}
             />
           ) : (
             <ListView
               items={filtered}
+              density={viewMode.density}
               onRemove={remove}
               removing={removing}
             />
@@ -325,15 +301,17 @@ export default function WishlistPage() {
 // ─── Grid View ──────────────────────────────────────────────
 function GridView({
   items,
+  cols,
   onRemove,
   removing,
 }: {
   items: WishlistItem[];
+  cols: 3 | 4 | 5;
   onRemove: (item: WishlistItem) => void;
   removing: string | null;
 }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+    <div className={gridClassName(cols)}>
       {items.map((item) => {
         const href =
           item.entityType === "artist"
@@ -430,13 +408,20 @@ function GridView({
 // ─── List View ──────────────────────────────────────────────
 function ListView({
   items,
+  density,
   onRemove,
   removing,
 }: {
   items: WishlistItem[];
+  density: ListDensity;
   onRemove: (item: WishlistItem) => void;
   removing: string | null;
 }) {
+  const isCompact = density === "compact";
+  const thumbClass = isCompact
+    ? "relative h-16 w-16 overflow-hidden rounded-lg bg-muted"
+    : "relative h-24 w-24 overflow-hidden rounded-lg bg-muted sm:h-28 sm:w-28";
+
   return (
     <div className="space-y-2">
       {items.map((item) => {
@@ -450,23 +435,28 @@ function ListView({
             key={k}
             className="overflow-hidden transition-all hover:border-gold/30"
           >
-            <div className="flex items-center gap-4 p-3">
+            <div
+              className={cn(
+                "flex items-center gap-4",
+                isCompact ? "p-2.5" : "p-3",
+              )}
+            >
               <Link href={href} className="shrink-0">
-                <div className="relative h-20 w-20 overflow-hidden rounded-lg bg-muted sm:h-24 sm:w-24">
+                <div className={thumbClass}>
                   {item.coverImageUrl ? (
                     <Image
                       src={item.coverImageUrl}
                       alt={item.name}
                       fill
-                      sizes="96px"
+                      sizes={isCompact ? "64px" : "112px"}
                       className="object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-muted-foreground/40">
                       {item.entityType === "artist" ? (
-                        <Music className="h-6 w-6" />
+                        <Music className={isCompact ? "h-5 w-5" : "h-6 w-6"} />
                       ) : (
-                        <Building2 className="h-6 w-6" />
+                        <Building2 className={isCompact ? "h-5 w-5" : "h-6 w-6"} />
                       )}
                     </div>
                   )}
@@ -492,7 +482,7 @@ function ListView({
                     )}
                   </span>
                 </div>
-                {item.categories.length > 0 && (
+                {!isCompact && item.categories.length > 0 && (
                   <p className="mt-0.5 line-clamp-1 text-xs text-gold/80">
                     {item.categories.map((c) => c.name).join(", ")}
                   </p>
@@ -507,21 +497,26 @@ function ListView({
                   {item.priceFrom && (
                     <span className="text-gold">de la {item.priceFrom}€</span>
                   )}
-                  <span className="hidden sm:inline">
-                    Salvat {new Date(item.addedAt).toLocaleDateString("ro-RO", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
+                  {!isCompact && (
+                    <span className="hidden sm:inline">
+                      Salvat{" "}
+                      {new Date(item.addedAt).toLocaleDateString("ro-RO", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex shrink-0 gap-2">
-                <Link href={href}>
-                  <Button size="sm" variant="outline" className="text-xs">
-                    Vezi
-                  </Button>
-                </Link>
+                {!isCompact && (
+                  <Link href={href}>
+                    <Button size="sm" variant="outline" className="text-xs">
+                      Vezi
+                    </Button>
+                  </Link>
+                )}
                 <button
                   type="button"
                   onClick={() => onRemove(item)}
