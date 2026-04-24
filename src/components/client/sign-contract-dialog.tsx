@@ -2,11 +2,11 @@
 
 // Sign contract dialog — opens from the booking card when status is
 // "accepted" or "confirmed_by_client" AND contract is not yet signed.
-// Client types their full name (single-line signature) + consent
-// checkbox → POST /api/booking-requests/[id]/contract → dialog shows
-// the generated PDF inline (iframe) + download link.
+// Fetches booking details from API and renders an HTML preview of the
+// contract terms (no iframe — more reliable across browsers). PDF is
+// available via "Deschide în tab nou" link.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,12 +22,25 @@ import { Label } from "@/components/ui/label";
 import { FileSignature, Loader2, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 
+interface BookingPreview {
+  clientName: string;
+  clientPhone: string | null;
+  clientEmail: string | null;
+  vendorName: string;
+  vendorKind: "artist" | "sala";
+  eventDate: string | null;
+  eventType: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  guestCount: number | null;
+  agreedPrice: number | null;
+  message: string | null;
+}
+
 interface Props {
   bookingId: number;
   initialSigned?: boolean;
-  /** Called after successful signing so parent can refresh UI. */
   onSigned?: () => void;
-  /** Trigger element — if omitted, renders a default "Semnează contract" button. */
   trigger?: React.ReactNode;
 }
 
@@ -42,8 +55,23 @@ export function SignContractDialog({
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [signed, setSigned] = useState(initialSigned);
+  const [preview, setPreview] = useState<BookingPreview | null>(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   const pdfUrl = `/api/booking-requests/${bookingId}/contract`;
+
+  // Fetch preview data when dialog opens
+  useEffect(() => {
+    if (!open || preview) return;
+    setLoadingPreview(true);
+    fetch(`/api/booking-requests/${bookingId}/contract-preview`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data) setPreview(data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingPreview(false));
+  }, [open, bookingId, preview]);
 
   async function sign() {
     if (signature.trim().length < 2) {
@@ -92,7 +120,7 @@ export function SignContractDialog({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading flex items-center gap-2">
               <FileSignature className="h-5 w-5 text-gold" />
@@ -100,18 +128,120 @@ export function SignContractDialog({
             </DialogTitle>
             <DialogDescription>
               {signed
-                ? "Contractul tău este deja semnat. Poți descărca PDF-ul sau deschide într-un tab nou."
+                ? "Contractul tău este deja semnat. Poți descărca PDF-ul."
                 : "Citește termenii și semnează electronic. Contractul are valoare juridică."}
             </DialogDescription>
           </DialogHeader>
 
-          {/* PDF preview */}
-          <div className="overflow-hidden rounded-lg border border-border/40">
-            <iframe
-              src={pdfUrl}
-              title={`Contract ${bookingId}`}
-              className="h-80 w-full"
-            />
+          {/* Contract preview — HTML instead of iframe for reliability */}
+          <div className="rounded-lg border border-border/40 bg-background/40 p-5 text-sm">
+            {loadingPreview ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-gold" />
+              </div>
+            ) : preview ? (
+              <div className="space-y-4">
+                <div className="border-b border-border/40 pb-3 text-center">
+                  <p className="font-heading text-base font-bold text-gold">
+                    CONTRACT DE PRESTĂRI SERVICII
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    ePetrecere.md · Republica Moldova
+                  </p>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gold">
+                    Părțile Contractante
+                  </p>
+                  <div className="grid gap-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        {preview.vendorKind === "sala" ? "Sala" : "Artist"} (Prestator):
+                      </span>
+                      <span className="font-medium">{preview.vendorName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Client (Beneficiar):</span>
+                      <span className="font-medium">{preview.clientName}</span>
+                    </div>
+                    {preview.clientPhone && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Telefon client:</span>
+                        <span className="font-medium">{preview.clientPhone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gold">
+                    Detalii Eveniment
+                  </p>
+                  <div className="grid gap-1 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tip eveniment:</span>
+                      <span className="font-medium">{preview.eventType || "—"}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Data:</span>
+                      <span className="font-medium">{preview.eventDate || "—"}</span>
+                    </div>
+                    {(preview.startTime || preview.endTime) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Interval orar:</span>
+                        <span className="font-medium">
+                          {preview.startTime || "—"} – {preview.endTime || "—"}
+                        </span>
+                      </div>
+                    )}
+                    {preview.guestCount && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Număr invitați:</span>
+                        <span className="font-medium">{preview.guestCount}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Preț agreat:</span>
+                      <span className="font-bold text-gold">
+                        {preview.agreedPrice
+                          ? `${preview.agreedPrice} EUR`
+                          : "de negociat"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gold">
+                    Termeni și Condiții
+                  </p>
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    <li>
+                      • Prestatorul se obligă să execute serviciile convenite la
+                      data și în intervalul orar stabilit.
+                    </li>
+                    <li>
+                      • Clientul se obligă să achite prețul agreat conform
+                      modalității stabilite.
+                    </li>
+                    <li>
+                      • Anularea se face conform politicii platformei
+                      ePetrecere.md.
+                    </li>
+                    <li>
+                      • Semnătura electronică are valoare juridică echivalentă
+                      cu semnătura pe hârtie, conform legislației RM.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Nu s-au putut încărca detaliile contractului. Folosește
+                &quot;Deschide în tab nou&quot; pentru a vedea PDF-ul.
+              </p>
+            )}
           </div>
 
           {!signed && (
@@ -147,7 +277,7 @@ export function SignContractDialog({
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <a
               href={pdfUrl}
               target="_blank"
@@ -155,7 +285,7 @@ export function SignContractDialog({
               className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs hover:bg-muted"
             >
               <Eye className="h-3.5 w-3.5" />
-              Deschide în tab nou
+              Deschide PDF în tab nou
             </a>
             {signed ? (
               <a
