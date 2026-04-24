@@ -108,10 +108,16 @@ export default function AuthRedirectPage() {
     if (!selectedRole) return;
     setSubmitting(true);
 
+    // Persist the chosen role IMMEDIATELY so the user is treated as
+    // artist/venue from the next request — not only after onboarding
+    // finishes. Falls through to the legacy redirect on failure.
+    await fetch("/api/auth/select-role", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: selectedRole }),
+    }).catch(() => {});
+
     if (selectedRole === "client") {
-      // Mark onboarding complete so the role picker doesn't show again
-      await fetch("/api/auth/complete-onboarding", { method: "POST" }).catch(() => {});
-      // If the client just came from the wizard, open their new plan.
       const planUrl = await consumeWizardData();
       router.replace(planUrl ?? "/cabinet");
     } else if (selectedRole === "artist") {
