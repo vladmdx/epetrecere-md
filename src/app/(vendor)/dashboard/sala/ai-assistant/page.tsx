@@ -18,7 +18,10 @@ const SUGGESTIONS = [
   "Care e rata mea de ocupare pe vara asta?",
   "Sugerează-mi un preț competitiv",
   "Blochează-mi 1-10 ianuarie pentru renovări",
-  "Cine a rezervat pentru weekend-ul următor?",
+  "Cum mi-au mers vizitele profilului în ultimele 30 zile?",
+  "Arată-mi recenziile fără răspuns și ajută-mă să răspund",
+  "Îmbunătățește-mi descrierea în română",
+  "Generează meta SEO pentru profil",
 ];
 
 export default function VenueAIAssistantPage() {

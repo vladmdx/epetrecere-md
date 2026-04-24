@@ -110,6 +110,52 @@ export async function POST(req: Request) {
   return NextResponse.json(created, { status: 201 });
 }
 
+// PUT /api/venue-images — bulk reorder. Body: { venueId, items: [{id, sortOrder}] }.
+// Owner-only. Used by the drag-drop gallery manager to persist a new order.
+const reorderSchema = z.object({
+  venueId: z.number().int().positive(),
+  items: z.array(
+    z.object({
+      id: z.number().int().positive(),
+      sortOrder: z.number().int().min(0).max(10_000),
+    }),
+  ),
+});
+
+export async function PUT(req: Request) {
+  const body = await req.json().catch(() => ({}));
+  const parsed = reorderSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.issues },
+      { status: 400 },
+    );
+  }
+
+  const owner = await requireVenueOwner(parsed.data.venueId);
+  if (!owner.ok) {
+    return NextResponse.json({ error: owner.error }, { status: owner.status });
+  }
+
+  // Apply updates sequentially — small sets (< 50 rows), so a Promise.all is
+  // fine and avoids a transaction dependency we don't otherwise need.
+  await Promise.all(
+    parsed.data.items.map((it) =>
+      db
+        .update(venueImages)
+        .set({ sortOrder: it.sortOrder })
+        .where(
+          and(
+            eq(venueImages.id, it.id),
+            eq(venueImages.venueId, parsed.data.venueId),
+          ),
+        ),
+    ),
+  );
+
+  return NextResponse.json({ success: true });
+}
+
 // DELETE /api/venue-images?id=N — owner-only.
 export async function DELETE(req: NextRequest) {
   const idParam = req.nextUrl.searchParams.get("id");

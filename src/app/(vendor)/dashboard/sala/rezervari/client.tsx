@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   CheckCircle,
@@ -16,6 +16,11 @@ import {
   Inbox,
   Music,
   ExternalLink,
+  Star,
+  Search,
+  Filter,
+  ArrowUpDown,
+  Ban,
 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
@@ -195,15 +200,100 @@ export function VenueBookingsClient({
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [acceptDialog, setAcceptDialog] = useState<Booking | null>(null);
   const [declineDialog, setDeclineDialog] = useState<Booking | null>(null);
+  const [completeDialog, setCompleteDialog] = useState<Booking | null>(null);
+  const [cancelDialog, setCancelDialog] = useState<Booking | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [acceptReply, setAcceptReply] = useState("");
   const [declineReason, setDeclineReason] = useState(DECLINE_REASONS[0]);
   const [declineMessage, setDeclineMessage] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
+  const [reviewRequested, setReviewRequested] = useState<Set<number>>(new Set());
+
+  // Toolbar state — spec 3.1
+  const [search, setSearch] = useState("");
+  const [filterEventType, setFilterEventType] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState("");
+  const [filterDateTo, setFilterDateTo] = useState("");
+  const [sortBy, setSortBy] = useState<"date_asc" | "date_desc" | "guests_desc" | "price_desc">(
+    "date_desc",
+  );
 
   function switchTab(tab: VenueBookingTab) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
     router.push(`/dashboard/sala/rezervari?${params.toString()}`);
+  }
+
+  /** Unique event types present in the current tab's list — populates the filter dropdown. */
+  const availableEventTypes = useMemo(() => {
+    const types = new Set<string>();
+    for (const b of bookings) {
+      if (b.eventType) types.add(b.eventType.toLowerCase());
+    }
+    return Array.from(types);
+  }, [bookings]);
+
+  /** Spec 3.1 — derived view with search/filter/sort applied. */
+  const visibleBookings = useMemo(() => {
+    let list = bookings;
+
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter((b) => {
+        const haystack = [
+          b.clientName,
+          b.clientPhone,
+          b.clientEmail,
+          b.userEmail,
+          b.message,
+          b.planTitle,
+          b.eventType,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+
+    if (filterEventType !== "all") {
+      list = list.filter(
+        (b) => (b.eventType || "").toLowerCase() === filterEventType,
+      );
+    }
+
+    if (filterDateFrom) {
+      list = list.filter((b) => b.eventDate >= filterDateFrom);
+    }
+    if (filterDateTo) {
+      list = list.filter((b) => b.eventDate <= filterDateTo);
+    }
+
+    const sorted = [...list];
+    sorted.sort((a, b) => {
+      switch (sortBy) {
+        case "date_asc":
+          return a.eventDate.localeCompare(b.eventDate);
+        case "date_desc":
+          return b.eventDate.localeCompare(a.eventDate);
+        case "guests_desc":
+          return (b.guestCount ?? 0) - (a.guestCount ?? 0);
+        case "price_desc":
+          return (b.agreedPrice ?? 0) - (a.agreedPrice ?? 0);
+      }
+    });
+    return sorted;
+  }, [bookings, search, filterEventType, filterDateFrom, filterDateTo, sortBy]);
+
+  const hasActiveFilters =
+    !!search || filterEventType !== "all" || !!filterDateFrom || !!filterDateTo;
+
+  function resetFilters() {
+    setSearch("");
+    setFilterEventType("all");
+    setFilterDateFrom("");
+    setFilterDateTo("");
+    setSortBy("date_desc");
   }
 
   async function confirmAccept() {
@@ -228,6 +318,76 @@ export function VenueBookingsClient({
       setAcceptReply("");
       setBookings((prev) => prev.filter((b) => b.id !== acceptDialog.id));
       router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirmComplete() {
+    if (!completeDialog) return;
+    setBusy(completeDialog.id);
+    try {
+      const res = await fetch(`/api/booking-requests/${completeDialog.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "complete" }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut finaliza");
+        return;
+      }
+      toast.success("Rezervare finalizată — poți cere recenzia acum!");
+      setCompleteDialog(null);
+      setBookings((prev) => prev.filter((b) => b.id !== completeDialog.id));
+      router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirmVendorCancel() {
+    if (!cancelDialog) return;
+    setBusy(cancelDialog.id);
+    try {
+      const res = await fetch(`/api/booking-requests/${cancelDialog.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "vendor_cancel",
+          reply: cancelReason.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut anula");
+        return;
+      }
+      toast.success("Rezervare anulată. Clientul a fost notificat.");
+      setCancelDialog(null);
+      setCancelReason("");
+      setBookings((prev) => prev.filter((b) => b.id !== cancelDialog.id));
+      router.refresh();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function requestReview(bookingId: number) {
+    setBusy(bookingId);
+    try {
+      const res = await fetch(`/api/reviews/request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingRequestId: bookingId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut trimite invitația");
+        return;
+      }
+      toast.success("Email trimis către client — îți va lăsa o recenzie");
+      setReviewRequested((prev) => new Set(prev).add(bookingId));
     } finally {
       setBusy(null);
     }
@@ -308,6 +468,90 @@ export function VenueBookingsClient({
         })}
       </div>
 
+      {/* Toolbar — spec 3.1 */}
+      {bookings.length > 0 && (
+        <Card>
+          <CardContent className="flex flex-wrap items-end gap-3 p-3">
+            <div className="flex-1 min-w-[200px]">
+              <Label htmlFor="rez-search" className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <Search className="mr-1 inline h-3 w-3" /> Caută
+              </Label>
+              <input
+                id="rez-search"
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Nume, telefon, email, mesaj..."
+                className="mt-1 h-8 w-full rounded-md border border-border/50 bg-background px-2 text-xs"
+              />
+            </div>
+            <div>
+              <Label htmlFor="rez-evtype" className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <Filter className="mr-1 inline h-3 w-3" /> Tip eveniment
+              </Label>
+              <select
+                id="rez-evtype"
+                value={filterEventType}
+                onChange={(e) => setFilterEventType(e.target.value)}
+                className="mt-1 h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
+              >
+                <option value="all">Toate</option>
+                {availableEventTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {EVENT_TYPE_LABELS[t] ?? t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="rez-from" className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                De la
+              </Label>
+              <input
+                id="rez-from"
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+                className="mt-1 h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
+              />
+            </div>
+            <div>
+              <Label htmlFor="rez-to" className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                Până la
+              </Label>
+              <input
+                id="rez-to"
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+                className="mt-1 h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
+              />
+            </div>
+            <div>
+              <Label htmlFor="rez-sort" className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                <ArrowUpDown className="mr-1 inline h-3 w-3" /> Sortează
+              </Label>
+              <select
+                id="rez-sort"
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="mt-1 h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
+              >
+                <option value="date_desc">Dată (cele mai noi)</option>
+                <option value="date_asc">Dată (cele mai vechi)</option>
+                <option value="guests_desc">Nr. persoane</option>
+                <option value="price_desc">Sumă</option>
+              </select>
+            </div>
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8">
+                Resetează
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Bookings list */}
       {bookings.length === 0 ? (
         <Card>
@@ -323,7 +567,20 @@ export function VenueBookingsClient({
         </Card>
       ) : (
         <div className="space-y-3">
-          {bookings.map((b) => {
+          {visibleBookings.length === 0 && (
+            <Card>
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">
+                Niciun rezultat pentru filtrele curente.{" "}
+                <button
+                  onClick={resetFilters}
+                  className="text-gold hover:underline"
+                >
+                  Resetează filtrele
+                </button>
+              </CardContent>
+            </Card>
+          )}
+          {visibleBookings.map((b) => {
             const eventKey = (b.eventType || "other").toLowerCase();
             const eventLabel = EVENT_TYPE_LABELS[eventKey] || b.eventType || "Eveniment";
             const borderColor = EVENT_TYPE_BORDER[eventKey] || "border-l-muted-foreground";
@@ -333,7 +590,9 @@ export function VenueBookingsClient({
               b.guestCount > venueCapacityMax;
             const isNew = initialTab === "noi";
             const isAccepted = initialTab === "acceptate";
+            const isCompleted = initialTab === "finalizate";
             const leadScore = computeLeadScore(b, venueCapacityMax);
+            const reviewDone = reviewRequested.has(b.id);
 
             return (
               <Card key={b.id} className={cn("border-l-4", borderColor)}>
@@ -537,8 +796,54 @@ export function VenueBookingsClient({
                       <div className="flex flex-col gap-2">
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400">
                           <CheckCircle className="h-3 w-3" />
-                          Acceptată
+                          {b.status === "confirmed_by_client"
+                            ? "Confirmat ambele părți"
+                            : "Acceptată"}
                         </span>
+                        <Button
+                          size="sm"
+                          onClick={() => setCompleteDialog(b)}
+                          disabled={busy === b.id}
+                          className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Finalizat
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setCancelDialog(b);
+                            setCancelReason("");
+                          }}
+                          disabled={busy === b.id}
+                          className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
+                        >
+                          <Ban className="h-4 w-4" />
+                          Anulează
+                        </Button>
+                      </div>
+                    )}
+
+                    {isCompleted && (
+                      <div className="flex flex-col gap-2">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-3 py-1 text-xs font-medium text-blue-400">
+                          <CheckCircle className="h-3 w-3" />
+                          Finalizat
+                        </span>
+                        <Button
+                          size="sm"
+                          onClick={() => requestReview(b.id)}
+                          disabled={busy === b.id || reviewDone}
+                          className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+                        >
+                          {busy === b.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Star className="h-4 w-4" />
+                          )}
+                          {reviewDone ? "Invitație trimisă" : "Cere recenzie"}
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -621,6 +926,112 @@ export function VenueBookingsClient({
                 <CheckCircle className="h-4 w-4" />
               )}
               Confirmă
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete dialog */}
+      <Dialog
+        open={!!completeDialog}
+        onOpenChange={(v) => !v && setCompleteDialog(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Marchează ca finalizat</DialogTitle>
+            <DialogDescription>
+              {completeDialog && (
+                <>
+                  Confirmi că evenimentul pentru{" "}
+                  <strong>{completeDialog.clientName}</strong> (
+                  {new Date(completeDialog.eventDate).toLocaleDateString("ro-RO", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  ) a avut loc cu succes? După aceea vei putea cere clientului o
+                  recenzie.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCompleteDialog(null)}
+              disabled={busy === completeDialog?.id}
+            >
+              Anulează
+            </Button>
+            <Button
+              onClick={confirmComplete}
+              disabled={busy === completeDialog?.id}
+              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              {busy === completeDialog?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle className="h-4 w-4" />
+              )}
+              Da, a fost un succes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vendor cancel dialog */}
+      <Dialog
+        open={!!cancelDialog}
+        onOpenChange={(v) => !v && setCancelDialog(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anulează rezervare confirmată</DialogTitle>
+            <DialogDescription>
+              Ziua se va debloca în calendar și clientul va fi notificat prin
+              email. Această acțiune este vizibilă în istoric.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-muted-foreground">
+              <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 text-red-400" />
+              Anularea unei rezervări confirmate afectează încrederea clientului.
+              Folosește doar în caz de urgență (renovare, forță majoră).
+            </div>
+            <div>
+              <Label htmlFor="cancel-reason" className="text-xs">
+                Motiv pentru client
+              </Label>
+              <Textarea
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={3}
+                className="mt-1"
+                placeholder="Ex: Ne pare rău, sala a suferit daune și nu poate găzdui evenimentul..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelDialog(null)}
+              disabled={busy === cancelDialog?.id}
+            >
+              Înapoi
+            </Button>
+            <Button
+              onClick={confirmVendorCancel}
+              disabled={busy === cancelDialog?.id}
+              variant="outline"
+              className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
+            >
+              {busy === cancelDialog?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Ban className="h-4 w-4" />
+              )}
+              Anulează rezervarea
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -7,7 +7,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues, calendarEvents } from "@/lib/db/schema";
 import {
@@ -40,11 +40,15 @@ export default async function VenueHomePage() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const monthStartIso = monthStart.toISOString().split("T")[0];
+  const monthEndIso = monthEnd.toISOString().split("T")[0];
 
   const [stats, activity, recentBookings, monthCalendar] = await Promise.all([
     getVenueStats(venue.id),
     getVenueActivity(appUser.id, 10),
     getVenueRecentBookings(venue.id, 5),
+    // Scope to this venue only — the previous query fetched events for ALL
+    // venues and filtered in JS, leaking other venues' availability.
     db
       .select({
         date: calendarEvents.date,
@@ -53,13 +57,12 @@ export default async function VenueHomePage() {
       })
       .from(calendarEvents)
       .where(
-        eq(calendarEvents.entityType, "venue"),
-      )
-      .then((rows) =>
-        rows.filter((r) => {
-          const d = new Date(r.date);
-          return d >= monthStart && d <= monthEnd;
-        }),
+        and(
+          eq(calendarEvents.entityType, "venue"),
+          eq(calendarEvents.entityId, venue.id),
+          gte(calendarEvents.date, monthStartIso),
+          lte(calendarEvents.date, monthEndIso),
+        ),
       ),
   ]);
 

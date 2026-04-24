@@ -8,12 +8,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import {
   Star,
+  StarHalf,
   MessageSquare,
   TrendingUp,
   Loader2,
   Mail,
   CheckCircle2,
   ExternalLink,
+  Search,
+  Filter,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +65,14 @@ export function VenueReviewsClient({
   const [submitting, setSubmitting] = useState(false);
   const [requestedIds, setRequestedIds] = useState<Set<number>>(new Set());
   const [requestingId, setRequestingId] = useState<number | null>(null);
+  const [bulkRequesting, setBulkRequesting] = useState(false);
+
+  // Filter state — applied client-side to reviewsState.
+  const [search, setSearch] = useState("");
+  const [filterStars, setFilterStars] = useState<number | null>(null); // null = all
+  const [filterReplied, setFilterReplied] = useState<"all" | "yes" | "no">(
+    "all",
+  );
 
   // Stats
   const stats = useMemo(() => {
@@ -134,6 +146,36 @@ export function VenueReviewsClient({
     }
   }
 
+  /** Derived list with search + filter applied. */
+  const filteredReviews = useMemo(() => {
+    let list = reviewsState;
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter((r) => {
+        const hay = [r.authorName, r.text, r.eventType, r.reply]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return hay.includes(q);
+      });
+    }
+    if (filterStars !== null) {
+      list = list.filter((r) => r.rating === filterStars);
+    }
+    if (filterReplied === "yes") list = list.filter((r) => !!r.reply);
+    else if (filterReplied === "no") list = list.filter((r) => !r.reply);
+    return list;
+  }, [reviewsState, search, filterStars, filterReplied]);
+
+  const hasActiveFilter =
+    !!search.trim() || filterStars !== null || filterReplied !== "all";
+
+  function resetFilters() {
+    setSearch("");
+    setFilterStars(null);
+    setFilterReplied("all");
+  }
+
   async function requestReview(bookingId: number) {
     setRequestingId(bookingId);
     try {
@@ -151,6 +193,59 @@ export function VenueReviewsClient({
       toast.success("Email trimis clientului");
     } finally {
       setRequestingId(null);
+    }
+  }
+
+  /** Fire a review-request email for every eligible booking in one batch.
+   *  Runs sequentially (not parallel) so the rate limiter on the server
+   *  doesn't reject half of them. */
+  async function requestAllReviews() {
+    const pending = reviewableBookings.filter(
+      (b) => b.clientEmail && !requestedIds.has(b.id),
+    );
+    if (pending.length === 0) {
+      toast.info("Nu există clienți eligibili cu email");
+      return;
+    }
+    if (
+      !confirm(
+        `Trimit email cu invitație pentru recenzie la ${pending.length} ${
+          pending.length === 1 ? "client" : "clienți"
+        }?`,
+      )
+    ) {
+      return;
+    }
+    setBulkRequesting(true);
+    let ok = 0;
+    let fail = 0;
+    try {
+      for (const b of pending) {
+        try {
+          const res = await fetch("/api/reviews/request", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ bookingRequestId: b.id }),
+          });
+          if (res.ok) {
+            ok++;
+            setRequestedIds((prev) => new Set(prev).add(b.id));
+          } else {
+            fail++;
+          }
+        } catch {
+          fail++;
+        }
+      }
+      if (fail === 0) {
+        toast.success(`${ok} invitații trimise`);
+      } else if (ok === 0) {
+        toast.error(`${fail} eșuate — verifică în consolă`);
+      } else {
+        toast.success(`${ok} trimise · ${fail} eșuate`);
+      }
+    } finally {
+      setBulkRequesting(false);
     }
   }
 
@@ -179,16 +274,18 @@ export function VenueReviewsClient({
       {/* Stats row */}
       <div className="grid gap-4 sm:grid-cols-3">
         <Card>
-          <CardContent className="flex items-center gap-3 pt-6">
-            <Star className="h-8 w-8 fill-gold text-gold" />
-            <div>
-              <p className="font-heading text-3xl font-bold text-gold">
+          <CardContent className="flex flex-col gap-2 pt-6">
+            <div className="flex items-baseline gap-3">
+              <p className="font-heading text-4xl font-bold text-gold">
                 {stats.avg.toFixed(1)}
               </p>
-              <p className="text-xs text-muted-foreground">
-                Rating mediu · {stats.count} {stats.count === 1 ? "recenzie" : "recenzii"}
-              </p>
+              <StarRatingDisplay rating={stats.avg} />
             </div>
+            <p className="text-xs text-muted-foreground">
+              Rating mediu ·{" "}
+              <strong>{stats.count}</strong>{" "}
+              {stats.count === 1 ? "recenzie" : "recenzii"}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -261,7 +358,7 @@ export function VenueReviewsClient({
       {reviewableBookings.length > 0 && (
         <Card>
           <CardContent className="space-y-3 p-5">
-            <div className="flex items-start justify-between gap-2">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-heading text-lg font-semibold">
                   Cere recenzie
@@ -271,6 +368,27 @@ export function VenueReviewsClient({
                   evenimentul trecut.
                 </p>
               </div>
+              {reviewableBookings.some(
+                (b) => b.clientEmail && !requestedIds.has(b.id),
+              ) && (
+                <Button
+                  size="sm"
+                  onClick={requestAllReviews}
+                  disabled={bulkRequesting}
+                  className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+                >
+                  {bulkRequesting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                  Cere de la toți ({
+                    reviewableBookings.filter(
+                      (b) => b.clientEmail && !requestedIds.has(b.id),
+                    ).length
+                  })
+                </Button>
+              )}
             </div>
             <div className="space-y-2">
               {reviewableBookings.map((b) => {
@@ -318,7 +436,7 @@ export function VenueReviewsClient({
         </Card>
       )}
 
-      {/* Reviews List */}
+      {/* Reviews List + Filter toolbar */}
       {reviewsState.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -327,7 +445,95 @@ export function VenueReviewsClient({
         </Card>
       ) : (
         <div className="space-y-4">
-          {reviewsState.map((review) => (
+          {/* Filter toolbar */}
+          <Card>
+            <CardContent className="flex flex-wrap items-center gap-3 p-3">
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Caută în autor, text, răspuns..."
+                  className="h-8 w-full rounded-md border border-border/50 bg-background pl-9 pr-2 text-xs"
+                />
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-muted-foreground">Stele:</span>
+                <button
+                  onClick={() => setFilterStars(null)}
+                  className={cn(
+                    "rounded px-2 py-0.5 text-xs",
+                    filterStars === null
+                      ? "bg-gold text-[#0D0D0D]"
+                      : "text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  Toate
+                </button>
+                {[5, 4, 3, 2, 1].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setFilterStars(s)}
+                    className={cn(
+                      "inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs",
+                      filterStars === s
+                        ? "bg-gold text-[#0D0D0D]"
+                        : "text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    {s}
+                    <Star className="h-2.5 w-2.5" />
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-1 text-xs">
+                <span className="text-muted-foreground">Răspuns:</span>
+                {(["all", "yes", "no"] as const).map((v) => (
+                  <button
+                    key={v}
+                    onClick={() => setFilterReplied(v)}
+                    className={cn(
+                      "rounded px-2 py-0.5",
+                      filterReplied === v
+                        ? "bg-gold text-[#0D0D0D]"
+                        : "text-muted-foreground hover:bg-muted",
+                    )}
+                  >
+                    {v === "all" ? "Toate" : v === "yes" ? "Da" : "Nu"}
+                  </button>
+                ))}
+              </div>
+              {hasActiveFilter && (
+                <button
+                  onClick={resetFilters}
+                  className="text-xs text-gold hover:underline"
+                >
+                  Resetează
+                </button>
+              )}
+              <span className="ml-auto text-xs text-muted-foreground">
+                {filteredReviews.length}/{reviewsState.length}
+              </span>
+            </CardContent>
+          </Card>
+
+          {filteredReviews.length === 0 && (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                Nicio recenzie pentru filtrul curent.{" "}
+                <button
+                  onClick={resetFilters}
+                  className="text-gold hover:underline"
+                >
+                  Resetează
+                </button>
+              </CardContent>
+            </Card>
+          )}
+
+          {filteredReviews.map((review) => (
             <Card key={review.id}>
               <CardContent className="pt-6">
                 <div className="flex items-start justify-between">
@@ -425,6 +631,43 @@ export function VenueReviewsClient({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * 5 stars, filled / half-filled / empty based on a rating in [0, 5].
+ * Uses Lucide's StarHalf for .3 - .7, rounds outside that. Matches the spec's
+ * "4 stele pline + 1 pe jumătate" presentation.
+ */
+function StarRatingDisplay({ rating }: { rating: number }) {
+  const stars: React.ReactNode[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const diff = rating - (i - 1);
+    if (diff >= 0.75) {
+      stars.push(
+        <Star key={i} className="h-5 w-5 fill-gold text-gold" aria-hidden />,
+      );
+    } else if (diff >= 0.25) {
+      // Half star — render a filled StarHalf over an empty Star for the outline.
+      stars.push(
+        <span key={i} className="relative inline-flex h-5 w-5" aria-hidden>
+          <Star className="absolute inset-0 h-5 w-5 text-gold/40" />
+          <StarHalf className="absolute inset-0 h-5 w-5 fill-gold text-gold" />
+        </span>,
+      );
+    } else {
+      stars.push(
+        <Star key={i} className="h-5 w-5 text-gold/30" aria-hidden />,
+      );
+    }
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-0.5"
+      aria-label={`${rating.toFixed(1)} din 5 stele`}
+    >
+      {stars}
+    </span>
   );
 }
 

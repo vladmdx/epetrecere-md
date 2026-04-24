@@ -21,6 +21,7 @@ export default async function VenueSettingsPage() {
       id: users.id,
       email: users.email,
       phone: users.phone,
+      languagePref: users.languagePref,
       notificationDigestFrequency: users.notificationDigestFrequency,
     })
     .from(users)
@@ -58,6 +59,7 @@ export default async function VenueSettingsPage() {
       }}
       userEmail={appUser.email}
       userPhone={appUser.phone}
+      userLanguage={appUser.languagePref ?? "ro"}
       icalUrl={icalUrl}
       notificationDigestFrequency={appUser.notificationDigestFrequency}
     />

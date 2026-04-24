@@ -37,7 +37,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { MenuScanner } from "@/components/vendor/menu-scanner";
+import { Sparkles } from "lucide-react";
 
 interface Category {
   id: number;
@@ -103,12 +106,57 @@ export function VenueMenuClient({
   initialItems,
   initialPackages,
 }: Props) {
+  const router = useRouter();
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [items, setItems] = useState<Item[]>(initialItems);
   const [packages, setPackages] = useState<Package[]>(initialPackages);
   const [busy, setBusy] = useState(false);
   const [menuPdfUrl, setMenuPdfUrl] = useState<string | null>(existingMenuPdfUrl);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const [translating, setTranslating] = useState(false);
+
+  const hasMenu = categories.length > 0 || packages.length > 0;
+
+  async function translateAll() {
+    if (
+      !confirm(
+        "Trimit tot meniul la Claude pentru traducere în RU + EN. Cele care au deja traduceri vor fi ignorate. Continui?",
+      )
+    ) {
+      return;
+    }
+    setTranslating(true);
+    try {
+      const res = await fetch("/api/venue-menu/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ venueId, overwrite: false }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Traducere eșuată");
+        return;
+      }
+      const data = (await res.json()) as {
+        translated: number;
+        categories: number;
+        items: number;
+        packages: number;
+        message?: string;
+      };
+      if (data.translated === 0) {
+        toast.success(data.message || "Tot meniul are deja traduceri");
+      } else {
+        toast.success(
+          `Traduse ${data.translated} nume (${data.categories} categorii · ${data.items} produse · ${data.packages} pachete)`,
+        );
+      }
+      router.refresh();
+    } finally {
+      setTranslating(false);
+    }
+  }
 
   async function uploadMenuPdf(file: File) {
     if (file.type !== "application/pdf") {
@@ -436,13 +484,56 @@ export function VenueMenuClient({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-heading text-2xl font-bold">Meniu Digital</h1>
-        <p className="text-muted-foreground">
-          Gestionează meniul pentru <strong>{venueName}</strong>. Va apărea pe
-          profilul public al sălii.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-2xl font-bold">Meniu Digital</h1>
+          <p className="text-muted-foreground">
+            Gestionează meniul pentru <strong>{venueName}</strong>. Va apărea pe
+            profilul public al sălii.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {hasMenu && (
+            <Button
+              variant="outline"
+              onClick={translateAll}
+              disabled={translating}
+              className="gap-2"
+              title="Traduce toate numele categoriilor, produselor și pachetelor în Rusă și Engleză"
+            >
+              {translating ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <span className="text-sm">🌐</span>
+              )}
+              Traduce RU + EN
+            </Button>
+          )}
+          <Button
+            variant={showScanner ? "default" : "outline"}
+            onClick={() => setShowScanner((v) => !v)}
+            className={cn(
+              "gap-2",
+              showScanner && "bg-gold text-[#0D0D0D] hover:bg-gold-dark",
+            )}
+          >
+            <Sparkles className="h-4 w-4" />
+            {showScanner ? "Închide scanarea" : "Scanează meniul cu AI"}
+          </Button>
+        </div>
       </div>
+
+      {/* AI scanner — image/PDF → editable preview → import */}
+      {showScanner && (
+        <MenuScanner
+          venueId={venueId}
+          onImported={() => {
+            setShowScanner(false);
+            // Refresh the server-side list so imported rows show up.
+            router.refresh();
+          }}
+        />
+      )}
 
       {/* PDF upload alternative */}
       <Card>

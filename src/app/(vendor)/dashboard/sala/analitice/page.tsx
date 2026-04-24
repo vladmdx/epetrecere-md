@@ -11,12 +11,26 @@ import {
   users,
   venues,
   profileViews,
+  profileClicks,
 } from "@/lib/db/schema";
 import { VenueAnalyticsClient } from "./client";
 
 export const dynamic = "force-dynamic";
 
-export default async function VenueAnalyticsPage() {
+/** Whitelisted period presets. Custom ranges can be added later with
+ *  `from` + `to` query params. */
+const PERIOD_DAYS: Record<string, number> = {
+  "7d": 7,
+  "30d": 30,
+  "90d": 90,
+  "12m": 365,
+};
+
+export default async function VenueAnalyticsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ period?: string }>;
+}) {
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect("/sign-in?redirect_url=/dashboard/sala/analitice");
 
@@ -41,10 +55,13 @@ export default async function VenueAnalyticsPage() {
     .limit(1);
   if (!venue) redirect("/dashboard");
 
+  const sp = await searchParams;
+  const periodKey = sp.period && PERIOD_DAYS[sp.period] ? sp.period : "30d";
+  const periodDays = PERIOD_DAYS[periodKey];
   const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
 
-  // Last 30 days of views, grouped per day for a line chart
+  // Views grouped per day — drives the line chart
   const viewsByDay = await db
     .select({
       day: sql<string>`DATE_TRUNC('day', ${profileViews.createdAt})::date::text`,
@@ -54,7 +71,7 @@ export default async function VenueAnalyticsPage() {
     .where(
       and(
         eq(profileViews.venueId, venue.id),
-        gte(profileViews.createdAt, thirtyDaysAgo),
+        gte(profileViews.createdAt, periodStart),
       ),
     )
     .groupBy(sql`DATE_TRUNC('day', ${profileViews.createdAt})`);
@@ -69,12 +86,32 @@ export default async function VenueAnalyticsPage() {
     .where(
       and(
         eq(profileViews.venueId, venue.id),
-        gte(profileViews.createdAt, thirtyDaysAgo),
+        gte(profileViews.createdAt, periodStart),
       ),
     )
     .groupBy(profileViews.referrer);
 
-  // Total views (30d)
+  // Click breakdown by type (CTA, phone, gallery, menu, contact)
+  const clickRows = await db
+    .select({
+      clickType: profileClicks.clickType,
+      count: sql<number>`COUNT(*)::int`,
+    })
+    .from(profileClicks)
+    .where(
+      and(
+        eq(profileClicks.venueId, venue.id),
+        gte(profileClicks.createdAt, periodStart),
+      ),
+    )
+    .groupBy(profileClicks.clickType);
+
+  const clicksByType: Record<string, number> = {};
+  for (const r of clickRows) {
+    clicksByType[r.clickType] = Number(r.count);
+  }
+
+  // Total views within the selected period
   const totalViews30d = viewsByDay.reduce((s, v) => s + Number(v.count), 0);
 
   // City comparison — average rating + price for active venues in same city
@@ -100,7 +137,7 @@ export default async function VenueAnalyticsPage() {
       .from(venues)
       .where(and(eq(venues.city, venue.city), eq(venues.isActive, true)));
 
-    // Average views per venue in this city (last 30d)
+    // Average views per venue in this city within the same period
     const cityViewRow = await db
       .select({
         total: sql<number>`COUNT(*)::int`,
@@ -111,7 +148,7 @@ export default async function VenueAnalyticsPage() {
         and(
           eq(venues.city, venue.city),
           eq(venues.isActive, true),
-          gte(profileViews.createdAt, thirtyDaysAgo),
+          gte(profileViews.createdAt, periodStart),
         ),
       );
 
@@ -125,21 +162,40 @@ export default async function VenueAnalyticsPage() {
     };
   }
 
-  // Build chart data for last 30 days (fill missing days with zero)
+  // Build chart data. We fill missing days with zero. For a 12-month period
+  // the chart aggregates by week to keep the x-axis readable.
   const chartPoints: Array<{ date: string; label: string; views: number }> = [];
   const viewsMap = new Map<string, number>();
   for (const v of viewsByDay) {
     viewsMap.set(v.day, Number(v.count));
   }
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - i);
-    const ds = d.toISOString().split("T")[0];
-    chartPoints.push({
-      date: ds,
-      label: d.toLocaleDateString("ro-RO", { day: "numeric", month: "short" }),
-      views: viewsMap.get(ds) ?? 0,
-    });
+  if (periodDays <= 90) {
+    for (let i = periodDays - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const ds = d.toISOString().split("T")[0];
+      chartPoints.push({
+        date: ds,
+        label: d.toLocaleDateString("ro-RO", { day: "numeric", month: "short" }),
+        views: viewsMap.get(ds) ?? 0,
+      });
+    }
+  } else {
+    // 12-month view: bucket by month
+    const byMonth = new Map<string, number>();
+    for (const [day, count] of viewsMap.entries()) {
+      const ym = day.slice(0, 7);
+      byMonth.set(ym, (byMonth.get(ym) ?? 0) + count);
+    }
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      chartPoints.push({
+        date: ym,
+        label: d.toLocaleDateString("ro-RO", { month: "short", year: "2-digit" }),
+        views: byMonth.get(ym) ?? 0,
+      });
+    }
   }
 
   return (
@@ -152,7 +208,10 @@ export default async function VenueAnalyticsPage() {
         ratingAvg: venue.ratingAvg,
         ratingCount: venue.ratingCount,
       }}
+      periodKey={periodKey}
+      periodDays={periodDays}
       totalViews30d={totalViews30d}
+      clicksByType={clicksByType}
       chartPoints={chartPoints}
       referrerBreakdown={referrerRows.map((r) => ({
         referrer: r.referrer,

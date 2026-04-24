@@ -1,8 +1,142 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { conversations, users, artists, venues } from "@/lib/db/schema";
-import { and, eq, desc, isNull } from "drizzle-orm";
+import {
+  conversations,
+  users,
+  artists,
+  venues,
+  bookingRequests,
+} from "@/lib/db/schema";
+import { and, eq, desc, isNull, inArray } from "drizzle-orm";
+
+/** Shape we attach to each conversation so the UI can show "Re: Nuntă 20 sept". */
+type LinkedBooking = {
+  id: number;
+  eventType: string | null;
+  eventDate: string | null;
+  status: string;
+};
+
+/**
+ * For each conversation, find the most-recent booking_request matching the
+ * same (clientUserId, artistId|venueId) pair. Runs ONE query total, groups
+ * in JS. Conversations without a booking get null.
+ */
+async function attachLinkedBookings<
+  T extends {
+    id: number;
+    clientUserId: string;
+    artistId: number | null;
+    venueId: number | null;
+  },
+>(rows: T[]): Promise<(T & { linkedBooking: LinkedBooking | null })[]> {
+  if (rows.length === 0) return [];
+
+  const clientIds = Array.from(new Set(rows.map((r) => r.clientUserId)));
+  const artistIds = Array.from(
+    new Set(rows.map((r) => r.artistId).filter((x): x is number => x !== null)),
+  );
+  const venueIds = Array.from(
+    new Set(rows.map((r) => r.venueId).filter((x): x is number => x !== null)),
+  );
+
+  // Build one OR query: clientUserId IN (...) AND (artistId IN (...) OR venueId IN (...))
+  // We run two smaller queries to keep the SQL simple and the indexes happy.
+  const [artistBookings, venueBookings] = await Promise.all([
+    artistIds.length > 0
+      ? db
+          .select({
+            id: bookingRequests.id,
+            clientUserId: bookingRequests.clientUserId,
+            artistId: bookingRequests.artistId,
+            venueId: bookingRequests.venueId,
+            eventType: bookingRequests.eventType,
+            eventDate: bookingRequests.eventDate,
+            status: bookingRequests.status,
+            updatedAt: bookingRequests.updatedAt,
+          })
+          .from(bookingRequests)
+          .where(
+            and(
+              inArray(bookingRequests.clientUserId, clientIds),
+              inArray(bookingRequests.artistId, artistIds),
+            ),
+          )
+          .orderBy(desc(bookingRequests.eventDate))
+      : Promise.resolve([] as Array<{
+          id: number;
+          clientUserId: string | null;
+          artistId: number | null;
+          venueId: number | null;
+          eventType: string | null;
+          eventDate: string;
+          status: string;
+          updatedAt: Date | null;
+        }>),
+    venueIds.length > 0
+      ? db
+          .select({
+            id: bookingRequests.id,
+            clientUserId: bookingRequests.clientUserId,
+            artistId: bookingRequests.artistId,
+            venueId: bookingRequests.venueId,
+            eventType: bookingRequests.eventType,
+            eventDate: bookingRequests.eventDate,
+            status: bookingRequests.status,
+            updatedAt: bookingRequests.updatedAt,
+          })
+          .from(bookingRequests)
+          .where(
+            and(
+              inArray(bookingRequests.clientUserId, clientIds),
+              inArray(bookingRequests.venueId, venueIds),
+            ),
+          )
+          .orderBy(desc(bookingRequests.eventDate))
+      : Promise.resolve([] as Array<{
+          id: number;
+          clientUserId: string | null;
+          artistId: number | null;
+          venueId: number | null;
+          eventType: string | null;
+          eventDate: string;
+          status: string;
+          updatedAt: Date | null;
+        }>),
+  ]);
+
+  const all = [...artistBookings, ...venueBookings];
+
+  // Key → most-recent booking. Since each query is already ordered by
+  // eventDate DESC, the first hit wins.
+  const byKey = new Map<string, LinkedBooking>();
+  for (const b of all) {
+    if (!b.clientUserId) continue;
+    const key = b.artistId
+      ? `${b.clientUserId}|a${b.artistId}`
+      : b.venueId
+        ? `${b.clientUserId}|v${b.venueId}`
+        : null;
+    if (!key) continue;
+    if (byKey.has(key)) continue; // keep first (= most recent)
+    byKey.set(key, {
+      id: b.id,
+      eventType: b.eventType,
+      eventDate: b.eventDate,
+      status: b.status,
+    });
+  }
+
+  return rows.map((r) => {
+    const key = r.artistId
+      ? `${r.clientUserId}|a${r.artistId}`
+      : r.venueId
+        ? `${r.clientUserId}|v${r.venueId}`
+        : "";
+    return { ...r, linkedBooking: byKey.get(key) ?? null };
+  });
+}
 
 // M0b #10 / Phase 6 — Persistent pre-booking chat for artists AND venues.
 // GET /api/conversations — list conversations for the signed-in user.
@@ -53,7 +187,7 @@ export async function GET(req: NextRequest) {
       .where(eq(conversations.artistId, artist.id))
       .orderBy(desc(conversations.lastMessageAt));
 
-    return NextResponse.json(rows);
+    return NextResponse.json(await attachLinkedBookings(rows));
   }
 
   if (role === "venue") {
@@ -83,7 +217,7 @@ export async function GET(req: NextRequest) {
       .where(eq(conversations.venueId, venue.id))
       .orderBy(desc(conversations.lastMessageAt));
 
-    return NextResponse.json(rows);
+    return NextResponse.json(await attachLinkedBookings(rows));
   }
 
   // Unified vendor role — returns conversations for BOTH the user's artist
@@ -146,7 +280,7 @@ export async function GET(req: NextRequest) {
         new Date(b.lastMessageAt).getTime() -
         new Date(a.lastMessageAt).getTime(),
     );
-    return NextResponse.json(merged);
+    return NextResponse.json(await attachLinkedBookings(merged));
   }
 
   // Default: client role — both artist and venue conversations they've opened.
@@ -222,7 +356,7 @@ export async function GET(req: NextRequest) {
       new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
   );
 
-  return NextResponse.json(merged);
+  return NextResponse.json(await attachLinkedBookings(merged));
 }
 
 // POST /api/conversations — find-or-create a conversation with artist OR venue.

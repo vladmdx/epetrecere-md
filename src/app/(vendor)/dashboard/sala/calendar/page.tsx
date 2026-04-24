@@ -14,6 +14,7 @@ import {
   calendarEvents,
   bookingRequests,
 } from "@/lib/db/schema";
+import { getVenueIcalToken } from "@/lib/calendar/ical-token";
 import { VenueCalendarClient } from "./client";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,10 @@ export default async function VenueCalendarPage({
   if (!clerkId) redirect("/sign-in?redirect_url=/dashboard/sala/calendar");
 
   const [appUser] = await db
-    .select({ id: users.id })
+    .select({
+      id: users.id,
+      googleRefreshToken: users.googleRefreshToken,
+    })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
@@ -102,6 +106,11 @@ export default async function VenueCalendarPage({
       ),
   ]);
 
+  const icalToken = getVenueIcalToken(venue.id);
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://epetrecere.md";
+  const icalUrl = `${appUrl}/api/calendar/venue-ical/${venue.id}/${icalToken}.ics`;
+
   return (
     <VenueCalendarClient
       venueId={venue.id}
@@ -111,6 +120,8 @@ export default async function VenueCalendarPage({
       events={events}
       bookings={bookingsRows}
       initialDate={sp.date || null}
+      icalUrl={icalUrl}
+      googleConnected={!!appUser.googleRefreshToken}
     />
   );
 }

@@ -347,12 +347,20 @@ export function VenueHomeDashboard({
                 );
               })}
             </div>
-            {/* Legend */}
-            <div className="mt-4 flex flex-wrap gap-3 border-t border-border/30 pt-3 text-[10px] text-muted-foreground">
-              <LegendDot color="bg-emerald-500/50" label="Disponibil" />
-              <LegendDot color="bg-red-500/50" label="Rezervat" />
-              <LegendDot color="bg-yellow-500/50" label="Tentativ" />
-              <LegendDot color="bg-slate-500/50" label="Blocat" />
+            {/* Legend — status colors (cell background) + event-type dots */}
+            <div className="mt-4 space-y-2 border-t border-border/30 pt-3 text-[10px] text-muted-foreground">
+              <div className="flex flex-wrap gap-3">
+                <LegendDot color="bg-emerald-500/50" label="Disponibil" />
+                <LegendDot color="bg-red-500/50" label="Rezervat" />
+                <LegendDot color="bg-yellow-500/50" label="Tentativ" />
+                <LegendDot color="bg-slate-500/50" label="Blocat" />
+              </div>
+              <div className="flex flex-wrap gap-3 text-[9px]">
+                <LegendDot color="bg-red-500" label="Nuntă" />
+                <LegendDot color="bg-blue-500" label="Botez" />
+                <LegendDot color="bg-purple-500" label="Corporate" />
+                <LegendDot color="bg-orange-500" label="Alt eveniment" />
+              </div>
             </div>
           </CardContent>
         </Card>

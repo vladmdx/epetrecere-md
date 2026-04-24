@@ -24,6 +24,7 @@ export async function PUT(
       | "reject"
       | "client_confirm"
       | "cancel"
+      | "vendor_cancel"
       | "complete"
       | "set_paid"
       | "propose_price";
@@ -352,6 +353,112 @@ export async function PUT(
       status: "completed",
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
+  } else if (action === "vendor_cancel") {
+    // Vendor-initiated cancellation of an accepted/confirmed booking. Frees
+    // the calendar slot (like reject-after-accept) and notifies the client by
+    // email + in-app so they know to find an alternative.
+    const owner = await requireBookingArtistOwner();
+    if (!owner.ok) {
+      return NextResponse.json({ error: owner.error }, { status: owner.status });
+    }
+    if (booking.status !== "accepted" && booking.status !== "confirmed_by_client") {
+      return NextResponse.json(
+        { error: "Only accepted/confirmed bookings can be cancelled by the vendor" },
+        { status: 409 },
+      );
+    }
+    await db.update(bookingRequests).set({
+      status: "cancelled",
+      artistReply: reply || "Rezervarea a fost anulată de organizator.",
+      updatedAt: new Date(),
+    }).where(eq(bookingRequests.id, Number(id)));
+
+    // Release the auto-blocked calendar slot.
+    if (booking.eventDate) {
+      const entityType = booking.venueId ? "venue" : "artist";
+      const entityId = booking.venueId ?? booking.artistId;
+      if (entityId) {
+        await db
+          .delete(calendarEvents)
+          .where(
+            and(
+              eq(calendarEvents.entityType, entityType),
+              eq(calendarEvents.entityId, entityId),
+              eq(calendarEvents.date, booking.eventDate),
+              eq(calendarEvents.source, "booking"),
+            ),
+          );
+      }
+    }
+
+    // Notify the client (in-app + email) — outside the main request flow so
+    // a transient email failure doesn't break the status transition.
+    void (async () => {
+      try {
+        let vendorName = "Organizatorul";
+        if (booking.venueId) {
+          const { venues } = await import("@/lib/db/schema");
+          const [v] = await db
+            .select({ nameRo: venues.nameRo })
+            .from(venues)
+            .where(eq(venues.id, booking.venueId))
+            .limit(1);
+          if (v) vendorName = `Sala ${v.nameRo}`;
+        } else if (booking.artistId) {
+          const [a] = await db
+            .select({ nameRo: artists.nameRo })
+            .from(artists)
+            .where(eq(artists.id, booking.artistId))
+            .limit(1);
+          if (a) vendorName = `Artistul ${a.nameRo}`;
+        }
+
+        const { notificationEmail } = await import(
+          "@/lib/email/templates/notification-email"
+        );
+        const emailBody = `<strong>${vendorName}</strong> a anulat rezervarea confirmată pentru ${booking.eventDate}.${
+          reply ? `<br><br>Motiv: <em>${reply}</em>` : ""
+        }<br><br>Poți alege un alt furnizor disponibil la această dată pe ePetrecere.md.`;
+
+        if (booking.clientUserId) {
+          const [clientUser] = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, booking.clientUserId))
+            .limit(1);
+          await dispatchNotification({
+            userId: booking.clientUserId,
+            type: "booking_status_changed",
+            title: `${vendorName} a anulat rezervarea ta`,
+            message: reply ?? `Pe ${booking.eventDate}`,
+            actionUrl: "/cabinet/rezervari",
+            email: clientUser?.email ?? undefined,
+            emailSubject: `❌ ${vendorName} a anulat rezervarea ta`,
+            emailHtml: notificationEmail({
+              title: "Rezervare anulată",
+              message: emailBody,
+              ctaUrl: "https://epetrecere.md/cabinet/rezervari",
+              ctaText: "Vezi detalii →",
+              emoji: "❌",
+            }),
+          });
+        } else if (booking.clientEmail) {
+          await sendEmail({
+            to: booking.clientEmail,
+            subject: `❌ ${vendorName} a anulat rezervarea ta`,
+            html: notificationEmail({
+              title: "Rezervare anulată",
+              message: emailBody,
+              ctaUrl: "https://epetrecere.md",
+              ctaText: "Vizitează ePetrecere.md →",
+              emoji: "❌",
+            }),
+          });
+        }
+      } catch (err) {
+        console.error("[vendor_cancel] notify failed", err);
+      }
+    })();
   } else if (action === "set_paid") {
     // Either the client (from the budget tab) or the artist (from their
     // dashboard) can toggle paid status. Both sides have legitimate reasons

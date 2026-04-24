@@ -76,7 +76,19 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          // Track CTA open — analytics conversion signal
+          if (artistId) {
+            void import("@/lib/analytics/track-click").then((m) =>
+              m.trackClick("artist", artistId, "cta"),
+            );
+          } else if (venueId) {
+            void import("@/lib/analytics/track-click").then((m) =>
+              m.trackClick("venue", venueId, "cta"),
+            );
+          }
+        }}
         className={cn(
           "w-full cursor-pointer rounded-xl py-3.5 text-center text-base font-semibold transition-colors",
           variant === "primary"
@@ -232,7 +244,18 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setOpen(true);
+          if (artistId) {
+            void import("@/lib/analytics/track-click").then((m) =>
+              m.trackClick("artist", artistId, "cta"),
+            );
+          } else if (venueId) {
+            void import("@/lib/analytics/track-click").then((m) =>
+              m.trackClick("venue", venueId, "cta"),
+            );
+          }
+        }}
         className={cn(
           "flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl py-3.5 text-center text-base font-semibold transition-colors",
           variant === "primary"

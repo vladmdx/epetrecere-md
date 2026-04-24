@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { venues, venueImages, reviews, users } from "@/lib/db/schema";
+import { venues, venueImages, reviews, users, redirects } from "@/lib/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 
@@ -48,6 +48,13 @@ const updateSchema = z.object({
   nameRo: z.string().min(2).optional(),
   nameRu: z.string().optional(),
   nameEn: z.string().optional(),
+  /** 2-80 chars, lowercase kebab-case; server re-sanitizes. */
+  slug: z
+    .string()
+    .min(2)
+    .max(80)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug invalid — doar litere/cifre și -")
+    .optional(),
   descriptionRo: z.string().optional(),
   descriptionRu: z.string().optional(),
   descriptionEn: z.string().optional(),
@@ -143,10 +150,51 @@ export async function PUT(
     if (data[k] === "") data[k] = undefined;
   }
 
+  // If the slug is changing, (1) block conflicts with a friendly error and
+  // (2) record a legacy redirect so existing inbound links still resolve.
+  let oldSlug: string | null = null;
+  if (typeof data.slug === "string") {
+    const [current] = await db
+      .select({ slug: venues.slug })
+      .from(venues)
+      .where(eq(venues.id, venueId))
+      .limit(1);
+    if (current && current.slug !== data.slug) {
+      const [conflict] = await db
+        .select({ id: venues.id })
+        .from(venues)
+        .where(eq(venues.slug, data.slug))
+        .limit(1);
+      if (conflict) {
+        return NextResponse.json(
+          { error: "Slug-ul este deja folosit de altă sală" },
+          { status: 409 },
+        );
+      }
+      oldSlug = current.slug;
+    } else {
+      // No actual change — don't spam the redirects table.
+      delete (data as { slug?: string }).slug;
+    }
+  }
+
   await db
     .update(venues)
     .set({ ...data, updatedAt: new Date() })
     .where(eq(venues.id, venueId));
+
+  if (oldSlug && typeof data.slug === "string") {
+    try {
+      await db.insert(redirects).values({
+        fromPath: `/sali/${oldSlug}`,
+        toPath: `/sali/${data.slug}`,
+        statusCode: "301",
+      });
+    } catch (err) {
+      // Duplicate redirect (e.g., slug flipped back and forth) — non-fatal.
+      console.warn("[venue slug] redirect insert skipped:", err);
+    }
+  }
 
   const [updated] = await db
     .select()

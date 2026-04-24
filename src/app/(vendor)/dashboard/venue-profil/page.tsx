@@ -32,6 +32,7 @@ const RichEditor = dynamic(
   { ssr: false },
 );
 import { MapPicker } from "@/components/shared/map-picker";
+import { VenueGalleryManager } from "@/components/vendor/venue-gallery-manager";
 
 const CANONICAL_FACILITIES = [
   "Parcare",
@@ -115,6 +116,43 @@ export default function VenueProfilePage() {
     if (current.includes(customFacility.trim())) return;
     update({ facilities: [...current, customFacility.trim()] });
     setCustomFacility("");
+  }
+
+  async function improveDescription(lang: "ro" | "ru" | "en") {
+    if (!venue) return;
+    const field =
+      lang === "ro"
+        ? "descriptionRo"
+        : lang === "ru"
+          ? "descriptionRu"
+          : "descriptionEn";
+    const current = (venue[field as keyof Venue] as string | null) ?? "";
+    try {
+      const res = await fetch("/api/ai/venue-description", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venueId: venue.id,
+          lang,
+          mode: current.trim() ? "improve" : "generate",
+          current,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut genera descrierea");
+        return;
+      }
+      const data = (await res.json()) as { description?: string };
+      if (!data.description) {
+        toast.error("Răspuns invalid de la AI");
+        return;
+      }
+      update({ [field]: data.description } as Partial<Venue>);
+      toast.success("Descriere generată — nu uita să salvezi");
+    } catch {
+      toast.error("Eroare la generare");
+    }
   }
 
   async function save() {
@@ -246,9 +284,11 @@ export default function VenueProfilePage() {
         </div>
       )}
 
-      <Tabs defaultValue="info">
-        <TabsList>
-          <TabsTrigger value="info">Informații</TabsTrigger>
+      <Tabs defaultValue="general">
+        <TabsList className="flex-wrap">
+          <TabsTrigger value="general">General</TabsTrigger>
+          <TabsTrigger value="description">Descriere</TabsTrigger>
+          <TabsTrigger value="gallery">Galerie</TabsTrigger>
           <TabsTrigger value="capacity">Capacitate & Preț</TabsTrigger>
           <TabsTrigger value="facilities">Facilități</TabsTrigger>
           <TabsTrigger value="location">Locație</TabsTrigger>
@@ -256,13 +296,13 @@ export default function VenueProfilePage() {
           <TabsTrigger value="extras">Meniu & Tur 360°</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="info" className="mt-6 space-y-6">
+        <TabsContent value="general" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Date de bază</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <Label>Nume (RO) *</Label>
                   <Input
@@ -275,6 +315,13 @@ export default function VenueProfilePage() {
                   <Input
                     value={venue.nameRu ?? ""}
                     onChange={(e) => update({ nameRu: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label>Name (EN)</Label>
+                  <Input
+                    value={venue.nameEn ?? ""}
+                    onChange={(e) => update({ nameEn: e.target.value })}
                   />
                 </div>
               </div>
@@ -323,30 +370,58 @@ export default function VenueProfilePage() {
             </CardContent>
           </Card>
 
+        </TabsContent>
+
+        <TabsContent value="description" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Descriere</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Editor rich-text: bold, italic, titluri, liste, link-uri.
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <CardTitle>Descriere</CardTitle>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Editor rich-text: bold, italic, titluri, liste, link-uri. AI-ul generează
+                    ~300 cuvinte pe baza numelui, capacității și facilităților sălii.
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <DescriptionLangEditor
+                label="Descriere (RO)"
+                placeholder="Descrie sala ta — atmosferă, ce o face specială, evenimente potrivite..."
+                value={venue.descriptionRo ?? ""}
+                onChange={(html) => update({ descriptionRo: html })}
+                onAi={() => improveDescription("ro")}
+              />
+              <DescriptionLangEditor
+                label="Descriere (RU)"
+                placeholder="Опишите ваш зал..."
+                value={venue.descriptionRu ?? ""}
+                onChange={(html) => update({ descriptionRu: html })}
+                onAi={() => improveDescription("ru")}
+              />
+              <DescriptionLangEditor
+                label="Description (EN)"
+                placeholder="Describe your venue — atmosphere, highlights, best-fit events..."
+                value={venue.descriptionEn ?? ""}
+                onChange={(html) => update({ descriptionEn: html })}
+                onAi={() => improveDescription("en")}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="gallery" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Galerie foto</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Minim 5 imagini recomandate. Prima imagine devine coperta sălii pe listing și pe
+                OpenGraph. JPG/PNG/WebP, max 10MB — comprimare automată la upload.
               </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label className="mb-2 block">Descriere (RO)</Label>
-                <RichEditor
-                  content={venue.descriptionRo ?? ""}
-                  onChange={(html) => update({ descriptionRo: html })}
-                  placeholder="Descrie sala ta — atmosferă, ce o face specială, evenimente potrivite..."
-                />
-              </div>
-              <div>
-                <Label className="mb-2 block">Descriere (RU)</Label>
-                <RichEditor
-                  content={venue.descriptionRu ?? ""}
-                  onChange={(html) => update({ descriptionRu: html })}
-                  placeholder="Опишите ваш зал..."
-                />
-              </div>
+            <CardContent>
+              <VenueGalleryManager venueId={venue.id} venueName={venue.nameRo} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -642,6 +717,63 @@ export default function VenueProfilePage() {
   );
 }
 
+/** Single-language description editor block with inline AI "improve" trigger. */
+function DescriptionLangEditor({
+  label,
+  placeholder,
+  value,
+  onChange,
+  onAi,
+}: {
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (html: string) => void;
+  onAi: () => void;
+}) {
+  const [working, setWorking] = useState(false);
+  const plainLength = value.replace(/<[^>]+>/g, "").trim().length;
+  return (
+    <div>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <Label>{label}</Label>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {plainLength} caractere
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              setWorking(true);
+              try {
+                await onAi();
+              } finally {
+                setWorking(false);
+              }
+            }}
+            disabled={working}
+            className="h-8 gap-1.5 text-xs"
+          >
+            {working ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <span className="text-sm">✨</span>
+            )}
+            {plainLength > 0 ? "Îmbunătățește cu AI" : "Generează cu AI"}
+          </Button>
+        </div>
+      </div>
+      <RichEditor
+        content={value}
+        onChange={onChange}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
 /** SEO editor: multi-language + SERP preview + AI auto-generate. */
 function SeoTabContent({
   venue,
@@ -768,6 +900,9 @@ function SeoTabContent({
           ))}
         </div>
 
+        {/* Slug editor — spec 4.7 */}
+        <SlugEditor venue={venue} setVenue={setVenue} />
+
         <div>
           <Label htmlFor="seo-title">
             Titlu SEO (meta title)
@@ -834,5 +969,107 @@ function SeoTabContent({
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+/** Slug editor with redirect warning — spec 4.7 */
+function SlugEditor({
+  venue,
+  setVenue,
+}: {
+  venue: Venue;
+  setVenue: (v: Venue) => void;
+}) {
+  const [draft, setDraft] = useState(venue.slug);
+  const [saving, setSaving] = useState(false);
+  const changed = draft.trim() !== venue.slug;
+
+  function slugify(raw: string) {
+    return raw
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
+  }
+
+  async function commitSlug() {
+    const cleaned = slugify(draft);
+    if (!cleaned) {
+      toast.error("Slug-ul trebuie să aibă cel puțin un caracter");
+      setDraft(venue.slug);
+      return;
+    }
+    if (cleaned === venue.slug) return;
+    if (
+      !confirm(
+        `Schimbarea slug-ului din "${venue.slug}" în "${cleaned}" va crea un redirect automat de la URL-ul vechi. Continui?`,
+      )
+    ) {
+      setDraft(venue.slug);
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/venues/${venue.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ slug: cleaned }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut actualiza slug-ul");
+        setDraft(venue.slug);
+        return;
+      }
+      setVenue({ ...venue, slug: cleaned });
+      setDraft(cleaned);
+      toast.success("Slug actualizat — URL-ul vechi redirectează automat");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <Label htmlFor="venue-slug">
+        Slug URL
+        <span className="ml-2 text-xs text-muted-foreground">
+          epetrecere.md/sali/<strong className="text-foreground">{draft || "—"}</strong>
+        </span>
+      </Label>
+      <div className="mt-1 flex gap-2">
+        <Input
+          id="venue-slug"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => setDraft((d) => slugify(d))}
+          placeholder={venue.slug}
+          className="font-mono text-sm"
+        />
+        {changed && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={commitSlug}
+            disabled={saving}
+          >
+            {saving ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              "Schimbă"
+            )}
+          </Button>
+        )}
+      </div>
+      {changed && (
+        <p className="mt-1 text-xs text-amber-500">
+          ⚠ Schimbarea slug-ului va crea un redirect automat de la URL-ul vechi.
+          Evită schimbări dese — afectează SEO-ul și link-urile existente.
+        </p>
+      )}
+    </div>
   );
 }

@@ -101,6 +101,17 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const description = getLocalized(artist, "description", locale);
   const [avatarOpen, setAvatarOpen] = useState(false);
 
+  // Track recent views so the homepage/cabinet "Recently viewed" widget has data
+  useEffect(() => {
+    import("@/hooks/use-recently-viewed").then(({ trackRecentView }) => {
+      trackRecentView("artist", {
+        slug: artist.slug,
+        name,
+        imageUrl: artist.photoUrl ?? null,
+      });
+    });
+  }, [artist.slug, artist.photoUrl, name]);
+
   // Resolve the event plan this booking should attach to. Priority order:
   // explicit `?plan=X` URL param (used by dashboard discovery links) →
   // sessionStorage.wizard-plan-id (set by /planifica/rezultate after the

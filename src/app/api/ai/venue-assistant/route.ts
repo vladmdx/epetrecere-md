@@ -19,9 +19,27 @@ import {
   users,
   bookingRequests,
   calendarEvents,
+  reviews,
+  profileViews,
+  profileClicks,
 } from "@/lib/db/schema";
-import { and, avg, count, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import {
+  and,
+  avg,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNull,
+  lte,
+  sql,
+} from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import {
+  generateVenueDescription,
+  generateSEOTexts,
+} from "@/lib/ai";
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -95,6 +113,102 @@ const TOOLS: Anthropic.Messages.Tool[] = [
       properties: {},
     },
   },
+  {
+    name: "recent_reviews",
+    description:
+      "Listează recenziile sălii (default cele fără răspuns). Folosește pentru a ajuta owner-ul să răspundă.",
+    input_schema: {
+      type: "object",
+      properties: {
+        onlyUnanswered: {
+          type: "boolean",
+          description: "Default true — doar recenzii fără răspuns.",
+        },
+        limit: { type: "number", description: "Default 5, max 20" },
+      },
+    },
+  },
+  {
+    name: "reply_to_review",
+    description:
+      "Postează un răspuns public la o recenzie. CERE EXPLICIT confirmarea textului de la utilizator înainte de apelare.",
+    input_schema: {
+      type: "object",
+      properties: {
+        reviewId: { type: "number" },
+        reply: { type: "string", description: "Răspunsul public (max 1000 chars)" },
+      },
+      required: ["reviewId", "reply"],
+    },
+  },
+  {
+    name: "improve_description",
+    description:
+      "Rescrie/îmbunătățește descrierea sălii folosind AI. Returnează doar preview-ul HTML; NU salvează. Owner-ul decide dacă vrea să îl salveze cu save_description.",
+    input_schema: {
+      type: "object",
+      properties: {
+        lang: { type: "string", enum: ["ro", "ru", "en"], description: "Default 'ro'" },
+        mode: {
+          type: "string",
+          enum: ["generate", "improve"],
+          description: "'improve' rescrie descrierea existentă; 'generate' scrie de la 0",
+        },
+      },
+    },
+  },
+  {
+    name: "save_description",
+    description:
+      "Salvează descrierea în DB (pentru limba specificată). Apelează DOAR după ce owner-ul a văzut preview-ul din improve_description și a confirmat explicit.",
+    input_schema: {
+      type: "object",
+      properties: {
+        lang: { type: "string", enum: ["ro", "ru", "en"] },
+        html: { type: "string", description: "Conținutul HTML (de la improve_description)" },
+      },
+      required: ["lang", "html"],
+    },
+  },
+  {
+    name: "generate_seo",
+    description:
+      "Generează titlu SEO (≤60 chars) + meta description (≤160 chars) pentru sala în limba specificată. Returnează doar preview.",
+    input_schema: {
+      type: "object",
+      properties: {
+        lang: { type: "string", enum: ["ro", "ru", "en"], description: "Default 'ro'" },
+      },
+    },
+  },
+  {
+    name: "save_seo",
+    description:
+      "Salvează titlu SEO + meta description pentru limba dată. Apelează DOAR după confirmarea explicită a owner-ului.",
+    input_schema: {
+      type: "object",
+      properties: {
+        lang: { type: "string", enum: ["ro", "ru", "en"] },
+        title: { type: "string", description: "Max 60 chars" },
+        description: { type: "string", description: "Max 160 chars" },
+      },
+      required: ["lang", "title", "description"],
+    },
+  },
+  {
+    name: "analytics_summary",
+    description:
+      "Returnează un sumar al analitice-lor profilului: vizite, CTA clicks, conversion rate, galerie, meniu, pe o perioadă.",
+    input_schema: {
+      type: "object",
+      properties: {
+        days: {
+          type: "number",
+          description: "Ultima N zile (7/30/90/365, default 30)",
+        },
+      },
+    },
+  },
 ];
 
 export async function POST(req: NextRequest) {
@@ -147,7 +261,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const systemPrompt = `Ești asistentul AI pentru proprietarul unei săli de evenimente pe ePetrecere.md. Ajuți la gestionarea sălii, planificare, și îmbunătățirea performanței profilului.
+  const systemPrompt = `Ești asistentul AI pentru proprietarul unei săli de evenimente pe ePetrecere.md. Ajuți la gestionarea sălii, planificare, îmbunătățirea profilului și răspunsuri la recenzii.
 
 Date despre sala ta:
 - Nume: ${venue.nameRo}
@@ -155,14 +269,19 @@ Date despre sala ta:
 - Capacitate: ${venue.capacityMin ?? "?"}–${venue.capacityMax ?? "?"} persoane
 - Preț actual/persoană: ${venue.pricePerPerson ? `${venue.pricePerPerson}€` : "nespecificat"}
 - Facilități: ${(venue.facilities as string[] | null)?.join(", ") || "nespecificat"}
-- Descriere actuală: ${venue.descriptionRo ? venue.descriptionRo.slice(0, 200) + "..." : "niciuna"}
+- Descriere actuală (RO, trunchiat): ${venue.descriptionRo ? venue.descriptionRo.slice(0, 200) + "..." : "niciuna"}
 
-Reguli:
-1. Răspunde în română, scurt și prietenos.
-2. Folosește tools pentru întrebări despre date concrete (rezervări, ocupare). NU inventa numere.
-3. Pentru blocări de calendar, cere explicit confirmarea utilizatorului înainte de a apela tool-ul.
-4. Pentru sugestii de preț, folosește suggest_price apoi oferă rationale clar.
-5. Nu ai acces la datele altor săli individual — doar la medii agregate.`;
+Reguli critice:
+1. Răspunde în română, scurt și prietenos (emoji-uri OK cu moderație).
+2. Folosește tools pentru ORICE întrebare despre date concrete (rezervări, ocupare, recenzii, analytics). Niciodată nu inventa numere.
+3. **Acțiuni destructive sau publice necesită confirmare explicită a owner-ului**:
+   - block_calendar_days → "Vrei să blochez 1-10 ian? (Da/Nu)"
+   - reply_to_review → afișează TEXTUL propus, cere "E OK să postez?" înainte de apel
+   - save_description / save_seo → arată preview-ul din improve_description sau generate_seo, cere "Salvez?" înainte de a apela save_*
+4. Pentru sugestii preț, folosește suggest_price apoi oferă rationale concret (vs medie oraș).
+5. La response review, generează un răspuns politicos, personalizat (menționează numele clientului + un detaliu din recenzie), ≤150 cuvinte. Arată-l înainte de a chema reply_to_review.
+6. La îmbunătățire descriere, folosește improve_description → arată preview → întreabă → save_description.
+7. Nu ai acces la datele altor săli individual — doar medii agregate via suggest_price.`;
 
   const client = getClient();
   const conversation: Anthropic.Messages.MessageParam[] = incoming.map((m) => ({
@@ -314,6 +433,254 @@ Reguli:
           blocked: dates.length,
           fromDate: input.fromDate,
           toDate: input.toDate,
+        });
+      } else if (toolUse.name === "recent_reviews") {
+        const input = toolUse.input as {
+          onlyUnanswered?: boolean;
+          limit?: number;
+        };
+        const onlyUnanswered = input.onlyUnanswered !== false; // default true
+        const limit = Math.min(20, Math.max(1, input.limit ?? 5));
+        const rows = await db
+          .select({
+            id: reviews.id,
+            authorName: reviews.authorName,
+            rating: reviews.rating,
+            text: reviews.text,
+            eventType: reviews.eventType,
+            reply: reviews.reply,
+            createdAt: reviews.createdAt,
+          })
+          .from(reviews)
+          .where(
+            and(
+              eq(reviews.venueId, venue.id),
+              eq(reviews.isApproved, true),
+              onlyUnanswered ? isNull(reviews.reply) : sql`TRUE`,
+            ),
+          )
+          .orderBy(desc(reviews.createdAt))
+          .limit(limit);
+        toolResult = JSON.stringify({
+          count: rows.length,
+          reviews: rows,
+        });
+      } else if (toolUse.name === "reply_to_review") {
+        const input = toolUse.input as { reviewId: number; reply: string };
+        // Ownership re-check — refuse if the review doesn't belong to this venue.
+        const [target] = await db
+          .select({ id: reviews.id, venueId: reviews.venueId })
+          .from(reviews)
+          .where(eq(reviews.id, input.reviewId))
+          .limit(1);
+        if (!target || target.venueId !== venue.id) {
+          toolResult = JSON.stringify({
+            success: false,
+            error: "Recenzia nu aparține sălii tale sau nu există.",
+          });
+        } else if (!input.reply || input.reply.trim().length === 0) {
+          toolResult = JSON.stringify({
+            success: false,
+            error: "Răspunsul nu poate fi gol.",
+          });
+        } else {
+          await db
+            .update(reviews)
+            .set({
+              reply: input.reply.trim().slice(0, 1000),
+              replyAt: new Date(),
+            })
+            .where(eq(reviews.id, input.reviewId));
+          toolResult = JSON.stringify({
+            success: true,
+            reviewId: input.reviewId,
+          });
+        }
+      } else if (toolUse.name === "improve_description") {
+        const input = toolUse.input as {
+          lang?: "ro" | "ru" | "en";
+          mode?: "generate" | "improve";
+        };
+        const lang = input.lang ?? "ro";
+        const currentField =
+          lang === "ro"
+            ? venue.descriptionRo
+            : lang === "ru"
+              ? (venue as unknown as { descriptionRu?: string | null }).descriptionRu
+              : (venue as unknown as { descriptionEn?: string | null }).descriptionEn;
+        const current = currentField ?? "";
+        const mode =
+          input.mode ?? (current.trim() ? "improve" : "generate");
+        try {
+          const html = await generateVenueDescription({
+            name:
+              lang === "ro"
+                ? venue.nameRo
+                : lang === "ru"
+                  ? (venue as unknown as { nameRu?: string | null }).nameRu || venue.nameRo
+                  : (venue as unknown as { nameEn?: string | null }).nameEn || venue.nameRo,
+            city: venue.city,
+            capacityMin: venue.capacityMin,
+            capacityMax: venue.capacityMax,
+            facilities: (venue.facilities as string[] | null) ?? [],
+            current,
+            mode,
+            language: lang,
+          });
+          toolResult = JSON.stringify({
+            success: true,
+            lang,
+            mode,
+            preview: html,
+            note: "Owner-ul trebuie să confirme înainte de save_description.",
+          });
+        } catch (err) {
+          toolResult = JSON.stringify({
+            success: false,
+            error: (err as Error).message || "Generare eșuată",
+          });
+        }
+      } else if (toolUse.name === "save_description") {
+        const input = toolUse.input as {
+          lang: "ro" | "ru" | "en";
+          html: string;
+        };
+        if (!input.html || input.html.length > 20_000) {
+          toolResult = JSON.stringify({
+            success: false,
+            error: "HTML lipsă sau prea lung (>20k)",
+          });
+        } else {
+          const field =
+            input.lang === "ro"
+              ? "descriptionRo"
+              : input.lang === "ru"
+                ? "descriptionRu"
+                : "descriptionEn";
+          await db
+            .update(venues)
+            .set({ [field]: input.html, updatedAt: new Date() })
+            .where(eq(venues.id, venue.id));
+          toolResult = JSON.stringify({
+            success: true,
+            lang: input.lang,
+          });
+        }
+      } else if (toolUse.name === "generate_seo") {
+        const input = toolUse.input as { lang?: "ro" | "ru" | "en" };
+        const lang = input.lang ?? "ro";
+        const name =
+          lang === "ro"
+            ? venue.nameRo
+            : lang === "ru"
+              ? (venue as unknown as { nameRu?: string | null }).nameRu || venue.nameRo
+              : (venue as unknown as { nameEn?: string | null }).nameEn || venue.nameRo;
+        const descrRaw =
+          lang === "ro"
+            ? venue.descriptionRo
+            : lang === "ru"
+              ? (venue as unknown as { descriptionRu?: string | null }).descriptionRu
+              : (venue as unknown as { descriptionEn?: string | null }).descriptionEn;
+        const plain = (descrRaw || "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 800);
+        const ctx = [
+          venue.city ? `Locație: ${venue.city}` : "",
+          venue.capacityMin || venue.capacityMax
+            ? `Capacitate: ${venue.capacityMin ?? "?"}–${venue.capacityMax ?? "?"} persoane`
+            : "",
+          plain,
+        ]
+          .filter(Boolean)
+          .join(". ");
+        try {
+          const r = await generateSEOTexts(
+            name || "Sală evenimente",
+            "venue",
+            ctx,
+            lang,
+          );
+          toolResult = JSON.stringify({
+            success: true,
+            lang,
+            title: r.title,
+            metaDescription: r.metaDescription,
+            note: "Owner-ul trebuie să confirme înainte de save_seo.",
+          });
+        } catch {
+          toolResult = JSON.stringify({
+            success: false,
+            error: "Serviciul AI a eșuat.",
+          });
+        }
+      } else if (toolUse.name === "save_seo") {
+        const input = toolUse.input as {
+          lang: "ro" | "ru" | "en";
+          title: string;
+          description: string;
+        };
+        const titleField =
+          input.lang === "ro"
+            ? "seoTitleRo"
+            : input.lang === "ru"
+              ? "seoTitleRu"
+              : "seoTitleEn";
+        const descField =
+          input.lang === "ro"
+            ? "seoDescRo"
+            : input.lang === "ru"
+              ? "seoDescRu"
+              : "seoDescEn";
+        await db
+          .update(venues)
+          .set({
+            [titleField]: input.title.slice(0, 100),
+            [descField]: input.description.slice(0, 300),
+            updatedAt: new Date(),
+          })
+          .where(eq(venues.id, venue.id));
+        toolResult = JSON.stringify({ success: true, lang: input.lang });
+      } else if (toolUse.name === "analytics_summary") {
+        const input = toolUse.input as { days?: number };
+        const days = [7, 30, 90, 365].includes(input.days ?? -1)
+          ? (input.days as number)
+          : 30;
+        const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const [viewsRow] = await db
+          .select({ total: sql<number>`COUNT(*)::int` })
+          .from(profileViews)
+          .where(
+            and(
+              eq(profileViews.venueId, venue.id),
+              gte(profileViews.createdAt, since),
+            ),
+          );
+        const clickRows = await db
+          .select({
+            clickType: profileClicks.clickType,
+            total: sql<number>`COUNT(*)::int`,
+          })
+          .from(profileClicks)
+          .where(
+            and(
+              eq(profileClicks.venueId, venue.id),
+              gte(profileClicks.createdAt, since),
+            ),
+          )
+          .groupBy(profileClicks.clickType);
+        const clicks: Record<string, number> = {};
+        for (const r of clickRows) clicks[r.clickType] = Number(r.total);
+        const views = Number(viewsRow?.total ?? 0);
+        const cta = clicks.cta ?? 0;
+        const conversionPct =
+          views > 0 ? Math.round((cta / views) * 1000) / 10 : 0;
+        toolResult = JSON.stringify({
+          days,
+          views,
+          clicks,
+          conversionPct,
         });
       } else if (toolUse.name === "suggest_price") {
         const row = await db

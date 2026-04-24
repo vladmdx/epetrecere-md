@@ -1,9 +1,6 @@
-// Phase 1 stub — redirect to the existing venue profile editor.
-// Phase 2 will replace this with an expanded tab structure
-// (General, Descriere, Galerie, Facilități, Locație, SEO) per spec.
+// Venue profile editor — spec section 4.
+//
+// This is the canonical route (reachable from the Venue sidebar). The older
+// /dashboard/venue-profil path now redirects here.
 
-import { redirect } from "next/navigation";
-
-export default function VenueProfilPage() {
-  redirect("/dashboard/venue-profil");
-}
+export { default } from "../../venue-profil/page";

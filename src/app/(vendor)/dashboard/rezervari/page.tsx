@@ -6,7 +6,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, User, Clock, Euro, CheckCircle, XCircle, Loader2, MessageSquare, Send, HandCoins, ArrowLeftRight } from "lucide-react";
+import { Calendar, User, Clock, Euro, CheckCircle, XCircle, Loader2, MessageSquare, Send, HandCoins, ArrowLeftRight, Star, Ban } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,74 @@ type ChatMessage = {
   createdAt: string;
 };
 
+const EVENT_TYPE_BORDER: Record<string, string> = {
+  wedding: "border-l-red-500",
+  nunta: "border-l-red-500",
+  baptism: "border-l-blue-500",
+  botez: "border-l-blue-500",
+  cumatrie: "border-l-cyan-500",
+  cumetrie: "border-l-cyan-500",
+  corporate: "border-l-purple-500",
+  birthday: "border-l-orange-500",
+  aniversare: "border-l-orange-500",
+};
+
+/**
+ * Hot/Warm/Cold lead score based on price, guest count, date proximity and
+ * message completeness. Mirrors the venue-side scoring.
+ */
+function computeLeadScore(b: BookingRequest): {
+  tier: "hot" | "warm" | "cold";
+  label: string;
+  emoji: string;
+  className: string;
+} {
+  let score = 0;
+  const price = b.agreedPrice ?? 0;
+  if (price >= 3000) score += 3;
+  else if (price >= 1500) score += 2;
+  else if (price >= 500) score += 1;
+
+  if (b.guestCount && b.guestCount >= 80) score += 2;
+  else if (b.guestCount && b.guestCount >= 40) score += 1;
+
+  if ((b.clientEmail) && b.clientPhone) score += 1;
+  if (b.message && b.message.trim().length > 20) score += 1;
+
+  if (b.eventDate) {
+    const days = Math.floor(
+      (new Date(b.eventDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    );
+    if (days >= 0 && days <= 30) score += 2;
+    else if (days > 30 && days <= 90) score += 1;
+  }
+
+  if (b.linkedVenue) score += 1;
+
+  if (score >= 6) {
+    return {
+      tier: "hot",
+      label: "Hot",
+      emoji: "🔥",
+      className: "bg-red-500/15 text-red-400 border-red-500/40",
+    };
+  }
+  if (score >= 3) {
+    return {
+      tier: "warm",
+      label: "Warm",
+      emoji: "🌡️",
+      className: "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
+    };
+  }
+  return {
+    tier: "cold",
+    label: "Cold",
+    emoji: "❄️",
+    className: "bg-blue-500/15 text-blue-400 border-blue-500/40",
+  };
+}
+
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "În așteptare", color: "bg-warning/10 text-warning border-warning/30" },
   accepted: { label: "Așteaptă confirmare client", color: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
@@ -81,6 +149,8 @@ export default function VendorBookingsPage() {
   const [acceptReply, setAcceptReply] = useState("");
   const [rejectDialog, setRejectDialog] = useState<BookingRequest | null>(null);
   const [rejectReply, setRejectReply] = useState("");
+  const [cancelDialog, setCancelDialog] = useState<BookingRequest | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
   const [proposeDialog, setProposeDialog] = useState<BookingRequest | null>(
     null,
   );
@@ -91,6 +161,7 @@ export default function VendorBookingsPage() {
   );
   const [messageText, setMessageText] = useState("");
   const [messageSending, setMessageSending] = useState(false);
+  const [reviewRequested, setReviewRequested] = useState<Set<number>>(new Set());
 
   // Load artistId for the signed-in user
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +204,52 @@ export default function VendorBookingsPage() {
       }
     })();
   }, [artistId]);
+
+  async function requestReview(bookingId: number) {
+    setBusy(bookingId);
+    try {
+      const res = await fetch("/api/reviews/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingRequestId: bookingId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut trimite invitația");
+        return;
+      }
+      toast.success("Email trimis — clientul primește invitația pentru recenzie");
+      setReviewRequested((prev) => new Set(prev).add(bookingId));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function confirmVendorCancel() {
+    if (!cancelDialog) return;
+    setBusy(cancelDialog.id);
+    try {
+      const res = await fetch(`/api/booking-requests/${cancelDialog.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "vendor_cancel",
+          reply: cancelReason.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.error || "Nu s-a putut anula");
+        return;
+      }
+      toast.success("Rezervare anulată. Clientul a fost notificat.");
+      setCancelDialog(null);
+      setCancelReason("");
+      await refreshBookings();
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function handleComplete(id: number) {
     setBusy(id);
@@ -461,12 +578,35 @@ export default function VendorBookingsPage() {
             const cfg = statusConfig[booking.status] || statusConfig.pending;
             const isExpanded = expandedId === booking.id;
             const chatMessages = chats[booking.id] || [];
+            const eventKey = (booking.eventType || "other").toLowerCase();
+            const borderColor = EVENT_TYPE_BORDER[eventKey] || "border-l-muted-foreground";
+            const leadScore = computeLeadScore(booking);
+            const showLeadScore =
+              booking.status === "pending" ||
+              booking.status === "accepted" ||
+              booking.status === "confirmed_by_client";
+            const reviewDone = reviewRequested.has(booking.id);
             return (
-              <Card key={booking.id} className="transition-all hover:border-gold/30">
+              <Card
+                key={booking.id}
+                className={cn("border-l-4 transition-all hover:border-gold/30", borderColor)}
+              >
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
+                        {showLeadScore && (
+                          <span
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold",
+                              leadScore.className,
+                            )}
+                            title={`Lead Score: ${leadScore.label}`}
+                          >
+                            <span aria-hidden>{leadScore.emoji}</span>
+                            {leadScore.label}
+                          </span>
+                        )}
                         <span className="font-heading font-bold">{booking.eventType || "Eveniment"}</span>
                         <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>
                         {booking.agreedPrice != null && booking.agreedPrice > 0 && (
@@ -508,9 +648,26 @@ export default function VendorBookingsPage() {
                       )}
                     </div>
 
-                    <div className="shrink-0 text-right">
-                      <p className="text-xs text-muted-foreground">Primită</p>
-                      <p className="text-xs text-muted-foreground">{formatDate(booking.createdAt)}</p>
+                    <div className="flex shrink-0 flex-col items-end gap-2">
+                      <div className="text-right">
+                        <p className="text-xs text-muted-foreground">Primită</p>
+                        <p className="text-xs text-muted-foreground">{formatDate(booking.createdAt)}</p>
+                      </div>
+                      {booking.status === "completed" && (
+                        <Button
+                          size="sm"
+                          onClick={() => requestReview(booking.id)}
+                          disabled={busy === booking.id || reviewDone}
+                          className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+                        >
+                          {busy === booking.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Star className="h-4 w-4" />
+                          )}
+                          {reviewDone ? "Invitație trimisă" : "Cere recenzie"}
+                        </Button>
+                      )}
                     </div>
                   </div>
 
@@ -614,7 +771,7 @@ export default function VendorBookingsPage() {
 
                   {(booking.status === "accepted" || booking.status === "confirmed_by_client") && (
                     <div className="mt-4 space-y-3 border-t border-border/40 pt-3">
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
                         variant="outline"
@@ -631,6 +788,18 @@ export default function VendorBookingsPage() {
                         className="gap-1 bg-emerald-600 text-white hover:bg-emerald-700"
                       >
                         <CheckCircle className="h-3.5 w-3.5" /> Finalizat
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy === booking.id}
+                        onClick={() => {
+                          setCancelDialog(booking);
+                          setCancelReason("");
+                        }}
+                        className="gap-1 border-red-500/40 text-red-400 hover:bg-red-500/10"
+                      >
+                        <Ban className="h-3.5 w-3.5" /> Anulează
                       </Button>
                       </div>
 
@@ -969,6 +1138,60 @@ export default function VendorBookingsPage() {
                 <Send className="h-4 w-4" />
               )}
               Trimite
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Vendor cancel dialog ───────────────────────────────── */}
+      <Dialog
+        open={!!cancelDialog}
+        onOpenChange={(v) => !v && setCancelDialog(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Anulează rezervare confirmată</DialogTitle>
+          </DialogHeader>
+          {cancelDialog && (
+            <div className="space-y-3 py-2">
+              <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-muted-foreground">
+                Ziua <strong>{formatDate(cancelDialog.eventDate)}</strong> se va
+                debloca în calendarul tău și clientul va fi notificat prin email.
+                Folosește doar în caz de urgență (boală, forță majoră).
+              </div>
+              <div>
+                <Label htmlFor="artist-cancel-reason">Motiv pentru client</Label>
+                <Textarea
+                  id="artist-cancel-reason"
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  rows={3}
+                  className="mt-1"
+                  placeholder="Ne pare rău, am o urgență și nu pot ajunge..."
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCancelDialog(null)}
+              disabled={busy === cancelDialog?.id}
+            >
+              Înapoi
+            </Button>
+            <Button
+              onClick={confirmVendorCancel}
+              disabled={busy === cancelDialog?.id}
+              variant="outline"
+              className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
+            >
+              {busy === cancelDialog?.id ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Ban className="h-4 w-4" />
+              )}
+              Anulează rezervarea
             </Button>
           </DialogFooter>
         </DialogContent>

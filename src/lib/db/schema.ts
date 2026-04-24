@@ -219,6 +219,12 @@ export const artists = pgTable("artists", {
   autoReplyEnabled: boolean("auto_reply_enabled").default(false).notNull(),
   autoReplyMessage: text("auto_reply_message"),
   photoUrl: text("photo_url"),
+  /** Up to 3 short video testimonials — embed URL (YouTube/Vimeo) or MP4.
+   *  Each item has optional clientName + caption. Shown on the public
+   *  artist profile under a "Testimoniale video" section. */
+  videoTestimonials: jsonb("video_testimonials")
+    .$type<Array<{ url: string; clientName: string | null; caption: string | null }>>()
+    .default([]),
   seoTitleRo: text("seo_title_ro"),
   seoTitleRu: text("seo_title_ru"),
   seoTitleEn: text("seo_title_en"),
@@ -323,6 +329,11 @@ export const venues = pgTable("venues", {
   /** Phase 4 — auto-reply email sent the moment a venue booking lands. */
   autoReplyEnabled: boolean("auto_reply_enabled").default(false).notNull(),
   autoReplyMessage: text("auto_reply_message"),
+  /** Up to 3 short video testimonials (embed URLs or MP4). Shown on the
+   *  public venue profile. */
+  videoTestimonials: jsonb("video_testimonials")
+    .$type<Array<{ url: string; clientName: string | null; caption: string | null }>>()
+    .default([]),
   /** Hours between bookings (venue might need setup/teardown time). */
   bufferHours: integer("buffer_hours").default(0),
   isActive: boolean("is_active").default(false).notNull(),
@@ -399,6 +410,32 @@ export const venueMenuPackages = pgTable("venue_menu_packages", {
   minGuests: integer("min_guests"),
   isRecommended: boolean("is_recommended").default(false).notNull(),
   sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+/**
+ * Cache for AI-parsed menu scans. Keyed by SHA-256 of the uploaded file
+ * bytes so re-scanning the same photo/PDF is free. Result is the raw
+ * JSON payload returned by /api/venue-menu/scan. Scoped per-venue so
+ * we never leak another venue's parsed menu.
+ *
+ * Safe to purge any row older than ~30d; entries rebuild on next scan.
+ */
+export const menuScanCache = pgTable("menu_scan_cache", {
+  id: serial("id").primaryKey(),
+  venueId: integer("venue_id")
+    .references(() => venues.id, { onDelete: "cascade" })
+    .notNull(),
+  /** SHA-256 of file bytes, hex. 64 chars. */
+  fileHash: varchar("file_hash", { length: 64 }).notNull(),
+  /** "image/jpeg" | "image/png" | "application/pdf" | "text/html" */
+  mimeType: text("mime_type").notNull(),
+  resultJson: jsonb("result_json")
+    .$type<{
+      categories: Array<Record<string, unknown>>;
+      packages: Array<Record<string, unknown>>;
+    }>()
+    .notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -671,6 +708,34 @@ export const wishlistEntityType = pgEnum("wishlist_entity_type", [
 ]);
 
 // ═══════════════════════════════════════════════════════
+// ADMIN AUDIT LOG — every sensitive admin action (bulk delete, approve
+// registration, override booking status) writes a row here. Keep the
+// shape flexible via metadata JSONB so new actions don't require a
+// migration. Pruning strategy: none for now — log growth is slow.
+// ═══════════════════════════════════════════════════════
+
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: serial("id").primaryKey(),
+    adminUserId: uuid("admin_user_id")
+      .references(() => users.id, { onDelete: "set null" })
+      .notNull(),
+    action: text("action").notNull(), // e.g. "bulk.deactivate", "registration.approve"
+    entity: text("entity"),           // "artist", "venue", "lead", ...
+    entityIds: jsonb("entity_ids").$type<number[]>().default([]),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_audit_created").on(t.createdAt),
+    index("idx_audit_admin_created").on(t.adminUserId, t.createdAt),
+  ],
+);
+
+// ═══════════════════════════════════════════════════════
 // PUSH SUBSCRIPTIONS — Web Push (VAPID). One user can have multiple
 // subscriptions (e.g. their phone + desktop browser); each browser
 // gives a unique endpoint URL. Endpoint is the PK so re-subscribes
@@ -893,6 +958,11 @@ export const chatMessages = pgTable("chat_messages", {
   senderType: text("sender_type").notNull(), // "client" | "artist" | "admin"
   senderName: text("sender_name").notNull(),
   message: text("message").notNull(),
+  /** Optional file attachment. Single URL (Blob/R2 hosted). Content type
+   *  inferred from the extension on the client when rendering. */
+  attachmentUrl: text("attachment_url"),
+  attachmentName: text("attachment_name"),
+  attachmentMime: text("attachment_mime"),
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
@@ -1195,6 +1265,36 @@ export const profileViews = pgTable("profile_views", {
   referrer: text("referrer"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+/**
+ * Per-click tracking on a public profile. Each CTA (Solicită Rezervare,
+ * call phone, open gallery, open menu, open contact, etc.) fires a
+ * fire-and-forget POST so Analytics can compute conversion rate.
+ *
+ * Separate from `profile_views` because views are passive (just hitting the
+ * page) while clicks are intentional. The split also keeps the existing
+ * traffic-source aggregation simple — referrer lives on views only.
+ */
+export const profileClicks = pgTable(
+  "profile_clicks",
+  {
+    id: serial("id").primaryKey(),
+    artistId: integer("artist_id").references(() => artists.id, {
+      onDelete: "cascade",
+    }),
+    venueId: integer("venue_id").references(() => venues.id, {
+      onDelete: "cascade",
+    }),
+    /** Narrow, stable set so the UI can translate + pivot reliably. */
+    clickType: text("click_type").notNull(), // "cta" | "phone" | "gallery" | "menu" | "contact"
+    sessionHash: text("session_hash").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_profile_clicks_venue").on(t.venueId, t.createdAt),
+    index("idx_profile_clicks_artist").on(t.artistId, t.createdAt),
+  ],
+);
 
 // ═══════════════════════════════════════════════════════
 // RELATIONS

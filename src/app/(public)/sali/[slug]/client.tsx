@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Star, MapPin, Users, Check, Lock, ChevronDown } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
@@ -14,6 +14,7 @@ import { CalendarWidget } from "@/components/public/calendar-widget";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
+import { trackClick } from "@/lib/analytics/track-click";
 
 interface VenueData {
   id: number;
@@ -94,6 +95,16 @@ export function VenueDetailClient({
   // M0a #8 — price gated behind login
   const canSeePrice = isLoaded && isSignedIn;
 
+  useEffect(() => {
+    import("@/hooks/use-recently-viewed").then(({ trackRecentView }) => {
+      trackRecentView("venue", {
+        slug: venue.slug,
+        name,
+        imageUrl: venue.images?.[0]?.url ?? null,
+      });
+    });
+  }, [venue.slug, venue.images, name]);
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
       <nav className="mb-6 text-xs text-muted-foreground">
@@ -122,8 +133,13 @@ export function VenueDetailClient({
             ) : null}
           </div>
 
-          {/* Gallery */}
-          <div className="mt-6">
+          {/* Gallery — fires a single "gallery" beacon when the user first
+              interacts with any thumbnail (debounced in the endpoint via
+              session dedupe). */}
+          <div
+            className="mt-6"
+            onClickCapture={() => trackClick("venue", venue.id, "gallery")}
+          >
             <ImageGallery images={(venue.images || []).map((img) => ({ url: img.url, alt: img.altRo }))} />
           </div>
 
@@ -238,7 +254,10 @@ export function VenueDetailClient({
 
               {/* Categories + Items accordion */}
               {menu && menu.categories.length > 0 && (
-                <div className="mb-4 space-y-2">
+                <div
+                  className="mb-4 space-y-2"
+                  onClickCapture={() => trackClick("venue", venue.id, "menu")}
+                >
                   {menu.categories.map((c) => (
                     <CategoryAccordion
                       key={c.id}
@@ -255,6 +274,7 @@ export function VenueDetailClient({
                   href={venue.menuPdfUrl || venue.menuUrl || "#"}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={() => trackClick("venue", venue.id, "menu")}
                   className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
                 >
                   Descarcă meniu PDF

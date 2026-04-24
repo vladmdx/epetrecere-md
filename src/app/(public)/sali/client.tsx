@@ -6,6 +6,7 @@ import { SortBar } from "@/components/public/sort-bar";
 import { PaginationBar } from "@/components/public/pagination-bar";
 import { CityFilter, CapacityFilter, ActiveFiltersReset } from "@/components/public/filter-bar";
 import { CompareBar } from "@/components/public/compare-bar";
+import { RecentlyViewed } from "@/components/public/recently-viewed";
 import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
@@ -105,6 +106,10 @@ export function VenuesListClient({ venues, total, page, totalPages, currentSort,
         totalPages={totalPages}
         onPageChange={(p) => updateParams("page", String(p))}
       />
+
+      <div className="mt-12 border-t border-border/30 pt-8">
+        <RecentlyViewed type="venue" />
+      </div>
     </div>
   );
 }

@@ -112,8 +112,29 @@ export async function POST(
 
   const body = await req.json().catch(() => ({}));
   const message = (body?.message || "").toString().trim();
-  if (!message) {
-    return NextResponse.json({ error: "message required" }, { status: 400 });
+  const attachmentUrl = body?.attachmentUrl
+    ? String(body.attachmentUrl).trim()
+    : null;
+  const attachmentName = body?.attachmentName
+    ? String(body.attachmentName).slice(0, 200)
+    : null;
+  const attachmentMime = body?.attachmentMime
+    ? String(body.attachmentMime).slice(0, 100)
+    : null;
+
+  // Either a text message OR an attachment is required — an empty POST is
+  // meaningless and usually a UI bug on the sender's side.
+  if (!message && !attachmentUrl) {
+    return NextResponse.json(
+      { error: "message or attachment required" },
+      { status: 400 },
+    );
+  }
+  if (attachmentUrl && !/^https?:\/\//i.test(attachmentUrl)) {
+    return NextResponse.json(
+      { error: "attachmentUrl must be an absolute URL" },
+      { status: 400 },
+    );
   }
 
   const ctx = await loadContext(conversationId, clerkId);
@@ -142,13 +163,27 @@ export async function POST(
       conversationId,
       senderType: ctx.side,
       senderName,
-      message,
+      message: message || "",
+      attachmentUrl,
+      attachmentName,
+      attachmentMime,
     })
     .returning();
 
   // Update conversation metadata: bump timestamp, preview, and opposite-side
-  // unread counter.
-  const preview = message.length > 120 ? message.slice(0, 117) + "…" : message;
+  // unread counter. For attachment-only messages the preview shows a hint so
+  // the inbox doesn't look like an empty row.
+  const previewBase =
+    message ||
+    (attachmentUrl
+      ? attachmentMime?.startsWith("image/")
+        ? "📷 Imagine"
+        : attachmentMime === "application/pdf"
+          ? "📎 PDF"
+          : "📎 Atașament"
+      : "");
+  const preview =
+    previewBase.length > 120 ? previewBase.slice(0, 117) + "…" : previewBase;
   await db
     .update(conversations)
     .set({

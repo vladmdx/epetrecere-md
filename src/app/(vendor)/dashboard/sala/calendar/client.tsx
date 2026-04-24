@@ -12,6 +12,11 @@ import {
   Loader2,
   Users,
   Clock,
+  List,
+  LayoutGrid,
+  Link as LinkIcon,
+  Copy,
+  ExternalLink,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,7 +61,12 @@ interface Props {
   events: CalendarEvent[];
   bookings: Booking[];
   initialDate: string | null;
+  icalUrl: string;
+  googleConnected: boolean;
 }
+
+/** Spec 2.8: calendar window capped at 18 months ahead of today. */
+const MAX_FUTURE_MONTHS = 18;
 
 const MONTHS_RO = [
   "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
@@ -112,8 +122,12 @@ export function VenueCalendarClient({
   events,
   bookings,
   initialDate,
+  icalUrl,
+  googleConnected,
 }: Props) {
   const router = useRouter();
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
+  const [showIcalSheet, setShowIcalSheet] = useState(false);
   const [dayDialog, setDayDialog] = useState<string | null>(initialDate);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
@@ -189,6 +203,24 @@ export function VenueCalendarClient({
     return () => window.removeEventListener("pointerup", onUp);
   }, [dragStart, dragEnd]);
 
+  // Spec 2.8: clamp forward navigation to 18 months out; clamp backward to
+  // 12 months ago (bookings older than a year are archive-only).
+  const maxFuture = useMemo(() => {
+    const d = new Date(today.getFullYear(), today.getMonth() + MAX_FUTURE_MONTHS, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  }, [today]);
+  const minPast = useMemo(() => {
+    const d = new Date(today.getFullYear(), today.getMonth() - 12, 1);
+    return { year: d.getFullYear(), month: d.getMonth() };
+  }, [today]);
+
+  const canGoNext =
+    monthYear < maxFuture.year ||
+    (monthYear === maxFuture.year && monthIndex < maxFuture.month);
+  const canGoPrev =
+    monthYear > minPast.year ||
+    (monthYear === minPast.year && monthIndex > minPast.month);
+
   function navigateMonth(delta: number) {
     let y = monthYear;
     let m = monthIndex + delta;
@@ -199,13 +231,55 @@ export function VenueCalendarClient({
       y += 1;
       m = 0;
     }
+    // Enforce the 18-month cap / 12-month floor silently.
+    if (y > maxFuture.year || (y === maxFuture.year && m > maxFuture.month)) return;
+    if (y < minPast.year || (y === minPast.year && m < minPast.month)) return;
     const monthStr = `${y}-${String(m + 1).padStart(2, "0")}`;
     router.push(`/dashboard/sala/calendar?month=${monthStr}`);
   }
 
+  function jumpToMonth(y: number, m: number) {
+    if (y > maxFuture.year || (y === maxFuture.year && m > maxFuture.month)) return;
+    if (y < minPast.year || (y === minPast.year && m < minPast.month)) return;
+    router.push(
+      `/dashboard/sala/calendar?month=${y}-${String(m + 1).padStart(2, "0")}`,
+    );
+  }
+
+  /** Build the list of (year, month) pairs we're allowed to jump to. */
+  const availableMonths = useMemo(() => {
+    const out: Array<{ year: number; month: number; label: string }> = [];
+    let y = minPast.year;
+    let m = minPast.month;
+    while (y < maxFuture.year || (y === maxFuture.year && m <= maxFuture.month)) {
+      out.push({ year: y, month: m, label: `${MONTHS_RO[m]} ${y}` });
+      m += 1;
+      if (m > 11) {
+        m = 0;
+        y += 1;
+      }
+    }
+    return out;
+  }, [minPast, maxFuture]);
+
   function goToday() {
     const ts = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
     router.push(`/dashboard/sala/calendar?date=${ts}`);
+  }
+
+  async function copyIcalUrl() {
+    try {
+      await navigator.clipboard.writeText(icalUrl);
+      toast.success("Link iCal copiat — lipește-l în Google/Apple/Outlook Calendar");
+    } catch {
+      toast.error("Nu s-a putut copia — selectează manual.");
+    }
+  }
+
+  function connectGoogle() {
+    // Pass the current calendar page as return-to via `state`.
+    const returnPath = "/dashboard/sala/calendar";
+    window.location.href = `/api/auth/google/callback?return=${encodeURIComponent(returnPath)}`;
   }
 
   async function saveDayStatus() {
@@ -299,7 +373,62 @@ export function VenueCalendarClient({
             💡 <strong>Sfat:</strong> Apasă și trage peste mai multe zile pentru a le seta rapid (ex: vacanță, renovare)
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* View toggle — spec 2.5 */}
+          <div
+            className="inline-flex rounded-lg border border-border/50 p-0.5"
+            role="tablist"
+            aria-label="Vizualizare calendar"
+          >
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "calendar"}
+              onClick={() => setViewMode("calendar")}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                viewMode === "calendar"
+                  ? "bg-gold text-[#0D0D0D]"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Calendar
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "list"}
+              onClick={() => setViewMode("list")}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                viewMode === "list"
+                  ? "bg-gold text-[#0D0D0D]"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <List className="h-3.5 w-3.5" />
+              Listă
+            </button>
+          </div>
+
+          {/* Month dropdown jumper — spec 2.4.5 */}
+          <select
+            aria-label="Sari la o lună"
+            value={`${monthYear}-${monthIndex}`}
+            onChange={(e) => {
+              const [y, m] = e.target.value.split("-").map(Number);
+              jumpToMonth(y, m);
+            }}
+            className="h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
+          >
+            {availableMonths.map((opt) => (
+              <option key={opt.label} value={`${opt.year}-${opt.month}`}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+
           <Button variant="outline" size="sm" onClick={goToday}>
             Azi
           </Button>
@@ -307,6 +436,7 @@ export function VenueCalendarClient({
             variant="outline"
             size="icon"
             onClick={() => navigateMonth(-1)}
+            disabled={!canGoPrev}
             aria-label="Luna precedentă"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -315,12 +445,51 @@ export function VenueCalendarClient({
             variant="outline"
             size="icon"
             onClick={() => navigateMonth(1)}
+            disabled={!canGoNext}
             aria-label="Luna următoare"
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {/* Google Calendar sync + iCal feed — spec 2.6 */}
+      <Card>
+        <CardContent className="flex flex-wrap items-center justify-between gap-3 p-3 text-xs">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <LinkIcon className="h-3.5 w-3.5 text-gold" />
+            <span>
+              <strong className="text-foreground">Sincronizare calendar:</strong>{" "}
+              Conectează Google Calendar ca să importi zilele ocupate, sau copiază
+              linkul iCal ca să te abonezi din Google/Apple/Outlook.
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {googleConnected ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-1 text-[11px] font-medium text-emerald-400">
+                <Check className="h-3 w-3" /> Google Calendar conectat
+              </span>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={connectGoogle}
+                className="h-7 text-xs"
+              >
+                <ExternalLink className="mr-1 h-3 w-3" /> Conectează Google Calendar
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowIcalSheet(true)}
+              className="h-7 text-xs"
+            >
+              <LinkIcon className="mr-1 h-3 w-3" /> Link iCal
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Legend */}
       <Card>
@@ -337,6 +506,7 @@ export function VenueCalendarClient({
       </Card>
 
       {/* Main calendar grid */}
+      {viewMode === "calendar" && (
       <Card>
         <CardContent className="p-5">
           <h2 className="mb-4 text-center font-heading text-xl font-semibold">
@@ -453,6 +623,67 @@ export function VenueCalendarClient({
           </div>
         </CardContent>
       </Card>
+      )}
+
+      {/* List view — spec 2.5 */}
+      {viewMode === "list" && (
+        <Card>
+          <CardContent className="p-5">
+            <h2 className="mb-4 font-heading text-xl font-semibold">
+              {MONTHS_RO[monthIndex]} {monthYear} — Zile cu status
+            </h2>
+            <ListView
+              monthYear={monthYear}
+              monthIndex={monthIndex}
+              eventsByDate={eventsByDate}
+              bookingsByDate={bookingsByDate}
+              onRowClick={(dateStr) => {
+                const event = eventsByDate.get(dateStr);
+                setDayDialog(dateStr);
+                setNote(event?.note || "");
+                setNewStatus(
+                  (event?.status as "available" | "blocked" | "tentative") ||
+                    "available",
+                );
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* iCal link dialog — spec 2.6 */}
+      <Dialog open={showIcalSheet} onOpenChange={setShowIcalSheet}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link iCal pentru sala ta</DialogTitle>
+            <DialogDescription>
+              Copiază linkul de mai jos și adaugă-l la Google Calendar (Alte calendare
+              → De la URL), Apple Calendar (File → New Calendar Subscription) sau
+              Outlook. Noile rezervări acceptate apar automat — sincronizare la cerere.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 rounded-lg border border-border/50 bg-accent/30 p-2 font-mono text-[10px] break-all">
+              {icalUrl}
+            </div>
+            <Button
+              onClick={copyIcalUrl}
+              className="w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+            >
+              <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiază link
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              ⚠️ Acest link este privat — nu îl publica. Oricine are linkul vede
+              rezervările tale confirmate.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowIcalSheet(false)}>
+              Închide
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Single-day dialog */}
       <Dialog open={!!dayDialog} onOpenChange={(v) => !v && setDayDialog(null)}>
@@ -746,5 +977,163 @@ function LegendChip({ color, label }: { color: string; label: string }) {
       <span className={cn("h-2.5 w-2.5 rounded-sm", color)} />
       <span className="text-muted-foreground">{label}</span>
     </span>
+  );
+}
+
+/** Spec 2.5 — Lista arată doar zilele cu status non-gol, sortate cronologic. */
+function ListView({
+  monthYear,
+  monthIndex,
+  eventsByDate,
+  bookingsByDate,
+  onRowClick,
+}: {
+  monthYear: number;
+  monthIndex: number;
+  eventsByDate: Map<string, CalendarEvent>;
+  bookingsByDate: Map<string, Booking[]>;
+  onRowClick: (dateStr: string) => void;
+}) {
+  const monthStart = new Date(monthYear, monthIndex, 1);
+  const monthEnd = new Date(monthYear, monthIndex + 1, 0);
+  const days: Array<{
+    dateStr: string;
+    statusLabel: string;
+    statusClass: string;
+    eventType: string | null;
+    client: string | null;
+    guestCount: number | null;
+    agreedPrice: number | null;
+    note: string | null;
+    kind: "booking" | "event";
+  }> = [];
+
+  for (let d = 1; d <= monthEnd.getDate(); d++) {
+    const dateStr = toDateStr(monthYear, monthIndex, d);
+    const dayBookings = bookingsByDate.get(dateStr) ?? [];
+    const confirmed = dayBookings.find(
+      (b) => b.status === "accepted" || b.status === "confirmed_by_client",
+    );
+    const pending = dayBookings.find((b) => b.status === "pending");
+    const event = eventsByDate.get(dateStr);
+
+    if (confirmed) {
+      const cfg = EVENT_TYPE_CONFIG[(confirmed.eventType || "").toLowerCase()];
+      days.push({
+        dateStr,
+        statusLabel: cfg?.label || "Rezervat",
+        statusClass: cfg?.text || "text-red-400",
+        eventType: confirmed.eventType,
+        client: confirmed.clientName,
+        guestCount: confirmed.guestCount,
+        agreedPrice: confirmed.agreedPrice,
+        note: null,
+        kind: "booking",
+      });
+    } else if (pending) {
+      days.push({
+        dateStr,
+        statusLabel: `Tentativ${pending.eventType ? ` · ${pending.eventType}` : ""}`,
+        statusClass: "text-yellow-400",
+        eventType: pending.eventType,
+        client: pending.clientName,
+        guestCount: pending.guestCount,
+        agreedPrice: pending.agreedPrice,
+        note: null,
+        kind: "booking",
+      });
+    } else if (event && event.status !== "available") {
+      const s = STATUS_CONFIG[event.status];
+      days.push({
+        dateStr,
+        statusLabel: s?.label || event.status,
+        statusClass:
+          event.status === "blocked"
+            ? "text-slate-400"
+            : event.status === "tentative"
+              ? "text-yellow-400"
+              : "text-emerald-400",
+        eventType: event.eventType,
+        client: null,
+        guestCount: null,
+        agreedPrice: null,
+        note: event.note,
+        kind: "event",
+      });
+    }
+  }
+
+  if (days.length === 0) {
+    void monthStart; // referenced for hypothetical future filtering
+    return (
+      <div className="rounded-lg border border-dashed border-border/40 py-10 text-center">
+        <p className="text-sm text-muted-foreground">
+          Nicio zi cu status pentru această lună.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground/70">
+          Treci în vizualizarea Calendar pentru a seta zile disponibile sau blocate.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <th className="pb-2 pr-3">Dată</th>
+            <th className="pb-2 pr-3">Status / Eveniment</th>
+            <th className="pb-2 pr-3">Client</th>
+            <th className="pb-2 pr-3 text-right">Nr. pers</th>
+            <th className="pb-2 pr-3 text-right">Preț</th>
+            <th className="pb-2 text-right">Acțiuni</th>
+          </tr>
+        </thead>
+        <tbody>
+          {days.map((d) => {
+            const dateObj = new Date(d.dateStr + "T00:00:00");
+            const label = dateObj.toLocaleDateString("ro-RO", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            });
+            return (
+              <tr
+                key={d.dateStr}
+                className="border-b border-border/20 last:border-0 hover:bg-accent/30"
+              >
+                <td className="py-3 pr-3 font-medium capitalize">{label}</td>
+                <td className={cn("py-3 pr-3 font-medium", d.statusClass)}>
+                  {d.statusLabel}
+                  {d.note && (
+                    <span className="block text-[11px] font-normal text-muted-foreground">
+                      {d.note}
+                    </span>
+                  )}
+                </td>
+                <td className="py-3 pr-3 text-muted-foreground">
+                  {d.client ?? "—"}
+                </td>
+                <td className="py-3 pr-3 text-right text-muted-foreground">
+                  {d.guestCount ?? "—"}
+                </td>
+                <td className="py-3 pr-3 text-right">
+                  {d.agreedPrice ? `${d.agreedPrice}€` : "—"}
+                </td>
+                <td className="py-3 text-right">
+                  <button
+                    onClick={() => onRowClick(d.dateStr)}
+                    className="text-xs text-gold hover:underline"
+                  >
+                    {d.kind === "booking" ? "Detalii" : "Editează"} →
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }

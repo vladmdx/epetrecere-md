@@ -31,7 +31,13 @@ interface Artist {
   location: string | null;
 }
 
-function SortableArtistCard({ artist, reorderMode }: { artist: Artist; reorderMode: boolean }) {
+function SortableArtistCard({
+  artist,
+  reorderMode,
+}: {
+  artist: Artist;
+  reorderMode: boolean;
+}) {
   const {
     attributes,
     listeners,
