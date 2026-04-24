@@ -8,6 +8,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { roRO } from "@clerk/localizations";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { PwaManager } from "@/components/shared/pwa-manager";
+import { ReferralCapture } from "@/components/shared/referral-capture";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
@@ -63,6 +64,7 @@ export default function RootLayout({
           {children}
           <CookieConsent />
           <PwaManager />
+          <ReferralCapture />
           <Toaster />
         </PreferencesProvider></LocaleProvider></ThemeProvider></ClerkProvider>
       </body>

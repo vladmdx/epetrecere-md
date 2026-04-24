@@ -23,6 +23,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { BulkActionsBar } from "@/components/admin/bulk-actions-bar";
 
 interface Artist {
   id: number; nameRo: string; slug: string; priceFrom: number | null;
@@ -34,9 +35,13 @@ interface Artist {
 function SortableArtistCard({
   artist,
   reorderMode,
+  selected,
+  onToggleSelect,
 }: {
   artist: Artist;
   reorderMode: boolean;
+  selected: boolean;
+  onToggleSelect: () => void;
 }) {
   const {
     attributes,
@@ -55,16 +60,31 @@ function SortableArtistCard({
 
   return (
     <div ref={setNodeRef} style={style}>
-      <Card className="transition-all hover:border-gold/30">
+      <Card
+        className={
+          selected
+            ? "border-gold/60 bg-gold/5 transition-all"
+            : "transition-all hover:border-gold/30"
+        }
+      >
         <CardContent className="flex items-center gap-4 py-3">
-          {reorderMode && (
+          {reorderMode ? (
             <button
               {...attributes}
               {...listeners}
               className="cursor-grab active:cursor-grabbing touch-none"
+              aria-label="Trage pentru reordonare"
             >
               <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
+          ) : (
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggleSelect}
+              aria-label={`Selectează ${artist.nameRo}`}
+              className="h-4 w-4 shrink-0 cursor-pointer accent-gold"
+            />
           )}
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/10 text-lg">🎵</div>
           <div className="flex-1 min-w-0">
@@ -92,32 +112,46 @@ function SortableArtistCard({
   );
 }
 
+async function loadAllArtists(): Promise<Artist[]> {
+  const all: Artist[] = [];
+  let page = 1;
+  while (true) {
+    const res = await fetch(`/api/artists?limit=100&page=${page}`);
+    if (!res.ok) break;
+    const data = await res.json();
+    const items: Artist[] = data.items || [];
+    all.push(...items);
+    if (items.length < 100) break;
+    page++;
+  }
+  return all;
+}
+
 export default function AdminArtistsPage() {
   const [artists, setArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [reorderMode, setReorderMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
+  async function refetchArtists() {
+    try {
+      const fresh = await loadAllArtists();
+      setArtists(fresh);
+    } catch {
+      toast.error("Nu s-au putut reîncărca artiștii");
+    }
+  }
+
   useEffect(() => {
     (async () => {
       try {
-        let allArtists: Artist[] = [];
-        let page = 1;
-        let hasMore = true;
-        while (hasMore) {
-          const res = await fetch(`/api/artists?limit=100&page=${page}`);
-          if (!res.ok) break;
-          const data = await res.json();
-          const items = data.items || [];
-          allArtists = [...allArtists, ...items];
-          hasMore = items.length === 100;
-          page++;
-        }
-        setArtists(allArtists);
+        const all = await loadAllArtists();
+        setArtists(all);
       } catch {
         toast.error("Nu s-au putut încărca artiștii");
       } finally {
@@ -125,6 +159,18 @@ export default function AdminArtistsPage() {
       }
     })();
   }, []);
+
+  // Entering reorder mode clears any in-flight selection so the two UIs
+  // don't collide (drag handle vs checkbox click target).
+  useEffect(() => {
+    if (reorderMode) setSelectedIds([]);
+  }, [reorderMode]);
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   const filtered = reorderMode
     ? artists
@@ -191,13 +237,27 @@ export default function AdminArtistsPage() {
           <SortableContext items={filtered.map((a) => a.id)} strategy={verticalListSortingStrategy}>
             <div className="space-y-2">
               {filtered.map((artist) => (
-                <SortableArtistCard key={artist.id} artist={artist} reorderMode={reorderMode} />
+                <SortableArtistCard
+                  key={artist.id}
+                  artist={artist}
+                  reorderMode={reorderMode}
+                  selected={selectedIds.includes(artist.id)}
+                  onToggleSelect={() => toggleSelect(artist.id)}
+                />
               ))}
               {filtered.length === 0 && <p className="py-8 text-center text-muted-foreground">Nu s-au găsit artiști</p>}
             </div>
           </SortableContext>
         </DndContext>
       )}
+
+      {/* Floating bulk actions bar — appears when admin has selected 1+ artists */}
+      <BulkActionsBar
+        entity="artist"
+        selectedIds={selectedIds}
+        onClear={() => setSelectedIds([])}
+        onComplete={refetchArtists}
+      />
     </div>
   );
 }

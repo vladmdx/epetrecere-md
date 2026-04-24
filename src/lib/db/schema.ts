@@ -143,9 +143,50 @@ export const users = pgTable("users", {
   googleRefreshToken: text("google_refresh_token"),
   googleAccessToken: text("google_access_token"),
   googleTokenExpiresAt: timestamp("google_token_expires_at"),
+  /** Personal referral code the user can share. Generated lazily on first
+   *  `/api/me/referral` GET so existing users get one retroactively. */
+  referralCode: varchar("referral_code", { length: 24 }).unique(),
+  /** Code this user signed up WITH. Captured from ?ref=xxx on landing.
+   *  Immutable after first set so users can't game the system. */
+  referredByCode: varchar("referred_by_code", { length: 24 }),
+  /** Credits earned from successful referrals, in EUR cents. Read-only
+   *  for users — incremented by /api/referrals/trigger when a milestone
+   *  is hit. Redeemable against subscription invoices (future Stripe tie-in). */
+  referralCreditCents: integer("referral_credit_cents").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+/**
+ * Audit trail for referral milestones. One row per credited event.
+ * `eventType` lifecycle:
+ *   signup       — referee created an account (0 credit, tracking only)
+ *   onboarded    — referee published a venue or artist profile (+5€)
+ *   first_booking — referee received their first confirmed booking (+20€)
+ *
+ * A given (referrer, referred, eventType) triple is unique — we never
+ * double-credit the same milestone.
+ */
+export const referralEvents = pgTable(
+  "referral_events",
+  {
+    id: serial("id").primaryKey(),
+    referrerUserId: uuid("referrer_user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    referredUserId: uuid("referred_user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    eventType: text("event_type").notNull(),
+    creditCents: integer("credit_cents").default(0).notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_referral_referrer").on(t.referrerUserId, t.createdAt),
+    index("idx_referral_referred").on(t.referredUserId),
+  ],
+);
 
 // ═══════════════════════════════════════════════════════
 // CATEGORIES

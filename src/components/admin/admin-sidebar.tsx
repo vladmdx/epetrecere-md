@@ -26,6 +26,7 @@ import {
   PartyPopper,
   Menu,
   X,
+  GitMerge,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ const navItems = [
   { href: "/admin/homepage-builder", icon: Home, label: "Homepage" },
   { href: "/admin/analytics", icon: BarChart3, label: "Analitice" },
   { href: "/admin/ai-assistant", icon: Bot, label: "AI Assistant" },
+  { href: "/admin/duplicates", icon: GitMerge, label: "Duplicate" },
   { href: "/admin/audit", icon: FileText, label: "Audit log" },
   { href: "/admin/setari", icon: Settings, label: "Setări" },
 ];

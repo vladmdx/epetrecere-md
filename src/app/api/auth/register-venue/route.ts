@@ -139,6 +139,19 @@ export async function POST(req: Request) {
       .set({ onboardingComplete: true })
       .where(eq(users.id, appUser.id));
 
+    // Referral milestone — non-blocking, dedupes server-side.
+    void (async () => {
+      try {
+        const { triggerReferral } = await import("@/lib/referrals/trigger");
+        await triggerReferral(appUser.id, "onboarded", {
+          kind: "venue",
+          venueId: venue.id,
+        });
+      } catch (err) {
+        console.error("[referral] venue onboarded trigger failed", err);
+      }
+    })();
+
     // Notify admins (in-app + email)
     const admins = await db
       .select({ id: users.id, email: users.email })

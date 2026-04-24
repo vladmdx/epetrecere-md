@@ -38,6 +38,7 @@ import { toast } from "sonner";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
 import { PushSubscribeButton } from "@/components/shared/push-subscribe-button";
 import { WhatsAppPhoneInput } from "@/components/shared/whatsapp-phone-input";
+import { ReferralCard } from "@/components/shared/referral-card";
 
 interface VenueSettings {
   id: number;
@@ -552,6 +553,9 @@ export function VenueSettingsClient({
 
       {/* Appearance */}
       <AppearanceSettings />
+
+      {/* Referral program */}
+      <ReferralCard />
 
       {/* Plan & Billing — spec 11.5 */}
       <Card>

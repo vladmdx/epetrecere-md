@@ -150,6 +150,26 @@ export async function PUT(
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
+    // Referral milestone — if the accepted booking is for a referred
+    // client and it's their first, credit the referrer. Non-blocking.
+    if (booking.clientUserId) {
+      void (async () => {
+        try {
+          const { triggerReferral, isFirstBookingForUser } = await import(
+            "@/lib/referrals/trigger"
+          );
+          if (await isFirstBookingForUser(booking.clientUserId!)) {
+            await triggerReferral(booking.clientUserId!, "first_booking", {
+              bookingId: booking.id,
+              eventDate: booking.eventDate,
+            });
+          }
+        } catch (err) {
+          console.error("[referral] first_booking trigger failed", err);
+        }
+      })();
+    }
+
     // Block the vendor's calendar — works for either artist OR venue.
     if (booking.eventDate) {
       const entityType = booking.venueId ? "venue" : "artist";

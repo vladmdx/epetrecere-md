@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Plus, Edit, Eye, MapPin, Users, Star, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { BulkActionsBar } from "@/components/admin/bulk-actions-bar";
 
 interface Venue {
   id: number;
@@ -21,18 +22,40 @@ interface Venue {
   ratingAvg: number | null;
 }
 
+async function loadAllVenues(): Promise<Venue[]> {
+  const res = await fetch("/api/venues?limit=200");
+  if (!res.ok) throw new Error("fetch failed");
+  const data = await res.json();
+  return Array.isArray(data.venues)
+    ? data.venues
+    : Array.isArray(data)
+      ? data
+      : [];
+}
+
 export default function AdminVenuesPage() {
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  async function refetchVenues() {
+    try {
+      setVenues(await loadAllVenues());
+    } catch {
+      toast.error("Nu s-au putut reîncărca sălile");
+    }
+  }
+
+  function toggleSelect(id: number) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/venues?limit=200");
-        if (res.ok) {
-          const data = await res.json();
-          setVenues(Array.isArray(data.venues) ? data.venues : Array.isArray(data) ? data : []);
-        }
+        setVenues(await loadAllVenues());
       } catch {
         toast.error("Nu s-au putut încărca sălile");
       } finally {
@@ -84,9 +107,25 @@ export default function AdminVenuesPage() {
         </Card>
       ) : (
         <div className="space-y-2">
-          {venues.map((venue) => (
-            <Card key={venue.id} className="transition-all hover:border-gold/30">
+          {venues.map((venue) => {
+            const selected = selectedIds.includes(venue.id);
+            return (
+            <Card
+              key={venue.id}
+              className={
+                selected
+                  ? "border-gold/60 bg-gold/5 transition-all"
+                  : "transition-all hover:border-gold/30"
+              }
+            >
               <CardContent className="flex items-center gap-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => toggleSelect(venue.id)}
+                  aria-label={`Selectează ${venue.nameRo}`}
+                  className="h-4 w-4 shrink-0 cursor-pointer accent-gold"
+                />
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/10 text-lg">🏛️</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
@@ -112,9 +151,17 @@ export default function AdminVenuesPage() {
                 </Link>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      <BulkActionsBar
+        entity="venue"
+        selectedIds={selectedIds}
+        onClear={() => setSelectedIds([])}
+        onComplete={refetchVenues}
+      />
     </div>
   );
 }

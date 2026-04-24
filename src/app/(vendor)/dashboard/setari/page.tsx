@@ -31,6 +31,7 @@ import { Save, Loader2, SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
 import { IcalSubscribeCard } from "@/components/vendor/ical-subscribe-card";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
+import { ReferralCard } from "@/components/shared/referral-card";
 
 type ArtistSettings = {
   kind: "artist";
@@ -323,6 +324,7 @@ export default function VendorSettingsPage() {
       )}
 
       <AppearanceSettings />
+      <ReferralCard />
     </div>
   );
 }
