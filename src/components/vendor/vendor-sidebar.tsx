@@ -117,7 +117,7 @@ export function VendorSidebar() {
   }, []);
 
   const navItems = isVenue ? venueNav : artistNav;
-  const roleLabel = isVenue ? "Sală" : "Artist";
+  const roleLabel = isVenue ? "Sală" : "Partener";
 
   return (
     <>

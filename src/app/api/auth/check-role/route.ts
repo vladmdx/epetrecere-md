@@ -147,6 +147,7 @@ export async function GET(req: NextRequest) {
     onboardingComplete: true,
     hasVenue,
     isNewUser,
+    phone: dbUser.phone ?? null,
     venueId: venue?.id ?? null,
     venueSlug: venue?.slug ?? null,
     venueApproved: venue?.isActive ?? false,
