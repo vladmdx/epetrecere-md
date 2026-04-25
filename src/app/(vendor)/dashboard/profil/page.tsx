@@ -377,8 +377,8 @@ export default function VendorProfilePage() {
           <Card>
             <CardHeader><CardTitle>Poza de Profil</CardTitle></CardHeader>
             <CardContent>
-              <div className="flex items-center gap-6">
-                <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl border-2 border-gold/30 bg-muted">
+              <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
+                <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-gold/30 bg-muted sm:h-28 sm:w-28">
                   {data.photoUrl ? (
                     <Image
                       src={data.photoUrl}
@@ -393,11 +393,11 @@ export default function VendorProfilePage() {
                     </div>
                   )}
                 </div>
-                <div className="space-y-2">
+                <div className="w-full space-y-2 sm:w-auto">
                   <p className="text-sm text-muted-foreground">
                     Aceasta este poza principală care apare pe cardul tău și în profil.
                   </p>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <label className="cursor-pointer">
                       <input
                         type="file"

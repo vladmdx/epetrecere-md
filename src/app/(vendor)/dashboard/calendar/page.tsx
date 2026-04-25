@@ -904,7 +904,7 @@ export default function VendorCalendarPage() {
                         onClick={() => handleDayClick(dateStr)}
                         disabled={isPast}
                         className={cn(
-                          "relative flex h-16 flex-col items-center justify-center rounded-lg border text-sm font-medium transition-all",
+                          "relative flex h-12 flex-col items-center justify-center rounded-lg border text-xs font-medium transition-all sm:h-16 sm:text-sm",
                           isPast && "cursor-not-allowed opacity-40",
                           !isPast && isSelected &&
                             "ring-2 ring-gold ring-offset-1 ring-offset-background",
@@ -1189,8 +1189,8 @@ export default function VendorCalendarPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {schedule.map((day, i) => (
-                  <div key={i} className="flex items-center gap-4 rounded-lg border border-border/40 p-3">
-                    <div className="w-24 text-sm font-medium">{DAYS[i]}</div>
+                  <div key={i} className="flex flex-wrap items-center gap-3 rounded-lg border border-border/40 p-3 sm:gap-4">
+                    <div className="w-20 shrink-0 text-sm font-medium sm:w-24">{DAYS[i]}</div>
                     <Switch
                       checked={day.isWorking}
                       onCheckedChange={(v) => {
@@ -1201,7 +1201,7 @@ export default function VendorCalendarPage() {
                     />
                     {day.isWorking ? (
                       <>
-                        <div className="w-32">
+                        <div className="w-24 sm:w-32">
                           <TimePicker
                             value={day.startTime}
                             onChange={(v) => {
@@ -1212,7 +1212,7 @@ export default function VendorCalendarPage() {
                           />
                         </div>
                         <span className="text-muted-foreground">—</span>
-                        <div className="w-32">
+                        <div className="w-24 sm:w-32">
                           <TimePicker
                             value={day.endTime}
                             onChange={(v) => {
@@ -1345,29 +1345,29 @@ export default function VendorCalendarPage() {
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap items-end gap-3">
-                  <div>
+                  <div className="flex-1 min-w-[140px]">
                     <Label>De la</Label>
                     <Input
                       type="date"
                       value={blockFrom}
                       onChange={(e) => setBlockFrom(e.target.value)}
-                      className="w-44"
+                      className="w-full sm:w-44"
                     />
                   </div>
-                  <div>
+                  <div className="flex-1 min-w-[140px]">
                     <Label>Până la</Label>
                     <Input
                       type="date"
                       value={blockTo}
                       onChange={(e) => setBlockTo(e.target.value)}
-                      className="w-44"
+                      className="w-full sm:w-44"
                     />
                   </div>
                   <Button
                     onClick={blockPeriod}
                     disabled={blockingPeriod || !blockFrom || !blockTo}
                     variant="destructive"
-                    className="gap-2"
+                    className="w-full gap-2 sm:w-auto"
                   >
                     {blockingPeriod ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1390,7 +1390,7 @@ export default function VendorCalendarPage() {
 
       {/* ─── Manual booking dialog ─────────────────────────────── */}
       <Dialog open={manualDialog} onOpenChange={setManualDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Adaugă rezervare manuală</DialogTitle>
           </DialogHeader>

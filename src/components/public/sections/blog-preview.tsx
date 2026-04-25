@@ -60,7 +60,7 @@ export function BlogPreviewSection() {
         </div>
 
         {loading ? (
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="overflow-hidden rounded-xl border border-border/40 bg-card animate-pulse">
                 <div className="aspect-[16/9] bg-muted" />
@@ -73,7 +73,7 @@ export function BlogPreviewSection() {
             ))}
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3">
             {posts.map((post) => (
               <Link
                 key={post.slug}

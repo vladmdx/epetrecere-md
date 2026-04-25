@@ -107,7 +107,7 @@ export function StatsCounterSection() {
         />
       </div>
       <div className="relative z-10 mx-auto max-w-5xl px-4 lg:px-8">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:gap-8 md:grid-cols-4">
           {statDefs.map((stat) => (
             <StatItem
               key={stat.label}

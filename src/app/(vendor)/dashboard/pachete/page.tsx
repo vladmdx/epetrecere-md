@@ -328,7 +328,7 @@ export default function VendorPackagesPage() {
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{form.id ? "Editează pachet" : "Pachet nou"}</DialogTitle>
           </DialogHeader>

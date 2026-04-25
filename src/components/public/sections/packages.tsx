@@ -63,7 +63,7 @@ export function PackagesSection() {
         </p>
       </div>
 
-      <div className="mt-10 grid gap-5 md:grid-cols-3">
+      <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2 md:grid-cols-3">
         {tiers.map((tier) => {
           const Icon = tier.icon;
           return (

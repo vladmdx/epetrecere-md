@@ -1030,7 +1030,7 @@ export default function VendorBookingsPage() {
         open={!!messageDialog}
         onOpenChange={(v) => !v && setMessageDialog(null)}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               Mesaj către {messageDialog?.clientName ?? "client"}
@@ -1062,7 +1062,7 @@ export default function VendorBookingsPage() {
               </div>
 
               {/* Chat history */}
-              <div className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-border/30 bg-background/30 p-2">
+              <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-border/30 bg-background/30 p-2 sm:max-h-64">
                 {(chats[messageDialog.id] || []).length === 0 ? (
                   <p className="py-6 text-center text-xs text-muted-foreground">
                     Niciun mesaj încă. Scrie primul mesaj clientului.

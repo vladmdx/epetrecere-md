@@ -56,7 +56,7 @@ export function CategoriesSection() {
           </div>
         </ScrollReveal>
 
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {categories.map((cat, i) => (
             <ScrollReveal key={cat.slug} delay={i * 0.05}>
               <Link

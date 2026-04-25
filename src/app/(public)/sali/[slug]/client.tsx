@@ -211,7 +211,7 @@ export function VenueDetailClient({
 
               {/* Packages */}
               {menu && menu.packages.length > 0 && (
-                <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {menu.packages.map((p) => (
                     <div
                       key={p.id}
@@ -365,7 +365,7 @@ export function VenueDetailClient({
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <div className="sticky top-20 space-y-3 rounded-xl border border-border/40 bg-card p-6">
+          <div className="space-y-3 rounded-xl border border-border/40 bg-card p-6 lg:sticky lg:top-20">
             {venue.pricePerPerson && (
               <div className="text-center">
                 {canSeePrice ? (

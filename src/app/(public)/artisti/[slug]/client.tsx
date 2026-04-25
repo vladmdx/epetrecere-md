@@ -445,7 +445,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* CTA Buttons */}
-          <div className="sticky top-20 space-y-3">
+          <div className="space-y-3 lg:sticky lg:top-20">
             <RequestPriceForm artistId={artist.id} />
             <RequestBookingForm
               artistId={artist.id}

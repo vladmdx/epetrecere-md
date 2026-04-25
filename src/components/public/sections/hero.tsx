@@ -53,13 +53,13 @@ export function HeroSection() {
         </ScrollReveal>
 
         <ScrollReveal delay={0.15}>
-          <h1 className="mx-auto max-w-4xl font-heading text-4xl font-bold leading-tight text-[#FAF8F2] md:text-5xl lg:text-6xl">
+          <h1 className="mx-auto max-w-4xl font-heading text-3xl font-bold leading-tight text-[#FAF8F2] sm:text-4xl md:text-5xl lg:text-6xl">
             {t("hero.title")}
           </h1>
         </ScrollReveal>
 
         <ScrollReveal delay={0.3}>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-[#D4D4E0]">
+          <p className="mx-auto mt-6 max-w-2xl text-base text-[#D4D4E0] sm:text-lg">
             {t("hero.description")}
           </p>
         </ScrollReveal>

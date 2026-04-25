@@ -22,11 +22,11 @@ export function VendorLayoutChrome({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex min-h-[100dvh] md:h-screen md:overflow-hidden">
       <VendorSidebar />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col md:overflow-hidden">
         <AdminTopbar />
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6">{children}</main>
+        <main className="flex-1 p-3 sm:p-6 md:overflow-y-auto">{children}</main>
       </div>
     </div>
   );

@@ -62,7 +62,7 @@ function DropdownMenu({ label, items, href }: { label: string; items: { slug: st
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
+            className="absolute left-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
           >
             {items.map((item) => (
               <Link
