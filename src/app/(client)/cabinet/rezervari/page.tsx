@@ -31,7 +31,7 @@ interface BookingRequest {
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "In așteptare", color: "text-warning border-warning/30 bg-warning/5" },
-  accepted: { label: "Acceptat de artist", color: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5" },
+  accepted: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
   confirmed_by_client: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
   rejected: { label: "Refuzat", color: "text-destructive border-destructive/30 bg-destructive/5" },
   cancelled: { label: "Anulat", color: "text-muted-foreground border-border/40 bg-muted/5" },
@@ -206,17 +206,9 @@ function renderBookingCard(
             </p>
           </div>
 
-          {/* Actions */}
+          {/* Actions — partner accept now finalizes the booking; no extra
+              client confirmation needed. */}
           <div className="flex flex-col items-stretch gap-2 shrink-0">
-            {b.status === "accepted" && (
-              <Button
-                size="sm"
-                className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs"
-                onClick={() => onConfirm(b.id)}
-              >
-                <CheckCircle2 className="h-3.5 w-3.5" /> Confirmă
-              </Button>
-            )}
             {b.artistSlug && (
               <Link href={`/artisti/${b.artistSlug}`}>
                 <Button variant="outline" size="sm" className="gap-1 text-xs w-full">

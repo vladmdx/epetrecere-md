@@ -5,6 +5,7 @@ import { users } from "@/lib/db/schema";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
 import { PushSubscribeButton } from "@/components/shared/push-subscribe-button";
 import { WhatsAppPhoneInput } from "@/components/shared/whatsapp-phone-input";
+import { NotificationSoundToggle } from "@/components/shared/notification-sound-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, MessageCircle } from "lucide-react";
 
@@ -45,6 +46,7 @@ export default async function ClientSettingsPage() {
             primești un mesaj.
           </p>
           <PushSubscribeButton />
+          <NotificationSoundToggle />
         </CardContent>
       </Card>
 

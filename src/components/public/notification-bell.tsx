@@ -5,6 +5,12 @@
 // Polls /api/notifications every 60 seconds when the user is signed in,
 // shows an unread count badge, and opens a dropdown with the latest 20
 // notifications. Click-to-read (and navigate) + a "mark all as read" action.
+//
+// Filters out message notifications — those are surfaced in the chat
+// bell only, so the notifications panel stays focused on bookings/reviews.
+//
+// Plays a soft chime when new unread notifications arrive (toggleable
+// via the user's "notificationSoundEnabled" localStorage flag).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -26,6 +32,44 @@ interface Notification {
 
 const POLL_INTERVAL_MS = 60_000;
 
+// Notifications surfaced via /chat or chat-bell — don't show them in the
+// global notification bell.
+const HIDDEN_TYPES = new Set([
+  "message_new",
+  "chat_new",
+  "conversation_new",
+]);
+
+const SOUND_PREF_KEY = "epetrecere.notification-sound-enabled";
+
+function isSoundEnabled(): boolean {
+  if (typeof window === "undefined") return true;
+  const v = localStorage.getItem(SOUND_PREF_KEY);
+  return v === null ? true : v === "1";
+}
+
+function playChime() {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.18);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.4);
+  } catch {}
+}
+
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
@@ -45,6 +89,7 @@ export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const lastUnreadRef = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     if (!isSignedIn) return;
@@ -53,8 +98,23 @@ export function NotificationBell() {
       const res = await fetch("/api/notifications", { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
-      setItems(data.notifications ?? []);
-      setUnreadCount(data.unreadCount ?? 0);
+      const all: Notification[] = data.notifications ?? [];
+      // Filter out chat/message types — those have their own bell.
+      const filtered = all.filter((n) => !HIDDEN_TYPES.has(n.type));
+      const unread = filtered.filter((n) => !n.isRead).length;
+
+      // If the count went UP since last poll, play a chime.
+      if (
+        lastUnreadRef.current !== null &&
+        unread > lastUnreadRef.current &&
+        isSoundEnabled()
+      ) {
+        playChime();
+      }
+      lastUnreadRef.current = unread;
+
+      setItems(filtered);
+      setUnreadCount(unread);
     } catch {
       // silent
     } finally {

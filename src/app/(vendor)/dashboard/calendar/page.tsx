@@ -910,7 +910,7 @@ export default function VendorCalendarPage() {
                             "ring-2 ring-gold ring-offset-1 ring-offset-background",
                           !isPast && isToday && "ring-1 ring-gold/50",
                           isBlocked
-                            ? "bg-muted/40 border-muted-foreground/40"
+                            ? "bg-destructive/15 border-destructive/50 text-destructive"
                             : bookingsForDay.length > 0
                               ? "bg-gold/5 border-gold/30"
                               : isPast
@@ -929,7 +929,7 @@ export default function VendorCalendarPage() {
                       >
                         <span
                           className={cn(
-                            isBlocked && "text-muted-foreground line-through",
+                            isBlocked && "text-destructive font-bold",
                             !isBlocked && bookingsForDay.length > 0 && "text-gold font-bold",
                             isToday && !isBlocked && bookingsForDay.length === 0 && "text-gold font-bold",
                           )}
@@ -1146,7 +1146,7 @@ export default function VendorCalendarPage() {
                         ) : (
                           <X className="h-4 w-4" />
                         )}
-                        Blochează ziua (vacanță)
+                        Blochează ziua
                       </Button>
                     )}
                   </div>

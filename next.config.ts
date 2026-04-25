@@ -26,6 +26,16 @@ const nextConfig: NextConfig = {
         hostname: "img.clerk.com",
       },
       {
+        // Vercel Blob storage — /api/upload returns URLs on
+        // *.public.blob.vercel-storage.com.
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+      },
+      {
+        protocol: "https",
+        hostname: "*.vercel-storage.com",
+      },
+      {
         protocol: "http",
         hostname: "artist.md",
       },

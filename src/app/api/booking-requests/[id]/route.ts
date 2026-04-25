@@ -143,8 +143,10 @@ export async function PUT(
       typeof agreedPrice === "number" && agreedPrice >= 0
         ? { agreedPrice }
         : {};
+    // The partner's accept finalizes the booking — no separate client
+    // confirmation step. Both parties get contact details below.
     await db.update(bookingRequests).set({
-      status: "accepted",
+      status: "confirmed_by_client",
       artistReply: reply || "Cererea a fost acceptată!",
       ...priceUpdate,
       updatedAt: new Date(),
@@ -590,35 +592,66 @@ export async function PUT(
   void (async () => {
     try {
       if (action === "accept" || action === "reject") {
-        // Look up the vendor name — could be an artist OR a venue
-        let vendorName = "Sala/Artist";
+        // Look up the vendor — name + contact info + owner userId
+        let vendorName = "Partenerul";
+        let vendorPhone: string | null = null;
+        let vendorEmail: string | null = null;
+        let vendorUserId: string | null = null;
         if (booking.artistId) {
           const [artist] = await db
-            .select({ nameRo: artists.nameRo })
+            .select({
+              userId: artists.userId,
+              nameRo: artists.nameRo,
+              phone: artists.phone,
+              email: artists.email,
+            })
             .from(artists)
             .where(eq(artists.id, booking.artistId))
             .limit(1);
-          if (artist) vendorName = artist.nameRo;
+          if (artist) {
+            vendorName = artist.nameRo;
+            vendorPhone = artist.phone;
+            vendorEmail = artist.email;
+            vendorUserId = artist.userId;
+          }
         } else if (booking.venueId) {
           const { venues } = await import("@/lib/db/schema");
           const [venue] = await db
-            .select({ nameRo: venues.nameRo })
+            .select({
+              userId: venues.userId,
+              nameRo: venues.nameRo,
+              phone: venues.phone,
+              email: venues.email,
+            })
             .from(venues)
             .where(eq(venues.id, booking.venueId))
             .limit(1);
-          if (venue) vendorName = venue.nameRo;
+          if (venue) {
+            vendorName = venue.nameRo;
+            vendorPhone = venue.phone;
+            vendorEmail = venue.email;
+            vendorUserId = venue.userId;
+          }
         }
-        const artist = { nameRo: vendorName };
         const { notificationEmail } = await import("@/lib/email/templates/notification-email");
 
         const timePart = booking.startTime
           ? `<br>Ora: ${booking.startTime}${booking.endTime ? ` – ${booking.endTime}` : ""}`
           : "";
+
+        // On accept the booking is auto-finalized — include partner
+        // contact info so the client can reach out directly.
+        const contactBlock = action === "accept"
+          ? `<br><br><strong>Date de contact ${vendorName}:</strong>${
+              vendorPhone ? `<br>📞 ${vendorPhone}` : ""
+            }${vendorEmail ? `<br>📧 ${vendorEmail}` : ""}`
+          : "";
+
         const emailBody = action === "accept"
-          ? `<strong>${vendorName}</strong> a acceptat cererea ta de rezervare pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Mesaj: <em>${reply}</em>` : ""}`
+          ? `<strong>${vendorName}</strong> a confirmat rezervarea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Mesaj: <em>${reply}</em>` : ""}${contactBlock}`
           : `<strong>${vendorName}</strong> a răspuns la cererea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Motivul: <em>${reply}</em>` : ""}`;
 
-        // In-app notification (requires clientUserId)
+        // Notify the CLIENT
         if (booking.clientUserId) {
           const clientUser = await db
             .select({ email: users.email })
@@ -630,36 +663,65 @@ export async function PUT(
             type: "booking_status_changed",
             title:
               action === "accept"
-                ? `Rezervarea ta la ${artist?.nameRo ?? "artist"} a fost acceptată`
-                : `Răspuns la cererea ta către ${artist?.nameRo ?? "artist"}`,
-            message: reply ?? undefined,
+                ? `Rezervarea ta la ${vendorName} este confirmată!`
+                : `Răspuns la cererea ta către ${vendorName}`,
+            message:
+              action === "accept"
+                ? vendorPhone
+                  ? `Date contact: ${vendorPhone}${vendorEmail ? ` · ${vendorEmail}` : ""}`
+                  : reply ?? undefined
+                : reply ?? undefined,
             actionUrl: "/cabinet/rezervari",
             email: clientUser[0]?.email ?? undefined,
             emailSubject: action === "accept"
-              ? `✅ Rezervarea ta la ${artist?.nameRo ?? "artist"} a fost acceptată!`
-              : `Răspuns la cererea ta — ${artist?.nameRo ?? "artist"}`,
+              ? `🎉 Rezervarea cu ${vendorName} este confirmată!`
+              : `Răspuns la cererea ta — ${vendorName}`,
             emailHtml: notificationEmail({
-              title: action === "accept" ? "Rezervare Acceptată!" : "Răspuns la Cererea Ta",
+              title: action === "accept" ? "Rezervare Confirmată!" : "Răspuns la Cererea Ta",
               message: emailBody,
               ctaUrl: "https://epetrecere.md/cabinet/rezervari",
               ctaText: "Vezi detalii →",
-              emoji: action === "accept" ? "✅" : "📩",
+              emoji: action === "accept" ? "🎉" : "📩",
             }),
           });
         } else if (booking.clientEmail) {
-          // No in-app user, but we have an email — send email directly
           const { sendEmail } = await import("@/lib/email/send");
           await sendEmail({
             to: booking.clientEmail,
             subject: action === "accept"
-              ? `✅ Rezervarea ta la ${artist?.nameRo ?? "artist"} a fost acceptată!`
-              : `Răspuns la cererea ta — ${artist?.nameRo ?? "artist"}`,
+              ? `🎉 Rezervarea cu ${vendorName} este confirmată!`
+              : `Răspuns la cererea ta — ${vendorName}`,
             html: notificationEmail({
-              title: action === "accept" ? "Rezervare Acceptată!" : "Răspuns la Cererea Ta",
+              title: action === "accept" ? "Rezervare Confirmată!" : "Răspuns la Cererea Ta",
               message: emailBody,
               ctaUrl: "https://epetrecere.md",
               ctaText: "Vizitează ePetrecere.md →",
-              emoji: action === "accept" ? "✅" : "📩",
+              emoji: action === "accept" ? "🎉" : "📩",
+            }),
+          });
+        }
+
+        // On accept also notify the PARTNER with the client's contact info.
+        if (action === "accept" && vendorUserId) {
+          const clientContactBlock = `<br><br><strong>Date de contact client:</strong><br>👤 ${booking.clientName}${
+            booking.clientPhone ? `<br>📞 ${booking.clientPhone}` : ""
+          }${booking.clientEmail ? `<br>📧 ${booking.clientEmail}` : ""}`;
+          await dispatchNotification({
+            userId: vendorUserId,
+            type: "booking_status_changed",
+            title: `Rezervare confirmată cu ${booking.clientName}`,
+            message: booking.clientPhone
+              ? `Date contact: ${booking.clientPhone}${booking.clientEmail ? ` · ${booking.clientEmail}` : ""}`
+              : undefined,
+            actionUrl: "/dashboard/rezervari",
+            email: vendorEmail ?? undefined,
+            emailSubject: `🎉 Rezervare confirmată cu ${booking.clientName}`,
+            emailHtml: notificationEmail({
+              title: "Rezervare confirmată!",
+              message: `Ai confirmat rezervarea cu <strong>${booking.clientName}</strong> pentru ${booking.eventDate}.${timePart}${clientContactBlock}`,
+              ctaUrl: "https://epetrecere.md/dashboard/rezervari",
+              ctaText: "Vezi rezervarea →",
+              emoji: "🎉",
             }),
           });
         }

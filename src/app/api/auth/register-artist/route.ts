@@ -8,7 +8,9 @@ import { slugify } from "@/lib/utils/slugify";
 
 const registerSchema = z.object({
   name: z.string().min(2),
-  phone: z.string().min(6),
+  // Phone is now collected at registration and stored on the user; the
+  // onboarding form may send an empty string. We fall back to users.phone.
+  phone: z.string().optional().default(""),
   categoryId: z.number(),
   description: z.string().optional(),
   location: z.string().optional(),
@@ -34,7 +36,11 @@ export async function POST(req: Request) {
 
     // Look up the app user by clerkId
     let [appUser] = await db
-      .select({ id: users.id, email: users.email })
+      .select({
+        id: users.id,
+        email: users.email,
+        phone: users.phone,
+      })
       .from(users)
       .where(eq(users.clerkId, clerkId))
       .limit(1);
@@ -70,14 +76,14 @@ export async function POST(req: Request) {
           role: "user",
         })
         .onConflictDoNothing()
-        .returning({ id: users.id, email: users.email });
+        .returning({ id: users.id, email: users.email, phone: users.phone });
 
       if (created) {
         appUser = created;
       } else {
         // Conflict means the user was created between our check and insert
         const [existing] = await db
-          .select({ id: users.id, email: users.email })
+          .select({ id: users.id, email: users.email, phone: users.phone })
           .from(users)
           .where(eq(users.clerkId, clerkId))
           .limit(1);
@@ -109,6 +115,11 @@ export async function POST(req: Request) {
     let slug = slugify(data.name);
     slug = `${slug}-${Date.now().toString(36)}`;
 
+    // Phone falls back to the user's phone (collected at registration)
+    const finalPhone = data.phone && data.phone.trim().length >= 6
+      ? data.phone
+      : appUser.phone || "";
+
     // Create artist (inactive — needs admin approval)
     const [artist] = await db
       .insert(artists)
@@ -118,8 +129,9 @@ export async function POST(req: Request) {
         nameRu: data.name,
         nameEn: data.name,
         slug,
-        phone: data.phone,
+        phone: finalPhone,
         email: appUser.email,
+        photoUrl: data.imageUrl || null,
         descriptionRo: data.description || null,
         location: data.location || "Chișinău",
         categoryIds: [data.categoryId],

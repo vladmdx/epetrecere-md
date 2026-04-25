@@ -33,6 +33,7 @@ import { IcalSubscribeCard } from "@/components/vendor/ical-subscribe-card";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
 import { ReferralCard } from "@/components/shared/referral-card";
 import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
+import { NotificationSoundToggle } from "@/components/shared/notification-sound-toggle";
 import { TimezoneSelector } from "@/components/shared/timezone-selector";
 
 type ArtistSettings = {
@@ -340,6 +341,7 @@ export default function VendorSettingsPage() {
         </div>
         <TimezoneSelector />
         <NotificationPrefsGrid />
+        <NotificationSoundToggle />
       </div>
 
       <ReferralCard />
