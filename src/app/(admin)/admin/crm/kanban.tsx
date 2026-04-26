@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -14,21 +14,30 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, DollarSign, Loader2 } from "lucide-react";
+import { Calendar, DollarSign, Loader2, User, Music, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { toast } from "sonner";
 
-interface Lead {
-  id: number;
+export interface CrmItem {
+  id: string;
+  rawId: number;
+  type: "lead" | "booking" | "offer";
   name: string;
   phone: string;
+  email: string | null;
   eventType: string | null;
   eventDate: string | null;
+  location: string | null;
+  guestCount: number | null;
   budget: number | null;
   status: string;
-  score: number | null;
+  rawStatus: string;
   source: string | null;
+  score: number | null;
+  message: string | null;
+  artistName: string | null;
+  createdAt: string;
 }
 
 const columns = [
@@ -36,6 +45,7 @@ const columns = [
   { id: "contacted", label: "Contactați", color: "bg-warning" },
   { id: "proposal_sent", label: "Propunere", color: "bg-gold" },
   { id: "negotiation", label: "Negociere", color: "bg-purple-500" },
+  { id: "accepted", label: "Acceptați", color: "bg-success" },
   { id: "confirmed", label: "Confirmați", color: "bg-success" },
 ];
 
@@ -44,33 +54,59 @@ const eventLabels: Record<string, string> = {
   corporate: "Corporate", birthday: "Aniversare", other: "Altele",
 };
 
-function LeadCard({ lead }: { lead: Lead }) {
-  const score = lead.score ?? 0;
+const typeIconMap = {
+  lead: User,
+  booking: Ticket,
+  offer: Music,
+} as const;
+
+const typeColorMap = {
+  lead: "text-blue-400 bg-blue-500/10",
+  booking: "text-purple-400 bg-purple-500/10",
+  offer: "text-gold bg-gold/10",
+} as const;
+
+function ItemCard({ item }: { item: CrmItem }) {
+  const score = item.score ?? 0;
+  const Icon = typeIconMap[item.type];
+  const detailUrl =
+    item.type === "lead" ? `/admin/crm/${item.rawId}` : "/admin/cereri-oferte";
+
   return (
-    <Link href={`/admin/crm/${lead.id}`}>
+    <Link href={detailUrl}>
       <div className="rounded-lg border border-border/40 bg-card p-3 shadow-sm transition-all hover:border-gold/30 hover:shadow-md cursor-pointer">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium truncate">{lead.name}</span>
-          <span className={cn(
-            "flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold",
-            score >= 70 ? "bg-success/20 text-success" : score >= 40 ? "bg-warning/20 text-warning" : "bg-muted text-muted-foreground",
-          )}>
-            {score}
-          </span>
+        <div className="flex items-center justify-between mb-2 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md", typeColorMap[item.type])}>
+              <Icon className="h-3.5 w-3.5" />
+            </span>
+            <span className="text-sm font-medium truncate">{item.name}</span>
+          </div>
+          {item.type === "lead" && (
+            <span className={cn(
+              "flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold",
+              score >= 70 ? "bg-success/20 text-success" : score >= 40 ? "bg-warning/20 text-warning" : "bg-muted text-muted-foreground",
+            )}>
+              {score}
+            </span>
+          )}
         </div>
         <div className="space-y-1 text-[11px] text-muted-foreground">
-          {(lead.eventType || lead.eventDate) && (
+          {item.artistName && (
+            <div className="text-gold/80 truncate">→ {item.artistName}</div>
+          )}
+          {(item.eventType || item.eventDate) && (
             <div className="flex items-center gap-1.5">
               <Calendar className="h-3 w-3" />
-              {lead.eventType ? (eventLabels[lead.eventType] || lead.eventType) : ""}
-              {lead.eventType && lead.eventDate ? " · " : ""}
-              {lead.eventDate || ""}
+              {item.eventType ? (eventLabels[item.eventType] || item.eventType) : ""}
+              {item.eventType && item.eventDate ? " · " : ""}
+              {item.eventDate || ""}
             </div>
           )}
-          {lead.budget && (
+          {item.budget && (
             <div className="flex items-center gap-1.5">
               <DollarSign className="h-3 w-3" />
-              {lead.budget}€
+              {item.budget}€
             </div>
           )}
         </div>
@@ -79,10 +115,10 @@ function LeadCard({ lead }: { lead: Lead }) {
   );
 }
 
-function SortableLeadCard({ lead }: { lead: Lead }) {
+function SortableItemCard({ item }: { item: CrmItem }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: lead.id,
-    data: { lead },
+    id: item.id,
+    data: { item },
   });
 
   const style = {
@@ -93,30 +129,26 @@ function SortableLeadCard({ lead }: { lead: Lead }) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <LeadCard lead={lead} />
+      <ItemCard item={item} />
     </div>
   );
 }
 
-export function KanbanBoard() {
-  const [leadsList, setLeadsList] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeId, setActiveId] = useState<number | null>(null);
+interface KanbanBoardProps {
+  items: CrmItem[];
+  onItemsChange: (items: CrmItem[]) => void;
+  loading: boolean;
+}
+
+export function KanbanBoard({ items, onItemsChange, loading }: KanbanBoardProps) {
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
 
-  useEffect(() => {
-    fetch("/api/leads")
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(data => { setLeadsList(Array.isArray(data) ? data : []); })
-      .catch(() => toast.error("Nu s-au putut încărca solicitările"))
-      .finally(() => setLoading(false));
-  }, []);
-
   function handleDragStart(event: DragStartEvent) {
-    setActiveId(event.active.id as number);
+    setActiveId(event.active.id as string);
   }
 
   async function handleDragEnd(event: DragEndEvent) {
@@ -126,45 +158,44 @@ export function KanbanBoard() {
     if (!over) return;
 
     const overId = String(over.id);
-    const targetColumn = columns.find((c) => c.id === overId);
+    const targetColumn = allColumns.find((c) => c.id === overId);
     if (!targetColumn) return;
 
-    const leadId = active.id as number;
-    const currentLead = leadsList.find(l => l.id === leadId);
-    if (!currentLead || currentLead.status === targetColumn.id) return;
+    const itemId = active.id as string;
+    const currentItem = items.find((l) => l.id === itemId);
+    if (!currentItem || currentItem.status === targetColumn.id) return;
 
     // Optimistic update
-    setLeadsList((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, status: targetColumn.id } : l)),
+    onItemsChange(
+      items.map((l) => (l.id === itemId ? { ...l, status: targetColumn.id } : l)),
     );
 
-    // Persist to API
+    // Persist via unified endpoint
     try {
-      await fetch(`/api/leads/${leadId}`, {
+      const res = await fetch("/api/crm/items", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: targetColumn.id }),
+        body: JSON.stringify({ id: itemId, status: targetColumn.id }),
       });
-      toast.success(`${currentLead.name} → ${targetColumn.label}`);
+      if (!res.ok) throw new Error();
+      toast.success(`${currentItem.name} → ${targetColumn.label}`);
     } catch {
       // Revert on failure
-      setLeadsList((prev) =>
-        prev.map((l) => (l.id === leadId ? { ...l, status: currentLead.status } : l)),
+      onItemsChange(
+        items.map((l) => (l.id === itemId ? { ...l, status: currentItem.status } : l)),
       );
       toast.error("Eroare la actualizare status");
     }
   }
 
-  const activeLead = leadsList.find((l) => l.id === activeId);
-
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-gold" /></div>;
   }
 
-  // Include completed/lost/follow_up as extra columns if they have leads
+  // Add extra columns for completed/lost/follow_up if items exist
   const extraStatuses = ["completed", "lost", "follow_up"];
   const extraColumns = extraStatuses
-    .filter(s => leadsList.some(l => l.status === s))
+    .filter(s => items.some(l => l.status === s))
     .map(s => ({
       id: s,
       label: s === "completed" ? "Finalizate" : s === "lost" ? "Pierdute" : "Follow-up",
@@ -172,6 +203,8 @@ export function KanbanBoard() {
     }));
 
   const allColumns = [...columns, ...extraColumns];
+
+  const activeItem = items.find((l) => l.id === activeId);
 
   return (
     <DndContext
@@ -182,7 +215,7 @@ export function KanbanBoard() {
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
         {allColumns.map((col) => {
-          const colLeads = leadsList.filter((l) => l.status === col.id);
+          const colItems = items.filter((l) => l.status === col.id);
           return (
             <div
               key={col.id}
@@ -193,15 +226,15 @@ export function KanbanBoard() {
                 <span className={cn("h-2.5 w-2.5 rounded-full", col.color)} />
                 <span className="text-sm font-bold">{col.label}</span>
                 <Badge variant="secondary" className="ml-auto text-xs">
-                  {colLeads.length}
+                  {colItems.length}
                 </Badge>
               </div>
-              <SortableContext items={colLeads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={colItems.map((l) => l.id)} strategy={verticalListSortingStrategy}>
                 <div className="flex flex-col gap-2 p-2 min-h-[200px]">
-                  {colLeads.map((lead) => (
-                    <SortableLeadCard key={lead.id} lead={lead} />
+                  {colItems.map((item) => (
+                    <SortableItemCard key={item.id} item={item} />
                   ))}
-                  {colLeads.length === 0 && (
+                  {colItems.length === 0 && (
                     <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground">
                       Trage aici
                     </div>
@@ -214,9 +247,9 @@ export function KanbanBoard() {
       </div>
 
       <DragOverlay>
-        {activeLead ? (
+        {activeItem ? (
           <div className="w-72 opacity-90">
-            <LeadCard lead={activeLead} />
+            <ItemCard item={activeItem} />
           </div>
         ) : null}
       </DragOverlay>

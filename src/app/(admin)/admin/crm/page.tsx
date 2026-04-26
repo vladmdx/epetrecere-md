@@ -10,12 +10,14 @@ import { Badge } from "@/components/ui/badge";
 import {
   Search, Phone, Mail, Calendar, DollarSign, User, ChevronRight,
   Clock, AlertCircle, CheckCircle, XCircle, MessageSquare, LayoutGrid, List, Loader2, Download,
+  Music, Ticket,
 } from "lucide-react";
 
 const KanbanBoard = dynamic(
   () => import("./kanban").then((m) => m.KanbanBoard),
   { ssr: false },
 );
+import type { CrmItem } from "./kanban";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -24,28 +26,18 @@ const statusConfig: Record<string, { label: string; color: string; icon: typeof 
   contacted: { label: "Contactat", color: "bg-warning/10 text-warning border-warning/30", icon: Phone },
   proposal_sent: { label: "Propunere", color: "bg-gold/10 text-gold border-gold/30", icon: Mail },
   negotiation: { label: "Negociere", color: "bg-purple-500/10 text-purple-500 border-purple-500/30", icon: MessageSquare },
+  accepted: { label: "Acceptat", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
   confirmed: { label: "Confirmat", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
   completed: { label: "Finalizat", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
   lost: { label: "Pierdut", color: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
   follow_up: { label: "Follow-up", color: "bg-warning/10 text-warning border-warning/30", icon: Clock },
 };
 
-interface Lead {
-  id: number;
-  name: string;
-  phone: string;
-  email: string | null;
-  eventType: string | null;
-  eventDate: string | null;
-  location: string | null;
-  guestCount: number | null;
-  budget: number | null;
-  status: string;
-  source: string | null;
-  score: number | null;
-  message: string | null;
-  createdAt: string;
-}
+const typeConfig = {
+  lead: { label: "Lead", color: "bg-blue-500/10 text-blue-400 border-blue-500/30", icon: User },
+  booking: { label: "Rezervare", color: "bg-purple-500/10 text-purple-400 border-purple-500/30", icon: Ticket },
+  offer: { label: "Ofertă", color: "bg-gold/10 text-gold border-gold/30", icon: Music },
+} as const;
 
 const eventTypeLabels: Record<string, string> = {
   wedding: "Nuntă", baptism: "Botez", cumpatrie: "Cumpătrie",
@@ -54,25 +46,27 @@ const eventTypeLabels: Record<string, string> = {
 };
 
 export default function CRMPage() {
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [items, setItems] = useState<CrmItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "lead" | "booking" | "offer">("all");
   const [view, setView] = useState<"list" | "kanban">("list");
 
   useEffect(() => {
-    fetch("/api/leads")
+    fetch("/api/crm/items")
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(data => { setLeads(Array.isArray(data) ? data : []); })
+      .then(data => { setItems(Array.isArray(data) ? data : []); })
       .catch(() => toast.error("Nu s-au putut încărca solicitările"))
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = leads.filter((lead) => {
-    if (statusFilter !== "all" && lead.status !== statusFilter) return false;
-    if (search && !lead.name.toLowerCase().includes(search.toLowerCase()) &&
-        !lead.phone.includes(search) &&
-        !(lead.email?.toLowerCase().includes(search.toLowerCase()))) return false;
+  const filtered = items.filter((item) => {
+    if (statusFilter !== "all" && item.status !== statusFilter) return false;
+    if (typeFilter !== "all" && item.type !== typeFilter) return false;
+    if (search && !item.name.toLowerCase().includes(search.toLowerCase()) &&
+        !item.phone.includes(search) &&
+        !(item.email?.toLowerCase().includes(search.toLowerCase()))) return false;
     return true;
   });
 
@@ -81,142 +75,196 @@ export default function CRMPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold">CRM — Solicitări</h1>
-          <p className="text-sm text-muted-foreground">{leads.length} solicitări totale</p>
+          <p className="text-sm text-muted-foreground">
+            {items.length} solicitări totale ·
+            {" "}{items.filter(i => i.type === "lead").length} leads,
+            {" "}{items.filter(i => i.type === "booking").length} rezervări,
+            {" "}{items.filter(i => i.type === "offer").length} oferte
+          </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* AD-10: CSV Export */}
           <Button variant="outline" size="sm" className="gap-1.5 border-gold/30 text-gold hover:bg-gold/10" onClick={() => {
-            const header = "Nume,Telefon,Email,Eveniment,Data,Locatie,Invitati,Buget,Status,Sursa,Creat\n";
-            const rows = leads.map((l) =>
-              [l.name, l.phone, l.email || "", l.eventType || "", l.eventDate || "", l.location || "", l.guestCount || "", l.budget || "", l.status, l.source || "", l.createdAt]
+            const header = "Tip,Nume,Telefon,Email,Eveniment,Data,Locatie,Invitati,Buget,Status,Sursa,Artist,Creat\n";
+            const rows = items.map((l) =>
+              [l.type, l.name, l.phone, l.email || "", l.eventType || "", l.eventDate || "", l.location || "", l.guestCount || "", l.budget || "", l.status, l.source || "", l.artistName || "", l.createdAt]
                 .map(v => `"${String(v).replace(/"/g, '""')}"`)
                 .join(",")
             ).join("\n");
             const blob = new Blob(["\uFEFF" + header + rows], { type: "text/csv;charset=utf-8" });
             const url = URL.createObjectURL(blob);
-            const a = document.createElement("a"); a.href = url; a.download = `crm-leads-${new Date().toISOString().split("T")[0]}.csv`; a.click();
+            const a = document.createElement("a"); a.href = url; a.download = `crm-${new Date().toISOString().split("T")[0]}.csv`; a.click();
             URL.revokeObjectURL(url);
             toast.success("CSV exportat");
           }}>
             <Download className="h-4 w-4" /> Export CSV
           </Button>
-        <div className="flex gap-1 rounded-lg border border-border/40 p-1">
-          <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className={view === "kanban" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""} onClick={() => setView("kanban")}>
-            <LayoutGrid className="h-4 w-4" />
-          </Button>
-          <Button variant={view === "list" ? "default" : "ghost"} size="sm" className={view === "list" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""} onClick={() => setView("list")}>
-            <List className="h-4 w-4" />
-          </Button>
-        </div>
+          <div className="flex gap-1 rounded-lg border border-border/40 p-1">
+            <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className={view === "kanban" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""} onClick={() => setView("kanban")}>
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button variant={view === "list" ? "default" : "ghost"} size="sm" className={view === "list" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""} onClick={() => setView("list")}>
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {view === "kanban" && <KanbanBoard />}
+      {view === "kanban" && <KanbanBoard items={items} onItemsChange={setItems} loading={loading} />}
 
       {view === "list" && (<>
-      {/* Status Filter Pills */}
-      <div className="flex flex-wrap gap-2">
-        <Button
-          variant={statusFilter === "all" ? "default" : "outline"}
-          size="sm"
-          className={statusFilter === "all" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
-          onClick={() => setStatusFilter("all")}
-        >
-          Toate ({leads.length})
-        </Button>
-        {Object.entries(statusConfig).map(([key, cfg]) => {
-          const count = leads.filter((l) => l.status === key).length;
-          if (!count) return null;
-          return (
-            <Button
-              key={key}
-              variant={statusFilter === key ? "default" : "outline"}
-              size="sm"
-              className={statusFilter === key ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
-              onClick={() => setStatusFilter(key)}
-            >
-              {cfg.label} ({count})
-            </Button>
-          );
-        })}
-      </div>
+        {/* Type Filter */}
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={typeFilter === "all" ? "default" : "outline"}
+            size="sm"
+            className={typeFilter === "all" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
+            onClick={() => setTypeFilter("all")}
+          >
+            Toate tipurile ({items.length})
+          </Button>
+          {(["lead", "booking", "offer"] as const).map((t) => {
+            const cfg = typeConfig[t];
+            const count = items.filter((i) => i.type === t).length;
+            return (
+              <Button
+                key={t}
+                variant={typeFilter === t ? "default" : "outline"}
+                size="sm"
+                className={typeFilter === t ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
+                onClick={() => setTypeFilter(t)}
+              >
+                <cfg.icon className="h-3.5 w-3.5 mr-1" />
+                {cfg.label}e ({count})
+              </Button>
+            );
+          })}
+        </div>
 
-      {/* Search */}
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Caută după nume, telefon, email..."
-          className="pl-9"
-        />
-      </div>
+        {/* Status Filter Pills */}
+        <div className="flex flex-wrap gap-2 border-t border-border/40 pt-3">
+          <Button
+            variant={statusFilter === "all" ? "default" : "outline"}
+            size="sm"
+            className={statusFilter === "all" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
+            onClick={() => setStatusFilter("all")}
+          >
+            Toate statusurile
+          </Button>
+          {Object.entries(statusConfig).map(([key, cfg]) => {
+            const count = items.filter((l) => l.status === key && (typeFilter === "all" || l.type === typeFilter)).length;
+            if (!count) return null;
+            return (
+              <Button
+                key={key}
+                variant={statusFilter === key ? "default" : "outline"}
+                size="sm"
+                className={statusFilter === key ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
+                onClick={() => setStatusFilter(key)}
+              >
+                {cfg.label} ({count})
+              </Button>
+            );
+          })}
+        </div>
 
-      {/* Loading */}
-      {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-gold" /></div>
-      ) : (
-      /* Leads Table */
-      <div className="space-y-3">
-        {filtered.map((lead) => {
-          const cfg = statusConfig[lead.status] || statusConfig.new;
-          const score = lead.score ?? 0;
-          return (
-            <Link key={lead.id} href={`/admin/crm/${lead.id}`}>
-              <Card className="transition-all hover:border-gold/30 hover:shadow-sm cursor-pointer">
-                <CardContent className="flex items-center gap-4 py-4">
-                  {/* Score */}
-                  <div className={cn(
-                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-sm font-bold",
-                    score >= 70 ? "bg-success/10 text-success" :
-                    score >= 40 ? "bg-warning/10 text-warning" :
-                    "bg-muted text-muted-foreground",
-                  )}>
-                    {score}
-                  </div>
+        {/* Search */}
+        <div className="relative max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Caută după nume, telefon, email..."
+            className="pl-9"
+          />
+        </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium truncate">{lead.name}</span>
-                      <Badge variant="outline" className={cn("text-xs", cfg.color)}>
-                        {cfg.label}
-                      </Badge>
-                      {lead.eventType && (
-                        <Badge variant="secondary" className="text-xs">
-                          {eventTypeLabels[lead.eventType] || lead.eventType}
-                        </Badge>
+        {/* Loading */}
+        {loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-gold" /></div>
+        ) : (
+          <div className="space-y-3">
+            {filtered.map((item) => {
+              const cfg = statusConfig[item.status] || statusConfig.new;
+              const tcfg = typeConfig[item.type];
+              const score = item.score ?? 0;
+              const detailUrl =
+                item.type === "lead" ? `/admin/crm/${item.rawId}` :
+                item.type === "booking" ? `/admin/cereri-oferte` :
+                "/admin/cereri-oferte";
+              return (
+                <Link key={item.id} href={detailUrl}>
+                  <Card className="transition-all hover:border-gold/30 hover:shadow-sm cursor-pointer">
+                    <CardContent className="flex items-center gap-4 py-4">
+                      {/* Type icon */}
+                      <div className={cn(
+                        "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                        tcfg.color,
+                      )}>
+                        <tcfg.icon className="h-5 w-5" />
+                      </div>
+
+                      {/* Score (only for leads) */}
+                      {item.type === "lead" && (
+                        <div className={cn(
+                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold",
+                          score >= 70 ? "bg-success/10 text-success" :
+                          score >= 40 ? "bg-warning/10 text-warning" :
+                          "bg-muted text-muted-foreground",
+                        )}>
+                          {score}
+                        </div>
                       )}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {lead.phone}</span>
-                      {lead.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {lead.email}</span>}
-                      {lead.eventDate && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {lead.eventDate}</span>}
-                      {lead.guestCount && <span className="flex items-center gap-1"><User className="h-3 w-3" /> {lead.guestCount} invitați</span>}
-                      {lead.budget && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> {lead.budget}€</span>}
-                    </div>
-                    {lead.message && (
-                      <p className="mt-1 text-xs text-muted-foreground truncate max-w-lg">{lead.message}</p>
-                    )}
-                  </div>
 
-                  <div className="text-xs text-muted-foreground shrink-0">
-                    {new Date(lead.createdAt).toLocaleDateString("ro-RO")}
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-                </CardContent>
-              </Card>
-            </Link>
-          );
-        })}
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium truncate">{item.name}</span>
+                          <Badge variant="outline" className={cn("text-xs", tcfg.color)}>
+                            {tcfg.label}
+                          </Badge>
+                          <Badge variant="outline" className={cn("text-xs", cfg.color)}>
+                            {cfg.label}
+                          </Badge>
+                          {item.eventType && (
+                            <Badge variant="secondary" className="text-xs">
+                              {eventTypeLabels[item.eventType] || item.eventType}
+                            </Badge>
+                          )}
+                          {item.artistName && (
+                            <Badge variant="secondary" className="text-xs">
+                              → {item.artistName}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {item.phone}</span>
+                          {item.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {item.email}</span>}
+                          {item.eventDate && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {item.eventDate}</span>}
+                          {item.guestCount && <span className="flex items-center gap-1"><User className="h-3 w-3" /> {item.guestCount} invitați</span>}
+                          {item.budget && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> {item.budget}€</span>}
+                        </div>
+                        {item.message && (
+                          <p className="mt-1 text-xs text-muted-foreground truncate max-w-lg">{item.message}</p>
+                        )}
+                      </div>
 
-        {filtered.length === 0 && (
-          <div className="py-12 text-center text-muted-foreground">
-            {leads.length === 0 ? "Nu sunt solicitări încă" : "Nu s-au găsit solicitări"}
+                      <div className="text-xs text-muted-foreground shrink-0">
+                        {new Date(item.createdAt).toLocaleDateString("ro-RO")}
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
+
+            {filtered.length === 0 && (
+              <div className="py-12 text-center text-muted-foreground">
+                {items.length === 0 ? "Nu sunt solicitări încă" : "Nu s-au găsit solicitări"}
+              </div>
+            )}
           </div>
         )}
-      </div>
-      )}
       </>)}
     </div>
   );
