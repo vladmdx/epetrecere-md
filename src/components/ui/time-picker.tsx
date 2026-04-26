@@ -258,11 +258,26 @@ export function TimePicker({
 
   function commitTyping() {
     const p = parseTime(typing);
-    if (p) {
-      setHM(p.h, p.m);
-    } else {
+    if (!p) {
       setTyping(value); // revert
+      return;
     }
+    // Reject typed times outside the working-hours window or on a day off.
+    if (wsWindow.offDay) {
+      setTyping(value);
+      return;
+    }
+    const totalMin = p.h * 60 + p.m;
+    if (totalMin < wsWindow.startMin || totalMin >= wsWindow.endMin) {
+      setTyping(value);
+      return;
+    }
+    // Reject typed times that fall inside a booked range.
+    if (wholeDayBlocked || isTimeBooked(p.h, p.m, bookedRanges)) {
+      setTyping(value);
+      return;
+    }
+    setHM(p.h, p.m);
   }
 
   const displayValue = parsed ? `${pad2(parsed.h)}:${pad2(parsed.m)}` : "";
