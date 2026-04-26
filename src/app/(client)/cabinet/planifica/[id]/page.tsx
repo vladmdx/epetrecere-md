@@ -1554,18 +1554,11 @@ function BookingsTab({
 
       {/* ─── Section 1: Existing bookings ───────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-heading text-xl font-bold">Rezervările mele</h2>
-            <p className="text-sm text-muted-foreground">
-              {planBookings.length} {planBookings.length === 1 ? "cerere" : "cereri"} trimise
-            </p>
-          </div>
-          <Link href="/artisti">
-            <Button variant="outline" size="sm" className="gap-1 text-xs">
-              <Plus className="h-3.5 w-3.5" /> Caută artiști
-            </Button>
-          </Link>
+        <div className="mb-4">
+          <h2 className="font-heading text-xl font-bold">Rezervările mele</h2>
+          <p className="text-sm text-muted-foreground">
+            {planBookings.length} {planBookings.length === 1 ? "cerere" : "cereri"} trimise
+          </p>
         </div>
 
         {planBookings.length === 0 ? (
