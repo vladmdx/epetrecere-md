@@ -270,10 +270,23 @@ export async function POST(req: NextRequest) {
         .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
         .where(eq(bookingRequests.eventPlanId, eventPlanId));
 
-      // Prevent duplicate booking for the same artist on same plan
-      if (existingBookings.some((b) => b.artistId === parsed.data.artistId)) {
+      // Prevent duplicate booking for the same artist on same plan.
+      // If the previous one was declined/cancelled/expired, surface a
+      // clearer message so the client knows to pick another artist.
+      const priorBooking = existingBookings.find(
+        (b) => b.artistId === parsed.data.artistId,
+      );
+      if (priorBooking) {
+        const declined =
+          priorBooking.status === "rejected" ||
+          priorBooking.status === "cancelled" ||
+          priorBooking.status === "expired";
         return NextResponse.json(
-          { error: "Ai trimis deja o cerere către acest artist pentru acest eveniment." },
+          {
+            error: declined
+              ? "Acest artist a refuzat deja cererea ta pentru acest eveniment. Te rugăm să alegi un alt artist."
+              : "Ai trimis deja o cerere către acest artist pentru acest eveniment.",
+          },
           { status: 409 },
         );
       }

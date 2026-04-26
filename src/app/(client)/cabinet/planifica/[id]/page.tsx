@@ -1517,10 +1517,32 @@ function BookingsTab({
     bookingsPerCategory.set(section.categoryId, booked);
   }
 
-  // Scope bookings to this plan only. Older bookings without eventPlanId
-  // (pre-Faza 1) still show up because we fall back to email-matching
-  // at the API layer.
-  const planBookings = bookings;
+  // Track artists who have rejected/cancelled bookings on this plan so
+  // the discovery section can hide its "Solicită rezervare" CTA — once
+  // a partner declines, the client should pick a different artist
+  // rather than spam the same one. The notification is still surfaced
+  // via the bell.
+  const blockedArtistIds = new Set<number>();
+  for (const b of bookings) {
+    if (
+      b.status === "rejected" ||
+      b.status === "cancelled" ||
+      b.status === "expired"
+    ) {
+      blockedArtistIds.add(b.artistId);
+    }
+  }
+
+  // Scope bookings to this plan only AND hide rejected/cancelled/expired
+  // entries — they're noise in the "Rezervările mele" list. The user
+  // still gets the bell notification when the artist declines, and the
+  // booking row stays in the database for audit/CRM.
+  const planBookings = bookings.filter(
+    (b) =>
+      b.status !== "rejected" &&
+      b.status !== "cancelled" &&
+      b.status !== "expired",
+  );
 
   return (
     <div className="space-y-10">
@@ -1634,6 +1656,7 @@ function BookingsTab({
           loading={discoveryLoading}
           bookingByArtistId={bookingByArtistId}
           bookingsPerCategory={bookingsPerCategory}
+          blockedArtistIds={blockedArtistIds}
           clientName={user?.fullName ?? "Client"}
           clientPhone={user?.primaryPhoneNumber?.phoneNumber ?? ""}
           clientEmail={user?.primaryEmailAddress?.emailAddress ?? undefined}
@@ -1659,6 +1682,7 @@ function DiscoverySection({
   loading,
   bookingByArtistId,
   bookingsPerCategory,
+  blockedArtistIds,
   clientName,
   clientPhone,
   clientEmail,
@@ -1669,6 +1693,10 @@ function DiscoverySection({
   loading: boolean;
   bookingByArtistId: Map<number, BookingRequest>;
   bookingsPerCategory: Map<number, number>;
+  /** Artists who already declined / cancelled / expired a booking on this
+   *  plan. The CTA is disabled with a "Refuzat anterior" label so the
+   *  client picks a different artist. */
+  blockedArtistIds: Set<number>;
   clientName: string;
   clientPhone: string;
   clientEmail?: string;
@@ -1861,6 +1889,7 @@ function DiscoverySection({
                         artist={a}
                         plan={plan}
                         existingBooking={bookingByArtistId.get(a.id)}
+                        previouslyDeclined={blockedArtistIds.has(a.id)}
                         categoryLimitReached={limitReached}
                         clientName={clientName}
                         clientPhone={clientPhone}
@@ -1898,6 +1927,7 @@ function PlanArtistCard({
   artist,
   plan,
   existingBooking,
+  previouslyDeclined = false,
   categoryLimitReached,
   clientName,
   clientPhone,
@@ -1908,6 +1938,9 @@ function PlanArtistCard({
   artist: DiscoveryArtist;
   plan: Plan;
   existingBooking?: BookingRequest;
+  /** True when the artist already declined / cancelled / expired a
+   *  request from this client on this plan. Hides the rebooking CTA. */
+  previouslyDeclined?: boolean;
   categoryLimitReached: boolean;
   clientName: string;
   clientPhone: string;
@@ -2059,16 +2092,18 @@ function PlanArtistCard({
   const isConfirmed = status === "confirmed_by_client" || status === "completed";
   const alreadyBooked = isPending || isAccepted || isConfirmed;
 
-  const disabled = alreadyBooked || categoryLimitReached;
+  const disabled = alreadyBooked || categoryLimitReached || previouslyDeclined;
   const primaryLabel = isConfirmed
     ? "Rezervat"
     : isAccepted
       ? "Confirmă rezervarea"
       : isPending
         ? "Cerere trimisă"
-        : categoryLimitReached
-          ? "Limită atinsă (5)"
-          : "Solicită rezervare";
+        : previouslyDeclined
+          ? "Refuzat anterior"
+          : categoryLimitReached
+            ? "Limită atinsă (5)"
+            : "Solicită rezervare";
 
   function pickSlot(slot: { id: number; startTime: string; endTime: string }) {
     if (selectedSlotId === slot.id) {
