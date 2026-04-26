@@ -112,8 +112,9 @@ export async function PUT(
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
-    // Artist conflict check — skip for venue bookings (venues currently allow
-    // multiple events per day; conflict logic will come in a later phase).
+    // Re-validate availability on accept — working hours + conflicts.
+    // Same checks as on POST so an artist can't accept a booking that
+    // violates their own schedule.
     if (booking.artistId) {
       const { checkArtistAvailability, formatConflictMessage } = await import(
         "@/lib/booking/availability"
@@ -132,6 +133,33 @@ export async function PUT(
               "Nu poți accepta această rezervare — " +
               formatConflictMessage(result).toLowerCase(),
             conflict: result.conflict,
+            outsideWorkingHours: result.outsideWorkingHours,
+            workingHours: result.workingHours,
+          },
+          { status: 409 },
+        );
+      }
+    }
+    if (booking.venueId) {
+      const { checkVenueAvailability, formatConflictMessage } = await import(
+        "@/lib/booking/availability"
+      );
+      const result = await checkVenueAvailability({
+        venueId: booking.venueId,
+        eventDate: booking.eventDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        excludeBookingId: booking.id,
+      });
+      if (!result.available) {
+        return NextResponse.json(
+          {
+            error:
+              "Nu poți accepta această rezervare — " +
+              formatConflictMessage(result).toLowerCase(),
+            conflict: result.conflict,
+            outsideWorkingHours: result.outsideWorkingHours,
+            workingHours: result.workingHours,
           },
           { status: 409 },
         );

@@ -9,7 +9,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { bookingRequests, calendarEvents } from "@/lib/db/schema";
+import {
+  bookingRequests,
+  calendarEvents,
+  workSchedule,
+} from "@/lib/db/schema";
 
 const BLOCKING_STATUSES = [
   "pending",
@@ -78,5 +82,26 @@ export async function GET(req: NextRequest) {
     (b) => !b.startTime || !b.endTime,
   );
 
-  return NextResponse.json({ bookedRanges, wholeDayBlocked });
+  // Working hours for this date's day-of-week (Mon=0..Sun=6 to match work_schedule)
+  const d = new Date(date + "T00:00:00");
+  const dow = (d.getDay() + 6) % 7;
+  const [scheduleRow] = await db
+    .select({
+      startTime: workSchedule.startTime,
+      endTime: workSchedule.endTime,
+      isWorking: workSchedule.isWorking,
+    })
+    .from(workSchedule)
+    .where(
+      and(eq(workSchedule.artistId, artistId), eq(workSchedule.dayOfWeek, dow)),
+    )
+    .limit(1);
+
+  const workingHours = scheduleRow
+    ? scheduleRow.isWorking
+      ? { start: scheduleRow.startTime, end: scheduleRow.endTime }
+      : null // explicit day off
+    : undefined; // no schedule configured — no restriction
+
+  return NextResponse.json({ bookedRanges, wholeDayBlocked, workingHours });
 }

@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Artist conflict check — only for artist bookings.
+  // Artist availability check — working hours + conflicts.
   if (parsed.data.artistId) {
     const { checkArtistAvailability, formatConflictMessage } = await import(
       "@/lib/booking/availability"
@@ -312,6 +312,32 @@ export async function POST(req: NextRequest) {
         {
           error: formatConflictMessage(result),
           conflict: result.conflict,
+          outsideWorkingHours: result.outsideWorkingHours,
+          workingHours: result.workingHours,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
+  // Venue availability check — working hours + conflicts.
+  if (parsed.data.venueId) {
+    const { checkVenueAvailability, formatConflictMessage } = await import(
+      "@/lib/booking/availability"
+    );
+    const result = await checkVenueAvailability({
+      venueId: parsed.data.venueId,
+      eventDate: parsed.data.eventDate,
+      startTime: parsed.data.startTime,
+      endTime: parsed.data.endTime,
+    });
+    if (!result.available) {
+      return NextResponse.json(
+        {
+          error: formatConflictMessage(result),
+          conflict: result.conflict,
+          outsideWorkingHours: result.outsideWorkingHours,
+          workingHours: result.workingHours,
         },
         { status: 409 },
       );

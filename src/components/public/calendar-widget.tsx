@@ -56,12 +56,17 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
     Array<{ startTime: string; endTime: string }>
   >([]);
   const [wholeDayBlocked, setWholeDayBlocked] = useState(false);
+  // null = explicit day off; undefined = no schedule restriction; object = working hours window
+  const [workingHours, setWorkingHours] = useState<
+    { start: string; end: string } | null | undefined
+  >(undefined);
 
-  // Fetch booked ranges when a date is selected (artist only)
+  // Fetch booked ranges + working hours when a date is selected (artist only)
   useEffect(() => {
     if (!selectedDate || entityType !== "artist") {
       setBookedRanges([]);
       setWholeDayBlocked(false);
+      setWorkingHours(undefined);
       return;
     }
     let cancelled = false;
@@ -73,6 +78,7 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
         if (cancelled) return;
         setBookedRanges(d.bookedRanges || []);
         setWholeDayBlocked(!!d.wholeDayBlocked);
+        setWorkingHours(d.workingHours);
       })
       .catch(() => {
         /* silent */
@@ -82,9 +88,20 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
     };
   }, [selectedDate, entityId, entityType]);
 
-  // Compute which hours 8..22 are fully unavailable
+  // Compute which hours are fully unavailable (booked or outside working hours)
   function isHourBooked(hour: number): boolean {
     if (wholeDayBlocked) return true;
+    if (workingHours === null) return true; // explicit day off
+    if (workingHours) {
+      const [wsH, wsM] = workingHours.start.split(":").map(Number);
+      const [weH, weM] = workingHours.end.split(":").map(Number);
+      const wsMin = wsH * 60 + (wsM || 0);
+      const weMin = (weH === 0 ? 24 : weH) * 60 + (weM || 0);
+      const slotStart = hour * 60;
+      const slotEnd = (hour + 1) * 60;
+      // Hour is unavailable if it falls outside working hours
+      if (slotStart < wsMin || slotEnd > weMin) return true;
+    }
     const slotStart = hour * 60;
     const slotEnd = (hour + 1) * 60;
     return bookedRanges.some((r) => {
@@ -200,8 +217,21 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
     let endTime: string | undefined;
     if (startTime && duration) {
       const [h, m] = startTime.split(":").map(Number);
-      const endH = h + duration;
-      endTime = `${String(Math.min(endH, 23)).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      let endH = h + duration;
+      // Clamp to working-hours end if configured
+      if (workingHours) {
+        const [weH] = workingHours.end.split(":").map(Number);
+        const weEffective = weH === 0 ? 24 : weH;
+        if (endH > weEffective) {
+          alert(
+            `Durata depășește orele de lucru (${workingHours.start}–${workingHours.end}). Te rugăm să alegi o durată mai mică.`,
+          );
+          return;
+        }
+      } else if (endH > 23) {
+        endH = 23;
+      }
+      endTime = `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
     }
 
     try {
@@ -358,6 +388,16 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           {getDayStatus(selectedDate).bookedSlots.length > 0 && (
             <p className="text-[10px] text-warning text-center mt-1">
               Ocupat: {getDayStatus(selectedDate).bookedSlots.join(", ")}
+            </p>
+          )}
+          {workingHours === null && (
+            <p className="text-[10px] text-destructive text-center mt-1">
+              Această zi nu este zi de lucru
+            </p>
+          )}
+          {workingHours && (
+            <p className="text-[10px] text-emerald-500 text-center mt-1">
+              Program: {workingHours.start}–{workingHours.end}
             </p>
           )}
           {bookedRanges.length > 0 && !wholeDayBlocked && (
