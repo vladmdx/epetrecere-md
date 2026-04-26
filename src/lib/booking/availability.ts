@@ -31,6 +31,24 @@ function toMinutes(time: string | null | undefined): number | null {
   return h * 60 + mm;
 }
 
+/**
+ * Parse end-time. Same as `toMinutes` but maps "00:00" → 1440 (next-day
+ * midnight) so a booking that ends at midnight is treated as ending at
+ * the close of the day, not at the start. Also rolls forward when the
+ * end <= start (e.g. 23:00–02:00 means 23:00 → 02:00 next day).
+ */
+function toEndMinutes(
+  endTime: string | null | undefined,
+  startMinutes: number | null,
+): number | null {
+  const raw = toMinutes(endTime);
+  if (raw === null) return null;
+  // Bare "00:00" without a startTime context → treat as next-day midnight
+  if (raw === 0) return 24 * 60;
+  if (startMinutes !== null && raw <= startMinutes) return raw + 24 * 60;
+  return raw;
+}
+
 /** Check if two time ranges [a1, a2] and [b1, b2] overlap. Null = whole day. */
 function rangesOverlap(
   a1: number | null,
@@ -91,7 +109,7 @@ export async function checkArtistAvailability(opts: {
 }): Promise<AvailabilityResult> {
   const { artistId, eventDate, excludeBookingId } = opts;
   const targetStart = toMinutes(opts.startTime);
-  const targetEnd = toMinutes(opts.endTime);
+  const targetEnd = toEndMinutes(opts.endTime, targetStart);
 
   // 0. Check the artist's weekly working hours (if any are configured).
   // We only enforce this when the artist has at least one row in
@@ -227,7 +245,7 @@ export async function checkVenueAvailability(opts: {
 }): Promise<AvailabilityResult> {
   const { venueId, eventDate, excludeBookingId } = opts;
   const targetStart = toMinutes(opts.startTime);
-  const targetEnd = toMinutes(opts.endTime);
+  const targetEnd = toEndMinutes(opts.endTime, targetStart);
 
   // 0. Check venue working hours
   if (targetStart !== null && targetEnd !== null) {
