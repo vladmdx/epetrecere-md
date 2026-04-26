@@ -60,9 +60,13 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
   const [workingHours, setWorkingHours] = useState<
     { start: string; end: string } | null | undefined
   >(undefined);
+  const [selectedStartTime, setSelectedStartTime] = useState<string>("");
+  const [selectedDuration, setSelectedDuration] = useState<string>("");
 
   // Fetch booked ranges + working hours when a date is selected (artist only)
   useEffect(() => {
+    setSelectedStartTime("");
+    setSelectedDuration("");
     if (!selectedDate || entityType !== "artist") {
       setBookedRanges([]);
       setWholeDayBlocked(false);
@@ -88,20 +92,34 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
     };
   }, [selectedDate, entityId, entityType]);
 
-  // Compute which hours are fully unavailable (booked or outside working hours)
+  // Day-of-week working hours window in 24h units. When working hours
+  // aren't configured we fall back to a sensible 08:00–23:00 default
+  // so existing artists without a schedule still see usable options.
+  const wsBoundaries = (() => {
+    if (workingHours === null) return null; // explicit day off
+    if (workingHours) {
+      const [wsH] = workingHours.start.split(":").map(Number);
+      const [weH] = workingHours.end.split(":").map(Number);
+      const weEffective = weH === 0 ? 24 : weH;
+      return { startH: wsH, endH: weEffective };
+    }
+    return { startH: 8, endH: 23 };
+  })();
+
+  // Hours offered as start time — every full hour from open until one
+  // hour before close (so at least a 1-hour booking fits).
+  const availableStartHours: number[] = (() => {
+    if (!wsBoundaries) return [];
+    const out: number[] = [];
+    for (let h = wsBoundaries.startH; h < wsBoundaries.endH; h++) {
+      out.push(h);
+    }
+    return out;
+  })();
+
+  // Whether a given start hour is unavailable (booked / blocked).
   function isHourBooked(hour: number): boolean {
     if (wholeDayBlocked) return true;
-    if (workingHours === null) return true; // explicit day off
-    if (workingHours) {
-      const [wsH, wsM] = workingHours.start.split(":").map(Number);
-      const [weH, weM] = workingHours.end.split(":").map(Number);
-      const wsMin = wsH * 60 + (wsM || 0);
-      const weMin = (weH === 0 ? 24 : weH) * 60 + (weM || 0);
-      const slotStart = hour * 60;
-      const slotEnd = (hour + 1) * 60;
-      // Hour is unavailable if it falls outside working hours
-      if (slotStart < wsMin || slotEnd > weMin) return true;
-    }
     const slotStart = hour * 60;
     const slotEnd = (hour + 1) * 60;
     return bookedRanges.some((r) => {
@@ -112,6 +130,14 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
       return rs < slotEnd && slotStart < re;
     });
   }
+
+  // Maximum allowed duration given the selected start hour and the end of
+  // the working-hours window. Capped at 8 hours.
+  const maxDuration: number = (() => {
+    if (!wsBoundaries || !selectedStartTime) return 8;
+    const [h] = selectedStartTime.split(":").map(Number);
+    return Math.max(0, Math.min(8, wsBoundaries.endH - h));
+  })();
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -414,10 +440,15 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
           {!showForm ? (
             <Button
               onClick={() => setShowForm(true)}
-              className="mt-2 w-full h-9 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs font-semibold rounded-lg"
+              disabled={workingHours === null || wholeDayBlocked}
+              className="mt-2 w-full h-9 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
-              Rezervă această dată
+              {workingHours === null
+                ? "Zi nelucrătoare"
+                : wholeDayBlocked
+                  ? "Indisponibil"
+                  : "Rezervă această dată"}
             </Button>
           ) : (
             <form onSubmit={handleBookingSubmit} className="mt-3 space-y-3">
@@ -453,25 +484,49 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
 
               <div className="grid grid-cols-2 gap-2">
                 <MiniField icon={Clock} label="Ora de început" required>
-                  <select name="startTime" required
-                    className="form-input !h-9 !text-xs appearance-none cursor-pointer">
-                    <option value="">Ora</option>
-                    {Array.from({ length: 15 }, (_, i) => i + 8)
+                  <select
+                    name="startTime"
+                    required
+                    value={selectedStartTime}
+                    onChange={(e) => {
+                      setSelectedStartTime(e.target.value);
+                      setSelectedDuration(""); // reset duration when start changes
+                    }}
+                    className="form-input !h-9 !text-xs appearance-none cursor-pointer"
+                    disabled={availableStartHours.length === 0}
+                  >
+                    <option value="">
+                      {availableStartHours.length === 0 ? "Indisponibil" : "Ora"}
+                    </option>
+                    {availableStartHours
                       .filter((h) => !isHourBooked(h))
-                      .map(h => (
-                        <option key={h} value={`${String(h).padStart(2, "0")}:00`}>
+                      .map((h) => (
+                        <option
+                          key={h}
+                          value={`${String(h).padStart(2, "0")}:00`}
+                        >
                           {String(h).padStart(2, "0")}:00
                         </option>
                       ))}
                   </select>
                 </MiniField>
                 <MiniField icon={Clock} label="Durată (ore)" required>
-                  <select name="duration" required
-                    className="form-input !h-9 !text-xs appearance-none cursor-pointer">
+                  <select
+                    name="duration"
+                    required
+                    value={selectedDuration}
+                    onChange={(e) => setSelectedDuration(e.target.value)}
+                    className="form-input !h-9 !text-xs appearance-none cursor-pointer"
+                    disabled={!selectedStartTime || maxDuration === 0}
+                  >
                     <option value="">Ore</option>
-                    {[1, 2, 3, 4, 5, 6, 7, 8].map(h => (
-                      <option key={h} value={h}>{h} {h === 1 ? "oră" : "ore"}</option>
-                    ))}
+                    {Array.from({ length: maxDuration }, (_, i) => i + 1).map(
+                      (h) => (
+                        <option key={h} value={h}>
+                          {h} {h === 1 ? "oră" : "ore"}
+                        </option>
+                      ),
+                    )}
                   </select>
                 </MiniField>
               </div>
