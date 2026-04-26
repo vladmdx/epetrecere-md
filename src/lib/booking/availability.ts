@@ -213,7 +213,7 @@ export async function checkArtistAvailability(opts: {
   // 3. Check each for overlap
   for (const b of bookings) {
     const bStart = toMinutes(b.startTime);
-    const bEnd = toMinutes(b.endTime);
+    const bEnd = toEndMinutes(b.endTime, bStart);
     if (rangesOverlap(targetStart, targetEnd, bStart, bEnd)) {
       return {
         available: false,
@@ -309,7 +309,7 @@ export async function checkVenueAvailability(opts: {
 
   for (const b of bookings) {
     const bStart = toMinutes(b.startTime);
-    const bEnd = toMinutes(b.endTime);
+    const bEnd = toEndMinutes(b.endTime, bStart);
     if (rangesOverlap(targetStart, targetEnd, bStart, bEnd)) {
       return {
         available: false,
