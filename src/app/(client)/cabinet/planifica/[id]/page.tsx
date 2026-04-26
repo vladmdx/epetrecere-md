@@ -100,6 +100,11 @@ interface Plan {
   /** Wizard-supplied: whether the plan also needs a venue — drives the
    *  conditional "Săli" tab. */
   venueNeeded?: boolean;
+  /** Wizard-supplied: which optional planning tabs the user opted into. */
+  checklistEnabled?: boolean;
+  budgetEnabled?: boolean;
+  guestsEnabled?: boolean;
+  seatingEnabled?: boolean;
   /** Max radius (km) from the event city for the Săli tab filter. */
   venueRadiusKm?: number | null;
   /** Wizard-supplied category IDs for pre-filtering the artist discovery. */
@@ -300,9 +305,18 @@ export default function PlanDetailPage({
   const seatedGuests = new Set(seats.map((s) => s.guestId)).size;
   const activeBookings = bookings.filter((b) => ["pending", "accepted", "confirmed_by_client"].includes(b.status));
 
-  // Hide the "Săli" tab unless the wizard / settings flagged this plan as
-  // needing a venue.
-  const visibleNavItems = NAV_ITEMS.filter((item) => !item.venueOnly || plan.venueNeeded);
+  // Each optional tab is gated on a wizard-time opt-in flag stored on
+  // the plan. Owners can flip these from the Setări tab afterwards.
+  // Seating is double-gated: requires both seating + guests enabled.
+  const visibleNavItems = NAV_ITEMS.filter((item) => {
+    if (item.venueOnly && !plan.venueNeeded) return false;
+    if (item.key === "checklist" && !plan.checklistEnabled) return false;
+    if (item.key === "budget" && !plan.budgetEnabled) return false;
+    if (item.key === "guests" && !plan.guestsEnabled) return false;
+    if (item.key === "seating" && (!plan.seatingEnabled || !plan.guestsEnabled))
+      return false;
+    return true;
+  });
 
   return (
     <div className="flex gap-0 -m-6 min-h-[calc(100vh-4rem)]">
@@ -390,7 +404,7 @@ export default function PlanDetailPage({
             </div>
           )}
 
-          {activeTab === "checklist" && (
+          {activeTab === "checklist" && plan.checklistEnabled && (
             <ChecklistView
               planId={plan.id}
               eventDate={plan.eventDate}
@@ -400,7 +414,7 @@ export default function PlanDetailPage({
             />
           )}
 
-          {activeTab === "budget" && (
+          {activeTab === "budget" && plan.budgetEnabled && (
             <BudgetTab
               plan={plan}
               bookings={bookings}
@@ -412,7 +426,7 @@ export default function PlanDetailPage({
             />
           )}
 
-          {activeTab === "guests" && (
+          {activeTab === "guests" && plan.guestsEnabled && (
             <GuestsView
               planId={plan.id}
               plan={plan}
@@ -422,7 +436,7 @@ export default function PlanDetailPage({
             />
           )}
 
-          {activeTab === "seating" && (
+          {activeTab === "seating" && plan.seatingEnabled && plan.guestsEnabled && (
             <SeatingView
               planId={plan.id}
               guests={guests}
@@ -3066,6 +3080,18 @@ function SettingsTab({
   const [budget, setBudget] = useState(plan.budgetTarget?.toString() || "");
   const [notes, setNotes] = useState(plan.notes || "");
   const [venueNeeded, setVenueNeeded] = useState(plan.venueNeeded ?? false);
+  const [checklistEnabled, setChecklistEnabled] = useState(
+    plan.checklistEnabled ?? false,
+  );
+  const [budgetEnabled, setBudgetEnabled] = useState(
+    plan.budgetEnabled ?? false,
+  );
+  const [guestsEnabled, setGuestsEnabled] = useState(
+    plan.guestsEnabled ?? false,
+  );
+  const [seatingEnabled, setSeatingEnabled] = useState(
+    plan.seatingEnabled ?? false,
+  );
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<number[]>(
     plan.selectedCategories ?? [],
   );
@@ -3113,6 +3139,12 @@ function SettingsTab({
           budgetTarget: budget ? Number(budget) : null,
           notes: notes || null,
           venueNeeded,
+          checklistEnabled,
+          budgetEnabled,
+          guestsEnabled,
+          // Seating requires guests — server enforces too, but we
+          // mirror it here so the UI doesn't lie about what's saved.
+          seatingEnabled: seatingEnabled && guestsEnabled,
           selectedCategories: selectedCategoryIds,
         }),
       });
@@ -3260,6 +3292,77 @@ function SettingsTab({
             </p>
           </div>
         </label>
+
+        <div className="space-y-2 pt-2">
+          <h3 className="text-sm font-semibold">Funcții opționale</h3>
+          <p className="text-xs text-muted-foreground">
+            Activează tab-urile pe care vrei să le folosești pentru acest eveniment.
+          </p>
+        </div>
+
+        <label className="flex items-start gap-3 rounded-lg border border-border/30 bg-card/50 p-3 cursor-pointer hover:border-gold/30 transition-colors">
+          <Checkbox
+            checked={checklistEnabled}
+            onCheckedChange={(v) => setChecklistEnabled(v === true)}
+            className="mt-0.5"
+          />
+          <div className="flex-1 text-sm">
+            <p className="font-medium">Checklist</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Lista pașilor de pregătire pentru evenimentul tău.
+            </p>
+          </div>
+        </label>
+
+        <label className="flex items-start gap-3 rounded-lg border border-border/30 bg-card/50 p-3 cursor-pointer hover:border-gold/30 transition-colors">
+          <Checkbox
+            checked={budgetEnabled}
+            onCheckedChange={(v) => setBudgetEnabled(v === true)}
+            className="mt-0.5"
+          />
+          <div className="flex-1 text-sm">
+            <p className="font-medium">Buget</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Urmărește cheltuielile pe categorii.
+            </p>
+          </div>
+        </label>
+
+        <label className="flex items-start gap-3 rounded-lg border border-border/30 bg-card/50 p-3 cursor-pointer hover:border-gold/30 transition-colors">
+          <Checkbox
+            checked={guestsEnabled}
+            onCheckedChange={(v) => {
+              const on = v === true;
+              setGuestsEnabled(on);
+              // Seating depends on guests — turning off guests must
+              // also turn off seating to keep them in sync.
+              if (!on) setSeatingEnabled(false);
+            }}
+            className="mt-0.5"
+          />
+          <div className="flex-1 text-sm">
+            <p className="font-medium">Listă invitați</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Importă, RSVP, alocare la mese.
+            </p>
+          </div>
+        </label>
+
+        {guestsEnabled && (
+          <label className="flex items-start gap-3 rounded-lg border border-border/30 bg-card/50 p-3 cursor-pointer hover:border-gold/30 transition-colors">
+            <Checkbox
+              checked={seatingEnabled}
+              onCheckedChange={(v) => setSeatingEnabled(v === true)}
+              className="mt-0.5"
+            />
+            <div className="flex-1 text-sm">
+              <p className="font-medium">Așezare mese</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Disponibil doar când ai listă de invitați activă.
+              </p>
+            </div>
+          </label>
+        )}
 
         <Button
           onClick={handleSave}

@@ -1100,6 +1100,16 @@ export const eventPlans = pgTable("event_plans", {
   /** Whether the user indicated in the wizard they also need a venue.
    *  When true the plan detail page surfaces the "Săli" tab. */
   venueNeeded: boolean("venue_needed").default(false).notNull(),
+  /** Wizard-toggled extras: which optional planning sections the user
+   *  enabled. Each gates a tab on the plan dashboard. Default false so
+   *  legacy plans don't force tabs the owner never asked for; existing
+   *  plans get the tabs back via the Setări tab. */
+  checklistEnabled: boolean("checklist_enabled").default(false).notNull(),
+  budgetEnabled: boolean("budget_enabled").default(false).notNull(),
+  guestsEnabled: boolean("guests_enabled").default(false).notNull(),
+  /** Seating only makes sense once a guest list exists, so the wizard
+   *  hides the seating question when guestsEnabled is false. */
+  seatingEnabled: boolean("seating_enabled").default(false).notNull(),
   /** Max radius (km) from the event city the user is willing to travel
    *  for a venue. 0 = only the selected city, 999 = no limit. Used to
    *  expand the city filter on the Săli tab via a city-proximity map.

@@ -76,6 +76,12 @@ const updatePlanSchema = z.object({
   seatsPerTable: z.number().int().min(2).max(20).optional(),
   notes: z.string().optional().nullable(),
   venueNeeded: z.boolean().optional(),
+  // Optional dashboard-tab toggles (Setări tab). Owners can enable a
+  // section after creating the plan if they skipped it in the wizard.
+  checklistEnabled: z.boolean().optional(),
+  budgetEnabled: z.boolean().optional(),
+  guestsEnabled: z.boolean().optional(),
+  seatingEnabled: z.boolean().optional(),
   selectedCategories: z.array(z.number().int().positive()).optional(),
   status: z.enum(["active", "completed", "cancelled"]).optional(),
 });

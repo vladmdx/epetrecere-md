@@ -22,6 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, ArrowRight, Loader2, Send, Sparkles,
   PartyPopper, Calendar, Users, Wrench, Building2, DollarSign, ClipboardCheck,
+  ClipboardList, Wallet, UtensilsCrossed, Check,
   Music, Mic, Disc3, Guitar, Camera, Video, Palette, Speaker, Star, Flame, Cake, LogIn,
 } from "lucide-react";
 
@@ -58,6 +59,13 @@ interface WizardData {
   email: string;
   /** GDPR checkbox — must be true before the wizard can submit. */
   gdprAccepted: boolean;
+  /** Optional planning sections the user wants to use. Each toggles a
+   *  tab on the plan dashboard; defaults are off so the user only sees
+   *  what they asked for. Seating is auto-disabled if guests are off. */
+  checklistEnabled: boolean;
+  budgetEnabled: boolean;
+  guestsEnabled: boolean;
+  seatingEnabled: boolean;
 }
 
 /** Typical event durations in hours. The user still picks a start hour
@@ -112,6 +120,10 @@ const initialData: WizardData = {
   phone: "",
   email: "",
   gdprAccepted: false,
+  checklistEnabled: false,
+  budgetEnabled: false,
+  guestsEnabled: false,
+  seatingEnabled: false,
 };
 
 /** Country prefixes shown in the phone picker. Moldova first, then the
@@ -141,11 +153,12 @@ const STEPS = [
   { key: "venue", icon: Building2 },
   { key: "services", icon: Wrench },
   { key: "budget", icon: DollarSign },
+  { key: "extras", icon: ClipboardList },
   { key: "summary", icon: ClipboardCheck },
 ];
 
-const TOTAL_STEPS = STEPS.length; // 7
-const SUMMARY_INDEX = TOTAL_STEPS - 1; // 6
+const TOTAL_STEPS = STEPS.length; // 8
+const SUMMARY_INDEX = TOTAL_STEPS - 1; // 7
 
 // ═══════════════════════════════════════════════
 // WIZARD COMPONENT
@@ -237,7 +250,8 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
       case 3: return data.venueNeeded === "yes" || data.venueNeeded === "no";
       case 4: return data.services.length > 0;
       case 5: return data.budget > 0;
-      case 6:
+      case 6: return true; // extras step — every choice is valid (including all "no")
+      case 7:
         return (
           !!data.name.trim() &&
           !!data.phone.trim() &&
@@ -396,7 +410,8 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         {step === 3 && <StepVenue data={data} update={update} autoNext={autoNext} />}
         {step === 4 && <StepServices data={data} update={update} />}
         {step === 5 && <StepBudget data={data} update={update} autoNext={autoNext} />}
-        {step === 6 && <StepSummary data={data} update={update} isSignedIn={!!isSignedIn} />}
+        {step === 6 && <StepExtras data={data} update={update} />}
+        {step === 7 && <StepSummary data={data} update={update} isSignedIn={!!isSignedIn} />}
 
         {/* Navigation */}
         <div className="mt-10 flex items-center justify-between">
@@ -848,6 +863,164 @@ function StepBudget({ data, update, autoNext }: StepProps) {
             className="mt-1 max-w-xs"
           />
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────
+// StepExtras — opt-in toggles for Checklist / Buget / Invitați /
+// Așezare Mese. The seating toggle only renders when the guests
+// toggle is on (asking the user how to seat 0 guests is meaningless).
+// ─────────────────────────────────────────────────
+function StepExtras({ data, update }: StepProps) {
+  const options: Array<{
+    key: "checklistEnabled" | "budgetEnabled" | "guestsEnabled";
+    icon: typeof ClipboardList;
+    title: string;
+    desc: string;
+  }> = [
+    {
+      key: "checklistEnabled",
+      icon: ClipboardList,
+      title: "Checklist",
+      desc: "Lista pașilor de pregătire (rezervare sală, invitații, costum, tort etc.) pre-populată după tipul evenimentului.",
+    },
+    {
+      key: "budgetEnabled",
+      icon: Wallet,
+      title: "Buget",
+      desc: "Urmărește cheltuielile pe categorii (artiști, sală, decor) cu sumă țintă vs. cheltuit.",
+    },
+    {
+      key: "guestsEnabled",
+      icon: Users,
+      title: "Listă invitați",
+      desc: "Importă, RSVP, alocare la mese — toate datele invitaților într-un singur loc.",
+    },
+  ];
+
+  function Toggle({
+    on,
+    onChange,
+  }: {
+    on: boolean;
+    onChange: (v: boolean) => void;
+  }) {
+    return (
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(true)}
+          className={cn(
+            "rounded-lg px-4 py-2 text-sm font-medium transition-all",
+            on
+              ? "bg-gold text-[#0D0D0D] shadow"
+              : "bg-muted/40 text-muted-foreground hover:bg-muted",
+          )}
+        >
+          <Check className="mr-1 inline h-3.5 w-3.5" /> Da
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(false)}
+          className={cn(
+            "rounded-lg px-4 py-2 text-sm font-medium transition-all",
+            !on
+              ? "bg-destructive/15 text-destructive ring-1 ring-destructive/30"
+              : "bg-muted/40 text-muted-foreground hover:bg-muted",
+          )}
+        >
+          Nu
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h2 className="mb-2 font-heading text-2xl font-bold">
+        Funcții suplimentare pentru evenimentul tău
+      </h2>
+      <p className="mb-8 text-muted-foreground">
+        Alege ce vrei să folosești în panoul evenimentului. Poți activa
+        oricare dintre ele mai târziu, din setările evenimentului.
+      </p>
+
+      <div className="space-y-3">
+        {options.map((opt) => {
+          const enabled = data[opt.key];
+          return (
+            <div
+              key={opt.key}
+              className={cn(
+                "flex items-center gap-4 rounded-xl border p-4 transition-all",
+                enabled
+                  ? "border-gold/40 bg-gold/5"
+                  : "border-border/40 hover:border-border",
+              )}
+            >
+              <div
+                className={cn(
+                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                  enabled ? "bg-gold/15 text-gold" : "bg-muted text-muted-foreground",
+                )}
+              >
+                <opt.icon className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-heading font-bold">{opt.title}</p>
+                <p className="text-xs text-muted-foreground">{opt.desc}</p>
+              </div>
+              <Toggle
+                on={enabled}
+                onChange={(v) => {
+                  // Turning off guests must also turn off seating —
+                  // seating without a guest list is meaningless.
+                  if (opt.key === "guestsEnabled" && !v) {
+                    update({ guestsEnabled: false, seatingEnabled: false });
+                  } else {
+                    update({ [opt.key]: v } as Partial<WizardData>);
+                  }
+                }}
+              />
+            </div>
+          );
+        })}
+
+        {/* Seating toggle — only rendered when guests are enabled. */}
+        {data.guestsEnabled && (
+          <div
+            className={cn(
+              "flex items-center gap-4 rounded-xl border p-4 transition-all",
+              data.seatingEnabled
+                ? "border-gold/40 bg-gold/5"
+                : "border-border/40 hover:border-border",
+            )}
+          >
+            <div
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+                data.seatingEnabled
+                  ? "bg-gold/15 text-gold"
+                  : "bg-muted text-muted-foreground",
+              )}
+            >
+              <UtensilsCrossed className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-heading font-bold">Așezare mese</p>
+              <p className="text-xs text-muted-foreground">
+                Așază invitații la mese — drag & drop, vizualizare grafică.
+                Disponibil doar când ai listă de invitați.
+              </p>
+            </div>
+            <Toggle
+              on={data.seatingEnabled}
+              onChange={(v) => update({ seatingEnabled: v })}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

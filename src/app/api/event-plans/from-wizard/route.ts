@@ -29,6 +29,13 @@ const wizardSchema = z.object({
   services: z.array(z.string()).optional(),
   budget: z.number().int().nonnegative().optional(),
   name: z.string().optional(),
+  // Optional dashboard tabs the user opted into during the wizard.
+  // Default false on the server side so older clients (admin wizard
+  // before this migration) don't accidentally enable everything.
+  checklistEnabled: z.boolean().optional(),
+  budgetEnabled: z.boolean().optional(),
+  guestsEnabled: z.boolean().optional(),
+  seatingEnabled: z.boolean().optional(),
 });
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -96,22 +103,32 @@ export async function POST(req: NextRequest) {
       venueNeeded: w.venueNeeded === "yes",
       venueRadiusKm: w.venueRadiusKm ?? 25,
       selectedCategories: categoryIds,
+      checklistEnabled: w.checklistEnabled ?? false,
+      budgetEnabled: w.budgetEnabled ?? false,
+      guestsEnabled: w.guestsEnabled ?? false,
+      // Seating only applies when guests are enabled — the wizard
+      // already enforces this client-side, the server enforces too.
+      seatingEnabled:
+        (w.seatingEnabled ?? false) && (w.guestsEnabled ?? false),
     })
     .returning();
 
-  // Seed the checklist exactly like the manual create flow.
-  const template = getPlannerTemplate(plan.eventType);
-  if (template.length > 0) {
-    await db.insert(checklistItems).values(
-      template.map((item, idx) => ({
-        planId: plan.id,
-        title: item.title,
-        category: item.category,
-        priority: item.priority,
-        dueDaysBefore: item.dueDaysBefore,
-        sortOrder: idx,
-      })),
-    );
+  // Seed the checklist only when the user opted in. Saves us inserting
+  // ~20 rows per plan that the user might never see if they skipped.
+  if (w.checklistEnabled) {
+    const template = getPlannerTemplate(plan.eventType);
+    if (template.length > 0) {
+      await db.insert(checklistItems).values(
+        template.map((item, idx) => ({
+          planId: plan.id,
+          title: item.title,
+          category: item.category,
+          priority: item.priority,
+          dueDaysBefore: item.dueDaysBefore,
+          sortOrder: idx,
+        })),
+      );
+    }
   }
 
   return NextResponse.json({ plan }, { status: 201 });
