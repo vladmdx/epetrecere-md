@@ -126,7 +126,10 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
       const [sh, sm] = r.startTime.split(":").map(Number);
       const [eh, em] = r.endTime.split(":").map(Number);
       const rs = sh * 60 + (sm || 0);
-      const re = eh * 60 + (em || 0);
+      let re = eh * 60 + (em || 0);
+      // Midnight end → 24:00; ranges crossing midnight roll forward
+      if (re === 0) re = 24 * 60;
+      if (re <= rs) re += 24 * 60;
       return rs < slotEnd && slotStart < re;
     });
   }

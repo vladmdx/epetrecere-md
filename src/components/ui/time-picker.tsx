@@ -64,7 +64,11 @@ function isTimeBooked(
     const e = parseTime(r.endTime);
     if (!s || !e) continue;
     const sMin = s.h * 60 + s.m;
-    const eMin = e.h * 60 + e.m;
+    let eMin = e.h * 60 + e.m;
+    // "00:00" end → midnight (end of day). And ranges that wrap past
+    // midnight (end <= start) roll forward by 24h.
+    if (eMin === 0) eMin = 24 * 60;
+    if (eMin <= sMin) eMin += 24 * 60;
     if (minutes >= sMin && minutes < eMin) return true;
   }
   return false;
