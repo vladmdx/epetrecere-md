@@ -2402,6 +2402,21 @@ function PlanArtistCard({
                       {durationOptions.map(({ durationMinutes, tiers }) => {
                         const selected =
                           selectedDurationMinutes === durationMinutes;
+                        // If this duration would push end time past the
+                        // artist's closing hour, disable it so the user
+                        // can't pick an out-of-hours slot.
+                        let exceedsWorkingHours = false;
+                        if (artistWorkingHours && startTime) {
+                          const [sh, sm] = startTime.split(":").map(Number);
+                          const startMin = sh * 60 + (sm || 0);
+                          const endTotal = startMin + durationMinutes;
+                          const [weH, weM] = artistWorkingHours.end
+                            .split(":")
+                            .map(Number);
+                          const closeMin =
+                            (weH === 0 ? 24 : weH) * 60 + (weM || 0);
+                          if (endTotal > closeMin) exceedsWorkingHours = true;
+                        }
                         // Preview the price for this duration at the current
                         // date/time so the client sees how overrides kick in.
                         const preview = resolvePriceForDuration(
@@ -2431,8 +2446,14 @@ function PlanArtistCard({
                           <button
                             key={durationMinutes}
                             type="button"
-                            disabled={submitting}
+                            disabled={submitting || exceedsWorkingHours}
+                            title={
+                              exceedsWorkingHours
+                                ? `Depășește orele de lucru ale artistului (până la ${artistWorkingHours?.end})`
+                                : undefined
+                            }
                             onClick={() => {
+                              if (exceedsWorkingHours) return;
                               setSelectedDurationMinutes(
                                 selected ? null : durationMinutes,
                               );
@@ -2442,7 +2463,9 @@ function PlanArtistCard({
                               "flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all",
                               selected
                                 ? "border-gold bg-gold/10 shadow-[0_0_0_1px_rgba(201,168,76,0.4)]"
-                                : "border-border/40 hover:border-gold/40",
+                                : exceedsWorkingHours
+                                  ? "border-border/20 opacity-40 cursor-not-allowed"
+                                  : "border-border/40 hover:border-gold/40",
                             )}
                           >
                             <div className="flex items-baseline justify-between gap-2">
