@@ -1935,6 +1935,15 @@ function PlanArtistCard({
   const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<
     number | null
   >(null);
+  // Working hours window for the event date (Mon=0..Sun=6).
+  // null = explicit day off; undefined = no schedule restriction; object = window.
+  const [artistWorkingHours, setArtistWorkingHours] = useState<
+    { start: string; end: string } | null | undefined
+  >(undefined);
+  const [bookedRanges, setBookedRanges] = useState<
+    Array<{ startTime: string; endTime: string }>
+  >([]);
+  const [wholeDayBlocked, setWholeDayBlocked] = useState(false);
 
   // When the booking modal opens for the first time, pre-fill start
   // from the plan's wizard answers so the client doesn't retype the obvious.
@@ -1950,6 +1959,35 @@ function PlanArtistCard({
       }
     }
   }, [modalOpen, plan.startTime, startTime]);
+
+  // Fetch artist availability (booked ranges + working hours) for the
+  // event date when the booking modal opens. Lets the TimePicker hide
+  // out-of-hours slots and intervals already taken.
+  useEffect(() => {
+    if (!modalOpen || !plan.eventDate) {
+      setArtistWorkingHours(undefined);
+      setBookedRanges([]);
+      setWholeDayBlocked(false);
+      return;
+    }
+    let cancelled = false;
+    fetch(
+      `/api/artist-availability?artist_id=${artist.id}&date=${plan.eventDate}`,
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d) return;
+        setArtistWorkingHours(d.workingHours);
+        setBookedRanges(d.bookedRanges || []);
+        setWholeDayBlocked(!!d.wholeDayBlocked);
+      })
+      .catch(() => {
+        /* silent */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modalOpen, plan.eventDate, artist.id]);
 
   // Load artist's pricing tiers when modal opens. Each tier is a (duration,
   // price, scope) row. We keep all scope variants so the resolver can pick
@@ -2335,7 +2373,15 @@ function PlanArtistCard({
                       setStartTime(v);
                       setSelectedSlotId(null);
                     }}
+                    workingHours={artistWorkingHours}
+                    bookedRanges={bookedRanges}
+                    wholeDayBlocked={wholeDayBlocked}
                   />
+                  {artistWorkingHours === null && (
+                    <p className="mt-1 text-[11px] text-destructive">
+                      Această zi nu este zi de lucru pentru artist.
+                    </p>
+                  )}
                 </div>
 
                 {/* Duration picker — the resolver picks the right price */}

@@ -29,6 +29,13 @@ export interface TimePickerProps {
   bookedRanges?: Array<{ startTime: string; endTime: string }>;
   /** If true, the whole day is unavailable (all slots disabled). */
   wholeDayBlocked?: boolean;
+  /**
+   * Working hours window for the selected day:
+   *   { start: "HH:MM", end: "HH:MM" } — only show hours within window.
+   *   null  — explicit day off (everything hidden)
+   *   undefined — no restriction (full 0–23 range)
+   */
+  workingHours?: { start: string; end: string } | null;
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -72,6 +79,7 @@ export function TimePicker({
   minuteStep = 15,
   bookedRanges,
   wholeDayBlocked,
+  workingHours,
 }: TimePickerProps) {
   const parsed = parseTime(value);
   const [open, setOpen] = useState(false);
@@ -156,13 +164,58 @@ export function TimePicker({
     });
   }, [open]);
 
-  const allHours = useMemo(() => Array.from({ length: 24 }, (_, i) => i), []);
+  // Resolve the working-hours window. null = day off (hide everything).
+  // undefined / no value = no restriction (full 0..23 range).
+  const wsWindow = useMemo(() => {
+    if (workingHours === null) return { offDay: true as const };
+    if (workingHours) {
+      const s = parseTime(workingHours.start);
+      const e = parseTime(workingHours.end);
+      if (s && e) {
+        // 00:00 close means midnight (24h)
+        const startMin = s.h * 60 + s.m;
+        const endMinRaw = e.h * 60 + e.m;
+        const endMin = endMinRaw === 0 ? 24 * 60 : endMinRaw;
+        return { offDay: false as const, startMin, endMin };
+      }
+    }
+    return { offDay: false as const, startMin: 0, endMin: 24 * 60 };
+  }, [workingHours]);
+
+  // Hours that contain at least one selectable minute inside the window.
+  const allHours = useMemo(() => {
+    if (wsWindow.offDay) return [] as number[];
+    const out: number[] = [];
+    for (let h = 0; h < 24; h++) {
+      const hStart = h * 60;
+      const hEnd = (h + 1) * 60;
+      // Hour is visible if any minute of it is inside the window
+      if (hEnd > wsWindow.startMin && hStart < wsWindow.endMin) out.push(h);
+    }
+    return out;
+  }, [wsWindow]);
+
   const allMinutes = useMemo(() => {
     const step = Math.max(1, Math.min(30, minuteStep));
     const out: number[] = [];
     for (let m = 0; m < 60; m += step) out.push(m);
     return out;
   }, [minuteStep]);
+
+  // Restrict minutes to those inside the working-hours window for the
+  // currently-active hour. E.g. if window ends at 22:00 and the user is
+  // on hour 21, all four minute slots are valid; on hour 22, only :00.
+  const allowedMinutesForHour = useMemo(() => {
+    if (wsWindow.offDay) return new Set<number>();
+    const h = parsed?.h;
+    if (h === undefined) return new Set(allMinutes);
+    const set = new Set<number>();
+    for (const m of allMinutes) {
+      const total = h * 60 + m;
+      if (total >= wsWindow.startMin && total < wsWindow.endMin) set.add(m);
+    }
+    return set;
+  }, [wsWindow, parsed?.h, allMinutes]);
 
   // An hour is fully booked if every minute step inside it is booked.
   const fullyBookedHours = useMemo(() => {
@@ -178,18 +231,23 @@ export function TimePicker({
     return set;
   }, [allHours, allMinutes, bookedRanges, wholeDayBlocked]);
 
-  // For the currently-selected hour, which minutes are booked?
+  // For the currently-selected hour, which minutes are booked OR outside
+  // the working-hours window?
   const bookedMinutesForHour = useMemo(() => {
     if (wholeDayBlocked) return new Set(allMinutes);
     const set = new Set<number>();
-    if (!bookedRanges?.length) return set;
     const h = parsed?.h;
+    // Mark minutes outside the working window as disabled
+    for (const m of allMinutes) {
+      if (!allowedMinutesForHour.has(m)) set.add(m);
+    }
+    if (!bookedRanges?.length) return set;
     if (h === undefined) return set;
     for (const m of allMinutes) {
       if (isTimeBooked(h, m, bookedRanges)) set.add(m);
     }
     return set;
-  }, [allMinutes, bookedRanges, wholeDayBlocked, parsed?.h]);
+  }, [allMinutes, bookedRanges, wholeDayBlocked, parsed?.h, allowedMinutesForHour]);
 
   const hours = allHours;
   const minutes = allMinutes;
@@ -318,6 +376,15 @@ export function TimePicker({
                 const p = parseTime(q)!;
                 const isBooked = wholeDayBlocked || isTimeBooked(p.h, p.m, bookedRanges);
                 if (isBooked) return null; // hide booked quick picks
+                // Hide quick picks outside working hours
+                if (wsWindow.offDay) return null;
+                const totalMin = p.h * 60 + p.m;
+                if (
+                  totalMin < wsWindow.startMin ||
+                  totalMin >= wsWindow.endMin
+                ) {
+                  return null;
+                }
                 const selected = displayValue === q;
                 return (
                   <button
@@ -347,6 +414,16 @@ export function TimePicker({
             {wholeDayBlocked && (
               <div className="border-t border-border/30 bg-red-500/5 px-3 py-1.5 text-[10px] text-red-600 dark:text-red-400">
                 Această zi este complet indisponibilă.
+              </div>
+            )}
+            {!wholeDayBlocked && wsWindow.offDay && (
+              <div className="border-t border-border/30 bg-red-500/5 px-3 py-1.5 text-[10px] text-red-600 dark:text-red-400">
+                Această zi nu este zi de lucru.
+              </div>
+            )}
+            {!wholeDayBlocked && !wsWindow.offDay && workingHours && (
+              <div className="border-t border-border/30 bg-emerald-500/5 px-3 py-1.5 text-[10px] text-emerald-600 dark:text-emerald-400">
+                Program: {workingHours.start}–{workingHours.end}
               </div>
             )}
           </div>,
