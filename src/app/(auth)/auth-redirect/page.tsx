@@ -17,6 +17,20 @@ async function consumeWizardData(): Promise<string | null> {
     const raw = sessionStorage.getItem("wizard-data");
     if (!raw) return null;
     const wizard = JSON.parse(raw);
+    // Only treat wizard data as a real submission if it has at least one
+    // meaningful field filled in. Browsing /planifica without filling
+    // anything used to populate sessionStorage with empty defaults, which
+    // then silently bypassed the role picker after signup.
+    const hasContent =
+      (wizard.eventType && wizard.eventType !== "") ||
+      (wizard.eventDate && wizard.eventDate !== "") ||
+      (Array.isArray(wizard.services) && wizard.services.length > 0) ||
+      (typeof wizard.guestCount === "number" && wizard.guestCount > 0) ||
+      (typeof wizard.budget === "number" && wizard.budget > 0);
+    if (!hasContent) {
+      sessionStorage.removeItem("wizard-data");
+      return null;
+    }
     const res = await fetch("/api/event-plans/from-wizard", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -81,12 +95,10 @@ export default function AuthRedirectPage() {
           }
         } else if (data.isNewUser === true) {
           // New user — collect phone first if missing, then role picker.
-          const planUrl = await consumeWizardData();
-          if (planUrl) {
-            await fetch("/api/auth/complete-onboarding", { method: "POST" }).catch(() => {});
-            router.replace(planUrl);
-            return;
-          }
+          // NOTE: We do NOT bypass via wizard-data anymore. Stale wizard data
+          // (from someone who browsed /planifica without submitting) used to
+          // skip the role picker and silently mark them as client. Wizard
+          // consumption now happens only after they explicitly pick "client".
           // Pre-fill from Clerk phoneNumbers if available
           const clerkPhone = user?.phoneNumbers?.[0]?.phoneNumber || "";
           if (data.phone && data.phone.length >= 6) {
