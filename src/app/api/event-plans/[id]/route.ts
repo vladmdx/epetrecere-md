@@ -119,6 +119,26 @@ export async function PUT(
     patch.archivedAt = null;
   }
 
+  // Seating without a guest list is meaningless — enforce the
+  // invariant on the server even if the UI fails to.
+  if (
+    parsed.data.seatingEnabled !== undefined ||
+    parsed.data.guestsEnabled !== undefined
+  ) {
+    // Resolve the effective values: prefer the patch, fall back to the
+    // existing plan so a partial PUT can't break the rule.
+    const effGuests =
+      parsed.data.guestsEnabled ?? owned.plan.guestsEnabled ?? false;
+    const effSeating = parsed.data.seatingEnabled ?? false;
+    if (effSeating && !effGuests) {
+      patch.seatingEnabled = false;
+    }
+    // Turning guests OFF must also turn seating OFF.
+    if (parsed.data.guestsEnabled === false) {
+      patch.seatingEnabled = false;
+    }
+  }
+
   const [updated] = await db
     .update(eventPlans)
     .set(patch)
