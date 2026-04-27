@@ -103,7 +103,7 @@
     "budget": "Budget",
     "message": "Message",
     "gdpr_consent": "I agree to the processing of personal data according to the Privacy Policy",
-    "submit_success": "Thank you! We will contact you within 24 hours.",
+    "submit_success": "Event created! Redirecting to bookings…",
     "required": "Required field"
   },
   "wizard": {

@@ -252,12 +252,10 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
       case 5: return data.budget > 0;
       case 6: return true; // extras step — every choice is valid (including all "no")
       case 7:
-        return (
-          !!data.name.trim() &&
-          !!data.phone.trim() &&
-          !!data.phonePrefix &&
-          data.gdprAccepted
-        );
+        // The summary step now only asks for the event title — phone /
+        // email / GDPR were collected at sign-up. Unauthenticated users
+        // get bounced through the sign-in gate inside handleSubmit.
+        return !!data.name.trim();
       default: return false;
     }
   }
@@ -279,22 +277,10 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
   }
 
   async function handleSubmit() {
-    // Field-level validation — tell the user exactly what's missing
-    // instead of a generic "eroare" toast later.
+    // The summary step only asks for the event title now — phone, email
+    // and GDPR consent come from the user's account (collected at signup).
     if (!data.name.trim()) {
       toast.error("Introduceți numele evenimentului (ex: Nunta Ana & Ion).");
-      return;
-    }
-    if (!data.phonePrefix) {
-      toast.error("Alegeți prefixul telefonic.");
-      return;
-    }
-    if (!data.phone.trim()) {
-      toast.error("Introduceți numărul de telefon.");
-      return;
-    }
-    if (!data.gdprAccepted) {
-      toast.error("Trebuie să acceptați Politica de Confidențialitate.");
       return;
     }
 
@@ -315,8 +301,12 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         return;
       }
 
-      // Full phone with the user-selected prefix.
-      const fullPhone = `${data.phonePrefix}${data.phone.replace(/^\+?\d+\s*/, "").trim()}`;
+      // Use the signed-in user's contact info — collected at sign-up,
+      // no need to re-ask. Full phone uses Clerk's E.164 format directly.
+      const accountPhone =
+        user?.primaryPhoneNumber?.phoneNumber || data.phone || "";
+      const accountEmail =
+        user?.primaryEmailAddress?.emailAddress || data.email || undefined;
 
       // Authenticated client flow: record the lead (fire-and-forget so the
       // user isn't blocked if the CRM insert fails), then materialize the
@@ -327,8 +317,8 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: data.name,
-          phone: fullPhone,
-          email: data.email || undefined,
+          phone: accountPhone,
+          email: accountEmail,
           eventType: data.eventType,
           eventDate: data.eventDate,
           location: data.location,
@@ -1036,7 +1026,7 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_summary")}</h2>
       <p className="mb-8 text-muted-foreground">
-        Verifică detaliile și completează datele de contact.
+        Verifică detaliile evenimentului tău.
       </p>
 
       {/* Summary */}
@@ -1056,7 +1046,9 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
         <SummaryRow label="Buget" value={`${data.budget.toLocaleString()}€`} />
       </div>
 
-      {/* Login banner (M0a #5) */}
+      {/* Login banner — only for visitors who haven't created an account
+          yet. Authenticated users have already supplied their phone/email
+          at signup, so we don't ask again. */}
       {!isSignedIn && (
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4">
           <LogIn className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
@@ -1070,7 +1062,9 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
         </div>
       )}
 
-      {/* Contact Form */}
+      {/* Event title — the only contact-style field we still ask for,
+          because it becomes the plan title and the user should be able
+          to override the auto-generated default ("Nuntă", "Botez", …). */}
       <div className="space-y-4">
         <div>
           <Label>Nume eveniment *</Label>
@@ -1083,68 +1077,6 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
           <p className="mt-1 text-xs text-muted-foreground">
             Acest nume va fi titlul planului tău de eveniment.
           </p>
-        </div>
-        <div>
-          <Label>{t("form.phone")} *</Label>
-          <div className="flex gap-2">
-            <Select
-              value={data.phonePrefix}
-              onValueChange={(v) => {
-                if (v) update({ phonePrefix: v });
-              }}
-            >
-              <SelectTrigger className="w-[130px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PHONE_PREFIXES.map((p) => (
-                  <SelectItem key={p.value} value={p.value}>
-                    {p.flag} {p.value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Input
-              value={data.phone}
-              onChange={(e) => update({ phone: e.target.value })}
-              type="tel"
-              placeholder="60 000 000"
-              required
-              className="flex-1"
-            />
-          </div>
-        </div>
-        <div>
-          <Label>{t("form.email")}</Label>
-          <Input
-            value={data.email}
-            onChange={(e) => update({ email: e.target.value })}
-            type="email"
-          />
-        </div>
-        <div className="flex items-start gap-2">
-          <Checkbox
-            id="gdpr-wizard"
-            checked={data.gdprAccepted}
-            onCheckedChange={(v) => update({ gdprAccepted: v === true })}
-            required
-          />
-          <Label
-            htmlFor="gdpr-wizard"
-            className="text-xs text-muted-foreground leading-tight cursor-pointer"
-          >
-            Sunt de acord cu prelucrarea datelor personale conform{" "}
-            <a
-              href="/confidentialitate"
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="text-gold underline hover:text-gold-dark"
-            >
-              Politicii de Confidențialitate
-            </a>{" "}
-            *
-          </Label>
         </div>
       </div>
     </div>

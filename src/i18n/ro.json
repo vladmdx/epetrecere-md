@@ -103,7 +103,7 @@
     "budget": "Buget",
     "message": "Mesaj",
     "gdpr_consent": "Sunt de acord cu prelucrarea datelor personale conform Politicii de Confidențialitate",
-    "submit_success": "Mulțumim! Vă contactăm în 24h.",
+    "submit_success": "Eveniment creat! Te redirecționăm la rezervări…",
     "required": "Câmp obligatoriu"
   },
   "wizard": {
