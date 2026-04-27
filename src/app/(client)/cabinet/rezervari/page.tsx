@@ -7,9 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
-import { Calendar, Loader2, Clock, MapPin, Users, Music, ExternalLink, CheckCircle2, MessageSquare } from "lucide-react";
+import { Calendar, Loader2, Clock, MapPin, Users, Music, ExternalLink, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 interface BookingRequest {
   id: number;
@@ -65,17 +64,6 @@ export default function ReservationsPage() {
       .finally(() => setLoading(false));
   }, [isSignedIn, user]);
 
-  async function confirmBooking(id: number) {
-    const res = await fetch(`/api/booking-requests/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "client_confirm" }),
-    });
-    if (!res.ok) { toast.error("Eroare la confirmare."); return; }
-    toast.success("Rezervare confirmată!");
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: "confirmed_by_client" } : b));
-  }
-
   const activeStatuses = ["pending", "accepted", "confirmed_by_client"];
   const pastStatuses = ["rejected", "cancelled", "completed"];
 
@@ -113,7 +101,7 @@ export default function ReservationsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {activeBookings.map(b => renderBookingCard(b, confirmBooking))}
+              {activeBookings.map(b => renderBookingCard(b))}
             </div>
           )}
         </TabsContent>
@@ -123,7 +111,7 @@ export default function ReservationsPage() {
             <p className="py-12 text-center text-muted-foreground">Nu ai rezervări trecute.</p>
           ) : (
             <div className="space-y-3">
-              {pastBookings.map(b => renderBookingCard(b, confirmBooking))}
+              {pastBookings.map(b => renderBookingCard(b))}
             </div>
           )}
         </TabsContent>
@@ -132,10 +120,7 @@ export default function ReservationsPage() {
   );
 }
 
-function renderBookingCard(
-  b: BookingRequest,
-  onConfirm: (id: number) => void,
-) {
+function renderBookingCard(b: BookingRequest) {
   const cfg = statusConfig[b.status] || statusConfig.pending;
   const eventLabel = b.eventType ? (EVENT_TYPE_LABELS[b.eventType] || b.eventType) : "Eveniment";
 

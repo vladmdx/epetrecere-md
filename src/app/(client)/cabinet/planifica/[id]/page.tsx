@@ -1379,7 +1379,9 @@ function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eve
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   pending: { label: "In așteptare", color: "text-warning border-warning/30 bg-warning/5" },
-  accepted: { label: "Acceptat", color: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5" },
+  // Both `accepted` (legacy) and `confirmed_by_client` (new) render as
+  // "Confirmat" — the artist's accept is now the final step.
+  accepted: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
   confirmed_by_client: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
   rejected: { label: "Refuzat", color: "text-destructive border-destructive/30 bg-destructive/5" },
   cancelled: { label: "Anulat", color: "text-muted-foreground border-border/40 bg-muted/5" },
@@ -1958,7 +1960,6 @@ function PlanArtistCard({
   const [modalOpen, setModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [message, setMessage] = useState("");
   // Separate start/end time input — can be filled manually or by clicking
   // one of the artist's declared slots as a preset.
@@ -2092,25 +2093,27 @@ function PlanArtistCard({
   const cover = artist.coverImageUrl || artist.coverUrl || null;
   const slots = artist.availabilitySlots ?? [];
 
-  // Determine status-driven UI state
+  // Determine status-driven UI state. The artist's `accept` is now the
+  // final step — no separate client-confirm action — so we treat both
+  // `accepted` (legacy) and `confirmed_by_client` as fully booked.
   const status = existingBooking?.status;
   const isPending = status === "pending";
-  const isAccepted = status === "accepted";
-  const isConfirmed = status === "confirmed_by_client" || status === "completed";
-  const alreadyBooked = isPending || isAccepted || isConfirmed;
+  const isConfirmed =
+    status === "accepted" ||
+    status === "confirmed_by_client" ||
+    status === "completed";
+  const alreadyBooked = isPending || isConfirmed;
 
   const disabled = alreadyBooked || categoryLimitReached || previouslyDeclined;
   const primaryLabel = isConfirmed
     ? "Rezervat"
-    : isAccepted
-      ? "Confirmă rezervarea"
-      : isPending
-        ? "Cerere trimisă"
-        : previouslyDeclined
-          ? "Refuzat anterior"
-          : categoryLimitReached
-            ? "Limită atinsă (5)"
-            : "Solicită rezervare";
+    : isPending
+      ? "Cerere trimisă"
+      : previouslyDeclined
+        ? "Refuzat anterior"
+        : categoryLimitReached
+          ? "Limită atinsă (5)"
+          : "Solicită rezervare";
 
   function pickSlot(slot: { id: number; startTime: string; endTime: string }) {
     if (selectedSlotId === slot.id) {
@@ -2227,29 +2230,6 @@ function PlanArtistCard({
     }
   }
 
-  async function confirmBooking() {
-    if (!existingBooking || confirming) return;
-    setConfirming(true);
-    try {
-      const res = await fetch(`/api/booking-requests/${existingBooking.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "client_confirm" }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Eroare");
-      }
-      toast.success(
-        `Ai confirmat rezervarea cu ${artist.nameRo}! Evenimentul este acum blocat în calendarul artistului.`,
-      );
-      onRefresh();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la confirmare");
-    } finally {
-      setConfirming(false);
-    }
-  }
 
   async function openChat() {
     setChatOpen(true);
@@ -2849,21 +2829,13 @@ function PlanArtistCard({
                 "mt-3 rounded-lg border px-3 py-2 text-xs",
                 isConfirmed
                   ? "border-success/30 bg-success/5 text-success"
-                  : isAccepted
-                    ? "border-gold/30 bg-gold/5 text-gold"
-                    : "border-info/30 bg-info/5 text-info",
+                  : "border-info/30 bg-info/5 text-info",
               )}
             >
               {isConfirmed && (
                 <span>
                   ✓ Rezervat {existingBooking.startTime && existingBooking.endTime ? `${existingBooking.startTime}–${existingBooking.endTime}` : ""}
                   {existingBooking.agreedPrice ? ` · ${existingBooking.agreedPrice}€` : ""}
-                </span>
-              )}
-              {isAccepted && (
-                <span>
-                  Artist a acceptat — apasă <strong>Confirmă</strong> pentru a
-                  finaliza rezervarea
                 </span>
               )}
               {isPending && (
@@ -2879,37 +2851,23 @@ function PlanArtistCard({
               viewMode === "list" && "sm:max-w-md",
             )}
           >
-            {isAccepted ? (
-              <Button
-                onClick={confirmBooking}
-                disabled={confirming}
-                size="sm"
-                className="w-full min-w-0 flex-1 gap-1.5 bg-success text-[#0D0D0D] hover:bg-success/90"
-              >
-                {confirming ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                ) : (
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                )}
-                <span className="truncate">Confirmă rezervarea</span>
-              </Button>
-            ) : (
-              <Button
-                onClick={() => setModalOpen(true)}
-                disabled={disabled}
-                size="sm"
-                className="w-full min-w-0 flex-1 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-60"
-              >
-                {isConfirmed ? (
-                  <Check className="h-3.5 w-3.5 shrink-0" />
-                ) : isPending ? (
-                  <Clock className="h-3.5 w-3.5 shrink-0" />
-                ) : (
-                  <Send className="h-3.5 w-3.5 shrink-0" />
-                )}
-                <span className="truncate">{primaryLabel}</span>
-              </Button>
-            )}
+            <Button
+              onClick={() => setModalOpen(true)}
+              disabled={disabled}
+              size="sm"
+              className="w-full min-w-0 flex-1 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-60"
+            >
+              {isConfirmed ? (
+                <Check className="h-3.5 w-3.5 shrink-0" />
+              ) : isPending ? (
+                <Clock className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <Send className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span className="truncate">{primaryLabel}</span>
+            </Button>
+            {/* (legacy) The standalone "Confirmă rezervarea" CTA was
+                removed — accept now finalizes the booking server-side. */}
             {/* Chat button — icon only on narrow cards, icon+text on wider */}
             <Button
               variant="outline"

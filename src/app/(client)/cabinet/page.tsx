@@ -14,7 +14,6 @@ import {
   Music,
   Building2,
   ExternalLink,
-  CheckCircle2,
   BookOpen,
   ClipboardList,
   Star,
@@ -24,7 +23,6 @@ import {
 } from "lucide-react";
 import { SignContractDialog } from "@/components/client/sign-contract-dialog";
 import { cn } from "@/lib/utils";
-import { toast } from "sonner";
 
 interface BookingRequest {
   id: number;
@@ -49,7 +47,11 @@ interface BookingRequest {
 
 const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "In așteptare", color: "text-warning border-warning/30 bg-warning/5" },
-  accepted: { label: "Acceptat de artist", color: "text-emerald-400 border-emerald-400/30 bg-emerald-400/5" },
+  // The partner's accept is final now — no separate client step. Both
+  // "accepted" (legacy bookings) and "confirmed_by_client" (new) are
+  // surfaced as "Confirmat" so the client doesn't see two different
+  // shades of "yes" for the same outcome.
+  accepted: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
   confirmed_by_client: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
   rejected: { label: "Refuzat", color: "text-destructive border-destructive/30 bg-destructive/5" },
   cancelled: { label: "Anulat", color: "text-muted-foreground border-border/40 bg-muted/5" },
@@ -82,21 +84,6 @@ export default function ClientCabinetPage() {
       .finally(() => setLoading(false));
   }, [isSignedIn, clerkUser]);
 
-  async function confirmBooking(id: number) {
-    const res = await fetch(`/api/booking-requests/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "client_confirm" }),
-    });
-    if (!res.ok) {
-      toast.error("Eroare la confirmare.");
-      return;
-    }
-    toast.success("Rezervare confirmată!");
-    setBookings((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status: "confirmed_by_client" } : b)),
-    );
-  }
 
   if (loading) {
     return (
@@ -278,15 +265,6 @@ export default function ClientCabinetPage() {
 
                     {/* Actions */}
                     <div className="flex flex-col items-stretch gap-2 shrink-0">
-                      {b.status === "accepted" && (
-                        <Button
-                          size="sm"
-                          className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs"
-                          onClick={() => confirmBooking(b.id)}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Confirmă
-                        </Button>
-                      )}
                       {(b.status === "accepted" ||
                         b.status === "confirmed_by_client") && (
                         <SignContractDialog
