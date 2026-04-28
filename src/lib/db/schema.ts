@@ -1602,6 +1602,10 @@ export const invitationGuests = pgTable("invitation_guests", {
   phone: text("phone"),
   whatsapp: text("whatsapp"),
   group: text("group"), // "family", "friends", "colleagues"
+  /** Same axis as guest_list.guest_type — drives singular vs plural
+   *  conjugation in the rendered greeting ("Ești invitat" vs "Sunteți
+   *  invitați"). Defaults to "single" so legacy rows keep their copy. */
+  guestType: text("guest_type").default("single").notNull(),
   // RSVP response
   rsvpStatus: invitationRsvpStatusEnum("rsvp_status").default("pending").notNull(),
   respondedAt: timestamp("responded_at"),

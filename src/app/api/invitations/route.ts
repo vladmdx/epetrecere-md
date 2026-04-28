@@ -54,6 +54,8 @@ const createSchema = z.object({
         phone: z.string().optional(),
         whatsapp: z.string().optional(),
         group: z.string().optional(),
+        /** single | couple | family — drives plural vs singular greeting. */
+        guestType: z.enum(["single", "couple", "family"]).optional(),
       }),
     )
     .max(500)
@@ -134,6 +136,7 @@ export async function POST(req: NextRequest) {
         phone: g.phone,
         whatsapp: g.whatsapp,
         group: g.group,
+        guestType: g.guestType ?? "single",
         rsvpToken: genToken(),
       })),
     );

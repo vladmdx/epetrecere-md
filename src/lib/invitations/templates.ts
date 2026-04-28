@@ -139,6 +139,8 @@ export function googleFontsUrl(design: InvitationDesign): string {
 export function invitationEmailHtml(opts: {
   design: InvitationDesign;
   guestName: string;
+  /** "single" | "couple" | "family" — drives singular vs plural greeting. */
+  guestType?: "single" | "couple" | "family";
   title: string;
   eventDate: string | null;
   ceremonyLocation: string | null;
@@ -148,71 +150,113 @@ export function invitationEmailHtml(opts: {
   message: string | null;
   dressCode: string | null;
   rsvpUrl: string;
+  /** Per-host overrides loaded from invitations.customColors. */
+  custom?: {
+    headerText?: string;
+    eventName?: string;
+    decorIcon?: string;
+    iconImageUrl?: string;
+    iconSize?: string | number;
+    iconAlign?: "left" | "center" | "right";
+    bgColor?: string;
+    textColor?: string;
+    accentColor?: string;
+    fontHeading?: string;
+    titleSize?: string | number;
+    titleAlign?: "left" | "center" | "right";
+  };
 }): string {
-  const { design, guestName, title, eventDate, ceremonyLocation, ceremonyTime, receptionLocation, receptionTime, message, dressCode, rsvpUrl } = opts;
+  const { design, guestName, guestType, title: rawTitle, eventDate, ceremonyLocation, ceremonyTime, receptionLocation, receptionTime, message, dressCode, rsvpUrl, custom } = opts;
   const fontsLink = googleFontsUrl(design);
   const font = design.fontFamily || "Helvetica, Arial, sans-serif";
-  const heading = design.fontHeading || font;
 
+  // Resolve template defaults vs host overrides.
+  const heading = custom?.fontHeading || design.fontHeading || font;
+  const bg = custom?.bgColor || design.cssVars["--inv-bg"];
+  const text = custom?.textColor || design.cssVars["--inv-text"];
+  const accent = custom?.accentColor || design.cssVars["--inv-accent"];
+  const title = custom?.eventName || rawTitle;
+  const titleSize = Number(custom?.titleSize ?? 42);
+  const titleAlign = custom?.titleAlign ?? "center";
+  const iconSize = Number(custom?.iconSize ?? 32);
+  const iconAlign = custom?.iconAlign ?? "center";
+
+  // Singular / plural greeting line. Host can override with their own
+  // text via custom.headerText.
+  const headerText =
+    custom?.headerText ||
+    (guestType === "couple" || guestType === "family"
+      ? "Sunteți invitați"
+      : "Ești invitat");
+
+  // Decorative element — uploaded image wins over emoji glyph.
   const decorations: Record<InvitationDesign["decorStyle"], string> = {
     sparkles: "✦",
     flowers: "❀",
     minimal: "—",
     ornate: "❦",
   };
-  const decor = decorations[design.decorStyle];
+  const fallbackDecor = custom?.decorIcon || decorations[design.decorStyle];
+  const decorBlock = custom?.iconImageUrl
+    ? `<img src="${custom.iconImageUrl}" alt="" style="display:inline-block;width:${iconSize}px;height:${iconSize}px;object-fit:contain;" />`
+    : `<span style="font-size:${iconSize}px;color:${accent};line-height:1;">${fallbackDecor}</span>`;
 
   return `<!DOCTYPE html>
 <html><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width">
 ${fontsLink ? `<link href="${fontsLink}" rel="stylesheet">` : ""}
+${custom?.fontHeading ? `<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(custom.fontHeading).replace(/%20/g, "+")}:wght@400;700&display=swap" rel="stylesheet">` : ""}
 </head>
-<body style="margin:0;padding:0;background:${design.cssVars["--inv-bg"]};font-family:'${font}',serif;color:${design.cssVars["--inv-text"]};">
-  <div style="max-width:600px;margin:0 auto;padding:40px 20px;text-align:center;">
+<body style="margin:0;padding:0;background:${bg};font-family:'${font}',serif;color:${text};">
+  <div style="max-width:600px;margin:0 auto;padding:40px 20px;">
     <!-- Ornament -->
-    <div style="font-size:32px;color:${design.cssVars["--inv-accent"]};margin-bottom:12px;">${decor}</div>
-    <p style="font-size:12px;letter-spacing:4px;text-transform:uppercase;color:${design.cssVars["--inv-accent"]};margin:0 0 16px;">Ești invitat</p>
+    <div style="text-align:${iconAlign};margin-bottom:12px;">${decorBlock}</div>
 
-    <!-- Title -->
-    <h1 style="font-family:'${heading}',serif;font-size:42px;margin:0 0 24px;color:${design.cssVars["--inv-text"]};font-weight:700;">
+    <!-- Guest name (the new placeholder line) -->
+    <p style="font-family:'${heading}',serif;font-size:${Math.round(titleSize * 0.55)}px;color:${text};margin:0 0 4px;text-align:${titleAlign};font-weight:500;">
+      ${guestName}
+    </p>
+
+    <!-- Greeting line (singular/plural per guest type) -->
+    <p style="font-size:12px;letter-spacing:4px;text-transform:uppercase;color:${accent};margin:0 0 16px;text-align:${titleAlign};">${headerText}</p>
+
+    <!-- Event title -->
+    <h1 style="font-family:'${heading}',serif;font-size:${titleSize}px;line-height:1.15;margin:0 0 24px;color:${text};font-weight:700;text-align:${titleAlign};">
       ${title}
     </h1>
 
-    ${eventDate ? `<p style="font-size:18px;font-style:italic;color:${design.cssVars["--inv-muted"]};margin:0 0 32px;">
+    ${eventDate ? `<p style="font-size:18px;font-style:italic;color:${design.cssVars["--inv-muted"]};margin:0 0 32px;text-align:${titleAlign};">
       ${new Date(eventDate).toLocaleDateString("ro-RO", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
     </p>` : ""}
 
-    <!-- Greeting -->
-    <div style="background:${design.cssVars["--inv-card"]};border:1px solid ${design.cssVars["--inv-border"]};border-radius:12px;padding:24px;margin:0 0 24px;">
-      <p style="font-size:16px;margin:0;color:${design.cssVars["--inv-text"]};">
-        Dragă <strong>${guestName}</strong>,
-      </p>
-      ${message ? `<p style="font-size:15px;font-style:italic;color:${design.cssVars["--inv-muted"]};margin:12px 0 0;line-height:1.6;">"${message}"</p>` : ""}
-    </div>
+    ${message ? `<div style="background:${design.cssVars["--inv-card"]};border:1px solid ${design.cssVars["--inv-border"]};border-radius:12px;padding:24px;margin:0 0 24px;">
+      <p style="font-size:15px;font-style:italic;color:${design.cssVars["--inv-muted"]};margin:0;line-height:1.6;text-align:center;">"${message}"</p>
+    </div>` : ""}
 
     <!-- Details -->
     <div style="text-align:left;background:${design.cssVars["--inv-card"]};border:1px solid ${design.cssVars["--inv-border"]};border-radius:12px;padding:20px;margin:0 0 24px;">
       ${ceremonyLocation ? `<div style="margin-bottom:12px;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:${design.cssVars["--inv-accent"]};margin-bottom:4px;">Ceremonia</div>
-        <div style="font-size:14px;color:${design.cssVars["--inv-text"]};">${ceremonyLocation}${ceremonyTime ? ` · ora ${ceremonyTime}` : ""}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:${accent};margin-bottom:4px;">Ceremonia</div>
+        <div style="font-size:14px;color:${text};">${ceremonyLocation}${ceremonyTime ? ` · ora ${ceremonyTime}` : ""}</div>
       </div>` : ""}
       ${receptionLocation ? `<div style="margin-bottom:12px;">
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:${design.cssVars["--inv-accent"]};margin-bottom:4px;">Petrecerea</div>
-        <div style="font-size:14px;color:${design.cssVars["--inv-text"]};">${receptionLocation}${receptionTime ? ` · ora ${receptionTime}` : ""}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:${accent};margin-bottom:4px;">Petrecerea</div>
+        <div style="font-size:14px;color:${text};">${receptionLocation}${receptionTime ? ` · ora ${receptionTime}` : ""}</div>
       </div>` : ""}
       ${dressCode ? `<div>
-        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:${design.cssVars["--inv-accent"]};margin-bottom:4px;">Cod Vestimentar</div>
-        <div style="font-size:14px;color:${design.cssVars["--inv-text"]};">${dressCode}</div>
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:2px;color:${accent};margin-bottom:4px;">Cod Vestimentar</div>
+        <div style="font-size:14px;color:${text};">${dressCode}</div>
       </div>` : ""}
     </div>
 
     <!-- RSVP -->
-    <a href="${rsvpUrl}" style="display:inline-block;background:${design.cssVars["--inv-accent"]};color:${design.cssVars["--inv-bg"]};padding:14px 40px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;font-family:'${font}',sans-serif;letter-spacing:1px;">
-      Confirmă Prezența
-    </a>
+    <div style="text-align:${titleAlign};">
+      <a href="${rsvpUrl}" style="display:inline-block;background:${accent};color:${bg};padding:14px 40px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:15px;font-family:'${font}',sans-serif;letter-spacing:1px;">
+        Confirmă Prezența
+      </a>
+    </div>
 
-    <div style="font-size:32px;color:${design.cssVars["--inv-accent"]};margin-top:32px;">${decor}</div>
-    <p style="font-size:11px;color:${design.cssVars["--inv-muted"]};margin-top:8px;">
+    <p style="font-size:11px;color:${design.cssVars["--inv-muted"]};margin-top:32px;text-align:center;">
       Creat cu ePetrecere.md
     </p>
   </div>

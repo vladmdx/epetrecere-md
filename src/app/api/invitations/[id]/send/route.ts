@@ -49,11 +49,39 @@ export async function POST(
     );
   }
 
-  // Resolve design
+  // Resolve design + host customizations. customColors is a JSON map
+  // mixing the picked designId with overrides like eventName, iconImageUrl,
+  // bgColor, fontHeading, etc. — passed through to the email template
+  // so the rendered HTML matches what the host saw in the live preview.
   const customColors = (inv.customColors || {}) as Record<string, unknown>;
   const designId =
     typeof customColors.designId === "string" ? customColors.designId : null;
   const design = getInvitationDesign(designId);
+  function strProp(k: string): string | undefined {
+    const v = customColors[k];
+    return typeof v === "string" ? v : undefined;
+  }
+  function alignProp(
+    k: string,
+  ): "left" | "center" | "right" | undefined {
+    const v = customColors[k];
+    if (v === "left" || v === "center" || v === "right") return v;
+    return undefined;
+  }
+  const customForRender = {
+    headerText: strProp("headerText"),
+    eventName: strProp("eventName"),
+    decorIcon: strProp("decorIcon"),
+    iconImageUrl: strProp("iconImageUrl"),
+    iconSize: strProp("iconSize"),
+    iconAlign: alignProp("iconAlign"),
+    bgColor: strProp("bgColor"),
+    textColor: strProp("textColor"),
+    accentColor: strProp("accentColor"),
+    fontHeading: strProp("fontHeading"),
+    titleSize: strProp("titleSize"),
+    titleAlign: alignProp("titleAlign"),
+  };
 
   // Load guests with email
   const guests = await db
@@ -77,9 +105,15 @@ export async function POST(
 
   for (const guest of withEmail) {
     const rsvpUrl = `${appUrl}/i/${inv.slug}?rsvp=${guest.rsvpToken}`;
+    const guestType = (guest.guestType as
+      | "single"
+      | "couple"
+      | "family"
+      | undefined) ?? "single";
     const html = invitationEmailHtml({
       design,
       guestName: guest.name,
+      guestType,
       title,
       eventDate: inv.eventDate,
       ceremonyLocation: inv.ceremonyLocation,
@@ -89,6 +123,7 @@ export async function POST(
       message: inv.message,
       dressCode: inv.dressCode,
       rsvpUrl,
+      custom: customForRender,
     });
 
     try {

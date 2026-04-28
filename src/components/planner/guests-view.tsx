@@ -77,6 +77,16 @@ const CHANNEL_PLACEHOLDERS: Record<ContactChannel, string> = {
   telegram: "@username sau +373 60 000 000",
 };
 
+/** Singular / plural greeting line that sits between the guest name
+ *  and the event title. Couples + families get the plural form so the
+ *  copy doesn't address one person when two or more were invited. */
+function defaultGreeting(guestType: GuestType | null | undefined): string {
+  if (guestType === "couple" || guestType === "family") {
+    return "Sunteți invitați";
+  }
+  return "Ești invitat";
+}
+
 /** Curated set of decorative icons the host can use as the invitation's
  *  centerpiece. Mix of bridal/festive emoji + the original glyphs. */
 const DECOR_ICONS = [
@@ -206,6 +216,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
   const [showCustomize, setShowCustomize] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const iconFileInputRef = useRef<HTMLInputElement>(null);
+  /** Which guest's data to render in the live preview. Defaults to a
+   *  generic placeholder so the host can see the layout before adding
+   *  any guests. Switching between guests/types lets them sanity-check
+   *  the singular vs plural greeting. */
+  const [previewGuestId, setPreviewGuestId] = useState<number | "demo">("demo");
 
   /** Reset customizations whenever the host picks a different template
    *  so the preview matches the chosen design out of the box. */
@@ -320,6 +335,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             email: g.email || undefined,
             phone: g.phone || undefined,
             group: g.group || undefined,
+            // Pass the guest type through so the email render picks
+            // singular vs plural copy ("Ești invitat" vs "Sunteți invitați").
+            guestType: (g.guestType as "single" | "couple" | "family" | null) ?? "single",
           })),
         }),
       });
@@ -550,6 +568,16 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         const tpl =
           INVITATION_DESIGN_LIST.find((d) => d.id === invData.designId) ??
           INVITATION_DESIGN_LIST[0];
+        // Resolve which guest powers the preview. Falls back to a demo
+        // entry that cycles through the three party shapes via
+        // `previewGuestId === "demo"` + the demo selector below.
+        const previewGuest =
+          previewGuestId === "demo"
+            ? null
+            : guests.find((g) => g.id === previewGuestId) ?? null;
+        const previewType: GuestType =
+          (previewGuest?.guestType as GuestType | null) ?? "single";
+        const previewName = previewGuest?.fullName || "{Numele invitatului}";
         // Effective values = customization override OR template default.
         const effIcon =
           custom.decorIcon ||
@@ -560,7 +588,10 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               : tpl.decorStyle === "minimal"
                 ? "—"
                 : "❦");
-        const effHeader = custom.headerText || "Ești invitat";
+        // Custom header text wins; otherwise auto-conjugate based on the
+        // selected preview guest's type so the host sees the real copy
+        // each invitee will receive.
+        const effHeader = custom.headerText || defaultGreeting(previewType);
         const effBg = custom.bgColor || tpl.preview.bg;
         const effText = custom.textColor || tpl.preview.text;
         const effAccent = custom.accentColor || tpl.preview.accent;
@@ -993,9 +1024,42 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
 
                 {/* Live preview */}
                 <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Previzualizare
-                  </Label>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Previzualizare
+                    </Label>
+                    {/* Preview-as selector — pick a real guest (or the
+                        demo placeholder) so the host sees how the
+                        rendered invitation looks for that person. */}
+                    {guests.length > 0 && (
+                      <Select
+                        value={String(previewGuestId)}
+                        onValueChange={(v) =>
+                          setPreviewGuestId(
+                            v === "demo" ? "demo" : Number(v),
+                          )
+                        }
+                      >
+                        <SelectTrigger className="h-7 w-auto gap-1 text-xs">
+                          <SelectValue placeholder="Previzualizează ca…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="demo">Placeholder</SelectItem>
+                          {guests.map((g) => (
+                            <SelectItem key={g.id} value={String(g.id)}>
+                              {g.fullName} (
+                              {g.guestType === "couple"
+                                ? "cuplu"
+                                : g.guestType === "family"
+                                  ? "familie"
+                                  : "singură"}
+                              )
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
                   {effFont && (
                     <link
                       rel="stylesheet"
@@ -1037,7 +1101,23 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                         </span>
                       )}
                     </div>
-                    {/* Header text — uppercase, accent color, follows title alignment */}
+                    {/* Guest name — placeholder when no preview-as picked,
+                        otherwise the actual invitee. Same alignment +
+                        font as the title so it reads as one block. */}
+                    <div
+                      className="mb-1 font-medium"
+                      style={{
+                        fontFamily: effFont ? `"${effFont}", serif` : undefined,
+                        fontSize: `${Math.round(custom.titleSize * 0.55)}px`,
+                        textAlign: custom.titleAlign,
+                        opacity: previewGuest ? 1 : 0.7,
+                        fontStyle: previewGuest ? "normal" : "italic",
+                      }}
+                    >
+                      {previewName}
+                    </div>
+                    {/* Greeting — auto-conjugates singular vs plural; host
+                        can override via the "Text de sus" field. */}
                     <div
                       className="mb-1 text-[10px] uppercase tracking-[0.3em]"
                       style={{ color: effAccent, textAlign: custom.titleAlign }}
