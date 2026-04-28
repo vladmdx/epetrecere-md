@@ -248,9 +248,12 @@ export async function POST(req: NextRequest) {
     ...bookingBase
   } = parsed.data;
 
-  // Max 5 artists per category per event plan (artist bookings only)
+  // One active request at a time per category per plan. The artist gets
+  // 24h to accept/reject; while their request is pending, the client
+  // can't shop the same category to another artist. After accept the
+  // booking takes the slot indefinitely; after reject/cancel/expire
+  // the category slot frees up so the client can try someone else.
   if (eventPlanId && parsed.data.artistId) {
-    // Get the category of the artist being booked
     const [targetArtist] = await db
       .select({ categoryIds: artists.categoryIds })
       .from(artists)
@@ -259,12 +262,12 @@ export async function POST(req: NextRequest) {
     const targetCategoryIds = targetArtist?.categoryIds ?? [];
 
     if (targetCategoryIds.length > 0) {
-      // Fetch existing bookings for this plan with their artist categories
       const existingBookings = await db
         .select({
           artistId: bookingRequests.artistId,
           status: bookingRequests.status,
           categoryIds: artists.categoryIds,
+          artistName: artists.nameRo,
         })
         .from(bookingRequests)
         .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
@@ -291,16 +294,29 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Count bookings per category, enforce max 5 per category
+      // Block if any artist in any of the target categories already
+      // has an ACTIVE (pending/accepted/confirmed/completed) booking on
+      // this plan. Pending blocks because we want a single open ask
+      // per category — no spamming five artists at once.
+      const ACTIVE_STATUSES = new Set([
+        "pending",
+        "accepted",
+        "confirmed_by_client",
+        "completed",
+      ]);
       for (const catId of targetCategoryIds) {
-        const countInCategory = existingBookings.filter((b) =>
-          (b.categoryIds ?? []).includes(catId),
-        ).length;
-        if (countInCategory >= 5) {
+        const blocker = existingBookings.find(
+          (b) =>
+            ACTIVE_STATUSES.has(b.status) &&
+            (b.categoryIds ?? []).includes(catId),
+        );
+        if (blocker) {
           return NextResponse.json(
             {
               error:
-                "Ai atins limita de 5 artiști per categorie pentru acest eveniment.",
+                blocker.status === "pending"
+                  ? `Așteaptă răspunsul lui ${blocker.artistName ?? "artist"} (până la 24h) înainte de a trimite altă cerere în această categorie.`
+                  : `Ai deja un artist confirmat (${blocker.artistName ?? "artist"}) în această categorie pentru evenimentul tău.`,
             },
             { status: 409 },
           );

@@ -252,7 +252,7 @@ export const invitationRsvpReminders = inngest.createFunction(
 //
 // Bookings that land in status "pending" are effectively blocking the
 // vendor's attention. If the vendor doesn't accept or reject within
-// 48h, we auto-mark them as "expired" so:
+// 24h, we auto-mark them as "expired" so:
 //   - The client gets notified their request timed out and can retry
 //   - The vendor's inbox stays clean (clear signal: this one is dead)
 //   - The calendar/occupancy reports don't count zombie pending requests
@@ -266,7 +266,7 @@ export const invitationRsvpReminders = inngest.createFunction(
 // ─────────────────────────────────────────────────────────
 export const expirePendingBookings = inngest.createFunction(
   {
-    id: "expire-pending-bookings-48h",
+    id: "expire-pending-bookings-24h",
     triggers: [{ cron: "0 * * * *" }], // top of every hour
   },
   async ({ step }) => {
@@ -274,7 +274,7 @@ export const expirePendingBookings = inngest.createFunction(
       process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
 
     return await step.run("expire-stale-pending", async () => {
-      // Select pending bookings older than 48h.
+      // Select pending bookings older than 24h.
       // Using sql template for the interval arithmetic; Drizzle's
       // relative-time helpers don't cover PostgreSQL `INTERVAL`.
       const stale = await db
@@ -290,7 +290,7 @@ export const expirePendingBookings = inngest.createFunction(
         .where(
           and(
             eq(bookingRequests.status, "pending"),
-            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '48 hours'`,
+            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours'`,
           ),
         );
 
@@ -303,7 +303,7 @@ export const expirePendingBookings = inngest.createFunction(
         .where(
           and(
             eq(bookingRequests.status, "pending"),
-            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '48 hours'`,
+            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours'`,
           ),
         );
 

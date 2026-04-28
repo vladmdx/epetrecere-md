@@ -124,6 +124,9 @@ interface BookingRequest {
   startTime?: string | null;
   endTime?: string | null;
   status: string;
+  /** Server timestamp when the booking was created. Drives the 24h
+   *  countdown shown on the pending artist's card. */
+  createdAt?: string | null;
   agreedPrice?: number | null;
   paidStatus?: "unpaid" | "partial" | "paid";
   priceOffers?: BookingPriceOffer[] | null;
@@ -1507,10 +1510,9 @@ function BookingsTab({
     })();
   }, [plan.eventDate, plan.selectedCategories]);
 
-  // Count existing bookings per category so the UI can show X/5 and
-  // disable the booking button once the user maxes out a category.
-  // Rejected/cancelled bookings don't count — the client can try a
-  // different artist to fill that slot.
+  // Active bookings indexed by artistId. Rejected / cancelled / expired
+  // entries don't count — those slots free up so the client can shop
+  // a different artist in the same category.
   const ACTIVE_STATUSES = new Set([
     "pending",
     "accepted",
@@ -1525,6 +1527,33 @@ function BookingsTab({
     if (!existing) bookingByArtistId.set(b.artistId, b);
   }
   const bookedArtistIds = new Set(bookingByArtistId.keys());
+
+  // For each category, find the active blocker booking + the artist's
+  // display name. Used to:
+  //   - cap the discovery section to a single live request per category
+  //   - render the "Așteaptă răspunsul lui …" tooltip on the other
+  //     artists in that category
+  //   - drive the 24h countdown on the artist actually holding the slot
+  const categoryBlocker = new Map<
+    number,
+    { artistId: number; artistName: string; status: string; createdAt: string }
+  >();
+  for (const section of byCategory) {
+    for (const a of section.artists) {
+      const b = bookingByArtistId.get(a.id);
+      if (b) {
+        // First active booking wins; new requests are POST-blocked anyway.
+        if (!categoryBlocker.has(section.categoryId)) {
+          categoryBlocker.set(section.categoryId, {
+            artistId: a.id,
+            artistName: a.nameRo ?? "Artist",
+            status: b.status,
+            createdAt: b.createdAt ?? new Date().toISOString(),
+          });
+        }
+      }
+    }
+  }
   const bookingsPerCategory = new Map<number, number>();
   for (const section of byCategory) {
     const booked = section.artists.filter((a) =>
@@ -1666,6 +1695,7 @@ function BookingsTab({
           bookingByArtistId={bookingByArtistId}
           bookingsPerCategory={bookingsPerCategory}
           blockedArtistIds={blockedArtistIds}
+          categoryBlocker={categoryBlocker}
           clientName={user?.fullName ?? "Client"}
           clientPhone={user?.primaryPhoneNumber?.phoneNumber ?? ""}
           clientEmail={user?.primaryEmailAddress?.emailAddress ?? undefined}
@@ -1692,6 +1722,7 @@ function DiscoverySection({
   bookingByArtistId,
   bookingsPerCategory,
   blockedArtistIds,
+  categoryBlocker,
   clientName,
   clientPhone,
   clientEmail,
@@ -1706,6 +1737,14 @@ function DiscoverySection({
    *  plan. The CTA is disabled with a "Refuzat anterior" label so the
    *  client picks a different artist. */
   blockedArtistIds: Set<number>;
+  /** For each category that already has an active request on this plan,
+   *  the artist holding the slot. Drives the "Așteaptă răspunsul lui …"
+   *  tooltip on every other artist in the same category, and the 24h
+   *  countdown on the artist who is actually pending. */
+  categoryBlocker: Map<
+    number,
+    { artistId: number; artistName: string; status: string; createdAt: string }
+  >;
   clientName: string;
   clientPhone: string;
   clientEmail?: string;
@@ -1859,8 +1898,11 @@ function DiscoverySection({
         // naturally scroll to the next category after exhausting the
         // current one.
         byCategory.map((section, idx) => {
-          const used = bookingsPerCategory.get(section.categoryId) ?? 0;
-          const limitReached = used >= MAX_PER_CATEGORY;
+          const blocker = categoryBlocker.get(section.categoryId);
+          // One active request per category — slot is "taken" any time
+          // a pending/accepted/confirmed booking exists in it.
+          const limitReached = !!blocker;
+          const used = limitReached ? 1 : 0;
           const visible = visibleByCategory[section.categoryId] ?? INITIAL_VISIBLE;
           const shown = section.artists.slice(0, visible);
           const hasMore = section.artists.length > visible;
@@ -1880,8 +1922,7 @@ function DiscoverySection({
                     {idx + 1}. {section.categoryName}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {section.artists.length} artiști disponibili · {used}/
-                    {MAX_PER_CATEGORY} cereri trimise
+                    {section.artists.length} artiști disponibili · {used}/1 cerere activă
                   </p>
                 </div>
               </div>
@@ -1892,21 +1933,31 @@ function DiscoverySection({
               ) : (
                 <>
                   <div className={cn("grid gap-4", gridCols)}>
-                    {shown.map((a) => (
-                      <PlanArtistCard
-                        key={a.id}
-                        artist={a}
-                        plan={plan}
-                        existingBooking={bookingByArtistId.get(a.id)}
-                        previouslyDeclined={blockedArtistIds.has(a.id)}
-                        categoryLimitReached={limitReached}
-                        clientName={clientName}
-                        clientPhone={clientPhone}
-                        clientEmail={clientEmail}
-                        viewMode={viewMode}
-                        onRefresh={() => onRefresh()}
-                      />
-                    ))}
+                    {shown.map((a) => {
+                      // The artist holding the slot for this category sees
+                      // the countdown card; the others get a disabled CTA
+                      // with the "Așteaptă răspunsul lui …" hint.
+                      const isBlockedByOther =
+                        !!blocker && blocker.artistId !== a.id;
+                      return (
+                        <PlanArtistCard
+                          key={a.id}
+                          artist={a}
+                          plan={plan}
+                          existingBooking={bookingByArtistId.get(a.id)}
+                          previouslyDeclined={blockedArtistIds.has(a.id)}
+                          categoryLimitReached={limitReached}
+                          blockedByOtherArtistName={
+                            isBlockedByOther ? blocker.artistName : null
+                          }
+                          clientName={clientName}
+                          clientPhone={clientPhone}
+                          clientEmail={clientEmail}
+                          viewMode={viewMode}
+                          onRefresh={() => onRefresh()}
+                        />
+                      );
+                    })}
                   </div>
                   {hasMore && (
                     <div className="mt-4 flex justify-center">
@@ -1929,6 +1980,59 @@ function DiscoverySection({
   );
 }
 
+/**
+ * Live countdown shown under a pending booking. Re-computes the
+ * remaining window every 60s so the host always sees a current
+ * estimate of how long the artist still has to respond before the
+ * Inngest cron auto-expires the request.
+ */
+function PendingCountdown({ createdAt }: { createdAt: string | null }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  if (!createdAt) {
+    return (
+      <span>
+        Partenerul are 24h să răspundă, altfel cererea se anulează automat.
+      </span>
+    );
+  }
+  const created = new Date(createdAt).getTime();
+  if (!Number.isFinite(created)) {
+    return (
+      <span>
+        Partenerul are 24h să răspundă, altfel cererea se anulează automat.
+      </span>
+    );
+  }
+  const deadline = created + 24 * 60 * 60 * 1000;
+  const remainingMs = deadline - now;
+  if (remainingMs <= 0) {
+    return (
+      <span>
+        Cererea va fi anulată în curând (24h depășite). Revino în câteva
+        minute.
+      </span>
+    );
+  }
+  const totalMin = Math.floor(remainingMs / 60_000);
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  return (
+    <div className="flex flex-col gap-1">
+      <span>
+        Partenerul are 24h să răspundă, altfel cererea se anulează automat.
+      </span>
+      <span className="font-mono text-xs text-warning">
+        ⏳ Cererea va fi anulată în {hours}h {String(minutes).padStart(2, "0")}m
+      </span>
+    </div>
+  );
+}
+
 // Artist card rendered inside the planner dashboard. Richer than the old
 // mini card: cover image + profile link + price + real hourly availability
 // slots for the plan's event date + inline "Solicită rezervare" modal.
@@ -1938,6 +2042,7 @@ function PlanArtistCard({
   existingBooking,
   previouslyDeclined = false,
   categoryLimitReached,
+  blockedByOtherArtistName = null,
   clientName,
   clientPhone,
   clientEmail,
@@ -1951,6 +2056,10 @@ function PlanArtistCard({
    *  request from this client on this plan. Hides the rebooking CTA. */
   previouslyDeclined?: boolean;
   categoryLimitReached: boolean;
+  /** Set when another artist in the same category already has an active
+   *  request. Used to disable this card's CTA + show the "Așteaptă
+   *  răspunsul lui {name}" hint. */
+  blockedByOtherArtistName?: string | null;
   clientName: string;
   clientPhone: string;
   clientEmail?: string;
@@ -2104,16 +2213,30 @@ function PlanArtistCard({
     status === "completed";
   const alreadyBooked = isPending || isConfirmed;
 
-  const disabled = alreadyBooked || categoryLimitReached || previouslyDeclined;
+  const disabled =
+    alreadyBooked ||
+    categoryLimitReached ||
+    previouslyDeclined ||
+    !!blockedByOtherArtistName;
   const primaryLabel = isConfirmed
     ? "Rezervat"
     : isPending
       ? "Cerere trimisă"
       : previouslyDeclined
         ? "Refuzat anterior"
-        : categoryLimitReached
-          ? "Limită atinsă (5)"
+        : blockedByOtherArtistName
+          ? "Categorie ocupată"
           : "Solicită rezervare";
+  // Hover hint for the disabled CTA — surfaces *why* the button is off.
+  const disabledHint = blockedByOtherArtistName
+    ? `Așteaptă răspunsul lui ${blockedByOtherArtistName} (până la 24h)`
+    : previouslyDeclined
+      ? "Acest artist a refuzat cererea ta"
+      : isPending
+        ? "Cerere deja trimisă acestui artist"
+        : isConfirmed
+          ? "Rezervare confirmată"
+          : null;
 
   function pickSlot(slot: { id: number; startTime: string; endTime: string }) {
     if (selectedSlotId === slot.id) {
@@ -2839,7 +2962,9 @@ function PlanArtistCard({
                 </span>
               )}
               {isPending && (
-                <span>Cerere trimisă, așteaptă răspunsul artistului</span>
+                <PendingCountdown
+                  createdAt={existingBooking.createdAt ?? null}
+                />
               )}
             </div>
           )}
@@ -2855,6 +2980,7 @@ function PlanArtistCard({
               onClick={() => setModalOpen(true)}
               disabled={disabled}
               size="sm"
+              title={disabledHint ?? undefined}
               className="w-full min-w-0 flex-1 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-60"
             >
               {isConfirmed ? (
