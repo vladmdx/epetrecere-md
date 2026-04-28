@@ -77,6 +77,26 @@ const CHANNEL_PLACEHOLDERS: Record<ContactChannel, string> = {
   telegram: "@username sau +373 60 000 000",
 };
 
+/** Curated set of decorative icons the host can use as the invitation's
+ *  centerpiece. Mix of bridal/festive emoji + the original glyphs. */
+const DECOR_ICONS = [
+  "✦", "❀", "—", "❦", "💍", "🌹", "🎉", "✨", "💕", "🕊️", "⭐", "🌟", "🥂", "🎂",
+];
+
+/** Google Fonts list — pre-loaded via the existing googleFontsUrl helper
+ *  when the design is rendered. Keeping it small so the preview stays
+ *  snappy and font requests don't stack up. */
+const FONT_OPTIONS = [
+  { value: "__default__", label: "Implicit (din șablon)" },
+  { value: "Playfair Display", label: "Playfair Display (clasic)" },
+  { value: "Cormorant Garamond", label: "Cormorant Garamond (elegant)" },
+  { value: "Dancing Script", label: "Dancing Script (cursiv)" },
+  { value: "Great Vibes", label: "Great Vibes (caligrafic)" },
+  { value: "Inter", label: "Inter (modern)" },
+  { value: "Montserrat", label: "Montserrat (modern bold)" },
+  { value: "Pacifico", label: "Pacifico (relaxat)" },
+];
+
 interface PlanContext {
   id: number;
   title: string;
@@ -164,6 +184,40 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
     rsvpDeadline: "",
   });
 
+  // Per-template customization overrides. Empty/undefined values mean
+  // "use the template defaults". Persisted into the invitation as
+  // customColors so the email + RSVP page reflect them.
+  const [custom, setCustom] = useState<{
+    headerText: string;
+    decorIcon: string;
+    bgColor: string;
+    textColor: string;
+    accentColor: string;
+    fontHeading: string;
+  }>({
+    headerText: "",
+    decorIcon: "",
+    bgColor: "",
+    textColor: "",
+    accentColor: "",
+    fontHeading: "",
+  });
+  const [showCustomize, setShowCustomize] = useState(false);
+
+  /** Reset customizations whenever the host picks a different template
+   *  so the preview matches the chosen design out of the box. */
+  function setDesign(id: InvitationDesignId) {
+    setInvData((s) => ({ ...s, designId: id }));
+    setCustom({
+      headerText: "",
+      decorIcon: "",
+      bgColor: "",
+      textColor: "",
+      accentColor: "",
+      fontHeading: "",
+    });
+  }
+
   function openSendDialog() {
     if (!plan) {
       toast.error("Date insuficiente despre eveniment.");
@@ -216,7 +270,18 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
           dressCode: invData.dressCode || undefined,
           rsvpDeadline: invData.rsvpDeadline || undefined,
           designId: invData.designId,
-          customColors: { designId: invData.designId },
+          // Persist the host's customizations so the rendered email +
+          // public RSVP page can reflect them. Only emit overrides the
+          // user actually changed (empty string means "use template").
+          customColors: {
+            designId: invData.designId,
+            ...(custom.headerText ? { headerText: custom.headerText } : {}),
+            ...(custom.decorIcon ? { decorIcon: custom.decorIcon } : {}),
+            ...(custom.bgColor ? { bgColor: custom.bgColor } : {}),
+            ...(custom.textColor ? { textColor: custom.textColor } : {}),
+            ...(custom.accentColor ? { accentColor: custom.accentColor } : {}),
+            ...(custom.fontHeading ? { fontHeading: custom.fontHeading } : {}),
+          },
           guests: guestsWithContact.map((g) => ({
             name: g.fullName,
             email: g.email || undefined,
@@ -442,83 +507,342 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         <StatCard icon={UserX} label="Refuzați" value={stats.declined} color="text-red-500" />
       </div>
 
-      {/* Inline design picker — surfaces the 4 templates upfront so the
-          host can preview / select before they even open the send dialog.
-          The selected design is stored in invData and re-used when the
-          dialog opens. */}
-      {plan && (
-        <div className="rounded-xl border border-border/40 bg-card p-4">
-          <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
-            <div>
-              <p className="font-heading font-bold">Design invitație</p>
-              <p className="text-xs text-muted-foreground">
-                Alege un șablon. Îl poți modifica înainte de trimitere.
-              </p>
-            </div>
-            <span className="rounded-full bg-gold/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold">
-              {INVITATION_DESIGN_LIST.find((d) => d.id === invData.designId)?.name ?? "Selectat"}
-            </span>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            {INVITATION_DESIGN_LIST.map((d) => {
-              const active = invData.designId === d.id;
-              return (
-                <button
-                  key={d.id}
+      {/* Inline design picker + customization editor. The 4 baseline
+          templates surface as preview cards. Selecting one (or opening
+          "Personalizează") swaps the lower section to an editor panel
+          where the host can override icon, colors, font, and the
+          header text. Changes mirror live into a preview card on the
+          right so the host sees the final look before sending. */}
+      {plan && (() => {
+        const tpl =
+          INVITATION_DESIGN_LIST.find((d) => d.id === invData.designId) ??
+          INVITATION_DESIGN_LIST[0];
+        // Effective values = customization override OR template default.
+        const effIcon =
+          custom.decorIcon ||
+          (tpl.decorStyle === "sparkles"
+            ? "✦"
+            : tpl.decorStyle === "flowers"
+              ? "❀"
+              : tpl.decorStyle === "minimal"
+                ? "—"
+                : "❦");
+        const effHeader = custom.headerText || "Ești invitat";
+        const effBg = custom.bgColor || tpl.preview.bg;
+        const effText = custom.textColor || tpl.preview.text;
+        const effAccent = custom.accentColor || tpl.preview.accent;
+        const effFont = custom.fontHeading || tpl.fontHeading || "";
+        const isCustomized =
+          custom.headerText ||
+          custom.decorIcon ||
+          custom.bgColor ||
+          custom.textColor ||
+          custom.accentColor ||
+          custom.fontHeading;
+
+        return (
+          <div className="rounded-xl border border-border/40 bg-card p-4">
+            <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="font-heading font-bold">Design invitație</p>
+                <p className="text-xs text-muted-foreground">
+                  Alege un șablon și personalizează-l. Modificările sunt vizibile în previzualizare.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full bg-gold/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold">
+                  {tpl.name}
+                </span>
+                <Button
                   type="button"
-                  onClick={() =>
-                    setInvData((s) => ({ ...s, designId: d.id }))
-                  }
+                  size="sm"
+                  variant={showCustomize ? "default" : "outline"}
+                  onClick={() => setShowCustomize((v) => !v)}
                   className={cn(
-                    "overflow-hidden rounded-lg border-2 text-left transition-all",
-                    active
-                      ? "border-gold shadow-[0_0_0_2px_rgba(201,168,76,0.25)]"
-                      : "border-border/40 hover:border-gold/30",
+                    "gap-1 text-xs",
+                    showCustomize && "bg-gold text-[#0D0D0D] hover:bg-gold-dark",
                   )}
                 >
-                  <div
-                    className="p-4"
-                    style={{ background: d.preview.bg, color: d.preview.text }}
+                  {showCustomize ? "Ascunde" : "Personalizează"}
+                </Button>
+              </div>
+            </div>
+
+            {/* Template gallery */}
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {INVITATION_DESIGN_LIST.map((d) => {
+                const active = invData.designId === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setDesign(d.id)}
+                    className={cn(
+                      "overflow-hidden rounded-lg border-2 text-left transition-all",
+                      active
+                        ? "border-gold shadow-[0_0_0_2px_rgba(201,168,76,0.25)]"
+                        : "border-border/40 hover:border-gold/30",
+                    )}
                   >
                     <div
-                      className="text-center text-lg"
-                      style={{ color: d.preview.accent }}
+                      className="p-4"
+                      style={{ background: d.preview.bg, color: d.preview.text }}
                     >
-                      {d.decorStyle === "sparkles"
-                        ? "✦"
-                        : d.decorStyle === "flowers"
-                          ? "❀"
-                          : d.decorStyle === "minimal"
-                            ? "—"
-                            : "❦"}
+                      <div
+                        className="text-center text-lg"
+                        style={{ color: d.preview.accent }}
+                      >
+                        {d.decorStyle === "sparkles"
+                          ? "✦"
+                          : d.decorStyle === "flowers"
+                            ? "❀"
+                            : d.decorStyle === "minimal"
+                              ? "—"
+                              : "❦"}
+                      </div>
+                      <div
+                        className="text-center text-[10px] uppercase tracking-widest"
+                        style={{ color: d.preview.accent }}
+                      >
+                        Ești invitat
+                      </div>
+                      <div
+                        className="mt-1 text-center text-sm font-bold"
+                        style={{
+                          fontFamily: d.fontHeading
+                            ? `"${d.fontHeading}", serif`
+                            : undefined,
+                        }}
+                      >
+                        {plan.title || "Ana & Ion"}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between bg-card px-3 py-2">
+                      <span className="text-xs font-medium">{d.name}</span>
+                      {active && <Check className="h-4 w-4 text-gold" />}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Customization editor + live preview */}
+            {showCustomize && (
+              <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
+                <div className="space-y-4 rounded-lg border border-border/40 bg-background/40 p-4">
+                  {/* Header text */}
+                  <div>
+                    <Label className="text-xs">Text titlu</Label>
+                    <Input
+                      className="mt-1"
+                      value={custom.headerText}
+                      onChange={(e) =>
+                        setCustom((s) => ({ ...s, headerText: e.target.value }))
+                      }
+                      placeholder="Ești invitat"
+                    />
+                  </div>
+
+                  {/* Icon picker */}
+                  <div>
+                    <Label className="text-xs">Iconiță</Label>
+                    <div className="mt-1 flex flex-wrap gap-1.5">
+                      {DECOR_ICONS.map((ic) => {
+                        const active = effIcon === ic;
+                        return (
+                          <button
+                            key={ic}
+                            type="button"
+                            onClick={() =>
+                              setCustom((s) => ({ ...s, decorIcon: ic }))
+                            }
+                            className={cn(
+                              "flex h-9 w-9 items-center justify-center rounded-md border text-lg transition-all",
+                              active
+                                ? "border-gold bg-gold/10"
+                                : "border-border/40 hover:border-gold/40",
+                            )}
+                          >
+                            {ic}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Colors */}
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div>
+                      <Label className="text-xs">Fundal</Label>
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={effBg}
+                          onChange={(e) =>
+                            setCustom((s) => ({ ...s, bgColor: e.target.value }))
+                          }
+                          className="h-9 w-12 cursor-pointer rounded border border-border/40 bg-transparent"
+                        />
+                        <Input
+                          value={effBg}
+                          onChange={(e) =>
+                            setCustom((s) => ({ ...s, bgColor: e.target.value }))
+                          }
+                          className="font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Text</Label>
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={effText}
+                          onChange={(e) =>
+                            setCustom((s) => ({ ...s, textColor: e.target.value }))
+                          }
+                          className="h-9 w-12 cursor-pointer rounded border border-border/40 bg-transparent"
+                        />
+                        <Input
+                          value={effText}
+                          onChange={(e) =>
+                            setCustom((s) => ({ ...s, textColor: e.target.value }))
+                          }
+                          className="font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-xs">Accent</Label>
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={effAccent}
+                          onChange={(e) =>
+                            setCustom((s) => ({ ...s, accentColor: e.target.value }))
+                          }
+                          className="h-9 w-12 cursor-pointer rounded border border-border/40 bg-transparent"
+                        />
+                        <Input
+                          value={effAccent}
+                          onChange={(e) =>
+                            setCustom((s) => ({ ...s, accentColor: e.target.value }))
+                          }
+                          className="font-mono text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Font */}
+                  <div>
+                    <Label className="text-xs">Font titlu</Label>
+                    <Select
+                      value={custom.fontHeading || "__default__"}
+                      onValueChange={(v) =>
+                        setCustom((s) => ({
+                          ...s,
+                          fontHeading: v === "__default__" ? "" : v ?? "",
+                        }))
+                      }
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder="Implicit (din șablon)">
+                          {custom.fontHeading
+                            ? (FONT_OPTIONS.find(
+                                (f) => f.value === custom.fontHeading,
+                              )?.label ?? custom.fontHeading)
+                            : "Implicit (din șablon)"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FONT_OPTIONS.map((f) => (
+                          <SelectItem key={f.value} value={f.value}>
+                            {f.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    {isCustomized ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          setCustom({
+                            headerText: "",
+                            decorIcon: "",
+                            bgColor: "",
+                            textColor: "",
+                            accentColor: "",
+                            fontHeading: "",
+                          })
+                        }
+                        className="text-xs"
+                      >
+                        Resetează la șablon
+                      </Button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">
+                        Modificările folosesc valorile din șablon implicit.
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live preview */}
+                <div className="space-y-2">
+                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Previzualizare
+                  </Label>
+                  {effFont && (
+                    <link
+                      rel="stylesheet"
+                      href={`https://fonts.googleapis.com/css2?family=${encodeURIComponent(
+                        effFont,
+                      ).replace(/%20/g, "+")}:wght@400;700&display=swap`}
+                    />
+                  )}
+                  <div
+                    className="overflow-hidden rounded-xl border-2 border-gold/30 p-8 text-center"
+                    style={{ background: effBg, color: effText }}
+                  >
+                    <div
+                      className="mb-2 text-5xl"
+                      style={{ color: effAccent }}
+                    >
+                      {effIcon}
                     </div>
                     <div
-                      className="text-center text-[10px] uppercase tracking-widest"
-                      style={{ color: d.preview.accent }}
+                      className="mb-1 text-[10px] uppercase tracking-[0.3em]"
+                      style={{ color: effAccent }}
                     >
-                      Ești invitat
+                      {effHeader}
                     </div>
                     <div
-                      className="mt-1 text-center text-sm font-bold"
+                      className="mt-2 text-2xl font-bold"
                       style={{
-                        fontFamily: d.fontHeading
-                          ? `"${d.fontHeading}", serif`
-                          : undefined,
+                        fontFamily: effFont ? `"${effFont}", serif` : undefined,
                       }}
                     >
-                      {plan.title || "Ana & Ion"}
+                      {invData.coupleNames || plan.title || "Ana & Ion"}
+                    </div>
+                    <div
+                      className="mt-3 text-xs"
+                      style={{ color: effAccent, opacity: 0.85 }}
+                    >
+                      {plan.eventDate || "Data evenimentului"}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between bg-card px-3 py-2">
-                    <span className="text-xs font-medium">{d.name}</span>
-                    {active && <Check className="h-4 w-4 text-gold" />}
-                  </div>
-                </button>
-              );
-            })}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Send invitations CTA */}
       {plan && guests.length > 0 && (
