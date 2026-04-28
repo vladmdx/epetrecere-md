@@ -187,35 +187,58 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
   // Per-template customization overrides. Empty/undefined values mean
   // "use the template defaults". Persisted into the invitation as
   // customColors so the email + RSVP page reflect them.
-  const [custom, setCustom] = useState<{
-    headerText: string;
-    decorIcon: string;
-    bgColor: string;
-    textColor: string;
-    accentColor: string;
-    fontHeading: string;
-  }>({
+  type Align = "left" | "center" | "right";
+  const initialCustom = {
     headerText: "",
+    eventName: "", // overrides the event title shown on the invitation
     decorIcon: "",
+    iconImageUrl: "",
+    iconSize: 48, // px
+    iconAlign: "center" as Align,
     bgColor: "",
     textColor: "",
     accentColor: "",
     fontHeading: "",
-  });
+    titleSize: 24, // px — couple/event name size
+    titleAlign: "center" as Align,
+  };
+  const [custom, setCustom] = useState(initialCustom);
   const [showCustomize, setShowCustomize] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const iconFileInputRef = useRef<HTMLInputElement>(null);
 
   /** Reset customizations whenever the host picks a different template
    *  so the preview matches the chosen design out of the box. */
   function setDesign(id: InvitationDesignId) {
     setInvData((s) => ({ ...s, designId: id }));
-    setCustom({
-      headerText: "",
-      decorIcon: "",
-      bgColor: "",
-      textColor: "",
-      accentColor: "",
-      fontHeading: "",
-    });
+    setCustom(initialCustom);
+  }
+
+  /** Upload a custom icon image (logo, monogram, png) to Vercel Blob and
+   *  store the public URL in `custom.iconImageUrl`. When set, the live
+   *  preview renders the image instead of the emoji glyph. */
+  async function handleIconUpload(file: File) {
+    if (!file.type.startsWith("image/")) {
+      toast.error("Selectează un fișier imagine.");
+      return;
+    }
+    setUploadingIcon(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("folder", "invitations");
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Upload failed");
+      }
+      const data = await res.json();
+      setCustom((s) => ({ ...s, iconImageUrl: data.url }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare la upload");
+    } finally {
+      setUploadingIcon(false);
+    }
   }
 
   function openSendDialog() {
@@ -272,15 +295,25 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
           designId: invData.designId,
           // Persist the host's customizations so the rendered email +
           // public RSVP page can reflect them. Only emit overrides the
-          // user actually changed (empty string means "use template").
+          // user actually changed (empty string means "use template");
+          // numeric / alignment fields always emit because they have
+          // sensible defaults that aren't "no value".
           customColors: {
             designId: invData.designId,
             ...(custom.headerText ? { headerText: custom.headerText } : {}),
+            ...(custom.eventName ? { eventName: custom.eventName } : {}),
             ...(custom.decorIcon ? { decorIcon: custom.decorIcon } : {}),
+            ...(custom.iconImageUrl
+              ? { iconImageUrl: custom.iconImageUrl }
+              : {}),
             ...(custom.bgColor ? { bgColor: custom.bgColor } : {}),
             ...(custom.textColor ? { textColor: custom.textColor } : {}),
             ...(custom.accentColor ? { accentColor: custom.accentColor } : {}),
             ...(custom.fontHeading ? { fontHeading: custom.fontHeading } : {}),
+            iconSize: String(custom.iconSize),
+            iconAlign: custom.iconAlign,
+            titleSize: String(custom.titleSize),
+            titleAlign: custom.titleAlign,
           },
           guests: guestsWithContact.map((g) => ({
             name: g.fullName,
@@ -532,13 +565,21 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         const effText = custom.textColor || tpl.preview.text;
         const effAccent = custom.accentColor || tpl.preview.accent;
         const effFont = custom.fontHeading || tpl.fontHeading || "";
+        const effEventName =
+          custom.eventName || invData.coupleNames || plan.title || "Ana & Ion";
         const isCustomized =
           custom.headerText ||
+          custom.eventName ||
           custom.decorIcon ||
+          custom.iconImageUrl ||
           custom.bgColor ||
           custom.textColor ||
           custom.accentColor ||
-          custom.fontHeading;
+          custom.fontHeading ||
+          custom.iconSize !== initialCustom.iconSize ||
+          custom.iconAlign !== initialCustom.iconAlign ||
+          custom.titleSize !== initialCustom.titleSize ||
+          custom.titleAlign !== initialCustom.titleAlign;
 
         return (
           <div className="rounded-xl border border-border/40 bg-card p-4">
@@ -632,7 +673,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                 <div className="space-y-4 rounded-lg border border-border/40 bg-background/40 p-4">
                   {/* Header text */}
                   <div>
-                    <Label className="text-xs">Text titlu</Label>
+                    <Label className="text-xs">Text de sus</Label>
                     <Input
                       className="mt-1"
                       value={custom.headerText}
@@ -643,18 +684,86 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                     />
                   </div>
 
-                  {/* Icon picker */}
+                  {/* Event name (the big title shown on the invitation) */}
                   <div>
-                    <Label className="text-xs">Iconiță</Label>
+                    <Label className="text-xs">Nume eveniment afișat</Label>
+                    <Input
+                      className="mt-1"
+                      value={custom.eventName}
+                      onChange={(e) =>
+                        setCustom((s) => ({ ...s, eventName: e.target.value }))
+                      }
+                      placeholder={plan.title || "Ex: Nunta Ana & Ion"}
+                    />
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Lasă gol pentru a folosi titlul evenimentului ({plan.title || "—"}).
+                    </p>
+                  </div>
+
+                  {/* Title size + alignment */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs">
+                        Dimensiune nume ({custom.titleSize}px)
+                      </Label>
+                      <input
+                        type="range"
+                        min={16}
+                        max={64}
+                        step={1}
+                        value={custom.titleSize}
+                        onChange={(e) =>
+                          setCustom((s) => ({
+                            ...s,
+                            titleSize: Number(e.target.value),
+                          }))
+                        }
+                        className="mt-2 w-full accent-[#C9A84C]"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Aliniere nume</Label>
+                      <div className="mt-1 grid grid-cols-3 gap-1">
+                        {(["left", "center", "right"] as Align[]).map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() =>
+                              setCustom((s) => ({ ...s, titleAlign: a }))
+                            }
+                            className={cn(
+                              "rounded-md border px-2 py-1.5 text-xs transition-all",
+                              custom.titleAlign === a
+                                ? "border-gold bg-gold/10 text-gold"
+                                : "border-border/40 hover:border-gold/40",
+                            )}
+                          >
+                            {a === "left" ? "⬅ Stg" : a === "center" ? "◆ Cn" : "Drp ➡"}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Icon picker — emoji glyphs */}
+                  <div>
+                    <Label className="text-xs">Iconiță (din listă)</Label>
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {DECOR_ICONS.map((ic) => {
-                        const active = effIcon === ic;
+                        const active =
+                          !custom.iconImageUrl && effIcon === ic;
                         return (
                           <button
                             key={ic}
                             type="button"
                             onClick={() =>
-                              setCustom((s) => ({ ...s, decorIcon: ic }))
+                              setCustom((s) => ({
+                                ...s,
+                                decorIcon: ic,
+                                // Choosing a glyph clears the uploaded
+                                // image so the preview shows just one.
+                                iconImageUrl: "",
+                              }))
                             }
                             className={cn(
                               "flex h-9 w-9 items-center justify-center rounded-md border text-lg transition-all",
@@ -667,6 +776,104 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                           </button>
                         );
                       })}
+                    </div>
+                  </div>
+
+                  {/* Custom icon upload */}
+                  <div>
+                    <Label className="text-xs">Sau încarcă o iconiță proprie</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <input
+                        ref={iconFileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) handleIconUpload(f);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={uploadingIcon}
+                        onClick={() => iconFileInputRef.current?.click()}
+                        className="gap-1.5"
+                      >
+                        {uploadingIcon ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <FileUp className="h-3.5 w-3.5" />
+                        )}
+                        {custom.iconImageUrl ? "Schimbă imaginea" : "Încarcă imagine"}
+                      </Button>
+                      {custom.iconImageUrl && (
+                        <>
+                          <img
+                            src={custom.iconImageUrl}
+                            alt="icon"
+                            className="h-9 w-9 rounded border border-border/40 object-contain"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setCustom((s) => ({ ...s, iconImageUrl: "" }))
+                            }
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            Șterge
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Icon size + alignment */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label className="text-xs">
+                        Dimensiune iconiță ({custom.iconSize}px)
+                      </Label>
+                      <input
+                        type="range"
+                        min={16}
+                        max={160}
+                        step={2}
+                        value={custom.iconSize}
+                        onChange={(e) =>
+                          setCustom((s) => ({
+                            ...s,
+                            iconSize: Number(e.target.value),
+                          }))
+                        }
+                        className="mt-2 w-full accent-[#C9A84C]"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Aliniere iconiță</Label>
+                      <div className="mt-1 grid grid-cols-3 gap-1">
+                        {(["left", "center", "right"] as Align[]).map((a) => (
+                          <button
+                            key={a}
+                            type="button"
+                            onClick={() =>
+                              setCustom((s) => ({ ...s, iconAlign: a }))
+                            }
+                            className={cn(
+                              "rounded-md border px-2 py-1.5 text-xs transition-all",
+                              custom.iconAlign === a
+                                ? "border-gold bg-gold/10 text-gold"
+                                : "border-border/40 hover:border-gold/40",
+                            )}
+                          >
+                            {a === "left" ? "⬅ Stg" : a === "center" ? "◆ Cn" : "Drp ➡"}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -771,16 +978,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                         type="button"
                         size="sm"
                         variant="outline"
-                        onClick={() =>
-                          setCustom({
-                            headerText: "",
-                            decorIcon: "",
-                            bgColor: "",
-                            textColor: "",
-                            accentColor: "",
-                            fontHeading: "",
-                          })
-                        }
+                        onClick={() => setCustom(initialCustom)}
                         className="text-xs"
                       >
                         Resetează la șablon
@@ -807,32 +1005,64 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                     />
                   )}
                   <div
-                    className="overflow-hidden rounded-xl border-2 border-gold/30 p-8 text-center"
+                    className="overflow-hidden rounded-xl border-2 border-gold/30 p-8"
                     style={{ background: effBg, color: effText }}
                   >
+                    {/* Icon — uploaded image OR emoji glyph, aligned to the
+                        host's chosen position with the picked size. */}
                     <div
-                      className="mb-2 text-5xl"
-                      style={{ color: effAccent }}
+                      className="mb-2"
+                      style={{ textAlign: custom.iconAlign }}
                     >
-                      {effIcon}
+                      {custom.iconImageUrl ? (
+                        <img
+                          src={custom.iconImageUrl}
+                          alt=""
+                          style={{
+                            display: "inline-block",
+                            width: `${custom.iconSize}px`,
+                            height: `${custom.iconSize}px`,
+                            objectFit: "contain",
+                          }}
+                        />
+                      ) : (
+                        <span
+                          style={{
+                            color: effAccent,
+                            fontSize: `${custom.iconSize}px`,
+                            lineHeight: 1,
+                          }}
+                        >
+                          {effIcon}
+                        </span>
+                      )}
                     </div>
+                    {/* Header text — uppercase, accent color, follows title alignment */}
                     <div
                       className="mb-1 text-[10px] uppercase tracking-[0.3em]"
-                      style={{ color: effAccent }}
+                      style={{ color: effAccent, textAlign: custom.titleAlign }}
                     >
                       {effHeader}
                     </div>
+                    {/* Big event name — host-controlled size, font, alignment */}
                     <div
-                      className="mt-2 text-2xl font-bold"
+                      className="mt-2 font-bold"
                       style={{
                         fontFamily: effFont ? `"${effFont}", serif` : undefined,
+                        fontSize: `${custom.titleSize}px`,
+                        lineHeight: 1.15,
+                        textAlign: custom.titleAlign,
                       }}
                     >
-                      {invData.coupleNames || plan.title || "Ana & Ion"}
+                      {effEventName}
                     </div>
                     <div
                       className="mt-3 text-xs"
-                      style={{ color: effAccent, opacity: 0.85 }}
+                      style={{
+                        color: effAccent,
+                        opacity: 0.85,
+                        textAlign: custom.titleAlign,
+                      }}
                     >
                       {plan.eventDate || "Data evenimentului"}
                     </div>
