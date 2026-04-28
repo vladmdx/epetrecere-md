@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2, Users, UserCheck, UserX, UserMinus, FileUp, Send, Mail, Phone as PhoneIcon, MessageCircle, Check } from "lucide-react";
+import { Plus, Trash2, Loader2, Users, UserCheck, UserX, UserMinus, FileUp, Send, Mail, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { INVITATION_DESIGN_LIST, type InvitationDesignId } from "@/lib/invitations/templates";
@@ -30,17 +30,52 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
+export type GuestType = "single" | "couple" | "family";
+export type ContactChannel =
+  | "email"
+  | "sms"
+  | "whatsapp"
+  | "viber"
+  | "telegram";
+
 export interface Guest {
   id: number;
   fullName: string;
   phone: string | null;
   email: string | null;
   group: string | null;
+  guestType?: GuestType | null;
+  partySize?: number | null;
+  kidsCount?: number | null;
+  contactChannel?: ContactChannel | null;
+  contactValue?: string | null;
   plusOnes: number;
   dietary: string | null;
   rsvp: "pending" | "accepted" | "declined" | "maybe";
   notes: string | null;
 }
+
+const GUEST_TYPE_LABELS: Record<GuestType, string> = {
+  single: "Singură persoană",
+  couple: "Cuplu",
+  family: "Familie",
+};
+
+const CHANNEL_LABELS: Record<ContactChannel, string> = {
+  email: "Email",
+  sms: "SMS",
+  whatsapp: "WhatsApp",
+  viber: "Viber",
+  telegram: "Telegram",
+};
+
+const CHANNEL_PLACEHOLDERS: Record<ContactChannel, string> = {
+  email: "email@exemplu.com",
+  sms: "+373 60 000 000",
+  whatsapp: "+373 60 000 000",
+  viber: "+373 60 000 000",
+  telegram: "@username sau +373 60 000 000",
+};
 
 interface PlanContext {
   id: number;
@@ -67,15 +102,6 @@ const RSVP_CONFIG: Record<
   accepted: { label: "Confirmat", color: "text-emerald-500", icon: UserCheck },
   declined: { label: "Refuzat", color: "text-red-500", icon: UserX },
   maybe: { label: "Posibil", color: "text-amber-500", icon: UserMinus },
-};
-
-const GROUP_LABELS: Record<string, string> = {
-  bride: "Partea miresei",
-  groom: "Partea mirelui",
-  family: "Familie",
-  friends: "Prieteni",
-  work: "Colegi",
-  other: "Altele",
 };
 
 function ThemedDateInput({
@@ -109,11 +135,15 @@ function ThemedDateInput({
 
 export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }: Props) {
   const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
-  const [email, setEmail] = useState("");
-  const [group, setGroup] = useState("friends");
-  const [plusOnes, setPlusOnes] = useState("0");
+  const [guestType, setGuestType] = useState<GuestType>("single");
+  /** Adults — only meaningful for type="family" (2..8). couple is locked
+   *  to 2, single to 1. We keep a string in state so the input plays nice
+   *  with empty intermediate values while the user is typing. */
+  const [familySize, setFamilySize] = useState("2");
+  const [kidsCount, setKidsCount] = useState("0");
+  const [contactChannel, setContactChannel] =
+    useState<ContactChannel>("whatsapp");
+  const [contactValue, setContactValue] = useState("");
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -139,9 +169,12 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       toast.error("Date insuficiente despre eveniment.");
       return;
     }
-    // Auto-fill from the event plan
-    setInvData({
-      designId: "elegant-gold",
+    // Auto-fill event metadata from the plan, but keep whichever design
+    // the host picked from the inline gallery. Falls back to the current
+    // value (which defaults to "elegant-gold").
+    setInvData((prev) => ({
+      ...prev,
+      designId: prev.designId,
       coupleNames: plan.title || "",
       eventDate: plan.eventDate || "",
       ceremonyTime: plan.startTime || "",
@@ -151,7 +184,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       message: "Cu drag vă invităm să ne fiți alături...",
       dressCode: "",
       rsvpDeadline: "",
-    });
+    }));
     setSendDialogOpen(true);
   }
 
@@ -300,11 +333,31 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
     let total = 0;
     const byRsvp = { pending: 0, accepted: 0, declined: 0, maybe: 0 };
     for (const g of guests) {
-      total += 1 + (g.plusOnes || 0);
-      byRsvp[g.rsvp] += 1 + (g.plusOnes || 0);
+      // New shape: partySize (adults) + kidsCount. Legacy rows fall back
+      // to 1 + plusOnes so historical data still shows reasonable counts.
+      const ps = g.partySize ?? 1;
+      const kids = g.kidsCount ?? 0;
+      const headcount =
+        g.partySize != null || g.kidsCount != null
+          ? ps + kids
+          : 1 + (g.plusOnes || 0);
+      total += headcount;
+      byRsvp[g.rsvp] += headcount;
     }
     return { total, ...byRsvp };
   }, [guests]);
+
+  /** Total adults for the current type — couple locked at 2, single at 1,
+   *  family clamped to 2..8. */
+  function resolvePartySize(): number {
+    if (guestType === "couple") return 2;
+    if (guestType === "family") {
+      const n = Number(familySize);
+      if (!Number.isFinite(n)) return 2;
+      return Math.max(2, Math.min(8, Math.floor(n)));
+    }
+    return 1;
+  }
 
   async function addGuest() {
     if (name.trim().length < 1) {
@@ -313,15 +366,27 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
     }
     setAdding(true);
     try {
+      const partySize = resolvePartySize();
+      const trimmedContact = contactValue.trim();
       const res = await fetch(`/api/event-plans/${planId}/guests`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fullName: name.trim(),
-          phone: phone || undefined,
-          email: email || undefined,
-          group,
-          plusOnes: Number(plusOnes) || 0,
+          guestType,
+          partySize,
+          kidsCount: Number(kidsCount) || 0,
+          contactChannel,
+          contactValue: trimmedContact || undefined,
+          // Mirror into legacy email/phone so existing send pipelines work.
+          email:
+            contactChannel === "email" && trimmedContact
+              ? trimmedContact
+              : undefined,
+          phone:
+            contactChannel !== "email" && trimmedContact
+              ? trimmedContact
+              : undefined,
         }),
       });
       if (!res.ok) {
@@ -330,10 +395,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       }
       const data = await res.json();
       onChange([...guests, data.guest]);
+      // Reset for next entry — keep the channel & guestType so adding
+      // a series of similar guests is fast.
       setName("");
-      setPhone("");
-      setEmail("");
-      setPlusOnes("0");
+      setKidsCount("0");
+      setContactValue("");
     } finally {
       setAdding(false);
     }
@@ -376,6 +442,84 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         <StatCard icon={UserX} label="Refuzați" value={stats.declined} color="text-red-500" />
       </div>
 
+      {/* Inline design picker — surfaces the 4 templates upfront so the
+          host can preview / select before they even open the send dialog.
+          The selected design is stored in invData and re-used when the
+          dialog opens. */}
+      {plan && (
+        <div className="rounded-xl border border-border/40 bg-card p-4">
+          <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-heading font-bold">Design invitație</p>
+              <p className="text-xs text-muted-foreground">
+                Alege un șablon. Îl poți modifica înainte de trimitere.
+              </p>
+            </div>
+            <span className="rounded-full bg-gold/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gold">
+              {INVITATION_DESIGN_LIST.find((d) => d.id === invData.designId)?.name ?? "Selectat"}
+            </span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {INVITATION_DESIGN_LIST.map((d) => {
+              const active = invData.designId === d.id;
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() =>
+                    setInvData((s) => ({ ...s, designId: d.id }))
+                  }
+                  className={cn(
+                    "overflow-hidden rounded-lg border-2 text-left transition-all",
+                    active
+                      ? "border-gold shadow-[0_0_0_2px_rgba(201,168,76,0.25)]"
+                      : "border-border/40 hover:border-gold/30",
+                  )}
+                >
+                  <div
+                    className="p-4"
+                    style={{ background: d.preview.bg, color: d.preview.text }}
+                  >
+                    <div
+                      className="text-center text-lg"
+                      style={{ color: d.preview.accent }}
+                    >
+                      {d.decorStyle === "sparkles"
+                        ? "✦"
+                        : d.decorStyle === "flowers"
+                          ? "❀"
+                          : d.decorStyle === "minimal"
+                            ? "—"
+                            : "❦"}
+                    </div>
+                    <div
+                      className="text-center text-[10px] uppercase tracking-widest"
+                      style={{ color: d.preview.accent }}
+                    >
+                      Ești invitat
+                    </div>
+                    <div
+                      className="mt-1 text-center text-sm font-bold"
+                      style={{
+                        fontFamily: d.fontHeading
+                          ? `"${d.fontHeading}", serif`
+                          : undefined,
+                      }}
+                    >
+                      {plan.title || "Ana & Ion"}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between bg-card px-3 py-2">
+                    <span className="text-xs font-medium">{d.name}</span>
+                    {active && <Check className="h-4 w-4 text-gold" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Send invitations CTA */}
       {plan && guests.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4">
@@ -402,90 +546,151 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
 
       {/* Add guest */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
-        <p className="mb-3 text-xs font-medium uppercase text-muted-foreground">Adaugă invitat</p>
-        <div className="grid gap-3 md:grid-cols-5">
-          <div className="md:col-span-2">
-            <Label htmlFor="gname" className="sr-only">
-              Nume
+        <p className="mb-3 text-xs font-medium uppercase text-muted-foreground">
+          Adaugă invitat
+        </p>
+
+        {/* Row 1 — name + type + (optional) family size */}
+        <div className="grid gap-3 md:grid-cols-12">
+          <div className="md:col-span-5">
+            <Label htmlFor="gname" className="text-xs">
+              Nume invitat
             </Label>
             <Input
               id="gname"
+              className="mt-1"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Nume și prenume"
+              placeholder="Ex: Ion Popescu"
             />
           </div>
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Telefon" />
-          <Input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            type="email"
-          />
-          <div className="flex gap-2">
-            <Select value={group} onValueChange={(v) => setGroup(v ?? "friends")}>
-              <SelectTrigger>
-                <SelectValue placeholder="Categorie">
-                  {GROUP_LABELS[group] || group}
-                </SelectValue>
+          <div className="md:col-span-4">
+            <Label className="text-xs">Tip</Label>
+            <Select
+              value={guestType}
+              onValueChange={(v) => {
+                if (!v) return;
+                setGuestType(v as GuestType);
+                if (v === "family" && Number(familySize) < 2) {
+                  setFamilySize("2");
+                }
+              }}
+            >
+              <SelectTrigger className="mt-1">
+                <SelectValue>{GUEST_TYPE_LABELS[guestType]}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="bride">Partea miresei</SelectItem>
-                <SelectItem value="groom">Partea mirelui</SelectItem>
-                <SelectItem value="family">Familie</SelectItem>
-                <SelectItem value="friends">Prieteni</SelectItem>
-                <SelectItem value="work">Colegi</SelectItem>
-                <SelectItem value="other">Altele</SelectItem>
+                <SelectItem value="single">Singură persoană (1)</SelectItem>
+                <SelectItem value="couple">Cuplu (2)</SelectItem>
+                <SelectItem value="family">Familie (2-8)</SelectItem>
               </SelectContent>
             </Select>
           </div>
+          {guestType === "family" && (
+            <div className="md:col-span-3">
+              <Label className="text-xs" htmlFor="famsize">
+                Persoane în familie
+              </Label>
+              <Input
+                id="famsize"
+                type="number"
+                min="2"
+                max="8"
+                className="mt-1"
+                value={familySize}
+                onChange={(e) => setFamilySize(e.target.value)}
+              />
+            </div>
+          )}
         </div>
-        <div className="mt-3 flex items-center gap-3">
-          <Label className="text-xs" htmlFor="plusones">
-            +1 / copii:
-          </Label>
-          <Input
-            id="plusones"
-            type="number"
-            min="0"
-            max="20"
-            value={plusOnes}
-            onChange={(e) => setPlusOnes(e.target.value)}
-            className="w-24"
-          />
-          <div className="ml-auto flex items-center gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) importFromFile(f);
+
+        {/* Row 2 — channel + contact value + kids */}
+        <div className="mt-3 grid gap-3 md:grid-cols-12">
+          <div className="md:col-span-3">
+            <Label className="text-xs">Canal contact</Label>
+            <Select
+              value={contactChannel}
+              onValueChange={(v) => {
+                if (v) setContactChannel(v as ContactChannel);
               }}
-            />
-            <Button
-              variant="outline"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className="gap-1"
             >
-              {importing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileUp className="h-4 w-4" />
-              )}
-              Import Excel
-            </Button>
-            <Button
-              onClick={addGuest}
-              disabled={adding}
-              className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
-            >
-              {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-              Adaugă
-            </Button>
+              <SelectTrigger className="mt-1">
+                <SelectValue>{CHANNEL_LABELS[contactChannel]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="email">📧 Email</SelectItem>
+                <SelectItem value="sms">✉️ SMS</SelectItem>
+                <SelectItem value="whatsapp">🟢 WhatsApp</SelectItem>
+                <SelectItem value="viber">🟣 Viber</SelectItem>
+                <SelectItem value="telegram">✈️ Telegram</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          <div className="md:col-span-6">
+            <Label className="text-xs">
+              {contactChannel === "email" ? "Email" : "Telefon / Username"}
+            </Label>
+            <Input
+              className="mt-1"
+              type={contactChannel === "email" ? "email" : "text"}
+              value={contactValue}
+              onChange={(e) => setContactValue(e.target.value)}
+              placeholder={CHANNEL_PLACEHOLDERS[contactChannel]}
+            />
+          </div>
+          <div className="md:col-span-3">
+            <Label className="text-xs" htmlFor="kids">
+              Copii
+            </Label>
+            <Input
+              id="kids"
+              type="number"
+              min="0"
+              max="20"
+              className="mt-1"
+              value={kidsCount}
+              onChange={(e) => setKidsCount(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Row 3 — actions */}
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importFromFile(f);
+            }}
+          />
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={importing}
+            className="gap-1"
+          >
+            {importing ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileUp className="h-4 w-4" />
+            )}
+            Import Excel
+          </Button>
+          <Button
+            onClick={addGuest}
+            disabled={adding}
+            className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+          >
+            {adding ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            Adaugă
+          </Button>
         </div>
       </div>
 
@@ -498,9 +703,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             <thead className="border-b border-border/40 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="p-3 text-left">Nume</th>
-                <th className="p-3 text-left">Grup</th>
+                <th className="p-3 text-left">Tip</th>
                 <th className="p-3 text-left">Contact</th>
-                <th className="p-3 text-left">+1</th>
+                <th className="p-3 text-left">Copii</th>
                 <th className="p-3 text-left">RSVP</th>
                 <th className="p-3" />
               </tr>
@@ -515,11 +720,32 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                     className="border-b border-border/20 last:border-0 hover:bg-muted/30"
                   >
                     <td className="p-3 font-medium">{g.fullName}</td>
-                    <td className="p-3 text-muted-foreground">{g.group ? (GROUP_LABELS[g.group] || g.group) : "—"}</td>
                     <td className="p-3 text-muted-foreground">
-                      {g.phone || g.email || "—"}
+                      {(() => {
+                        const t = (g.guestType ?? "single") as GuestType;
+                        if (t === "single") return "Singură";
+                        if (t === "couple") return "Cuplu (2)";
+                        return `Familie (${g.partySize ?? 2})`;
+                      })()}
                     </td>
-                    <td className="p-3">{g.plusOnes > 0 ? `+${g.plusOnes}` : "—"}</td>
+                    <td className="p-3 text-muted-foreground">
+                      {(() => {
+                        const ch = g.contactChannel as ContactChannel | null;
+                        const v =
+                          g.contactValue ?? g.email ?? g.phone ?? null;
+                        if (!v) return "—";
+                        const label = ch ? CHANNEL_LABELS[ch] : "Contact";
+                        return (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="rounded-md bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase">
+                              {label}
+                            </span>
+                            <span>{v}</span>
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="p-3">{(g.kidsCount ?? 0) > 0 ? `+${g.kidsCount} copii` : "—"}</td>
                     <td className="p-3">
                       <Select
                         value={g.rsvp}

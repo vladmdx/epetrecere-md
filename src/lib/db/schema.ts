@@ -1164,10 +1164,33 @@ export const guestList = pgTable("guest_list", {
   fullName: text("full_name").notNull(),
   phone: text("phone"),
   email: text("email"),
-  /** "Side of the family": "bride" | "groom" | "friends" | "work" */
+  /** Legacy "side of the family" field — kept for backwards-compat with
+   *  imported guests. New rows use `guestType` instead. */
   group: text("group"),
-  /** Number of +1s / children this guest brings. */
+  /**
+   * Party shape for the new guest model:
+   *   - "single"  → one adult, partySize = 1
+   *   - "couple"  → two adults, partySize = 2 (locked)
+   *   - "family"  → one household, partySize 2..8 picked by the host
+   * Defaults to "single" so legacy rows behave like a single guest.
+   */
+  guestType: text("guest_type").default("single").notNull(),
+  /** Total adults invited under this entry. 1 / 2 / 2..8 depending on type. */
+  partySize: integer("party_size").default(1).notNull(),
+  /** Number of children expected to attend (separate from adults). */
+  kidsCount: integer("kids_count").default(0).notNull(),
+  /** Legacy field — historically mixed +1s and children. New rows leave
+   *  this at 0 and rely on `kidsCount` instead. Kept so old data renders. */
   plusOnes: integer("plus_ones").default(0).notNull(),
+  /**
+   * Channel the host wants the invitation sent on. Drives both the
+   * input label on the form ("Email" vs "Telefon" vs "@telegram") and
+   * the dispatch logic when invitations are actually sent.
+   */
+  contactChannel: text("contact_channel").default("whatsapp").notNull(),
+  /** The contact value (email, phone, @username) for the chosen channel.
+   *  Mirrored into `email` / `phone` for legacy reads. */
+  contactValue: text("contact_value"),
   dietary: text("dietary"),
   rsvp: rsvpStatusEnum("rsvp").default("pending").notNull(),
   notes: text("notes"),

@@ -10,8 +10,15 @@ import { requirePlanOwnership } from "@/lib/planner/ownership";
 const patchGuestSchema = z.object({
   fullName: z.string().min(1).max(120).optional(),
   phone: z.string().optional().nullable(),
-  email: z.email().optional().nullable(),
+  email: z.string().optional().nullable(),
   group: z.string().optional().nullable(),
+  guestType: z.enum(["single", "couple", "family"]).optional(),
+  partySize: z.number().int().min(1).max(8).optional(),
+  kidsCount: z.number().int().min(0).max(20).optional(),
+  contactChannel: z
+    .enum(["email", "sms", "whatsapp", "viber", "telegram"])
+    .optional(),
+  contactValue: z.string().optional().nullable(),
   plusOnes: z.number().int().min(0).max(20).optional(),
   dietary: z.string().optional().nullable(),
   rsvp: z.enum(["pending", "accepted", "declined", "maybe"]).optional(),
