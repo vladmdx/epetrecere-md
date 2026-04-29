@@ -212,6 +212,27 @@ export default function ReservationsPage() {
     }
   }
 
+  // Real-time chat polling: while the message dialog is open, refresh the
+  // thread every 4s so the partner's replies show up without page refresh.
+  useEffect(() => {
+    if (!messageDialog) return;
+    const id = messageDialog.id;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/chat?booking_request_id=${id}`);
+        if (!r.ok) return;
+        const data = await r.json();
+        if (Array.isArray(data)) {
+          setChats(prev => ({ ...prev, [id]: data }));
+        }
+      } catch {
+        // silent
+      }
+    };
+    const handle = window.setInterval(tick, 4000);
+    return () => window.clearInterval(handle);
+  }, [messageDialog]);
+
   async function sendMessageFromDialog() {
     if (!messageDialog) return;
     const msg = messageText.trim();

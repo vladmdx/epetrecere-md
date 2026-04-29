@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { chatMessages, bookingRequests, artists, users } from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import {
+  chatMessages,
+  bookingRequests,
+  artists,
+  users,
+  conversations,
+  venues,
+} from "@/lib/db/schema";
+import { eq, and, sql, isNull, or } from "drizzle-orm";
 
-// Verify the signed-in user is either the client or the artist on this booking
+// Verify the signed-in user is either the client or the artist/venue on this booking
 async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
   const [appUser] = await db
     .select({ id: users.id })
@@ -14,16 +21,18 @@ async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
   if (!appUser) return false;
 
   const [booking] = await db
-    .select({ clientUserId: bookingRequests.clientUserId, artistId: bookingRequests.artistId })
+    .select({
+      clientUserId: bookingRequests.clientUserId,
+      artistId: bookingRequests.artistId,
+      venueId: bookingRequests.venueId,
+    })
     .from(bookingRequests)
     .where(eq(bookingRequests.id, bookingRequestId))
     .limit(1);
   if (!booking) return false;
 
-  // Client side
   if (booking.clientUserId === appUser.id) return true;
 
-  // Artist side
   if (booking.artistId) {
     const [artist] = await db
       .select({ id: artists.id })
@@ -32,10 +41,67 @@ async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
       .limit(1);
     if (artist) return true;
   }
+  if (booking.venueId) {
+    const [venue] = await db
+      .select({ id: venues.id })
+      .from(venues)
+      .where(and(eq(venues.id, booking.venueId), eq(venues.userId, appUser.id)))
+      .limit(1);
+    if (venue) return true;
+  }
   return false;
 }
 
-// GET chat messages for a booking request
+/**
+ * Find or create a conversation between the client and the vendor (artist or
+ * venue) of a booking. Returns the conversation id, or null if either party
+ * isn't resolvable.
+ */
+async function findOrCreateConversationForBooking(bookingRequestId: number) {
+  const [booking] = await db
+    .select({
+      clientUserId: bookingRequests.clientUserId,
+      artistId: bookingRequests.artistId,
+      venueId: bookingRequests.venueId,
+    })
+    .from(bookingRequests)
+    .where(eq(bookingRequests.id, bookingRequestId))
+    .limit(1);
+  if (!booking?.clientUserId) return null;
+  if (!booking.artistId && !booking.venueId) return null;
+
+  // Look up an existing conversation
+  const [existing] = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.clientUserId, booking.clientUserId),
+        booking.artistId
+          ? eq(conversations.artistId, booking.artistId)
+          : eq(conversations.venueId, booking.venueId!),
+        booking.artistId
+          ? isNull(conversations.venueId)
+          : isNull(conversations.artistId),
+      ),
+    )
+    .limit(1);
+  if (existing) return existing.id;
+
+  const [created] = await db
+    .insert(conversations)
+    .values({
+      clientUserId: booking.clientUserId,
+      artistId: booking.artistId ?? null,
+      venueId: booking.venueId ?? null,
+    })
+    .returning({ id: conversations.id });
+  return created?.id ?? null;
+}
+
+// GET chat messages for a booking request — returns messages from BOTH the
+// booking-specific stream AND the linked client↔vendor conversation, so chats
+// kicked off pre-booking are visible inline with the booking history.
 export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -46,17 +112,52 @@ export async function GET(req: NextRequest) {
   const hasAccess = await verifyBookingAccess(clerkId, Number(bookingRequestId));
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // Try to also pull messages from the global conversation linked to this
+  // booking. The conversation may exist even if the booking-stream is empty
+  // (pre-booking chat), so we union the two streams.
+  const conversationId = await findOrCreateConversationForBooking(
+    Number(bookingRequestId),
+  );
+
   const messages = await db
     .select()
     .from(chatMessages)
-    .where(eq(chatMessages.bookingRequestId, Number(bookingRequestId)))
+    .where(
+      conversationId
+        ? or(
+            eq(chatMessages.bookingRequestId, Number(bookingRequestId)),
+            eq(chatMessages.conversationId, conversationId),
+          )
+        : eq(chatMessages.bookingRequestId, Number(bookingRequestId)),
+    )
     .orderBy(chatMessages.createdAt)
-    .limit(100);
+    .limit(200);
 
-  return NextResponse.json(messages);
+  // De-duplicate by id (the same row may match both predicates if both FKs are
+  // set, which is the case for messages sent through the bridge).
+  const seen = new Set<number>();
+  const dedup = messages.filter((m) => {
+    if (seen.has(m.id)) return false;
+    seen.add(m.id);
+    return true;
+  });
+
+  return NextResponse.json(dedup);
 }
 
 // SEND chat message
+//
+// CRITICAL: This endpoint bridges the legacy booking-chat system (rows tied
+// to bookingRequestId) and the persistent conversation system (rows tied to
+// conversationId, surfaced in /cabinet/mesaje and the chat bell).
+//
+// On every send we:
+//   1. Find/create the conversation for (client, vendor)
+//   2. Insert ONE chat_messages row with BOTH foreign keys set
+//   3. Update conversation metadata (lastMessageAt, preview, unread counter)
+//
+// This means a partner sending a message from /dashboard/rezervari shows up
+// instantly in the client's /cabinet/mesaje and chat bell — and vice versa.
 export async function POST(req: Request) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -71,25 +172,29 @@ export async function POST(req: Request) {
   const hasAccess = await verifyBookingAccess(clerkId, Number(bookingRequestId));
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-  // Derive senderType and senderName from the authenticated user (not client input)
   const [appUser] = await db
     .select({ id: users.id, name: users.name, role: users.role })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
 
-  let senderType = "client";
+  // Look up the booking once for routing decisions.
+  const [booking] = await db
+    .select({
+      clientUserId: bookingRequests.clientUserId,
+      artistId: bookingRequests.artistId,
+      venueId: bookingRequests.venueId,
+      clientEmail: bookingRequests.clientEmail,
+    })
+    .from(bookingRequests)
+    .where(eq(bookingRequests.id, Number(bookingRequestId)))
+    .limit(1);
+
+  let senderType: "client" | "artist" | "venue" = "client";
   let senderName = appUser?.name || "Client";
 
-  if (appUser) {
-    // Check if user is the artist on this booking
-    const [booking] = await db
-      .select({ artistId: bookingRequests.artistId })
-      .from(bookingRequests)
-      .where(eq(bookingRequests.id, Number(bookingRequestId)))
-      .limit(1);
-
-    if (booking && booking.artistId) {
+  if (appUser && booking) {
+    if (booking.artistId) {
       const [artist] = await db
         .select({ id: artists.id, nameRo: artists.nameRo })
         .from(artists)
@@ -100,36 +205,66 @@ export async function POST(req: Request) {
         senderName = artist.nameRo || appUser.name || "Artist";
       }
     }
+    if (senderType === "client" && booking.venueId) {
+      const [venue] = await db
+        .select({ id: venues.id, nameRo: venues.nameRo })
+        .from(venues)
+        .where(and(eq(venues.id, booking.venueId), eq(venues.userId, appUser.id)))
+        .limit(1);
+      if (venue) {
+        senderType = "venue";
+        senderName = venue.nameRo || appUser.name || "Sală";
+      }
+    }
   }
 
-  const [msg] = await db.insert(chatMessages).values({
-    bookingRequestId,
-    senderType,
-    senderName,
-    message,
-  }).returning();
+  // Bridge: ensure a conversation exists and tag the message with both FKs
+  const conversationId = await findOrCreateConversationForBooking(
+    Number(bookingRequestId),
+  );
+
+  const [msg] = await db
+    .insert(chatMessages)
+    .values({
+      bookingRequestId,
+      conversationId: conversationId ?? null,
+      senderType,
+      senderName,
+      message,
+    })
+    .returning();
+
+  // Update conversation metadata so the chat bell + /cabinet/mesaje reflect
+  // the new message immediately.
+  if (conversationId) {
+    const preview = message.length > 120 ? message.slice(0, 117) + "..." : message;
+    const isVendorSender = senderType === "artist" || senderType === "venue";
+    await db
+      .update(conversations)
+      .set({
+        lastMessageAt: new Date(),
+        lastMessagePreview: preview,
+        ...(isVendorSender
+          ? { clientUnread: sql`${conversations.clientUnread} + 1` }
+          : { artistUnread: sql`${conversations.artistUnread} + 1` }),
+      })
+      .where(eq(conversations.id, conversationId));
+  }
 
   // Dispatch notification to the OTHER party (fire-and-forget)
   void (async () => {
     try {
-      const [booking] = await db
-        .select({
-          clientUserId: bookingRequests.clientUserId,
-          clientEmail: bookingRequests.clientEmail,
-          artistId: bookingRequests.artistId,
-          venueId: bookingRequests.venueId,
-        })
-        .from(bookingRequests)
-        .where(eq(bookingRequests.id, Number(bookingRequestId)))
-        .limit(1);
       if (!booking) return;
 
       const { dispatchNotification } = await import("@/lib/notifications/dispatch");
       const { notificationEmail } = await import("@/lib/email/templates/notification-email");
       const truncated = message.length > 100 ? message.slice(0, 100) + "..." : message;
 
-      if (senderType === "artist") {
-        // Artist sent — notify client
+      const isVendorSender = senderType === "artist" || senderType === "venue";
+
+      if (isVendorSender) {
+        // Vendor sent — notify client. Route to /cabinet/mesaje so the message
+        // is surfaced in the unified inbox, not just the booking detail view.
         if (booking.clientUserId) {
           const [client] = await db
             .select({ email: users.email })
@@ -141,13 +276,17 @@ export async function POST(req: Request) {
             type: "booking_request_status_changed",
             title: `Mesaj nou de la ${senderName}`,
             message: truncated,
-            actionUrl: "/cabinet/rezervari",
+            actionUrl: conversationId
+              ? `/cabinet/mesaje?conversation=${conversationId}`
+              : "/cabinet/rezervari",
             email: client?.email ?? booking.clientEmail ?? undefined,
             emailSubject: `💬 Mesaj nou de la ${senderName}`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
               message: `<em>"${message}"</em>`,
-              ctaUrl: "https://epetrecere.md/cabinet/rezervari",
+              ctaUrl: conversationId
+                ? `https://epetrecere.md/cabinet/mesaje?conversation=${conversationId}`
+                : "https://epetrecere.md/cabinet/rezervari",
               ctaText: "Răspunde →",
               emoji: "💬",
             }),
@@ -157,6 +296,7 @@ export async function POST(req: Request) {
         // Client sent — notify vendor
         let vendorUserId: string | null = null;
         let vendorEmail: string | null = null;
+        let vendorDashboardUrl = "/dashboard/mesaje";
         if (booking.artistId) {
           const [a] = await db
             .select({ userId: artists.userId, email: artists.email })
@@ -166,7 +306,6 @@ export async function POST(req: Request) {
           vendorUserId = a?.userId ?? null;
           vendorEmail = a?.email ?? null;
         } else if (booking.venueId) {
-          const { venues } = await import("@/lib/db/schema");
           const [v] = await db
             .select({ userId: venues.userId, email: venues.email })
             .from(venues)
@@ -174,6 +313,7 @@ export async function POST(req: Request) {
             .limit(1);
           vendorUserId = v?.userId ?? null;
           vendorEmail = v?.email ?? null;
+          vendorDashboardUrl = "/dashboard/sala/mesaje";
         }
         if (vendorUserId) {
           await dispatchNotification({
@@ -181,13 +321,17 @@ export async function POST(req: Request) {
             type: "booking_request_new",
             title: `Mesaj nou de la ${senderName}`,
             message: truncated,
-            actionUrl: "/dashboard/rezervari",
+            actionUrl: conversationId
+              ? `${vendorDashboardUrl}?conversation=${conversationId}`
+              : "/dashboard/rezervari",
             email: vendorEmail ?? undefined,
             emailSubject: `💬 Mesaj nou de la ${senderName}`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
               message: `<em>"${message}"</em>`,
-              ctaUrl: "https://epetrecere.md/dashboard/rezervari",
+              ctaUrl: conversationId
+                ? `https://epetrecere.md${vendorDashboardUrl}?conversation=${conversationId}`
+                : "https://epetrecere.md/dashboard/rezervari",
               ctaText: "Răspunde →",
               emoji: "💬",
             }),

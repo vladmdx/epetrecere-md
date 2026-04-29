@@ -390,6 +390,27 @@ export default function VendorBookingsPage() {
     }
   }
 
+  // Poll the chat thread every 4s while the dialog is open so the artist sees
+  // the client's reply without refreshing the page.
+  useEffect(() => {
+    if (!messageDialog) return;
+    const id = messageDialog.id;
+    const tick = async () => {
+      try {
+        const r = await fetch(`/api/chat?booking_request_id=${id}`);
+        if (!r.ok) return;
+        const data = await r.json();
+        if (Array.isArray(data)) {
+          setChats((prev) => ({ ...prev, [id]: data }));
+        }
+      } catch {
+        // silent
+      }
+    };
+    const handle = window.setInterval(tick, 4000);
+    return () => window.clearInterval(handle);
+  }, [messageDialog]);
+
   async function sendMessageFromDialog() {
     if (!messageDialog) return;
     const msg = messageText.trim();
