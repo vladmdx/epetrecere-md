@@ -32,11 +32,12 @@ import {
   getVenueStats,
   type VenueStats,
 } from "@/lib/db/queries/venue-stats";
+import { DashboardBookingsPreview } from "@/components/vendor/dashboard-bookings-preview";
 
 export const dynamic = "force-dynamic";
 
 type Loaded =
-  | { kind: "artist"; stats: ArtistStats }
+  | { kind: "artist"; stats: ArtistStats; artistId: number }
   | { kind: "venue"; stats: VenueStats; venueName: string }
   | null;
 
@@ -60,7 +61,7 @@ async function loadStats(): Promise<
     .where(eq(artists.userId, appUser.id))
     .limit(1);
   if (artist) {
-    return { kind: "artist", stats: await getArtistStats(artist.id) };
+    return { kind: "artist", stats: await getArtistStats(artist.id), artistId: artist.id };
   }
 
   // Venue fallback
@@ -215,6 +216,10 @@ export default async function VendorDashboard() {
         ))}
       </div>
 
+      {/* Active bookings list with quick actions */}
+      {loaded?.kind === "artist" && (
+        <DashboardBookingsPreview artistId={loaded.artistId} />
+      )}
     </div>
   );
 }

@@ -753,6 +753,82 @@ export async function PUT(
             }),
           });
         }
+      } else if (action === "propose_price") {
+        // Determine who proposed and notify the OTHER party
+        const { userId: clerkId } = await auth();
+        if (clerkId) {
+          const [appUser] = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.clerkId, clerkId))
+            .limit(1);
+          const isClient = appUser && appUser.id === booking.clientUserId;
+
+          // Resolve vendor info
+          let vendorInfo: { userId: string | null; nameRo: string; email: string | null } | null = null;
+          if (booking.artistId) {
+            const [a] = await db
+              .select({ userId: artists.userId, nameRo: artists.nameRo, email: artists.email })
+              .from(artists)
+              .where(eq(artists.id, booking.artistId))
+              .limit(1);
+            vendorInfo = a ?? null;
+          } else if (booking.venueId) {
+            const { venues } = await import("@/lib/db/schema");
+            const [v] = await db
+              .select({ userId: venues.userId, nameRo: venues.nameRo, email: venues.email })
+              .from(venues)
+              .where(eq(venues.id, booking.venueId))
+              .limit(1);
+            vendorInfo = v ?? null;
+          }
+
+          const { notificationEmail } = await import("@/lib/email/templates/notification-email");
+          const priceText = `${agreedPrice}€`;
+
+          if (isClient && vendorInfo?.userId) {
+            // Client proposed — notify vendor
+            await dispatchNotification({
+              userId: vendorInfo.userId,
+              type: "booking_request_new",
+              title: `${booking.clientName} a propus un preț`,
+              message: `${priceText}${reply ? ` — ${reply}` : ""}`,
+              actionUrl: "/dashboard/rezervari",
+              email: vendorInfo.email ?? undefined,
+              emailSubject: `💰 Contraofertă: ${priceText} de la ${booking.clientName}`,
+              emailHtml: notificationEmail({
+                title: "Contraofertă Nouă",
+                message: `<strong>${booking.clientName}</strong> a propus prețul <strong>${priceText}</strong> pentru evenimentul din ${booking.eventDate}.${reply ? `<br><br>"${reply}"` : ""}`,
+                ctaUrl: "https://epetrecere.md/dashboard/rezervari",
+                ctaText: "Vezi oferta →",
+                emoji: "💰",
+              }),
+            });
+          } else if (!isClient && booking.clientUserId) {
+            // Vendor proposed — notify client
+            const [client] = await db
+              .select({ email: users.email })
+              .from(users)
+              .where(eq(users.id, booking.clientUserId))
+              .limit(1);
+            await dispatchNotification({
+              userId: booking.clientUserId,
+              type: "booking_request_status_changed",
+              title: `${vendorInfo?.nameRo ?? "Partenerul"} a propus un preț`,
+              message: `${priceText}${reply ? ` — ${reply}` : ""}`,
+              actionUrl: "/cabinet/rezervari",
+              email: client?.email ?? booking.clientEmail ?? undefined,
+              emailSubject: `💰 Ofertă nouă: ${priceText} de la ${vendorInfo?.nameRo ?? "Partener"}`,
+              emailHtml: notificationEmail({
+                title: "Ofertă Nouă de Preț",
+                message: `<strong>${vendorInfo?.nameRo ?? "Partenerul"}</strong> a propus prețul <strong>${priceText}</strong> pentru evenimentul din ${booking.eventDate}.${reply ? `<br><br>"${reply}"` : ""}`,
+                ctaUrl: "https://epetrecere.md/cabinet/rezervari",
+                ctaText: "Vezi oferta →",
+                emoji: "💰",
+              }),
+            });
+          }
+        }
       } else if (action === "client_confirm") {
         // Resolve the vendor — artist or venue
         let artist: { userId: string | null; nameRo: string; slug: string; email: string | null } | null = null;

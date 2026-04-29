@@ -898,6 +898,12 @@ export default function VendorCalendarPage() {
                     const visibleDots = dots.slice(0, 4);
                     const extraDots = dots.length - visibleDots.length;
 
+                    // Determine visual status for cell background:
+                    // blocked → red, booked → red, tentative → orange, available → green
+                    const isBooked = entry?.status === "booked";
+                    const isTentative = entry?.status === "tentative";
+                    const isAvailable = entry?.status === "available";
+
                     return (
                       <button
                         key={day}
@@ -909,29 +915,45 @@ export default function VendorCalendarPage() {
                           !isPast && isSelected &&
                             "ring-2 ring-gold ring-offset-1 ring-offset-background",
                           !isPast && isToday && "ring-1 ring-gold/50",
+                          // Status-based backgrounds (priority: blocked > booked > tentative > bookings > available > default)
                           isBlocked
-                            ? "bg-destructive/15 border-destructive/50 text-destructive"
-                            : bookingsForDay.length > 0
-                              ? "bg-gold/5 border-gold/30"
-                              : isPast
-                                ? "border-border/10"
-                                : "border-border/20 hover:border-gold/30",
+                            ? "bg-destructive/30 border-destructive/60 text-destructive hover:bg-destructive/40"
+                            : isBooked
+                              ? "bg-destructive/20 border-destructive/40 text-destructive"
+                              : isTentative
+                                ? "bg-warning/20 border-warning/40 text-warning"
+                                : bookingsForDay.length > 0
+                                  ? "bg-gold/10 border-gold/40"
+                                  : isAvailable
+                                    ? "bg-success/15 border-success/40 hover:bg-success/25"
+                                    : isPast
+                                      ? "border-border/10"
+                                      : "border-border/20 hover:border-gold/30",
                         )}
                         title={
                           isPast
                             ? "Zilele trecute nu pot fi modificate"
                             : isBlocked
-                              ? "Zi blocată"
-                              : bookingsForDay.length > 0
-                                ? `${bookingsForDay.length} ${bookingsForDay.length === 1 ? "rezervare" : "rezervări"}`
-                                : undefined
+                              ? "Zi blocată — apasă pentru a debloca"
+                              : isBooked
+                                ? "Zi ocupată"
+                                : isTentative
+                                  ? "Zi tentativă"
+                                  : isAvailable
+                                    ? "Zi disponibilă"
+                                    : bookingsForDay.length > 0
+                                      ? `${bookingsForDay.length} ${bookingsForDay.length === 1 ? "rezervare" : "rezervări"}`
+                                      : undefined
                         }
                       >
                         <span
                           className={cn(
                             isBlocked && "text-destructive font-bold",
-                            !isBlocked && bookingsForDay.length > 0 && "text-gold font-bold",
-                            isToday && !isBlocked && bookingsForDay.length === 0 && "text-gold font-bold",
+                            isBooked && "text-destructive font-bold",
+                            isTentative && "text-warning font-bold",
+                            !isBlocked && !isBooked && !isTentative && bookingsForDay.length > 0 && "text-gold font-bold",
+                            isAvailable && !bookingsForDay.length && "text-success font-semibold",
+                            isToday && !isBlocked && !isBooked && !isTentative && bookingsForDay.length === 0 && !isAvailable && "text-gold font-bold",
                           )}
                         >
                           {day}
