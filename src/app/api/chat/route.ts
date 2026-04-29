@@ -109,5 +109,95 @@ export async function POST(req: Request) {
     message,
   }).returning();
 
+  // Dispatch notification to the OTHER party (fire-and-forget)
+  void (async () => {
+    try {
+      const [booking] = await db
+        .select({
+          clientUserId: bookingRequests.clientUserId,
+          clientEmail: bookingRequests.clientEmail,
+          artistId: bookingRequests.artistId,
+          venueId: bookingRequests.venueId,
+        })
+        .from(bookingRequests)
+        .where(eq(bookingRequests.id, Number(bookingRequestId)))
+        .limit(1);
+      if (!booking) return;
+
+      const { dispatchNotification } = await import("@/lib/notifications/dispatch");
+      const { notificationEmail } = await import("@/lib/email/templates/notification-email");
+      const truncated = message.length > 100 ? message.slice(0, 100) + "..." : message;
+
+      if (senderType === "artist") {
+        // Artist sent — notify client
+        if (booking.clientUserId) {
+          const [client] = await db
+            .select({ email: users.email })
+            .from(users)
+            .where(eq(users.id, booking.clientUserId))
+            .limit(1);
+          await dispatchNotification({
+            userId: booking.clientUserId,
+            type: "booking_request_status_changed",
+            title: `Mesaj nou de la ${senderName}`,
+            message: truncated,
+            actionUrl: "/cabinet/rezervari",
+            email: client?.email ?? booking.clientEmail ?? undefined,
+            emailSubject: `💬 Mesaj nou de la ${senderName}`,
+            emailHtml: notificationEmail({
+              title: `Mesaj nou de la ${senderName}`,
+              message: `<em>"${message}"</em>`,
+              ctaUrl: "https://epetrecere.md/cabinet/rezervari",
+              ctaText: "Răspunde →",
+              emoji: "💬",
+            }),
+          });
+        }
+      } else {
+        // Client sent — notify vendor
+        let vendorUserId: string | null = null;
+        let vendorEmail: string | null = null;
+        if (booking.artistId) {
+          const [a] = await db
+            .select({ userId: artists.userId, email: artists.email })
+            .from(artists)
+            .where(eq(artists.id, booking.artistId))
+            .limit(1);
+          vendorUserId = a?.userId ?? null;
+          vendorEmail = a?.email ?? null;
+        } else if (booking.venueId) {
+          const { venues } = await import("@/lib/db/schema");
+          const [v] = await db
+            .select({ userId: venues.userId, email: venues.email })
+            .from(venues)
+            .where(eq(venues.id, booking.venueId))
+            .limit(1);
+          vendorUserId = v?.userId ?? null;
+          vendorEmail = v?.email ?? null;
+        }
+        if (vendorUserId) {
+          await dispatchNotification({
+            userId: vendorUserId,
+            type: "booking_request_new",
+            title: `Mesaj nou de la ${senderName}`,
+            message: truncated,
+            actionUrl: "/dashboard/rezervari",
+            email: vendorEmail ?? undefined,
+            emailSubject: `💬 Mesaj nou de la ${senderName}`,
+            emailHtml: notificationEmail({
+              title: `Mesaj nou de la ${senderName}`,
+              message: `<em>"${message}"</em>`,
+              ctaUrl: "https://epetrecere.md/dashboard/rezervari",
+              ctaText: "Răspunde →",
+              emoji: "💬",
+            }),
+          });
+        }
+      }
+    } catch (err) {
+      console.error("[chat] notification dispatch failed", err);
+    }
+  })();
+
   return NextResponse.json(msg, { status: 201 });
 }
