@@ -702,103 +702,125 @@ export default function VendorBookingsPage() {
                     </div>
                   </div>
 
-                  {booking.status === "pending" && (
-                    <div className="mt-4 space-y-2 border-t border-border/40 pt-3">
-                      {/* Price history, if any prior counter-offers */}
-                      {booking.priceOffers && booking.priceOffers.length > 0 && (
-                        <div className="rounded-md border border-border/30 bg-background/40 p-2">
-                          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                            Istoric oferte
-                          </p>
-                          <div className="space-y-1">
-                            {booking.priceOffers.map((o, i) => (
-                              <div
-                                key={i}
-                                className="flex items-center gap-2 text-xs"
-                              >
-                                <HandCoins
-                                  className={cn(
-                                    "h-3 w-3",
-                                    o.from === "artist"
-                                      ? "text-gold"
-                                      : "text-muted-foreground",
-                                  )}
-                                />
-                                <span className="text-muted-foreground">
-                                  {o.from === "artist" ? "Tu" : "Client"}:
-                                </span>
-                                <span className="font-bold text-gold">
-                                  {o.amount}€
-                                </span>
-                                {o.message && (
-                                  <span className="text-muted-foreground italic">
-                                    “{o.message}”
+                  {booking.status === "pending" && (() => {
+                    const offers = booking.priceOffers ?? [];
+                    const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
+                    // Partner already counter-offered — wait for client response.
+                    // Hide Accept/Propose/Reject; keep only "Trimite mesaj".
+                    const waitingForClient = lastOffer?.from === "artist";
+                    return (
+                      <div className="mt-4 space-y-2 border-t border-border/40 pt-3">
+                        {/* Price history */}
+                        {offers.length > 0 && (
+                          <div className="rounded-md border border-border/30 bg-background/40 p-2">
+                            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                              Istoric oferte
+                            </p>
+                            <div className="space-y-1">
+                              {offers.map((o, i) => (
+                                <div
+                                  key={i}
+                                  className="flex items-center gap-2 text-xs"
+                                >
+                                  <HandCoins
+                                    className={cn(
+                                      "h-3 w-3",
+                                      o.from === "artist"
+                                        ? "text-gold"
+                                        : "text-muted-foreground",
+                                    )}
+                                  />
+                                  <span className="text-muted-foreground">
+                                    {o.from === "artist" ? "Tu" : "Client"}:
                                   </span>
-                                )}
-                              </div>
-                            ))}
+                                  <span className="font-bold text-gold">
+                                    {o.amount}€
+                                  </span>
+                                  {o.message && (
+                                    <span className="text-muted-foreground italic">
+                                      &ldquo;{o.message}&rdquo;
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Three actions in a single row */}
-                      <div className="flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          disabled={busy === booking.id}
-                          onClick={() => {
-                            setAcceptDialog(booking);
-                            setAcceptReply("");
-                          }}
-                          className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
-                        >
-                          <CheckCircle className="h-3.5 w-3.5" />
-                          Acceptă
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy === booking.id}
-                          onClick={() => {
-                            setProposeDialog(booking);
-                            setProposeAmount(
-                              booking.agreedPrice
-                                ? String(booking.agreedPrice)
-                                : "",
-                            );
-                            setProposeMessage("");
-                          }}
-                          className="gap-1.5"
-                        >
-                          <ArrowLeftRight className="h-3.5 w-3.5" />
-                          Propune preț
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy === booking.id}
-                          onClick={() => openMessageDialog(booking)}
-                          className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10"
-                        >
-                          <MessageSquare className="h-3.5 w-3.5" />
-                          Trimite mesaj
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy === booking.id}
-                          onClick={() => {
-                            setRejectDialog(booking);
-                            setRejectReply("");
-                          }}
-                          className="gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10"
-                        >
-                          <XCircle className="h-3.5 w-3.5" />
-                          Refuză
-                        </Button>
+                        {waitingForClient ? (
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs text-amber-500 italic">
+                              ⏳ Ai trimis oferta de {lastOffer?.amount}€ — așteptăm răspunsul clientului. Poți doar să trimiți un mesaj sau să retragi oferta cu un nou preț.
+                            </p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === booking.id}
+                              onClick={() => openMessageDialog(booking)}
+                              className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              Trimite mesaj
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              disabled={busy === booking.id}
+                              onClick={() => {
+                                setAcceptDialog(booking);
+                                setAcceptReply("");
+                              }}
+                              className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
+                            >
+                              <CheckCircle className="h-3.5 w-3.5" />
+                              {lastOffer?.from === "client" ? `Acceptă ${lastOffer.amount}€` : "Acceptă"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === booking.id}
+                              onClick={() => {
+                                setProposeDialog(booking);
+                                setProposeAmount(
+                                  String(lastOffer?.amount ?? booking.agreedPrice ?? ""),
+                                );
+                                setProposeMessage("");
+                              }}
+                              className="gap-1.5"
+                            >
+                              <ArrowLeftRight className="h-3.5 w-3.5" />
+                              Propune preț
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === booking.id}
+                              onClick={() => openMessageDialog(booking)}
+                              className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10"
+                            >
+                              <MessageSquare className="h-3.5 w-3.5" />
+                              Trimite mesaj
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={busy === booking.id}
+                              onClick={() => {
+                                setRejectDialog(booking);
+                                setRejectReply("");
+                              }}
+                              className="gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10"
+                            >
+                              <XCircle className="h-3.5 w-3.5" />
+                              Refuză
+                            </Button>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
 
                   {(booking.status === "accepted" || booking.status === "confirmed_by_client") && (
                     <div className="mt-4 space-y-3 border-t border-border/40 pt-3">
