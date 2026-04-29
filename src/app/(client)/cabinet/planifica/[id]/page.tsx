@@ -1588,6 +1588,11 @@ function BookingsTab({
       b.status !== "cancelled" &&
       b.status !== "expired",
   );
+  // Split into "Cu succes" (the artist accepted, or the client is done
+  // with their part) vs "În așteptare" (still waiting on the artist).
+  // The pending bucket gets a 24h countdown per row.
+  const pendingBookings = planBookings.filter((b) => b.status === "pending");
+  const confirmedBookings = planBookings.filter((b) => b.status !== "pending");
 
   return (
     <div className="space-y-10">
@@ -1597,12 +1602,13 @@ function BookingsTab({
         onBookingsCreated={onRefresh}
       />
 
-      {/* ─── Section 1: Existing bookings ───────────────────────── */}
+      {/* ─── Section 1: Existing bookings, split confirmed vs pending ── */}
       <section>
         <div className="mb-4">
           <h2 className="font-heading text-xl font-bold">Rezervările mele</h2>
           <p className="text-sm text-muted-foreground">
-            {planBookings.length} {planBookings.length === 1 ? "cerere" : "cereri"} trimise
+            {confirmedBookings.length} cu succes · {pendingBookings.length}{" "}
+            în așteptare
           </p>
         </div>
 
@@ -1615,87 +1621,46 @@ function BookingsTab({
             </p>
           </div>
         ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {planBookings.map((b) => {
-              const cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG.pending;
-              return (
-                <Card key={b.id} className="transition-all hover:border-gold/30">
-                  <CardContent className="py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-10 w-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
-                          <BookOpen className="h-5 w-5 text-gold" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {b.artistName || "Artist"}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {b.eventDate && new Date(b.eventDate).toLocaleDateString("ro-MD")}
-                            {b.startTime && b.endTime && (
-                              <span className="text-gold">
-                                {" · "}
-                                <Clock className="inline h-3 w-3" /> {b.startTime}–{b.endTime}
-                              </span>
-                            )}
-                            {b.eventType && ` · ${EVENT_TYPE_LABELS[b.eventType] || b.eventType}`}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge variant="outline" className={cn("text-xs shrink-0", cfg.color)}>
-                        {cfg.label}
-                      </Badge>
-                    </div>
-                    {/* Price pill if negotiated */}
-                    {b.agreedPrice != null && (
-                      <div className="mt-3 flex items-center justify-between rounded-lg bg-gold/5 border border-gold/20 px-3 py-2">
-                        <span className="text-xs text-muted-foreground">Preț agreat</span>
-                        <span className="text-sm font-semibold text-gold">
-                          {b.agreedPrice}€
-                        </span>
-                      </div>
-                    )}
+          <div className="space-y-6">
+            {confirmedBookings.length > 0 && (
+              <div>
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-success">
+                  <Check className="h-3.5 w-3.5" /> Rezervări cu succes
+                  <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success">
+                    {confirmedBookings.length}
+                  </span>
+                </h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {confirmedBookings.map((b) => (
+                    <BookingListCard
+                      key={b.id}
+                      booking={b}
+                      onRefresh={onRefresh}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
-                    {/* Negotiation panel — only surfaced when the artist
-                        sent a counter-offer the client hasn't replied to
-                        yet. Once a price is agreed, or while waiting for
-                        the artist's first response, the bookings list
-                        stays clean — price negotiation otherwise happens
-                        in the initial booking-request modal. */}
-                    {(() => {
-                      const offers = b.priceOffers ?? [];
-                      const last = offers.length > 0 ? offers[offers.length - 1] : null;
-                      const artistHasOpenOffer =
-                        last !== null &&
-                        last.from === "artist" &&
-                        b.status === "pending" &&
-                        b.agreedPrice == null;
-                      if (!artistHasOpenOffer) return null;
-                      return (
-                        <div className="mt-3 border-t border-border/20 pt-3">
-                          <PriceNegotiationPanel
-                            booking={{
-                              id: b.id,
-                              status: b.status as
-                                | "pending"
-                                | "accepted"
-                                | "confirmed_by_client"
-                                | "rejected"
-                                | "cancelled"
-                                | "completed",
-                              agreedPrice: b.agreedPrice ?? null,
-                              priceOffers: b.priceOffers ?? null,
-                            }}
-                            perspective="client"
-                            onUpdate={onRefresh}
-                          />
-                        </div>
-                      );
-                    })()}
-                  </CardContent>
-                </Card>
-              );
-            })}
+            {pendingBookings.length > 0 && (
+              <div>
+                <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-warning">
+                  <Clock className="h-3.5 w-3.5" /> Rezervări în așteptare
+                  <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] text-warning">
+                    {pendingBookings.length}
+                  </span>
+                </h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {pendingBookings.map((b) => (
+                    <BookingListCard
+                      key={b.id}
+                      booking={b}
+                      onRefresh={onRefresh}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -1918,9 +1883,18 @@ function DiscoverySection({
           const limitReached = !!blocker;
           const used = limitReached ? 1 : 0;
           const visible = visibleByCategory[section.categoryId] ?? INITIAL_VISIBLE;
-          const shown = section.artists.slice(0, visible);
-          const hasMore = section.artists.length > visible;
-          const isEmpty = section.artists.length === 0;
+          // Put the artist holding the slot first so the user sees who
+          // they're waiting on (or who they confirmed) without scrolling
+          // through 30+ cards looking for them.
+          const orderedArtists = blocker
+            ? [
+                ...section.artists.filter((a) => a.id === blocker.artistId),
+                ...section.artists.filter((a) => a.id !== blocker.artistId),
+              ]
+            : section.artists;
+          const shown = orderedArtists.slice(0, visible);
+          const hasMore = orderedArtists.length > visible;
+          const isEmpty = orderedArtists.length === 0;
 
           return (
             <div key={section.categoryId}>
@@ -1991,6 +1965,112 @@ function DiscoverySection({
         })
       )}
     </section>
+  );
+}
+
+/**
+ * Single row in the BookingsTab "Rezervările mele" list. Encapsulates
+ * the layout that used to live inline so the same shape can render
+ * inside both the "Rezervări cu succes" and "Rezervări în așteptare"
+ * buckets without duplicating ~80 lines of JSX. Pending rows get a
+ * countdown to the auto-expiry deadline.
+ */
+function BookingListCard({
+  booking: b,
+  onRefresh,
+}: {
+  booking: BookingRequest;
+  onRefresh: () => Promise<void> | void;
+}) {
+  const cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG.pending;
+  const isPending = b.status === "pending";
+  return (
+    <Card className="transition-all hover:border-gold/30">
+      <CardContent className="py-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+              <BookOpen className="h-5 w-5 text-gold" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium truncate">
+                {b.artistName || "Artist"}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {b.eventDate &&
+                  new Date(b.eventDate).toLocaleDateString("ro-MD")}
+                {b.startTime && b.endTime && (
+                  <span className="text-gold">
+                    {" · "}
+                    <Clock className="inline h-3 w-3" /> {b.startTime}–
+                    {b.endTime}
+                  </span>
+                )}
+                {b.eventType &&
+                  ` · ${EVENT_TYPE_LABELS[b.eventType] || b.eventType}`}
+              </p>
+            </div>
+          </div>
+          <Badge
+            variant="outline"
+            className={cn("text-xs shrink-0", cfg.color)}
+          >
+            {cfg.label}
+          </Badge>
+        </div>
+
+        {/* Pending → live countdown to the 24h auto-expire deadline. */}
+        {isPending && (
+          <div className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs text-warning">
+            <PendingCountdown createdAt={b.createdAt ?? null} />
+          </div>
+        )}
+
+        {/* Price pill if negotiated */}
+        {b.agreedPrice != null && (
+          <div className="mt-3 flex items-center justify-between rounded-lg bg-gold/5 border border-gold/20 px-3 py-2">
+            <span className="text-xs text-muted-foreground">Preț agreat</span>
+            <span className="text-sm font-semibold text-gold">
+              {b.agreedPrice}€
+            </span>
+          </div>
+        )}
+
+        {/* Negotiation panel — only surfaced when the artist
+            sent a counter-offer the client hasn't replied to
+            yet. */}
+        {(() => {
+          const offers = b.priceOffers ?? [];
+          const last = offers.length > 0 ? offers[offers.length - 1] : null;
+          const artistHasOpenOffer =
+            last !== null &&
+            last.from === "artist" &&
+            b.status === "pending" &&
+            b.agreedPrice == null;
+          if (!artistHasOpenOffer) return null;
+          return (
+            <div className="mt-3 border-t border-border/20 pt-3">
+              <PriceNegotiationPanel
+                booking={{
+                  id: b.id,
+                  status: b.status as
+                    | "pending"
+                    | "accepted"
+                    | "confirmed_by_client"
+                    | "rejected"
+                    | "cancelled"
+                    | "completed",
+                  agreedPrice: b.agreedPrice ?? null,
+                  priceOffers: b.priceOffers ?? null,
+                }}
+                perspective="client"
+                onUpdate={onRefresh}
+              />
+            </div>
+          );
+        })()}
+      </CardContent>
+    </Card>
   );
 }
 
