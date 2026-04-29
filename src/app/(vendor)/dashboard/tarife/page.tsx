@@ -8,7 +8,6 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { DurationPricingManager } from "@/components/vendor/duration-pricing-manager";
-import { AiPricingSuggestions } from "@/components/vendor/ai-pricing-suggestions";
 
 export default function TarifePage() {
   const [artistId, setArtistId] = useState<number | null>(null);
@@ -59,10 +58,7 @@ export default function TarifePage() {
           <p className="text-sm text-muted-foreground">{error}</p>
         </div>
       ) : artistId != null ? (
-        <div className="space-y-6">
-          <AiPricingSuggestions />
-          <DurationPricingManager artistId={artistId} />
-        </div>
+        <DurationPricingManager artistId={artistId} />
       ) : null}
     </div>
   );
