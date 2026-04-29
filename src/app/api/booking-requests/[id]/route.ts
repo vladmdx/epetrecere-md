@@ -167,10 +167,22 @@ export async function PUT(
     }
     // When the artist accepts, they may also declare the final agreed price.
     // That price flows straight into the event plan's budget.
-    const priceUpdate =
+    // If they don't specify, but there have been counter-offers, use the
+    // LATEST counter-offer's amount (whichever side proposed it) as the
+    // sealed price — accepting a negotiated booking should honor the
+    // last number on the table, not the original request.
+    let finalAgreedPrice: number | undefined =
       typeof agreedPrice === "number" && agreedPrice >= 0
-        ? { agreedPrice }
-        : {};
+        ? agreedPrice
+        : undefined;
+    if (finalAgreedPrice === undefined && Array.isArray(booking.priceOffers) && booking.priceOffers.length > 0) {
+      const lastOffer = booking.priceOffers[booking.priceOffers.length - 1] as { amount?: number };
+      if (typeof lastOffer?.amount === "number") {
+        finalAgreedPrice = lastOffer.amount;
+      }
+    }
+    const priceUpdate =
+      finalAgreedPrice !== undefined ? { agreedPrice: finalAgreedPrice } : {};
     // The partner's accept finalizes the booking — no separate client
     // confirmation step. Both parties get contact details below.
     await db.update(bookingRequests).set({
