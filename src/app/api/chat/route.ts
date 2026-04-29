@@ -142,6 +142,40 @@ export async function GET(req: NextRequest) {
     return true;
   });
 
+  // Mark this side's unread as 0 on the linked conversation. The booking-chat
+  // dialog reading this endpoint counts as "the user has seen the messages",
+  // so the chat bell badge should clear too.
+  if (conversationId) {
+    const [appUser] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+    const [conv] = await db
+      .select({
+        clientUserId: conversations.clientUserId,
+        clientUnread: conversations.clientUnread,
+        artistUnread: conversations.artistUnread,
+      })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
+    if (appUser && conv) {
+      const isClient = conv.clientUserId === appUser.id;
+      if (isClient && conv.clientUnread > 0) {
+        await db
+          .update(conversations)
+          .set({ clientUnread: 0 })
+          .where(eq(conversations.id, conversationId));
+      } else if (!isClient && conv.artistUnread > 0) {
+        await db
+          .update(conversations)
+          .set({ artistUnread: 0 })
+          .where(eq(conversations.id, conversationId));
+      }
+    }
+  }
+
   return NextResponse.json(dedup);
 }
 

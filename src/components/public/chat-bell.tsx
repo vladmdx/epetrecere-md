@@ -16,7 +16,10 @@ interface ConversationPreview {
   unread: number;
 }
 
-const POLL_INTERVAL_MS = 60_000;
+// Poll cadence: 15s while logged in. The badge needs to feel near-realtime
+// when a partner replies, but a 60s gap was bad UX (still showed unread after
+// the user clearly opened the conversation).
+const POLL_INTERVAL_MS = 15_000;
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -79,6 +82,22 @@ export function ChatBell() {
     load();
     const timer = setInterval(load, POLL_INTERVAL_MS);
     return () => clearInterval(timer);
+  }, [isLoaded, isSignedIn, load]);
+
+  // Force-refresh on demand. Pages dispatch `chat:read` after the user opens a
+  // conversation (server already cleared the unread counter on GET) so the
+  // badge clears instantly without waiting for the next poll.
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    const handler = () => load();
+    window.addEventListener("chat:read", handler);
+    // Also refresh when the tab regains focus — covers the case where the
+    // user opens the conversation in a separate tab.
+    window.addEventListener("focus", handler);
+    return () => {
+      window.removeEventListener("chat:read", handler);
+      window.removeEventListener("focus", handler);
+    };
   }, [isLoaded, isSignedIn, load]);
 
   // Close on outside click

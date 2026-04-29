@@ -62,6 +62,9 @@ export default function MessagesPage() {
     const data = await res.json();
     setMessages(Array.isArray(data) ? data : []);
     setConversations(prev => prev.map(c => c.id === id ? { ...c, clientUnread: 0 } : c));
+    // Notify the chat bell to refresh its badge — server already cleared the
+    // unread counter on the GET above, this just forces an immediate poll.
+    window.dispatchEvent(new CustomEvent("chat:read", { detail: { conversationId: id } }));
   }
 
   useEffect(() => {

@@ -143,6 +143,8 @@ export default function VenueMessagesPage() {
     setConversations((prev) =>
       prev.map((c) => (c.id === id ? { ...c, artistUnread: 0 } : c)),
     );
+    // Force the chat bell to refresh its badge immediately (skip the 60s poll).
+    window.dispatchEvent(new CustomEvent("chat:read", { detail: { conversationId: id } }));
   }
 
   async function uploadAttachment(file: File) {
