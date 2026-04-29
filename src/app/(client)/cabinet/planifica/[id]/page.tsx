@@ -2026,27 +2026,67 @@ function BookingListCard({
           </div>
         )}
 
-        {/* Price pill if negotiated */}
-        {b.agreedPrice != null && (
-          <div className="mt-3 flex items-center justify-between rounded-lg bg-gold/5 border border-gold/20 px-3 py-2">
-            <span className="text-xs text-muted-foreground">Preț agreat</span>
-            <span className="text-sm font-semibold text-gold">
-              {b.agreedPrice}€
-            </span>
+        {/* Price pill — show original or last offer */}
+        {(() => {
+          const offers = b.priceOffers ?? [];
+          const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
+          const displayPrice = lastOffer?.amount ?? b.agreedPrice;
+          if (displayPrice == null) return null;
+          return (
+            <div className="mt-3 flex items-center justify-between rounded-lg bg-gold/5 border border-gold/20 px-3 py-2">
+              <span className="text-xs text-muted-foreground">
+                {lastOffer
+                  ? lastOffer.from === "artist"
+                    ? "Ofertă partener"
+                    : "Ofertă ta"
+                  : "Preț agreat"}
+              </span>
+              <span className="text-sm font-semibold text-gold">
+                {displayPrice}€
+              </span>
+            </div>
+          );
+        })()}
+
+        {/* Price negotiation history — show all offers when there's been negotiation */}
+        {(b.priceOffers ?? []).length > 0 && (
+          <div className="mt-3 rounded-lg border border-gold/20 bg-gold/5 p-3 space-y-1.5">
+            <p className="text-[11px] font-semibold text-gold uppercase tracking-wide">
+              Istoric negociere
+            </p>
+            {(b.priceOffers ?? []).map((offer, idx) => (
+              <div
+                key={idx}
+                className={cn(
+                  "rounded-md px-2 py-1.5 text-xs flex items-start justify-between gap-2",
+                  offer.from === "client"
+                    ? "ml-4 bg-blue-500/10 border border-blue-500/20"
+                    : "mr-4 bg-gold/10 border border-gold/20",
+                )}
+              >
+                <div className="min-w-0 flex-1">
+                  <span className={cn("font-semibold", offer.from === "client" ? "text-blue-400" : "text-gold")}>
+                    {offer.from === "client" ? "Tu" : "Partenerul"}:
+                  </span>{" "}
+                  <span className="font-bold">{offer.amount}€</span>
+                  {offer.message && (
+                    <p className="mt-0.5 text-muted-foreground italic">&ldquo;{offer.message}&rdquo;</p>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
-        {/* Negotiation panel — only surfaced when the artist
-            sent a counter-offer the client hasn't replied to
-            yet. */}
+        {/* Negotiation panel — surfaced when the artist
+            sent a counter-offer the client hasn't replied to yet. */}
         {(() => {
           const offers = b.priceOffers ?? [];
           const last = offers.length > 0 ? offers[offers.length - 1] : null;
           const artistHasOpenOffer =
             last !== null &&
             last.from === "artist" &&
-            b.status === "pending" &&
-            b.agreedPrice == null;
+            b.status === "pending";
           if (!artistHasOpenOffer) return null;
           return (
             <div className="mt-3 border-t border-border/20 pt-3">

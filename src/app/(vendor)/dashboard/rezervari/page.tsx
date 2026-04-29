@@ -608,13 +608,44 @@ export default function VendorBookingsPage() {
                           </span>
                         )}
                         <span className="font-heading font-bold">{booking.eventType || "Eveniment"}</span>
-                        <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>
-                        {booking.agreedPrice != null && booking.agreedPrice > 0 && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-xs font-bold text-gold">
-                            <Euro className="h-3 w-3" />
-                            {booking.agreedPrice}€
-                          </span>
-                        )}
+                        {(() => {
+                          const offers = booking.priceOffers ?? [];
+                          const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
+                          const waitingForClient = booking.status === "pending" && lastOffer?.from === "artist";
+                          const clientCounter = booking.status === "pending" && lastOffer?.from === "client";
+                          if (waitingForClient) {
+                            return (
+                              <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/40 bg-amber-500/10">
+                                ⏳ Așteptăm răspunsul clientului
+                              </Badge>
+                            );
+                          }
+                          if (clientCounter) {
+                            return (
+                              <Badge variant="outline" className="text-xs text-blue-400 border-blue-500/40 bg-blue-500/10">
+                                💰 Contraofertă client
+                              </Badge>
+                            );
+                          }
+                          return <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>;
+                        })()}
+                        {(() => {
+                          const offers = booking.priceOffers ?? [];
+                          const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
+                          const displayPrice = lastOffer?.amount ?? booking.agreedPrice;
+                          if (displayPrice == null || displayPrice <= 0) return null;
+                          return (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-gold/15 px-2 py-0.5 text-xs font-bold text-gold">
+                              <Euro className="h-3 w-3" />
+                              {displayPrice}€
+                              {lastOffer && (
+                                <span className="opacity-70 font-normal">
+                                  ({lastOffer.from === "artist" ? "tu" : "client"})
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {formatDate(booking.eventDate)}</span>

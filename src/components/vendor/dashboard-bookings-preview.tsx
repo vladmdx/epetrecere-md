@@ -193,24 +193,45 @@ export function DashboardBookingsPreview({ artistId }: Props) {
     const isPending = b.status === "pending";
     const lastOffer = b.priceOffers && b.priceOffers.length > 0 ? b.priceOffers[b.priceOffers.length - 1] : null;
     const lastOfferIsFromClient = lastOffer?.from === "client";
+    const lastOfferIsFromArtist = lastOffer?.from === "artist";
+    // Partner is "waiting" when they made the last offer and client hasn't replied
+    const waitingForClient = isPending && lastOfferIsFromArtist;
+    // Partner needs to act when client made the last offer (or no offers yet)
+    const needsAction = isPending && !waitingForClient;
+    // Display price: use latest offer if any, else original
+    const displayPrice = lastOffer?.amount ?? b.agreedPrice;
 
     return (
       <div
         key={b.id}
-        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/50 p-3 hover:border-gold/30 transition-colors"
+        className={cn(
+          "flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background/50 p-3 transition-colors",
+          waitingForClient ? "border-amber-500/30 bg-amber-500/5" : "border-border/40 hover:border-gold/30",
+        )}
       >
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-sm">{b.clientName}</span>
-            <Badge variant="outline" className={cn("text-[10px]", cfg?.color)}>{cfg?.label}</Badge>
-            {b.agreedPrice !== null && b.agreedPrice > 0 && (
+            {waitingForClient ? (
+              <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/40 bg-amber-500/10">
+                ⏳ Așteptăm răspunsul clientului
+              </Badge>
+            ) : (
+              <Badge variant="outline" className={cn("text-[10px]", cfg?.color)}>{cfg?.label}</Badge>
+            )}
+            {displayPrice !== null && displayPrice !== undefined && displayPrice > 0 && (
               <Badge variant="outline" className="text-[10px] gap-0.5 text-gold border-gold/30">
-                <Euro className="h-3 w-3" /> {b.agreedPrice}€
+                <Euro className="h-3 w-3" /> {displayPrice}€
+                {lastOffer && (
+                  <span className="ml-0.5 opacity-70">
+                    ({lastOffer.from === "client" ? "client" : "tu"})
+                  </span>
+                )}
               </Badge>
             )}
             {lastOfferIsFromClient && isPending && (
               <Badge variant="outline" className="text-[10px] gap-0.5 text-blue-400 border-blue-500/30 bg-blue-500/5">
-                💰 Contra-ofertă: {lastOffer?.amount}€
+                💰 Contraofertă client
               </Badge>
             )}
           </div>
@@ -240,15 +261,17 @@ export function DashboardBookingsPreview({ artistId }: Props) {
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {isPending ? (
+          {needsAction ? (
             <>
               <Button
                 size="sm"
                 onClick={() => setAcceptDialog(b)}
                 disabled={busy === b.id}
                 className="h-8 gap-1 bg-green-600 hover:bg-green-700 text-white text-xs"
+                title={lastOfferIsFromClient ? `Acceptă la ${lastOffer?.amount}€` : "Acceptă"}
               >
-                <CheckCircle className="h-3.5 w-3.5" /> Acceptă
+                <CheckCircle className="h-3.5 w-3.5" />
+                {lastOfferIsFromClient ? `Acceptă ${lastOffer?.amount}€` : "Acceptă"}
               </Button>
               <Button
                 size="sm"
@@ -274,6 +297,12 @@ export function DashboardBookingsPreview({ artistId }: Props) {
                 <XCircle className="h-3.5 w-3.5" />
               </Button>
             </>
+          ) : waitingForClient ? (
+            <Link href="/dashboard/rezervari">
+              <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
+                <MessageSquare className="h-3.5 w-3.5" /> Detalii
+              </Button>
+            </Link>
           ) : (
             <Link href="/dashboard/rezervari">
               <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
