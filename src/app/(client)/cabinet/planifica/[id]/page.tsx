@@ -1656,28 +1656,42 @@ function BookingsTab({
                       </div>
                     )}
 
-                    {/* Negotiation panel — always rendered for non-terminal
-                        states; component itself decides what buttons show. */}
-                    {["pending", "accepted"].includes(b.status) && (
-                      <div className="mt-3 border-t border-border/20 pt-3">
-                        <PriceNegotiationPanel
-                          booking={{
-                            id: b.id,
-                            status: b.status as
-                              | "pending"
-                              | "accepted"
-                              | "confirmed_by_client"
-                              | "rejected"
-                              | "cancelled"
-                              | "completed",
-                            agreedPrice: b.agreedPrice ?? null,
-                            priceOffers: b.priceOffers ?? null,
-                          }}
-                          perspective="client"
-                          onUpdate={onRefresh}
-                        />
-                      </div>
-                    )}
+                    {/* Negotiation panel — only surfaced when the artist
+                        sent a counter-offer the client hasn't replied to
+                        yet. Once a price is agreed, or while waiting for
+                        the artist's first response, the bookings list
+                        stays clean — price negotiation otherwise happens
+                        in the initial booking-request modal. */}
+                    {(() => {
+                      const offers = b.priceOffers ?? [];
+                      const last = offers.length > 0 ? offers[offers.length - 1] : null;
+                      const artistHasOpenOffer =
+                        last !== null &&
+                        last.from === "artist" &&
+                        b.status === "pending" &&
+                        b.agreedPrice == null;
+                      if (!artistHasOpenOffer) return null;
+                      return (
+                        <div className="mt-3 border-t border-border/20 pt-3">
+                          <PriceNegotiationPanel
+                            booking={{
+                              id: b.id,
+                              status: b.status as
+                                | "pending"
+                                | "accepted"
+                                | "confirmed_by_client"
+                                | "rejected"
+                                | "cancelled"
+                                | "completed",
+                              agreedPrice: b.agreedPrice ?? null,
+                              priceOffers: b.priceOffers ?? null,
+                            }}
+                            perspective="client"
+                            onUpdate={onRefresh}
+                          />
+                        </div>
+                      );
+                    })()}
                   </CardContent>
                 </Card>
               );
