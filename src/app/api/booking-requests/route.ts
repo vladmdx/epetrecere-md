@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, offerRequests, artists, venues } from "@/lib/db/schema";
 import { users } from "@/lib/db/schema";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
@@ -51,6 +51,27 @@ const bookingSchema = z.object({
 export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Opportunistic expiry — every read flips any pending booking that
+  // sat unanswered for more than 24h. The dedicated cron also does
+  // this once a day, but doing it here means a user refreshing their
+  // dashboard never sees a stale "Așteaptă răspunsul…" blocker. The
+  // statement is a no-op when nothing matches.
+  void (async () => {
+    try {
+      await db
+        .update(bookingRequests)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(
+          and(
+            eq(bookingRequests.status, "pending"),
+            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours'`,
+          ),
+        );
+    } catch (err) {
+      console.error("[bookings.GET] expire sweep failed:", err);
+    }
+  })();
 
   const artistId = req.nextUrl.searchParams.get("artist_id");
   const clientEmail = req.nextUrl.searchParams.get("client_email");
