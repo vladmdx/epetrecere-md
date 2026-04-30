@@ -15,6 +15,7 @@ const registerSchema = z.object({
   description: z.string().optional(),
   location: z.string().optional(),
   imageUrl: z.string().optional(),
+  priceFrom: z.number().optional(),
 });
 
 export async function POST(req: Request) {
@@ -134,6 +135,7 @@ export async function POST(req: Request) {
         photoUrl: data.imageUrl || null,
         descriptionRo: data.description || null,
         location: data.location || "Chișinău",
+        priceFrom: data.priceFrom && data.priceFrom > 0 ? data.priceFrom : null,
         categoryIds: [data.categoryId],
         isActive: false,
         isVerified: false,
