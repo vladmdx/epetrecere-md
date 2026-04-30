@@ -16,22 +16,43 @@ export const metadata: Metadata = generateMeta({
   path: "/categorii",
 });
 
-// Hardcoded local images for the categories that have them — DB image_url is
-// optional and most rows are null. The fallback (gold gradient + emoji)
-// renders nicely for everyone else.
+// Local images for every category. DB image_url is optional — most rows are
+// null — so we map slug → filename in /public/images/categories. Fallback
+// (gold gradient + emoji) only kicks in for slugs not listed here.
 const LOCAL_IMAGES: Record<string, string> = {
+  // Music
   moderatori: "/images/categories/moderatori.jpg",
   dj: "/images/categories/dj.jpg",
   cantareti: "/images/categories/cantareti.jpg",
   "cantareti-de-estrada": "/images/categories/cantareti.jpg",
+  "interpreti-muzica-populara": "/images/categories/interpreti-muzica-populara.jpg",
   formatii: "/images/categories/formatii.jpg",
+  "cover-band": "/images/categories/cover-band.jpg",
+  instrumentalisti: "/images/categories/instrumentalisti.jpg",
+  cvartet: "/images/categories/cvartet.jpg",
+  // Dance
+  dansatori: "/images/categories/dansatori.jpg",
+  "dansuri-populare": "/images/categories/dansuri-populare.jpg",
+  "ansamblu-tiganesc": "/images/categories/ansamblu-tiganesc.jpg",
+  "dans-oriental": "/images/categories/dans-oriental.jpg",
+  striptiz: "/images/categories/striptiz.jpg",
+  // Show
+  "show-program": "/images/categories/show-program.jpg",
+  "iluzionisti-magicieni": "/images/categories/iluzionisti-magicieni.jpg",
+  animatori: "/images/categories/animatori.jpg",
+  "show-ul-focului": "/images/categories/show-ul-focului.jpg",
+  clovni: "/images/categories/clovni.jpg",
+  "interesant-la-sarbatoare": "/images/categories/interesant-la-sarbatoare.jpg",
+  "show-circus": "/images/categories/show-circus.jpg",
+  "stand-up": "/images/categories/stand-up.jpg",
+  "mos-craciun": "/images/categories/mos-craciun.jpg",
+  // Services
   fotografi: "/images/categories/fotografi.jpg",
   videografi: "/images/categories/videografi.jpg",
   decor: "/images/categories/decor.jpg",
-  animatori: "/images/categories/animatori.jpg",
   "echipament-tehnic": "/images/categories/echipament.jpg",
-  "show-program": "/images/categories/show-program.jpg",
-  dansatori: "/images/categories/dansatori.jpg",
+  "foto-video": "/images/categories/foto-video.jpg",
+  "foto-zona-selfie": "/images/categories/foto-zona-selfie.jpg",
 };
 
 export default async function AllCategoriesPage() {
