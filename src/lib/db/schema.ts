@@ -240,6 +240,10 @@ export const categories = pgTable("categories", {
   seoDescRo: text("seo_desc_ro"),
   seoDescRu: text("seo_desc_ru"),
   seoDescEn: text("seo_desc_en"),
+  /** Long-form Romanian SEO content rendered at the bottom of the category
+   *  landing page. Markdown-ish plain text; paragraphs separated by blank
+   *  lines. Optimized for Moldova / Chișinău local search intent. */
+  seoBodyRo: text("seo_body_ro"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

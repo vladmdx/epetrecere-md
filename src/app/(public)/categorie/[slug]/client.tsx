@@ -28,6 +28,7 @@ interface Props {
     descriptionEn: string | null;
     slug: string;
     priceFrom: number | null;
+    seoBodyRo: string | null;
   };
   artists: Array<{
     id: number;
@@ -306,6 +307,46 @@ export function CategoryPageClient({
         totalPages={totalPages}
         onPageChange={(p) => updateParams("page", String(p))}
       />
+
+      {/* SEO long-form body — rendered below the listing. Romanian content
+          optimized for Moldova / Chișinău local search. Plain text with
+          paragraphs separated by blank lines. */}
+      {category.seoBodyRo && (
+        <section className="mt-16 border-t border-border/40 pt-10">
+          <div className="prose prose-sm dark:prose-invert max-w-3xl mx-auto">
+            {category.seoBodyRo.split(/\n\s*\n/).map((para, idx) => {
+              const trimmed = para.trim();
+              if (!trimmed) return null;
+              // Lines starting with "## " become subheadings.
+              if (trimmed.startsWith("## ")) {
+                return (
+                  <h2
+                    key={idx}
+                    className="font-heading text-xl font-bold mt-6 mb-2 text-foreground"
+                  >
+                    {trimmed.slice(3)}
+                  </h2>
+                );
+              }
+              if (trimmed.startsWith("### ")) {
+                return (
+                  <h3
+                    key={idx}
+                    className="font-heading text-lg font-semibold mt-4 mb-1.5 text-foreground"
+                  >
+                    {trimmed.slice(4)}
+                  </h3>
+                );
+              }
+              return (
+                <p key={idx} className="mb-3 text-muted-foreground leading-relaxed">
+                  {trimmed}
+                </p>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

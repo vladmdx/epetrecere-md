@@ -62,6 +62,24 @@ export async function PATCH(
     update.seoDescRo =
       v === null || v === "" ? null : typeof v === "string" ? v.trim().slice(0, 200) : null;
   }
+  if (Object.prototype.hasOwnProperty.call(body, "seoBodyRo")) {
+    const v = body.seoBodyRo;
+    update.seoBodyRo =
+      v === null || v === ""
+        ? null
+        : typeof v === "string"
+          ? v.slice(0, 8000)
+          : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "descriptionRo")) {
+    const v = body.descriptionRo;
+    update.descriptionRo =
+      v === null || v === ""
+        ? null
+        : typeof v === "string"
+          ? v.trim().slice(0, 500)
+          : null;
+  }
   if (Object.prototype.hasOwnProperty.call(body, "icon")) {
     const v = body.icon;
     if (v === null || v === "") {

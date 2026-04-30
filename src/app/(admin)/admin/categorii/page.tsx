@@ -43,8 +43,10 @@ interface Category {
   imageUrl: string | null;
   imageAlt: string | null;
   badge: string | null;
+  descriptionRo: string | null;
   seoTitleRo: string | null;
   seoDescRo: string | null;
+  seoBodyRo: string | null;
   sortOrder: number | null;
 }
 
@@ -136,8 +138,10 @@ export default function CategoriesPage() {
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
   const [badge, setBadge] = useState("");
+  const [shortDesc, setShortDesc] = useState("");
   const [seoTitle, setSeoTitle] = useState("");
   const [seoDesc, setSeoDesc] = useState("");
+  const [seoBody, setSeoBody] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -170,8 +174,10 @@ export default function CategoriesPage() {
     setImageUrl(cat.imageUrl || "");
     setImageAlt(cat.imageAlt || "");
     setBadge(cat.badge || "");
+    setShortDesc(cat.descriptionRo || "");
     setSeoTitle(cat.seoTitleRo || "");
     setSeoDesc(cat.seoDescRo || "");
+    setSeoBody(cat.seoBodyRo || "");
   }
 
   function closeEdit() {
@@ -179,8 +185,10 @@ export default function CategoriesPage() {
     setImageUrl("");
     setImageAlt("");
     setBadge("");
+    setShortDesc("");
     setSeoTitle("");
     setSeoDesc("");
+    setSeoBody("");
   }
 
   async function handleFileUpload(file: File) {
@@ -214,8 +222,10 @@ export default function CategoriesPage() {
           imageUrl: imageUrl || null,
           imageAlt: imageAlt.trim() || null,
           badge: badge.trim() || null,
+          descriptionRo: shortDesc.trim() || null,
           seoTitleRo: seoTitle.trim() || null,
           seoDescRo: seoDesc.trim() || null,
+          seoBodyRo: seoBody.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -394,6 +404,25 @@ export default function CategoriesPage() {
               </p>
             </div>
 
+            {/* Short description — shown above the artist grid as hero text. */}
+            <div>
+              <Label htmlFor="shortDesc" className="mb-2 block">
+                Descriere scurtă (1-2 fraze, sub titlu)
+              </Label>
+              <textarea
+                id="shortDesc"
+                placeholder="ex: Cei mai buni DJ-i din Moldova pentru nuntă, cumătrie și corporate."
+                value={shortDesc}
+                onChange={(e) => setShortDesc(e.target.value)}
+                maxLength={500}
+                rows={2}
+                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {shortDesc.length}/500 caractere · Apare imediat sub titlul paginii
+              </p>
+            </div>
+
             {/* SEO — title + description rendered on /categorie/[slug]. */}
             <div className="rounded-lg border border-border/40 bg-muted/20 p-4 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-gold">
@@ -448,6 +477,25 @@ export default function CategoriesPage() {
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* SEO body — long content rendered below the listing. */}
+            <div>
+              <Label htmlFor="seoBody" className="mb-2 block">
+                Text SEO (apare sub lista de artiști)
+              </Label>
+              <textarea
+                id="seoBody"
+                placeholder="Conținut SEO optimizat pentru Moldova / Chișinău. Folosește paragrafe separate prin linie goală. Poți menționa orașe, tipuri de evenimente, prețuri etc."
+                value={seoBody}
+                onChange={(e) => setSeoBody(e.target.value)}
+                maxLength={8000}
+                rows={10}
+                className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {seoBody.length}/8000 caractere · Text optimizat pentru Google. Paragrafele sunt separate prin linie goală.
+              </p>
             </div>
           </div>
           <DialogFooter>
