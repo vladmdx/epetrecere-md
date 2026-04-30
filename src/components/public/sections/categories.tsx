@@ -88,6 +88,19 @@ export function CategoriesSection() {
             </ScrollReveal>
           ))}
         </div>
+
+        {/* See-all CTA — opens the full categories page in the same style. */}
+        <ScrollReveal delay={0.2}>
+          <div className="mt-10 flex justify-center">
+            <Link
+              href="/categorii"
+              className="inline-flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-6 py-3 text-sm font-medium text-gold transition-all hover:bg-gold hover:text-[#0D0D0D]"
+            >
+              Vezi toate categoriile
+              <span aria-hidden>→</span>
+            </Link>
+          </div>
+        </ScrollReveal>
       </div>
     </section>
   );
