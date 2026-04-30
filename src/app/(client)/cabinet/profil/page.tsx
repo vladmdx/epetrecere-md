@@ -20,6 +20,8 @@ import {
   Pencil,
   Check,
   X,
+  Settings as SettingsIcon,
+  Shield as ShieldIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -482,6 +484,42 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
+      {/* Account quick-access — Setări and Confidențialitate used to be
+          standalone sidebar items. Surfacing them here as cards keeps the
+          sidebar focused on event tools while preserving easy access. */}
+      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+        <a href="/cabinet/setari" className="block">
+          <Card className="h-full cursor-pointer transition-all hover:border-gold/40 hover:bg-card/80">
+            <CardContent className="flex items-start gap-3 p-5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-gold">
+                <SettingsIcon className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-heading font-bold text-sm">Setări</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Notificări, preferințe limbă, cadență email
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </a>
+        <a href="/cabinet/date" className="block">
+          <Card className="h-full cursor-pointer transition-all hover:border-gold/40 hover:bg-card/80">
+            <CardContent className="flex items-start gap-3 p-5">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gold/10 text-gold">
+                <ShieldIcon className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-heading font-bold text-sm">Confidențialitate</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Date personale, GDPR, ștergere cont
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </a>
+      </div>
+
       {/* Danger zone */}
       <Card className="border-destructive/20">
         <CardHeader>
@@ -490,7 +528,7 @@ export default function ProfilePage() {
             Sesiune
           </CardTitle>
         </CardHeader>
-        <CardContent className="flex gap-3">
+        <CardContent>
           <Button
             variant="outline"
             onClick={() => signOut({ redirectUrl: "/" })}
@@ -499,11 +537,6 @@ export default function ProfilePage() {
             <LogOut className="mr-2 h-4 w-4" />
             Deconectare
           </Button>
-          <a href="/cabinet/date">
-            <Button variant="ghost" className="text-xs text-muted-foreground">
-              Ștergere cont & Date GDPR
-            </Button>
-          </a>
         </CardContent>
       </Card>
     </div>

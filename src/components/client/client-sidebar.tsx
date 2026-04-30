@@ -19,7 +19,6 @@ import {
   Plus,
   PartyPopper,
   Archive,
-  ChevronRight,
   ChevronDown,
   Settings,
   Menu,
@@ -38,8 +37,8 @@ const topNav = [
   { href: "/cabinet/profil", icon: User, label: "Contul Meu" },
 ] as const;
 
-// Tools section — actual instruments only. Confidențialitate + Setări used
-// to live here too; they're now under "Cont" further down.
+// Tools section — actual instruments only. Confidențialitate + Setări are
+// now accessed from /cabinet/profil (Contul Meu) instead of the sidebar.
 const toolsNav = [
   { href: "/cabinet/checklist", icon: CheckSquare, label: "Checklist" },
   { href: "/cabinet/buget", icon: Wallet, label: "Budget & Cheltuieli" },
@@ -57,12 +56,6 @@ const calculatorsNav = [
   { href: "/calculatoare/nunta", label: "Cost Nuntă" },
   { href: "/calculatoare/alcool", label: "Băuturi" },
   { href: "/calculatoare/meniu", label: "Meniu" },
-] as const;
-
-// Account section — privacy/settings, kept distinct from event tools.
-const accountNav = [
-  { href: "/cabinet/date", icon: Shield, label: "Confidențialitate" },
-  { href: "/cabinet/setari", icon: Settings, label: "Setări" },
 ] as const;
 
 interface PlanSummary {
@@ -132,6 +125,28 @@ function NavBody({
               </Link>
             );
           })}
+
+          {/* Arhivă (rendered before "Eveniment nou" per user request).
+              Only surfaces when the client has at least one completed event. */}
+          {archivedCount > 0 && (
+            <Link
+              href="/cabinet/arhiva"
+              onClick={onNavigate}
+              className={cn(
+                "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+                pathname.startsWith("/cabinet/arhiva")
+                  ? "bg-gold/10 text-gold font-medium"
+                  : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+              )}
+            >
+              <Archive className="h-4 w-4 shrink-0" />
+              <span className="flex-1 truncate">Arhivă evenimente</span>
+              <span className="text-[10px] tabular-nums text-muted-foreground/70">
+                {archivedCount}
+              </span>
+            </Link>
+          )}
+
           <Link
             href="/cabinet/planifica"
             onClick={onNavigate}
@@ -143,7 +158,7 @@ function NavBody({
             )}
           >
             <Plus className="h-4 w-4 shrink-0" />
-            <span className="truncate">Plan nou</span>
+            <span className="truncate">Eveniment nou</span>
           </Link>
         </>
       )}
@@ -162,40 +177,6 @@ function NavBody({
       {/* Calculatoare — collapsible group. Click chevron to expand and pick
           the right calculator. Each entry is a public /calculatoare/* page. */}
       <CalculatorsAccordion pathname={pathname} onNavigate={onNavigate} />
-
-      <SectionHeader label="Cont" />
-
-      {accountNav.map((item) => (
-        <NavLink
-          key={item.href}
-          item={item}
-          pathname={pathname}
-          onClick={onNavigate}
-        />
-      ))}
-
-      {archivedCount > 0 && (
-        <>
-          <div className="pt-4 pb-1 px-2" />
-          <Link
-            href="/cabinet/arhiva"
-            onClick={onNavigate}
-            className={cn(
-              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
-              pathname.startsWith("/cabinet/arhiva")
-                ? "bg-gold/10 text-gold font-medium"
-                : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
-            )}
-          >
-            <Archive className="h-4 w-4 shrink-0" />
-            <span className="flex-1 truncate">Arhivă Evenimente</span>
-            <span className="text-[10px] tabular-nums text-muted-foreground/70">
-              {archivedCount}
-            </span>
-            <ChevronRight className="h-3 w-3 opacity-40" />
-          </Link>
-        </>
-      )}
     </nav>
   );
 }
