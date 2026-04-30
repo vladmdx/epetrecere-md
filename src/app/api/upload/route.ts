@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
     "blog",
     "avatars",
     "invitations",
+    "categories",
   ]);
   const rawFolder = (formData.get("folder") as string) || "uploads";
   const folder = allowedFolders.has(rawFolder) ? rawFolder : "uploads";

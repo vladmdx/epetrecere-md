@@ -10,9 +10,11 @@ interface Props {
   name: string;
   image: string | null;
   priceFrom: number | null;
+  /** Admin-controlled label rendered as a pill in the top-right. */
+  badge?: string | null;
 }
 
-export function CategoryCard({ slug, name, image, priceFrom }: Props) {
+export function CategoryCard({ slug, name, image, priceFrom, badge }: Props) {
   const emoji = getCategoryEmoji(slug);
   return (
     <Link
@@ -36,6 +38,11 @@ export function CategoryCard({ slug, name, image, priceFrom }: Props) {
               {emoji}
             </span>
           </div>
+        )}
+        {badge && (
+          <span className="absolute right-3 top-3 rounded-full bg-gold px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[#0D0D0D] shadow-lg">
+            {badge}
+          </span>
         )}
       </div>
 

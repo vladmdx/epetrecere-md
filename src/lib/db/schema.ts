@@ -222,6 +222,10 @@ export const categories = pgTable("categories", {
   descriptionEn: text("description_en"),
   icon: text("icon"),
   imageUrl: text("image_url"),
+  /** Optional short label rendered as a small pill on category cards.
+   *  Distinct from the slug — admins set it from /admin/categorii ("Nou",
+   *  "Popular", "Hot", etc.). Free-form, displayed verbatim. */
+  badge: text("badge"),
   priceFrom: integer("price_from"),
   sortOrder: integer("sort_order").default(0),
   parentId: integer("parent_id"),
