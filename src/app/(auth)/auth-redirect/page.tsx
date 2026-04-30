@@ -67,6 +67,24 @@ export default function AuthRedirectPage() {
       return;
     }
 
+    /** Public tool landing pages (e.g. /utilitati/budget) stash the desired
+     *  /cabinet path in sessionStorage before bouncing through sign-in.
+     *  Consume it here so the user lands inside the tool, not on /cabinet. */
+    function consumeIntendedNext(): string | null {
+      try {
+        const raw = sessionStorage.getItem("next-url");
+        if (!raw) return null;
+        sessionStorage.removeItem("next-url");
+        // Only allow same-origin /cabinet paths to avoid open-redirect.
+        if (raw.startsWith("/cabinet/") || raw.startsWith("/dashboard/")) {
+          return raw;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    }
+
     async function checkRole() {
       try {
         const email = user?.primaryEmailAddress?.emailAddress;
@@ -118,10 +136,19 @@ export default function AuthRedirectPage() {
           }
           setChecking(false);
         } else if (data.hasVenue) {
-          router.replace("/dashboard");
+          // Vendor — honor explicit /dashboard/* deep-link if set.
+          const intended = consumeIntendedNext();
+          router.replace(intended && intended.startsWith("/dashboard/") ? intended : "/dashboard");
         } else {
-          // Existing client — if they just finished the wizard flow, take
-          // them straight into the new plan. Otherwise send to /cabinet.
+          // Existing client — priority order:
+          //   1. Explicit /cabinet/* deep-link (from a public tool landing)
+          //   2. Wizard data → take them into the new plan
+          //   3. Default /cabinet
+          const intended = consumeIntendedNext();
+          if (intended && intended.startsWith("/cabinet/")) {
+            router.replace(intended);
+            return;
+          }
           const planUrl = await consumeWizardData();
           router.replace(planUrl ?? "/cabinet");
         }
@@ -175,6 +202,17 @@ export default function AuthRedirectPage() {
     }).catch(() => {});
 
     if (selectedRole === "client") {
+      // Same priority as in checkRole — explicit deep-link wins over wizard.
+      try {
+        const raw = sessionStorage.getItem("next-url");
+        if (raw && raw.startsWith("/cabinet/")) {
+          sessionStorage.removeItem("next-url");
+          router.replace(raw);
+          return;
+        }
+      } catch {
+        /* ignore — fall through to wizard / default */
+      }
       const planUrl = await consumeWizardData();
       router.replace(planUrl ?? "/cabinet");
     } else if (selectedRole === "artist") {

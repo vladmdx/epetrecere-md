@@ -20,6 +20,7 @@ import {
   PartyPopper,
   Archive,
   ChevronRight,
+  ChevronDown,
   Settings,
   Menu,
   X,
@@ -37,13 +38,29 @@ const topNav = [
   { href: "/cabinet/profil", icon: User, label: "Contul Meu" },
 ] as const;
 
-// Tools section — rendered under the dynamic events block.
+// Tools section — actual instruments only. Confidențialitate + Setări used
+// to live here too; they're now under "Cont" further down.
 const toolsNav = [
   { href: "/cabinet/checklist", icon: CheckSquare, label: "Checklist" },
   { href: "/cabinet/buget", icon: Wallet, label: "Budget & Cheltuieli" },
   { href: "/cabinet/invitatii", icon: Mail, label: "Invitații Electronice" },
-  { href: "/cabinet/calculator-dar", icon: Calculator, label: "Calculator Dar" },
   { href: "/cabinet/moments", icon: Camera, label: "Momente Eveniment" },
+] as const;
+
+// Calculatoare section — rendered as collapsible accordion under Instrumente.
+// Each entry is a public /calculatoare/* page; the user lands directly there
+// and the result is logged in their dashboard if they're signed in.
+const calculatorsNav = [
+  { href: "/calculatoare/buget", label: "Buget" },
+  { href: "/calculatoare/invitati", label: "Invitați & Mese" },
+  { href: "/calculatoare/dar-nunta", label: "Dar Nuntă" },
+  { href: "/calculatoare/nunta", label: "Cost Nuntă" },
+  { href: "/calculatoare/alcool", label: "Băuturi" },
+  { href: "/calculatoare/meniu", label: "Meniu" },
+] as const;
+
+// Account section — privacy/settings, kept distinct from event tools.
+const accountNav = [
   { href: "/cabinet/date", icon: Shield, label: "Confidențialitate" },
   { href: "/cabinet/setari", icon: Settings, label: "Setări" },
 ] as const;
@@ -134,6 +151,21 @@ function NavBody({
       <SectionHeader label="Instrumente" />
 
       {toolsNav.map((item) => (
+        <NavLink
+          key={item.href}
+          item={item}
+          pathname={pathname}
+          onClick={onNavigate}
+        />
+      ))}
+
+      {/* Calculatoare — collapsible group. Click chevron to expand and pick
+          the right calculator. Each entry is a public /calculatoare/* page. */}
+      <CalculatorsAccordion pathname={pathname} onNavigate={onNavigate} />
+
+      <SectionHeader label="Cont" />
+
+      {accountNav.map((item) => (
         <NavLink
           key={item.href}
           item={item}
@@ -265,6 +297,64 @@ function SectionHeader({ label }: { label: string }) {
       <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
         {label}
       </p>
+    </div>
+  );
+}
+
+function CalculatorsAccordion({
+  pathname,
+  onNavigate,
+}: {
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  // Default expanded if user is currently inside any /calculatoare/* page.
+  const onCalcRoute = pathname.startsWith("/calculatoare");
+  const [open, setOpen] = useState(onCalcRoute);
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={cn(
+          "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
+          onCalcRoute
+            ? "bg-gold/10 text-gold font-medium"
+            : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
+        )}
+      >
+        <Calculator className="h-4 w-4 shrink-0" />
+        <span className="flex-1 text-left truncate">Calculatoare</span>
+        <ChevronDown
+          className={cn(
+            "h-3.5 w-3.5 shrink-0 transition-transform",
+            open && "rotate-180",
+          )}
+        />
+      </button>
+      {open && (
+        <div className="ml-6 mt-0.5 space-y-0.5 border-l border-border/30 pl-2">
+          {calculatorsNav.map((c) => {
+            const isActive = pathname === c.href;
+            return (
+              <Link
+                key={c.href}
+                href={c.href}
+                onClick={onNavigate}
+                className={cn(
+                  "block rounded-lg px-3 py-1.5 text-xs transition-colors",
+                  isActive
+                    ? "bg-gold/10 text-gold font-medium"
+                    : "text-muted-foreground/80 hover:bg-accent/50 hover:text-foreground",
+                )}
+              >
+                {c.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

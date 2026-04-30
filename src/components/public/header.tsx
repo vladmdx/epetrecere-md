@@ -134,6 +134,133 @@ function DropdownMenu({ label, items, href }: { label: string; items: { slug: st
   );
 }
 
+// "Utilități" dropdown — instead of a list of slugs (like categories), it
+// renders a curated list of in-app tools + a nested "Calculatoare" submenu.
+// Each top-level tool links to a public landing page (/utilitati/[slug])
+// optimized for SEO, where the CTA pushes users into the corresponding
+// /cabinet/* tool after login.
+const UTILITATI_TOOLS = [
+  { slug: "checklist", label: "Checklist Eveniment", emoji: "✅" },
+  { slug: "budget", label: "Budget & Cheltuieli", emoji: "💰" },
+  { slug: "invitatii-electronice", label: "Invitații Electronice", emoji: "✉️" },
+  { slug: "lista-invitati", label: "Listă Invitați & Așezare Mese", emoji: "👥" },
+  { slug: "momente-eveniment", label: "Momente Eveniment", emoji: "📸" },
+];
+
+const UTILITATI_CALCULATORS = [
+  { slug: "buget", label: "Calculator Buget" },
+  { slug: "invitati", label: "Calculator Invitați & Mese" },
+  { slug: "dar-nunta", label: "Calculator Dar Nuntă" },
+  { slug: "nunta", label: "Calculator Cost Nuntă" },
+  { slug: "alcool", label: "Calculator Băuturi" },
+  { slug: "meniu", label: "Calculator Meniu" },
+];
+
+function UtilitatiDropdown() {
+  const [open, setOpen] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => {
+        setOpen(false);
+        setCalcOpen(false);
+      }}
+    >
+      <Link
+        href="/utilitati"
+        className="flex items-center gap-1 text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap"
+      >
+        Utilități
+        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+      </Link>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute left-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
+          >
+            {/* Tools */}
+            {UTILITATI_TOOLS.map((tool) => (
+              <Link
+                key={tool.slug}
+                href={`/utilitati/${tool.slug}`}
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/80 transition-colors hover:bg-accent hover:text-gold"
+                onClick={() => setOpen(false)}
+              >
+                <span className="text-base">{tool.emoji}</span>
+                <span>{tool.label}</span>
+              </Link>
+            ))}
+
+            {/* Calculatoare — clickable to /calculatoare AND has nested
+                submenu on hover */}
+            <div
+              className="relative mt-1 border-t border-border/30 pt-1"
+              onMouseEnter={() => setCalcOpen(true)}
+              onMouseLeave={() => setCalcOpen(false)}
+            >
+              <Link
+                href="/calculatoare"
+                className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-accent hover:text-gold"
+                onClick={() => setOpen(false)}
+              >
+                <span className="flex items-center gap-2">
+                  <span className="text-base">🧮</span>
+                  Calculatoare
+                </span>
+                <ChevronDown className={cn("h-3.5 w-3.5 -rotate-90 transition-transform", calcOpen && "rotate-0")} />
+              </Link>
+
+              <AnimatePresence>
+                {calcOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -6 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute left-full top-0 ml-1 w-64 rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
+                  >
+                    {UTILITATI_CALCULATORS.map((calc) => (
+                      <Link
+                        key={calc.slug}
+                        href={`/calculatoare/${calc.slug}`}
+                        className="block rounded-lg px-3 py-2 text-sm text-white/80 transition-colors hover:bg-accent hover:text-gold"
+                        onClick={() => {
+                          setCalcOpen(false);
+                          setOpen(false);
+                        }}
+                      >
+                        {calc.label}
+                      </Link>
+                    ))}
+                    <Link
+                      href="/calculatoare"
+                      className="mt-1 block rounded-lg border-t border-border/30 px-3 pt-2.5 pb-1 text-xs font-medium text-gold hover:bg-gold/10"
+                      onClick={() => {
+                        setCalcOpen(false);
+                        setOpen(false);
+                      }}
+                    >
+                      Vezi toate →
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function UserMenu() {
   const { isSignedIn, user } = useUser();
   const { signOut } = useClerk();
@@ -243,9 +370,7 @@ export function Header() {
             {t("nav.venues")}
           </Link>
           <DropdownMenu label={t("nav.services")} items={serviceCategories} href="/servicii" />
-          <Link href="/calculatoare" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
-            Calculatoare
-          </Link>
+          <UtilitatiDropdown />
           <Link href="/blog" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
             {t("nav.blog")}
           </Link>
@@ -316,7 +441,16 @@ export function Header() {
               ))}
               <div className="my-2 border-t border-border/40" />
               <Link href="/sali" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.venues")}</Link>
-              <Link href="/calculatoare" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">Calculatoare</Link>
+              <p className="px-3 py-1 mt-2 text-xs font-medium uppercase tracking-wider text-gold">Utilități</p>
+              {UTILITATI_TOOLS.map((tool) => (
+                <Link key={tool.slug} href={`/utilitati/${tool.slug}`} onClick={() => setMobileOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">
+                  {tool.emoji} {tool.label}
+                </Link>
+              ))}
+              <Link href="/calculatoare" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-gold hover:bg-gold/10">
+                🧮 Calculatoare (toate)
+              </Link>
               <Link href="/blog" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.blog")}</Link>
               <Link href="/contact" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.contact")}</Link>
               {showPlannerCta && (
