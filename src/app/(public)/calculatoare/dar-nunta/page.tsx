@@ -1,5 +1,4 @@
-import type { Metadata } from "next";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { DarNuntaClient } from "./client";
 
@@ -8,12 +7,13 @@ import { DarNuntaClient } from "./client";
 // whether you attend solo/couple/family, and venue tier, compute a
 // suggested minimum / typical / generous gift amount in €.
 
-export const metadata: Metadata = generateMeta({
-  title: "Cât să dau dar la nuntă? — Calculator Moldova",
-  description:
-    "Calculează suma potrivită pentru darul de nuntă în funcție de relația cu mirii, oraș, tipul sălii și câte persoane mergi. Sugestii reale pentru Moldova 2025.",
-  path: "/calculatoare/dar-nunta",
-});
+export async function generateMetadata() {
+  return metaForPath("/calculatoare/dar-nunta", {
+    title: "Cât să dau dar la nuntă? — Calculator Moldova",
+    description:
+      "Calculează suma potrivită pentru darul de nuntă în funcție de relația cu mirii, oraș, tipul sălii și câte persoane mergi. Sugestii reale pentru Moldova 2025.",
+  });
+}
 
 export default function DarNuntaPage() {
   const breadcrumbs = [

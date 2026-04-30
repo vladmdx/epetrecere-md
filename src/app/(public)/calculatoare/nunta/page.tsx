@@ -1,6 +1,5 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { WeddingCostCalculatorClient } from "./client";
 
@@ -9,12 +8,13 @@ import { WeddingCostCalculatorClient } from "./client";
 // unique categories (inele, rochie, costum, dar de nașă, lună de miere) and
 // Moldovan traditions (cumătri, nași) that don't apply to corporate/birthday.
 
-export const metadata: Metadata = generateMeta({
-  title: "Calculator cost nuntă Moldova 2025 — estimează total pe categorii",
-  description:
-    "Cât costă o nuntă în Moldova? Calculator complet: sală, meniu, rochie, foto-video, decor, inele, lună de miere. Estimări pe intervale reale 2025.",
-  path: "/calculatoare/nunta",
-});
+export async function generateMetadata() {
+  return metaForPath("/calculatoare/nunta", {
+    title: "Calculator cost nuntă Moldova 2025 — estimează total pe categorii",
+    description:
+      "Cât costă o nuntă în Moldova? Calculator complet: sală, meniu, rochie, foto-video, decor, inele, lună de miere. Estimări pe intervale reale 2025.",
+  });
+}
 
 export default function WeddingCostPage() {
   const breadcrumbs = [

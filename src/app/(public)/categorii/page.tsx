@@ -1,7 +1,6 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { getAllCategories } from "@/lib/db/queries/categories";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { CategoryCard } from "./category-card";
 
@@ -9,12 +8,13 @@ import { CategoryCard } from "./category-card";
 // hourly is plenty.
 export const revalidate = 3600;
 
-export const metadata: Metadata = generateMeta({
-  title: "Toate Categoriile — ePetrecere.md",
-  description:
-    "Descoperă toate categoriile de artiști și servicii pentru evenimente în Moldova: DJ, cântăreți, formații, fotografi, decor, animatori și multe altele.",
-  path: "/categorii",
-});
+export async function generateMetadata() {
+  return metaForPath("/categorii", {
+    title: "Toate Categoriile — ePetrecere.md",
+    description:
+      "Descoperă toate categoriile de artiști și servicii pentru evenimente în Moldova: DJ, cântăreți, formații, fotografi, decor, animatori și multe altele.",
+  });
+}
 
 // Local images for every category. DB image_url is optional — most rows are
 // null — so we map slug → filename in /public/images/categories. Fallback

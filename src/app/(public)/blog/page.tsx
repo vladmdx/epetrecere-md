@@ -1,19 +1,19 @@
-import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import Image from "next/image";
 import { Calendar, Tag } from "lucide-react";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 
-export const metadata: Metadata = generateMeta({
-  title: "Blog",
-  description:
-    "Sfaturi, idei și inspirație pentru organizarea evenimentelor perfecte în Moldova.",
-  path: "/blog",
-});
+export async function generateMetadata() {
+  return metaForPath("/blog", {
+    title: "Blog",
+    description:
+      "Sfaturi, idei și inspirație pentru organizarea evenimentelor perfecte în Moldova.",
+  });
+}
 
 export default async function BlogListingPage() {
   const posts = await db

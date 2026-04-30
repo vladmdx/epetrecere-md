@@ -1,6 +1,5 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { BudgetCalculatorClient } from "./client";
 
@@ -9,12 +8,13 @@ import { BudgetCalculatorClient } from "./client";
 // Server component handles metadata + breadcrumbs; the interactive form is
 // in ./client.tsx since it needs React state.
 
-export const metadata: Metadata = generateMeta({
-  title: "Calculator buget nuntă, botez, cumătrie — estimare online gratuită",
-  description:
-    "Calculează bugetul exact pentru nuntă, botez sau cumătrie în Moldova. Meniu, artiști, decor, foto-video, transport — prețuri reale 2025 pe ePetrecere.md.",
-  path: "/calculatoare/buget",
-});
+export async function generateMetadata() {
+  return metaForPath("/calculatoare/buget", {
+    title: "Calculator buget nuntă, botez, cumătrie — estimare online gratuită",
+    description:
+      "Calculează bugetul exact pentru nuntă, botez sau cumătrie în Moldova. Meniu, artiști, decor, foto-video, transport — prețuri reale 2025 pe ePetrecere.md.",
+  });
+}
 
 export default function BudgetCalculatorPage() {
   const breadcrumbs = [

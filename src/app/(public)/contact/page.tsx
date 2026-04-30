@@ -1,13 +1,14 @@
-import type { Metadata } from "next";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { ContactPageClient } from "./client";
 
-export const metadata: Metadata = generateMeta({
-  title: "Contact",
-  description: "Contactează echipa ePetrecere.md pentru servicii evenimente în Republica Moldova.",
-  path: "/contact",
-});
+export async function generateMetadata() {
+  return metaForPath("/contact", {
+    title: "Contact",
+    description:
+      "Contactează echipa ePetrecere.md pentru servicii evenimente în Republica Moldova.",
+  });
+}
 
 export default function ContactPage() {
   return (

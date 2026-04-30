@@ -1,13 +1,14 @@
-import type { Metadata } from "next";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, organizationJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Sparkles, Users, Calendar, Shield } from "lucide-react";
 
-export const metadata: Metadata = generateMeta({
-  title: "Despre Noi",
-  description: "Despre ePetrecere.md — platforma de servicii pentru evenimente din Republica Moldova.",
-  path: "/despre",
-});
+export async function generateMetadata() {
+  return metaForPath("/despre", {
+    title: "Despre Noi",
+    description:
+      "Despre ePetrecere.md — platforma de servicii pentru evenimente din Republica Moldova.",
+  });
+}
 
 const features = [
   { icon: Users, title: "500+ Artiști", desc: "Cea mai mare bază de artiști și furnizori de servicii pentru evenimente din Moldova." },

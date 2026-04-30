@@ -1,18 +1,18 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { DrinksCalculatorClient } from "./client";
 
 // M3 #3 — Alcohol & drinks calculator.
 // URL: /calculatoare/alcool
 
-export const metadata: Metadata = generateMeta({
-  title: "Calculator băuturi nuntă — vin, vodcă, coniac, șampanie, apă",
-  description:
-    "Calculează câte sticle de vin, vodcă, coniac, șampanie, bere și apă îți trebuie pentru nuntă, botez sau cumătrie. Norme Moldova, 2025.",
-  path: "/calculatoare/alcool",
-});
+export async function generateMetadata() {
+  return metaForPath("/calculatoare/alcool", {
+    title: "Calculator băuturi nuntă — vin, vodcă, coniac, șampanie, apă",
+    description:
+      "Calculează câte sticle de vin, vodcă, coniac, șampanie, bere și apă îți trebuie pentru nuntă, botez sau cumătrie. Norme Moldova, 2025.",
+  });
+}
 
 export default function DrinksCalculatorPage() {
   const breadcrumbs = [

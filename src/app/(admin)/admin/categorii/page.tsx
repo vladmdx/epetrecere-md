@@ -43,6 +43,8 @@ interface Category {
   imageUrl: string | null;
   imageAlt: string | null;
   badge: string | null;
+  seoTitleRo: string | null;
+  seoDescRo: string | null;
   sortOrder: number | null;
 }
 
@@ -134,6 +136,8 @@ export default function CategoriesPage() {
   const [imageUrl, setImageUrl] = useState("");
   const [imageAlt, setImageAlt] = useState("");
   const [badge, setBadge] = useState("");
+  const [seoTitle, setSeoTitle] = useState("");
+  const [seoDesc, setSeoDesc] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -166,6 +170,8 @@ export default function CategoriesPage() {
     setImageUrl(cat.imageUrl || "");
     setImageAlt(cat.imageAlt || "");
     setBadge(cat.badge || "");
+    setSeoTitle(cat.seoTitleRo || "");
+    setSeoDesc(cat.seoDescRo || "");
   }
 
   function closeEdit() {
@@ -173,6 +179,8 @@ export default function CategoriesPage() {
     setImageUrl("");
     setImageAlt("");
     setBadge("");
+    setSeoTitle("");
+    setSeoDesc("");
   }
 
   async function handleFileUpload(file: File) {
@@ -206,6 +214,8 @@ export default function CategoriesPage() {
           imageUrl: imageUrl || null,
           imageAlt: imageAlt.trim() || null,
           badge: badge.trim() || null,
+          seoTitleRo: seoTitle.trim() || null,
+          seoDescRo: seoDesc.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -382,6 +392,62 @@ export default function CategoriesPage() {
               <p className="mt-1 text-xs text-muted-foreground">
                 Lasă gol pentru a elimina eticheta. Apare ca pill peste imaginea de pe homepage și pe pagina de categorii.
               </p>
+            </div>
+
+            {/* SEO — title + description rendered on /categorie/[slug]. */}
+            <div className="rounded-lg border border-border/40 bg-muted/20 p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-gold">
+                SEO (Google)
+              </p>
+              <div>
+                <Label htmlFor="seoTitle" className="mb-2 block">
+                  Meta titlu (max 60 caractere)
+                </Label>
+                <Input
+                  id="seoTitle"
+                  placeholder="ex: DJ pentru evenimente — Chișinău, Moldova"
+                  value={seoTitle}
+                  onChange={(e) => setSeoTitle(e.target.value)}
+                  maxLength={70}
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {seoTitle.length}/60 caractere · Lasă gol pentru titlu automat
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="seoDesc" className="mb-2 block">
+                  Meta descriere (max 160 caractere)
+                </Label>
+                <textarea
+                  id="seoDesc"
+                  placeholder="ex: Găsește cei mai buni DJ-i pentru nuntă, cumătrie și corporate. Profile verificate, prețuri transparente."
+                  value={seoDesc}
+                  onChange={(e) => setSeoDesc(e.target.value)}
+                  maxLength={200}
+                  rows={3}
+                  className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                />
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  {seoDesc.length}/160 caractere · Lasă gol pentru descriere automată
+                </p>
+              </div>
+              {/* SERP preview */}
+              {(seoTitle || seoDesc) && (
+                <div className="rounded-md border border-border/40 bg-background p-3 text-left">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                    Previzualizare Google
+                  </p>
+                  <p className="text-blue-500 text-base font-medium leading-tight truncate">
+                    {seoTitle || `${editing?.nameRo} — ePetrecere.md`}
+                  </p>
+                  <p className="text-emerald-700 dark:text-emerald-400 text-xs">
+                    epetrecere.md › categorie › {editing?.slug}
+                  </p>
+                  <p className="text-muted-foreground text-xs mt-0.5 line-clamp-2">
+                    {seoDesc || `Descoperă ${editing?.nameRo?.toLowerCase()} pentru evenimente în Moldova`}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

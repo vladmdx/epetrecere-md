@@ -14,17 +14,16 @@ import { FloatingCTA } from "@/components/shared/floating-cta";
 import { websiteJsonLd, organizationJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getFeaturedArtists } from "@/lib/db/queries/artists";
 import { getFeaturedVenues } from "@/lib/db/queries/venues";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { db } from "@/lib/db";
 import { homepageSections } from "@/lib/db/schema";
 import { asc } from "drizzle-orm";
 
 export async function generateMetadata() {
-  return generateMeta({
+  return metaForPath("/", {
     title: "Marketplace pentru Evenimente din Moldova",
     description:
       "Găsește artiști, săli de evenimente și servicii pentru nuntă, botez, cumetrie și corporate. Cea mai mare platformă de evenimente din Republica Moldova.",
-    path: "/",
   });
 }
 

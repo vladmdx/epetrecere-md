@@ -1,18 +1,18 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { GuestCalculatorClient } from "./client";
 
 // M3 #2 — Guest / table planning calculator.
 // URL: /calculatoare/invitati
 
-export const metadata: Metadata = generateMeta({
-  title: "Calculator invitați, mese și logistică eveniment",
-  description:
-    "Calculează câte mese, băi, ospătari și locuri de parcare îți trebuie pentru numărul tău de invitați. Formule verificate pentru nunți și evenimente în Moldova.",
-  path: "/calculatoare/invitati",
-});
+export async function generateMetadata() {
+  return metaForPath("/calculatoare/invitati", {
+    title: "Calculator invitați, mese și logistică eveniment",
+    description:
+      "Calculează câte mese, băi, ospătari și locuri de parcare îți trebuie pentru numărul tău de invitați. Formule verificate pentru nunți și evenimente în Moldova.",
+  });
+}
 
 export default function GuestCalculatorPage() {
   const breadcrumbs = [

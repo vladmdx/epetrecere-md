@@ -1,18 +1,18 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { MenuCalculatorClient } from "./client";
 
 // M3 #4 — Menu / food calculator.
 // URL: /calculatoare/meniu
 
-export const metadata: Metadata = generateMeta({
-  title: "Calculator meniu & mâncare nuntă, botez, cumătrie",
-  description:
-    "Calculează cantitățile de aperitive, fel principal, zeamă, fructe și tort pentru evenimentul tău. Norme pe porții, prețuri bulk Moldova 2025.",
-  path: "/calculatoare/meniu",
-});
+export async function generateMetadata() {
+  return metaForPath("/calculatoare/meniu", {
+    title: "Calculator meniu & mâncare nuntă, botez, cumătrie",
+    description:
+      "Calculează cantitățile de aperitive, fel principal, zeamă, fructe și tort pentru evenimentul tău. Norme pe porții, prețuri bulk Moldova 2025.",
+  });
+}
 
 export default function MenuCalculatorPage() {
   const breadcrumbs = [

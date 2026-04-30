@@ -44,6 +44,7 @@ const navItems = [
   { href: "/admin/foto-ugc", icon: Camera, label: "Fotografii UGC" },
   { href: "/admin/blog", icon: FileText, label: "Blog" },
   { href: "/admin/pagini", icon: FileText, label: "Pagini" },
+  { href: "/admin/meta", icon: Globe, label: "Meta Pagini" },
   { href: "/admin/seo", icon: Globe, label: "SEO" },
   { href: "/admin/import", icon: Upload, label: "Import" },
   { href: "/admin/homepage-builder", icon: Home, label: "Homepage" },

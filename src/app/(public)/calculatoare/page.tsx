@@ -1,17 +1,17 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Calculator, Wallet, Users, Wine, Utensils, Heart, Gift, ArrowRight } from "lucide-react";
 
 // M3 — Calculators index. Entry point for all event planning tools.
 
-export const metadata: Metadata = generateMeta({
-  title: "Calculatoare pentru evenimente — Buget, invitați, băuturi, meniu",
-  description:
-    "Calculează bugetul nunții, numărul de invitați și mese, cantitățile de băuturi și meniul pentru evenimentul tău. Estimări gratuite bazate pe prețuri reale din Moldova.",
-  path: "/calculatoare",
-});
+export async function generateMetadata() {
+  return metaForPath("/calculatoare", {
+    title: "Calculatoare pentru evenimente — Buget, invitați, băuturi, meniu",
+    description:
+      "Calculează bugetul nunții, numărul de invitați și mese, cantitățile de băuturi și meniul pentru evenimentul tău. Estimări gratuite bazate pe prețuri reale din Moldova.",
+  });
+}
 
 const CALCULATORS = [
   {

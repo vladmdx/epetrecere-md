@@ -51,6 +51,17 @@ export async function PATCH(
       update.imageAlt = v.trim().slice(0, 200);
     }
   }
+  // SEO meta — title (max 60 = Google's display limit) + desc (max 160).
+  if (Object.prototype.hasOwnProperty.call(body, "seoTitleRo")) {
+    const v = body.seoTitleRo;
+    update.seoTitleRo =
+      v === null || v === "" ? null : typeof v === "string" ? v.trim().slice(0, 70) : null;
+  }
+  if (Object.prototype.hasOwnProperty.call(body, "seoDescRo")) {
+    const v = body.seoDescRo;
+    update.seoDescRo =
+      v === null || v === "" ? null : typeof v === "string" ? v.trim().slice(0, 200) : null;
+  }
   if (Object.prototype.hasOwnProperty.call(body, "icon")) {
     const v = body.icon;
     if (v === null || v === "") {

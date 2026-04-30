@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
 import { getAllCategories } from "@/lib/db/queries/categories";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { ArtistsListClient } from "./client";
 
-export const metadata: Metadata = generateMeta({
-  title: "Artiști pentru Evenimente",
-  description: "Descoperă cei mai buni artiști pentru nunta, botezul sau evenimentul tău în Republica Moldova.",
-  path: "/artisti",
-});
+export async function generateMetadata() {
+  return metaForPath("/artisti", {
+    title: "Artiști pentru Evenimente",
+    description:
+      "Descoperă cei mai buni artiști pentru nunta, botezul sau evenimentul tău în Republica Moldova.",
+  });
+}
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

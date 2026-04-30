@@ -1,15 +1,16 @@
-import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getVenues } from "@/lib/db/queries/venues";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { VenuesListClient } from "./client";
 
-export const metadata: Metadata = generateMeta({
-  title: "Săli & Restaurante pentru Evenimente",
-  description: "Găsește sala perfectă pentru nunta sau evenimentul tău în Republica Moldova.",
-  path: "/sali",
-});
+export async function generateMetadata() {
+  return metaForPath("/sali", {
+    title: "Săli & Restaurante pentru Evenimente",
+    description:
+      "Găsește sala perfectă pentru nunta sau evenimentul tău în Republica Moldova.",
+  });
+}
 
 interface Props {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;

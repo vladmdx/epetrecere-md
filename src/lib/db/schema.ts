@@ -702,6 +702,29 @@ export const pages = pgTable("pages", {
 });
 
 // ═══════════════════════════════════════════════════════
+// PAGE META — admin-editable SEO overrides for routes that don't have
+// their own DB-backed entity (homepage, /artisti, /sali, /calculatoare,
+// individual calculators, etc.). Keyed by URL path. Empty title/description
+// fall back to whatever each page.tsx hardcodes in generateMeta().
+// ═══════════════════════════════════════════════════════
+
+export const pageMeta = pgTable("page_meta", {
+  id: serial("id").primaryKey(),
+  /** URL path the meta applies to. e.g. "/" or "/calculatoare/buget". */
+  path: text("path").unique().notNull(),
+  /** Human-readable label shown in /admin/meta. */
+  label: text("label").notNull(),
+  /** Optional override of <title>. Empty → page falls back to hardcoded. */
+  title: text("title"),
+  /** Optional override of meta description. Same fallback behavior. */
+  description: text("description"),
+  /** Group bucket in the admin UI (e.g. "pages", "tools"). */
+  groupName: text("group_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ═══════════════════════════════════════════════════════
 // SITE SETTINGS & HOMEPAGE
 // ═══════════════════════════════════════════════════════
 

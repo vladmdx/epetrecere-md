@@ -1,16 +1,17 @@
-import type { Metadata } from "next";
 import Link from "next/link";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { metaForPath } from "@/lib/seo/page-meta";
 import {
   Mic, Disc3, Music, Guitar, Camera, Video, Palette, PartyPopper,
   Building2, Speaker, Star, Sparkles, Cake, Flame,
 } from "lucide-react";
 
-export const metadata: Metadata = generateMeta({
-  title: "Servicii pentru Evenimente",
-  description: "Toate serviciile disponibile pentru evenimentul tău: artiști, fotografi, videografi, decor, echipament și multe altele.",
-  path: "/servicii",
-});
+export async function generateMetadata() {
+  return metaForPath("/servicii", {
+    title: "Servicii pentru Evenimente",
+    description:
+      "Toate serviciile disponibile pentru evenimentul tău: artiști, fotografi, videografi, decor, echipament și multe altele.",
+  });
+}
 
 const services = [
   { slug: "moderatori", name: "Moderatori / MC", icon: Mic, desc: "Profesioniști care conduc ceremonia și petrecerea cu stil." },
