@@ -15,9 +15,13 @@ import { useUserRole, isClientOrGuest } from "@/hooks/use-user-role";
 import { cn } from "@/lib/utils";
 import { useUser, useClerk } from "@clerk/nextjs";
 
-const artistCategories = [
+// Fallback list rendered on first paint before /api/categories resolves —
+// covers the most-clicked items so the menu is never empty. The full list is
+// fetched on mount and replaces this.
+const FALLBACK_ARTIST_CATEGORIES = [
   { slug: "moderatori", label: "Moderatori" },
   { slug: "dj", label: "DJ" },
+  { slug: "cantareti", label: "Cântăreți" },
   { slug: "cantareti-de-estrada", label: "Cântăreți de Estradă" },
   { slug: "interpreti-muzica-populara", label: "Interpreți Muzică Populară" },
   { slug: "cover-band", label: "Cover Band" },
@@ -27,16 +31,58 @@ const artistCategories = [
   { slug: "dansatori", label: "Dansatori" },
   { slug: "dansuri-populare", label: "Dansuri Populare" },
   { slug: "ansamblu-tiganesc", label: "Ansamblu Țigănesc" },
+  { slug: "dans-oriental", label: "Dans Oriental" },
+  { slug: "striptiz", label: "Striptiz" },
   { slug: "show-program", label: "Show Program" },
+  { slug: "iluzionisti-magicieni", label: "Iluzioniști / Magicieni" },
   { slug: "animatori", label: "Animatori" },
+  { slug: "show-ul-focului", label: "Show-ul Focului" },
+  { slug: "clovni", label: "Clovni" },
+  { slug: "interesant-la-sarbatoare", label: "Interesant la Sărbătoare" },
+  { slug: "show-circus", label: "Show Circus" },
   { slug: "stand-up", label: "Stand Up" },
+  { slug: "mos-craciun", label: "Moș Crăciun" },
 ];
 
-const serviceCategories = [
+const FALLBACK_SERVICE_CATEGORIES = [
+  { slug: "fotografi", label: "Fotografi" },
+  { slug: "videografi", label: "Videografi" },
+  { slug: "decor", label: "Decor & Floristică" },
   { slug: "echipament-tehnic", label: "Echipament Tehnic" },
   { slug: "foto-video", label: "Foto & Video" },
   { slug: "foto-zona-selfie", label: "Foto Zonă / Selfie" },
 ];
+
+function useCategories() {
+  const [artist, setArtist] = useState(FALLBACK_ARTIST_CATEGORIES);
+  const [service, setService] = useState(FALLBACK_SERVICE_CATEGORIES);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/categories")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: unknown) => {
+        if (!alive) return;
+        const list = Array.isArray(rows)
+          ? (rows as Array<{ slug: string; nameRo: string; type: string; sortOrder?: number | null }>)
+          : [];
+        const sortFn = (a: { sortOrder?: number | null }, b: { sortOrder?: number | null }) =>
+          (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+        const artists = list
+          .filter((c) => c.type === "artist")
+          .sort(sortFn)
+          .map((c) => ({ slug: c.slug, label: c.nameRo }));
+        const services = list
+          .filter((c) => c.type === "service")
+          .sort(sortFn)
+          .map((c) => ({ slug: c.slug, label: c.nameRo }));
+        if (artists.length > 0) setArtist(artists);
+        if (services.length > 0) setService(services);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  return { artist, service };
+}
 
 function DropdownMenu({ label, items, href }: { label: string; items: { slug: string; label: string }[]; href: string }) {
   const [open, setOpen] = useState(false);
@@ -62,7 +108,7 @@ function DropdownMenu({ label, items, href }: { label: string; items: { slug: st
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-50 mt-2 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
+            className="absolute left-0 top-full z-50 mt-2 max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
           >
             {items.map((item) => (
               <Link
@@ -74,6 +120,13 @@ function DropdownMenu({ label, items, href }: { label: string; items: { slug: st
                 {item.label}
               </Link>
             ))}
+            <Link
+              href={href}
+              className="mt-1 block rounded-lg border-t border-border/30 px-3 pt-2.5 pb-1 text-xs font-medium text-gold hover:bg-gold/10"
+              onClick={() => setOpen(false)}
+            >
+              Vezi toate →
+            </Link>
           </motion.div>
         )}
       </AnimatePresence>
@@ -168,6 +221,9 @@ export function Header() {
   // Hide the "Plan event" CTA for vendors and admins — it's a client-
   // facing action. Guests + clients still see it.
   const showPlannerCta = isClientOrGuest(userRole);
+  // Live category lists from /api/categories — falls back to a hardcoded
+  // list on first paint so the menu is never empty.
+  const { artist: artistCategories, service: serviceCategories } = useCategories();
 
   return (
     <header className={`fixed top-0 z-50 w-full transition-all duration-300 backdrop-blur-md ${scrolled ? "bg-[#0D0D0D]/90 border-b border-gold/10 shadow-lg" : "bg-[#0D0D0D]/40 border-b border-transparent"}`}>
@@ -240,7 +296,7 @@ export function Header() {
             <nav className="flex flex-col gap-1 px-4 py-4">
               <div className="mb-3 lg:hidden"><SearchAutocomplete /></div>
               <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gold">Artiști</p>
-              {artistCategories.slice(0, 8).map((cat) => (
+              {artistCategories.map((cat) => (
                 <Link key={cat.slug} href={`/categorie/${cat.slug}`} onClick={() => setMobileOpen(false)}
                   className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">
                   {cat.label}
