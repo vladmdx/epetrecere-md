@@ -48,7 +48,11 @@ export const CATEGORY_META: Record<string, CategoryMeta> = {
   // ── Music ─────────────────────────────────────────
   moderatori: { emoji: "🎤", allowedEventTypes: [...VENUE_NEUTRAL, "concert"] },
   dj: { emoji: "🎧", allowedEventTypes: ["wedding", "corporate", "birthday", "other"] },
-  cantareti: { emoji: "🎙️", allowedEventTypes: [...ALL_EVENT_TYPES] },
+  cantareti: {
+    emoji: "🎙️",
+    // Excluded from baptism — religious ceremony, no secular performers.
+    allowedEventTypes: ["wedding", "cumatrie", "corporate", "birthday", "concert", "other"],
+  },
   "cantareti-de-estrada": { emoji: "🎤", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "interpreti-muzica-populara": { emoji: "🪗", allowedEventTypes: [...VENUE_NEUTRAL, "concert"] },
   formatii: { emoji: "🎸", allowedEventTypes: [...ALL_EVENT_TYPES] },
@@ -68,7 +72,7 @@ export const CATEGORY_META: Record<string, CategoryMeta> = {
   "iluzionisti-magicieni": { emoji: "🎩", allowedEventTypes: [...VENUE_NEUTRAL] },
   animatori: { emoji: "🎈", allowedEventTypes: ["baptism", "cumatrie", "birthday", "other"] }, // kids
   "show-ul-focului": { emoji: "🔥", allowedEventTypes: ["wedding", "corporate", "birthday", "other"] },
-  clovni: { emoji: "🤡", allowedEventTypes: ["baptism", "cumatrie", "birthday", "other"] }, // kids
+  clovni: { emoji: "🤡", allowedEventTypes: ["birthday", "other"] }, // kids birthdays only
   "interesant-la-sarbatoare": { emoji: "✨", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "show-circus": { emoji: "🎪", allowedEventTypes: [...VENUE_NEUTRAL] },
   "stand-up": { emoji: "🎙️", allowedEventTypes: ["corporate", "birthday", "other"] },
