@@ -22,9 +22,12 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, ArrowRight, Loader2, Send, Sparkles,
   PartyPopper, Calendar, Users, Wrench, Building2, DollarSign, ClipboardCheck,
-  ClipboardList, Wallet, UtensilsCrossed, Check,
-  Music, Mic, Disc3, Guitar, Camera, Video, Palette, Speaker, Star, Flame, Cake, LogIn,
+  ClipboardList, Wallet, UtensilsCrossed, Check, LogIn,
 } from "lucide-react";
+import {
+  getCategoryEmoji,
+  isCategoryAllowedForEvent,
+} from "@/lib/wizard/categories-meta";
 
 // ═══════════════════════════════════════════════
 // TYPES
@@ -75,7 +78,6 @@ const DEFAULT_DURATION_HOURS: Record<string, number> = {
   wedding: 10,
   baptism: 6,
   cumatrie: 6,
-  cumpatrie: 6,
   birthday: 5,
   corporate: 4,
   concert: 3,
@@ -87,7 +89,6 @@ const DEFAULT_START_TIME: Record<string, string> = {
   wedding: "14:00",
   baptism: "12:00",
   cumatrie: "17:00",
-  cumpatrie: "17:00",
   birthday: "18:00",
   corporate: "18:00",
   concert: "19:00",
@@ -460,7 +461,7 @@ interface StepProps {
 const eventTypes = [
   { value: "wedding", icon: "💒" },
   { value: "baptism", icon: "👶" },
-  { value: "cumpatrie", icon: "🎉" },
+  { value: "cumatrie", icon: "🎉" },
   { value: "corporate", icon: "🏢" },
   { value: "birthday", icon: "🎂" },
   { value: "concert", icon: "🎵" },
@@ -506,7 +507,6 @@ const DURATION_PRESETS: Record<string, number[]> = {
   wedding: [8, 10, 12],
   baptism: [4, 5, 6, 8],
   cumatrie: [4, 6, 8],
-  cumpatrie: [4, 6, 8],
   birthday: [3, 4, 5, 6, 8],
   corporate: [2, 3, 4, 6],
   concert: [2, 3, 4],
@@ -762,23 +762,58 @@ function StepVenue({ data, update }: StepProps) {
 // Service / category picker. Renamed from "services" — per M0a the wizard
 // collects *categories* of artists only; actual artist profiles are revealed
 // post-login on the results page.
-const serviceOptions = [
-  { id: "singer", label: "Cântăreț", icon: Music },
-  { id: "mc", label: "Moderator / MC", icon: Mic },
-  { id: "dj", label: "DJ", icon: Disc3 },
-  { id: "photographer", label: "Fotograf", icon: Camera },
-  { id: "videographer", label: "Videograf", icon: Video },
-  { id: "band", label: "Formație / Band", icon: Guitar },
-  { id: "show", label: "Show / Dans", icon: Star },
-  { id: "decor", label: "Decor / Floristică", icon: Palette },
-  { id: "candy_bar", label: "Candy Bar / Tort", icon: Cake },
-  { id: "fireworks", label: "Foc de artificii", icon: Flame },
-  { id: "animators", label: "Animatori", icon: PartyPopper },
-  { id: "equipment", label: "Echipament tehnic", icon: Speaker },
-];
+//
+// Until 2026-04 this step rendered a hand-curated list of 12 generic IDs
+// ("singer", "dj", ...) which silently dropped half the actual DB categories
+// (Striptiz, Moș Crăciun, Stand Up, Iluzioniști, etc.) and showed all options
+// for every event type — Stand Up at a baptism, etc. Now we:
+//   1. Fetch all live categories from /api/categories (= what artist.md has)
+//   2. Use the slug as the wizard service id (no aliasing layer needed)
+//   3. Filter by event type via CATEGORY_META.allowedEventTypes
+type CategoryRow = {
+  id: number;
+  slug: string;
+  nameRo: string;
+  type: "artist" | "service" | "venue";
+  sortOrder?: number | null;
+};
 
 function StepServices({ data, update }: StepProps) {
   const { t } = useLocale();
+  const [categories, setCategories] = useState<CategoryRow[]>([]);
+  const [loadingCats, setLoadingCats] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/categories")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: unknown) => {
+        if (!alive) return;
+        const list: CategoryRow[] = Array.isArray(data)
+          ? (data as CategoryRow[])
+          : ((data as { items?: CategoryRow[] })?.items ?? []);
+        // Wizard step picks ARTIST + SERVICE categories. Venues are picked
+        // in their own step (StepVenue).
+        setCategories(
+          list.filter((c) => c.type === "artist" || c.type === "service"),
+        );
+      })
+      .catch(() => {
+        /* silent — empty list will show below */
+      })
+      .finally(() => {
+        if (alive) setLoadingCats(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Filter categories by the picked event type so e.g. Stand Up doesn't show
+  // for Cumătrie/Botez (audience: family with kids).
+  const visible = categories
+    .filter((c) => isCategoryAllowedForEvent(c.slug, data.eventType))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
   function toggleService(id: string) {
     const current = data.services;
@@ -794,23 +829,36 @@ function StepServices({ data, update }: StepProps) {
       <p className="mb-8 text-muted-foreground">
         Bifează categoriile de artiști dorite. După autentificare îți vom arăta doar artiștii liberi pentru data ta.
       </p>
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {serviceOptions.map((svc) => (
-          <button
-            key={svc.id}
-            onClick={() => toggleService(svc.id)}
-            className={cn(
-              "flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all",
-              data.services.includes(svc.id)
-                ? "border-gold bg-gold/10"
-                : "border-border/40 hover:border-gold/30",
-            )}
-          >
-            <svc.icon className={cn("h-5 w-5 shrink-0", data.services.includes(svc.id) ? "text-gold" : "text-muted-foreground")} />
-            <span className="text-sm font-medium">{svc.label}</span>
-          </button>
-        ))}
-      </div>
+      {loadingCats ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-gold" />
+        </div>
+      ) : visible.length === 0 ? (
+        <p className="py-8 text-center text-sm text-muted-foreground">
+          Nu sunt categorii potrivite pentru acest tip de eveniment.
+        </p>
+      ) : (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {visible.map((cat) => {
+            const checked = data.services.includes(cat.slug);
+            return (
+              <button
+                key={cat.slug}
+                onClick={() => toggleService(cat.slug)}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl border-2 p-4 text-left transition-all",
+                  checked
+                    ? "border-gold bg-gold/10"
+                    : "border-border/40 hover:border-gold/30",
+                )}
+              >
+                <span className="text-2xl shrink-0">{getCategoryEmoji(cat.slug)}</span>
+                <span className="text-sm font-medium">{cat.nameRo}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -1022,6 +1070,25 @@ interface SummaryProps extends StepProps {
 
 function StepSummary({ data, update, isSignedIn }: SummaryProps) {
   const { t } = useLocale();
+  // Pull category names so the summary shows real labels (e.g. "Iluzioniști /
+  // Magicieni") instead of raw slugs.
+  const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/categories")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: unknown) => {
+        if (!alive) return;
+        const list: Array<{ slug: string; nameRo: string }> = Array.isArray(rows)
+          ? (rows as Array<{ slug: string; nameRo: string }>)
+          : [];
+        const map: Record<string, string> = {};
+        for (const c of list) map[c.slug] = c.nameRo;
+        setCategoryNames(map);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_summary")}</h2>
@@ -1040,7 +1107,7 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
         {data.services.length > 0 && (
           <SummaryRow
             label="Categorii"
-            value={data.services.map((s) => serviceOptions.find((o) => o.id === s)?.label || s).join(", ")}
+            value={data.services.map((s) => categoryNames[s] || s).join(", ")}
           />
         )}
         <SummaryRow label="Buget" value={`${data.budget.toLocaleString()}€`} />

@@ -57,7 +57,7 @@ const statusConfig: Record<string, { label: string; color: string }> = {
 };
 
 const eventTypeLabels: Record<string, string> = {
-  wedding: "Nuntă", baptism: "Botez", cumpatrie: "Cumpătrie",
+  wedding: "Nuntă", baptism: "Botez", cumatrie: "Cumătrie",
   corporate: "Corporate", birthday: "Aniversare", concert: "Concert",
   other: "Altele",
 };

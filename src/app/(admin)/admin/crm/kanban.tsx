@@ -50,7 +50,7 @@ const columns = [
 ];
 
 const eventLabels: Record<string, string> = {
-  wedding: "Nuntă", baptism: "Botez", cumpatrie: "Cumpătrie",
+  wedding: "Nuntă", baptism: "Botez", cumatrie: "Cumătrie",
   corporate: "Corporate", birthday: "Aniversare", other: "Altele",
 };
 

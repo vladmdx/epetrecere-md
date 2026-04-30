@@ -42,7 +42,6 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   wedding: "Nuntă",
   baptism: "Cumătrie / Botez",
   cumatrie: "Cumătrie",
-  cumpatrie: "Cumătrie",
   birthday: "Aniversare",
   corporate: "Eveniment Corporativ",
   other: "Eveniment",

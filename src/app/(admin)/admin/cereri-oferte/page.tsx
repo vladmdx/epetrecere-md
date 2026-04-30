@@ -34,7 +34,7 @@ interface OfferRequest {
 type FilterTab = "new" | "accepted" | "rejected" | "all";
 
 const eventTypeLabels: Record<string, string> = {
-  wedding: "Nuntă", baptism: "Botez", cumpatrie: "Cumpătrie",
+  wedding: "Nuntă", baptism: "Botez", cumatrie: "Cumătrie",
   corporate: "Corporate", birthday: "Aniversare", concert: "Concert",
   other: "Altele",
 };

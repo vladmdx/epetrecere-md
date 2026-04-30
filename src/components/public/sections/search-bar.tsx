@@ -26,7 +26,7 @@ const eventTypes = [
   { value: "", label: "Toate", icon: Sparkles },
   { value: "wedding", label: "Nuntă", icon: Heart },
   { value: "baptism", label: "Botez", icon: Baby },
-  { value: "cumpatrie", label: "Cumpătrie", icon: Users },
+  { value: "cumatrie", label: "Cumătrie", icon: Users },
   { value: "corporate", label: "Corporate", icon: Building2 },
   { value: "birthday", label: "Aniversare", icon: PartyPopper },
 ];
