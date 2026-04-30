@@ -28,6 +28,7 @@ import {
   getCategoryEmoji,
   isCategoryAllowedForEvent,
 } from "@/lib/wizard/categories-meta";
+import { MOLDOVA_CITIES } from "@/lib/moldova-cities";
 
 // ═══════════════════════════════════════════════
 // TYPES
@@ -107,7 +108,7 @@ function deriveTimeSlot(startTime: string): string {
 const initialData: WizardData = {
   eventType: "",
   eventDate: "",
-  location: "",
+  location: "Chișinău",
   startTime: "",
   durationHours: 5,
   timeSlot: "",
@@ -498,7 +499,8 @@ function StepEventType({ data, update, autoNext }: StepProps) {
   );
 }
 
-const cities = ["Chișinău", "Bălți", "Cahul", "Orhei", "Ungheni", "Soroca", "Comrat", "Edineț"];
+// Source-of-truth list of localities lives in @/lib/moldova-cities.ts so
+// every picker (wizard, /dashboard/setari, onboarding) stays in sync.
 
 /** Shown below the duration field as quick-pick presets. Wedding gets
  *  the "all day" helper; everything else shows sensible alternatives so
@@ -550,22 +552,20 @@ function StepDate({ data, update }: StepProps) {
 
         <div>
           <Label>{t("form.location")} *</Label>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {cities.map((city) => (
-              <button
-                key={city}
-                onClick={() => update({ location: city })}
-                className={cn(
-                  "rounded-lg border px-4 py-2 text-sm transition-all",
-                  data.location === city
-                    ? "border-gold bg-gold/10 text-gold font-medium"
-                    : "border-border/40 hover:border-gold/30",
-                )}
-              >
+          <select
+            value={data.location || "Chișinău"}
+            onChange={(e) => update({ location: e.target.value })}
+            className="mt-2 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            {MOLDOVA_CITIES.map((city) => (
+              <option key={city} value={city}>
                 {city}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Chișinău + Top 5 orașe sunt primele, restul în ordine alfabetică.
+          </p>
         </div>
 
         {/* Start time + duration replace the old morning/afternoon/evening

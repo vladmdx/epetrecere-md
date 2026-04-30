@@ -7,11 +7,14 @@
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  artists,
   bookingRequests,
   calendarEvents,
   workSchedule,
   venues,
 } from "@/lib/db/schema";
+
+import { DEFAULT_BUFFER_MINUTES } from "@/lib/moldova-cities";
 
 /** Booking statuses that "hold" a time slot — can't be double-booked. */
 const BLOCKING_STATUSES = [
@@ -110,6 +113,17 @@ export async function checkArtistAvailability(opts: {
   const { artistId, eventDate, excludeBookingId } = opts;
   const targetStart = toMinutes(opts.startTime);
   const targetEnd = toEndMinutes(opts.endTime, targetStart);
+
+  // Pull the artist's buffer setting (minutes between bookings). This is
+  // ADDED to the END of every existing booking when checking for conflicts,
+  // so a booking ending at 16:00 with a 15-min buffer is treated as taking
+  // the slot until 16:15 from the next-client's perspective.
+  const [artistRow] = await db
+    .select({ bufferMinutes: artists.bufferMinutes })
+    .from(artists)
+    .where(eq(artists.id, artistId))
+    .limit(1);
+  const artistBufferMinutes = artistRow?.bufferMinutes ?? DEFAULT_BUFFER_MINUTES;
 
   // 0. Check the artist's weekly working hours (if any are configured).
   // We only enforce this when the artist has at least one row in
@@ -210,11 +224,13 @@ export async function checkArtistAvailability(opts: {
       ),
     );
 
-  // 3. Check each for overlap
+  // 3. Check each for overlap. Existing booking's end-time is extended by
+  // the artist's bufferMinutes to enforce a gap between gigs.
   for (const b of bookings) {
     const bStart = toMinutes(b.startTime);
     const bEnd = toEndMinutes(b.endTime, bStart);
-    if (rangesOverlap(targetStart, targetEnd, bStart, bEnd)) {
+    const bEndPadded = bEnd === null ? null : bEnd + artistBufferMinutes;
+    if (rangesOverlap(targetStart, targetEnd, bStart, bEndPadded)) {
       return {
         available: false,
         conflict: {
@@ -246,6 +262,14 @@ export async function checkVenueAvailability(opts: {
   const { venueId, eventDate, excludeBookingId } = opts;
   const targetStart = toMinutes(opts.startTime);
   const targetEnd = toEndMinutes(opts.endTime, targetStart);
+
+  // Pull the venue's bufferMinutes (gap between events on same day).
+  const [venueRow] = await db
+    .select({ bufferMinutes: venues.bufferMinutes })
+    .from(venues)
+    .where(eq(venues.id, venueId))
+    .limit(1);
+  const venueBufferMinutes = venueRow?.bufferMinutes ?? DEFAULT_BUFFER_MINUTES;
 
   // 0. Check venue working hours
   if (targetStart !== null && targetEnd !== null) {
@@ -310,7 +334,8 @@ export async function checkVenueAvailability(opts: {
   for (const b of bookings) {
     const bStart = toMinutes(b.startTime);
     const bEnd = toEndMinutes(b.endTime, bStart);
-    if (rangesOverlap(targetStart, targetEnd, bStart, bEnd)) {
+    const bEndPadded = bEnd === null ? null : bEnd + venueBufferMinutes;
+    if (rangesOverlap(targetStart, targetEnd, bStart, bEndPadded)) {
       return {
         available: false,
         conflict: {

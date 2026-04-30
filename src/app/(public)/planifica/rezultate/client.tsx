@@ -203,6 +203,10 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
           qs.set("date", wizard!.eventDate);
           if (categoryId !== undefined) qs.set("category", String(categoryId));
           if (wizard!.budget > 0) qs.set("price_max", String(wizard!.budget));
+          // Filter by event city — only artists whose base_city matches OR
+          // whose travel_distance_km covers it should appear. The API
+          // resolves the actual distance check.
+          if (wizard!.location) qs.set("city", wizard!.location);
 
           const res = await fetch(`/api/artists?${qs.toString()}`);
           if (!res.ok) throw new Error("artists fetch failed");

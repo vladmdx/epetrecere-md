@@ -31,6 +31,7 @@ import { Save, Loader2, SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
 import { IcalSubscribeCard } from "@/components/vendor/ical-subscribe-card";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
+import { MOLDOVA_CITIES, TRAVEL_DISTANCE_OPTIONS } from "@/lib/moldova-cities";
 import { ReferralCard } from "@/components/shared/referral-card";
 import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
 import { NotificationSoundToggle } from "@/components/shared/notification-sound-toggle";
@@ -41,6 +42,11 @@ type ArtistSettings = {
   id: number;
   calendarEnabled: boolean;
   bufferHours: number;
+  bufferMinutes: number;
+  baseCity: string;
+  travelDistanceKm: number;
+  travelSurchargeEnabled: boolean;
+  travelSurchargeAmount: number | null;
   autoReplyEnabled: boolean;
   autoReplyMessage: string;
 };
@@ -49,6 +55,7 @@ type VenueSettings = {
   kind: "venue";
   id: number;
   calendarEnabled: boolean;
+  bufferMinutes: number;
 };
 
 type Loaded = ArtistSettings | VenueSettings | { kind: "none" };
@@ -77,6 +84,11 @@ export default function VendorSettingsPage() {
               id: Number(a.id),
               calendarEnabled: Boolean(a.calendarEnabled),
               bufferHours: Number(a.bufferHours ?? 2),
+              bufferMinutes: Number(a.bufferMinutes ?? 15),
+              baseCity: (a.baseCity as string) || "Chișinău",
+              travelDistanceKm: Number(a.travelDistanceKm ?? 30),
+              travelSurchargeEnabled: Boolean(a.travelSurchargeEnabled),
+              travelSurchargeAmount: a.travelSurchargeAmount == null ? null : Number(a.travelSurchargeAmount),
               autoReplyEnabled: Boolean(a.autoReplyEnabled),
               autoReplyMessage:
                 (a.autoReplyMessage as string) ?? DEFAULT_AUTO_REPLY,
@@ -94,6 +106,7 @@ export default function VendorSettingsPage() {
               kind: "venue",
               id: Number(v.id),
               calendarEnabled: Boolean(v.calendarEnabled),
+              bufferMinutes: Number(v.bufferMinutes ?? 15),
             });
             setLoading(false);
             return;
@@ -130,6 +143,11 @@ export default function VendorSettingsPage() {
             id: state.id,
             calendarEnabled: state.calendarEnabled,
             bufferHours: state.bufferHours,
+            bufferMinutes: state.bufferMinutes,
+            baseCity: state.baseCity,
+            travelDistanceKm: state.travelDistanceKm,
+            travelSurchargeEnabled: state.travelSurchargeEnabled,
+            travelSurchargeAmount: state.travelSurchargeAmount,
             autoReplyEnabled: state.autoReplyEnabled,
             autoReplyMessage: state.autoReplyMessage,
           }),
@@ -144,6 +162,7 @@ export default function VendorSettingsPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             calendarEnabled: state.calendarEnabled,
+            bufferMinutes: state.bufferMinutes,
           }),
         });
         if (!res.ok) {
@@ -240,32 +259,153 @@ export default function VendorSettingsPage() {
             />
           </div>
 
-          {state.kind === "artist" && (
+          {/* Buffer between bookings (minutes). 15 default, configurable up
+              to 90 in 15-min steps. Replaces the legacy bufferHours field
+              for the client-facing calendar — when an event ends 16:00 with
+              a 15-min buffer, the client sees the next slot start at 16:15. */}
+          {(state.kind === "artist" || state.kind === "venue") && (
             <div className="flex items-center justify-between">
               <div>
-                <Label>Buffer între evenimente (ore)</Label>
+                <Label>Buffer între evenimente</Label>
                 <p className="text-xs text-muted-foreground">
-                  Cât timp pauză între două rezervări consecutive.
+                  Pauză minimă între două rezervări consecutive. Dacă un
+                  eveniment se termină la 16:00 și ai 15 min buffer, clienții
+                  văd următorul slot disponibil de la 16:15.
                 </p>
               </div>
-              <Input
-                type="number"
-                min={0}
-                max={48}
-                value={state.bufferHours}
+              <select
+                value={state.bufferMinutes}
                 onChange={(e) =>
                   setState((prev) =>
-                    prev.kind === "artist"
-                      ? { ...prev, bufferHours: Number(e.target.value) }
-                      : prev,
+                    prev.kind === "none"
+                      ? prev
+                      : { ...prev, bufferMinutes: Number(e.target.value) },
                   )
                 }
-                className="w-24"
-              />
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {[15, 30, 45, 60, 75, 90].map((m) => (
+                  <option key={m} value={m}>
+                    {m} min
+                  </option>
+                ))}
+              </select>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Travel settings — artist only. Determines which events the artist
+          appears in (city + max distance) and whether they charge a travel
+          surcharge for events outside their base city. */}
+      {state.kind === "artist" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Locație și deplasare</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Stabilește orașul de bază și distanța maximă la care te deplasezi.
+              Clienții care planifică evenimente în afara razei tale nu te vor
+              vedea în rezultate.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <Label>Orașul de bază</Label>
+                <p className="text-xs text-muted-foreground">
+                  Punctul de pornire pentru calculul distanței.
+                </p>
+              </div>
+              <select
+                value={state.baseCity}
+                onChange={(e) =>
+                  setState((prev) =>
+                    prev.kind === "artist"
+                      ? { ...prev, baseCity: e.target.value }
+                      : prev,
+                  )
+                }
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[200px]"
+              >
+                {MOLDOVA_CITIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <Label>Distanța maximă de deplasare</Label>
+                <p className="text-xs text-muted-foreground">
+                  Cât de departe ești dispus să mergi pentru un eveniment.
+                </p>
+              </div>
+              <select
+                value={state.travelDistanceKm}
+                onChange={(e) =>
+                  setState((prev) =>
+                    prev.kind === "artist"
+                      ? { ...prev, travelDistanceKm: Number(e.target.value) }
+                      : prev,
+                  )
+                }
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[200px]"
+              >
+                {TRAVEL_DISTANCE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Plată suplimentară pentru deplasare</Label>
+                <p className="text-xs text-muted-foreground">
+                  Activează dacă percepi o sumă fixă pentru evenimente în afara
+                  orașului de bază.
+                </p>
+              </div>
+              <Switch
+                checked={state.travelSurchargeEnabled}
+                onCheckedChange={(v) =>
+                  setState((prev) =>
+                    prev.kind === "artist"
+                      ? { ...prev, travelSurchargeEnabled: v }
+                      : prev,
+                  )
+                }
+              />
+            </div>
+            {state.travelSurchargeEnabled && (
+              <div className="flex items-center justify-between gap-4">
+                <Label className="flex-1">Sumă deplasare (€)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={1000}
+                  value={state.travelSurchargeAmount ?? ""}
+                  onChange={(e) =>
+                    setState((prev) =>
+                      prev.kind === "artist"
+                        ? {
+                            ...prev,
+                            travelSurchargeAmount: e.target.value
+                              ? Number(e.target.value)
+                              : null,
+                          }
+                        : prev,
+                    )
+                  }
+                  className="w-32"
+                  placeholder="ex: 100"
+                />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* iCal subscription — moved here from the Calendar page so all
           integration/sync settings live together. */}

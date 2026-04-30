@@ -47,12 +47,18 @@ export default function ProfilePage() {
   > | null>(null);
   const [savingEmail, setSavingEmail] = useState(false);
 
-  // Sync phone from Clerk user
+  // Sync phone from Clerk user. Picks any phone (verified preferred) so a
+  // half-finished previous attempt doesn't ghost the new save.
   useEffect(() => {
     if (user) {
       setFirstName(user.firstName || "");
       setLastName(user.lastName || "");
-      setPhoneValue(user.primaryPhoneNumber?.phoneNumber || "");
+      const anyPhone =
+        user.primaryPhoneNumber?.phoneNumber ||
+        user.phoneNumbers.find((p) => p.verification?.status === "verified")?.phoneNumber ||
+        user.phoneNumbers[0]?.phoneNumber ||
+        "";
+      setPhoneValue(anyPhone);
     }
   }, [user]);
 
@@ -98,7 +104,9 @@ export default function ProfilePage() {
       toast.success(
         "Cod de verificare trimis prin SMS. Verifică telefonul.",
       );
-      // For simplicity, open Clerk profile for phone verification
+      // Force-refresh the local user so the UI flips from "Nu ai adăugat"
+      // to "Modifică" immediately, even before verification finishes.
+      await user.reload();
       setEditingPhone(false);
       openUserProfile();
     } catch (err: unknown) {
@@ -165,7 +173,21 @@ export default function ProfilePage() {
     );
   }
 
-  const currentPhone = user?.primaryPhoneNumber?.phoneNumber;
+  // Treat ANY phone on the Clerk user as "current" — not just the primary
+  // one. Without this, users with an unverified phone left over from a
+  // previous attempt would see "Nu ai adăugat" + an "Adaugă" button, but
+  // any new phone they tried to save would fail with "phone already
+  // exists" because Clerk still tracks the unverified leftover. Picking
+  // the verified one first if available keeps the displayed value sane.
+  const currentPhone = (() => {
+    if (!user) return undefined;
+    if (user.primaryPhoneNumber?.phoneNumber) return user.primaryPhoneNumber.phoneNumber;
+    const verified = user.phoneNumbers.find(
+      (p) => p.verification?.status === "verified",
+    );
+    if (verified) return verified.phoneNumber;
+    return user.phoneNumbers[0]?.phoneNumber;
+  })();
   const currentEmail = user?.primaryEmailAddress?.emailAddress;
 
   return (

@@ -85,6 +85,7 @@ const updateSchema = z.object({
   autoReplyEnabled: z.boolean().optional(),
   autoReplyMessage: z.string().nullable().optional(),
   bufferHours: z.number().int().min(0).max(24).nullable().optional(),
+  bufferMinutes: z.number().int().min(15).max(180).optional(),
   workingHours: z
     .object({
       mon: z

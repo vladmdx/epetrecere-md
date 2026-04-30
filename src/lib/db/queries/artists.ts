@@ -70,16 +70,28 @@ export async function getArtists(filters: ArtistFilters = {}) {
   if (filters.featured) {
     conditions.push(eq(artists.isFeatured, true));
   }
-  // M2 — location filter (SEO auto-pages). Match the free-text location
-  // column against any of the city's known spellings so "Chișinău" /
-  // "Chisinau" / "Кишинёв" all count.
+  // City filter — matches an artist when:
+  //   1. their base_city equals the requested city (exact match preferred), OR
+  //   2. their travel_distance_km is "all Moldova" (sentinel 999), OR
+  //   3. their free-text location field contains the city name (legacy).
+  // We don't have geocoded coordinates yet, so the km-distance check is a
+  // simple base_city match + "covers all" escape hatch — good enough for
+  // Moldova-scale geography where "Chișinău + suburbii" vs "all Moldova"
+  // is the relevant decision for ~95% of artists.
   const locationNeedles: string[] = [];
   if (filters.cityKeywords?.length) locationNeedles.push(...filters.cityKeywords);
   if (filters.city) locationNeedles.push(filters.city);
   if (locationNeedles.length) {
     const unique = Array.from(new Set(locationNeedles.map((s) => s.trim()).filter(Boolean)));
-    const ilikeConds = unique.map((needle) => ilike(artists.location, `%${needle}%`));
-    const combined = ilikeConds.length === 1 ? ilikeConds[0] : or(...ilikeConds);
+    const conds = [
+      // base_city exact match (case-insensitive)
+      ...unique.map((needle) => ilike(artists.baseCity, needle)),
+      // "all Moldova" travel preference
+      gte(artists.travelDistanceKm, 999),
+      // legacy free-text location contains the city
+      ...unique.map((needle) => ilike(artists.location, `%${needle}%`)),
+    ];
+    const combined = conds.length === 1 ? conds[0] : or(...conds);
     if (combined) conditions.push(combined);
   }
 

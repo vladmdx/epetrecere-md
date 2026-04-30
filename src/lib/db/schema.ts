@@ -284,6 +284,23 @@ export const artists = pgTable("artists", {
   isPremium: boolean("is_premium").default(false).notNull(),
   calendarEnabled: boolean("calendar_enabled").default(false).notNull(),
   bufferHours: integer("buffer_hours").default(2),
+  /** Minutes of buffer between bookings — added to event end time for the
+   *  next-availability check. Default 15, configurable up to 90 from
+   *  /dashboard/setari. Replaces the legacy bufferHours field for the
+   *  client-facing calendar; bufferHours stays for backward compat. */
+  bufferMinutes: integer("buffer_minutes").default(15).notNull(),
+  /** Where the artist is based — used for travel-distance filtering on
+   *  the public discovery grid. Defaults to "Chișinău". */
+  baseCity: text("base_city").default("Chișinău"),
+  /** Max distance the artist will travel from base_city (km). 30 = base
+   *  city + suburbs, 999 = "all Moldova". */
+  travelDistanceKm: integer("travel_distance_km").default(30).notNull(),
+  /** When true, the artist charges extra for travel beyond their base
+   *  city — surfaced in the booking summary so the client knows upfront. */
+  travelSurchargeEnabled: boolean("travel_surcharge_enabled").default(false).notNull(),
+  /** Extra fee (€) for travel. Applied when client picks an event in a
+   *  different city than baseCity. */
+  travelSurchargeAmount: integer("travel_surcharge_amount"),
   sortOrder: integer("sort_order").default(0),
   // Feature 14 — auto-reply on new booking request. When enabled, the message
   // is emailed to the client the moment their request lands, reducing bounce.
@@ -407,6 +424,9 @@ export const venues = pgTable("venues", {
     .default([]),
   /** Hours between bookings (venue might need setup/teardown time). */
   bufferHours: integer("buffer_hours").default(0),
+  /** Minutes of buffer between bookings (parallel to artists.bufferMinutes).
+   *  Default 15, configurable from /dashboard/sala/setari. */
+  bufferMinutes: integer("buffer_minutes").default(15).notNull(),
   /** Weekly opening hours keyed by ISO weekday (mon..sun). Each entry
    *  is `{ open: "HH:mm", close: "HH:mm" }` or null meaning closed.
    *  Null at the column level = not configured (public page shows "la cerere"). */
