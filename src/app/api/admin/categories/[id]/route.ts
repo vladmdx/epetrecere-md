@@ -43,6 +43,14 @@ export async function PATCH(
       update.badge = v.trim().slice(0, 40);
     }
   }
+  if (Object.prototype.hasOwnProperty.call(body, "imageAlt")) {
+    const v = body.imageAlt;
+    if (v === null || v === "") {
+      update.imageAlt = null;
+    } else if (typeof v === "string") {
+      update.imageAlt = v.trim().slice(0, 200);
+    }
+  }
   if (Object.prototype.hasOwnProperty.call(body, "icon")) {
     const v = body.icon;
     if (v === null || v === "") {

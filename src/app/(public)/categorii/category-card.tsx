@@ -9,12 +9,14 @@ interface Props {
   slug: string;
   name: string;
   image: string | null;
+  /** Admin-supplied alt text for SEO/screen readers. Falls back to name. */
+  imageAlt?: string | null;
   priceFrom: number | null;
   /** Admin-controlled label rendered as a pill in the top-right. */
   badge?: string | null;
 }
 
-export function CategoryCard({ slug, name, image, priceFrom, badge }: Props) {
+export function CategoryCard({ slug, name, image, imageAlt, priceFrom, badge }: Props) {
   const emoji = getCategoryEmoji(slug);
   return (
     <Link
@@ -26,7 +28,7 @@ export function CategoryCard({ slug, name, image, priceFrom, badge }: Props) {
           <>
             <img
               src={image}
-              alt={name}
+              alt={imageAlt || name}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
               loading="lazy"
             />

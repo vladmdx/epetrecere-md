@@ -222,6 +222,9 @@ export const categories = pgTable("categories", {
   descriptionEn: text("description_en"),
   icon: text("icon"),
   imageUrl: text("image_url"),
+  /** HTML `alt` attribute for the category image — used by screen readers
+   *  and crawlers. Falls back to nameRo when null. */
+  imageAlt: text("image_alt"),
   /** Optional short label rendered as a small pill on category cards.
    *  Distinct from the slug — admins set it from /admin/categorii ("Nou",
    *  "Popular", "Hot", etc.). Free-form, displayed verbatim. */

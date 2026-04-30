@@ -107,6 +107,7 @@ export default async function AllCategoriesPage() {
                     slug={cat.slug}
                     name={cat.nameRo}
                     image={cat.imageUrl ?? LOCAL_IMAGES[cat.slug] ?? null}
+                    imageAlt={cat.imageAlt}
                     priceFrom={cat.priceFrom}
                     badge={cat.badge}
                   />
@@ -131,6 +132,7 @@ export default async function AllCategoriesPage() {
                     slug={cat.slug}
                     name={cat.nameRo}
                     image={cat.imageUrl ?? LOCAL_IMAGES[cat.slug] ?? null}
+                    imageAlt={cat.imageAlt}
                     priceFrom={cat.priceFrom}
                     badge={cat.badge}
                   />

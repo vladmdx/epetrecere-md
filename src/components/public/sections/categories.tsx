@@ -82,6 +82,7 @@ interface CategoryRow {
   nameRu: string | null;
   nameEn: string | null;
   imageUrl: string | null;
+  imageAlt: string | null;
   badge: string | null;
   priceFrom: number | null;
   isActive?: boolean;
@@ -124,6 +125,7 @@ export function CategoriesSection() {
       slug,
       name: localizedName,
       image: db?.imageUrl || LOCAL_IMAGES[slug] || "",
+      imageAlt: db?.imageAlt || localizedName, // fallback to localized name
       badge: db?.badge ?? null,
       priceFrom: db?.priceFrom ?? null,
     };
@@ -159,7 +161,7 @@ export function CategoriesSection() {
                 <div className="relative aspect-[4/3] overflow-hidden">
                   <img
                     src={cat.image}
-                    alt={cat.name}
+                    alt={cat.imageAlt}
                     className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
                     loading="lazy"
                   />

@@ -41,6 +41,7 @@ interface Category {
   isActive: boolean;
   icon: string | null;
   imageUrl: string | null;
+  imageAlt: string | null;
   badge: string | null;
   sortOrder: number | null;
 }
@@ -131,6 +132,7 @@ export default function CategoriesPage() {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Category | null>(null);
   const [imageUrl, setImageUrl] = useState("");
+  const [imageAlt, setImageAlt] = useState("");
   const [badge, setBadge] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -162,12 +164,14 @@ export default function CategoriesPage() {
   function openEdit(cat: Category) {
     setEditing(cat);
     setImageUrl(cat.imageUrl || "");
+    setImageAlt(cat.imageAlt || "");
     setBadge(cat.badge || "");
   }
 
   function closeEdit() {
     setEditing(null);
     setImageUrl("");
+    setImageAlt("");
     setBadge("");
   }
 
@@ -200,6 +204,7 @@ export default function CategoriesPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: imageUrl || null,
+          imageAlt: imageAlt.trim() || null,
           badge: badge.trim() || null,
         }),
       });
@@ -341,6 +346,25 @@ export default function CategoriesPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Image alt text — HTML alt attribute, used for SEO + screen
+                readers. Falls back to the category name when empty. */}
+            <div>
+              <Label htmlFor="imageAlt" className="mb-2 block">
+                Tag alt al imaginii (SEO + accesibilitate)
+              </Label>
+              <Input
+                id="imageAlt"
+                placeholder={`ex: "DJ profesional la nuntă în Chișinău"`}
+                value={imageAlt}
+                onChange={(e) => setImageAlt(e.target.value)}
+                maxLength={200}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Descrie imaginea în câteva cuvinte. E folosit de Google și de cititoarele de ecran.
+                Lasă gol pentru a folosi numele categoriei automat.
+              </p>
             </div>
 
             {/* Badge */}
