@@ -72,6 +72,7 @@ export default function OnboardingPage() {
     travelSurchargeEnabled: false,
     travelSurchargeAmount: 0,
     priceFrom: 0,
+    priceHidden: false,
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -224,6 +225,7 @@ export default function OnboardingPage() {
               travelSurchargeAmount: data.travelSurchargeEnabled
                 ? data.travelSurchargeAmount
                 : null,
+              priceHidden: data.priceHidden,
             }),
           });
         } catch {
@@ -529,18 +531,41 @@ export default function OnboardingPage() {
               setează ulterior din /dashboard/tarife.
             </p>
           </div>
-          <div>
-            <Label>Preț de start (€) — opțional</Label>
-            <Input
-              type="number"
-              min={0}
-              value={data.priceFrom || ""}
-              onChange={(e) => update({ priceFrom: Number(e.target.value) })}
-              placeholder="ex: 200"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Lasă gol dacă încă nu ai un preț stabilit — îl poți adăuga ulterior.
-            </p>
+          {!data.priceHidden && (
+            <div>
+              <Label>Preț de start (€) — opțional</Label>
+              <Input
+                type="number"
+                min={0}
+                value={data.priceFrom || ""}
+                onChange={(e) => update({ priceFrom: Number(e.target.value) })}
+                placeholder="ex: 200"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Lasă gol dacă încă nu ai un preț stabilit — îl poți adăuga ulterior.
+              </p>
+            </div>
+          )}
+          {/* Toggle "ascunde prețul" — for artists with negotiated pricing.
+              When enabled, clients see "Preț la cerere" + a "request quote"
+              form instead of "Solicită rezervare". */}
+          <div className="rounded-lg border border-border/40 bg-background/50 p-4">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={data.priceHidden}
+                onChange={(e) => update({ priceHidden: e.target.checked, priceFrom: e.target.checked ? 0 : data.priceFrom })}
+                className="mt-1 h-4 w-4 rounded border-input"
+              />
+              <div className="flex-1">
+                <p className="text-sm font-medium">Nu indica prețul public</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Clientul va vedea „Preț la cerere" și va trebui să-ți scrie
+                  pentru ofertă personalizată. Util pentru tarife negociabile
+                  (în funcție de eveniment, durată, zonă etc.).
+                </p>
+              </div>
+            </label>
           </div>
         </div>
       )}

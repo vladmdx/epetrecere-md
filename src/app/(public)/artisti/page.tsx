@@ -23,6 +23,9 @@ export default async function ArtistsPage({ searchParams }: Props) {
   const filters = {
     search: (sp.q as string) || undefined,
     categoryId: sp.category ? Number(sp.category) : undefined,
+    // City filter — passed by the homepage search bar. Matches base_city
+    // OR travel_distance_km>=999 (artists who cover all Moldova).
+    city: (sp.city as string) || undefined,
     sort: (sp.sort as "popular" | "price_asc" | "price_desc" | "rating" | "newest") || "popular",
     page: sp.page ? Number(sp.page) : 1,
     priceMin: sp.price_min ? Number(sp.price_min) : undefined,

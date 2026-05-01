@@ -2,15 +2,17 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { CustomCalendar } from "@/components/public/custom-calendar";
 import { useLocale } from "@/hooks/use-locale";
 import {
-  Search, ChevronDown,
-  Heart, Baby, Users, Building2, PartyPopper, Sparkles,
+  Search, ChevronDown, MapPin,
+  Sparkles,
   Mic2, Disc3, Music2, Guitar, Camera, Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MOLDOVA_CITIES, DEFAULT_CITY } from "@/lib/moldova-cities";
 
 function getTomorrow() {
   const d = new Date();
@@ -22,14 +24,15 @@ function formatDate(d: Date) {
   return d.toISOString().split("T")[0];
 }
 
-const eventTypes = [
-  { value: "", label: "Toate", icon: Sparkles },
-  { value: "wedding", label: "Nuntă", icon: Heart },
-  { value: "baptism", label: "Botez", icon: Baby },
-  { value: "cumatrie", label: "Cumătrie", icon: Users },
-  { value: "corporate", label: "Corporate", icon: Building2 },
-  { value: "birthday", label: "Aniversare", icon: PartyPopper },
-];
+// Localitati: full Moldova list. Default Chișinău. The first slot used to
+// be event-type — replaced now because the homepage search drives the
+// "find an artist near me" flow rather than full event planning (that
+// lives on /planifica).
+const localityItems = MOLDOVA_CITIES.map((city) => ({
+  value: city,
+  label: city,
+  icon: MapPin,
+}));
 
 const categories = [
   { value: "", label: "Toate", icon: Sparkles },
@@ -116,17 +119,28 @@ function CustomDropdown({
 export function SearchBarSection() {
   const { t } = useLocale();
   const router = useRouter();
-  const [eventType, setEventType] = useState("");
+  const { isSignedIn, isLoaded } = useUser();
+  const [city, setCity] = useState(DEFAULT_CITY);
   const [date, setDate] = useState(getTomorrow());
   const [category, setCategory] = useState("");
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const params = new URLSearchParams();
-    if (eventType) params.set("event_type", eventType);
+    if (city) params.set("city", city);
     if (date) params.set("date", formatDate(date));
     if (category) params.set("category", category);
-    router.push(`/artisti?${params.toString()}`);
+    const target = `/artisti?${params.toString()}`;
+
+    // Free artists for a specific locality+date are gated behind login —
+    // the public /artisti list shows everyone, but the city-scoped search
+    // is more sensitive (private contact info, calendar). Anonymous users
+    // bounce through sign-in and land back on the search results.
+    if (isLoaded && !isSignedIn) {
+      router.push(`/sign-in?redirect_url=${encodeURIComponent(target)}`);
+      return;
+    }
+    router.push(target);
   }
 
   return (
@@ -136,10 +150,10 @@ export function SearchBarSection() {
         className="mx-auto flex max-w-5xl flex-col gap-3 px-4 sm:flex-row sm:items-end lg:px-8"
       >
         <CustomDropdown
-          label={t("search.event_type")}
-          items={eventTypes}
-          value={eventType}
-          onChange={setEventType}
+          label={t("search.location") ?? "Localitate"}
+          items={localityItems}
+          value={city}
+          onChange={setCity}
         />
 
         <CustomCalendar

@@ -174,15 +174,19 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
 
     try {
       // Use /api/booking-requests when targeting a specific vendor (artist or
-      // venue). For venues we always use this path so the request lands in the
-      // venue's "Rezervări" inbox. Falls back to /api/leads for form-only
-      // inquiries without a vendor target.
-      const usePlanFlow = !!((artistId && eventPlanId) || venueId);
-      const payload = usePlanFlow
+      // venue) — even WITHOUT an event plan. This is the new standalone
+      // booking flow: client books directly from artist profile and the
+      // request lands in /cabinet/rezervari + the partner's inbox just like
+      // event-plan bookings (eventPlanId stays null).
+      // Falls back to /api/leads only for vendor-less form inquiries.
+      const useBookingFlow = !!(artistId || venueId);
+      const payload = useBookingFlow
         ? {
             artistId: artistId ?? undefined,
             venueId: venueId ?? undefined,
-            eventPlanId,
+            // eventPlanId is OPTIONAL — included when present, omitted for
+            // standalone bookings.
+            ...(eventPlanId ? { eventPlanId } : {}),
             clientName: form.get("name") as string,
             clientPhone: `+373${form.get("phone") as string}`,
             clientEmail: (form.get("email") as string) || undefined,
@@ -210,7 +214,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
             venueId,
           };
       const res = await fetch(
-        usePlanFlow ? "/api/booking-requests" : "/api/leads",
+        useBookingFlow ? "/api/booking-requests" : "/api/leads",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -219,8 +223,10 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
       );
       if (!res.ok) throw new Error();
       toast.success(
-        usePlanFlow
-          ? "Cererea a fost trimisă și legată de planul tău!"
+        useBookingFlow
+          ? eventPlanId
+            ? "Cererea a fost trimisă și legată de planul tău!"
+            : "Cererea de rezervare a fost trimisă! O vezi în Rezervările Mele."
           : "Cererea de rezervare a fost trimisă! Vă vom contacta în curând.",
       );
       setOpen(false);

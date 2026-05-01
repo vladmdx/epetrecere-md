@@ -47,6 +47,7 @@ type ArtistSettings = {
   travelDistanceKm: number;
   travelSurchargeEnabled: boolean;
   travelSurchargeAmount: number | null;
+  priceHidden: boolean;
   autoReplyEnabled: boolean;
   autoReplyMessage: string;
 };
@@ -89,6 +90,7 @@ export default function VendorSettingsPage() {
               travelDistanceKm: Number(a.travelDistanceKm ?? 30),
               travelSurchargeEnabled: Boolean(a.travelSurchargeEnabled),
               travelSurchargeAmount: a.travelSurchargeAmount == null ? null : Number(a.travelSurchargeAmount),
+              priceHidden: Boolean(a.priceHidden),
               autoReplyEnabled: Boolean(a.autoReplyEnabled),
               autoReplyMessage:
                 (a.autoReplyMessage as string) ?? DEFAULT_AUTO_REPLY,
@@ -148,6 +150,7 @@ export default function VendorSettingsPage() {
             travelDistanceKm: state.travelDistanceKm,
             travelSurchargeEnabled: state.travelSurchargeEnabled,
             travelSurchargeAmount: state.travelSurchargeAmount,
+            priceHidden: state.priceHidden,
             autoReplyEnabled: state.autoReplyEnabled,
             autoReplyMessage: state.autoReplyMessage,
           }),
@@ -403,6 +406,42 @@ export default function VendorSettingsPage() {
                 />
               </div>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Price visibility — for artists with negotiated pricing. When ON,
+          public profile shows "Preț la cerere" + a quote-request form
+          instead of the standard "Solicită rezervare". */}
+      {state.kind === "artist" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Preț public</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Controlează cum este afișat tariful tău pe profilul public.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <Label>Nu indica prețul public</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Clientul va vedea „Preț la cerere" și va trebui să-ți scrie
+                  pentru ofertă personalizată. Util când tariful depinde de
+                  durata, locația sau tipul evenimentului.
+                </p>
+              </div>
+              <Switch
+                checked={state.priceHidden}
+                onCheckedChange={(v) =>
+                  setState((prev) =>
+                    prev.kind === "artist"
+                      ? { ...prev, priceHidden: v }
+                      : prev,
+                  )
+                }
+              />
+            </div>
           </CardContent>
         </Card>
       )}

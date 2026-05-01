@@ -24,6 +24,7 @@ import {
   Menu,
   X,
   Heart,
+  Music,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -162,6 +163,15 @@ function NavBody({
           </Link>
         </>
       )}
+
+      {/* Standalone artist booking — between event-plan flow and the tools.
+          Lets clients book an artist without having to start an event plan. */}
+      <SectionHeader label="Rezervare Artist" />
+      <NavLink
+        item={{ href: "/cabinet/rezervare-artist", icon: Music, label: "Rezervă un artist" }}
+        pathname={pathname}
+        onClick={onNavigate}
+      />
 
       <SectionHeader label="Instrumente" />
 

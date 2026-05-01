@@ -28,6 +28,7 @@ interface ArtistData {
   descriptionRu: string | null;
   descriptionEn: string | null;
   priceFrom: number | null;
+  priceHidden?: boolean | null;
   priceCurrency: string | null;
   location: string | null;
   phone: string | null;
@@ -204,7 +205,16 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                     {artist.ratingAvg.toFixed(1)} ({artist.ratingCount} recenzii)
                   </span>
                 ) : null}
-                {artist.priceFrom ? (
+                {/* Price display has 4 states:
+                    1. Artist hides price (priceHidden=true) → "Preț la cerere"
+                    2. Anonymous + has price → "Preț la autentificare" CTA
+                    3. Logged in + has price → show "de la X€"
+                    4. No price set + not hidden → nothing */}
+                {artist.priceHidden ? (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-xs font-medium text-gold/90">
+                    Preț la cerere
+                  </span>
+                ) : artist.priceFrom ? (
                   canSeeContact ? (
                     <span className="font-accent font-semibold text-gold">
                       {t("common.from")} {artist.priceFrom}€
@@ -444,18 +454,49 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* CTA Buttons */}
+          {/* CTA Buttons — branch by auth + price visibility:
+              - Anonymous → single big "Înregistrează-te ca să vezi
+                disponibilitatea și prețul" CTA
+              - Logged in + price hidden → only "Cere ofertă" form
+                (RequestPriceForm), no booking button (price negotiated)
+              - Logged in + price visible → both Cere preț + Solicită
+                rezervare buttons (existing UX) */}
           <div className="space-y-3 lg:sticky lg:top-20">
-            <RequestPriceForm artistId={artist.id} />
-            <RequestBookingForm
-              artistId={artist.id}
-              eventPlanId={eventPlanId}
-              icon={<CalendarDays className="h-4 w-4" />}
-            />
-            {eventPlanId && (
-              <p className="text-center text-[11px] text-gold/70">
-                Rezervarea va fi legată de planul tău.
-              </p>
+            {!canSeeContact ? (
+              <a
+                href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
+                className="flex flex-col items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-4 py-5 text-center hover:bg-gold/20"
+              >
+                <Lock className="h-5 w-5 text-gold" />
+                <span className="font-heading font-bold text-gold">
+                  Înregistrează-te pentru rezervare
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  După autentificare poți vedea disponibilitatea, prețul și
+                  poți trimite cerere de rezervare.
+                </span>
+              </a>
+            ) : artist.priceHidden ? (
+              <>
+                <RequestPriceForm artistId={artist.id} />
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Acest artist nu publică tariful — solicită ofertă personalizată.
+                </p>
+              </>
+            ) : (
+              <>
+                <RequestPriceForm artistId={artist.id} />
+                <RequestBookingForm
+                  artistId={artist.id}
+                  eventPlanId={eventPlanId}
+                  icon={<CalendarDays className="h-4 w-4" />}
+                />
+                {eventPlanId && (
+                  <p className="text-center text-[11px] text-gold/70">
+                    Rezervarea va fi legată de planul tău.
+                  </p>
+                )}
+              </>
             )}
             <ChatWidget
               artistId={artist.id}

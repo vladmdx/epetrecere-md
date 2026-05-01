@@ -72,6 +72,7 @@ const artistSchema = z.object({
   travelDistanceKm: z.number().min(0).max(999).optional(),
   travelSurchargeEnabled: z.boolean().optional(),
   travelSurchargeAmount: z.number().min(0).max(10000).nullable().optional(),
+  priceHidden: z.boolean().optional(),
   autoReplyEnabled: z.boolean().optional(),
   autoReplyMessage: z.string().optional(),
   photoUrl: z.string().nullable().optional(),

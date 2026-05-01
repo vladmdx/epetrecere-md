@@ -301,6 +301,11 @@ export const artists = pgTable("artists", {
   /** Extra fee (€) for travel. Applied when client picks an event in a
    *  different city than baseCity. */
   travelSurchargeAmount: integer("travel_surcharge_amount"),
+  /** When true, the artist hides the priceFrom on public profile and
+   *  client sees a "request quote" CTA instead of the standard booking
+   *  form. Useful for artists with non-fixed pricing (negotiated per
+   *  event) who don't want to anchor expectations. */
+  priceHidden: boolean("price_hidden").default(false).notNull(),
   sortOrder: integer("sort_order").default(0),
   // Feature 14 — auto-reply on new booking request. When enabled, the message
   // is emailed to the client the moment their request lands, reducing bounce.
