@@ -506,8 +506,11 @@ function StepEventType({ data, update, autoNext }: StepProps) {
                 )}
                 loading="lazy"
               />
-              {/* Gradient overlay — same as homepage */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+              {/* Gradient overlay — concentrated at the bottom only so the
+                  top half of each photo stays visible. The previous
+                  full-card via-black/40 layer washed out the photos
+                  entirely; matching the homepage CategoriesSection style. */}
+              <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
               {selected && (
                 <div className="absolute inset-0 bg-gold/15" />
               )}
