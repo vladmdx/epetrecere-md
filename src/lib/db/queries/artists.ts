@@ -71,25 +71,29 @@ export async function getArtists(filters: ArtistFilters = {}) {
     conditions.push(eq(artists.isFeatured, true));
   }
   // City filter — matches an artist when:
-  //   1. their base_city equals the requested city (exact match preferred), OR
-  //   2. their travel_distance_km is "all Moldova" (sentinel 999), OR
-  //   3. their free-text location field contains the city name (legacy).
-  // We don't have geocoded coordinates yet, so the km-distance check is a
-  // simple base_city match + "covers all" escape hatch — good enough for
-  // Moldova-scale geography where "Chișinău + suburbii" vs "all Moldova"
-  // is the relevant decision for ~95% of artists.
+  //   1. their base_city equals the requested city (case-insensitive), OR
+  //   2. their travel_distance_km is "all Moldova" (sentinel 999).
+  //
+  // We deliberately DO NOT fall back to ILIKE on the legacy `location`
+  // free-text field. That worked for SEO auto-pages but caused false
+  // positives once base_city was introduced — an artist whose admin set
+  // base_city=Bălți but whose stale location was "Chișinău" would show up
+  // in BOTH cities. base_city is the authoritative declaration now.
+  //
+  // For SEO auto-pages (/artisti/in/[city]/[category]) the city slug is
+  // expanded to known spellings via filters.cityKeywords, and we still
+  // check base_city against each one — so "Chișinău", "Chisinau" and
+  // "Кишинёв" all match correctly without needing the legacy field.
   const locationNeedles: string[] = [];
   if (filters.cityKeywords?.length) locationNeedles.push(...filters.cityKeywords);
   if (filters.city) locationNeedles.push(filters.city);
   if (locationNeedles.length) {
     const unique = Array.from(new Set(locationNeedles.map((s) => s.trim()).filter(Boolean)));
     const conds = [
-      // base_city exact match (case-insensitive)
+      // base_city case-insensitive equality with any spelling
       ...unique.map((needle) => ilike(artists.baseCity, needle)),
-      // "all Moldova" travel preference
+      // "all Moldova" travel preference — always shown
       gte(artists.travelDistanceKm, 999),
-      // legacy free-text location contains the city
-      ...unique.map((needle) => ilike(artists.location, `%${needle}%`)),
     ];
     const combined = conds.length === 1 ? conds[0] : or(...conds);
     if (combined) conditions.push(combined);

@@ -21,6 +21,10 @@ export async function GET(req: NextRequest) {
   const filters = {
     categoryId: params.get("category") ? Number(params.get("category")) : undefined,
     search: params.get("q") || undefined,
+    // City filter — passed by the planifica wizard so artists are scoped to
+    // (a) their base_city OR (b) "all Moldova" travel preference. Empty
+    // value (no city in URL) means "show everyone" (legacy behavior).
+    city: params.get("city") || undefined,
     priceMin: params.get("price_min") ? Number(params.get("price_min")) : undefined,
     priceMax: params.get("price_max") ? Number(params.get("price_max")) : undefined,
     ratingMin: params.get("rating_min") ? Number(params.get("rating_min")) : undefined,

@@ -186,12 +186,18 @@ export async function PUT(req: Request) {
   const newSlug = typeof data.slug === "string" ? data.slug : oldSlug;
   const slugChanged = newSlug !== oldSlug;
 
+  // When baseCity is updated, mirror it into the legacy `location` field so
+  // SEO auto-pages and any other code still reading `location` stay in sync.
+  // baseCity is the authoritative source; location is kept around for back-
+  // compat (city-keyword search on /artisti, OG meta, etc.).
+  const setData: Partial<typeof artists.$inferInsert> = { ...data, updatedAt: new Date() };
+  if (typeof data.baseCity === "string" && data.baseCity.trim()) {
+    setData.location = data.baseCity.trim();
+  }
+
   await db
     .update(artists)
-    .set({
-      ...data,
-      updatedAt: new Date(),
-    })
+    .set(setData)
     .where(eq(artists.id, Number(id)));
 
   if (slugChanged) {
