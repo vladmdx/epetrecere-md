@@ -16,10 +16,21 @@ const registerSchema = z.object({
   phone: z.string().min(6),
   email: z.string().email().optional(),
   city: z.string().optional(),
+  // Address is now REQUIRED in the onboarding wizard. Server still accepts
+  // missing for legacy compatibility — onboarding UI enforces it.
   address: z.string().optional(),
   capacityMin: z.number().int().positive().optional(),
   capacityMax: z.number().int().positive().optional(),
   description: z.string().optional(),
+  // Required: at least one image. Onboarding uploads to /api/upload and
+  // passes URL(s) here. First one becomes the cover photo.
+  imageUrls: z.array(z.string().url()).max(10).optional(),
+  // Optional extras — venue can fill any combination during onboarding;
+  // missing ones can be edited later from /dashboard/sala/profil.
+  menuPdfUrl: z.string().url().optional(),
+  menuUrl: z.string().url().optional(), // public website URL with menu
+  virtualTourUrl: z.string().url().optional(),
+  websiteUrl: z.string().url().optional(),
 });
 
 export async function POST(req: Request) {
@@ -126,12 +137,30 @@ export async function POST(req: Request) {
         capacityMin: data.capacityMin ?? null,
         capacityMax: data.capacityMax ?? null,
         descriptionRo: data.description ?? null,
+        website: data.websiteUrl ?? null,
+        menuUrl: data.menuUrl ?? null,
+        menuPdfUrl: data.menuPdfUrl ?? null,
+        virtualTourUrl: data.virtualTourUrl ?? null,
         isActive: false,
         isFeatured: false,
         facilities: [],
         seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
       })
       .returning();
+
+    // Create venue_images rows. First image is the cover (isCover=true).
+    if (data.imageUrls && data.imageUrls.length > 0) {
+      const { venueImages } = await import("@/lib/db/schema");
+      await db.insert(venueImages).values(
+        data.imageUrls.map((url, idx) => ({
+          venueId: venue.id,
+          url,
+          isCover: idx === 0,
+          sortOrder: idx,
+          altRo: data.name,
+        })),
+      );
+    }
 
     // Mark onboarding complete
     await db

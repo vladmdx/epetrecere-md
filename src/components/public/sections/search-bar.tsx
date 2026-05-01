@@ -9,7 +9,7 @@ import { useLocale } from "@/hooks/use-locale";
 import {
   Search, ChevronDown, MapPin,
   Sparkles,
-  Mic2, Disc3, Music2, Guitar, Camera, Video,
+  Music,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MOLDOVA_CITIES, DEFAULT_CITY } from "@/lib/moldova-cities";
@@ -34,15 +34,18 @@ const localityItems = MOLDOVA_CITIES.map((city) => ({
   icon: MapPin,
 }));
 
-const categories = [
-  { value: "", label: "Toate", icon: Sparkles },
-  { value: "1", label: "Moderatori", icon: Mic2 },
-  { value: "2", label: "DJ", icon: Disc3 },
-  { value: "3", label: "Cântăreți", icon: Music2 },
-  { value: "4", label: "Formații", icon: Guitar },
-  { value: "5", label: "Fotografi", icon: Camera },
-  { value: "6", label: "Videografi", icon: Video },
+// Default fallback shown on first paint — replaced with full list once
+// /api/categories resolves. Includes the 6 most-clicked categories so the
+// dropdown is never empty even if the request fails.
+const FALLBACK_CATEGORIES = [
+  { value: "", label: "Toate", icon: Sparkles as React.ComponentType<{ className?: string }> },
 ];
+
+interface CategoryItem {
+  value: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
 
 // Custom Dropdown
 function CustomDropdown({
@@ -123,6 +126,43 @@ export function SearchBarSection() {
   const [city, setCity] = useState(DEFAULT_CITY);
   const [date, setDate] = useState(getTomorrow());
   const [category, setCategory] = useState("");
+  // Live category list from /api/categories — replaces the old hardcoded
+  // 6-item array so adding a new category in /admin/categorii surfaces it
+  // here automatically.
+  const [categories, setCategories] = useState<CategoryItem[]>(FALLBACK_CATEGORIES);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/categories", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: unknown) => {
+        if (!alive) return;
+        const list = Array.isArray(rows)
+          ? (rows as Array<{ id: number; nameRo: string; type: string; sortOrder?: number | null }>)
+          : [];
+        // Show artist + service categories (skip venues — they have a
+        // separate filter on /sali). Sort by sortOrder so admins can
+        // reorder via /admin/categorii.
+        const visible = list
+          .filter((c) => c.type === "artist" || c.type === "service")
+          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+          .map<CategoryItem>((c) => ({
+            value: String(c.id),
+            label: c.nameRo,
+            icon: Music,
+          }));
+        if (visible.length > 0) {
+          setCategories([
+            { value: "", label: "Toate", icon: Sparkles },
+            ...visible,
+          ]);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
