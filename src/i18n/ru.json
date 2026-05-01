@@ -53,6 +53,7 @@
   },
   "search": {
     "event_type": "Тип события",
+    "location": "Город",
     "date": "Дата",
     "category": "Категория",
     "search_button": "Найти",

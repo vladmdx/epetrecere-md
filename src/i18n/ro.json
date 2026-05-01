@@ -53,6 +53,7 @@
   },
   "search": {
     "event_type": "Tip Eveniment",
+    "location": "Localitate",
     "date": "Dată",
     "category": "Categorie",
     "search_button": "Caută",

@@ -53,6 +53,7 @@
   },
   "search": {
     "event_type": "Event Type",
+    "location": "Location",
     "date": "Date",
     "category": "Category",
     "search_button": "Search",
