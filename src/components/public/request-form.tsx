@@ -169,8 +169,27 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setLoading(true);
     const form = new FormData(e.currentTarget);
+
+    // Client-side validation — eventDate is required by the API but is
+    // collected via a custom MiniCalendar (no native HTML required attr).
+    // Without this guard, the user submits → the API rejects with 400 and
+    // the catch-all toast says "A apărut o eroare" which is confusing.
+    const useBookingFlow = !!(artistId || venueId);
+    if (useBookingFlow && !eventDate) {
+      toast.error("Selectează data evenimentului ca să trimiți cererea.");
+      return;
+    }
+    if (useBookingFlow && !form.get("name")) {
+      toast.error("Completează numele.");
+      return;
+    }
+    if (useBookingFlow && !form.get("phone")) {
+      toast.error("Completează numărul de telefon.");
+      return;
+    }
+
+    setLoading(true);
 
     try {
       // Use /api/booking-requests when targeting a specific vendor (artist or
@@ -179,7 +198,6 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
       // request lands in /cabinet/rezervari + the partner's inbox just like
       // event-plan bookings (eventPlanId stays null).
       // Falls back to /api/leads only for vendor-less form inquiries.
-      const useBookingFlow = !!(artistId || venueId);
       const payload = useBookingFlow
         ? {
             artistId: artistId ?? undefined,

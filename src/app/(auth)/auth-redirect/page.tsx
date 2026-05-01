@@ -85,6 +85,25 @@ export default function AuthRedirectPage() {
       }
     }
 
+    /** Homepage locality search bar stashes the target /artisti URL when
+     *  it bounces an anonymous user through sign-in. After login we land
+     *  them back on the search results, scoped to their city + date. */
+    function consumeSearchNext(): string | null {
+      try {
+        const raw = sessionStorage.getItem("search-next");
+        if (!raw) return null;
+        sessionStorage.removeItem("search-next");
+        // Allowlist /artisti? and /sali? — these are the public pages the
+        // search bar can produce. Anything else is dropped.
+        if (raw.startsWith("/artisti") || raw.startsWith("/sali")) {
+          return raw;
+        }
+        return null;
+      } catch {
+        return null;
+      }
+    }
+
     async function checkRole() {
       try {
         const email = user?.primaryEmailAddress?.emailAddress;
@@ -141,9 +160,15 @@ export default function AuthRedirectPage() {
           router.replace(intended && intended.startsWith("/dashboard/") ? intended : "/dashboard");
         } else {
           // Existing client — priority order:
-          //   1. Explicit /cabinet/* deep-link (from a public tool landing)
-          //   2. Wizard data → take them into the new plan
-          //   3. Default /cabinet
+          //   1. Search-next (homepage locality search) → /artisti?city=…
+          //   2. Explicit /cabinet/* deep-link (from a public tool landing)
+          //   3. Wizard data → take them into the new plan
+          //   4. Default /cabinet
+          const searchNext = consumeSearchNext();
+          if (searchNext) {
+            router.replace(searchNext);
+            return;
+          }
           const intended = consumeIntendedNext();
           if (intended && intended.startsWith("/cabinet/")) {
             router.replace(intended);
@@ -202,8 +227,14 @@ export default function AuthRedirectPage() {
     }).catch(() => {});
 
     if (selectedRole === "client") {
-      // Same priority as in checkRole — explicit deep-link wins over wizard.
+      // Same priority as in checkRole: search-next > deep-link > wizard.
       try {
+        const search = sessionStorage.getItem("search-next");
+        if (search && (search.startsWith("/artisti") || search.startsWith("/sali"))) {
+          sessionStorage.removeItem("search-next");
+          router.replace(search);
+          return;
+        }
         const raw = sessionStorage.getItem("next-url");
         if (raw && raw.startsWith("/cabinet/")) {
           sessionStorage.removeItem("next-url");

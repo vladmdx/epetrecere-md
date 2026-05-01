@@ -485,11 +485,13 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               </>
             ) : (
               <>
-                <RequestPriceForm artistId={artist.id} />
+                {/* Price already visible above → no separate "Află prețul"
+                    form needed. Just the booking CTA. */}
                 <RequestBookingForm
                   artistId={artist.id}
                   eventPlanId={eventPlanId}
                   icon={<CalendarDays className="h-4 w-4" />}
+                  variant="primary"
                 />
                 {eventPlanId && (
                   <p className="text-center text-[11px] text-gold/70">

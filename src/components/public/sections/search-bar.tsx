@@ -136,8 +136,18 @@ export function SearchBarSection() {
     // the public /artisti list shows everyone, but the city-scoped search
     // is more sensitive (private contact info, calendar). Anonymous users
     // bounce through sign-in and land back on the search results.
+    //
+    // We stash the target in sessionStorage instead of using
+    // ?redirect_url=… because Clerk's forceRedirectUrl="/auth-redirect"
+    // overrides the query param. /auth-redirect picks up "search-next"
+    // and routes there after the role check.
     if (isLoaded && !isSignedIn) {
-      router.push(`/sign-in?redirect_url=${encodeURIComponent(target)}`);
+      try {
+        sessionStorage.setItem("search-next", target);
+      } catch {
+        /* fall through — user lands on /cabinet */
+      }
+      router.push("/sign-in");
       return;
     }
     router.push(target);
