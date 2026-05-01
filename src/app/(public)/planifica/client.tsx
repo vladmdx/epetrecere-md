@@ -459,14 +459,18 @@ interface StepProps {
   autoNext?: () => void;
 }
 
+// Event type cards use the same visual style as the homepage CategoriesSection:
+// real background photo + dark gradient overlay + label. Files in
+// /public/images/event-types/[slug].jpg — admin can replace any without
+// touching this code.
 const eventTypes = [
-  { value: "wedding", icon: "💒" },
-  { value: "baptism", icon: "👶" },
-  { value: "cumatrie", icon: "🎉" },
-  { value: "corporate", icon: "🏢" },
-  { value: "birthday", icon: "🎂" },
-  { value: "concert", icon: "🎵" },
-  { value: "other", icon: "✨" },
+  { value: "wedding", image: "/images/event-types/wedding.jpg" },
+  { value: "baptism", image: "/images/event-types/baptism.jpg" },
+  { value: "cumatrie", image: "/images/event-types/cumatrie.jpg" },
+  { value: "corporate", image: "/images/event-types/corporate.jpg" },
+  { value: "birthday", image: "/images/event-types/birthday.jpg" },
+  { value: "concert", image: "/images/event-types/concert.jpg" },
+  { value: "other", image: "/images/event-types/other.jpg" },
 ];
 
 function StepEventType({ data, update, autoNext }: StepProps) {
@@ -476,24 +480,51 @@ function StepEventType({ data, update, autoNext }: StepProps) {
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_event_type")}</h2>
       <p className="mb-8 text-muted-foreground">Ce tip de eveniment planifici?</p>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {eventTypes.map((et) => (
-          <button
-            key={et.value}
-            onClick={() => {
-              update({ eventType: et.value });
-              autoNext?.();
-            }}
-            className={cn(
-              "flex flex-col items-center gap-2 rounded-xl border-2 p-6 transition-all",
-              data.eventType === et.value
-                ? "border-gold bg-gold/10 text-gold"
-                : "border-border/40 hover:border-gold/30",
-            )}
-          >
-            <span className="text-3xl">{et.icon}</span>
-            <span className="text-sm font-medium">{t(`event_types.${et.value}`)}</span>
-          </button>
-        ))}
+        {eventTypes.map((et) => {
+          const selected = data.eventType === et.value;
+          return (
+            <button
+              key={et.value}
+              onClick={() => {
+                update({ eventType: et.value });
+                autoNext?.();
+              }}
+              className={cn(
+                "group relative aspect-[4/3] overflow-hidden rounded-xl border-2 transition-all",
+                selected
+                  ? "border-gold ring-2 ring-gold/40"
+                  : "border-border/40 hover:border-gold/50",
+              )}
+            >
+              {/* Background image */}
+              <img
+                src={et.image}
+                alt={t(`event_types.${et.value}`)}
+                className={cn(
+                  "absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110",
+                  selected && "scale-105",
+                )}
+                loading="lazy"
+              />
+              {/* Gradient overlay — same as homepage */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+              {selected && (
+                <div className="absolute inset-0 bg-gold/15" />
+              )}
+              {/* Label */}
+              <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4">
+                <span
+                  className={cn(
+                    "font-heading text-sm font-bold sm:text-base",
+                    selected ? "text-gold" : "text-white",
+                  )}
+                >
+                  {t(`event_types.${et.value}`)}
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
     </div>
   );

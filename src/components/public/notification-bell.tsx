@@ -167,13 +167,25 @@ export function NotificationBell() {
     }
   }
 
+  // Open the dropdown AND eagerly mark everything as read. The user "saw"
+  // the notifications by clicking the bell — counts as viewed even if they
+  // don't click each individual row. Server still keeps the actionUrl, so
+  // they can click into a specific notification later from the dropdown.
+  function toggleAndMarkSeen() {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next && unreadCount > 0) void markAllRead();
+      return next;
+    });
+  }
+
   return (
     <div className="relative" ref={rootRef}>
       <Button
         variant="ghost"
         size="icon"
         className="relative h-9 w-9 rounded-full"
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleAndMarkSeen}
         aria-label="Notificări"
       >
         <Bell className="h-5 w-5" />
