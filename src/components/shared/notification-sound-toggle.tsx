@@ -1,49 +1,36 @@
 "use client";
 
-// Toggle for the soft chime that plays when a new notification arrives.
-// Persisted in localStorage so it stays per-browser. Read by the
-// NotificationBell component before deciding to ring.
+// Toggle for the soft chime played when a new notification or chat
+// message arrives. Persisted in localStorage so it stays per-browser.
+// Read by NotificationBell + ChatBell via the shared sound helper.
 
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Volume2, VolumeX } from "lucide-react";
-
-const KEY = "epetrecere.notification-sound-enabled";
+import {
+  isSoundEnabled,
+  setSoundEnabled,
+  playNotificationChime,
+  playMessageChime,
+} from "@/lib/notifications/sound";
 
 export function NotificationSoundToggle() {
   const [enabled, setEnabled] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const v = localStorage.getItem(KEY);
-    setEnabled(v === null ? true : v === "1");
+    setEnabled(isSoundEnabled());
     setHydrated(true);
   }, []);
 
   function update(next: boolean) {
     setEnabled(next);
-    localStorage.setItem(KEY, next ? "1" : "0");
+    setSoundEnabled(next);
     if (next) {
-      // Quick preview chime so the user hears what they're enabling.
-      try {
-        const AudioCtx =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext })
-            .webkitAudioContext;
-        if (!AudioCtx) return;
-        const ctx = new AudioCtx();
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(880, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.18);
-        gain.gain.setValueAtTime(0.15, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.4);
-      } catch {}
+      // Preview both chimes back-to-back so the user can hear both
+      // sounds (notification first, then message ~500ms later).
+      playNotificationChime();
+      setTimeout(() => playMessageChime(), 500);
     }
   }
 
@@ -58,16 +45,17 @@ export function NotificationSoundToggle() {
           <VolumeX className="h-5 w-5 text-muted-foreground" />
         )}
         <div>
-          <p className="text-sm font-medium">Sunet la notificări</p>
+          <p className="text-sm font-medium">Sunet la notificări și mesaje</p>
           <p className="text-xs text-muted-foreground">
-            Joacă un ton scurt când primești o notificare nouă.
+            Joacă un ton scurt când primești o notificare sau un mesaj nou.
+            Standard: pornit. Click pe comutator pentru a auzi un preview.
           </p>
         </div>
       </div>
       <Switch
         checked={enabled}
         onCheckedChange={update}
-        aria-label="Sunet la notificări"
+        aria-label="Sunet la notificări și mesaje"
       />
     </div>
   );

@@ -7,6 +7,7 @@ import { MessageCircle } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { playMessageChime } from "@/lib/notifications/sound";
 
 interface ConversationPreview {
   id: number;
@@ -40,6 +41,10 @@ export function ChatBell() {
   const [totalUnread, setTotalUnread] = useState(0);
   const [userRole, setUserRole] = useState<"client" | "artist" | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  // Track previous unread count so we only chime on a real RISE — not on
+  // the initial mount or when the user closes the dropdown (which marks
+  // messages as read and the counter naturally drops).
+  const lastUnreadRef = useRef<number | null>(null);
 
   // Detect if user is artist or client
   useEffect(() => {
@@ -69,8 +74,15 @@ export function ChatBell() {
             ? ((c.artistUnread as number) || 0)
             : ((c.clientUnread as number) || 0),
         }));
+        const newTotal = convos.reduce((sum, c) => sum + c.unread, 0);
+        // Chime only when count went UP since last poll (not on initial
+        // mount). The chime helper internally honors the sound preference.
+        if (lastUnreadRef.current !== null && newTotal > lastUnreadRef.current) {
+          playMessageChime();
+        }
+        lastUnreadRef.current = newTotal;
         setConversations(convos);
-        setTotalUnread(convos.reduce((sum, c) => sum + c.unread, 0));
+        setTotalUnread(newTotal);
       }
     } catch {
       // silent

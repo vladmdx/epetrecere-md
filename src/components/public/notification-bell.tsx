@@ -19,6 +19,7 @@ import { Bell, Check, Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { playNotificationChime } from "@/lib/notifications/sound";
 
 interface Notification {
   id: number;
@@ -39,36 +40,6 @@ const HIDDEN_TYPES = new Set([
   "chat_new",
   "conversation_new",
 ]);
-
-const SOUND_PREF_KEY = "epetrecere.notification-sound-enabled";
-
-function isSoundEnabled(): boolean {
-  if (typeof window === "undefined") return true;
-  const v = localStorage.getItem(SOUND_PREF_KEY);
-  return v === null ? true : v === "1";
-}
-
-function playChime() {
-  try {
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioCtx) return;
-    const ctx = new AudioCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.18);
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
-  } catch {}
-}
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -103,13 +74,14 @@ export function NotificationBell() {
       const filtered = all.filter((n) => !HIDDEN_TYPES.has(n.type));
       const unread = filtered.filter((n) => !n.isRead).length;
 
-      // If the count went UP since last poll, play a chime.
+      // If the count went UP since last poll, play a chime. The chime
+      // helper internally checks the user's sound preference (on by
+      // default, toggleable from /cabinet/setari + /dashboard/setari).
       if (
         lastUnreadRef.current !== null &&
-        unread > lastUnreadRef.current &&
-        isSoundEnabled()
+        unread > lastUnreadRef.current
       ) {
-        playChime();
+        playNotificationChime();
       }
       lastUnreadRef.current = unread;
 
