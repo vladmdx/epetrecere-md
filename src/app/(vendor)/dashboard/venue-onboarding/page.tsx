@@ -7,7 +7,7 @@
 //   Step 3: Extras (menu PDF, menu URL, virtual tour, website — all optional)
 //   Step 4: Confirmare
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import Image from "next/image";
@@ -47,6 +47,8 @@ export default function VenueOnboardingPage() {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [loadingExisting, setLoadingExisting] = useState(true);
+  const [resubmit, setResubmit] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuInputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState({
@@ -63,6 +65,50 @@ export default function VenueOnboardingPage() {
     virtualTourUrl: "",
     websiteUrl: "",
   });
+
+  // Pre-fill the form if the user already has a venue submission. Approved
+  // venues redirect to the dashboard (admin-edit only). Pending ones load
+  // their existing data so the user can fix what was wrong and re-submit
+  // without re-entering everything from scratch.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/me/venue", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : { venue: null }))
+      .then((res: { venue: Record<string, unknown> | null; images?: Array<{ url: string }> }) => {
+        if (!alive) return;
+        const v = res?.venue;
+        if (!v) return;
+        if (v.isActive) {
+          // Already approved — bounce them into the dashboard. They can edit
+          // through /dashboard/sala/profil from there.
+          router.replace("/dashboard/sala");
+          return;
+        }
+        // Pending — pre-fill the wizard so they can finish/correct + re-submit.
+        setResubmit(true);
+        setData({
+          name: (v.nameRo as string) || "",
+          phone: (v.phone as string) || "",
+          city: (v.city as string) || DEFAULT_CITY,
+          address: (v.address as string) || "",
+          capacityMin: Number(v.capacityMin) || 50,
+          capacityMax: Number(v.capacityMax) || 200,
+          description: (v.descriptionRo as string) || "",
+          imageUrls: Array.isArray(res.images) ? res.images.map((i) => i.url) : [],
+          menuPdfUrl: (v.menuPdfUrl as string) || "",
+          menuUrl: (v.menuUrl as string) || "",
+          virtualTourUrl: (v.virtualTourUrl as string) || "",
+          websiteUrl: (v.website as string) || "",
+        });
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLoadingExisting(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [router]);
 
   function update(partial: Partial<typeof data>) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -198,13 +244,28 @@ export default function VenueOnboardingPage() {
     }
   }
 
+  // While we check whether the user has an existing pending submission,
+  // show a small spinner instead of an empty form. Cheaper UX than a flash
+  // of "Înregistrare" → "Editează cererea".
+  if (loadingExisting) {
+    return (
+      <div className="mx-auto max-w-2xl py-20 text-center">
+        <Loader2 className="mx-auto h-8 w-8 animate-spin text-gold" />
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto max-w-2xl py-12 px-4">
       <div className="mb-8 text-center">
         <Building2 className="mx-auto mb-3 h-10 w-10 text-gold" />
-        <h1 className="font-heading text-2xl font-bold">Înregistrare Sală</h1>
+        <h1 className="font-heading text-2xl font-bold">
+          {resubmit ? "Editează cererea" : "Înregistrare Sală"}
+        </h1>
         <p className="mt-1 text-muted-foreground">
-          Completează datele pentru a publica sala ta pe ePetrecere.md
+          {resubmit
+            ? "Cererea ta este în așteptare. Poți modifica datele și retrimite — nu trebuie să o creezi de la zero."
+            : "Completează datele pentru a publica sala ta pe ePetrecere.md"}
         </p>
       </div>
 
