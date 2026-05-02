@@ -107,16 +107,20 @@ export async function POST(req: Request) {
       }
     }
 
-    // A user may only own one venue through this flow.
-    const existing = await db
-      .select({ id: venues.id })
+    // A user may own only one APPROVED venue through this flow. If they
+    // already have one that's still pending (isActive=false), treat this
+    // submission as a re-submission and UPDATE the pending row instead of
+    // hard-blocking. The previous behavior locked users out forever after
+    // their first incomplete attempt.
+    const [existing] = await db
+      .select({ id: venues.id, isActive: venues.isActive })
       .from(venues)
       .where(eq(venues.userId, appUser.id))
       .limit(1);
 
-    if (existing.length > 0) {
+    if (existing && existing.isActive) {
       return NextResponse.json(
-        { error: "Venue already registered", venueId: existing[0].id },
+        { error: "Venue already registered", venueId: existing.id },
         { status: 409 },
       );
     }
@@ -124,33 +128,68 @@ export async function POST(req: Request) {
     const data = parsed.data;
     const slug = `${slugify(data.name)}-${Date.now().toString(36)}`;
 
-    const [venue] = await db
-      .insert(venues)
-      .values({
-        userId: appUser.id,
-        nameRo: data.name,
-        slug,
-        phone: data.phone,
-        email: data.email ?? appUser.email ?? null,
-        city: data.city ?? "Chișinău",
-        address: data.address ?? null,
-        capacityMin: data.capacityMin ?? null,
-        capacityMax: data.capacityMax ?? null,
-        descriptionRo: data.description ?? null,
-        website: data.websiteUrl ?? null,
-        menuUrl: data.menuUrl ?? null,
-        menuPdfUrl: data.menuPdfUrl ?? null,
-        virtualTourUrl: data.virtualTourUrl ?? null,
-        isActive: false,
-        isFeatured: false,
-        facilities: [],
-        seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
-      })
-      .returning();
+    let venue: typeof venues.$inferSelect;
+    if (existing) {
+      // Re-submission of a still-pending venue — overwrite all editable
+      // fields, keep the original id + slug + createdAt so any in-flight
+      // admin notifications still resolve.
+      const [updated] = await db
+        .update(venues)
+        .set({
+          nameRo: data.name,
+          phone: data.phone,
+          email: data.email ?? appUser.email ?? null,
+          city: data.city ?? "Chișinău",
+          address: data.address ?? null,
+          capacityMin: data.capacityMin ?? null,
+          capacityMax: data.capacityMax ?? null,
+          descriptionRo: data.description ?? null,
+          website: data.websiteUrl ?? null,
+          menuUrl: data.menuUrl ?? null,
+          menuPdfUrl: data.menuPdfUrl ?? null,
+          virtualTourUrl: data.virtualTourUrl ?? null,
+          seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
+          updatedAt: new Date(),
+        })
+        .where(eq(venues.id, existing.id))
+        .returning();
+      venue = updated;
+    } else {
+      const [created] = await db
+        .insert(venues)
+        .values({
+          userId: appUser.id,
+          nameRo: data.name,
+          slug,
+          phone: data.phone,
+          email: data.email ?? appUser.email ?? null,
+          city: data.city ?? "Chișinău",
+          address: data.address ?? null,
+          capacityMin: data.capacityMin ?? null,
+          capacityMax: data.capacityMax ?? null,
+          descriptionRo: data.description ?? null,
+          website: data.websiteUrl ?? null,
+          menuUrl: data.menuUrl ?? null,
+          menuPdfUrl: data.menuPdfUrl ?? null,
+          virtualTourUrl: data.virtualTourUrl ?? null,
+          isActive: false,
+          isFeatured: false,
+          facilities: [],
+          seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
+        })
+        .returning();
+      venue = created;
+    }
 
     // Create venue_images rows. First image is the cover (isCover=true).
+    // On re-submission we wipe the previous images and re-insert — keeps
+    // the new uploads as the source of truth and avoids accumulating
+    // stale URLs from earlier failed attempts.
     if (data.imageUrls && data.imageUrls.length > 0) {
       const { venueImages } = await import("@/lib/db/schema");
+      if (existing) {
+        await db.delete(venueImages).where(eq(venueImages.venueId, venue.id));
+      }
       await db.insert(venueImages).values(
         data.imageUrls.map((url, idx) => ({
           venueId: venue.id,
