@@ -92,6 +92,7 @@ function NavList({
 export function VendorSidebar() {
   const pathname = usePathname();
   const [isVenue, setIsVenue] = useState(false);
+  const [profileSlug, setProfileSlug] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -102,12 +103,15 @@ export function VendorSidebar() {
         if (cancelled) return;
         if (data.artist) {
           setIsVenue(false);
+          setProfileSlug(data.artist.slug ?? null);
           return;
         }
         return fetch("/api/me/venue")
           .then((r) => (r.ok ? r.json() : { venue: null }))
           .then((venueData) => {
-            if (!cancelled) setIsVenue(!!venueData.venue);
+            if (cancelled) return;
+            setIsVenue(!!venueData.venue);
+            setProfileSlug(venueData.venue?.slug ?? null);
           });
       })
       .catch(() => {});
@@ -118,6 +122,13 @@ export function VendorSidebar() {
 
   const navItems = isVenue ? venueNav : artistNav;
   const roleLabel = isVenue ? "Sală" : "Partener";
+  // "Vezi profil" link target — falls back to homepage when slug isn't
+  // resolved yet (mid-onboarding) so the link is never broken.
+  const profileHref = profileSlug
+    ? isVenue
+      ? `/sali/${profileSlug}`
+      : `/artisti/${profileSlug}`
+    : "/";
 
   return (
     <>
@@ -136,12 +147,12 @@ export function VendorSidebar() {
 
         <div className="border-t border-border/40 p-2">
           <Link
-            href="/"
+            href={profileHref}
             target="_blank"
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
           >
             <Globe className="h-4 w-4 shrink-0" />
-            <span>Vezi profilul meu</span>
+            <span>Vezi profil</span>
           </Link>
         </div>
       </aside>
@@ -192,13 +203,13 @@ export function VendorSidebar() {
             />
             <div className="border-t border-border/40 p-2">
               <Link
-                href="/"
+                href={profileHref}
                 target="_blank"
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
               >
                 <Globe className="h-4 w-4 shrink-0" />
-                <span>Vezi profilul meu</span>
+                <span>Vezi profil</span>
               </Link>
             </div>
           </aside>

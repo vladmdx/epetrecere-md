@@ -32,6 +32,7 @@ const RichEditor = dynamic(
   { ssr: false },
 );
 import { MapPicker } from "@/components/shared/map-picker";
+import { MapsAutofill } from "@/components/vendor/maps-autofill";
 import { VenueGalleryManager } from "@/components/vendor/venue-gallery-manager";
 import {
   WorkingHoursEditor,
@@ -359,6 +360,16 @@ export default function VenueProfilePage() {
                   onChange={(e) => update({ website: e.target.value })}
                 />
               </div>
+              {/* Google Maps autofill — same component as on onboarding.
+                  Pasting a Maps link rewrites city + address in one shot. */}
+              <MapsAutofill
+                onResult={(r) => {
+                  update({
+                    address: r.address || venue.address,
+                    city: r.city || venue.city,
+                  });
+                }}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Oraș</Label>

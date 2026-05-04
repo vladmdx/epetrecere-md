@@ -33,7 +33,7 @@ export default async function VenueDashboardLayout({
   }
 
   const [venueRecord] = await db
-    .select({ id: venues.id, nameRo: venues.nameRo })
+    .select({ id: venues.id, nameRo: venues.nameRo, slug: venues.slug })
     .from(venues)
     .where(eq(venues.userId, appUser.id))
     .limit(1);
@@ -48,7 +48,10 @@ export default async function VenueDashboardLayout({
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <VenueSidebar venueName={venueRecord?.nameRo ?? null} />
+      <VenueSidebar
+        venueName={venueRecord?.nameRo ?? null}
+        venueSlug={venueRecord?.slug ?? null}
+      />
       <div className="flex flex-1 flex-col overflow-hidden">
         <AdminTopbar />
         <main className="flex-1 overflow-y-auto p-3 sm:p-6">{children}</main>

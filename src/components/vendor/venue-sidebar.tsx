@@ -75,7 +75,17 @@ function NavList({
   );
 }
 
-export function VenueSidebar({ venueName }: { venueName?: string | null }) {
+export function VenueSidebar({
+  venueName,
+  venueSlug,
+}: {
+  venueName?: string | null;
+  venueSlug?: string | null;
+}) {
+  // "Vezi profil" link target — defaults to the homepage when the venue
+  // doesn't have a slug yet (mid-onboarding) so we never produce a broken
+  // link.
+  const profileHref = venueSlug ? `/sali/${venueSlug}` : "/";
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -107,12 +117,12 @@ export function VenueSidebar({ venueName }: { venueName?: string | null }) {
 
         <div className="border-t border-border/20 p-3">
           <Link
-            href="/"
+            href={profileHref}
             target="_blank"
             className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
           >
             <Globe className="h-4 w-4 shrink-0" />
-            <span>Vezi site</span>
+            <span>Vezi profil</span>
           </Link>
         </div>
       </aside>
@@ -175,13 +185,13 @@ export function VenueSidebar({ venueName }: { venueName?: string | null }) {
 
             <div className="border-t border-border/20 p-3">
               <Link
-                href="/"
+                href={profileHref}
                 target="_blank"
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
               >
                 <Globe className="h-4 w-4 shrink-0" />
-                <span>Vezi site</span>
+                <span>Vezi profil</span>
               </Link>
             </div>
           </aside>

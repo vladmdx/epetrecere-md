@@ -445,7 +445,10 @@ export const venues = pgTable("venues", {
     sun: { open: string; close: string } | null;
   }>(),
   isActive: boolean("is_active").default(false).notNull(),
-  isFeatured: boolean("is_featured").default(false).notNull(),
+  /** Default true during the launch phase — every approved venue gets the
+   *  premium homepage placement. We'll flip back to false once we
+   *  introduce paid tiers and start gating the feature. */
+  isFeatured: boolean("is_featured").default(true).notNull(),
   ratingAvg: real("rating_avg").default(0),
   ratingCount: integer("rating_count").default(0),
   seoTitleRo: text("seo_title_ro"),

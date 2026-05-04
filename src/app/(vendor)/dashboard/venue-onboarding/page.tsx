@@ -32,6 +32,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MOLDOVA_CITIES, DEFAULT_CITY } from "@/lib/moldova-cities";
+import { MapsAutofill } from "@/components/vendor/maps-autofill";
 
 const STEP_LABELS = [
   "Date de bază",
@@ -312,6 +313,17 @@ export default function VenueOnboardingPage() {
               placeholder="+373 69 ..."
             />
           </div>
+          {/* Google Maps autofill — paste the venue's Maps URL and we'll
+              extract address + city automatically. Saves the user from
+              typing the same info already on Maps. */}
+          <MapsAutofill
+            onResult={(r) => {
+              update({
+                address: r.address || data.address,
+                city: r.city && MOLDOVA_CITIES.includes(r.city) ? r.city : data.city,
+              });
+            }}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <Label>Oraș *</Label>

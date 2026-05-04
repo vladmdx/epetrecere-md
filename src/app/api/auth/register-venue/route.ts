@@ -173,7 +173,9 @@ export async function POST(req: Request) {
           menuPdfUrl: data.menuPdfUrl ?? null,
           virtualTourUrl: data.virtualTourUrl ?? null,
           isActive: false,
-          isFeatured: false,
+          // Launch-phase: every approved venue gets the premium homepage
+          // placement. Will revert to false once paid tiers are introduced.
+          isFeatured: true,
           facilities: [],
           seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
         })
@@ -220,36 +222,45 @@ export async function POST(req: Request) {
       }
     })();
 
-    // Notify admins (in-app + email)
-    const admins = await db
-      .select({ id: users.id, email: users.email })
-      .from(users)
-      .where(eq(users.role, "super_admin"));
-    for (const admin of admins) {
-      await db.insert(notifications).values({
-        userId: admin.id,
-        type: "venue_registered",
-        title: "Sală nouă înregistrată!",
-        message: `${data.name} (${data.phone}) s-a înregistrat ca sală și așteaptă aprobare.`,
-        actionUrl: `/admin/cereri-inregistrare`,
-      });
+    // Notify admins (in-app + email) — fire-and-forget. Awaiting these
+    // sends caused the venue registration POST to hang for ~1 minute when
+    // the email provider was slow, leaving the user staring at a stuck
+    // "Trimite pentru aprobare" button.
+    void (async () => {
+      try {
+        const admins = await db
+          .select({ id: users.id, email: users.email })
+          .from(users)
+          .where(eq(users.role, "super_admin"));
+        for (const admin of admins) {
+          await db.insert(notifications).values({
+            userId: admin.id,
+            type: "venue_registered",
+            title: "Sală nouă înregistrată!",
+            message: `${data.name} (${data.phone}) s-a înregistrat ca sală și așteaptă aprobare.`,
+            actionUrl: `/admin/cereri-inregistrare`,
+          });
 
-      if (admin.email) {
-        const { sendEmail } = await import("@/lib/email/send");
-        await sendEmail({
-          to: admin.email,
-          subject: `🔔 Sală nouă: ${data.name} așteaptă aprobare`,
-          html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#1A1A2E;border-radius:12px;color:#FAF8F2;">
-            <h2 style="color:#C9A84C;margin:0 0 16px;">Sală Nouă Înregistrată</h2>
-            <p><strong>${data.name}</strong> (${data.phone}) s-a înregistrat ca sală.</p>
-            <p>Oraș: ${data.city || "Nespecificat"}</p>
-            <div style="margin-top:20px;text-align:center;">
-              <a href="https://epetrecere.md/admin/cereri-inregistrare" style="display:inline-block;background:#C9A84C;color:#0D0D0D;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Vezi cererea →</a>
-            </div>
-          </div>`,
-        }).catch((err) => console.error("[register-venue] Email failed:", err));
+          if (admin.email) {
+            const { sendEmail } = await import("@/lib/email/send");
+            sendEmail({
+              to: admin.email,
+              subject: `🔔 Sală nouă: ${data.name} așteaptă aprobare`,
+              html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#1A1A2E;border-radius:12px;color:#FAF8F2;">
+                <h2 style="color:#C9A84C;margin:0 0 16px;">Sală Nouă Înregistrată</h2>
+                <p><strong>${data.name}</strong> (${data.phone}) s-a înregistrat ca sală.</p>
+                <p>Oraș: ${data.city || "Nespecificat"}</p>
+                <div style="margin-top:20px;text-align:center;">
+                  <a href="https://epetrecere.md/admin/cereri-inregistrare" style="display:inline-block;background:#C9A84C;color:#0D0D0D;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Vezi cererea →</a>
+                </div>
+              </div>`,
+            }).catch((err) => console.error("[register-venue] Email failed:", err));
+          }
+        }
+      } catch (err) {
+        console.error("[register-venue] admin notify failed:", err);
       }
-    }
+    })();
 
     return NextResponse.json({ success: true, venueId: venue.id, slug });
   } catch (err) {
