@@ -136,26 +136,35 @@ export function PublicAiChat() {
 
   return (
     <>
-      {/* Floating trigger */}
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={open ? "Închide asistentul AI" : "Deschide asistentul AI"}
-        className={cn(
-          "fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all hover:scale-105",
-          "bg-gradient-to-br from-gold to-gold-dark text-[#0D0D0D]",
-          open && "rotate-90",
-        )}
-      >
-        {open ? <X className="h-6 w-6" /> : <Bot className="h-6 w-6" />}
-      </button>
+      {/* Floating trigger — pushed above the iOS Safari bottom toolbar
+          via env(safe-area-inset-bottom). Hidden when the panel is open
+          since the panel header now has its own X. */}
+      {!open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Deschide asistentul AI"
+          className={cn(
+            "fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all hover:scale-105",
+            "bg-gradient-to-br from-gold to-gold-dark text-[#0D0D0D]",
+          )}
+          style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+        >
+          <Bot className="h-6 w-6" />
+        </button>
+      )}
 
       {/* Panel */}
       {open && (
         <div
           className={cn(
-            "fixed bottom-24 right-5 z-50 flex w-[92vw] max-w-sm flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl",
+            // On iOS Safari the floating trigger button (`bottom-5`) was
+            // sitting under the browser's bottom toolbar so users couldn't
+            // tap the X. Bumped offset up + added a header close button so
+            // there's always a way out from inside the panel.
+            "fixed bottom-24 right-3 z-50 flex w-[94vw] max-w-sm flex-col overflow-hidden rounded-2xl border border-border/60 bg-card shadow-2xl",
             "h-[70vh] max-h-[560px]",
+            "pb-[env(safe-area-inset-bottom)]",
           )}
         >
           {/* Header */}
@@ -176,6 +185,17 @@ export function PublicAiChat() {
               title="Conversație nouă"
             >
               Resetează
+            </button>
+            {/* Close — always reachable from inside the panel, regardless
+                of the floating trigger being hidden under Safari's toolbar
+                on mobile. */}
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Închide asistentul"
+              className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <X className="h-4 w-4" />
             </button>
           </div>
 
