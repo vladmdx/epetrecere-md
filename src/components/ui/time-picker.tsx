@@ -311,31 +311,19 @@ export function TimePicker({
         >
           <Clock className="h-3.5 w-3.5" />
         </div>
-        <input
-          type="text"
-          inputMode="numeric"
-          value={typing}
-          onChange={(e) => setTyping(e.target.value)}
-          onFocus={() => setOpen(true)}
-          onBlur={commitTyping}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              commitTyping();
-              setOpen(false);
-            }
-          }}
-          onClick={(e) => e.stopPropagation()}
-          disabled={disabled}
-          placeholder={placeholder}
-          className="flex-1 bg-transparent font-mono text-sm text-foreground outline-none placeholder:text-muted-foreground/60"
+        {/* Read-only display — clicking the wrapper button opens the picker.
+            We deliberately disallow free-form typing so the user can't
+            enter a time outside the hour/minute grid (which would also
+            need extra validation against working hours / bookings). */}
+        <span
+          className={cn(
+            "flex-1 select-none font-mono text-sm",
+            displayValue ? "text-foreground" : "text-muted-foreground/60",
+          )}
           aria-label="Selector oră"
-        />
-        {!displayValue && (
-          <span className="font-mono text-xs text-muted-foreground/60">
-            HH:MM
-          </span>
-        )}
+        >
+          {displayValue || placeholder}
+        </span>
       </button>
 
       {open &&

@@ -9,6 +9,11 @@ import { useLocale } from "@/hooks/use-locale";
 import {
   Search, ChevronDown, MapPin,
   Sparkles,
+  Heart,
+  Baby,
+  Users,
+  Briefcase,
+  Cake,
   Music,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,18 +39,29 @@ const localityItems = MOLDOVA_CITIES.map((city) => ({
   icon: MapPin,
 }));
 
-// Default fallback shown on first paint — replaced with full list once
-// /api/categories resolves. Includes the 6 most-clicked categories so the
-// dropdown is never empty even if the request fails.
-const FALLBACK_CATEGORIES = [
-  { value: "", label: "Toate", icon: Sparkles as React.ComponentType<{ className?: string }> },
-];
-
 interface CategoryItem {
   value: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
 }
+
+/**
+ * The homepage search is now event-driven, not artist-category-driven.
+ * Picking an event type funnels the user into /planifica with that type
+ * pre-selected — the wizard does the rest of the work (services, budget,
+ * artist matching). Keeping the city + date inputs gives the wizard
+ * usable context on step 1.
+ */
+const EVENT_TYPE_ITEMS: CategoryItem[] = [
+  { value: "", label: "Alege evenimentul", icon: Sparkles },
+  { value: "wedding", label: "Nuntă", icon: Heart },
+  { value: "baptism", label: "Botez", icon: Baby },
+  { value: "cumatrie", label: "Cumătrie", icon: Users },
+  { value: "birthday", label: "Zi de naștere", icon: Cake },
+  { value: "corporate", label: "Eveniment corporate", icon: Briefcase },
+  { value: "concert", label: "Concert / Petrecere", icon: Music },
+  { value: "other", label: "Altă petrecere", icon: Sparkles },
+];
 
 // Custom Dropdown
 function CustomDropdown({
@@ -125,76 +141,30 @@ export function SearchBarSection() {
   const { isSignedIn, isLoaded } = useUser();
   const [city, setCity] = useState(DEFAULT_CITY);
   const [date, setDate] = useState(getTomorrow());
-  const [category, setCategory] = useState("");
-  // Live category list from /api/categories — replaces the old hardcoded
-  // 6-item array so adding a new category in /admin/categorii surfaces it
-  // here automatically.
-  const [categories, setCategories] = useState<CategoryItem[]>(FALLBACK_CATEGORIES);
-
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/categories", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows: unknown) => {
-        if (!alive) return;
-        const list = Array.isArray(rows)
-          ? (rows as Array<{ id: number; nameRo: string; type: string; sortOrder?: number | null }>)
-          : [];
-        // Show artist + service categories (skip venues — they have a
-        // separate filter on /sali). Sort by sortOrder so admins can
-        // reorder via /admin/categorii.
-        const visible = list
-          .filter((c) => c.type === "artist" || c.type === "service")
-          .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-          .map<CategoryItem>((c) => ({
-            value: String(c.id),
-            label: c.nameRo,
-            icon: Music,
-          }));
-        if (visible.length > 0) {
-          setCategories([
-            { value: "", label: "Toate", icon: Sparkles },
-            ...visible,
-          ]);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
+  const [eventType, setEventType] = useState("");
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
+    // Funnel into /planifica with the event picked + city/date prefilled.
+    // The planifica wizard owns the rest of the matching logic now —
+    // homepage search is just a smart entry point, not a parallel artist
+    // filter.
     const params = new URLSearchParams();
+    if (eventType) params.set("eventType", eventType);
     if (city) params.set("city", city);
     if (date) params.set("date", formatDate(date));
-    if (category) params.set("category", category);
-    const target = `/artisti?${params.toString()}`;
+    const target = `/planifica?${params.toString()}`;
 
-    // Free artists for a specific locality+date are gated behind login —
-    // the public /artisti list shows everyone, but the city-scoped search
-    // is more sensitive (private contact info, calendar). Anonymous users
-    // bounce through sign-in and land back on the search results.
-    //
-    // We stash the target in sessionStorage instead of using
-    // ?redirect_url=… because Clerk's forceRedirectUrl="/auth-redirect"
-    // overrides the query param. /auth-redirect picks up "search-next"
-    // and routes there after the role check.
-    if (isLoaded && !isSignedIn) {
-      try {
-        sessionStorage.setItem("search-next", target);
-      } catch {
-        /* fall through — user lands on /cabinet */
-      }
-      router.push("/sign-in");
-      return;
-    }
+    // /planifica is a public page — no auth gate needed for browsing the
+    // wizard. Sign-in is enforced only on submit (last step), where the
+    // wizard already redirects through Clerk's forceRedirectUrl flow.
+    void isSignedIn;
+    void isLoaded;
     router.push(target);
   }
 
   return (
-    <section className="sticky top-16 z-40 border-b border-gold/10 bg-[#0D0D0D]/90 backdrop-blur-md py-5">
+    <section className="border-b border-gold/10 bg-[#0D0D0D]/90 py-5">
       <form
         onSubmit={handleSearch}
         className="mx-auto flex max-w-5xl flex-col gap-3 px-4 sm:flex-row sm:items-end lg:px-8"
@@ -213,10 +183,10 @@ export function SearchBarSection() {
         />
 
         <CustomDropdown
-          label={t("search.category")}
-          items={categories}
-          value={category}
-          onChange={setCategory}
+          label="Eveniment"
+          items={EVENT_TYPE_ITEMS}
+          value={eventType}
+          onChange={setEventType}
         />
 
         <Button

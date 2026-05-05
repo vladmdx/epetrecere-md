@@ -181,7 +181,8 @@ const NAV_ITEMS: NavItem[] = [
   { key: "bookings", icon: BookOpen, label: "Rezervări Artiști" },
   { key: "venues", icon: MapPin, label: "Săli", venueOnly: true },
   { key: "checklist", icon: ClipboardList, label: "Checklist" },
-  { key: "budget", icon: Wallet, label: "Budget" },
+  // Budget tab removed — see BudgetTab definition below; per-category
+  // price filtering on the Rezervări Artiști tab replaces it.
   { key: "guests", icon: Users, label: "Invitați" },
   { key: "seating", icon: UtensilsCrossed, label: "Așezare Mese" },
   { key: "settings", icon: Settings, label: "Setări" },
@@ -314,7 +315,6 @@ export default function PlanDetailPage({
   const visibleNavItems = NAV_ITEMS.filter((item) => {
     if (item.venueOnly && !plan.venueNeeded) return false;
     if (item.key === "checklist" && !plan.checklistEnabled) return false;
-    if (item.key === "budget" && !plan.budgetEnabled) return false;
     if (item.key === "guests" && !plan.guestsEnabled) return false;
     if (item.key === "seating" && (!plan.seatingEnabled || !plan.guestsEnabled))
       return false;
@@ -417,17 +417,8 @@ export default function PlanDetailPage({
             />
           )}
 
-          {activeTab === "budget" && plan.budgetEnabled && (
-            <BudgetTab
-              plan={plan}
-              bookings={bookings}
-              onBookingUpdate={(b) =>
-                setBookings((prev) =>
-                  prev.map((x) => (x.id === b.id ? { ...x, ...b } : x)),
-                )
-              }
-            />
-          )}
+          {/* Budget tab removed — per-category price filter on
+              Rezervări Artiști supersedes the standalone budget tracker. */}
 
           {activeTab === "guests" && plan.guestsEnabled && (
             <GuestsView
@@ -502,17 +493,6 @@ export default function PlanDetailPage({
         {/* Right Stats Sidebar — visible on overview */}
         {activeTab === "overview" && (
           <aside className="hidden lg:flex w-64 shrink-0 flex-col gap-4 border-l border-border/30 bg-card/30 p-4">
-            {/* Budget Widget */}
-            <Card>
-              <CardContent className="py-4">
-                <p className="text-2xl font-heading font-bold">
-                  {plan.budgetTarget ? `${plan.budgetTarget}€` : "—"}
-                </p>
-                <p className="text-xs text-muted-foreground">Budget</p>
-                <BudgetProgress plan={plan} bookings={bookings} />
-              </CardContent>
-            </Card>
-
             {/* Files Widget */}
             <Card>
               <CardContent className="py-4">
@@ -815,15 +795,7 @@ function OverviewTab({
         </Card>
 
         {/* Stats cards for mobile (hidden on lg since right sidebar shows them) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 lg:hidden">
-          <Card>
-            <CardContent className="py-4 text-center">
-              <p className="text-2xl font-heading font-bold text-gold">
-                {plan.budgetTarget ? `${plan.budgetTarget}€` : "—"}
-              </p>
-              <p className="text-xs text-muted-foreground">Budget</p>
-            </CardContent>
-          </Card>
+        <div className="grid grid-cols-2 gap-3 lg:hidden">
           <Card>
             <CardContent className="py-4 text-center">
               <p className="text-2xl font-heading font-bold">{guestTotal}</p>
@@ -1694,6 +1666,37 @@ type ViewMode = "grid" | "list";
 const COLUMN_STORAGE_KEY = "plan-bookings-columns";
 const VIEW_MODE_STORAGE_KEY = "plan-bookings-view-mode";
 
+// Budget brackets on the per-category browse view. Same thresholds across
+// every category — small/medium/large is a coarse signal and per-category
+// tuning would just confuse clients comparing across artists.
+type BudgetBracket = "all" | "small" | "medium" | "large";
+const BUDGET_BRACKETS: Array<{
+  key: BudgetBracket;
+  label: string;
+  min?: number;
+  max?: number;
+}> = [
+  { key: "all", label: "Toți" },
+  { key: "small", label: "Buget mic", max: 200 },
+  { key: "medium", label: "Buget mediu", min: 200, max: 500 },
+  { key: "large", label: "Buget mare", min: 500 },
+];
+
+function inBudgetBracket(
+  price: number | null | undefined,
+  bracket: BudgetBracket,
+): boolean {
+  if (bracket === "all") return true;
+  // Artists without a published price land in "all" only — bucketing
+  // them anywhere else would be guesswork.
+  if (price == null) return false;
+  const bb = BUDGET_BRACKETS.find((b) => b.key === bracket);
+  if (!bb) return true;
+  if (bb.min !== undefined && price < bb.min) return false;
+  if (bb.max !== undefined && price >= bb.max) return false;
+  return true;
+}
+
 function DiscoverySection({
   plan,
   byCategory,
@@ -1755,15 +1758,7 @@ function DiscoverySection({
     try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode); } catch { /* ignore */ }
   }
 
-  // Visible-count per category id — starts at INITIAL_VISIBLE, bumped by
-  // LOAD_MORE_STEP when the user clicks "Încarcă mai mulți".
-  const [visibleByCategory, setVisibleByCategory] = useState<Record<number, number>>({});
-  const showMore = (catId: number) => {
-    setVisibleByCategory((prev) => ({
-      ...prev,
-      [catId]: (prev[catId] ?? INITIAL_VISIBLE) + LOAD_MORE_STEP,
-    }));
-  };
+  // Visible-count + Load-more state moved into <SequentialCategories>.
 
   // Tailwind can't safely interpolate arbitrary lg:grid-cols-N at runtime
   // because it purges unused classes. Map to a static class per column count.
@@ -1869,102 +1864,285 @@ function DiscoverySection({
           </Link>
         </div>
       ) : (
-        // Render every selected category as its own section in the order
-        // the user picked them. Empty sections still render so the user
-        // sees all their selections and knows where to look next. Each
-        // section starts with INITIAL_VISIBLE=8 artists and a "Încarcă
-        // mai mulți" button; sections flow one after another so you
-        // naturally scroll to the next category after exhausting the
-        // current one.
-        byCategory.map((section, idx) => {
-          const blocker = categoryBlocker.get(section.categoryId);
-          // One active request per category — slot is "taken" any time
-          // a pending/accepted/confirmed booking exists in it.
-          const limitReached = !!blocker;
-          const used = limitReached ? 1 : 0;
-          const visible = visibleByCategory[section.categoryId] ?? INITIAL_VISIBLE;
-          // Put the artist holding the slot first so the user sees who
-          // they're waiting on (or who they confirmed) without scrolling
-          // through 30+ cards looking for them.
-          const orderedArtists = blocker
-            ? [
-                ...section.artists.filter((a) => a.id === blocker.artistId),
-                ...section.artists.filter((a) => a.id !== blocker.artistId),
-              ]
-            : section.artists;
-          const shown = orderedArtists.slice(0, visible);
-          const hasMore = orderedArtists.length > visible;
-          const isEmpty = orderedArtists.length === 0;
-
-          return (
-            <div key={section.categoryId}>
-              {/* Subtle divider between sections so the eye finds the
-                  next category quickly after a long "Încarcă mai mulți"
-                  list of cards. */}
-              {idx > 0 && (
-                <div className="mb-8 mt-2 border-t border-border/30" />
-              )}
-              <div className="mb-3 flex items-end justify-between gap-3">
-                <div>
-                  <h3 className="font-heading text-lg font-bold">
-                    {idx + 1}. {section.categoryName}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {section.artists.length} artiști disponibili · {used}/1 cerere activă
-                  </p>
-                </div>
-              </div>
-              {isEmpty ? (
-                <div className="rounded-xl border border-dashed border-border/40 py-8 text-center text-xs text-muted-foreground">
-                  Niciun artist disponibil în această categorie pentru data aleasă.
-                </div>
-              ) : (
-                <>
-                  <div className={cn("grid gap-4", gridCols)}>
-                    {shown.map((a) => {
-                      // The artist holding the slot for this category sees
-                      // the countdown card; the others get a disabled CTA
-                      // with the "Așteaptă răspunsul lui …" hint.
-                      const isBlockedByOther =
-                        !!blocker && blocker.artistId !== a.id;
-                      return (
-                        <PlanArtistCard
-                          key={a.id}
-                          artist={a}
-                          plan={plan}
-                          existingBooking={bookingByArtistId.get(a.id)}
-                          previouslyDeclined={blockedArtistIds.has(a.id)}
-                          categoryLimitReached={limitReached}
-                          blockedByOtherArtistName={
-                            isBlockedByOther ? blocker.artistName : null
-                          }
-                          clientName={clientName}
-                          clientPhone={clientPhone}
-                          clientEmail={clientEmail}
-                          viewMode={viewMode}
-                          onRefresh={() => onRefresh()}
-                        />
-                      );
-                    })}
-                  </div>
-                  {hasMore && (
-                    <div className="mt-4 flex justify-center">
-                      <Button
-                        variant="outline"
-                        onClick={() => showMore(section.categoryId)}
-                        className="gap-2"
-                      >
-                        Încarcă mai mulți {section.categoryName.toLowerCase()} ({section.artists.length - visible} rămași)
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          );
-        })
+        // Sequential category browse — show one category at a time so
+        // the client decides per category before moving on. Skip/Back
+        // navigation lets them re-visit earlier categories without
+        // losing the per-category budget bracket they picked.
+        <SequentialCategories
+          byCategory={byCategory}
+          plan={plan}
+          gridCols={gridCols}
+          viewMode={viewMode}
+          bookingByArtistId={bookingByArtistId}
+          categoryBlocker={categoryBlocker}
+          blockedArtistIds={blockedArtistIds}
+          clientName={clientName}
+          clientPhone={clientPhone}
+          clientEmail={clientEmail}
+          onRefresh={onRefresh}
+        />
       )}
     </section>
+  );
+}
+
+/**
+ * Sequential per-category artist browser. Renders ONE category at a
+ * time; "Sări peste" / "Înapoi" / "Continuă" buttons walk through the
+ * list. Each category gets its own budget bracket (Toți / Mic / Mediu
+ * / Mare) so the user can drill in without affecting siblings.
+ */
+function SequentialCategories({
+  byCategory,
+  plan,
+  gridCols,
+  viewMode,
+  bookingByArtistId,
+  categoryBlocker,
+  blockedArtistIds,
+  clientName,
+  clientPhone,
+  clientEmail,
+  onRefresh,
+}: {
+  byCategory: Array<{ categoryId: number; categoryName: string; artists: DiscoveryArtist[] }>;
+  plan: Plan;
+  gridCols: string;
+  viewMode: ViewMode;
+  bookingByArtistId: Map<number, BookingRequest>;
+  categoryBlocker: Map<
+    number,
+    { artistId: number; artistName: string; status: string; createdAt: string }
+  >;
+  blockedArtistIds: Set<number>;
+  clientName: string;
+  clientPhone: string;
+  clientEmail?: string;
+  onRefresh: () => Promise<void> | void;
+}) {
+  const [currentIdx, setCurrentIdx] = useState(0);
+  // Per-category visible count (Load more) and budget bracket. The
+  // brackets are keyed by categoryId so going back keeps the previous
+  // selection.
+  const [visibleByCategory, setVisibleByCategory] = useState<
+    Record<number, number>
+  >({});
+  const [bracketByCategory, setBracketByCategory] = useState<
+    Record<number, BudgetBracket>
+  >({});
+
+  // Reset to the first category when the byCategory list changes (e.g.
+  // user toggles selectedCategories in Setări and the parent refetches).
+  // Guarded so the effect only triggers a setState when the index is
+  // actually out of range, avoiding the cascading-render warning.
+  useEffect(() => {
+    if (currentIdx >= byCategory.length) {
+      setCurrentIdx(0);
+    }
+  }, [byCategory.length, currentIdx]);
+
+  // Reset scroll on category change so the user starts at the top of
+  // the section header. requestAnimationFrame so React commits first.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  }, [currentIdx]);
+
+  function showMore(categoryId: number) {
+    setVisibleByCategory((prev) => ({
+      ...prev,
+      [categoryId]: (prev[categoryId] ?? INITIAL_VISIBLE) + LOAD_MORE_STEP,
+    }));
+  }
+
+  function setBracket(categoryId: number, bracket: BudgetBracket) {
+    setBracketByCategory((prev) => ({ ...prev, [categoryId]: bracket }));
+  }
+
+  if (byCategory.length === 0) return null;
+
+  const section = byCategory[currentIdx];
+  const blocker = categoryBlocker.get(section.categoryId);
+  const limitReached = !!blocker;
+  const used = limitReached ? 1 : 0;
+  const visible = visibleByCategory[section.categoryId] ?? INITIAL_VISIBLE;
+  const bracket = bracketByCategory[section.categoryId] ?? "all";
+
+  const orderedArtists = blocker
+    ? [
+        ...section.artists.filter((a) => a.id === blocker.artistId),
+        ...section.artists.filter((a) => a.id !== blocker.artistId),
+      ]
+    : section.artists;
+  const filtered = orderedArtists.filter((a) =>
+    inBudgetBracket(a.priceFrom, bracket),
+  );
+  const shown = filtered.slice(0, visible);
+  const hasMore = filtered.length > visible;
+  const isEmpty = filtered.length === 0;
+
+  const isFirst = currentIdx === 0;
+  const isLast = currentIdx === byCategory.length - 1;
+
+  return (
+    <div className="space-y-6">
+      {/* Step indicator + category title */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs uppercase tracking-wider text-gold/70">
+            Categoria {currentIdx + 1} din {byCategory.length}
+          </p>
+          <h3 className="font-heading text-xl font-bold">
+            {section.categoryName}
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {filtered.length} artiști{" "}
+            {bracket !== "all" ? "în bugetul ales" : "disponibili"} · {used}/1
+            cerere activă
+          </p>
+        </div>
+        <div className="flex items-center gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
+            disabled={isFirst}
+            className={cn(
+              "rounded-lg border px-3 py-1.5 transition-colors",
+              isFirst
+                ? "border-border/30 text-muted-foreground/40"
+                : "border-border/40 hover:border-gold/30 hover:text-foreground",
+            )}
+          >
+            ← Înapoi
+          </button>
+          {!isLast && (
+            <button
+              type="button"
+              onClick={() => setCurrentIdx((i) => i + 1)}
+              className="rounded-lg border border-border/40 px-3 py-1.5 hover:border-gold/30"
+            >
+              Sări peste →
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Budget bracket filter */}
+      <div className="flex flex-wrap gap-2">
+        {BUDGET_BRACKETS.map((b) => {
+          const isActive = bracket === b.key;
+          return (
+            <button
+              key={b.key}
+              type="button"
+              onClick={() => setBracket(section.categoryId, b.key)}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-xs transition-colors",
+                isActive
+                  ? "border-gold bg-gold/10 text-gold"
+                  : "border-border/40 text-muted-foreground hover:border-gold/30",
+              )}
+            >
+              {b.label}
+              {b.min !== undefined && b.max !== undefined ? (
+                <span className="ml-1 text-muted-foreground/70">
+                  ({b.min}–{b.max}€)
+                </span>
+              ) : b.min !== undefined ? (
+                <span className="ml-1 text-muted-foreground/70">
+                  (peste {b.min}€)
+                </span>
+              ) : b.max !== undefined ? (
+                <span className="ml-1 text-muted-foreground/70">
+                  (sub {b.max}€)
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+
+      {isEmpty ? (
+        <div className="rounded-xl border border-dashed border-border/40 py-8 text-center text-xs text-muted-foreground">
+          {bracket === "all"
+            ? "Niciun artist disponibil în această categorie pentru data aleasă."
+            : "Niciun artist în această categorie cu bugetul selectat. Încearcă alt buget sau sări la următoarea categorie."}
+        </div>
+      ) : (
+        <>
+          <div className={cn("grid gap-4", gridCols)}>
+            {shown.map((a) => {
+              const isBlockedByOther =
+                !!blocker && blocker.artistId !== a.id;
+              return (
+                <PlanArtistCard
+                  key={a.id}
+                  artist={a}
+                  plan={plan}
+                  existingBooking={bookingByArtistId.get(a.id)}
+                  previouslyDeclined={blockedArtistIds.has(a.id)}
+                  categoryLimitReached={limitReached}
+                  blockedByOtherArtistName={
+                    isBlockedByOther ? blocker.artistName : null
+                  }
+                  clientName={clientName}
+                  clientPhone={clientPhone}
+                  clientEmail={clientEmail}
+                  viewMode={viewMode}
+                  onRefresh={() => onRefresh()}
+                />
+              );
+            })}
+          </div>
+          {hasMore && (
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                onClick={() => showMore(section.categoryId)}
+                className="gap-2"
+              >
+                Încarcă mai mulți {section.categoryName.toLowerCase()} (
+                {filtered.length - visible} rămași)
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Big footer step nav so the user has an obvious next-step CTA
+          after browsing — especially on mobile where the top nav is
+          off-screen by now. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/30 pt-4">
+        <button
+          type="button"
+          onClick={() => setCurrentIdx((i) => Math.max(0, i - 1))}
+          disabled={isFirst}
+          className={cn(
+            "rounded-lg border px-4 py-2 text-sm",
+            isFirst
+              ? "border-border/30 text-muted-foreground/40"
+              : "border-border/40 hover:border-gold/30",
+          )}
+        >
+          ← Categoria precedentă
+        </button>
+        {isLast ? (
+          <span className="text-xs text-muted-foreground">
+            Aceasta a fost ultima categorie aleasă.
+          </span>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setCurrentIdx((i) => i + 1)}
+            className="rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark"
+          >
+            Continuă la {byCategory[currentIdx + 1]?.categoryName} →
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -3301,9 +3479,6 @@ function SettingsTab({
   const [checklistEnabled, setChecklistEnabled] = useState(
     plan.checklistEnabled ?? false,
   );
-  const [budgetEnabled, setBudgetEnabled] = useState(
-    plan.budgetEnabled ?? false,
-  );
   const [guestsEnabled, setGuestsEnabled] = useState(
     plan.guestsEnabled ?? false,
   );
@@ -3354,11 +3529,9 @@ function SettingsTab({
           eventDate: eventDate || null,
           location: location || null,
           guestCountTarget: guestCount ? Number(guestCount) : null,
-          budgetTarget: budget ? Number(budget) : null,
           notes: notes || null,
           venueNeeded,
           checklistEnabled,
-          budgetEnabled,
           guestsEnabled,
           // Seating requires guests — server enforces too, but we
           // mirror it here so the UI doesn't lie about what's saved.
@@ -3528,20 +3701,6 @@ function SettingsTab({
             <p className="font-medium">Checklist</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               Lista pașilor de pregătire pentru evenimentul tău.
-            </p>
-          </div>
-        </label>
-
-        <label className="flex items-start gap-3 rounded-lg border border-border/30 bg-card/50 p-3 cursor-pointer hover:border-gold/30 transition-colors">
-          <Checkbox
-            checked={budgetEnabled}
-            onCheckedChange={(v) => setBudgetEnabled(v === true)}
-            className="mt-0.5"
-          />
-          <div className="flex-1 text-sm">
-            <p className="font-medium">Buget</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Urmărește cheltuielile pe categorii.
             </p>
           </div>
         </label>

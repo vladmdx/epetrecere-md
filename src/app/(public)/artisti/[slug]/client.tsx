@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtistCard } from "@/components/public/artist-card";
 import { ImageGallery } from "@/components/public/image-gallery";
-import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
+import { RequestPriceForm } from "@/components/public/request-form";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { ShareButtons } from "@/components/public/share-buttons";
 import { trackClick } from "@/lib/analytics/track-click";
@@ -351,14 +351,21 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                           )}
                         </div>
                         <div className="mt-4">
-                          <RequestBookingForm
-                            artistId={artist.id}
-                            eventPlanId={eventPlanId}
-                            label="Solicită pachetul"
-                            variant="primary"
-                            presetMessage={presetMessage}
-                            className="!py-2 text-sm"
-                          />
+                          {/* Package booking also funnels through the
+                              user's event plan now. The actual "Solicită
+                              pachetul" CTA lives on /cabinet/planifica/[id]
+                              ?tab=bookings, where the package_id can be
+                              persisted alongside the booking. */}
+                          <Link
+                            href={
+                              eventPlanId
+                                ? `/cabinet/planifica/${eventPlanId}?tab=bookings&package=${pkg.id}`
+                                : "/cabinet"
+                            }
+                            className="flex w-full items-center justify-center gap-2 rounded-lg bg-gold/10 px-4 py-2 text-sm font-medium text-gold ring-1 ring-gold/30 hover:bg-gold/20"
+                          >
+                            Solicită pachetul prin planul tău
+                          </Link>
                         </div>
                       </div>
                     );
@@ -485,19 +492,29 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               </>
             ) : (
               <>
-                {/* Price already visible above → no separate "Află prețul"
-                    form needed. Just the booking CTA. */}
-                <RequestBookingForm
-                  artistId={artist.id}
-                  eventPlanId={eventPlanId}
-                  icon={<CalendarDays className="h-4 w-4" />}
-                  variant="primary"
-                />
-                {eventPlanId && (
-                  <p className="text-center text-[11px] text-gold/70">
-                    Rezervarea va fi legată de planul tău.
-                  </p>
-                )}
+                {/* Direct artist booking has been removed — the only
+                    booking path is through an event plan. The user lands
+                    on /cabinet (their event-plan list) and picks the
+                    plan they want this artist booked for; the artist's
+                    "Solicită rezervare" lives inside that plan's
+                    bookings tab now. */}
+                <Link
+                  href={
+                    eventPlanId
+                      ? `/cabinet/planifica/${eventPlanId}?tab=bookings`
+                      : "/cabinet"
+                  }
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-gold px-4 py-3 font-heading text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  {eventPlanId
+                    ? "Rezervă pentru evenimentul tău"
+                    : "Adaugă la un eveniment"}
+                </Link>
+                <p className="text-center text-[11px] text-muted-foreground">
+                  Rezervările se fac doar din panoul evenimentului tău —
+                  ai nevoie de un plan de eveniment activ.
+                </p>
               </>
             )}
             <ChatWidget

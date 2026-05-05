@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -21,8 +21,8 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
   ArrowLeft, ArrowRight, Loader2, Send, Sparkles,
-  PartyPopper, Calendar, Users, Wrench, Building2, DollarSign, ClipboardCheck,
-  ClipboardList, Wallet, UtensilsCrossed, Check, LogIn,
+  PartyPopper, Calendar, Users, Wrench, Building2, ClipboardCheck,
+  ClipboardList, UtensilsCrossed, Check, LogIn,
 } from "lucide-react";
 import {
   getCategoryEmoji,
@@ -53,7 +53,6 @@ interface WizardData {
    *  the selected city, 999 = no limit. */
   venueRadiusKm: number;
   services: string[]; // selected category ids
-  budget: number;
   /** Event title — used as the plan title ("Nunta Ana & Ion"). Labelled
    *  "Nume eveniment" in the UI. Kept as `name` for back-compat with the
    *  leads + plan endpoints that already consumed this field. */
@@ -67,7 +66,6 @@ interface WizardData {
    *  tab on the plan dashboard; defaults are off so the user only sees
    *  what they asked for. Seating is auto-disabled if guests are off. */
   checklistEnabled: boolean;
-  budgetEnabled: boolean;
   guestsEnabled: boolean;
   seatingEnabled: boolean;
 }
@@ -96,6 +94,22 @@ const DEFAULT_START_TIME: Record<string, string> = {
   other: "18:00",
 };
 
+/**
+ * Default guest counts per event type. Wedding is the only one that
+ * routinely runs to ~150; family events (botez, cumătrie, zi de naștere)
+ * tend to be 30–50; corporate/concerts vary a lot but skew smaller for
+ * private setups.
+ */
+const DEFAULT_GUEST_COUNT: Record<string, number> = {
+  wedding: 150,
+  baptism: 40,
+  cumatrie: 50,
+  birthday: 30,
+  corporate: 50,
+  concert: 60,
+  other: 40,
+};
+
 function deriveTimeSlot(startTime: string): string {
   if (!startTime) return "";
   const [h] = startTime.split(":").map(Number);
@@ -116,14 +130,12 @@ const initialData: WizardData = {
   venueNeeded: "",
   venueRadiusKm: 25,
   services: [],
-  budget: 2000,
   name: "",
   phonePrefix: "+373",
   phone: "",
   email: "",
   gdprAccepted: false,
   checklistEnabled: false,
-  budgetEnabled: false,
   guestsEnabled: false,
   seatingEnabled: false,
 };
@@ -148,19 +160,19 @@ const PHONE_PREFIXES: Array<{ value: string; label: string; flag: string }> = [
 // Reordered per requirements: Sală (venue) BEFORE Servicii (categories)
 // StepArtists removed — clients only pick categories, the artists are
 // revealed after login on the results page.
+// Budget step removed — budget is no longer part of event planning.
 const STEPS = [
   { key: "event_type", icon: PartyPopper },
   { key: "date", icon: Calendar },
   { key: "guests", icon: Users },
   { key: "venue", icon: Building2 },
   { key: "services", icon: Wrench },
-  { key: "budget", icon: DollarSign },
   { key: "extras", icon: ClipboardList },
   { key: "summary", icon: ClipboardCheck },
 ];
 
-const TOTAL_STEPS = STEPS.length; // 8
-const SUMMARY_INDEX = TOTAL_STEPS - 1; // 7
+const TOTAL_STEPS = STEPS.length; // 7
+const SUMMARY_INDEX = TOTAL_STEPS - 1; // 6
 
 // ═══════════════════════════════════════════════
 // WIZARD COMPONENT
@@ -217,8 +229,8 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
   function update(partial: Partial<WizardData>) {
     setData((prev) => {
       const next = { ...prev, ...partial };
-      // When the event type changes, suggest a start time and duration.
-      // Don't overwrite values the user already typed manually.
+      // When the event type changes, suggest a start time, duration and
+      // guest count. Don't overwrite values the user already typed manually.
       if (partial.eventType && partial.eventType !== prev.eventType) {
         if (!prev.startTime) {
           next.startTime = DEFAULT_START_TIME[partial.eventType] ?? "18:00";
@@ -227,6 +239,9 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         // for the new type takes effect (user can still override).
         next.durationHours =
           DEFAULT_DURATION_HOURS[partial.eventType] ?? 5;
+        // Refresh guest count similarly. Only "wedding" gets the high
+        // default — botez/cumătrie/zi-de-naștere etc. start much smaller.
+        next.guestCount = DEFAULT_GUEST_COUNT[partial.eventType] ?? 50;
       }
       // Keep the legacy timeSlot derived so email templates and CRM
       // previews ("seară", "după-amiază") keep working.
@@ -253,9 +268,8 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
       case 2: return data.guestCount > 0;
       case 3: return data.venueNeeded === "yes" || data.venueNeeded === "no";
       case 4: return data.services.length > 0;
-      case 5: return data.budget > 0;
-      case 6: return true; // extras step — every choice is valid (including all "no")
-      case 7:
+      case 5: return true; // extras step — every choice is valid (including all "no")
+      case 6:
         // The summary step now only asks for the event title — phone /
         // email / GDPR were collected at sign-up. Unauthenticated users
         // get bounced through the sign-in gate inside handleSubmit.
@@ -264,8 +278,18 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
     }
   }
 
+  // Reset scroll on step change so the user always sees the wizard header,
+  // not whichever halfway-down position the previous step left them at —
+  // critical on mobile where the steps indicator scrolls off-screen.
+  function scrollWizardTop() {
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+    }
+  }
+
   function nextStep() {
     setStep((s) => Math.min(s + 1, SUMMARY_INDEX));
+    scrollWizardTop();
   }
 
   // Auto-advance with a short delay so the user sees their selection highlight
@@ -273,11 +297,13 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
     setTimeout(() => {
       // Use functional setState so we don't race on rapid auto-advances
       setStep((s) => Math.min(s + 1, SUMMARY_INDEX));
+      scrollWizardTop();
     }, 220);
   }
 
   function prevStep() {
     setStep((s) => Math.max(s - 1, 0));
+    scrollWizardTop();
   }
 
   async function handleSubmit() {
@@ -327,7 +353,6 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
           eventDate: data.eventDate,
           location: data.location,
           guestCount: data.guestCount,
-          budget: data.budget,
           source: "wizard",
           message: `Categorii: ${data.services.join(", ")}${data.venueNeeded === "yes" ? " | Are nevoie de sală" : ""}`,
           wizardData: {
@@ -403,9 +428,8 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         {step === 2 && <StepGuests data={data} update={update} autoNext={autoNext} />}
         {step === 3 && <StepVenue data={data} update={update} autoNext={autoNext} />}
         {step === 4 && <StepServices data={data} update={update} />}
-        {step === 5 && <StepBudget data={data} update={update} autoNext={autoNext} />}
-        {step === 6 && <StepExtras data={data} update={update} />}
-        {step === 7 && <StepSummary data={data} update={update} isSignedIn={!!isSignedIn} />}
+        {step === 5 && <StepExtras data={data} update={update} />}
+        {step === 6 && <StepSummary data={data} update={update} isSignedIn={!!isSignedIn} />}
 
         {/* Navigation */}
         <div className="mt-10 flex items-center justify-between">
@@ -666,7 +690,10 @@ function StepDate({ data, update }: StepProps) {
   );
 }
 
-const guestPresets = [50, 100, 150, 200, 300, 500];
+/** Quick-pick guest counts. The lower bucket (20/40) is now visible
+ *  because most events on the platform aren't weddings — botez and
+ *  cumătrie are typically 30–50 guests. */
+const guestPresets = [20, 40, 60, 100, 150, 300];
 
 function StepGuests({ data, update, autoNext }: StepProps) {
   const { t } = useLocale();
@@ -723,15 +750,31 @@ const VENUE_RADIUS_PRESETS: Array<{ value: number; label: string; sub?: string }
 
 function StepVenue({ data, update }: StepProps) {
   const { t } = useLocale();
+  const radiusSectionRef = useRef<HTMLDivElement | null>(null);
   // Auto-advance removed — when user picks "Yes" they must also choose a
   // radius, so we keep them on this step until they hit "Continuă".
+
+  // On small screens the "Da, am nevoie de sală" card sits above the fold
+  // but the radius picker that appears below the cards is off-screen —
+  // users tap "Yes" and think the page is stuck. Auto-scroll the radius
+  // section into view so the next required choice is visible.
+  function pickYes() {
+    update({ venueNeeded: "yes" });
+    requestAnimationFrame(() => {
+      radiusSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+  }
+
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_venue")}</h2>
       <p className="mb-8 text-muted-foreground">Ai nevoie de o sală sau restaurant?</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <button
-          onClick={() => update({ venueNeeded: "yes" })}
+          onClick={pickYes}
           className={cn(
             "flex flex-col items-center gap-3 rounded-xl border-2 p-8 transition-all",
             data.venueNeeded === "yes"
@@ -763,7 +806,7 @@ function StepVenue({ data, update }: StepProps) {
           well-covered by a handful of distance buckets and this keeps
           the UI honest (we don't have lat/lng on venue rows). */}
       {data.venueNeeded === "yes" && (
-        <div className="mt-8">
+        <div className="mt-8 scroll-mt-20" ref={radiusSectionRef}>
           <Label>Rază de căutare *</Label>
           <p className="mb-3 text-xs text-muted-foreground">
             Cât de departe de {data.location || "orașul ales"} ești dispus să
@@ -899,57 +942,17 @@ function StepServices({ data, update }: StepProps) {
   );
 }
 
-const budgetPresets = [500, 1000, 2000, 3000, 5000, 10000];
-
-function StepBudget({ data, update, autoNext }: StepProps) {
-  const { t } = useLocale();
-  return (
-    <div>
-      <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_budget")}</h2>
-      <p className="mb-8 text-muted-foreground">{t("wizard.budget_info")}</p>
-      <div className="space-y-6">
-        <div className="flex flex-wrap gap-2">
-          {budgetPresets.map((b) => (
-            <button
-              key={b}
-              onClick={() => {
-                update({ budget: b });
-                autoNext?.();
-              }}
-              className={cn(
-                "rounded-lg border px-5 py-3 font-accent text-sm font-semibold transition-all",
-                data.budget === b
-                  ? "border-gold bg-gold/10 text-gold"
-                  : "border-border/40 hover:border-gold/30",
-              )}
-            >
-              {b.toLocaleString()}€
-            </button>
-          ))}
-        </div>
-        <div>
-          <Label>Buget personalizat (EUR):</Label>
-          <Input
-            type="number"
-            min={100}
-            value={data.budget}
-            onChange={(e) => update({ budget: Number(e.target.value) })}
-            className="mt-1 max-w-xs"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
+// Budget step removed — events no longer track a target budget; the
+// dashboard now exposes a per-category price filter instead.
 
 // ─────────────────────────────────────────────────
-// StepExtras — opt-in toggles for Checklist / Buget / Invitați /
-// Așezare Mese. The seating toggle only renders when the guests
-// toggle is on (asking the user how to seat 0 guests is meaningless).
+// StepExtras — opt-in toggles for Checklist / Invitați / Așezare Mese.
+// The seating toggle only renders when the guests toggle is on (asking
+// the user how to seat 0 guests is meaningless).
 // ─────────────────────────────────────────────────
 function StepExtras({ data, update }: StepProps) {
   const options: Array<{
-    key: "checklistEnabled" | "budgetEnabled" | "guestsEnabled";
+    key: "checklistEnabled" | "guestsEnabled";
     icon: typeof ClipboardList;
     title: string;
     desc: string;
@@ -959,12 +962,6 @@ function StepExtras({ data, update }: StepProps) {
       icon: ClipboardList,
       title: "Checklist",
       desc: "Lista pașilor de pregătire (rezervare sală, invitații, costum, tort etc.) pre-populată după tipul evenimentului.",
-    },
-    {
-      key: "budgetEnabled",
-      icon: Wallet,
-      title: "Buget",
-      desc: "Urmărește cheltuielile pe categorii (artiști, sală, decor) cu sumă țintă vs. cheltuit.",
     },
     {
       key: "guestsEnabled",
@@ -1146,7 +1143,6 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
             value={data.services.map((s) => categoryNames[s] || s).join(", ")}
           />
         )}
-        <SummaryRow label="Buget" value={`${data.budget.toLocaleString()}€`} />
       </div>
 
       {/* Login banner — only for visitors who haven't created an account
