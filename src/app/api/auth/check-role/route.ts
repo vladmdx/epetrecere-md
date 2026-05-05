@@ -5,6 +5,12 @@ import { users, artists, venues } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 
+// This endpoint drives the post-signup role picker. The response MUST
+// reflect the latest DB state — a stale cached "you're already onboarded"
+// answer would silently bypass the picker for a freshly re-signed-up user.
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   // Rate limit to prevent abuse
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
@@ -130,7 +136,6 @@ export async function GET(req: NextRequest) {
   let isNewUser = false;
 
   if (dbUser.role === "user" && !hasVenue && !dbUser.onboardingComplete) {
-    // Check if they have an artist record (shouldn't happen if role != "artist", but be safe)
     const [artistRecord] = await db
       .select({ id: artists.id })
       .from(artists)

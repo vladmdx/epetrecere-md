@@ -114,13 +114,22 @@ export default function AuthRedirectPage() {
           return;
         }
 
-        const res = await fetch(`/api/auth/check-role?email=${encodeURIComponent(email)}`);
+        const res = await fetch(
+          `/api/auth/check-role?email=${encodeURIComponent(email)}`,
+          // Bypass any HTTP cache on the way out of the edge — a stale
+          // "you're already onboarded" response would silently skip the
+          // role picker for someone who just signed up.
+          { cache: "no-store" },
+        );
         if (!res.ok) {
           setShowRoleSelect(true);
           setChecking(false);
           return;
         }
         const data = await res.json();
+        // Surfaces in the browser console so the user/QA can confirm
+        // which branch we entered and why.
+        console.log("[auth-redirect] check-role →", data);
 
         if (data.role === "admin" || data.role === "super_admin") {
           router.replace("/admin");
