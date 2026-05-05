@@ -15,7 +15,7 @@ import { z } from "zod/v4";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues } from "@/lib/db/schema";
-import { slugify } from "@/lib/utils/slugify";
+import { pickUniqueSlug } from "@/lib/utils/slugify";
 
 const schema = z.object({
   role: z.enum(["client", "artist", "venue"]),
@@ -102,7 +102,16 @@ export async function POST(req: Request) {
         .limit(1);
       if (!existing) {
         const baseName = appUser.name || "Sală nouă";
-        const slug = `${slugify(baseName)}-${Date.now().toString(36)}`;
+        // Clean slug — same helper as register-venue. Conflicts get -2/-3
+        // suffixes; no timestamp noise.
+        const slug = await pickUniqueSlug(baseName, async (candidate) => {
+          const [hit] = await db
+            .select({ id: venues.id })
+            .from(venues)
+            .where(eq(venues.slug, candidate))
+            .limit(1);
+          return !!hit;
+        });
         await db.insert(venues).values({
           userId: appUser.id,
           nameRo: baseName,
@@ -110,7 +119,8 @@ export async function POST(req: Request) {
           phone: "",
           city: "Chișinău",
           isActive: false,
-          isFeatured: false,
+          // Launch phase parity with register-venue.
+          isFeatured: true,
           facilities: [],
         });
       }
