@@ -28,6 +28,9 @@ const wizardSchema = z.object({
   venueRadiusKm: z.number().int().min(0).max(9999).optional(),
   services: z.array(z.string()).optional(),
   budget: z.number().int().nonnegative().optional(),
+  /** Free-text venue note when the user said "Nu, am deja sală".
+   *  Saved on plan.notes so artists/dashboard can see it. */
+  existingVenue: z.string().max(300).optional(),
   name: z.string().optional(),
   // Optional dashboard tabs the user opted into during the wizard.
   // Default false on the server side so older clients (admin wizard
@@ -102,6 +105,12 @@ export async function POST(req: NextRequest) {
       budgetTarget: w.budget ?? null,
       venueNeeded: w.venueNeeded === "yes",
       venueRadiusKm: w.venueRadiusKm ?? 25,
+      // When the user already has a venue, persist their note so
+      // partners can see where they're playing without asking.
+      notes:
+        w.venueNeeded === "no" && w.existingVenue?.trim()
+          ? `Locație: ${w.existingVenue.trim()}`
+          : null,
       selectedCategories: categoryIds,
       checklistEnabled: w.checklistEnabled ?? false,
       budgetEnabled: w.budgetEnabled ?? false,

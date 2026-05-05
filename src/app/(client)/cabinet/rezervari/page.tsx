@@ -541,33 +541,12 @@ export default function ReservationsPage() {
                 </Button>
               )}
 
-              {/* Counter-offer (when pending and partner sent a price) */}
-              {canNegotiate && lastOfferIsFromArtist && (
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    setProposeAmount(String(lastOffer?.amount ?? ""));
-                    setProposeDialog(b);
-                  }}
-                  className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
-                >
-                  <HandCoins className="h-3.5 w-3.5" />
-                  Negociază
-                </Button>
-              )}
-
-              {/* First counter-offer (no offers yet) */}
-              {canNegotiate && offers.length === 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setProposeDialog(b)}
-                  className="gap-1"
-                >
-                  <HandCoins className="h-3.5 w-3.5" />
-                  Propune preț
-                </Button>
-              )}
+              {/* "Propune preț" / "Negociază" removed from the client
+                  side — pricing is the partner's responsibility. The
+                  client either confirms the partner's offer or waits.
+                  Keeps the conversation cleaner: no back-and-forth
+                  counter-offers from someone who shouldn't be quoting
+                  the gig in the first place. */}
 
               {/* Message */}
               <Button

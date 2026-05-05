@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Star, BadgeCheck, Crown, MapPin, Globe, CalendarDays, X, ZoomIn, Lock, Camera } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
-import { CalendarWidget } from "@/components/public/calendar-widget";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -534,22 +533,10 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               />
             </div>
 
-            {/* Calendar: vizibil pentru useri logați, ascuns pentru nelogați */}
-            {canSeeContact ? (
-              <CalendarWidget
-                entityType="artist"
-                entityId={artist.id}
-                enabled
-              />
-            ) : (
-              <a
-                href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
-                className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/5 px-4 py-3 text-sm text-gold/90 hover:bg-gold/10 hover:text-gold"
-              >
-                <Lock className="h-4 w-4 shrink-0" />
-                <span>Calendar disponibil după autentificare</span>
-              </a>
-            )}
+            {/* Calendar removed from public profile — disponibilitatea se
+                vede doar în fluxul de rezervare al unui plan de eveniment
+                (/cabinet/planifica/[id]?tab=bookings). Public profile
+                stays focused on the artist's portfolio + reviews. */}
           </div>
         </div>
       </div>

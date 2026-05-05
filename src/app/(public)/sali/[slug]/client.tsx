@@ -11,7 +11,6 @@ import { RequestPriceForm, RequestBookingForm } from "@/components/public/reques
 import { ChatWidget } from "@/components/public/chat-widget";
 import { ShareButtons } from "@/components/public/share-buttons";
 import { ReviewPhotoUploader } from "@/components/public/review-photo-uploader";
-import { CalendarWidget } from "@/components/public/calendar-widget";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -429,24 +428,9 @@ export function VenueDetailClient({
             </div>
           </div>
 
-          {/* M6 Intern #1 — calendar gated behind login */}
-          {venue.calendarEnabled && (
-            canSeePrice ? (
-              <CalendarWidget
-                entityType="venue"
-                entityId={venue.id}
-                enabled
-              />
-            ) : (
-              <a
-                href={`/sign-in?redirect_url=${encodeURIComponent(`/sali/${venue.slug}`)}`}
-                className="flex items-center gap-2 rounded-xl border border-gold/30 bg-gold/5 px-4 py-3 text-sm text-gold/90 hover:bg-gold/10 hover:text-gold"
-              >
-                <Lock className="h-4 w-4 shrink-0" />
-                <span>Calendar disponibil după autentificare</span>
-              </a>
-            )
-          )}
+          {/* Calendar removed from public profile — see comment on
+              /artisti/[slug]/client.tsx. Availability lives behind the
+              event-plan booking flow now. */}
         </div>
       </div>
     </div>

@@ -17,15 +17,45 @@ const chatSchema = z.object({
   context: z.enum(["admin", "vendor"]),
 });
 
-const ADMIN_SYSTEM = `Ești un asistent AI pentru platforma ePetrecere.md — un marketplace de servicii pentru evenimente din Republica Moldova.
+const ADMIN_SYSTEM_BASE = `Ești un asistent AI pentru platforma ePetrecere.md — un marketplace de servicii pentru evenimente din Republica Moldova.
 Ai acces la baza de date a platformei prin funcții (tools). Folosește-le pentru a răspunde la întrebări despre artiști, leads, analytics.
 Poți actualiza statusul lead-urilor și genera descrieri.
 Răspunde concis și profesional în limba utilizatorului.`;
 
-const VENDOR_SYSTEM = `Ești un asistent AI personal pentru artiștii de pe platforma ePetrecere.md.
+const VENDOR_SYSTEM_BASE = `Ești un asistent AI personal pentru artiștii de pe platforma ePetrecere.md.
 Ai acces la calendarul, rezervările și datele artistului prin funcții (tools).
 Ajuți cu gestionarea calendarului, răspunsuri la întrebări, și sfaturi de promovare.
 Răspunde prietenos și util în limba utilizatorului.`;
+
+/**
+ * Inject "today's date" into the system prompt every request. Without this
+ * Claude has no idea what year it is — partners reported the assistant
+ * answering June 2024 calendar questions when asked about June 2026, and
+ * contradicting itself on follow-ups. The prompt also pins year context
+ * so date math ("next month", "in 3 weeks") doesn't drift to the model's
+ * training cutoff.
+ */
+function buildSystemPrompt(base: string): string {
+  const now = new Date();
+  const dateRo = now.toLocaleDateString("ro-RO", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const isoDate = now.toISOString().slice(0, 10); // YYYY-MM-DD
+  return `${base}
+
+DATA CURENTĂ (folosește această dată pentru orice referință temporală — nu te baza pe data ta de antrenament):
+- Data de azi: ${dateRo} (${isoDate})
+- Anul curent: ${now.getFullYear()}
+
+REGULI STRICT despre date:
+- Când utilizatorul cere informații despre o anumită zi (ex. "20.06"), interpretează anul ca cel curent (${now.getFullYear()}) decât dacă a specificat altfel.
+- Când răspunzi despre disponibilitatea calendarului, folosește EXCLUSIV datele întoarse de tool-uri. NU inventa marcaje "booked" sau "blocked" care nu există în răspunsul tool-ului.
+- Dacă tool-ul nu întoarce nimic pentru o dată, răspunsul este "ești liber" — nu spune "este rezervat".
+- Nu te contrazice între mesaje. Dacă într-un mesaj ai spus "ești liber pe data X", la mesajul următor nu spune că data X este "booked" decât dacă tool-ul rulat între timp a confirmat rezervarea.`;
+}
 
 export async function POST(req: Request) {
   // Auth gate — only authenticated users with the correct role may use the
@@ -67,7 +97,9 @@ export async function POST(req: Request) {
 
   const client = new Anthropic({ apiKey });
   const isAdmin = requestedContext === "admin";
-  const systemPrompt = isAdmin ? ADMIN_SYSTEM : VENDOR_SYSTEM;
+  const systemPrompt = buildSystemPrompt(
+    isAdmin ? ADMIN_SYSTEM_BASE : VENDOR_SYSTEM_BASE,
+  );
   const tools = isAdmin ? adminTools : vendorTools;
 
   // Resolve vendor artist ID for scoping vendor tools

@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Plus,
   Loader2,
@@ -20,6 +21,7 @@ import {
   MapPin,
   Users,
   ArrowRight,
+  Trash2,
 } from "lucide-react";
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
@@ -51,6 +53,7 @@ export default function PlannerIndexPage() {
   const { isSignedIn, isLoaded } = useUser();
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<PlanListItem[]>([]);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -66,6 +69,36 @@ export default function PlannerIndexPage() {
       .catch(() => setPlans([]))
       .finally(() => setLoading(false));
   }, [isLoaded, isSignedIn]);
+
+  // Inline plan delete — exposed on every card so phone users don't have
+  // to drill into /cabinet/planifica/[id] → Setări tab to remove a plan.
+  // The Setări-tab delete still works; this just adds a mobile-friendly
+  // entry point without changing any server-side behavior.
+  async function handleDelete(planId: number, planTitle: string) {
+    if (
+      !confirm(
+        `Ștergi definitiv planul "${planTitle}"? Acțiunea nu poate fi anulată.`,
+      )
+    ) {
+      return;
+    }
+    setDeletingId(planId);
+    try {
+      const res = await fetch(`/api/event-plans/${planId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        toast.error("Nu am putut șterge planul.");
+        return;
+      }
+      setPlans((prev) => prev.filter((p) => p.id !== planId));
+      toast.success("Planul a fost șters.");
+    } catch {
+      toast.error("Eroare la ștergere.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   if (loading) {
     return (
@@ -137,51 +170,69 @@ export default function PlannerIndexPage() {
           const eventLabel = p.eventType
             ? EVENT_TYPE_LABELS[p.eventType] ?? p.eventType
             : null;
+          const isDeleting = deletingId === p.id;
           return (
-            <Link
+            <div
               key={p.id}
-              href={`/cabinet/planifica/${p.id}`}
-              className="group rounded-xl border border-border/40 bg-card p-5 transition-all hover:border-gold/40 hover:shadow-lg"
+              className="group relative rounded-xl border border-border/40 bg-card p-5 transition-all hover:border-gold/40 hover:shadow-lg"
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
-                  <h2 className="font-heading text-lg font-semibold truncate">
-                    {p.title}
-                  </h2>
-                  {eventLabel && (
-                    <span className="mt-1 inline-block rounded-full border border-gold/30 bg-gold/5 px-2 py-0.5 text-[11px] text-gold">
-                      {eventLabel}
+              <Link
+                href={`/cabinet/planifica/${p.id}`}
+                className="block"
+              >
+                <div className="flex items-start justify-between gap-3 pr-10">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-heading text-lg font-semibold truncate">
+                      {p.title}
+                    </h2>
+                    {eventLabel && (
+                      <span className="mt-1 inline-block rounded-full border border-gold/30 bg-gold/5 px-2 py-0.5 text-[11px] text-gold">
+                        {eventLabel}
+                      </span>
+                    )}
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-gold" />
+                </div>
+
+                <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {p.eventDate && (
+                    <span className="flex items-center gap-1">
+                      <CalendarIcon className="h-3 w-3" />
+                      {new Date(p.eventDate).toLocaleDateString("ro-MD", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })}
+                    </span>
+                  )}
+                  {p.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {p.location}
+                    </span>
+                  )}
+                  {p.guestCountTarget && (
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {p.guestCountTarget} invitați
                     </span>
                   )}
                 </div>
-                <ArrowRight className="h-4 w-4 text-muted-foreground/60 transition-transform group-hover:translate-x-0.5 group-hover:text-gold" />
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                {p.eventDate && (
-                  <span className="flex items-center gap-1">
-                    <CalendarIcon className="h-3 w-3" />
-                    {new Date(p.eventDate).toLocaleDateString("ro-MD", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </span>
+              </Link>
+              <button
+                type="button"
+                onClick={() => void handleDelete(p.id, p.title)}
+                disabled={isDeleting}
+                aria-label="Șterge planul"
+                className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
                 )}
-                {p.location && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
-                    {p.location}
-                  </span>
-                )}
-                {p.guestCountTarget && (
-                  <span className="flex items-center gap-1">
-                    <Users className="h-3 w-3" />
-                    {p.guestCountTarget} invitați
-                  </span>
-                )}
-              </div>
-            </Link>
+              </button>
+            </div>
           );
         })}
       </div>

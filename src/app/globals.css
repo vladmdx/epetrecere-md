@@ -159,9 +159,18 @@
     @apply bg-background text-foreground;
     font-family: var(--user-font, var(--font-sans));
     font-size: calc(16px * var(--user-text-scale, 1));
+    /* Mobile fix: even with overflow-x:hidden on the body, a deeply
+       nested overflowing element could still produce a phantom scroll
+       on touch (iOS in particular). Pinning the html scroll axis to
+       vertical kills the horizontal swipe. */
+    overflow-x: clip;
+    overscroll-behavior-x: none;
+    touch-action: pan-y;
   }
   html {
     @apply font-sans;
+    overflow-x: clip;
+    overscroll-behavior-x: none;
   }
 
   /* Gold focus ring on interactive elements */

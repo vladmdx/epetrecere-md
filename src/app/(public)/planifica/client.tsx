@@ -53,6 +53,10 @@ interface WizardData {
    *  the selected city, 999 = no limit. */
   venueRadiusKm: number;
   services: string[]; // selected category ids
+  /** Free-text venue name/address the client typed when they answered
+   *  "Nu, am deja locație" on the venue step. Optional — empty string
+   *  means the user skipped. Saved on the plan.notes column. */
+  existingVenue: string;
   /** Event title — used as the plan title ("Nunta Ana & Ion"). Labelled
    *  "Nume eveniment" in the UI. Kept as `name` for back-compat with the
    *  leads + plan endpoints that already consumed this field. */
@@ -130,6 +134,7 @@ const initialData: WizardData = {
   venueNeeded: "",
   venueRadiusKm: 25,
   services: [],
+  existingVenue: "",
   name: "",
   phonePrefix: "+373",
   phone: "",
@@ -375,7 +380,11 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         if (planId) {
           sessionStorage.setItem(planIdKey, String(planId));
           toast.success(t("form.submit_success"));
-          router.push(`/cabinet/planifica/${planId}?tab=bookings`);
+          // Land on Săli first if the user said they need a venue — that
+          // matches the new tab order (Săli before Rezervări Artiști).
+          // Otherwise jump straight to Rezervări Artiști.
+          const initialTab = data.venueNeeded === "yes" ? "venues" : "bookings";
+          router.push(`/cabinet/planifica/${planId}?tab=${initialTab}`);
           return;
         }
       }
@@ -431,8 +440,14 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         {step === 5 && <StepExtras data={data} update={update} />}
         {step === 6 && <StepSummary data={data} update={update} isSignedIn={!!isSignedIn} />}
 
-        {/* Navigation */}
-        <div className="mt-10 flex items-center justify-between">
+        {/* Navigation. On mobile the page used to end flush with the
+            viewport bottom — Safari/Chrome's UI bar covered the
+            Continuă button. Pad with `pb-28` + safe-area inset so the
+            CTA always clears the browser chrome. */}
+        <div
+          className="mt-10 flex items-center justify-between gap-3 pb-28 sm:pb-10"
+          style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom))" }}
+        >
           <Button
             variant="outline"
             onClick={prevStep}
@@ -800,6 +815,26 @@ function StepVenue({ data, update }: StepProps) {
           <span className="text-xs text-muted-foreground">Am sala rezervată sau eveniment outdoor</span>
         </button>
       </div>
+
+      {/* When the user already has a venue, ask for an optional name +
+          address so artists know where to show up. Stored on plan.notes
+          and surfaced in the booking-request message. Skipping it is
+          fine — partners can always ask via chat. */}
+      {data.venueNeeded === "no" && (
+        <div className="mt-8 space-y-2">
+          <Label>Ai deja sala rezervată? (opțional)</Label>
+          <Input
+            value={data.existingVenue}
+            onChange={(e) => update({ existingVenue: e.target.value })}
+            placeholder="Ex: Restaurant Pegas, Strada Albișoara 20/1"
+            maxLength={200}
+          />
+          <p className="text-xs text-muted-foreground">
+            Această info va fi vizibilă pentru artiștii pe care îi
+            inviți, ca să știe locația și să poată planifica deplasarea.
+          </p>
+        </div>
+      )}
 
       {/* Radius picker — only when the user wants a venue. We use radius
           brackets instead of a real slider because Moldovan cities are

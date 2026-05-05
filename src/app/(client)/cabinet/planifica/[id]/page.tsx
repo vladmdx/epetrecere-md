@@ -178,8 +178,11 @@ type NavItem = {
  */
 const NAV_ITEMS: NavItem[] = [
   { key: "overview", icon: LayoutDashboard, label: "Prezentare" },
-  { key: "bookings", icon: BookOpen, label: "Rezervări Artiști" },
+  // Săli before Rezervări Artiști — picking the venue first matches how
+  // people actually plan: book the place, then assemble the show. The
+  // tab still hides automatically when venueNeeded=false.
   { key: "venues", icon: MapPin, label: "Săli", venueOnly: true },
+  { key: "bookings", icon: BookOpen, label: "Rezervări Artiști" },
   { key: "checklist", icon: ClipboardList, label: "Checklist" },
   // Budget tab removed — see BudgetTab definition below; per-category
   // price filtering on the Rezervări Artiști tab replaces it.
@@ -3814,20 +3817,44 @@ function SettingsTab({
         <div className="pt-6 border-t border-border/20 space-y-3">
           <div>
             <h3 className="text-sm font-semibold mb-2">Finalizare</h3>
-            <Button
-              onClick={handleArchive}
-              disabled={archiving}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              {archiving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              Marchează ca finalizat → Arhivă
-            </Button>
+            {(() => {
+              // Block early finalize — the user used to be able to mark
+              // an event "completed" months before it actually happened,
+              // which trashed the analytics pipeline (events older than
+              // their archive date) and let bookings be confirmed for a
+              // "past" event. Compare against eventDate + startTime so
+              // the button only unlocks once the event is actually over.
+              const eventStart =
+                plan.eventDate
+                  ? new Date(
+                      `${plan.eventDate}T${plan.startTime ?? "23:59"}:00`,
+                    )
+                  : null;
+              const eventOver = eventStart ? eventStart.getTime() < Date.now() : true;
+              return (
+                <>
+                  <Button
+                    onClick={handleArchive}
+                    disabled={archiving || !eventOver}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
+                    {archiving ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    Marchează ca finalizat → Arhivă
+                  </Button>
+                  {!eventOver && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Disponibil după ce evenimentul are loc.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
           </div>
           <div>
             <h3 className="text-sm font-semibold text-destructive mb-2">Zona periculoasă</h3>

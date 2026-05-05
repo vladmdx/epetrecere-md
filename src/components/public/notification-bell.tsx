@@ -175,7 +175,10 @@ export function NotificationBell() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
             transition={{ duration: 0.15 }}
-            className="absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-xl border border-border/40 bg-popover shadow-lg"
+            // Mobile fix: w-80 (320px) overflowed narrow phones and got
+            // clipped at the viewport edge. Cap to viewport width minus
+            // a 1rem inset on small screens, keep w-80 on tablet+.
+            className="fixed right-2 top-14 z-50 w-[calc(100vw-1rem)] max-w-sm overflow-hidden rounded-xl border border-border/40 bg-popover shadow-2xl sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:w-80"
           >
             <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
               <div>
