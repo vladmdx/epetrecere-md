@@ -4,7 +4,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { artists, users, notifications } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { slugify } from "@/lib/utils/slugify";
+import { pickUniqueSlug } from "@/lib/utils/slugify";
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -113,8 +113,16 @@ export async function POST(req: Request) {
     }
 
     const data = parsed.data;
-    let slug = slugify(data.name);
-    slug = `${slug}-${Date.now().toString(36)}`;
+    // Clean slug derived from the artist's name. We collide-check against
+    // existing artists.slug; -2/-3 suffixes are added only when needed.
+    const slug = await pickUniqueSlug(data.name, async (candidate) => {
+      const [hit] = await db
+        .select({ id: artists.id })
+        .from(artists)
+        .where(eq(artists.slug, candidate))
+        .limit(1);
+      return !!hit;
+    });
 
     // Phone falls back to the user's phone (collected at registration)
     const finalPhone = data.phone && data.phone.trim().length >= 6

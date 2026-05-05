@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { NotificationBell } from "@/components/public/notification-bell";
 import { ChatBell } from "@/components/public/chat-bell";
 
@@ -18,7 +19,8 @@ export function AdminTopbar() {
           />
         </div>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
+        <LanguageSwitcher />
         <ChatBell />
         <NotificationBell />
         <ThemeToggle />

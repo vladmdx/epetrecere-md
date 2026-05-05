@@ -178,7 +178,8 @@ export function MenuScanner({ venueId, onImported }: Props) {
       (!data.packages || data.packages.length === 0)
     ) {
       toast.error(
-        "Nicio categorie sau pachet detectat — încearcă o altă sursă.",
+        "AI nu a găsit niciun produs. Încearcă o pagină mai specifică (ex: /meniu) sau încarcă o poză/PDF al meniului.",
+        { duration: 8000 },
       );
       setStage("idle");
       return;

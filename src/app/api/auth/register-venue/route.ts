@@ -9,7 +9,7 @@ import { z } from "zod/v4";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venues, users, notifications } from "@/lib/db/schema";
-import { slugify } from "@/lib/utils/slugify";
+import { pickUniqueSlug } from "@/lib/utils/slugify";
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -126,7 +126,16 @@ export async function POST(req: Request) {
     }
 
     const data = parsed.data;
-    const slug = `${slugify(data.name)}-${Date.now().toString(36)}`;
+    // Clean slug from venue name. If a previous venue is using it, the
+    // helper appends -2, -3, etc. — never a timestamp.
+    const slug = await pickUniqueSlug(data.name, async (candidate) => {
+      const [hit] = await db
+        .select({ id: venues.id })
+        .from(venues)
+        .where(eq(venues.slug, candidate))
+        .limit(1);
+      return !!hit;
+    });
 
     let venue: typeof venues.$inferSelect;
     if (existing) {

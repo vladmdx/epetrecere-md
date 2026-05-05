@@ -72,3 +72,30 @@ export function slugify(text: string): string {
       .substring(0, 80)
   );
 }
+
+/**
+ * Pick a unique slug by adding `-2`, `-3`, \u2026 suffixes until the candidate
+ * isn't taken. Pass an `isTaken` checker that returns true if a given slug
+ * already exists in the target table \u2014 keeps this helper DB-agnostic.
+ *
+ * We deliberately do NOT append a timestamp: the goal is a clean public URL
+ * (`/sali/grand-palace`, not `/sali/grand-palace-mooz6vvx`). Conflict numbers
+ * stay readable.
+ */
+export async function pickUniqueSlug(
+  base: string,
+  isTaken: (candidate: string) => Promise<boolean>,
+): Promise<string> {
+  const baseSlug = slugify(base) || "venue";
+  let candidate = baseSlug;
+  for (let n = 2; await isTaken(candidate); n++) {
+    candidate = `${baseSlug}-${n}`;
+    if (n > 999) {
+      // Pathological case \u2014 fall back to a random suffix so insertion
+      // never deadlocks.
+      candidate = `${baseSlug}-${Math.random().toString(36).slice(2, 8)}`;
+      break;
+    }
+  }
+  return candidate;
+}

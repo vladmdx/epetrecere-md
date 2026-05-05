@@ -15,8 +15,6 @@ import {
   Check,
   Globe,
   Crown,
-  Star,
-  Sparkles,
   Download,
   AlertTriangle,
 } from "lucide-react";
@@ -556,81 +554,35 @@ export function VenueSettingsClient({
       {/* Referral program */}
       <ReferralCard />
 
-      {/* Plan & Billing — spec 11.5 */}
-      <Card>
+      {/* Plan & Billing — launch phase: all venues get Premium free */}
+      <Card className="border-gold/40 bg-gradient-to-br from-gold/10 via-gold/5 to-transparent">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Crown className="h-4 w-4 text-gold" />
-            Plan & Facturare
+            Plan curent
           </CardTitle>
-          <p className="text-xs text-muted-foreground">
-            Planul tău curent:{" "}
-            <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-foreground">
-              Free
-            </span>
-          </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid gap-3 md:grid-cols-3">
-            <PlanCard
-              tier="free"
-              name="Free"
-              price="0€"
-              period="pentru totdeauna"
-              features={[
-                "Până la 10 imagini galerie",
-                "Profil public cu descriere",
-                "Calendar disponibilitate",
-                "Auto-reply email",
-                "Notificări push + email",
-                "AI Assistant (20 cereri/h)",
-              ]}
-              current
-            />
-            <PlanCard
-              tier="pro"
-              name="Pro"
-              price="19€"
-              period="/lună"
-              badge="Popular"
-              features={[
-                "Până la 50 imagini galerie",
-                "Analytics detaliat + comparație oraș",
-                "Virtual tour 360°",
-                "Meniu digital complet",
-                "Priority support",
-                "AI Assistant (100 cereri/h)",
-              ]}
-            />
-            <PlanCard
-              tier="premium"
-              name="Premium"
-              price="49€"
-              period="/lună"
-              features={[
-                "Tot din Pro +",
-                "Featured în listing top",
-                "AI suggestions nelimitat",
-                "Traducere automată RO/RU/EN",
-                "Consulting personalizat 1:1",
-                "Bonus: 0% comision primele 3 luni",
-              ]}
-            />
-          </div>
-          <div className="flex items-center justify-between rounded-lg bg-muted/20 p-3">
-            <p className="text-xs text-muted-foreground">
-              💳 Plățile Stripe vor fi disponibile în curând. Pentru upgrade
-              contactează-ne la <strong>contact@epetrecere.md</strong>.
-            </p>
-          </div>
-          <div className="flex items-center justify-between rounded-lg border border-border/40 p-3">
-            <div>
-              <p className="text-sm font-medium">Istoric plăți</p>
-              <p className="text-xs text-muted-foreground">
-                Nicio tranzacție încă.
+          <div className="flex items-start gap-3 rounded-xl border border-gold/30 bg-card/60 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/20">
+              <Crown className="h-5 w-5 text-gold" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-heading text-base font-bold text-gold">
+                Premium activ
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Cât suntem în faza de lansare, toate sălile au acces gratuit la
+                toate funcționalitățile Premium: imagini galerie nelimitate,
+                analytics detaliat, virtual tour 360°, meniu digital, AI
+                Assistant, traducere automată RO/RU/EN, featured în listing top
+                și prioritate în suport.
               </p>
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            Te vom anunța din timp când introducem planurile plătite.
+          </p>
         </CardContent>
       </Card>
 
@@ -777,69 +729,3 @@ export function VenueSettingsClient({
   );
 }
 
-/** Single plan tile inside the Plan & Billing card. `current` styles the
- *  tile with a gold border + "Planul tău" badge. `badge` shows a small
- *  "Popular" chip on Pro. */
-function PlanCard({
-  tier,
-  name,
-  price,
-  period,
-  features,
-  current,
-  badge,
-}: {
-  tier: "free" | "pro" | "premium";
-  name: string;
-  price: string;
-  period: string;
-  features: string[];
-  current?: boolean;
-  badge?: string;
-}) {
-  const Icon = tier === "free" ? Sparkles : tier === "pro" ? Star : Crown;
-  return (
-    <div
-      className={
-        current
-          ? "relative space-y-3 rounded-xl border-2 border-gold bg-gold/5 p-4"
-          : "relative space-y-3 rounded-xl border border-border/40 bg-card p-4"
-      }
-    >
-      {current && (
-        <span className="absolute -top-2 left-3 rounded-full bg-gold px-2 py-0.5 text-[10px] font-bold text-[#0D0D0D]">
-          Planul tău
-        </span>
-      )}
-      {badge && !current && (
-        <span className="absolute -top-2 right-3 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-[#0D0D0D]">
-          {badge}
-        </span>
-      )}
-      <div className="flex items-center gap-2">
-        <Icon
-          className={
-            tier === "premium"
-              ? "h-4 w-4 text-amber-400"
-              : tier === "pro"
-                ? "h-4 w-4 text-gold"
-                : "h-4 w-4 text-muted-foreground"
-          }
-        />
-        <span className="font-heading text-lg font-bold">{name}</span>
-      </div>
-      <div className="flex items-baseline gap-1">
-        <span className="font-heading text-2xl font-bold">{price}</span>
-        <span className="text-xs text-muted-foreground">{period}</span>
-      </div>
-      <ul className="space-y-1 text-xs">
-        {features.map((f) => (
-          <li key={f} className="flex items-start gap-1.5 text-muted-foreground">
-            <Check className="mt-0.5 h-3 w-3 shrink-0 text-emerald-400" />
-            <span>{f}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}

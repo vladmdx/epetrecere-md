@@ -200,12 +200,14 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
     sessionStorage.setItem(storageKey, JSON.stringify(data));
   }, [data, storageKey]);
 
-  // Pre-fill name/email/phone when user is signed in
+  // Pre-fill email/phone when user is signed in. We DO NOT pre-fill `name`
+  // — that field is the *event* title (e.g. "Nunta Ana & Ion"), not the
+  // user's full name. Leaving it empty lets the placeholder guide the
+  // owner to enter an event-style title.
   useEffect(() => {
     if (isSignedIn && user) {
       setData((prev) => ({
         ...prev,
-        name: prev.name || [user.firstName, user.lastName].filter(Boolean).join(" ") || "",
         email: prev.email || user.primaryEmailAddress?.emailAddress || "",
         phone: prev.phone || user.primaryPhoneNumber?.phoneNumber?.replace(/^\+373/, "") || "",
       }));
@@ -1164,15 +1166,17 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
       )}
 
       {/* Event title — the only contact-style field we still ask for,
-          because it becomes the plan title and the user should be able
-          to override the auto-generated default ("Nuntă", "Botez", …). */}
+          because it becomes the plan title. The placeholder adapts to
+          the chosen event type so the owner has a concrete suggestion;
+          we never pre-fill the value, so the suggestion stays a hint
+          (clicking the field shows an empty input, not text to delete). */}
       <div className="space-y-4">
         <div>
           <Label>Nume eveniment *</Label>
           <Input
             value={data.name}
             onChange={(e) => update({ name: e.target.value })}
-            placeholder="Ex: Nunta Ana & Ion"
+            placeholder={eventNamePlaceholder(data.eventType)}
             required
           />
           <p className="mt-1 text-xs text-muted-foreground">
@@ -1182,6 +1186,28 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
       </div>
     </div>
   );
+}
+
+/** Suggest an event-style placeholder based on the picked type. The user can
+ *  always override; this just nudges them away from typing their own name
+ *  ("Stratulat Nicolae") into a field that's meant to title the event. */
+function eventNamePlaceholder(eventType: string): string {
+  switch (eventType) {
+    case "wedding":
+      return "Ex: Nunta Ana & Ion";
+    case "baptism":
+      return "Ex: Botezul lui Gabi";
+    case "cumatrie":
+      return "Ex: Cumătria lui Mihai";
+    case "corporate":
+      return "Ex: Petrecerea companiei";
+    case "birthday":
+      return "Ex: Ziua de naștere a Mariei";
+    case "concert":
+      return "Ex: Concert Live";
+    default:
+      return "Ex: Nunta Ana & Ion";
+  }
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {

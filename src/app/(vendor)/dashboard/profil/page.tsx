@@ -25,6 +25,7 @@ import { toast } from "sonner";
 
 type ProfileData = {
   nameRo: string;
+  slug: string;
   location: string;
   phone: string;
   email: string;
@@ -54,6 +55,7 @@ type Category = {
 
 const EMPTY: ProfileData = {
   nameRo: "",
+  slug: "",
   location: "",
   phone: "",
   email: "",
@@ -120,6 +122,7 @@ export default function VendorProfilePage() {
         setArtistCategoryIds((a.categoryIds as number[]) ?? []);
         setData({
           nameRo: (a.nameRo as string) ?? "",
+          slug: (a.slug as string) ?? "",
           location: (a.location as string) ?? "",
           phone: (a.phone as string) ?? "",
           email: (a.email as string) ?? "",
@@ -217,6 +220,7 @@ export default function VendorProfilePage() {
       const payload = {
         id: artistId,
         nameRo: data.nameRo,
+        slug: data.slug,
         location: data.location,
         phone: data.phone,
         email: data.email,
@@ -437,6 +441,33 @@ export default function VendorProfilePage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div><Label>Nume artistic</Label><Input value={data.nameRo} onChange={(e) => update({ nameRo: e.target.value })} /></div>
                 <div><Label>Locație</Label><Input value={data.location} onChange={(e) => update({ location: e.target.value })} /></div>
+              </div>
+              {/* Slug — public URL. Manual edit is allowed; server records a
+                  redirect from the previous slug so the old link keeps
+                  working. */}
+              <div>
+                <Label>Adresă URL (slug)</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="shrink-0 select-none text-xs text-muted-foreground">
+                    epetrecere.md/artisti/
+                  </span>
+                  <Input
+                    value={data.slug}
+                    onChange={(e) =>
+                      update({
+                        slug: e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9-]/g, "-")
+                          .replace(/-+/g, "-"),
+                      })
+                    }
+                    placeholder="dj-marius"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Doar litere mici, cifre și liniuțe. Linkurile vechi vor
+                  redirecționa automat la cel nou.
+                </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div><Label>Telefon</Label><Input value={data.phone} onChange={(e) => update({ phone: e.target.value })} /></div>

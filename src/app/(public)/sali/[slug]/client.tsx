@@ -284,17 +284,42 @@ export function VenueDetailClient({
                 </div>
               )}
 
-              {/* PDF menu link (fallback/complement) — either an uploaded PDF or an external URL */}
+              {/* External website link + uploaded PDF download — separate buttons
+                * because they do different things: menuUrl opens the venue's
+                * own menu page on their site, menuPdfUrl downloads the PDF the
+                * owner uploaded to our R2 bucket. */}
               {(venue.menuPdfUrl || venue.menuUrl) && (
-                <a
-                  href={venue.menuPdfUrl || venue.menuUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => trackClick("venue", venue.id, "menu")}
-                  className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
-                >
-                  Descarcă meniu PDF
-                </a>
+                <div className="flex flex-wrap gap-2">
+                  {venue.menuUrl && (
+                    <a
+                      href={venue.menuUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackClick("venue", venue.id, "menu")}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/5 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/15"
+                    >
+                      Vezi meniul pe site
+                    </a>
+                  )}
+                  {venue.menuPdfUrl && (
+                    <a
+                      href={venue.menuPdfUrl}
+                      // `download` attribute hints the browser to save the
+                      // file rather than navigate. Same-origin (Vercel Blob /
+                      // R2 with proper headers) honors it; cross-origin hosts
+                      // may still open inline, but the link still triggers a
+                      // download dialog if the response uses
+                      // Content-Disposition: attachment.
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => trackClick("venue", venue.id, "menu")}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
+                    >
+                      Descarcă meniu PDF
+                    </a>
+                  )}
+                </div>
               )}
             </div>
           ) : null}

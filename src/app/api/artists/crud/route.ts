@@ -187,6 +187,22 @@ export async function PUT(req: Request) {
   const newSlug = typeof data.slug === "string" ? data.slug : oldSlug;
   const slugChanged = newSlug !== oldSlug;
 
+  // Friendly conflict check before the DB throws a 500 on the unique
+  // constraint. Same-id matches are obviously fine.
+  if (slugChanged) {
+    const [conflict] = await db
+      .select({ id: artists.id })
+      .from(artists)
+      .where(eq(artists.slug, newSlug))
+      .limit(1);
+    if (conflict && conflict.id !== Number(id)) {
+      return NextResponse.json(
+        { error: `Slug-ul "${newSlug}" e deja folosit. Alege altul.` },
+        { status: 409 },
+      );
+    }
+  }
+
   // When baseCity is updated, mirror it into the legacy `location` field so
   // SEO auto-pages and any other code still reading `location` stay in sync.
   // baseCity is the authoritative source; location is kept around for back-

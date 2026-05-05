@@ -173,6 +173,9 @@ export default function VenueProfilePage() {
           nameRo: venue.nameRo,
           nameRu: venue.nameRu ?? undefined,
           nameEn: venue.nameEn ?? undefined,
+          slug: venue.slug,
+          lat: venue.lat,
+          lng: venue.lng,
           descriptionRo: venue.descriptionRo ?? undefined,
           descriptionRu: venue.descriptionRu ?? undefined,
           descriptionEn: venue.descriptionEn ?? undefined,
@@ -199,10 +202,13 @@ export default function VenueProfilePage() {
           ogImageUrl: venue.ogImageUrl ?? null,
         }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Eroare la salvare");
+      }
       toast.success("Sala a fost salvată!");
-    } catch {
-      toast.error("Eroare la salvare");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare la salvare");
     } finally {
       setSaving(false);
     }
@@ -334,6 +340,33 @@ export default function VenueProfilePage() {
                   />
                 </div>
               </div>
+              {/* Slug editor — controls the public URL (/sali/<slug>).
+                  Server re-validates on save and adds a redirect from the
+                  old slug, so old links keep working. */}
+              <div>
+                <Label>Adresă URL (slug)</Label>
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="shrink-0 select-none text-xs text-muted-foreground">
+                    epetrecere.md/sali/
+                  </span>
+                  <Input
+                    value={venue.slug}
+                    onChange={(e) =>
+                      update({
+                        slug: e.target.value
+                          .toLowerCase()
+                          .replace(/[^a-z0-9-]/g, "-")
+                          .replace(/-+/g, "-"),
+                      })
+                    }
+                    placeholder="grand-palace"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Doar litere mici, cifre și liniuțe. Linkurile vechi vor
+                  redirecționa automat la cel nou.
+                </p>
+              </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label>Telefon</Label>
@@ -361,12 +394,21 @@ export default function VenueProfilePage() {
                 />
               </div>
               {/* Google Maps autofill — same component as on onboarding.
-                  Pasting a Maps link rewrites city + address in one shot. */}
+                  Pasting a Maps link fills address, city, phone, website
+                  and a draft description (when Places API is enabled).
+                  Never overwrites user-entered values. */}
               <MapsAutofill
                 onResult={(r) => {
                   update({
+                    nameRo: venue.nameRo || r.placeName || venue.nameRo,
                     address: r.address || venue.address,
                     city: r.city || venue.city,
+                    phone: venue.phone || r.phone || venue.phone,
+                    website: venue.website || r.website || venue.website,
+                    descriptionRo:
+                      venue.descriptionRo || r.summary || venue.descriptionRo,
+                    lat: r.lat ?? venue.lat,
+                    lng: r.lng ?? venue.lng,
                   });
                 }}
               />
@@ -394,7 +436,7 @@ export default function VenueProfilePage() {
               <CardTitle>Program funcționare</CardTitle>
               <p className="text-xs text-muted-foreground">
                 Apare pe profilul public sub formă de „Lu-Vi 10:00-22:00 ·
-                Sâ-Du 10:00-24:00". Lasă zilele închise dezactivate.
+                Sâ-Du 10:00-24:00&rdquo;. Lasă zilele închise dezactivate.
               </p>
             </CardHeader>
             <CardContent>

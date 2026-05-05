@@ -313,14 +313,22 @@ export default function VenueOnboardingPage() {
               placeholder="+373 69 ..."
             />
           </div>
-          {/* Google Maps autofill — paste the venue's Maps URL and we'll
-              extract address + city automatically. Saves the user from
-              typing the same info already on Maps. */}
+          {/* Google Maps autofill — paste the venue's Maps URL and we
+              pre-fill name, address, city, phone, website and (when
+              GOOGLE_PLACES_API_KEY is set) a draft description. We never
+              overwrite values the owner has already typed. */}
           <MapsAutofill
             onResult={(r) => {
               update({
+                name: data.name || r.placeName || data.name,
+                phone: data.phone || r.phone || data.phone,
                 address: r.address || data.address,
-                city: r.city && MOLDOVA_CITIES.includes(r.city) ? r.city : data.city,
+                city:
+                  r.city && MOLDOVA_CITIES.includes(r.city)
+                    ? r.city
+                    : data.city,
+                websiteUrl: data.websiteUrl || r.website || data.websiteUrl,
+                description: data.description || r.summary || data.description,
               });
             }}
           />

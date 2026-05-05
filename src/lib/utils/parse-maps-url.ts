@@ -19,6 +19,9 @@ export interface ParsedMapsUrl {
   lng?: number;
   /** Place name decoded from the /place/{name} segment, if present. */
   placeName?: string;
+  /** Google's internal place identifier ("ChIJ…") parsed from the URL data
+   *  segment. When present, it unlocks Places-API enrichment server-side. */
+  placeId?: string;
 }
 
 /** Parse a Google Maps URL into lat/lng + best-effort name. */
@@ -62,6 +65,19 @@ export function parseGoogleMapsUrl(input: string): ParsedMapsUrl | null {
     out.lng = Number(dataMatch[2]);
   }
 
+  // Pattern 4: !1s0x...:0x...!... — the data segment also encodes the
+  // canonical place id as a hex pair. We can also pull `ChIJ...` style ids
+  // when they appear directly. Both forms work with Places API "id:..." or
+  // "place_id" lookups respectively.
+  const hexIdMatch = url.pathname.match(/!1s(0x[0-9a-f]+:0x[0-9a-f]+)/i);
+  if (hexIdMatch) {
+    out.placeId = hexIdMatch[1];
+  }
+  const chijMatch = url.pathname.match(/(ChIJ[A-Za-z0-9_-]{20,})/);
+  if (chijMatch) {
+    out.placeId = chijMatch[1];
+  }
+
   // Place name from /place/{Name}/...
   const placeMatch = url.pathname.match(/\/maps\/place\/([^/]+)/);
   if (placeMatch) {
@@ -79,7 +95,7 @@ export function parseGoogleMapsUrl(input: string): ParsedMapsUrl | null {
     }
   }
 
-  if (out.lat === undefined && !out.placeName) return null;
+  if (out.lat === undefined && !out.placeName && !out.placeId) return null;
   return out;
 }
 

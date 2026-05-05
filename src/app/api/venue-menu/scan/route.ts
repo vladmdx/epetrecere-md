@@ -110,14 +110,22 @@ async function fetchFile(
   return { bytes: buffer, contentType };
 }
 
-/** Extract the visible text content from an HTML page. Strips scripts/styles,
- *  collapses whitespace, and caps at 20 000 chars so we don't blow the AI
- *  context window on a SPA that ships a bundle in the body. */
+/** Extract the visible text content from an HTML page. Strips scripts/styles
+ *  AND boilerplate chrome (header/nav/footer/cart) so the menu items dominate
+ *  what we send to the model. Caps at 60 000 chars — large enough for a
+ *  full e-commerce restaurant menu, small enough to stay well below
+ *  Claude's context budget. */
 function htmlToText(html: string): string {
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
+    // Drop chrome that just adds noise on shop-style menu pages (cart UI,
+    // breadcrumbs, footer links). The menu data itself stays in <main>/
+    // <article>/<section> and isn't affected.
+    .replace(/<header[\s\S]*?<\/header>/gi, " ")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
@@ -127,7 +135,7 @@ function htmlToText(html: string): string {
     .replace(/&gt;/g, ">")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 20_000);
+    .slice(0, 60_000);
 }
 
 /** Resolve the effective mime type: client-declared first, then sniffed from
@@ -265,14 +273,36 @@ export async function POST(req: NextRequest) {
     const text = htmlToText(fetched.bytes.toString("utf-8"));
     if (text.length < 100) {
       return NextResponse.json(
-        { error: "Pagina nu conține suficient text pentru extragere" },
+        {
+          error:
+            "Pagina nu conține suficient text vizibil. Probabil meniul se încarcă cu JavaScript — încearcă o pagină statică (PDF/poză a meniului) sau un screenshot.",
+        },
+        { status: 400 },
+      );
+    }
+    // Cloudflare/CAPTCHA challenge detection: the marker pages are short
+    // and contain known signal phrases. Surface a clear explanation
+    // instead of feeding garbage to the model.
+    const lower = text.toLowerCase();
+    const isChallenge =
+      (lower.includes("just a moment") ||
+        lower.includes("checking your browser") ||
+        lower.includes("verify you are human") ||
+        lower.includes("cloudflare")) &&
+      text.length < 5_000;
+    if (isChallenge) {
+      return NextResponse.json(
+        {
+          error:
+            "Site-ul este protejat de Cloudflare/anti-bot și nu putem accesa meniul de pe server. Încarcă un PDF sau o poză a meniului.",
+        },
         { status: 400 },
       );
     }
     contentBlocks = [
       {
         type: "text",
-        text: `The following is the extracted text of a website menu page (${parsed.data.fileUrl}). Parse it and return the JSON described in the system prompt.\n\n---\n\n${text}`,
+        text: `The following is the extracted text of a website menu page (${parsed.data.fileUrl}). Parse it and return the JSON described in the system prompt.\n\nIMPORTANT: be aggressive in extraction. E-commerce menus often mix item names with "Adaugă în coș" / "Add to cart" labels and prices in MDL or EUR. Ignore the cart UI and pull every distinct food item with its price. Map similar categories (e.g. "Plăcinte" → utensils icon, "Salate" → salad).\n\n---\n\n${text}`,
       },
     ];
   } else {
@@ -293,11 +323,13 @@ export async function POST(req: NextRequest) {
     ];
   }
 
+  // Use the latest Sonnet for both better extraction quality and a longer
+  // output window. 8K tokens is enough for ~150 menu items with prices.
   let rawText = "";
   try {
     const message = await getClient().messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
+      model: "claude-sonnet-4-5",
+      max_tokens: 8000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: contentBlocks }],
     });

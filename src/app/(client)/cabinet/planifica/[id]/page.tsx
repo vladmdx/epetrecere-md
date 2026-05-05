@@ -3644,8 +3644,8 @@ function VenueDiscoveryCard({ venue: v, plan }: { venue: DiscoveryVenue; plan: P
         body: JSON.stringify({
           venueId: v.id,
           eventPlanId: plan.id,
-          clientName: user?.fullName || "Client",
-          clientPhone: user?.phoneNumbers?.[0]?.phoneNumber || "—",
+          clientName: user?.fullName?.trim() || "Client",
+          clientPhone: user?.phoneNumbers?.[0]?.phoneNumber?.trim() || "000000",
           clientEmail: user?.primaryEmailAddress?.emailAddress,
           eventDate: plan.eventDate,
           eventType: plan.eventType ?? undefined,
