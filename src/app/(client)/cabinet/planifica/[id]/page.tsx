@@ -1671,6 +1671,14 @@ type ViewMode = "grid" | "list";
 const COLUMN_STORAGE_KEY = "plan-bookings-columns";
 const VIEW_MODE_STORAGE_KEY = "plan-bookings-view-mode";
 
+// Mobile users get their own column picker — desktop options (3/4/5) are
+// too cramped on a phone, and "single column" wastes vertical space when
+// browsing dozens of artists. Default 2 because that's the readable
+// sweet-spot for the artist-card layout at 320–430px widths.
+const MOBILE_COLUMN_OPTIONS = [1, 2, 3] as const;
+type MobileColumnCount = (typeof MOBILE_COLUMN_OPTIONS)[number];
+const MOBILE_COLUMN_STORAGE_KEY = "plan-bookings-mobile-columns";
+
 // Budget brackets on the per-category browse view. Same thresholds across
 // every category — small/medium/large is a coarse signal and per-category
 // tuning would just confuse clients comparing across artists.
@@ -1740,6 +1748,8 @@ function DiscoverySection({
   // Columns preference — persisted per user in localStorage so the layout
   // stays consistent between plan visits.
   const [columns, setColumns] = useState<ColumnCount>(4);
+  const [mobileColumns, setMobileColumns] =
+    useState<MobileColumnCount>(2);
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   useEffect(() => {
     try {
@@ -1747,6 +1757,11 @@ function DiscoverySection({
       const n = Number(stored);
       if (COLUMN_OPTIONS.includes(n as ColumnCount)) {
         setColumns(n as ColumnCount);
+      }
+      const storedMobile = localStorage.getItem(MOBILE_COLUMN_STORAGE_KEY);
+      const m = Number(storedMobile);
+      if (MOBILE_COLUMN_OPTIONS.includes(m as MobileColumnCount)) {
+        setMobileColumns(m as MobileColumnCount);
       }
       const storedView = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
       if (storedView === "list" || storedView === "grid") {
@@ -1758,6 +1773,12 @@ function DiscoverySection({
     setColumns(n);
     try { localStorage.setItem(COLUMN_STORAGE_KEY, String(n)); } catch { /* ignore */ }
   }
+  function changeMobileColumns(n: MobileColumnCount) {
+    setMobileColumns(n);
+    try {
+      localStorage.setItem(MOBILE_COLUMN_STORAGE_KEY, String(n));
+    } catch { /* ignore */ }
+  }
   function changeViewMode(mode: ViewMode) {
     setViewMode(mode);
     try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode); } catch { /* ignore */ }
@@ -1766,15 +1787,22 @@ function DiscoverySection({
   // Visible-count + Load-more state moved into <SequentialCategories>.
 
   // Tailwind can't safely interpolate arbitrary lg:grid-cols-N at runtime
-  // because it purges unused classes. Map to a static class per column count.
+  // because it purges unused classes. The mobile prefix (no breakpoint)
+  // controls phones; sm/lg/xl prefixes step up at 640/1024/1280px.
+  const mobileColsClass =
+    mobileColumns === 1
+      ? "grid-cols-1"
+      : mobileColumns === 2
+        ? "grid-cols-2"
+        : "grid-cols-3";
   const gridCols =
     viewMode === "list"
       ? "grid-cols-1"
       : columns === 3
-        ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3"
+        ? `${mobileColsClass} sm:grid-cols-2 lg:grid-cols-3`
         : columns === 4
-          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5";
+          ? `${mobileColsClass} sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`
+          : `${mobileColsClass} sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5`;
 
   return (
     <section className="space-y-10">
@@ -1827,26 +1855,54 @@ function DiscoverySection({
               <span className="hidden sm:inline">Listă</span>
             </button>
           </div>
-          {/* Column picker — 3/4/5 cards per row (only in grid mode) */}
+          {/* Column picker — desktop (3/4/5 cards per row) and mobile
+              (1/2/3). Two pickers because the readable card width is
+              very different on a phone vs a 27" monitor; sharing one
+              control led to either tiny phone cards or wasted desktop
+              space. */}
           {viewMode === "grid" && (
-            <div className="hidden lg:flex items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
-              <span className="px-2 text-xs text-muted-foreground">Coloane:</span>
-              {COLUMN_OPTIONS.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => changeColumns(n)}
-                  className={cn(
-                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
-                    columns === n
-                      ? "bg-gold text-[#0D0D0D]"
-                      : "text-muted-foreground hover:bg-accent",
-                  )}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
+            <>
+              <div className="hidden lg:flex items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
+                <span className="px-2 text-xs text-muted-foreground">
+                  Coloane:
+                </span>
+                {COLUMN_OPTIONS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => changeColumns(n)}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                      columns === n
+                        ? "bg-gold text-[#0D0D0D]"
+                        : "text-muted-foreground hover:bg-accent",
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="flex sm:hidden items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
+                <span className="px-2 text-[11px] text-muted-foreground">
+                  Pe rând:
+                </span>
+                {MOBILE_COLUMN_OPTIONS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => changeMobileColumns(n)}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                      mobileColumns === n
+                        ? "bg-gold text-[#0D0D0D]"
+                        : "text-muted-foreground hover:bg-accent",
+                    )}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </div>
