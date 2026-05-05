@@ -2,7 +2,7 @@
 
 import { useUser } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, Music, Building2, PartyPopper, Phone } from "lucide-react";
 
 /**
@@ -58,6 +58,13 @@ export default function AuthRedirectPage() {
   const [phoneInput, setPhoneInput] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
   const [phoneError, setPhoneError] = useState<string | null>(null);
+  // Guard: useUser() can re-emit `user` as Clerk hydrates more profile
+  // fields, which re-runs this effect. Without a guard, checkRole races
+  // with itself — first call decides (e.g. show role picker), then a
+  // later call sees the user differently (e.g. `onboardingComplete=true`
+  // after select-role landed) and silently navigates them away. Pin the
+  // decision to the first run.
+  const decidedRef = useRef(false);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -66,6 +73,11 @@ export default function AuthRedirectPage() {
       router.replace("/sign-in");
       return;
     }
+    if (decidedRef.current) return;
+    // Lock now, before any async work — keeps later effect runs (Clerk
+    // re-emits `user` as it hydrates) from spawning a parallel checkRole
+    // that races with this one.
+    decidedRef.current = true;
 
     /** Public tool landing pages (e.g. /utilitati/budget) stash the desired
      *  /cabinet path in sessionStorage before bouncing through sign-in.
