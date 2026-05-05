@@ -60,110 +60,148 @@ async function reverseGeocode(
   }
 }
 
-/** Pull the rich profile from Google Places API. Requires
+// Field mask for the Place Details call. Place fields are categorized into
+// SKU tiers (essentials, pro, enterprise) — we only pull the ones we
+// actually populate the form with, so each request stays in the cheapest
+// billable tier we can manage.
+const PLACE_DETAILS_FIELDS = [
+  "id",
+  "displayName",
+  "formattedAddress",
+  "addressComponents",
+  "internationalPhoneNumber",
+  "nationalPhoneNumber",
+  "websiteUri",
+  "editorialSummary",
+  "types",
+  "primaryTypeDisplayName",
+  "rating",
+  "userRatingCount",
+  "photos",
+  "location",
+].join(",");
+
+/** Pull the rich profile from the Google Places API (v1 / "New"). Requires
  *  GOOGLE_PLACES_API_KEY. Returns nothing on miss — the caller falls back
- *  to OpenStreetMap. */
+ *  to OpenStreetMap. We deliberately use the new API because the legacy
+ *  one (`maps.googleapis.com/maps/api/place/...`) is no longer enabled by
+ *  default for new Cloud projects. */
 async function placesEnrich(
   args: { placeId?: string; placeName?: string; lat?: number; lng?: number },
 ): Promise<Partial<ExpandedMaps>> {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) return {};
 
-  // Resolve to a Place id we can pass to Place Details. Order:
-  //   1. Direct ChIJ... id from the URL.
-  //   2. Search by name + lat/lng (when present).
-  //   3. Search by lat/lng nearest place.
+  // 1. Resolve to a Place "places/<id>" resource name.
+  //    The URL we parsed only ever yields `ChIJ...` ids (legacy format) or
+  //    none — both go through Search Text in the new API, biased by the
+  //    coordinates when available.
   let placeId: string | undefined;
-  if (args.placeId && args.placeId.startsWith("ChIJ")) {
-    placeId = args.placeId;
-  } else if (args.placeName) {
+  if (args.placeName || args.placeId) {
     try {
-      const findUrl = new URL(
-        "https://maps.googleapis.com/maps/api/place/findplacefromtext/json",
-      );
-      findUrl.searchParams.set("input", args.placeName);
-      findUrl.searchParams.set("inputtype", "textquery");
-      findUrl.searchParams.set("fields", "place_id");
+      const searchBody: Record<string, unknown> = {
+        textQuery: args.placeName || args.placeId,
+        languageCode: "ro",
+      };
       if (args.lat !== undefined && args.lng !== undefined) {
-        findUrl.searchParams.set(
-          "locationbias",
-          `point:${args.lat},${args.lng}`,
-        );
+        searchBody.locationBias = {
+          circle: {
+            center: { latitude: args.lat, longitude: args.lng },
+            radius: 500,
+          },
+        };
       }
-      findUrl.searchParams.set("key", apiKey);
-      const r = await fetch(findUrl.toString(), {
-        signal: AbortSignal.timeout(5000),
-      });
+      const r = await fetch(
+        "https://places.googleapis.com/v1/places:searchText",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": apiKey,
+            // Search responses are listed by `places.<field>`. We only
+            // need the id; details come from the second call.
+            "X-Goog-FieldMask": "places.id",
+          },
+          body: JSON.stringify(searchBody),
+          signal: AbortSignal.timeout(5000),
+        },
+      );
       if (r.ok) {
-        const j = await r.json();
-        placeId = j.candidates?.[0]?.place_id;
+        const j = (await r.json()) as { places?: Array<{ id?: string }> };
+        placeId = j.places?.[0]?.id;
+      } else {
+        // Surface the API's complaint in logs — most common failure mode is
+        // "Places API (New) not enabled" or restricted-key referrer mismatch.
+        console.warn("[maps.expand] places.searchText failed", await r.text());
       }
-    } catch {
-      /* fall through */
+    } catch (err) {
+      console.warn("[maps.expand] places.searchText threw", err);
     }
   }
   if (!placeId) return {};
 
+  // 2. Place Details with the rich field mask.
   try {
-    const detailsUrl = new URL(
-      "https://maps.googleapis.com/maps/api/place/details/json",
+    const r = await fetch(
+      `https://places.googleapis.com/v1/places/${encodeURIComponent(placeId)}?languageCode=ro`,
+      {
+        headers: {
+          "X-Goog-Api-Key": apiKey,
+          "X-Goog-FieldMask": PLACE_DETAILS_FIELDS,
+        },
+        signal: AbortSignal.timeout(5000),
+      },
     );
-    detailsUrl.searchParams.set("place_id", placeId);
-    detailsUrl.searchParams.set(
-      "fields",
-      [
-        "name",
-        "formatted_address",
-        "international_phone_number",
-        "website",
-        "editorial_summary",
-        "types",
-        "rating",
-        "user_ratings_total",
-        "photos",
-        "address_components",
-      ].join(","),
-    );
-    detailsUrl.searchParams.set("language", "ro");
-    detailsUrl.searchParams.set("key", apiKey);
+    if (!r.ok) {
+      console.warn("[maps.expand] place details failed", await r.text());
+      return {};
+    }
+    type AddrComp = { types: string[]; longText: string };
+    type Place = {
+      id?: string;
+      displayName?: { text?: string };
+      formattedAddress?: string;
+      addressComponents?: AddrComp[];
+      internationalPhoneNumber?: string;
+      nationalPhoneNumber?: string;
+      websiteUri?: string;
+      editorialSummary?: { text?: string };
+      types?: string[];
+      rating?: number;
+      userRatingCount?: number;
+      photos?: Array<{ name?: string }>;
+    };
+    const place = (await r.json()) as Place;
 
-    const r = await fetch(detailsUrl.toString(), {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (!r.ok) return {};
-    const j = await r.json();
-    const result = j.result ?? {};
-
-    // address_components → city
-    const components: Array<{ types: string[]; long_name: string }> =
-      result.address_components ?? [];
-    const cityComp = components.find((c) =>
+    const cityComp = place.addressComponents?.find((c) =>
       c.types.some((t) =>
         ["locality", "administrative_area_level_2", "postal_town"].includes(t),
       ),
     );
 
-    // First photo → public photo URL via the photo proxy.
-    const photoRef: string | undefined = result.photos?.[0]?.photo_reference;
-    const photoUrl = photoRef
-      ? `https://maps.googleapis.com/maps/api/place/photo?maxwidth=1600&photo_reference=${encodeURIComponent(
-          photoRef,
-        )}&key=${apiKey}`
+    // Photos in the new API are referenced by their resource name, e.g.
+    // `places/{place_id}/photos/{photo_id}`. The media endpoint streams the
+    // actual image bytes; we expose the URL so the front-end can render
+    // it directly in an <img>.
+    const photoName = place.photos?.[0]?.name;
+    const photoUrl = photoName
+      ? `https://places.googleapis.com/v1/${photoName}/media?maxHeightPx=1600&key=${apiKey}`
       : undefined;
 
     return {
-      placeName: result.name,
-      address: result.formatted_address,
-      city: cityComp?.long_name,
-      phone: result.international_phone_number,
-      website: result.website,
-      summary: result.editorial_summary?.overview,
-      categories: Array.isArray(result.types) ? result.types.slice(0, 5) : undefined,
-      rating: typeof result.rating === "number" ? result.rating : undefined,
-      ratingCount: result.user_ratings_total,
+      placeName: place.displayName?.text,
+      address: place.formattedAddress,
+      city: cityComp?.longText,
+      phone: place.internationalPhoneNumber || place.nationalPhoneNumber,
+      website: place.websiteUri,
+      summary: place.editorialSummary?.text,
+      categories: place.types?.slice(0, 5),
+      rating: typeof place.rating === "number" ? place.rating : undefined,
+      ratingCount: place.userRatingCount,
       photoUrl,
     };
-  } catch {
+  } catch (err) {
+    console.warn("[maps.expand] place details threw", err);
     return {};
   }
 }
