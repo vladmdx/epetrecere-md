@@ -1442,12 +1442,17 @@ function BookingsTab({
         const catNameById = new Map(cats.map((c) => [c.id, c.nameRo]));
 
         const categories = plan.selectedCategories ?? [];
-        // Fetch up to 60 per category so "Încarcă mai mulți" can reveal
-        // several batches without refetching; the initial grid only shows
-        // INITIAL_VISIBLE, the rest stays in memory.
+        // Discovery feed:
+        //   - sort=newest so freshly registered artists surface at the
+        //     top instead of being buried after the legacy seed batch;
+        //   - limit=200 so categories with 60+ artists (Moderatori has
+        //     71+) don't drop the tail off the end of the page. The
+        //     initial grid still only shows INITIAL_VISIBLE per
+        //     category; "Încarcă mai mulți" reveals the rest from
+        //     memory without refetching.
         if (categories.length === 0) {
           const res = await fetch(
-            `/api/artists?date=${plan.eventDate}&limit=60`,
+            `/api/artists?date=${plan.eventDate}&sort=newest&limit=200`,
             { cache: "no-store" },
           ).then((r) => (r.ok ? r.json() : { items: [] }));
           setByCategory([
@@ -1463,7 +1468,7 @@ function BookingsTab({
         const sections = await Promise.all(
           categories.map(async (catId) => {
             const res = await fetch(
-              `/api/artists?date=${plan.eventDate}&category=${catId}&limit=60`,
+              `/api/artists?date=${plan.eventDate}&category=${catId}&sort=newest&limit=200`,
               { cache: "no-store" },
             ).then((r) => (r.ok ? r.json() : { items: [] }));
             return {
