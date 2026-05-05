@@ -94,48 +94,58 @@ async function placesEnrich(
 
   // 1. Resolve to a Place "places/<id>" resource name.
   //    The URL we parsed only ever yields `ChIJ...` ids (legacy format) or
-  //    none — both go through Search Text in the new API, biased by the
-  //    coordinates when available.
-  let placeId: string | undefined;
-  if (args.placeName || args.placeId) {
+  //    none — both go through Search Text in the new API. We try a tight
+  //    bias first (5 km, picks the right venue when the URL coords are
+  //    accurate) and fall back to an unbiased search if the bias misses
+  //    (URL coords might be approximate or slightly off).
+  async function searchOnce(body: Record<string, unknown>): Promise<string | undefined> {
     try {
-      const searchBody: Record<string, unknown> = {
-        textQuery: args.placeName || args.placeId,
-        languageCode: "ro",
-      };
-      if (args.lat !== undefined && args.lng !== undefined) {
-        searchBody.locationBias = {
-          circle: {
-            center: { latitude: args.lat, longitude: args.lng },
-            radius: 500,
-          },
-        };
-      }
       const r = await fetch(
         "https://places.googleapis.com/v1/places:searchText",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Goog-Api-Key": apiKey,
+            "X-Goog-Api-Key": apiKey!,
             // Search responses are listed by `places.<field>`. We only
             // need the id; details come from the second call.
             "X-Goog-FieldMask": "places.id",
           },
-          body: JSON.stringify(searchBody),
+          body: JSON.stringify(body),
           signal: AbortSignal.timeout(5000),
         },
       );
       if (r.ok) {
         const j = (await r.json()) as { places?: Array<{ id?: string }> };
-        placeId = j.places?.[0]?.id;
-      } else {
-        // Surface the API's complaint in logs — most common failure mode is
-        // "Places API (New) not enabled" or restricted-key referrer mismatch.
-        console.warn("[maps.expand] places.searchText failed", await r.text());
+        return j.places?.[0]?.id;
       }
+      // Surface the API's complaint in logs — most common failure mode is
+      // "Places API (New) not enabled" or restricted-key referrer mismatch.
+      console.warn("[maps.expand] places.searchText failed", await r.text());
+      return undefined;
     } catch (err) {
       console.warn("[maps.expand] places.searchText threw", err);
+      return undefined;
+    }
+  }
+
+  let placeId: string | undefined;
+  const query = args.placeName || args.placeId;
+  if (query) {
+    if (args.lat !== undefined && args.lng !== undefined) {
+      placeId = await searchOnce({
+        textQuery: query,
+        languageCode: "ro",
+        locationBias: {
+          circle: {
+            center: { latitude: args.lat, longitude: args.lng },
+            radius: 5000,
+          },
+        },
+      });
+    }
+    if (!placeId) {
+      placeId = await searchOnce({ textQuery: query, languageCode: "ro" });
     }
   }
   if (!placeId) return {};
