@@ -115,11 +115,13 @@ export default function AuthRedirectPage() {
         }
 
         const res = await fetch(
-          `/api/auth/check-role?email=${encodeURIComponent(email)}`,
-          // Bypass any HTTP cache on the way out of the edge — a stale
-          // "you're already onboarded" response would silently skip the
-          // role picker for someone who just signed up.
-          { cache: "no-store" },
+          // Cache-buster query param — defeats any intermediary that
+          // ignores cache: "no-store" headers (some Edge proxies do).
+          `/api/auth/check-role?email=${encodeURIComponent(email)}&_t=${Date.now()}`,
+          {
+            cache: "no-store",
+            headers: { "Cache-Control": "no-cache, no-store, must-revalidate" },
+          },
         );
         if (!res.ok) {
           setShowRoleSelect(true);

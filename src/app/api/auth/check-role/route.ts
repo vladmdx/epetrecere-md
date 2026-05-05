@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { users, artists, venues } from "@/lib/db/schema";
+import {
+  users,
+  artists,
+  venues,
+  eventPlans,
+  bookingRequests,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 
@@ -130,12 +136,24 @@ export async function GET(req: NextRequest) {
   }
 
   // For regular users: determine if they need to see the role picker.
-  // A user is "new" (needs role picker) if onboardingComplete is false
-  // and they have no venue/artist records.
+  //
+  // Two layers of detection so we never silently dump a fresh signup on
+  // /cabinet as "client":
+  //
+  //   1. Default-state check — onboardingComplete still false AND no
+  //      venue/artist row → never picked a role yet.
+  //   2. Activity check — even if onboardingComplete somehow flipped to
+  //      true (webhook race, manual flag flip, leftover state from a
+  //      deleted-then-re-signed-up account), require *evidence* of
+  //      genuine client use (event plan or submitted booking) before
+  //      treating them as an existing client. No evidence → re-show
+  //      the picker. The picker is idempotent; one extra click is a
+  //      negligible UX cost vs. silently locking a partner/venue
+  //      candidate into a client experience.
   const hasVenue = !!venue;
   let isNewUser = false;
 
-  if (dbUser.role === "user" && !hasVenue && !dbUser.onboardingComplete) {
+  if (dbUser.role === "user" && !hasVenue) {
     const [artistRecord] = await db
       .select({ id: artists.id })
       .from(artists)
@@ -143,7 +161,27 @@ export async function GET(req: NextRequest) {
       .limit(1);
 
     if (!artistRecord) {
-      isNewUser = true;
+      if (!dbUser.onboardingComplete) {
+        isNewUser = true;
+      } else {
+        // onboardingComplete=true but no role-bearing entity → check for
+        // real client activity. If none, the picker re-confirms intent.
+        const [plan] = await db
+          .select({ id: eventPlans.id })
+          .from(eventPlans)
+          .where(eq(eventPlans.userId, dbUser.id))
+          .limit(1);
+        const [booking] = plan
+          ? [null]
+          : await db
+              .select({ id: bookingRequests.id })
+              .from(bookingRequests)
+              .where(eq(bookingRequests.clientUserId, dbUser.id))
+              .limit(1);
+        if (!plan && !booking) {
+          isNewUser = true;
+        }
+      }
     }
   }
 
