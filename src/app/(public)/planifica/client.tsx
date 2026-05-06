@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -192,6 +192,7 @@ interface WizardClientProps {
 export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
   const { t } = useLocale();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { isSignedIn, user } = useUser();
   const [step, setStep] = useState(0);
   const [data, setData] = useState<WizardData>(initialData);
@@ -201,16 +202,37 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
   const storageKey = adminMode ? "admin-wizard-data" : "wizard-data";
   const planIdKey = adminMode ? "admin-wizard-plan-id" : "wizard-plan-id";
 
-  // Persist in sessionStorage
+  // Persist in sessionStorage. URL params (from the homepage search bar
+  // funnel) take precedence on first hydration so /planifica?eventType=
+  // wedding lands on step 0 with Nuntă pre-selected.
   useEffect(() => {
     const saved = sessionStorage.getItem(storageKey);
+    let next = initialData;
     if (saved) {
-      try { setData(JSON.parse(saved)); } catch { /* ignore */ }
-    }
-    // Reset any stale plan id when wizard starts fresh
-    if (!saved) {
+      try {
+        next = { ...next, ...JSON.parse(saved) };
+      } catch {
+        /* ignore */
+      }
+    } else {
       sessionStorage.removeItem(planIdKey);
     }
+    const eventType = searchParams.get("eventType");
+    if (eventType) next.eventType = eventType;
+    const city = searchParams.get("city");
+    if (city) next.location = city;
+    const date = searchParams.get("date");
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) next.eventDate = date;
+    if (eventType || city || date) {
+      // When the user came from the homepage search, jump them past the
+      // first step (event type) since they already picked it. They land
+      // on step 1 (date) with the date prefilled too.
+      setStep((s) => (s === 0 && eventType ? 1 : s));
+    }
+    setData(next);
+    // Run only on mount — search params change after navigation should
+    // not silently rewrite the wizard mid-edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey, planIdKey]);
 
   useEffect(() => {
