@@ -218,7 +218,23 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
       sessionStorage.removeItem(planIdKey);
     }
     const eventType = searchParams.get("eventType");
-    if (eventType) next.eventType = eventType;
+    if (eventType) {
+      next.eventType = eventType;
+      // Mirror the per-event-type defaults that update() applies in the
+      // normal click path. Without this, prefill from the homepage
+      // funnel arrived on step 1 with the time blank and duration at
+      // the global default — losing the per-event tuning the wizard
+      // gives interactive users.
+      if (!next.startTime) {
+        next.startTime = DEFAULT_START_TIME[eventType] ?? "18:00";
+      }
+      if (next.durationHours === initialData.durationHours) {
+        next.durationHours = DEFAULT_DURATION_HOURS[eventType] ?? 5;
+      }
+      if (next.guestCount === initialData.guestCount) {
+        next.guestCount = DEFAULT_GUEST_COUNT[eventType] ?? 50;
+      }
+    }
     const city = searchParams.get("city");
     if (city) next.location = city;
     const date = searchParams.get("date");
