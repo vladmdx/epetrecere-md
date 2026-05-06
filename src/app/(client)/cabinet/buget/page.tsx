@@ -1,14 +1,11 @@
-import type { Metadata } from "next";
-import { generateMeta } from "@/lib/seo/generate-meta";
-import { BudgetTrackerClient } from "./client";
+// Budget tracker removed per round-2 spec. Existing bookmarks/links to
+// /cabinet/buget redirect to the cabinet root so the page doesn't 404.
+// The standalone tracker is intentionally gone — clients filter by
+// per-category price brackets on Rezervări Artiști instead of running
+// a separate budget tab.
 
-export const metadata: Metadata = generateMeta({
-  title: "Buget nuntă — tracker cheltuieli",
-  description:
-    "Urmărește bugetul nunții pe categorii: estimat vs. plătit. Adaugă facturi și rămâi în control.",
-  path: "/cabinet/buget",
-});
+import { redirect } from "next/navigation";
 
 export default function BudgetTrackerPage() {
-  return <BudgetTrackerClient />;
+  redirect("/cabinet/planifica");
 }

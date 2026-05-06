@@ -40,9 +40,11 @@ const topNav = [
 
 // Tools section — actual instruments only. Confidențialitate + Setări are
 // now accessed from /cabinet/profil (Contul Meu) instead of the sidebar.
+// Budget instrument removed — see related round-2 changes that
+// stripped the budget tab/wizard step. Per-category price filtering
+// inside Rezervări Artiști replaces it.
 const toolsNav = [
   { href: "/cabinet/checklist", icon: CheckSquare, label: "Checklist" },
-  { href: "/cabinet/buget", icon: Wallet, label: "Budget & Cheltuieli" },
   { href: "/cabinet/invitatii", icon: Mail, label: "Invitații Electronice" },
   { href: "/cabinet/moments", icon: Camera, label: "Momente Eveniment" },
 ] as const;
