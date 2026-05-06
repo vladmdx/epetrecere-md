@@ -594,8 +594,48 @@ export default function VendorBookingsPage() {
                     </CardContent>
                   </Card>
                 ) : (
-        <div className="space-y-3">
-          {list.map((booking) => {
+        <div className="space-y-6">
+          {(() => {
+            // Group bookings by event date so the partner sees their
+            // calendar at a glance instead of a flat 30-row list. Each
+            // group shows a sticky-feeling header with the event date
+            // and the count of requests for that day. Within a group
+            // we sort by created_at desc so newest activity bubbles up.
+            const groups = new Map<string, typeof list>();
+            for (const b of list) {
+              const key = b.eventDate ?? "fără-dată";
+              const arr = groups.get(key);
+              if (arr) arr.push(b);
+              else groups.set(key, [b] as typeof list);
+            }
+            const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+              if (a === "fără-dată") return 1;
+              if (b === "fără-dată") return -1;
+              return a.localeCompare(b);
+            });
+            return sortedKeys.map((dateKey) => {
+              const dateBookings = groups.get(dateKey) ?? [];
+              const headerLabel =
+                dateKey === "fără-dată"
+                  ? "Fără dată stabilită"
+                  : new Date(dateKey + "T00:00:00").toLocaleDateString("ro-MD", {
+                      weekday: "long",
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    });
+              return (
+                <div key={dateKey} className="space-y-3">
+                  <div className="flex items-end justify-between gap-3 border-b border-border/30 pb-1.5">
+                    <h3 className="font-heading text-sm font-bold text-gold">
+                      {headerLabel}
+                    </h3>
+                    <span className="text-xs text-muted-foreground">
+                      {dateBookings.length} cere
+                      {dateBookings.length === 1 ? "re" : "ri"}
+                    </span>
+                  </div>
+                  {dateBookings.map((booking) => {
             const cfg = statusConfig[booking.status] || statusConfig.pending;
             const isExpanded = expandedId === booking.id;
             const chatMessages = chats[booking.id] || [];
@@ -922,6 +962,10 @@ export default function VendorBookingsPage() {
               </Card>
             );
           })}
+                </div>
+              );
+            });
+          })()}
         </div>
                 )}
               </TabsContent>

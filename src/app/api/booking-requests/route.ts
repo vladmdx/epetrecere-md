@@ -177,10 +177,17 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(bookingRequests.createdAt))
     .limit(50);
 
-  // Privacy: hide client contact from the artist. All communication between
-  // the parties must happen through the in-app chat. Only admins (and the
-  // client themselves, via client_email query) see real contact data.
-  const redact = !isAdmin && !!artistId;
+  // Privacy: hide client contact from the artist while the booking is
+  // still tentative. Once the partner accepts (status = "accepted" or
+  // "confirmed_by_client"), both sides need direct contact to coordinate
+  // the actual gig — chat alone isn't enough for last-minute logistics.
+  // Per-row check below; this flag only gates the *default* behavior.
+  const SHARED_CONTACT_STATUSES = new Set([
+    "accepted",
+    "confirmed_by_client",
+    "completed",
+  ]);
+  const redactByDefault = !isAdmin && !!artistId;
 
   // Phase 6 — enrich artist bookings with the venue on the same event plan
   // (if any). Lets the artist see "Eveniment la Sala X" on their rezervări.
@@ -217,12 +224,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const payload = result.map((row) => ({
-    ...row,
-    clientPhone: redact ? null : row.clientPhone,
-    clientEmail: redact ? null : row.clientEmail,
-    linkedVenue: row.eventPlanId ? planToVenue.get(row.eventPlanId) ?? null : null,
-  }));
+  const payload = result.map((row) => {
+    // After the partner accepts, contact info flows both ways so they
+    // can coordinate the gig directly. Before that, the artist sees
+    // null and clients see null on the artist side via the public
+    // booking redirect.
+    const showContact =
+      !redactByDefault || SHARED_CONTACT_STATUSES.has(row.status);
+    return {
+      ...row,
+      clientPhone: showContact ? row.clientPhone : null,
+      clientEmail: showContact ? row.clientEmail : null,
+      linkedVenue: row.eventPlanId
+        ? planToVenue.get(row.eventPlanId) ?? null
+        : null,
+    };
+  });
 
   return NextResponse.json(payload);
 }

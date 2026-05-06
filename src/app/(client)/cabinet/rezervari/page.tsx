@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, type ReactElement } from "react";
 import { useUser } from "@clerk/nextjs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -298,9 +298,7 @@ export default function ReservationsPage() {
               <p className="text-xs mt-1">Explorează artiști și fă prima ta rezervare!</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {activeBookings.map(b => renderBookingCard(b))}
-            </div>
+            <BookingsByEvent bookings={activeBookings} render={renderBookingCard} />
           )}
         </TabsContent>
 
@@ -308,9 +306,7 @@ export default function ReservationsPage() {
           {pastBookings.length === 0 ? (
             <p className="py-12 text-center text-muted-foreground">Nu ai rezervări trecute.</p>
           ) : (
-            <div className="space-y-3">
-              {pastBookings.map(b => renderBookingCard(b))}
-            </div>
+            <BookingsByEvent bookings={pastBookings} render={renderBookingCard} />
           )}
         </TabsContent>
       </Tabs>
@@ -559,8 +555,13 @@ export default function ReservationsPage() {
                 Mesaj
               </Button>
 
-              {/* Cancel (when pending or accepted) */}
-              {(b.status === "pending" || b.status === "accepted") && (
+              {/* Cancel — only after the partner has actually accepted.
+                  While the request is "pending" the client has to wait
+                  out the 24h response window. Cancelling pre-acceptance
+                  rewards no-one and racks up cancelled-by-client noise
+                  in the partner's CRM. After acceptance the client can
+                  still back out. */}
+              {b.status === "accepted" && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -571,6 +572,9 @@ export default function ReservationsPage() {
                   <XCircle className="h-3.5 w-3.5" />
                   Anulează
                 </Button>
+              )}
+              {b.status === "pending" && (
+                <PendingCountdown createdAt={b.createdAt} />
               )}
 
               {b.artistSlug && (
@@ -586,4 +590,103 @@ export default function ReservationsPage() {
       </Card>
     );
   }
+}
+
+/**
+ * Live 24-hour countdown for pending bookings. Replaces the old "you
+ * can cancel any time" affordance — the client sees how long the
+ * partner has left to respond instead. Auto-expiry happens server-side
+ * via the cron sweep; this is purely UI feedback.
+ */
+function PendingCountdown({ createdAt }: { createdAt: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+  const created = new Date(createdAt).getTime();
+  const expiresAt = created + 24 * 60 * 60 * 1000;
+  const remaining = Math.max(0, expiresAt - now);
+  const hours = Math.floor(remaining / (60 * 60 * 1000));
+  const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+  const expired = remaining === 0;
+  return (
+    <div
+      className={cn(
+        "rounded-lg border px-3 py-1.5 text-center text-xs font-medium",
+        expired
+          ? "border-destructive/40 bg-destructive/5 text-destructive"
+          : "border-amber-500/40 bg-amber-500/5 text-amber-500",
+      )}
+    >
+      {expired ? (
+        "⌛ Cererea a expirat — așteaptă răspuns sau retrimite."
+      ) : (
+        <>
+          ⏳ Partenerul are{" "}
+          <strong>
+            {hours}h {String(minutes).padStart(2, "0")}m
+          </strong>{" "}
+          să răspundă
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Group a flat booking list into per-event sections, ordered by event
+ * date ascending. Each group renders a header with the date + event
+ * type + total bookings on that day so the client sees their day-level
+ * agenda instead of a mixed feed.
+ */
+function BookingsByEvent({
+  bookings,
+  render,
+}: {
+  bookings: BookingRequest[];
+  render: (b: BookingRequest) => ReactElement;
+}) {
+  const groups = new Map<string, BookingRequest[]>();
+  for (const b of bookings) {
+    const key = b.eventDate ?? "fără-dată";
+    const arr = groups.get(key);
+    if (arr) arr.push(b);
+    else groups.set(key, [b]);
+  }
+  const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
+    if (a === "fără-dată") return 1;
+    if (b === "fără-dată") return -1;
+    return a.localeCompare(b);
+  });
+  return (
+    <div className="space-y-6">
+      {sortedKeys.map((dateKey) => {
+        const list = groups.get(dateKey) ?? [];
+        const headerLabel =
+          dateKey === "fără-dată"
+            ? "Fără dată stabilită"
+            : new Date(dateKey + "T00:00:00").toLocaleDateString("ro-MD", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              });
+        return (
+          <div key={dateKey} className="space-y-3">
+            <div className="flex items-end justify-between gap-3 border-b border-border/30 pb-1.5">
+              <h3 className="font-heading text-sm font-bold text-gold">
+                {headerLabel}
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                {list.length} rezerv
+                {list.length === 1 ? "are" : "ări"}
+              </span>
+            </div>
+            {list.map((b) => render(b))}
+          </div>
+        );
+      })}
+    </div>
+  );
 }

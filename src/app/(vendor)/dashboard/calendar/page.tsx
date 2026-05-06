@@ -1595,13 +1595,14 @@ export default function VendorCalendarPage() {
             >
               Anulează
             </Button>
+            {/* Save stays enabled — submitManualBooking surfaces a
+                specific toast for each missing field. The earlier
+                blanket-disabled state confused partners ("the button
+                doesn't react") because they couldn't tell whether the
+                form was waiting on a package, a time, or just broken. */}
             <Button
               onClick={submitManualBooking}
-              disabled={
-                manualSaving ||
-                manualPackageId == null ||
-                !manualStartTime
-              }
+              disabled={manualSaving}
               className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {manualSaving ? (
