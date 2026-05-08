@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 
 interface BookingRequest {
   id: number;
+  eventPlanId: number | null;
   artistId: number | null;
   venueId: number | null;
   clientName: string;
@@ -40,9 +41,24 @@ interface BookingRequest {
   artistReply: string | null;
   artistName: string | null;
   artistSlug: string | null;
+  /** Resolved on the server from artist.categoryIds → category.nameRo. */
+  categoryNames?: string[] | null;
   venueName: string | null;
   venueSlug: string | null;
+  agreedPrice?: number | null;
+  /** Latest counter-offer amount (so we can show what the partner /
+   *  client are negotiating instead of the original ask). */
+  priceOffers?: Array<{ amount: number }> | null;
   createdAt: string;
+}
+
+interface PlanSummary {
+  id: number;
+  title: string;
+  eventType: string | null;
+  eventDate: string | null;
+  location: string | null;
+  guestCountTarget: number | null;
 }
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -70,15 +86,25 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 export default function ClientCabinetPage() {
   const { isSignedIn, user: clerkUser } = useUser();
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
+  const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isSignedIn || !clerkUser?.primaryEmailAddress?.emailAddress) return;
     const email = clerkUser.primaryEmailAddress.emailAddress;
-    fetch(`/api/booking-requests?client_email=${encodeURIComponent(email)}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: BookingRequest[]) => {
-        if (Array.isArray(data)) setBookings(data);
+    Promise.all([
+      fetch(`/api/booking-requests?client_email=${encodeURIComponent(email)}`)
+        .then((r) => (r.ok ? r.json() : []))
+        .then((data) => (Array.isArray(data) ? (data as BookingRequest[]) : [])),
+      fetch("/api/event-plans?status=active", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { plans: [] }))
+        .then((data) =>
+          Array.isArray(data?.plans) ? (data.plans as PlanSummary[]) : [],
+        ),
+    ])
+      .then(([bs, ps]) => {
+        setBookings(bs);
+        setPlans(ps);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -160,19 +186,27 @@ export default function ClientCabinetPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {activeBookings.map((b) => {
+        <BookingsByPlan
+          bookings={activeBookings}
+          plans={plans}
+          render={(b) => {
             const cfg = statusConfig[b.status] || statusConfig.pending;
             const eventLabel = b.eventType
               ? EVENT_TYPE_LABELS[b.eventType] || b.eventType
               : "Eveniment";
 
+            // Latest negotiated price (counter-offer wins) or the
+            // original agreed price.
+            const lastOffer = b.priceOffers?.length
+              ? b.priceOffers[b.priceOffers.length - 1].amount
+              : null;
+            const displayPrice = lastOffer ?? b.agreedPrice ?? null;
             return (
               <Card key={b.id} className="transition-all hover:border-gold/30">
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 space-y-2">
-                      {/* Header: event type + status */}
+                      {/* Header: event type + status + category + price */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-heading font-semibold text-base">
                           {eventLabel}
@@ -180,6 +214,22 @@ export default function ClientCabinetPage() {
                         <Badge variant="outline" className={cn("text-xs", cfg.color)}>
                           {cfg.label}
                         </Badge>
+                        {b.categoryNames && b.categoryNames.length > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs text-gold/80 border-gold/30 bg-gold/5"
+                          >
+                            {b.categoryNames.join(" · ")}
+                          </Badge>
+                        )}
+                        {displayPrice != null && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs text-gold border-gold/30 bg-gold/5"
+                          >
+                            {displayPrice}€
+                          </Badge>
+                        )}
                       </div>
 
                       {/* Vendor info — artist or venue */}
@@ -300,9 +350,127 @@ export default function ClientCabinetPage() {
                 </CardContent>
               </Card>
             );
-          })}
-        </div>
+          }}
+        />
       )}
+    </div>
+  );
+}
+
+/**
+ * Group bookings under their event_plan header so the user sees a
+ * proper agenda ("Botezul lui Gabi · 29 mai 2026 · Chișinău · 40
+ * invitați") followed by every booking on that plan, instead of one
+ * flat list where it's not obvious which booking belongs to which
+ * event. Bookings without a plan id (legacy or admin-seeded) fall
+ * into a "Fără eveniment" bucket at the bottom.
+ */
+function BookingsByPlan({
+  bookings,
+  plans,
+  render,
+}: {
+  bookings: BookingRequest[];
+  plans: PlanSummary[];
+  render: (b: BookingRequest) => React.ReactElement;
+}) {
+  const planById = new Map(plans.map((p) => [p.id, p]));
+  const groups = new Map<number | "none", BookingRequest[]>();
+  for (const b of bookings) {
+    const key = b.eventPlanId ?? "none";
+    const arr = groups.get(key);
+    if (arr) arr.push(b);
+    else groups.set(key, [b]);
+  }
+  // Order groups: real plans first by event date asc; "none" bucket last.
+  const orderedKeys = Array.from(groups.keys()).sort((a, b) => {
+    if (a === "none") return 1;
+    if (b === "none") return -1;
+    const da = planById.get(a as number)?.eventDate ?? "";
+    const db = planById.get(b as number)?.eventDate ?? "";
+    return da.localeCompare(db);
+  });
+
+  return (
+    <div className="space-y-6">
+      {orderedKeys.map((key) => {
+        const list = groups.get(key) ?? [];
+        const plan = key !== "none" ? planById.get(key as number) : null;
+
+        // Pick a venue header from the bookings if any of them is a
+        // venue request — saves the user from clicking into the event
+        // to see where it's happening.
+        const venueBooking = list.find((b) => b.venueName);
+
+        const eventLabel = plan?.eventType
+          ? EVENT_TYPE_LABELS[plan.eventType] ?? plan.eventType
+          : "Eveniment";
+        const dateLabel = plan?.eventDate
+          ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            })
+          : null;
+
+        return (
+          <section key={String(key)}>
+            {/* Plan header — bold title + meta line. Doubles as link
+                back into the plan detail page when we have an id. */}
+            <div className="mb-3 rounded-xl border border-gold/30 bg-gold/5 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] uppercase tracking-wider text-gold/70">
+                    {eventLabel}
+                  </p>
+                  <h3 className="font-heading text-base font-bold">
+                    {plan?.title ?? "Cereri fără eveniment alocat"}
+                  </h3>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    {dateLabel && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {dateLabel}
+                      </span>
+                    )}
+                    {plan?.location && (
+                      <span className="flex items-center gap-1">
+                        <Building2 className="h-3 w-3" />
+                        {plan.location}
+                      </span>
+                    )}
+                    {venueBooking?.venueName && (
+                      <span className="flex items-center gap-1 text-gold/80">
+                        <Building2 className="h-3 w-3" />
+                        {venueBooking.venueName}
+                      </span>
+                    )}
+                    {plan?.guestCountTarget && (
+                      <span className="flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {plan.guestCountTarget} invitați
+                      </span>
+                    )}
+                    <span className="text-gold/80">
+                      {list.length} cere{list.length === 1 ? "re" : "ri"}
+                    </span>
+                  </div>
+                </div>
+                {plan && (
+                  <Link
+                    href={`/cabinet/planifica/${plan.id}`}
+                    className="rounded-lg border border-gold/30 px-3 py-1.5 text-xs text-gold hover:bg-gold/10"
+                  >
+                    Deschide eveniment →
+                  </Link>
+                )}
+              </div>
+            </div>
+            <div className="space-y-3">{list.map((b) => render(b))}</div>
+          </section>
+        );
+      })}
     </div>
   );
 }
