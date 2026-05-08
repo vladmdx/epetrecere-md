@@ -117,9 +117,13 @@ interface Plan {
 
 interface BookingRequest {
   id: number;
-  artistId: number;
+  artistId: number | null;
   artistName: string | null;
   artistSlug: string | null;
+  /** Resolved on the server from artist.categoryIds → category.nameRo.
+   *  Used to show "Cantăreți / Moderatori" alongside the artist name
+   *  so the user remembers which slot the booking fills. */
+  categoryNames?: string[] | null;
   /** Venue bookings live in the same table — these are null for
    *  artist requests and vice versa. */
   venueId?: number | null;
@@ -1558,7 +1562,7 @@ function BookingsTab({
   const bookingByArtistId = new Map<number, BookingRequest>();
   for (const b of bookings) {
     if (!ACTIVE_STATUSES.has(b.status)) continue;
-    // Keep the most recent active booking per artist
+    if (b.artistId == null) continue; // skip venue bookings here
     const existing = bookingByArtistId.get(b.artistId);
     if (!existing) bookingByArtistId.set(b.artistId, b);
   }
@@ -1605,6 +1609,7 @@ function BookingsTab({
   // via the bell.
   const blockedArtistIds = new Set<number>();
   for (const b of bookings) {
+    if (b.artistId == null) continue; // venue bookings have no artistId
     if (
       b.status === "rejected" ||
       b.status === "cancelled" ||
@@ -1618,8 +1623,13 @@ function BookingsTab({
   // entries — they're noise in the "Rezervările mele" list. The user
   // still gets the bell notification when the artist declines, and the
   // booking row stays in the database for audit/CRM.
+  //
+  // ALSO drop venue bookings — they belong on the Săli tab, not here.
+  // Without this filter a venue request shows up as "Artist" because
+  // artistName is null and the row falls back to the generic label.
   const planBookings = bookings.filter(
     (b) =>
+      b.artistId != null &&
       b.status !== "rejected" &&
       b.status !== "cancelled" &&
       b.status !== "expired",
@@ -2351,6 +2361,11 @@ function BookingListCard({
               <p className="text-sm font-medium truncate">
                 {b.artistName || "Artist"}
               </p>
+              {b.categoryNames && b.categoryNames.length > 0 && (
+                <p className="text-[11px] uppercase tracking-wide text-gold/80">
+                  {b.categoryNames.join(" · ")}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 {b.eventDate &&
                   new Date(b.eventDate).toLocaleDateString("ro-MD")}
@@ -4559,7 +4574,11 @@ function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium">{target?.name ?? "Partener"}</p>
           <p className="text-xs text-muted-foreground">
-            {target?.type === "venue" ? "Sală" : "Artist"}
+            {target?.type === "venue"
+              ? "Sală"
+              : b.categoryNames && b.categoryNames.length > 0
+                ? b.categoryNames.join(" · ")
+                : "Artist"}
             {b.eventDate &&
               ` · ${new Date(b.eventDate + "T00:00:00").toLocaleDateString(
                 "ro-MD",
