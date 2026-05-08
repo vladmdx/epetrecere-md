@@ -77,12 +77,10 @@ export default function OnboardingPage() {
     priceFrom: 0,
     priceHidden: false,
     /** Multiple duration → price tiers. Same shape as
-     *  artist_packages rows; persisted as such on submit. The wizard
-     *  ships with two convenient defaults the user can edit/delete. */
-    pricePackages: [
-      { hours: 1, minutes: 0, price: 0, nameRo: "1h" },
-      { hours: 2, minutes: 0, price: 0, nameRo: "2h" },
-    ] as Array<{
+     *  artist_packages rows; persisted as such on submit. Starts
+     *  empty — the partner adds their own values without preset
+     *  hints to anchor on. */
+    pricePackages: [] as Array<{
       hours: number;
       minutes: number;
       price: number;
@@ -548,11 +546,9 @@ export default function OnboardingPage() {
               Tarife
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Adaugă unul sau mai multe tarife pe durată — ex. 45 min,
-              1h, 2h. Clienții vor vedea „de la X€" (cel mai mic) pe
-              profilul tău. Poți completa mai multe variante mai
-              târziu din <strong>/dashboard/tarife</strong> (override
-              weekend, evening, etc.).
+              Adaugă tarifele tale pe durată. Poți completa variante
+              suplimentare (weekend, evening) ulterior din{" "}
+              <strong>/dashboard/tarife</strong>.
             </p>
           </div>
           {!data.priceHidden && (
@@ -578,7 +574,6 @@ export default function OnboardingPage() {
                           };
                           update({ pricePackages: next });
                         }}
-                        placeholder="0"
                       />
                     </div>
                     <div className="col-span-3">
@@ -597,7 +592,6 @@ export default function OnboardingPage() {
                           };
                           update({ pricePackages: next });
                         }}
-                        placeholder="0"
                       />
                     </div>
                     <div className="col-span-4">
@@ -614,7 +608,6 @@ export default function OnboardingPage() {
                           };
                           update({ pricePackages: next });
                         }}
-                        placeholder="200"
                       />
                     </div>
                     <div className="col-span-2 flex justify-end">
@@ -646,12 +639,8 @@ export default function OnboardingPage() {
                 }
                 className="w-full rounded-lg border border-dashed border-border/40 px-3 py-2 text-xs text-muted-foreground hover:border-gold/40 hover:text-gold"
               >
-                + Adaugă încă un tarif
+                + Adaugă tarif
               </button>
-              <p className="text-xs text-muted-foreground">
-                Poți avea mai multe variante pentru durate diferite.
-                Cel mai mic preț apare ca „de la X€" pe profilul tău.
-              </p>
             </div>
           )}
           {/* Toggle "ascunde prețul" — for artists with negotiated pricing.
