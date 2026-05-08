@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { ChatWidget } from "@/components/public/chat-widget";
+import { WishlistButton } from "@/components/public/wishlist-button";
 import { ShareButtons } from "@/components/public/share-buttons";
 import { ReviewPhotoUploader } from "@/components/public/review-photo-uploader";
 import { useLocale } from "@/hooks/use-locale";
@@ -126,7 +127,12 @@ export function VenueDetailClient({
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <h1 className="font-heading text-2xl font-bold md:text-3xl">{name}</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="font-heading text-2xl font-bold md:text-3xl">{name}</h1>
+            <div className="ml-auto">
+              <WishlistButton entityType="venue" entityId={venue.id} />
+            </div>
+          </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             {venue.city && (

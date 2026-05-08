@@ -11,6 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtistCard } from "@/components/public/artist-card";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm } from "@/components/public/request-form";
+import { WishlistButton } from "@/components/public/wishlist-button";
+import { AddToEventButton } from "@/components/public/add-to-event-button";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { ShareButtons } from "@/components/public/share-buttons";
 import { trackClick } from "@/lib/analytics/track-click";
@@ -190,6 +192,13 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                     <Crown className="h-3 w-3" /> Premium
                   </Badge>
                 )}
+                {/* Wishlist back on the public artist page — got dropped
+                    when the booking CTA was rewired to the event-plan
+                    flow. Heart toggle on the right of the title row;
+                    persists per signed-in user via /api/wishlist. */}
+                <div className="ml-auto">
+                  <WishlistButton entityType="artist" entityId={artist.id} />
+                </div>
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
@@ -491,25 +500,14 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               </>
             ) : (
               <>
-                {/* Direct artist booking has been removed — the only
-                    booking path is through an event plan. The user lands
-                    on /cabinet (their event-plan list) and picks the
-                    plan they want this artist booked for; the artist's
-                    "Solicită rezervare" lives inside that plan's
-                    bookings tab now. */}
-                <Link
-                  href={
-                    eventPlanId
-                      ? `/cabinet/planifica/${eventPlanId}?tab=bookings`
-                      : "/cabinet"
-                  }
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-gold px-4 py-3 font-heading text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark"
-                >
-                  <CalendarDays className="h-4 w-4" />
-                  {eventPlanId
-                    ? "Rezervă pentru evenimentul tău"
-                    : "Adaugă la un eveniment"}
-                </Link>
+                {/* Plan picker — opens a dialog with the user's existing
+                    event plans, redirects to /planifica if they have
+                    none, redirects to sign-in if they're not auth'd. */}
+                <AddToEventButton
+                  artistId={artist.id}
+                  artistSlug={artist.slug}
+                  presetEventPlanId={eventPlanId ?? null}
+                />
                 <p className="text-center text-[11px] text-muted-foreground">
                   Rezervările se fac doar din panoul evenimentului tău —
                   ai nevoie de un plan de eveniment activ.

@@ -119,6 +119,11 @@ interface BookingRequest {
   artistId: number;
   artistName: string | null;
   artistSlug: string | null;
+  /** Venue bookings live in the same table — these are null for
+   *  artist requests and vice versa. */
+  venueId?: number | null;
+  venueName?: string | null;
+  venueSlug?: string | null;
   eventType: string | null;
   eventDate: string;
   startTime?: string | null;
@@ -153,6 +158,7 @@ const EVENT_TYPES = [
 type TabKey =
   | "overview"
   | "bookings"
+  | "my-bookings"
   | "venues"
   | "checklist"
   | "budget"
@@ -183,6 +189,9 @@ const NAV_ITEMS: NavItem[] = [
   // tab still hides automatically when venueNeeded=false.
   { key: "venues", icon: MapPin, label: "Săli", venueOnly: true },
   { key: "bookings", icon: BookOpen, label: "Rezervări Artiști" },
+  // Personal cererile trimise live in their own tab so the user
+  // doesn't have to scan through every category to find them.
+  { key: "my-bookings", icon: BookOpen, label: "Cererile mele" },
   { key: "checklist", icon: ClipboardList, label: "Checklist" },
   // Budget tab removed — see BudgetTab definition below; per-category
   // price filtering on the Rezervări Artiști tab replaces it.
@@ -422,6 +431,10 @@ export default function PlanDetailPage({
 
           {/* Budget tab removed — per-category price filter on
               Rezervări Artiști supersedes the standalone budget tracker. */}
+
+          {activeTab === "my-bookings" && (
+            <MyBookingsTab bookings={bookings} />
+          )}
 
           {activeTab === "guests" && plan.guestsEnabled && (
             <GuestsView
@@ -1435,14 +1448,37 @@ function BookingsTab({
     setDiscoveryLoading(true);
     (async () => {
       try {
-        // Fetch category metadata once so we can label sections nicely.
-        const catsRes = await fetch("/api/categories", { cache: "no-store" }).then(
-          (r) => (r.ok ? r.json() : []),
-        );
+        // Fetch category metadata + wishlist in parallel — wishlisted
+        // artists float to the top of every category section so the
+        // user sees their saved favourites before random newcomers.
+        const [catsRes, wishlistRes] = await Promise.all([
+          fetch("/api/categories", { cache: "no-store" }).then((r) =>
+            r.ok ? r.json() : [],
+          ),
+          fetch("/api/wishlist", { cache: "no-store" }).then((r) =>
+            r.ok ? r.json() : { items: [] },
+          ),
+        ]);
         const cats: Array<{ id: number; nameRo: string }> = Array.isArray(catsRes)
           ? catsRes
           : catsRes.items ?? [];
         const catNameById = new Map(cats.map((c) => [c.id, c.nameRo]));
+        const wishlistArtistIds = new Set<number>(
+          ((wishlistRes?.items ?? []) as Array<{
+            entityType: string;
+            entityId: number;
+          }>)
+            .filter((w) => w.entityType === "artist")
+            .map((w) => w.entityId),
+        );
+        // Promote wishlisted artists to the top of each category list,
+        // preserving the API's existing newest-first order for the rest.
+        const promote = (list: DiscoveryArtist[]): DiscoveryArtist[] => {
+          if (wishlistArtistIds.size === 0) return list;
+          const wishlisted = list.filter((a) => wishlistArtistIds.has(a.id));
+          const others = list.filter((a) => !wishlistArtistIds.has(a.id));
+          return [...wishlisted, ...others];
+        };
 
         const categories = plan.selectedCategories ?? [];
         // Discovery feed:
@@ -1462,7 +1498,7 @@ function BookingsTab({
             {
               categoryId: 0,
               categoryName: "Toți artiștii",
-              artists: (res.items ?? []) as DiscoveryArtist[],
+              artists: promote((res.items ?? []) as DiscoveryArtist[]),
             },
           ]);
           return;
@@ -1477,7 +1513,7 @@ function BookingsTab({
             return {
               categoryId: catId,
               categoryName: catNameById.get(catId) ?? `Categorie #${catId}`,
-              artists: (res.items ?? []) as DiscoveryArtist[],
+              artists: promote((res.items ?? []) as DiscoveryArtist[]),
             };
           }),
         );
@@ -2013,6 +2049,25 @@ function SequentialCategories({
       window.scrollTo({ top: 0, behavior: "smooth" });
     });
   }, [currentIdx]);
+
+  // Auto-advance to the next category once the user has booked someone
+  // in the current one. Without this they sat on a screen full of "ai
+  // deja un partener confirmat" cards with no obvious next action. We
+  // watch `categoryBlocker` (the per-category active-booking map) for
+  // the current category id; the moment a booking lands, schedule a
+  // 2.5s advance — long enough for the success toast to land + the
+  // user to see the confirmation card highlighted.
+  const currentCategoryId = byCategory[currentIdx]?.categoryId ?? null;
+  const hasActiveBookingHere =
+    currentCategoryId != null && categoryBlocker.has(currentCategoryId);
+  useEffect(() => {
+    if (!hasActiveBookingHere) return;
+    if (currentIdx >= byCategory.length - 1) return;
+    const id = setTimeout(() => {
+      setCurrentIdx((i) => Math.min(i + 1, byCategory.length - 1));
+    }, 2500);
+    return () => clearTimeout(id);
+  }, [hasActiveBookingHere, currentIdx, byCategory.length]);
 
   function showMore(categoryId: number) {
     setVisibleByCategory((prev) => ({
@@ -3873,8 +3928,112 @@ function SettingsTab({
   );
 }
 
+/**
+ * Cererile mele — flat list of every booking request the client has
+ * submitted on this plan, split into "Confirmate" + "În așteptare".
+ * Read-only summary; actions (cancel, accept counter-offer, message)
+ * still live on /cabinet/rezervari for now.
+ */
+function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
+  const ACTIVE_STATUSES = new Set([
+    "accepted",
+    "confirmed_by_client",
+    "completed",
+  ]);
+  const PENDING_STATUSES = new Set(["pending"]);
+  const confirmed = bookings.filter((b) => ACTIVE_STATUSES.has(b.status));
+  const pending = bookings.filter((b) => PENDING_STATUSES.has(b.status));
+
+  function row(b: BookingRequest) {
+    const target = b.artistName
+      ? { name: b.artistName, slug: b.artistSlug, type: "artist" as const }
+      : b.venueName
+        ? { name: b.venueName, slug: b.venueSlug, type: "venue" as const }
+        : null;
+    return (
+      <div
+        key={b.id}
+        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/40 bg-card/60 p-3 text-sm"
+      >
+        <div className="flex-1 min-w-0">
+          <p className="font-medium">{target?.name ?? "Partener"}</p>
+          <p className="text-xs text-muted-foreground">
+            {target?.type === "venue" ? "Sală" : "Artist"}
+            {b.eventDate &&
+              ` · ${new Date(b.eventDate + "T00:00:00").toLocaleDateString(
+                "ro-MD",
+                { day: "numeric", month: "long" },
+              )}`}
+            {b.startTime && ` · ${b.startTime}`}
+          </p>
+        </div>
+        {b.agreedPrice ? (
+          <span className="rounded-full border border-gold/30 bg-gold/5 px-2 py-0.5 text-xs font-medium text-gold">
+            {b.agreedPrice}€
+          </span>
+        ) : null}
+        {target?.slug && target.type === "artist" && (
+          <Link
+            href={`/artisti/${target.slug}`}
+            className="text-xs text-gold hover:underline"
+          >
+            Profil →
+          </Link>
+        )}
+        {target?.slug && target.type === "venue" && (
+          <Link
+            href={`/sali/${target.slug}`}
+            className="text-xs text-gold hover:underline"
+          >
+            Profil →
+          </Link>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <header>
+        <h2 className="font-heading text-xl font-bold">Cererile mele</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Toate cererile pe care le-ai trimis pentru acest eveniment —
+          săli și parteneri într-un singur loc.
+        </p>
+      </header>
+
+      <section>
+        <h3 className="mb-2 font-heading text-sm font-bold text-gold">
+          Rezervate ({confirmed.length})
+        </h3>
+        {confirmed.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border/40 px-3 py-6 text-center text-xs text-muted-foreground">
+            Nicio rezervare confirmată încă.
+          </p>
+        ) : (
+          <div className="space-y-2">{confirmed.map(row)}</div>
+        )}
+      </section>
+
+      <section>
+        <h3 className="mb-2 font-heading text-sm font-bold text-amber-500">
+          În așteptare ({pending.length})
+        </h3>
+        {pending.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-border/40 px-3 py-6 text-center text-xs text-muted-foreground">
+            Nicio cerere în așteptare.
+          </p>
+        ) : (
+          <div className="space-y-2">{pending.map(row)}</div>
+        )}
+      </section>
+    </div>
+  );
+}
+
 function VenueDiscoveryCard({ venue: v, plan }: { venue: DiscoveryVenue; plan: Plan }) {
   const { user } = useUser();
+  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
 
@@ -3906,6 +4065,13 @@ function VenueDiscoveryCard({ venue: v, plan }: { venue: DiscoveryVenue; plan: P
       }
       toast.success(`Cerere trimisă la ${v.nameRo}!`);
       setSent(true);
+      // Hand control to the partners tab — booking the venue is the
+      // first decision; assembling the show is what comes next. The
+      // 2.5s delay lets the success toast register before the tab
+      // switches under the user.
+      setTimeout(() => {
+        router.replace(`/cabinet/planifica/${plan.id}?tab=bookings`);
+      }, 2500);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Eroare");
     } finally {

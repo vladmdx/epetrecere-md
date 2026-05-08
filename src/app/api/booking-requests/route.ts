@@ -167,6 +167,7 @@ export async function GET(req: NextRequest) {
       updatedAt: bookingRequests.updatedAt,
       artistName: artists.nameRo,
       artistSlug: artists.slug,
+      artistCategoryIds: artists.categoryIds,
       venueName: venues.nameRo,
       venueSlug: venues.slug,
     })
@@ -176,6 +177,26 @@ export async function GET(req: NextRequest) {
     .where(and(...conditions))
     .orderBy(desc(bookingRequests.createdAt))
     .limit(50);
+
+  // Resolve artist category name(s) — clients want to see "Cantăreți"
+  // next to the artist so they remember which slot the booking fills.
+  // Fetched in one query to keep the read cheap.
+  const allCatIds = Array.from(
+    new Set(
+      result
+        .flatMap((r) => r.artistCategoryIds ?? [])
+        .filter((n): n is number => typeof n === "number"),
+    ),
+  );
+  const catNameById = new Map<number, string>();
+  if (allCatIds.length > 0) {
+    const { categories: categoriesTable } = await import("@/lib/db/schema");
+    const cats = await db
+      .select({ id: categoriesTable.id, nameRo: categoriesTable.nameRo })
+      .from(categoriesTable)
+      .where(inArray(categoriesTable.id, allCatIds));
+    for (const c of cats) catNameById.set(c.id, c.nameRo);
+  }
 
   // Privacy: hide client contact from the artist while the booking is
   // still tentative. Once the partner accepts (status = "accepted" or
@@ -225,16 +246,17 @@ export async function GET(req: NextRequest) {
   }
 
   const payload = result.map((row) => {
-    // After the partner accepts, contact info flows both ways so they
-    // can coordinate the gig directly. Before that, the artist sees
-    // null and clients see null on the artist side via the public
-    // booking redirect.
     const showContact =
       !redactByDefault || SHARED_CONTACT_STATUSES.has(row.status);
+    const cats =
+      (row.artistCategoryIds ?? [])
+        .map((id) => catNameById.get(id))
+        .filter((n): n is string => Boolean(n));
     return {
       ...row,
       clientPhone: showContact ? row.clientPhone : null,
       clientEmail: showContact ? row.clientEmail : null,
+      categoryNames: cats,
       linkedVenue: row.eventPlanId
         ? planToVenue.get(row.eventPlanId) ?? null
         : null,

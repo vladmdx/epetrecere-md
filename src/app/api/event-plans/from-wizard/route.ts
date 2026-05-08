@@ -10,9 +10,13 @@ import {
   eventPlans,
   checklistItems,
   categories,
+  users,
 } from "@/lib/db/schema";
+import { and, eq, gte, sql } from "drizzle-orm";
 import { getPlannerTemplate } from "@/lib/planner/templates";
 import { requireAppUser } from "@/lib/planner/ownership";
+
+const MAX_PLANS_PER_WEEK = 3;
 
 import { SERVICE_TO_CATEGORY_SLUG } from "@/lib/wizard/service-mapping";
 
@@ -66,6 +70,36 @@ export async function POST(req: NextRequest) {
   }
 
   const w = parsed.data;
+
+  // Per-week rate limit on plan creation. Mirrors the gate in
+  // /api/event-plans POST so users hitting the wizard funnel can't
+  // bypass by going through the from-wizard path.
+  const [me] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, auth.userId))
+    .limit(1);
+  const isAdmin = me?.role === "admin" || me?.role === "super_admin";
+  if (!isAdmin) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [recent] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(eventPlans)
+      .where(
+        and(
+          eq(eventPlans.userId, auth.userId),
+          gte(eventPlans.createdAt, sevenDaysAgo),
+        ),
+      );
+    if ((recent?.count ?? 0) >= MAX_PLANS_PER_WEEK) {
+      return NextResponse.json(
+        {
+          error: `Poți crea maximum ${MAX_PLANS_PER_WEEK} evenimente pe săptămână. Încearcă din nou peste câteva zile.`,
+        },
+        { status: 429 },
+      );
+    }
+  }
 
   // Resolve service-slug strings → category IDs for selectedCategories.
   let categoryIds: number[] = [];

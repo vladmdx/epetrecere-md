@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { eventPlans, checklistItems } from "@/lib/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { eventPlans, checklistItems, users } from "@/lib/db/schema";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { getPlannerTemplate } from "@/lib/planner/templates";
 import { requireAppUser } from "@/lib/planner/ownership";
+
+/** Cap on event plans a single client may create per rolling 7-day
+ *  window. Stops drive-by spam (someone testing the wizard with
+ *  throwaway plans, or a bot creating dozens to flood partners). Admins
+ *  bypass this — they need to be able to seed test data. */
+const MAX_PLANS_PER_WEEK = 3;
 
 // M4 — /api/event-plans
 //
@@ -68,6 +74,35 @@ export async function POST(req: NextRequest) {
       { error: "Validation failed", details: parsed.error.issues },
       { status: 400 },
     );
+  }
+
+  // Per-week rate limit (3 plans / rolling 7 days). Admins bypass so
+  // ops can still seed/test from production.
+  const [me] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, auth.userId))
+    .limit(1);
+  const isAdmin = me?.role === "admin" || me?.role === "super_admin";
+  if (!isAdmin) {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [recent] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(eventPlans)
+      .where(
+        and(
+          eq(eventPlans.userId, auth.userId),
+          gte(eventPlans.createdAt, sevenDaysAgo),
+        ),
+      );
+    if ((recent?.count ?? 0) >= MAX_PLANS_PER_WEEK) {
+      return NextResponse.json(
+        {
+          error: `Poți crea maximum ${MAX_PLANS_PER_WEEK} evenimente pe săptămână. Încearcă din nou peste câteva zile.`,
+        },
+        { status: 429 },
+      );
+    }
   }
 
   const { eventDate, selectedCategories, ...rest } = parsed.data;

@@ -50,6 +50,7 @@ interface BookingRequest {
   artistReply: string | null;
   artistName: string | null;
   artistSlug: string | null;
+  categoryNames?: string[] | null;
   agreedPrice: number | null;
   priceOffers: BookingPriceOffer[] | null;
   createdAt: string;
@@ -412,6 +413,11 @@ export default function ReservationsPage() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-heading font-semibold text-base">{eventLabel}</span>
                 <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>
+                {b.categoryNames && b.categoryNames.length > 0 && (
+                  <Badge variant="outline" className="text-xs text-gold/80 border-gold/30 bg-gold/5">
+                    {b.categoryNames.join(" · ")}
+                  </Badge>
+                )}
                 {b.agreedPrice !== null && b.agreedPrice > 0 && (
                   <Badge variant="outline" className="text-xs text-gold border-gold/30 bg-gold/5 gap-1">
                     <Euro className="h-3 w-3" /> {b.agreedPrice}€
