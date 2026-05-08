@@ -2070,33 +2070,49 @@ function SequentialCategories({
     });
   }, [currentIdx]);
 
-  // Auto-advance to the NEXT UNBOOKED category. Without the
-  // unbooked-only filter the effect would chain-advance through every
-  // already-booked category at 2.5s intervals — exactly the bug a user
-  // hit when they reopened a fully-booked plan and watched the page
-  // strobe through 5 categories in 12 seconds.
+  // A category counts as "resolved" when it has either an active
+  // booking OR no available artists at all — the latter happens for
+  // niche slots like Decor & Floristică that have no artist rows.
+  // Without treating them as resolved the user got stuck on an empty
+  // grid with no obvious way out.
+  function isCategoryResolved(s: { categoryId: number; artists: DiscoveryArtist[] }) {
+    return categoryBlocker.has(s.categoryId) || s.artists.length === 0;
+  }
+
   const currentCategoryId = byCategory[currentIdx]?.categoryId ?? null;
   const hasActiveBookingHere =
     currentCategoryId != null && categoryBlocker.has(currentCategoryId);
-  // Find the next category INDEX that has no booking yet.
-  const nextUnbookedIdx = (() => {
+
+  // Next category INDEX that's neither booked nor empty.
+  const nextOpenIdx = (() => {
     for (let i = currentIdx + 1; i < byCategory.length; i++) {
-      const id = byCategory[i]?.categoryId;
-      if (id != null && !categoryBlocker.has(id)) return i;
+      if (!isCategoryResolved(byCategory[i])) return i;
     }
     return -1;
   })();
-  const allCategoriesBooked = byCategory.every((s) =>
-    categoryBlocker.has(s.categoryId),
-  );
+  const allCategoriesBooked = byCategory.every(isCategoryResolved);
   useEffect(() => {
     if (!hasActiveBookingHere) return;
-    if (nextUnbookedIdx === -1) return;
+    if (nextOpenIdx === -1) return;
     const id = setTimeout(() => {
-      setCurrentIdx(nextUnbookedIdx);
+      setCurrentIdx(nextOpenIdx);
     }, 2500);
     return () => clearTimeout(id);
-  }, [hasActiveBookingHere, nextUnbookedIdx]);
+  }, [hasActiveBookingHere, nextOpenIdx]);
+
+  // Skip empty categories the user lands on directly (back/forward
+  // nav, stale state, fresh page load) — instead of showing the
+  // "0 artiști disponibili" dead-end, slide forward to the next
+  // open category. If there isn't one the allCategoriesBooked panel
+  // takes over below.
+  useEffect(() => {
+    const cur = byCategory[currentIdx];
+    if (!cur) return;
+    if (isCategoryResolved(cur) && nextOpenIdx !== -1) {
+      setCurrentIdx(nextOpenIdx);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIdx, byCategory.length, categoryBlocker]);
 
   function showMore(categoryId: number) {
     setVisibleByCategory((prev) => ({
@@ -4267,12 +4283,36 @@ function AllCategoriesBookedPanel({
 
   const headline =
     pendingCount > 0
-      ? "Toate categoriile sunt în așteptarea răspunsului partenerilor"
+      ? "Toate categoriile au cereri trimise — așteptăm răspunsurile"
       : "Toți partenerii confirmați!";
   const subline =
     pendingCount > 0
-      ? `${confirmedCount} confirmate · ${pendingCount} în așteptare. Vei primi notificare când răspund.`
+      ? `${confirmedCount} confirmate · ${pendingCount} în așteptare. Vei primi notificare când răspund. Partenerii au 24h să răspundă.`
       : "Toți cei pe care i-ai invitat au confirmat — felicitări!";
+
+  // Catalogue of artist/service categories user could ADD. Strips
+  // anything already on the plan so the picker only offers extras.
+  const [allCats, setAllCats] = useState<
+    Array<{ id: number; nameRo: string; type: string }>
+  >([]);
+  const [adding, setAdding] = useState(false);
+  useEffect(() => {
+    fetch("/api/categories", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows: unknown) => {
+        const list = Array.isArray(rows)
+          ? (rows as Array<{ id: number; nameRo: string; type: string }>)
+          : [];
+        setAllCats(
+          list.filter(
+            (c) => c.type === "artist" || c.type === "service",
+          ),
+        );
+      })
+      .catch(() => {});
+  }, []);
+  const selected = new Set(plan.selectedCategories ?? []);
+  const extras = allCats.filter((c) => !selected.has(c.id)).slice(0, 8);
 
   async function activate(field: "checklistEnabled" | "guestsEnabled") {
     try {
@@ -4285,12 +4325,32 @@ function AllCategoriesBookedPanel({
         toast.error("Nu am putut activa secțiunea.");
         return;
       }
-      // Soft refresh — the parent re-reads the plan via fetch on
-      // mount, so a hard navigate will pick up the new flag.
       router.refresh();
       toast.success("Activat. Reîncarcă pagina ca să-l vezi în meniu.");
     } catch {
       toast.error("Eroare la activare.");
+    }
+  }
+
+  async function addCategory(catId: number) {
+    setAdding(true);
+    try {
+      const next = Array.from(new Set([...selected, catId]));
+      const res = await fetch(`/api/event-plans/${plan.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ selectedCategories: next }),
+      });
+      if (!res.ok) {
+        toast.error("Nu am putut adăuga categoria.");
+        return;
+      }
+      toast.success("Categorie adăugată — caut artiștii disponibili.");
+      router.refresh();
+    } catch {
+      toast.error("Eroare la salvare.");
+    } finally {
+      setAdding(false);
     }
   }
 
@@ -4425,6 +4485,35 @@ function AllCategoriesBookedPanel({
                 </span>
               </button>
             )}
+          </CardContent>
+        </Card>
+      )}
+
+      {extras.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              Mai vrei alți parteneri cât aștepți răspunsul?
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Adaugă o categorie nouă de parteneri pe planul tău; rămân
+              alături de cele existente.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {extras.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  disabled={adding}
+                  onClick={() => void addCategory(c.id)}
+                  className="rounded-full border border-border/40 bg-card/60 px-3 py-1.5 text-xs hover:border-gold/40 hover:text-gold disabled:opacity-50"
+                >
+                  + {c.nameRo}
+                </button>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
