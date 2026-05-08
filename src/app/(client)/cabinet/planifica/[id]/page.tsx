@@ -53,6 +53,7 @@ import {
   Star,
   Send,
   Check,
+  CheckCircle2,
   X,
   MessageCircle,
   LayoutGrid,
@@ -747,6 +748,25 @@ function OverviewTab({
           </div>
         </CardContent>
       </Card>
+
+      {/* Event progress — single card with three sub-bars (artists,
+          invitați, checklist) + the conditional "mark complete"
+          gate. Sits directly under the hero so it's the first thing
+          the user sees on overview. */}
+      <EventProgressCard
+        plan={plan}
+        bookings={bookings}
+        guests={guests}
+        guestAccepted={guestAccepted}
+        checklistDone={checklistDone}
+        checklistTotal={checklistTotal}
+        onSwitchTab={onSwitchTab}
+        onPlanUpdate={(p) => {
+          // Best-effort local update — the parent owns the canonical
+          // plan and refetches on archive anyway.
+          void p;
+        }}
+      />
 
       {/* My Tasks + Stats grid on mobile/tablet */}
       <div className="grid gap-6 lg:grid-cols-1">
@@ -2050,24 +2070,33 @@ function SequentialCategories({
     });
   }, [currentIdx]);
 
-  // Auto-advance to the next category once the user has booked someone
-  // in the current one. Without this they sat on a screen full of "ai
-  // deja un partener confirmat" cards with no obvious next action. We
-  // watch `categoryBlocker` (the per-category active-booking map) for
-  // the current category id; the moment a booking lands, schedule a
-  // 2.5s advance — long enough for the success toast to land + the
-  // user to see the confirmation card highlighted.
+  // Auto-advance to the NEXT UNBOOKED category. Without the
+  // unbooked-only filter the effect would chain-advance through every
+  // already-booked category at 2.5s intervals — exactly the bug a user
+  // hit when they reopened a fully-booked plan and watched the page
+  // strobe through 5 categories in 12 seconds.
   const currentCategoryId = byCategory[currentIdx]?.categoryId ?? null;
   const hasActiveBookingHere =
     currentCategoryId != null && categoryBlocker.has(currentCategoryId);
+  // Find the next category INDEX that has no booking yet.
+  const nextUnbookedIdx = (() => {
+    for (let i = currentIdx + 1; i < byCategory.length; i++) {
+      const id = byCategory[i]?.categoryId;
+      if (id != null && !categoryBlocker.has(id)) return i;
+    }
+    return -1;
+  })();
+  const allCategoriesBooked = byCategory.every((s) =>
+    categoryBlocker.has(s.categoryId),
+  );
   useEffect(() => {
     if (!hasActiveBookingHere) return;
-    if (currentIdx >= byCategory.length - 1) return;
+    if (nextUnbookedIdx === -1) return;
     const id = setTimeout(() => {
-      setCurrentIdx((i) => Math.min(i + 1, byCategory.length - 1));
+      setCurrentIdx(nextUnbookedIdx);
     }, 2500);
     return () => clearTimeout(id);
-  }, [hasActiveBookingHere, currentIdx, byCategory.length]);
+  }, [hasActiveBookingHere, nextUnbookedIdx]);
 
   function showMore(categoryId: number) {
     setVisibleByCategory((prev) => ({
@@ -2081,6 +2110,19 @@ function SequentialCategories({
   }
 
   if (byCategory.length === 0) return null;
+
+  // Once every selected category has an active request, browsing more
+  // artists is pointless — show the user a clear "you're done here"
+  // panel that nudges them to the next planning step (checklist /
+  // invitati / overview) instead of strobing through booked sections.
+  if (allCategoriesBooked) {
+    return (
+      <AllCategoriesBookedPanel
+        plan={plan}
+        bookings={Array.from(bookingByArtistId.values())}
+      />
+    );
+  }
 
   const section = byCategory[currentIdx];
   const blocker = categoryBlocker.get(section.categoryId);
@@ -3924,6 +3966,476 @@ function SettingsTab({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Per-event progress card on Overview. Three sub-bars stacked
+ * vertically:
+ *   1. Parteneri — N segments, one per booking; yellow=pending,
+ *      green=confirmed, red=rejected, grey=remaining slot.
+ *   2. Invitați — single bar with green=accepted, yellow=pending,
+ *      red=declined, grey=unanswered.
+ *   3. Checklist — single bar with green=done, grey=remaining.
+ * Each bar collapses gracefully when the section is disabled.
+ *
+ * Below the bars sits the "Mark complete" gate: only available once
+ * eventDate has actually passed AND every booking is confirmed +
+ * the user has touched checklist/invitați (if enabled).
+ */
+function EventProgressCard({
+  plan,
+  bookings,
+  guests,
+  guestAccepted,
+  checklistDone,
+  checklistTotal,
+  onSwitchTab: _onSwitchTab,
+  onPlanUpdate,
+}: {
+  plan: Plan;
+  bookings: BookingRequest[];
+  guests: Guest[];
+  guestAccepted: number;
+  checklistDone: number;
+  checklistTotal: number;
+  onSwitchTab: (tab: TabKey) => void;
+  onPlanUpdate: (p: Plan) => void;
+}) {
+  void _onSwitchTab;
+  const router = useRouter();
+  const [archiving, setArchiving] = useState(false);
+
+  // Bookings buckets — fixed colour codes the user can read at a glance.
+  const confirmedB = bookings.filter(
+    (b) => b.status === "accepted" || b.status === "confirmed_by_client",
+  ).length;
+  const pendingB = bookings.filter((b) => b.status === "pending").length;
+  const rejectedB = bookings.filter(
+    (b) => b.status === "rejected" || b.status === "cancelled" || b.status === "expired",
+  ).length;
+  const totalSlots = Math.max(bookings.length, plan.selectedCategories?.length ?? 0);
+  const remainingSlots = Math.max(0, totalSlots - confirmedB - pendingB - rejectedB);
+
+  // Guests
+  const guestPending = guests.filter((g) => g.rsvp === "pending").length;
+  const guestDeclined = guests.filter((g) => g.rsvp === "declined").length;
+  const guestUnanswered = Math.max(
+    0,
+    guests.length - guestAccepted - guestPending - guestDeclined,
+  );
+  const guestTarget = plan.guestCountTarget ?? guests.length;
+
+  // Checklist
+  const checklistPct =
+    checklistTotal > 0 ? Math.round((checklistDone / checklistTotal) * 100) : 0;
+
+  // Event-complete gate.
+  const eventStart = plan.eventDate
+    ? new Date(`${plan.eventDate}T${plan.startTime ?? "23:59"}:00`)
+    : null;
+  const eventOver = eventStart ? eventStart.getTime() < Date.now() : false;
+  const everythingConfirmed = pendingB === 0 && confirmedB > 0;
+  const canMarkComplete = eventOver && everythingConfirmed;
+
+  async function markComplete() {
+    if (!canMarkComplete) return;
+    setArchiving(true);
+    try {
+      const res = await fetch(`/api/event-plans/${plan.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (!res.ok) {
+        toast.error("Nu am putut marca evenimentul ca finalizat.");
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.plan) onPlanUpdate(data.plan);
+      toast.success("Eveniment finalizat. Mulțumim!");
+      router.refresh();
+    } catch {
+      toast.error("Eroare la finalizare.");
+    } finally {
+      setArchiving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-heading">
+          Progresul evenimentului
+        </CardTitle>
+        <p className="text-xs text-muted-foreground">
+          Verde = confirmat · Galben = în așteptare · Roșu = refuzat ·
+          Gri = neînceput
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Parteneri */}
+        {totalSlots > 0 ? (
+          <ProgressRow
+            label="Parteneri"
+            sub={`${confirmedB}/${totalSlots} confirmați${pendingB ? ` · ${pendingB} în așteptare` : ""}${rejectedB ? ` · ${rejectedB} refuzate` : ""}`}
+            segments={[
+              ...Array(confirmedB).fill("confirmed" as const),
+              ...Array(pendingB).fill("pending" as const),
+              ...Array(rejectedB).fill("rejected" as const),
+              ...Array(remainingSlots).fill("idle" as const),
+            ]}
+          />
+        ) : (
+          <ProgressRow
+            label="Parteneri"
+            sub="Nu ai trimis cereri încă"
+            segments={["idle", "idle", "idle", "idle"]}
+          />
+        )}
+
+        {/* Invitați — only if the section is on */}
+        {plan.guestsEnabled && (
+          <PercentBar
+            label="Invitați"
+            sub={
+              guestTarget > 0
+                ? `${guestAccepted} acceptat${guestAccepted === 1 ? "" : "i"} din ${guestTarget}${guestDeclined ? ` · ${guestDeclined} refuzat${guestDeclined === 1 ? "" : "i"}` : ""}`
+                : "Adaugă invitați pentru a urmări RSVP"
+            }
+            buckets={{
+              confirmed: guestAccepted,
+              pending: guestPending,
+              rejected: guestDeclined,
+              idle: guestUnanswered,
+            }}
+            total={Math.max(guestTarget, guests.length, 1)}
+          />
+        )}
+
+        {/* Checklist — only if the section is on */}
+        {plan.checklistEnabled && checklistTotal > 0 && (
+          <PercentBar
+            label="Checklist"
+            sub={`${checklistDone} din ${checklistTotal} bifate (${checklistPct}%)`}
+            buckets={{
+              confirmed: checklistDone,
+              pending: 0,
+              rejected: 0,
+              idle: checklistTotal - checklistDone,
+            }}
+            total={checklistTotal}
+          />
+        )}
+
+        {/* Mark complete — gated on event-over + everything-confirmed */}
+        <div className="rounded-lg border border-border/30 bg-card/40 p-3">
+          {canMarkComplete ? (
+            <button
+              type="button"
+              onClick={() => void markComplete()}
+              disabled={archiving}
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700 disabled:opacity-60"
+            >
+              {archiving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              Marchează evenimentul ca finalizat
+            </button>
+          ) : (
+            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+              <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                Evenimentul poate fi marcat ca finalizat după ce a avut
+                loc și toate cererile au răspuns.
+              </span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+type SegmentKind = "confirmed" | "pending" | "rejected" | "idle";
+
+function segmentClass(kind: SegmentKind): string {
+  if (kind === "confirmed") return "bg-emerald-500";
+  if (kind === "pending") return "bg-amber-500";
+  if (kind === "rejected") return "bg-red-500";
+  return "bg-muted";
+}
+
+/** Discrete N-segment bar — used for the parteneri row where each
+ *  artist gets its own coloured slot. */
+function ProgressRow({
+  label,
+  sub,
+  segments,
+}: {
+  label: string;
+  sub: string;
+  segments: SegmentKind[];
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-end justify-between gap-2">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-[11px] text-muted-foreground">{sub}</span>
+      </div>
+      <div className="flex gap-1">
+        {segments.length === 0 ? (
+          <div className="h-2.5 flex-1 rounded-full bg-muted" />
+        ) : (
+          segments.map((s, i) => (
+            <div
+              key={i}
+              className={`h-2.5 flex-1 rounded-full ${segmentClass(s)}`}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Continuous bar split by bucket — used for Invitați + Checklist. */
+function PercentBar({
+  label,
+  sub,
+  buckets,
+  total,
+}: {
+  label: string;
+  sub: string;
+  buckets: Record<SegmentKind, number>;
+  total: number;
+}) {
+  const safeTotal = Math.max(total, 1);
+  const widths = {
+    confirmed: (buckets.confirmed / safeTotal) * 100,
+    pending: (buckets.pending / safeTotal) * 100,
+    rejected: (buckets.rejected / safeTotal) * 100,
+    idle: (buckets.idle / safeTotal) * 100,
+  };
+  return (
+    <div>
+      <div className="mb-1 flex items-end justify-between gap-2">
+        <span className="text-sm font-medium">{label}</span>
+        <span className="text-[11px] text-muted-foreground">{sub}</span>
+      </div>
+      <div className="flex h-2.5 overflow-hidden rounded-full bg-muted">
+        {(["confirmed", "pending", "rejected", "idle"] as SegmentKind[]).map(
+          (k) => (
+            <div
+              key={k}
+              className={segmentClass(k)}
+              style={{ width: `${widths[k]}%` }}
+            />
+          ),
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Replaces the discovery grid on Rezervări Artiști once every selected
+ * category already has an active request. Without this the user just
+ * stared at strobing "ai deja un partener confirmat" cards. Now they
+ * see a clear "you're done here" panel + nudges to the next step.
+ */
+function AllCategoriesBookedPanel({
+  plan,
+  bookings,
+}: {
+  plan: Plan;
+  bookings: BookingRequest[];
+}) {
+  const router = useRouter();
+  const pendingCount = bookings.filter((b) => b.status === "pending").length;
+  const confirmedCount = bookings.filter(
+    (b) => b.status === "accepted" || b.status === "confirmed_by_client",
+  ).length;
+
+  const noChecklist = !plan.checklistEnabled;
+  const noGuests = !plan.guestsEnabled;
+  const everythingEnabled = !noChecklist && !noGuests;
+
+  const headline =
+    pendingCount > 0
+      ? "Toate categoriile sunt în așteptarea răspunsului partenerilor"
+      : "Toți partenerii confirmați!";
+  const subline =
+    pendingCount > 0
+      ? `${confirmedCount} confirmate · ${pendingCount} în așteptare. Vei primi notificare când răspund.`
+      : "Toți cei pe care i-ai invitat au confirmat — felicitări!";
+
+  async function activate(field: "checklistEnabled" | "guestsEnabled") {
+    try {
+      const res = await fetch(`/api/event-plans/${plan.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: true }),
+      });
+      if (!res.ok) {
+        toast.error("Nu am putut activa secțiunea.");
+        return;
+      }
+      // Soft refresh — the parent re-reads the plan via fetch on
+      // mount, so a hard navigate will pick up the new flag.
+      router.refresh();
+      toast.success("Activat. Reîncarcă pagina ca să-l vezi în meniu.");
+    } catch {
+      toast.error("Eroare la activare.");
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <Card className="overflow-hidden border-gold/30 bg-gradient-to-br from-gold/10 via-gold/5 to-transparent">
+        <CardContent className="py-6">
+          <div className="flex items-start gap-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gold/15 text-gold">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-heading text-lg font-bold">{headline}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{subline}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Ce mai poți face acum</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {plan.checklistEnabled && (
+            <Link
+              href={`/cabinet/planifica/${plan.id}?tab=checklist`}
+              className="flex items-center justify-between rounded-lg border border-border/40 bg-card/60 p-3 hover:border-gold/40"
+            >
+              <div className="flex items-center gap-3">
+                <ClipboardList className="h-4 w-4 text-gold" />
+                <span className="text-sm font-medium">
+                  Vezi checklist-ul evenimentului
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">→</span>
+            </Link>
+          )}
+          {plan.guestsEnabled && (
+            <Link
+              href={`/cabinet/planifica/${plan.id}?tab=guests`}
+              className="flex items-center justify-between rounded-lg border border-border/40 bg-card/60 p-3 hover:border-gold/40"
+            >
+              <div className="flex items-center gap-3">
+                <Users className="h-4 w-4 text-gold" />
+                <span className="text-sm font-medium">
+                  Lista de invitați + RSVP
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">→</span>
+            </Link>
+          )}
+          {plan.venueNeeded && (
+            <Link
+              href={`/cabinet/planifica/${plan.id}?tab=venues`}
+              className="flex items-center justify-between rounded-lg border border-border/40 bg-card/60 p-3 hover:border-gold/40"
+            >
+              <div className="flex items-center gap-3">
+                <MapPin className="h-4 w-4 text-gold" />
+                <span className="text-sm font-medium">
+                  Verifică sala rezervată
+                </span>
+              </div>
+              <span className="text-xs text-muted-foreground">→</span>
+            </Link>
+          )}
+          <Link
+            href={`/cabinet/planifica/${plan.id}?tab=overview`}
+            className="flex items-center justify-between rounded-lg border border-border/40 bg-card/60 p-3 hover:border-gold/40"
+          >
+            <div className="flex items-center gap-3">
+              <LayoutDashboard className="h-4 w-4 text-gold" />
+              <span className="text-sm font-medium">
+                Înapoi la prezentare
+              </span>
+            </div>
+            <span className="text-xs text-muted-foreground">→</span>
+          </Link>
+        </CardContent>
+      </Card>
+
+      {(noChecklist || noGuests) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">
+              Suplimentar, poți activa
+            </CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Secțiuni care te ajută să planifici ce a mai rămas.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {noChecklist && (
+              <button
+                type="button"
+                onClick={() => void activate("checklistEnabled")}
+                className="flex w-full items-center justify-between rounded-lg border border-dashed border-border/40 p-3 text-left hover:border-gold/40 hover:bg-card/60"
+              >
+                <div className="flex items-center gap-3">
+                  <ClipboardList className="h-4 w-4 text-gold" />
+                  <div>
+                    <p className="text-sm font-medium">Activează Checklist</p>
+                    <p className="text-xs text-muted-foreground">
+                      Lista pașilor pre-populată după tipul evenimentului.
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-md border border-gold/30 px-2 py-1 text-xs text-gold">
+                  Activează
+                </span>
+              </button>
+            )}
+            {noGuests && (
+              <button
+                type="button"
+                onClick={() => void activate("guestsEnabled")}
+                className="flex w-full items-center justify-between rounded-lg border border-dashed border-border/40 p-3 text-left hover:border-gold/40 hover:bg-card/60"
+              >
+                <div className="flex items-center gap-3">
+                  <Users className="h-4 w-4 text-gold" />
+                  <div>
+                    <p className="text-sm font-medium">
+                      Activează Lista Invitaților
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Importă, RSVP, alocare la mese.
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-md border border-gold/30 px-2 py-1 text-xs text-gold">
+                  Activează
+                </span>
+              </button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {everythingEnabled && pendingCount === 0 && (
+        <Card className="border-emerald-500/40 bg-emerald-500/5">
+          <CardContent className="py-4 text-center text-sm text-emerald-300">
+            Tot e bifat. Vei primi notificare dacă apare ceva nou.
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
