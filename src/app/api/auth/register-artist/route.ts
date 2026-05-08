@@ -2,9 +2,23 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { artists, users, notifications } from "@/lib/db/schema";
+import {
+  artists,
+  artistPackages,
+  users,
+  notifications,
+} from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
+
+/** A single duration → price tier the onboarding wizard can submit
+ *  alongside the artist row. Mirrors the artist_packages columns. */
+const packageTierSchema = z.object({
+  hours: z.number().int().min(0).max(24).default(0),
+  minutes: z.number().int().min(0).max(59).default(0),
+  price: z.number().int().min(0).max(100_000),
+  nameRo: z.string().max(120).optional(),
+});
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -15,7 +29,14 @@ const registerSchema = z.object({
   description: z.string().optional(),
   location: z.string().optional(),
   imageUrl: z.string().optional(),
+  /** Legacy single "preț de start". Still supported for backwards
+   *  compatibility but new clients should send the packages array
+   *  instead. When packages are sent, the lowest price wins as
+   *  priceFrom. */
   priceFrom: z.number().optional(),
+  /** Multiple duration-based tiers (45min/1h/2h etc.) — surfaces in
+   *  /dashboard/tarife and as the rezervare modal's package picker. */
+  packages: z.array(packageTierSchema).max(20).optional(),
 });
 
 export async function POST(req: Request) {
@@ -129,6 +150,19 @@ export async function POST(req: Request) {
       ? data.phone
       : appUser.phone || "";
 
+    // priceFrom precedence: minimum across the packages array, falling
+    // back to the legacy `priceFrom` field. Listing pages still sort
+    // by this column, so we keep it accurate even with multiple tiers.
+    const validTiers = (data.packages ?? []).filter(
+      (p) => p.price > 0 && (p.hours > 0 || p.minutes > 0),
+    );
+    const minTierPrice = validTiers.length
+      ? Math.min(...validTiers.map((p) => p.price))
+      : null;
+    const resolvedPriceFrom =
+      minTierPrice ??
+      (data.priceFrom && data.priceFrom > 0 ? data.priceFrom : null);
+
     // Create artist (inactive — needs admin approval)
     const [artist] = await db
       .insert(artists)
@@ -143,7 +177,7 @@ export async function POST(req: Request) {
         photoUrl: data.imageUrl || null,
         descriptionRo: data.description || null,
         location: data.location || "Chișinău",
-        priceFrom: data.priceFrom && data.priceFrom > 0 ? data.priceFrom : null,
+        priceFrom: resolvedPriceFrom,
         categoryIds: [data.categoryId],
         isActive: false,
         isVerified: false,
@@ -153,6 +187,27 @@ export async function POST(req: Request) {
         seoTitleRo: `${data.name} — Artist Evenimente | ePetrecere.md`,
       })
       .returning();
+
+    // Persist each duration tier as an artist_packages row. Skipped
+    // when the array is empty so legacy onboarding submissions stay
+    // exactly the same shape.
+    if (validTiers.length > 0) {
+      await db.insert(artistPackages).values(
+        validTiers.map((p) => ({
+          artistId: artist.id,
+          nameRo:
+            p.nameRo?.trim() ||
+            (p.hours > 0
+              ? `${p.hours}h${p.minutes ? ` ${p.minutes}min` : ""}`
+              : `${p.minutes} min`),
+          price: p.price,
+          durationHours: p.hours > 0 ? p.hours : null,
+          durationMinutes: p.minutes,
+          scope: "base" as const,
+          isVisible: true,
+        })),
+      );
+    }
 
     // Update user role to artist and mark onboarding complete
     await db

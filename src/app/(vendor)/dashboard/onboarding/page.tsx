@@ -71,8 +71,23 @@ export default function OnboardingPage() {
     travelDistanceKm: 30,
     travelSurchargeEnabled: false,
     travelSurchargeAmount: 0,
+    /** Legacy single "preț de start" — kept around for back-compat
+     *  when the user can't / won't define duration tiers. The
+     *  packages array below is the canonical source. */
     priceFrom: 0,
     priceHidden: false,
+    /** Multiple duration → price tiers. Same shape as
+     *  artist_packages rows; persisted as such on submit. The wizard
+     *  ships with two convenient defaults the user can edit/delete. */
+    pricePackages: [
+      { hours: 1, minutes: 0, price: 0, nameRo: "1h" },
+      { hours: 2, minutes: 0, price: 0, nameRo: "2h" },
+    ] as Array<{
+      hours: number;
+      minutes: number;
+      price: number;
+      nameRo: string;
+    }>,
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -189,6 +204,12 @@ export default function OnboardingPage() {
   async function handleSubmit() {
     setSubmitting(true);
     try {
+      // Drop empty / zero-priced tiers before submit. Server validates
+      // again but trimming here keeps the payload clean.
+      const cleanPackages = (data.pricePackages || []).filter(
+        (p) => p.price > 0 && (p.hours > 0 || p.minutes > 0),
+      );
+
       // 1. Create the artist row (same endpoint as before).
       const res = await fetch("/api/auth/register-artist", {
         method: "POST",
@@ -201,6 +222,7 @@ export default function OnboardingPage() {
           imageUrl: data.imageUrl,
           description: data.description || undefined,
           priceFrom: data.priceFrom > 0 ? data.priceFrom : undefined,
+          packages: cleanPackages.length > 0 ? cleanPackages : undefined,
         }),
       });
       if (!res.ok) {
@@ -523,26 +545,112 @@ export default function OnboardingPage() {
           <div>
             <h2 className="font-heading text-lg font-bold flex items-center gap-2">
               <Euro className="h-5 w-5 text-gold" />
-              Preț de start
+              Tarife
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Tariful tău minim pentru un eveniment. Clienții vor vedea „de la X
-              €" pe profilul tău. Tarife detaliate (ore, weekend, sezon) se
-              setează ulterior din /dashboard/tarife.
+              Adaugă unul sau mai multe tarife pe durată — ex. 45 min,
+              1h, 2h. Clienții vor vedea „de la X€" (cel mai mic) pe
+              profilul tău. Poți completa mai multe variante mai
+              târziu din <strong>/dashboard/tarife</strong> (override
+              weekend, evening, etc.).
             </p>
           </div>
           {!data.priceHidden && (
-            <div>
-              <Label>Preț de start (€) — opțional</Label>
-              <Input
-                type="number"
-                min={0}
-                value={data.priceFrom || ""}
-                onChange={(e) => update({ priceFrom: Number(e.target.value) })}
-                placeholder="ex: 200"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Lasă gol dacă încă nu ai un preț stabilit — îl poți adăuga ulterior.
+            <div className="space-y-3">
+              {data.pricePackages.map((tier, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-border/40 bg-background/50 p-3"
+                >
+                  <div className="grid grid-cols-12 items-end gap-2">
+                    <div className="col-span-3">
+                      <Label className="text-[11px]">Ore</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={24}
+                        value={tier.hours || ""}
+                        onChange={(e) => {
+                          const next = [...data.pricePackages];
+                          next[i] = {
+                            ...tier,
+                            hours: Number(e.target.value) || 0,
+                          };
+                          update({ pricePackages: next });
+                        }}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Label className="text-[11px]">Min</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={59}
+                        step={15}
+                        value={tier.minutes || ""}
+                        onChange={(e) => {
+                          const next = [...data.pricePackages];
+                          next[i] = {
+                            ...tier,
+                            minutes: Number(e.target.value) || 0,
+                          };
+                          update({ pricePackages: next });
+                        }}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="col-span-4">
+                      <Label className="text-[11px]">Preț (€)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={tier.price || ""}
+                        onChange={(e) => {
+                          const next = [...data.pricePackages];
+                          next[i] = {
+                            ...tier,
+                            price: Number(e.target.value) || 0,
+                          };
+                          update({ pricePackages: next });
+                        }}
+                        placeholder="200"
+                      />
+                    </div>
+                    <div className="col-span-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = data.pricePackages.filter(
+                            (_, j) => j !== i,
+                          );
+                          update({ pricePackages: next });
+                        }}
+                        className="rounded-md border border-destructive/40 px-2 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() =>
+                  update({
+                    pricePackages: [
+                      ...data.pricePackages,
+                      { hours: 0, minutes: 0, price: 0, nameRo: "" },
+                    ],
+                  })
+                }
+                className="w-full rounded-lg border border-dashed border-border/40 px-3 py-2 text-xs text-muted-foreground hover:border-gold/40 hover:text-gold"
+              >
+                + Adaugă încă un tarif
+              </button>
+              <p className="text-xs text-muted-foreground">
+                Poți avea mai multe variante pentru durate diferite.
+                Cel mai mic preț apare ca „de la X€" pe profilul tău.
               </p>
             </div>
           )}
@@ -598,7 +706,29 @@ export default function OnboardingPage() {
             {data.travelSurchargeEnabled && (
               <SummaryRow label="Plată deplasare" value={`${data.travelSurchargeAmount}€`} />
             )}
-            {data.priceFrom > 0 && <SummaryRow label="Preț de start" value={`${data.priceFrom}€`} />}
+            {data.priceFrom > 0 && (
+              <SummaryRow label="Preț de start" value={`${data.priceFrom}€`} />
+            )}
+            {(() => {
+              const tiers = data.pricePackages.filter(
+                (p) => p.price > 0 && (p.hours > 0 || p.minutes > 0),
+              );
+              if (tiers.length === 0) return null;
+              return (
+                <SummaryRow
+                  label="Tarife"
+                  value={tiers
+                    .map((p) => {
+                      const dur =
+                        p.hours > 0
+                          ? `${p.hours}h${p.minutes ? ` ${p.minutes}m` : ""}`
+                          : `${p.minutes} min`;
+                      return `${dur} = ${p.price}€`;
+                    })
+                    .join(" · ")}
+                />
+              );
+            })()}
             {data.description && (
               <div className="rounded-lg bg-muted/40 p-3 mt-3">
                 <p className="text-xs font-medium text-muted-foreground mb-1">Descriere</p>
