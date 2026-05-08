@@ -52,11 +52,11 @@ export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Opportunistic expiry — every read flips any pending booking that
-  // sat unanswered for more than 24h. The dedicated cron also does
-  // this once a day, but doing it here means a user refreshing their
-  // dashboard never sees a stale "Așteaptă răspunsul…" blocker. The
-  // statement is a no-op when nothing matches.
+  // Opportunistic expiry — every read flips any pending booking past
+  // its response window (24h artists / 72h venues). The dedicated
+  // cron also does this hourly, but doing it on read means a user
+  // refreshing their dashboard never sees a stale blocker. No-op
+  // when nothing matches.
   void (async () => {
     try {
       await db
@@ -65,7 +65,13 @@ export async function GET(req: NextRequest) {
         .where(
           and(
             eq(bookingRequests.status, "pending"),
-            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours'`,
+            sql`(
+              (${bookingRequests.artistId} IS NOT NULL
+                AND ${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours')
+              OR
+              (${bookingRequests.venueId} IS NOT NULL
+                AND ${bookingRequests.createdAt} < NOW() - INTERVAL '72 hours')
+            )`,
           ),
         );
     } catch (err) {
@@ -382,6 +388,64 @@ export async function POST(req: NextRequest) {
           );
         }
       }
+    }
+  }
+
+  // Venue side of the same constraint — only ONE active venue
+  // request per plan. Until the venue accepts/rejects/expires, the
+  // client can't shop another venue. Same status semantics as artists
+  // (pending/accepted/confirmed/completed = active; rejected /
+  // cancelled / expired free up the slot).
+  if (eventPlanId && parsed.data.venueId) {
+    const existingVenueBookings = await db
+      .select({
+        venueId: bookingRequests.venueId,
+        status: bookingRequests.status,
+        venueName: venues.nameRo,
+      })
+      .from(bookingRequests)
+      .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
+      .where(eq(bookingRequests.eventPlanId, eventPlanId));
+
+    // Reject duplicate venue request.
+    const priorVenue = existingVenueBookings.find(
+      (b) => b.venueId === parsed.data.venueId,
+    );
+    if (priorVenue) {
+      const declined =
+        priorVenue.status === "rejected" ||
+        priorVenue.status === "cancelled" ||
+        priorVenue.status === "expired";
+      return NextResponse.json(
+        {
+          error: declined
+            ? "Această sală a refuzat deja cererea ta pentru acest eveniment. Te rugăm să alegi o altă sală."
+            : "Ai trimis deja o cerere la această sală pentru acest eveniment.",
+        },
+        { status: 409 },
+      );
+    }
+
+    // Block while another venue request is still active.
+    const ACTIVE_STATUSES = new Set([
+      "pending",
+      "accepted",
+      "confirmed_by_client",
+      "completed",
+    ]);
+    const venueBlocker = existingVenueBookings.find(
+      (b) => b.venueId != null && ACTIVE_STATUSES.has(b.status),
+    );
+    if (venueBlocker) {
+      return NextResponse.json(
+        {
+          error:
+            venueBlocker.status === "pending"
+              ? `Așteaptă răspunsul de la ${venueBlocker.venueName ?? "sală"} (până la 72h) înainte de a trimite altă cerere la o sală.`
+              : `Ai deja o sală confirmată (${venueBlocker.venueName ?? "sală"}) pentru evenimentul tău.`,
+        },
+        { status: 409 },
+      );
     }
   }
 

@@ -263,29 +263,39 @@ export default function PlanDetailPage({
   //  • eventPlanId matches (the canonical link, Faza 1+), or
   //  • eventPlanId is null but eventDate matches (legacy bookings made
   //    before we had event_plan_id on booking_requests).
-  useEffect(() => {
+  // Pulled out as a callback so the venue + artist tabs can re-fetch
+  // after they create a new booking.
+  const refreshBookings = useCallback(async () => {
     if (!user?.primaryEmailAddress?.emailAddress || !plan) return;
     const email = user.primaryEmailAddress.emailAddress;
-    fetch(`/api/booking-requests?client_email=${encodeURIComponent(email)}`)
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: BookingRequest[] & { eventPlanId?: number | null }[]) => {
-        if (!Array.isArray(data)) return;
-        const scoped = data.filter((b) => {
-          const bp = b as BookingRequest & { eventPlanId?: number | null };
-          if (bp.eventPlanId === plan.id) return true;
-          if (
-            bp.eventPlanId == null &&
-            plan.eventDate &&
-            b.eventDate === plan.eventDate
-          ) {
-            return true;
-          }
-          return false;
-        });
-        setBookings(scoped);
-      })
-      .catch(() => {});
+    try {
+      const r = await fetch(
+        `/api/booking-requests?client_email=${encodeURIComponent(email)}`,
+        { cache: "no-store" },
+      );
+      if (!r.ok) return;
+      const data = (await r.json()) as BookingRequest[];
+      if (!Array.isArray(data)) return;
+      const scoped = data.filter((b) => {
+        const bp = b as BookingRequest & { eventPlanId?: number | null };
+        if (bp.eventPlanId === plan.id) return true;
+        if (
+          bp.eventPlanId == null &&
+          plan.eventDate &&
+          b.eventDate === plan.eventDate
+        ) {
+          return true;
+        }
+        return false;
+      });
+      setBookings(scoped);
+    } catch {
+      /* ignore */
+    }
   }, [user, plan]);
+  useEffect(() => {
+    void refreshBookings();
+  }, [refreshBookings]);
 
   async function deletePlan() {
     if (!confirm("Sigur vrei să ștergi acest plan? Operațiunea este ireversibilă.")) return;
@@ -470,36 +480,12 @@ export default function PlanDetailPage({
             <BookingsTab
               plan={plan}
               bookings={bookings}
-              onRefresh={async () => {
-                if (!user?.primaryEmailAddress?.emailAddress) return;
-                const email = user.primaryEmailAddress.emailAddress;
-                const r = await fetch(
-                  `/api/booking-requests?client_email=${encodeURIComponent(email)}`,
-                );
-                if (r.ok) {
-                  const data: BookingRequest[] = await r.json();
-                  if (Array.isArray(data) && plan) {
-                    setBookings(
-                      data.filter((b) => {
-                        const bp = b as BookingRequest & {
-                          eventPlanId?: number | null;
-                        };
-                        return (
-                          bp.eventPlanId === plan.id ||
-                          (bp.eventPlanId == null &&
-                            plan.eventDate &&
-                            b.eventDate === plan.eventDate)
-                        );
-                      }),
-                    );
-                  }
-                }
-              }}
+              onRefresh={refreshBookings}
             />
           )}
 
           {activeTab === "venues" && plan.venueNeeded && (
-            <VenuesTab plan={plan} />
+            <VenuesTab plan={plan} bookings={bookings} onRefresh={refreshBookings} />
           )}
 
           {activeTab === "photos" && (
@@ -2490,7 +2476,16 @@ function BookingListCard({
  * estimate of how long the artist still has to respond before the
  * Inngest cron auto-expires the request.
  */
-function PendingCountdown({ createdAt }: { createdAt: string | null }) {
+function PendingCountdown({
+  createdAt,
+  windowHours = 24,
+}: {
+  createdAt: string | null;
+  /** Response window in hours. Artists = 24 (default), venues = 72.
+   *  Caller passes the right value based on whether the booking has
+   *  an artistId or venueId. */
+  windowHours?: number;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 60_000);
@@ -2500,7 +2495,7 @@ function PendingCountdown({ createdAt }: { createdAt: string | null }) {
   if (!createdAt) {
     return (
       <span>
-        Partenerul are 24h să răspundă, altfel cererea se anulează automat.
+        Partenerul are {windowHours}h să răspundă, altfel cererea se anulează automat.
       </span>
     );
   }
@@ -2508,16 +2503,16 @@ function PendingCountdown({ createdAt }: { createdAt: string | null }) {
   if (!Number.isFinite(created)) {
     return (
       <span>
-        Partenerul are 24h să răspundă, altfel cererea se anulează automat.
+        Partenerul are {windowHours}h să răspundă, altfel cererea se anulează automat.
       </span>
     );
   }
-  const deadline = created + 24 * 60 * 60 * 1000;
+  const deadline = created + windowHours * 60 * 60 * 1000;
   const remainingMs = deadline - now;
   if (remainingMs <= 0) {
     return (
       <span>
-        Cererea va fi anulată în curând (24h depășite). Revino în câteva
+        Cererea va fi anulată în curând ({windowHours}h depășite). Revino în câteva
         minute.
       </span>
     );
@@ -3538,10 +3533,49 @@ interface DiscoveryVenue {
   ratingCount: number;
 }
 
-function VenuesTab({ plan }: { plan: Plan }) {
+function VenuesTab({
+  plan,
+  bookings,
+  onRefresh,
+}: {
+  plan: Plan;
+  bookings: BookingRequest[];
+  onRefresh: () => Promise<void> | void;
+}) {
   const [venues, setVenues] = useState<DiscoveryVenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState<number>(plan.venueRadiusKm ?? 25);
+
+  // Index venue bookings on this plan so each card knows whether the
+  // user has already pinged that specific venue and what status the
+  // request is in. Mirrors how the artist discovery feed handles the
+  // "one active request per category" rule.
+  const ACTIVE_VENUE_STATUSES = new Set([
+    "pending",
+    "accepted",
+    "confirmed_by_client",
+    "completed",
+  ]);
+  const venueBookings = bookings.filter((b) => b.venueId != null);
+  const venueBookingByVenueId = new Map<number, BookingRequest>();
+  for (const b of venueBookings) {
+    if (b.venueId == null) continue;
+    venueBookingByVenueId.set(b.venueId, b);
+  }
+  const activeVenueBooking = venueBookings.find((b) =>
+    ACTIVE_VENUE_STATUSES.has(b.status),
+  );
+  const declinedVenueIds = new Set<number>(
+    venueBookings
+      .filter(
+        (b) =>
+          b.status === "rejected" ||
+          b.status === "cancelled" ||
+          b.status === "expired",
+      )
+      .map((b) => b.venueId)
+      .filter((id): id is number => id != null),
+  );
 
   // Expand the selected city into all towns within `radius` km using the
   // hardcoded Moldovan city-proximity table. 999 = no filter (all cities).
@@ -3639,11 +3673,43 @@ function VenuesTab({ plan }: { plan: Plan }) {
           </Link>
         </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2">
-          {venues.map((v) => (
-            <VenueDiscoveryCard key={v.id} venue={v} plan={plan} />
-          ))}
-        </div>
+        (() => {
+          // Order: the venue holding the active slot first (so the user
+          // sees what they're waiting on), then everyone else, then the
+          // declined/cancelled/expired venues at the bottom.
+          const sortedVenues = [...venues].sort((a, b) => {
+            const aActive = activeVenueBooking?.venueId === a.id ? 0 : 1;
+            const bActive = activeVenueBooking?.venueId === b.id ? 0 : 1;
+            if (aActive !== bActive) return aActive - bActive;
+            const aDeclined = declinedVenueIds.has(a.id) ? 1 : 0;
+            const bDeclined = declinedVenueIds.has(b.id) ? 1 : 0;
+            return aDeclined - bDeclined;
+          });
+          return (
+            <div className="grid gap-3 md:grid-cols-2">
+              {sortedVenues.map((v) => (
+                <VenueDiscoveryCard
+                  key={v.id}
+                  venue={v}
+                  plan={plan}
+                  existingBooking={venueBookingByVenueId.get(v.id) ?? null}
+                  blockedByOtherVenue={
+                    !!activeVenueBooking &&
+                    activeVenueBooking.venueId !== v.id
+                      ? {
+                          venueName: activeVenueBooking.venueName ?? "altă sală",
+                          createdAt: activeVenueBooking.createdAt,
+                          status: activeVenueBooking.status,
+                        }
+                      : null
+                  }
+                  declinedHere={declinedVenueIds.has(v.id)}
+                  onRefresh={onRefresh}
+                />
+              ))}
+            </div>
+          );
+        })()
       )}
     </div>
   );
@@ -4651,11 +4717,41 @@ function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
   );
 }
 
-function VenueDiscoveryCard({ venue: v, plan }: { venue: DiscoveryVenue; plan: Plan }) {
+function VenueDiscoveryCard({
+  venue: v,
+  plan,
+  existingBooking,
+  blockedByOtherVenue,
+  declinedHere,
+  onRefresh,
+}: {
+  venue: DiscoveryVenue;
+  plan: Plan;
+  existingBooking: BookingRequest | null;
+  /** Set when another venue holds the active slot — disables the CTA
+   *  on this card with the "Așteaptă răspunsul…" hint. */
+  blockedByOtherVenue: {
+    venueName: string;
+    createdAt: string | null | undefined;
+    status: string;
+  } | null;
+  /** True when THIS venue rejected/cancelled/expired earlier — the
+   *  CTA is disabled and the card sits at the bottom of the list. */
+  declinedHere: boolean;
+  onRefresh: () => Promise<void> | void;
+}) {
   const { user } = useUser();
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
-  const [sent, setSent] = useState(false);
+
+  const isHolder = !!existingBooking && existingBooking.status === "pending";
+  const isConfirmed =
+    !!existingBooking &&
+    (existingBooking.status === "accepted" ||
+      existingBooking.status === "confirmed_by_client");
+  const sent = !!existingBooking; // any prior booking → CTA changes
+  const ctaDisabled =
+    submitting || sent || !!blockedByOtherVenue || declinedHere;
 
   async function sendRequest() {
     if (!plan.eventDate) {
@@ -4684,7 +4780,7 @@ function VenueDiscoveryCard({ venue: v, plan }: { venue: DiscoveryVenue; plan: P
         throw new Error(err.error || "Eroare la trimitere");
       }
       toast.success(`Cerere trimisă la ${v.nameRo}!`);
-      setSent(true);
+      await onRefresh();
       // Hand control to the partners tab — booking the venue is the
       // first decision; assembling the show is what comes next. The
       // 2.5s delay lets the success toast register before the tab
@@ -4732,21 +4828,77 @@ function VenueDiscoveryCard({ venue: v, plan }: { venue: DiscoveryVenue; plan: P
           </div>
         </div>
       </Link>
+      {/* Status banner — only when this venue has activity. Pending
+          shows the 72h countdown; confirmed/declined-by-this-venue
+          gets its own colour-coded label. */}
+      {existingBooking && (
+        <div className="mt-3 rounded-lg border px-3 py-2 text-xs">
+          {isHolder ? (
+            <div className="flex flex-col gap-0.5 text-amber-500">
+              <span className="font-medium">⏳ Cerere în așteptare</span>
+              <PendingCountdown
+                createdAt={existingBooking.createdAt ?? null}
+                windowHours={72}
+              />
+            </div>
+          ) : isConfirmed ? (
+            <div className="text-success">
+              ✓ Sala a confirmat — verifică detaliile pe contractul/email-ul tău.
+            </div>
+          ) : (
+            <div className="text-muted-foreground">
+              Cererea anterioară către această sală a fost respinsă/anulată.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* If a different venue already holds the active slot, gate this
+          card so the user can't fan out requests across multiple
+          venues. Shows whom they're waiting on with the same 72h
+          countdown the holder card has. */}
+      {!existingBooking && blockedByOtherVenue && (
+        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-500">
+          <div className="font-medium">
+            Așteaptă răspunsul de la {blockedByOtherVenue.venueName}
+          </div>
+          <PendingCountdown
+            createdAt={blockedByOtherVenue.createdAt ?? null}
+            windowHours={72}
+          />
+        </div>
+      )}
+
       <div className="mt-3 flex gap-2 border-t border-border/30 pt-3">
         <Button
           onClick={sendRequest}
-          disabled={submitting || sent}
+          disabled={ctaDisabled}
           size="sm"
           className="flex-1 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+          title={
+            blockedByOtherVenue
+              ? `Așteaptă răspunsul de la ${blockedByOtherVenue.venueName}`
+              : declinedHere
+                ? "Această sală a refuzat cererea anterioară"
+                : undefined
+          }
         >
           {submitting ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : sent ? (
+          ) : sent || declinedHere ? (
             <Check className="h-3.5 w-3.5" />
           ) : (
             <BookOpen className="h-3.5 w-3.5" />
           )}
-          {sent ? "Cerere trimisă" : "Solicită rezervare"}
+          {declinedHere
+            ? "Refuzată"
+            : isConfirmed
+              ? "Confirmată"
+              : isHolder
+                ? "În așteptare"
+                : blockedByOtherVenue
+                  ? "Indisponibil"
+                  : "Solicită rezervare"}
         </Button>
         <Link href={`/sali/${v.slug}?plan=${plan.id}`} target="_blank">
           <Button size="sm" variant="outline" className="gap-1.5">

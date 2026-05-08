@@ -274,9 +274,15 @@ export const expirePendingBookings = inngest.createFunction(
       process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
 
     return await step.run("expire-stale-pending", async () => {
-      // Select pending bookings older than 24h.
-      // Using sql template for the interval arithmetic; Drizzle's
-      // relative-time helpers don't cover PostgreSQL `INTERVAL`.
+      // Two windows: 24h for artists, 72h for venues. Combined into a
+      // single OR clause so the cron stays a one-shot read+write.
+      const expireClause = sql`(
+        (${bookingRequests.artistId} IS NOT NULL
+          AND ${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours')
+        OR
+        (${bookingRequests.venueId} IS NOT NULL
+          AND ${bookingRequests.createdAt} < NOW() - INTERVAL '72 hours')
+      )`;
       const stale = await db
         .select({
           id: bookingRequests.id,
@@ -287,12 +293,7 @@ export const expirePendingBookings = inngest.createFunction(
           venueId: bookingRequests.venueId,
         })
         .from(bookingRequests)
-        .where(
-          and(
-            eq(bookingRequests.status, "pending"),
-            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours'`,
-          ),
-        );
+        .where(and(eq(bookingRequests.status, "pending"), expireClause));
 
       if (stale.length === 0) return { expired: 0 };
 
@@ -300,12 +301,7 @@ export const expirePendingBookings = inngest.createFunction(
       await db
         .update(bookingRequests)
         .set({ status: "expired", updatedAt: new Date() })
-        .where(
-          and(
-            eq(bookingRequests.status, "pending"),
-            sql`${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours'`,
-          ),
-        );
+        .where(and(eq(bookingRequests.status, "pending"), expireClause));
 
       // Best-effort email to the client — continue on failure.
       for (const b of stale) {

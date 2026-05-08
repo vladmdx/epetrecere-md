@@ -1,9 +1,13 @@
-// Hourly cron: booking_requests stuck in status "pending" for more than
-// 24h get flipped to "expired" so the client's category slot frees up
-// and the artist's inbox stays clean. Mirrors the Inngest function in
-// src/lib/inngest/functions.ts (expire-pending-bookings-24h) but runs
-// on Vercel cron — redundant by design so a missed Inngest tick can't
-// leave stale "Așteaptă răspunsul…" blockers in the discovery UI.
+// Hourly cron: booking_requests stuck in status "pending" past their
+// per-side response window get flipped to "expired" so the client's
+// slot frees up and the partner's inbox stays clean.
+// Windows differ by who's responding:
+//   - Artists: 24h (people-facing, individual decisions)
+//   - Venues: 72h (more paperwork, often requires owner approval)
+//
+// Mirrors the Inngest function in src/lib/inngest/functions.ts but
+// runs on Vercel cron — redundant by design so a missed Inngest tick
+// can't leave stale "Așteaptă răspunsul…" blockers in the discovery UI.
 //
 // Scheduled via vercel.json. Protected by CRON_SECRET — Vercel attaches
 // `Authorization: Bearer <secret>` automatically when the env var is set.
@@ -30,7 +34,9 @@ export async function GET(req: NextRequest) {
 
   // Snapshot what we're about to expire so we can notify the clients
   // by email + bell. Pull artist/venue names so the message reads
-  // naturally ("Igor Nedoseikin nu a răspuns…").
+  // naturally ("Igor Nedoseikin nu a răspuns…"). Two queries — one
+  // per response window — instead of mixing the per-side intervals
+  // into a single SQL clause where it's harder to read.
   const stale = await db
     .select({
       id: bookingRequests.id,
@@ -45,7 +51,13 @@ export async function GET(req: NextRequest) {
     .where(
       and(
         eq(bookingRequests.status, "pending"),
-        sql`${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours'`,
+        sql`(
+          (${bookingRequests.artistId} IS NOT NULL
+            AND ${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours')
+          OR
+          (${bookingRequests.venueId} IS NOT NULL
+            AND ${bookingRequests.createdAt} < NOW() - INTERVAL '72 hours')
+        )`,
       ),
     );
 
@@ -60,7 +72,13 @@ export async function GET(req: NextRequest) {
     .where(
       and(
         eq(bookingRequests.status, "pending"),
-        sql`${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours'`,
+        sql`(
+          (${bookingRequests.artistId} IS NOT NULL
+            AND ${bookingRequests.createdAt} < NOW() - INTERVAL '24 hours')
+          OR
+          (${bookingRequests.venueId} IS NOT NULL
+            AND ${bookingRequests.createdAt} < NOW() - INTERVAL '72 hours')
+        )`,
       ),
     );
 
@@ -91,11 +109,13 @@ export async function GET(req: NextRequest) {
             .from(users)
             .where(eq(users.id, b.clientUserId))
             .limit(1);
+          const windowHours = b.venueId ? 72 : 24;
+          const targetLabel = b.venueId ? "altă sală" : "alt artist";
           await dispatchNotification({
             userId: b.clientUserId,
             type: "booking_status_changed",
             title: `Cererea către ${vendorName} a expirat`,
-            message: `Nu a răspuns în 24h. Poți încerca alt ${b.artistId ? "artist" : "partener"} pentru data ${b.eventDate}.`,
+            message: `Nu a răspuns în ${windowHours}h. Poți încerca ${targetLabel} pentru data ${b.eventDate}.`,
             actionUrl: "/cabinet/rezervari",
             email: u?.email ?? undefined,
             emailSubject: `Cererea ta către ${vendorName} a expirat`,
