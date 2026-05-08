@@ -148,7 +148,12 @@ export function ChatBell() {
             initial={{ opacity: 0, y: 4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 4 }}
-            className="absolute right-0 top-full z-50 mt-2 w-72 rounded-xl border border-border/40 bg-popover shadow-lg overflow-hidden"
+            // Mobile fix: w-72 (288px) attached to right-0 of a button
+            // sitting close to the viewport's left edge (e.g. inside a
+            // mobile drawer header) clipped off-screen. Switch to a
+            // fixed sheet anchored to the right inset on small screens
+            // and promote back to the absolute popover at sm:.
+            className="fixed right-2 top-14 z-50 w-[calc(100vw-1rem)] max-w-sm overflow-hidden rounded-xl border border-border/40 bg-popover shadow-2xl sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:w-72"
           >
             <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
               <h3 className="text-sm font-semibold">Mesaje</h3>

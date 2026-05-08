@@ -201,16 +201,21 @@ export default function ClientCabinetPage() {
               ? b.priceOffers[b.priceOffers.length - 1].amount
               : null;
             const displayPrice = lastOffer ?? b.agreedPrice ?? null;
+            // eventLabel is a no-op here now — kept assigned in case
+            // some downstream tweak needs it again, but no longer
+            // rendered inside the per-booking card. The plan header
+            // above the cards already carries the event type so
+            // duplicating it on every booking was just noise.
+            void eventLabel;
             return (
               <Card key={b.id} className="transition-all hover:border-gold/30">
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 space-y-2">
-                      {/* Header: event type + status + category + price */}
+                      {/* Status + category + price chips. Event type
+                          intentionally omitted — see the parent
+                          BookingsByPlan header. */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-heading font-semibold text-base">
-                          {eventLabel}
-                        </span>
                         <Badge variant="outline" className={cn("text-xs", cfg.color)}>
                           {cfg.label}
                         </Badge>
@@ -415,10 +420,15 @@ function BookingsByPlan({
           : null;
 
         return (
-          <section key={String(key)}>
+          <section
+            key={String(key)}
+            className="overflow-hidden rounded-xl border border-gold/30 bg-gold/5"
+          >
             {/* Plan header — bold title + meta line. Doubles as link
-                back into the plan detail page when we have an id. */}
-            <div className="mb-3 rounded-xl border border-gold/30 bg-gold/5 p-4">
+                back into the plan detail page when we have an id.
+                Bookings nest INSIDE this container so the user sees
+                them as part of the event group, not adjacent cards. */}
+            <header className="border-b border-gold/20 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-[11px] uppercase tracking-wider text-gold/70">
@@ -466,8 +476,10 @@ function BookingsByPlan({
                   </Link>
                 )}
               </div>
+            </header>
+            <div className="space-y-3 bg-background/40 p-3 sm:p-4">
+              {list.map((b) => render(b))}
             </div>
-            <div className="space-y-3">{list.map((b) => render(b))}</div>
           </section>
         );
       })}
