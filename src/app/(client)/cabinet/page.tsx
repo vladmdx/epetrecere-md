@@ -271,30 +271,22 @@ export default function ClientCabinetPage() {
                         </div>
                       )}
 
-                      {/* Event details */}
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {new Date(b.eventDate).toLocaleDateString("ro-MD", {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          })}
-                        </span>
-                        {b.startTime && (
+                      {/* Per-booking details — date + guest count are
+                          intentionally omitted here; the parent event
+                          header already carries them, and showing them
+                          again on every card was just visual noise.
+                          Time stays because individual bookings often
+                          have different start/end slots within the
+                          same event day. */}
+                      {b.startTime && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Clock className="h-3.5 w-3.5" />
                             {b.startTime}
                             {b.endTime ? ` – ${b.endTime}` : ""}
                           </span>
-                        )}
-                        {b.guestCount && (
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" />
-                            {b.guestCount} invitați
-                          </span>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* Client message */}
                       {b.message && (
