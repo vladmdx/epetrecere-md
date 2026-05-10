@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { eventPlans, checklistItems, users } from "@/lib/db/schema";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { getPlannerTemplate } from "@/lib/planner/templates";
-import { requireAppUser } from "@/lib/planner/ownership";
+import { requireAppUser, requireClientUser } from "@/lib/planner/ownership";
 
 /** Cap on event plans a single client may create per rolling 7-day
  *  window. Stops drive-by spam (someone testing the wizard with
@@ -62,7 +62,10 @@ const createPlanSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAppUser();
+  // Plan creation is a client-only action — partners (artists/venues) are
+  // blocked here so they can't accidentally end up as clients of the
+  // platform. Admins still pass through for ops seeding.
+  const auth = await requireClientUser();
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

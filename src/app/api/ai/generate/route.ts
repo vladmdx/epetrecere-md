@@ -59,7 +59,12 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ error: "Unknown type" }, { status: 400 });
-  } catch {
-    return NextResponse.json({ error: "AI service unavailable" }, { status: 503 });
+  } catch (err) {
+    // Surface the underlying reason so the partner gets an actionable
+    // toast instead of a generic "AI indisponibil". Logged in full for
+    // server-side debugging.
+    console.error("[ai/generate] error:", err);
+    const message = err instanceof Error ? err.message : "AI service unavailable";
+    return NextResponse.json({ error: message }, { status: 503 });
   }
 }

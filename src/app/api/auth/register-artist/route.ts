@@ -8,8 +8,9 @@ import {
   users,
   notifications,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
+import { validatePhone } from "@/lib/phone/validate";
 
 /** A single duration → price tier the onboarding wizard can submit
  *  alongside the artist row. Mirrors the artist_packages columns. */
@@ -145,10 +146,43 @@ export async function POST(req: Request) {
       return !!hit;
     });
 
-    // Phone falls back to the user's phone (collected at registration)
-    const finalPhone = data.phone && data.phone.trim().length >= 6
-      ? data.phone
-      : appUser.phone || "";
+    // Phone falls back to the user's phone (collected at registration).
+    // Validate against the country-specific format and de-dupe across
+    // accounts so each artist contact is unique.
+    const candidatePhone =
+      data.phone && data.phone.trim().length >= 6
+        ? data.phone
+        : appUser.phone || "";
+    let finalPhone = candidatePhone;
+    if (candidatePhone) {
+      const phoneCheck = validatePhone(candidatePhone);
+      if (!phoneCheck.ok) {
+        return NextResponse.json({ error: phoneCheck.error }, { status: 400 });
+      }
+      finalPhone = phoneCheck.e164;
+      const [phoneCollision] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.phone, finalPhone), ne(users.id, appUser.id)))
+        .limit(1);
+      if (phoneCollision) {
+        return NextResponse.json(
+          {
+            error:
+              "Acest număr de telefon este deja folosit de un alt cont.",
+          },
+          { status: 409 },
+        );
+      }
+      // Keep the user row in sync — partners often edit their phone in
+      // onboarding even if they entered a different one earlier.
+      if (appUser.phone !== finalPhone) {
+        await db
+          .update(users)
+          .set({ phone: finalPhone, updatedAt: new Date() })
+          .where(eq(users.id, appUser.id));
+      }
+    }
 
     // priceFrom precedence: minimum across the packages array, falling
     // back to the legacy `priceFrom` field. Listing pages still sort
@@ -187,6 +221,38 @@ export async function POST(req: Request) {
         seoTitleRo: `${data.name} — Artist Evenimente | ePetrecere.md`,
       })
       .returning();
+
+    // Auto-improve the description in the background. The partner wrote
+    // a seed in onboarding; we polish it with Claude so the public page
+    // launches with SEO-friendly copy instead of a one-paragraph blurb.
+    // Fire-and-forget: failures don't block submission, the partner can
+    // re-trigger from /dashboard/profil.
+    if (data.description && data.description.trim().length >= 40) {
+      const seed = data.description.trim();
+      void (async () => {
+        try {
+          const { generateArtistDescription } = await import("@/lib/ai");
+          const polished = await generateArtistDescription(
+            data.name,
+            // categoryIds resolved earlier as data.categoryId — we don't
+            // have the name handy here without another lookup, so we use
+            // a generic "artist" as the category. Good enough for the
+            // first pass; partner can re-generate from settings.
+            "artist",
+            seed,
+            "ro",
+          );
+          if (polished && polished.trim().length > 0) {
+            await db
+              .update(artists)
+              .set({ descriptionRo: polished, updatedAt: new Date() })
+              .where(eq(artists.id, artist.id));
+          }
+        } catch (err) {
+          console.error("[register-artist] auto AI rewrite failed:", err);
+        }
+      })();
+    }
 
     // Persist each duration tier as an artist_packages row. Skipped
     // when the array is empty so legacy onboarding submissions stay
@@ -245,13 +311,19 @@ export async function POST(req: Request) {
       // Email notification to admin
       if (admin.email) {
         const { sendEmail } = await import("@/lib/email/send");
+        const photoBlock = data.imageUrl
+          ? `<div style="text-align:center;margin:0 0 16px;">
+              <img src="${data.imageUrl}" alt="${data.name}" style="width:96px;height:96px;border-radius:50%;object-fit:cover;border:3px solid #C9A84C;" />
+            </div>`
+          : "";
         await sendEmail({
           to: admin.email,
           subject: `🔔 Artist nou: ${data.name} așteaptă aprobare`,
           html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#1A1A2E;border-radius:12px;color:#FAF8F2;">
             <h2 style="color:#C9A84C;margin:0 0 16px;">Artist Nou Înregistrat</h2>
+            ${photoBlock}
             <p><strong>${data.name}</strong> (${appUser.email}) s-a înregistrat ca artist.</p>
-            <p>Telefon: ${data.phone}</p>
+            <p>Telefon: ${finalPhone || "—"}</p>
             <p>Oraș: ${data.location || "Nespecificat"}</p>
             <div style="margin-top:20px;text-align:center;">
               <a href="https://epetrecere.md/admin/cereri-inregistrare" style="display:inline-block;background:#C9A84C;color:#0D0D0D;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Vezi cererea →</a>

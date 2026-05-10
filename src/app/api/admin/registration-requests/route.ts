@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { artists, venues, users, categories, notifications } from "@/lib/db/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { artists, venues, users, categories, notifications, venueImages } from "@/lib/db/schema";
+import { eq, and, sql, inArray, asc, desc } from "drizzle-orm";
 import { sendEmail } from "@/lib/email/send";
 import { registrationStatusEmail } from "@/lib/email/templates/registration-status";
 
@@ -35,6 +35,7 @@ export async function GET() {
       location: artists.location,
       description: artists.descriptionRo,
       categoryIds: artists.categoryIds,
+      photoUrl: artists.photoUrl,
       createdAt: artists.createdAt,
       userId: artists.userId,
     })
@@ -42,7 +43,7 @@ export async function GET() {
     .where(and(eq(artists.isActive, false), sql`${artists.userId} IS NOT NULL`))
     .orderBy(artists.createdAt);
 
-  // Get pending venues
+  // Get pending venues — pull a cover image so admins can see what they're approving.
   const pendingVenues = await db
     .select({
       id: venues.id,
@@ -60,6 +61,25 @@ export async function GET() {
     .from(venues)
     .where(and(eq(venues.isActive, false), sql`${venues.userId} IS NOT NULL`))
     .orderBy(venues.createdAt);
+
+  // Cover images for the pending venues — venues' first uploaded photo.
+  const venueIds = pendingVenues.map((v) => v.id);
+  const venueImageRows = venueIds.length > 0
+    ? await db
+        .select({
+          venueId: venueImages.venueId,
+          url: venueImages.url,
+          isCover: venueImages.isCover,
+          sortOrder: venueImages.sortOrder,
+        })
+        .from(venueImages)
+        .where(inArray(venueImages.venueId, venueIds))
+        .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder))
+    : [];
+  const venueCoverMap = new Map<number, string>();
+  for (const row of venueImageRows) {
+    if (!venueCoverMap.has(row.venueId)) venueCoverMap.set(row.venueId, row.url);
+  }
 
   // Get all categories for artist category names
   const allCategories = await db
@@ -100,6 +120,7 @@ export async function GET() {
         description: a.description,
         categoryName: catName,
         capacity: null,
+        photoUrl: a.photoUrl ?? null,
         createdAt: a.createdAt?.toISOString() ?? new Date().toISOString(),
         userId: a.userId,
         userName: u?.name ?? null,
@@ -124,6 +145,7 @@ export async function GET() {
         description: v.description,
         categoryName: null,
         capacity: cap,
+        photoUrl: venueCoverMap.get(v.id) ?? null,
         createdAt: v.createdAt?.toISOString() ?? new Date().toISOString(),
         userId: v.userId,
         userName: u?.name ?? null,

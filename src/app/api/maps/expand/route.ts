@@ -17,6 +17,19 @@ import { parseGoogleMapsUrl, isMapsShortLink } from "@/lib/utils/parse-maps-url"
 // Auth-gated to prevent random users from spinning a free proxy. Rate-
 // limited per IP because Nominatim has a 1 req/sec etiquette policy.
 
+/** Per-day opening window keyed by ISO weekday short name. Each value is
+ *  either `{ open, close }` (open that day) or `null` (closed). Mirrors the
+ *  shape of the venues.workingHours column so we can save it 1-to-1. */
+export type WorkingHoursMap = {
+  mon: { open: string; close: string } | null;
+  tue: { open: string; close: string } | null;
+  wed: { open: string; close: string } | null;
+  thu: { open: string; close: string } | null;
+  fri: { open: string; close: string } | null;
+  sat: { open: string; close: string } | null;
+  sun: { open: string; close: string } | null;
+};
+
 interface ExpandedMaps {
   lat?: number;
   lng?: number;
@@ -35,6 +48,46 @@ interface ExpandedMaps {
   ratingCount?: number;
   /** Cover photo URL (hot-linked from the Places photo CDN). */
   photoUrl?: string;
+  /** Weekly opening hours keyed by mon..sun (matches venues.workingHours). */
+  workingHours?: WorkingHoursMap;
+  /** Human-readable description text (Places primary type display name +
+   *  category). Useful as a description seed. */
+  primaryTypeDisplay?: string;
+}
+
+/** Convert Places API `regularOpeningHours.periods` (each entry has
+ *  `open: { day, hour, minute }` and optional `close`) into the columnar
+ *  mon..sun map our schema uses. */
+function mapPlacesOpeningHours(
+  periods: Array<{
+    open: { day: number; hour: number; minute: number };
+    close?: { day: number; hour: number; minute: number };
+  }> | undefined,
+): WorkingHoursMap | undefined {
+  if (!Array.isArray(periods) || periods.length === 0) return undefined;
+  // Places weekday convention: 0 = Sunday, 1 = Monday, …, 6 = Saturday.
+  const slot: WorkingHoursMap = {
+    mon: null, tue: null, wed: null, thu: null,
+    fri: null, sat: null, sun: null,
+  };
+  const dayKeys: (keyof WorkingHoursMap)[] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+  for (const period of periods) {
+    if (!period.open || period.open.day === undefined) continue;
+    const key = dayKeys[period.open.day];
+    if (!key) continue;
+    const fmt = (h: number, m: number) =>
+      `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    if (!period.close) {
+      // 24-hour day — Places omits close.
+      slot[key] = { open: "00:00", close: "23:59" };
+      continue;
+    }
+    slot[key] = {
+      open: fmt(period.open.hour ?? 0, period.open.minute ?? 0),
+      close: fmt(period.close.hour ?? 0, period.close.minute ?? 0),
+    };
+  }
+  return slot;
 }
 
 async function reverseGeocode(
@@ -79,6 +132,9 @@ const PLACE_DETAILS_FIELDS = [
   "userRatingCount",
   "photos",
   "location",
+  // Opening hours — the new API returns periods + a localized weekday text;
+  // we use the periods to build the columnar working_hours map.
+  "regularOpeningHours",
 ].join(",");
 
 /** Pull the rich profile from the Google Places API (v1 / "New"). Requires
@@ -167,6 +223,10 @@ async function placesEnrich(
       return {};
     }
     type AddrComp = { types: string[]; longText: string };
+    type PlacesPeriod = {
+      open: { day: number; hour: number; minute: number };
+      close?: { day: number; hour: number; minute: number };
+    };
     type Place = {
       id?: string;
       displayName?: { text?: string };
@@ -176,10 +236,12 @@ async function placesEnrich(
       nationalPhoneNumber?: string;
       websiteUri?: string;
       editorialSummary?: { text?: string };
+      primaryTypeDisplayName?: { text?: string };
       types?: string[];
       rating?: number;
       userRatingCount?: number;
       photos?: Array<{ name?: string }>;
+      regularOpeningHours?: { periods?: PlacesPeriod[] };
     };
     const place = (await r.json()) as Place;
 
@@ -209,6 +271,8 @@ async function placesEnrich(
       rating: typeof place.rating === "number" ? place.rating : undefined,
       ratingCount: place.userRatingCount,
       photoUrl,
+      workingHours: mapPlacesOpeningHours(place.regularOpeningHours?.periods),
+      primaryTypeDisplay: place.primaryTypeDisplayName?.text,
     };
   } catch (err) {
     console.warn("[maps.expand] place details threw", err);
@@ -299,6 +363,8 @@ export async function POST(req: Request) {
   out.rating = placesData.rating;
   out.ratingCount = placesData.ratingCount;
   out.photoUrl = placesData.photoUrl;
+  out.workingHours = placesData.workingHours;
+  out.primaryTypeDisplay = placesData.primaryTypeDisplay;
 
   return NextResponse.json(out);
 }

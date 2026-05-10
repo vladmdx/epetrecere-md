@@ -7,6 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+export type WorkingHoursMap = {
+  mon: { open: string; close: string } | null;
+  tue: { open: string; close: string } | null;
+  wed: { open: string; close: string } | null;
+  thu: { open: string; close: string } | null;
+  fri: { open: string; close: string } | null;
+  sat: { open: string; close: string } | null;
+  sun: { open: string; close: string } | null;
+};
+
 export interface MapsResult {
   lat?: number;
   lng?: number;
@@ -21,6 +31,10 @@ export interface MapsResult {
   categories?: string[];
   /** Cover photo URL from the Places API photo proxy. */
   photoUrl?: string;
+  /** Localized primary type — "Sală pentru evenimente", "Restaurant" etc. */
+  primaryTypeDisplay?: string;
+  /** Weekly opening hours, mon..sun. Each value is `{ open, close }` or null. */
+  workingHours?: WorkingHoursMap;
 }
 
 interface Props {
@@ -80,6 +94,8 @@ export function MapsAutofill({ onResult, className }: Props) {
       if (data.phone) extras.push("telefon");
       if (data.website) extras.push("website");
       if (data.summary) extras.push("descriere");
+      if (data.workingHours) extras.push("orar");
+      if (data.lat && data.lng) extras.push("coordonate");
       if (data.photoUrl) extras.push("poză");
       const extrasMsg = extras.length ? ` (+${extras.join(", ")})` : "";
       toast.success(

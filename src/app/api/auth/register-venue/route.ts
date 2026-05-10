@@ -6,10 +6,20 @@
 import { NextResponse } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venues, users, notifications } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
+import { validatePhone } from "@/lib/phone/validate";
+
+// Each day is `{ open: HH:mm, close: HH:mm }` or null (closed). Mirrors
+// venues.workingHours so we can pass it straight through.
+const dayWindowSchema = z
+  .object({
+    open: z.string().regex(/^\d{2}:\d{2}$/),
+    close: z.string().regex(/^\d{2}:\d{2}$/),
+  })
+  .nullable();
 
 const registerSchema = z.object({
   name: z.string().min(2),
@@ -31,6 +41,22 @@ const registerSchema = z.object({
   menuUrl: z.string().url().optional(), // public website URL with menu
   virtualTourUrl: z.string().url().optional(),
   websiteUrl: z.string().url().optional(),
+  // Map autofill payload — captured by /api/maps/expand, forwarded on submit.
+  // Saved on the venue row so the public page renders the embedded map and
+  // the schedule section without admin help.
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  workingHours: z
+    .object({
+      mon: dayWindowSchema,
+      tue: dayWindowSchema,
+      wed: dayWindowSchema,
+      thu: dayWindowSchema,
+      fri: dayWindowSchema,
+      sat: dayWindowSchema,
+      sun: dayWindowSchema,
+    })
+    .optional(),
 });
 
 export async function POST(req: Request) {
@@ -48,6 +74,13 @@ export async function POST(req: Request) {
         { status: 400 },
       );
     }
+
+    // Country-aware phone format check (MD = 8 digits, RO = 9, etc.).
+    const phoneCheck = validatePhone(parsed.data.phone);
+    if (!phoneCheck.ok) {
+      return NextResponse.json({ error: phoneCheck.error }, { status: 400 });
+    }
+    const normalizedPhone = phoneCheck.e164;
 
     // Look up user by clerkId
     let [appUser] = await db
@@ -125,6 +158,26 @@ export async function POST(req: Request) {
       );
     }
 
+    // Phone uniqueness across users — partner contacts must be unique so
+    // SMS/email dedupe and bulk admin lookups stay correct.
+    const [phoneCollision] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, normalizedPhone), ne(users.id, appUser.id)))
+      .limit(1);
+    if (phoneCollision) {
+      return NextResponse.json(
+        { error: "Acest număr de telefon este deja folosit de un alt cont." },
+        { status: 409 },
+      );
+    }
+    // Persist the normalized phone on the user row so future lookups use
+    // the same canonical form.
+    await db
+      .update(users)
+      .set({ phone: normalizedPhone, updatedAt: new Date() })
+      .where(eq(users.id, appUser.id));
+
     const data = parsed.data;
     // Clean slug from venue name. If a previous venue is using it, the
     // helper appends -2, -3, etc. — never a timestamp.
@@ -146,7 +199,7 @@ export async function POST(req: Request) {
         .update(venues)
         .set({
           nameRo: data.name,
-          phone: data.phone,
+          phone: normalizedPhone,
           email: data.email ?? appUser.email ?? null,
           city: data.city ?? "Chișinău",
           address: data.address ?? null,
@@ -157,6 +210,12 @@ export async function POST(req: Request) {
           menuUrl: data.menuUrl ?? null,
           menuPdfUrl: data.menuPdfUrl ?? null,
           virtualTourUrl: data.virtualTourUrl ?? null,
+          // Map data: only overwrite when the new submission carries fresh
+          // values, so a partner who removed the URL doesn't lose previously
+          // resolved coordinates.
+          ...(typeof data.lat === "number" ? { lat: data.lat } : {}),
+          ...(typeof data.lng === "number" ? { lng: data.lng } : {}),
+          ...(data.workingHours ? { workingHours: data.workingHours } : {}),
           seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
           updatedAt: new Date(),
         })
@@ -170,7 +229,7 @@ export async function POST(req: Request) {
           userId: appUser.id,
           nameRo: data.name,
           slug,
-          phone: data.phone,
+          phone: normalizedPhone,
           email: data.email ?? appUser.email ?? null,
           city: data.city ?? "Chișinău",
           address: data.address ?? null,
@@ -181,6 +240,12 @@ export async function POST(req: Request) {
           menuUrl: data.menuUrl ?? null,
           menuPdfUrl: data.menuPdfUrl ?? null,
           virtualTourUrl: data.virtualTourUrl ?? null,
+          // Coordinates and weekly schedule when the partner pasted a Maps
+          // URL during onboarding. Null otherwise — public page renders the
+          // map only when both lat & lng are present.
+          lat: typeof data.lat === "number" ? data.lat : null,
+          lng: typeof data.lng === "number" ? data.lng : null,
+          workingHours: data.workingHours ?? null,
           isActive: false,
           // Launch-phase: every approved venue gets the premium homepage
           // placement. Will revert to false once paid tiers are introduced.
@@ -218,6 +283,36 @@ export async function POST(req: Request) {
       .set({ onboardingComplete: true })
       .where(eq(users.id, appUser.id));
 
+    // Auto-improve the description with AI in the background. The seed
+    // can come from either the partner or the Maps autofill summary —
+    // either way, polishing it gives the public page launch-ready copy.
+    if (data.description && data.description.trim().length >= 40) {
+      const seed = data.description.trim();
+      void (async () => {
+        try {
+          const { generateVenueDescription } = await import("@/lib/ai");
+          const html = await generateVenueDescription({
+            name: data.name,
+            city: data.city ?? null,
+            capacityMin: data.capacityMin ?? null,
+            capacityMax: data.capacityMax ?? null,
+            facilities: [],
+            current: seed,
+            mode: "improve",
+            language: "ro",
+          });
+          if (html && html.trim().length > 0) {
+            await db
+              .update(venues)
+              .set({ descriptionRo: html, updatedAt: new Date() })
+              .where(eq(venues.id, venue.id));
+          }
+        } catch (err) {
+          console.error("[register-venue] auto AI rewrite failed:", err);
+        }
+      })();
+    }
+
     // Referral milestone — non-blocking, dedupes server-side.
     void (async () => {
       try {
@@ -252,11 +347,18 @@ export async function POST(req: Request) {
 
           if (admin.email) {
             const { sendEmail } = await import("@/lib/email/send");
+            const coverUrl = data.imageUrls?.[0];
+            const coverBlock = coverUrl
+              ? `<div style="text-align:center;margin:0 0 16px;">
+                  <img src="${coverUrl}" alt="${data.name}" style="width:100%;max-width:420px;height:200px;border-radius:8px;object-fit:cover;border:1px solid #C9A84C;" />
+                </div>`
+              : "";
             sendEmail({
               to: admin.email,
               subject: `🔔 Sală nouă: ${data.name} așteaptă aprobare`,
               html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#1A1A2E;border-radius:12px;color:#FAF8F2;">
                 <h2 style="color:#C9A84C;margin:0 0 16px;">Sală Nouă Înregistrată</h2>
+                ${coverBlock}
                 <p><strong>${data.name}</strong> (${data.phone}) s-a înregistrat ca sală.</p>
                 <p>Oraș: ${data.city || "Nespecificat"}</p>
                 <div style="margin-top:20px;text-align:center;">

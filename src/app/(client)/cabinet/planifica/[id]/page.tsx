@@ -297,6 +297,74 @@ export default function PlanDetailPage({
     void refreshBookings();
   }, [refreshBookings]);
 
+  // Auto-book hand-off: when the user clicked "Eveniment nou" from an
+  // artist page, we stash { artistId, artistSlug } in sessionStorage. The
+  // moment they land on this newly-created plan we fire the booking
+  // request automatically — no extra clicks. Single-fire: clear the
+  // stash even on failure so a stuck flag doesn't loop forever.
+  useEffect(() => {
+    if (!plan || !user?.primaryEmailAddress?.emailAddress) return;
+    let raw: string | null = null;
+    try {
+      raw = sessionStorage.getItem("auto-book-after-plan");
+    } catch {
+      return;
+    }
+    if (!raw) return;
+    try {
+      sessionStorage.removeItem("auto-book-after-plan");
+    } catch {
+      /* ignore */
+    }
+    let parsed: { artistId?: number } | null = null;
+    try {
+      parsed = JSON.parse(raw) as { artistId?: number };
+    } catch {
+      return;
+    }
+    const artistId = parsed?.artistId;
+    if (!artistId || !Number.isFinite(artistId)) return;
+    if (!plan.eventDate) {
+      toast.message(
+        "Adaugă o dată evenimentului ca să trimitem cererea către partener.",
+      );
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await fetch("/api/booking-requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            artistId,
+            clientName: user.fullName || "Client",
+            clientPhone: "000000",
+            clientEmail: user.primaryEmailAddress?.emailAddress,
+            eventDate: plan.eventDate,
+            eventType: plan.eventType ?? undefined,
+            guestCount: plan.guestCountTarget ?? undefined,
+            eventPlanId: plan.id,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          toast.error(
+            err.error ||
+              "Nu am putut trimite cererea automat — încearcă din tabul Rezervări.",
+          );
+          return;
+        }
+        toast.success("Cererea a fost trimisă către partener.");
+        await refreshBookings();
+        // Switch to the bookings tab so the user sees the request right
+        // after creation. Cheap UX win.
+        setActiveTab("bookings" as TabKey);
+      } catch {
+        toast.error("Eroare la trimiterea automată a cererii.");
+      }
+    })();
+  }, [plan, user, refreshBookings]);
+
   async function deletePlan() {
     if (!confirm("Sigur vrei să ștergi acest plan? Operațiunea este ireversibilă.")) return;
     const res = await fetch(`/api/event-plans/${planId}`, { method: "DELETE" });

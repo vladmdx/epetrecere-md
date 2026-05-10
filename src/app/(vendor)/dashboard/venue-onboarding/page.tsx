@@ -65,6 +65,22 @@ export default function VenueOnboardingPage() {
     menuUrl: "",
     virtualTourUrl: "",
     websiteUrl: "",
+    // From Maps autofill — never typed by hand. We forward them on submit
+    // so the public venue page can render the map and the schedule
+    // section without an admin needing to manually fill them.
+    lat: null as number | null,
+    lng: null as number | null,
+    workingHours: null as
+      | {
+          mon: { open: string; close: string } | null;
+          tue: { open: string; close: string } | null;
+          wed: { open: string; close: string } | null;
+          thu: { open: string; close: string } | null;
+          fri: { open: string; close: string } | null;
+          sat: { open: string; close: string } | null;
+          sun: { open: string; close: string } | null;
+        }
+      | null,
   });
 
   // Pre-fill the form if the user already has a venue submission. Approved
@@ -100,6 +116,20 @@ export default function VenueOnboardingPage() {
           menuUrl: (v.menuUrl as string) || "",
           virtualTourUrl: (v.virtualTourUrl as string) || "",
           websiteUrl: (v.website as string) || "",
+          // Re-hydrate the Maps payload so a re-submit doesn't accidentally
+          // wipe coordinates / schedule that admins manually filled.
+          lat: typeof v.lat === "number" ? (v.lat as number) : null,
+          lng: typeof v.lng === "number" ? (v.lng as number) : null,
+          workingHours:
+            (v.workingHours as {
+              mon: { open: string; close: string } | null;
+              tue: { open: string; close: string } | null;
+              wed: { open: string; close: string } | null;
+              thu: { open: string; close: string } | null;
+              fri: { open: string; close: string } | null;
+              sat: { open: string; close: string } | null;
+              sun: { open: string; close: string } | null;
+            } | null) ?? null,
         });
       })
       .catch(() => {})
@@ -213,6 +243,12 @@ export default function VenueOnboardingPage() {
           menuUrl: data.menuUrl || undefined,
           virtualTourUrl: data.virtualTourUrl || undefined,
           websiteUrl: data.websiteUrl || undefined,
+          // Maps autofill payload — server stores lat/lng so the public
+          // page renders the embedded map; workingHours becomes the
+          // schedule section.
+          lat: data.lat ?? undefined,
+          lng: data.lng ?? undefined,
+          workingHours: data.workingHours ?? undefined,
         }),
       });
       if (!res.ok) {
@@ -329,6 +365,12 @@ export default function VenueOnboardingPage() {
                     : data.city,
                 websiteUrl: data.websiteUrl || r.website || data.websiteUrl,
                 description: data.description || r.summary || data.description,
+                // Coordinates and working hours are taken whenever Places
+                // returns them — they aren't user-typed so there's nothing
+                // to clobber.
+                lat: typeof r.lat === "number" ? r.lat : data.lat,
+                lng: typeof r.lng === "number" ? r.lng : data.lng,
+                workingHours: r.workingHours ?? data.workingHours,
               });
             }}
           />

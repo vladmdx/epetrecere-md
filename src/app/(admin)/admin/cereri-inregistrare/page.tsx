@@ -30,6 +30,7 @@ interface RegistrationRequest {
   description: string | null;
   categoryName: string | null;
   capacity: string | null;
+  photoUrl: string | null;
   createdAt: string;
   userId: string | null;
   userName: string | null;
@@ -135,20 +136,34 @@ export default function RegistrationRequestsPage() {
                 <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
                   {/* Info */}
                   <div className="flex gap-4">
-                    <div
-                      className={cn(
-                        "flex h-12 w-12 shrink-0 items-center justify-center rounded-full",
-                        req.type === "artist"
-                          ? "bg-purple-500/10 text-purple-400"
-                          : "bg-blue-500/10 text-blue-400",
-                      )}
-                    >
-                      {req.type === "artist" ? (
-                        <Music className="h-5 w-5" />
-                      ) : (
-                        <Building2 className="h-5 w-5" />
-                      )}
-                    </div>
+                    {req.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={req.photoUrl}
+                        alt={req.name}
+                        className={cn(
+                          "h-14 w-14 shrink-0 rounded-full object-cover ring-2",
+                          req.type === "artist"
+                            ? "ring-purple-500/30"
+                            : "ring-blue-500/30",
+                        )}
+                      />
+                    ) : (
+                      <div
+                        className={cn(
+                          "flex h-14 w-14 shrink-0 items-center justify-center rounded-full",
+                          req.type === "artist"
+                            ? "bg-purple-500/10 text-purple-400"
+                            : "bg-blue-500/10 text-blue-400",
+                        )}
+                      >
+                        {req.type === "artist" ? (
+                          <Music className="h-5 w-5" />
+                        ) : (
+                          <Building2 className="h-5 w-5" />
+                        )}
+                      </div>
+                    )}
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-heading text-lg font-bold">{req.name}</h3>

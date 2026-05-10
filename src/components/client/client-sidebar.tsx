@@ -24,7 +24,6 @@ import {
   Menu,
   X,
   Heart,
-  Music,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -166,14 +165,11 @@ function NavBody({
         </>
       )}
 
-      {/* Standalone artist booking — between event-plan flow and the tools.
-          Lets clients book an artist without having to start an event plan. */}
-      <SectionHeader label="Rezervare Artist" />
-      <NavLink
-        item={{ href: "/cabinet/rezervare-artist", icon: Music, label: "Rezervă un artist" }}
-        pathname={pathname}
-        onClick={onNavigate}
-      />
+      {/* Standalone direct booking removed: every reservation must originate
+          from a planned event so we can run conflict detection, group
+          partners by event, and apply the per-week plan limit. The "Adaugă
+          în eveniment" button on artist/venue profiles is the only entry
+          point now. */}
 
       <SectionHeader label="Instrumente" />
 

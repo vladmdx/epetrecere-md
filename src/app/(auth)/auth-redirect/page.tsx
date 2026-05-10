@@ -225,7 +225,14 @@ export default function AuthRedirectPage() {
         body: JSON.stringify({ phone: trimmed }),
       });
       if (!res.ok) {
-        setPhoneError("Nu s-a putut salva numărul. Încearcă din nou.");
+        // Surface the server's actual reason — country-format mismatch
+        // ("Numărul de Moldova trebuie să aibă exact 8 cifre...") or
+        // uniqueness collision. Falls back to the legacy generic when
+        // the body isn't JSON.
+        const body = await res.json().catch(() => null);
+        setPhoneError(
+          body?.error || "Nu s-a putut salva numărul. Încearcă din nou.",
+        );
         return;
       }
       // Move on to role picker
@@ -317,7 +324,7 @@ export default function AuthRedirectPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handlePhoneSubmit();
               }}
-              placeholder="+373 69 ..."
+              placeholder="+373 69 123 456"
               className="mt-2 w-full rounded-lg border border-[#2A2A3E] bg-[#141428] px-4 py-3 text-[#FAF8F2] placeholder:text-[#666] focus:border-[#C9A84C] focus:outline-none focus:ring-1 focus:ring-[#C9A84C]"
               autoFocus
             />

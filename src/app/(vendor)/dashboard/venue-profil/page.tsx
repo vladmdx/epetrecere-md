@@ -405,10 +405,18 @@ export default function VenueProfilePage() {
                     city: r.city || venue.city,
                     phone: venue.phone || r.phone || venue.phone,
                     website: venue.website || r.website || venue.website,
+                    // The Places summary becomes the seed for the AI
+                    // rewrite (handled by improveDescription below). When
+                    // there's no existing description we drop the summary
+                    // straight in so the editor isn't left empty.
                     descriptionRo:
                       venue.descriptionRo || r.summary || venue.descriptionRo,
                     lat: r.lat ?? venue.lat,
                     lng: r.lng ?? venue.lng,
+                    // Pull the schedule when Places returns one. Editor
+                    // panel below renders it; partner can edit before
+                    // saving.
+                    workingHours: r.workingHours ?? venue.workingHours,
                   });
                 }}
               />

@@ -1,11 +1,11 @@
 "use client";
 
+import { useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Button } from "@/components/ui/button";
 import {
   Bold, Italic, List, ListOrdered, Heading2, Heading3,
   Link as LinkIcon, Undo, Redo, Quote,
@@ -37,6 +37,19 @@ export function RichEditor({ content = "", onChange, placeholder = "Scrie aici..
       },
     },
   });
+
+  // Sync external content changes back into TipTap. Without this, AI
+  // "Generează" / "Îmbunătățește" buttons that update the parent state
+  // are silently dropped — the editor was initialized once and never
+  // re-reads `content`. We only push when the prop actually differs from
+  // the editor's current HTML so user typing isn't fought.
+  useEffect(() => {
+    if (!editor) return;
+    const currentHtml = editor.getHTML();
+    if (content === currentHtml) return;
+    // emitUpdate=false → don't re-fire onUpdate and create a render loop.
+    editor.commands.setContent(content || "", { emitUpdate: false });
+  }, [content, editor]);
 
   if (!editor) return null;
 

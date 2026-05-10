@@ -14,7 +14,7 @@ import {
 } from "@/lib/db/schema";
 import { and, eq, gte, sql } from "drizzle-orm";
 import { getPlannerTemplate } from "@/lib/planner/templates";
-import { requireAppUser } from "@/lib/planner/ownership";
+import { requireClientUser } from "@/lib/planner/ownership";
 
 const MAX_PLANS_PER_WEEK = 3;
 
@@ -56,7 +56,10 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
-  const auth = await requireAppUser();
+  // Same client-only gate as /api/event-plans POST. Stops a partner who
+  // somehow lands on /auth-redirect with stashed wizard data from being
+  // converted into a client.
+  const auth = await requireClientUser();
   if (!auth.ok) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }

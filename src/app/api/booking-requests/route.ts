@@ -290,16 +290,46 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Resolve the authenticated user so we can link booking to their account
+  // Resolve the authenticated user so we can link booking to their account.
+  // Also check that they aren't a partner — a vendor account creating
+  // booking requests is almost certainly an accidental cross-role use.
   const { userId: clerkId } = await auth();
   let clientUserId: string | undefined;
   if (clerkId) {
     const [appUser] = await db
-      .select({ id: users.id })
+      .select({ id: users.id, role: users.role })
       .from(users)
       .where(eq(users.clerkId, clerkId))
       .limit(1);
-    if (appUser) clientUserId = appUser.id;
+    if (appUser) {
+      // Admins always pass through. For everyone else, reject if they
+      // own an artist or venue row, or hold the artist role.
+      const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
+      if (!isAdmin) {
+        const [artistOwn] = await db
+          .select({ id: artists.id })
+          .from(artists)
+          .where(eq(artists.userId, appUser.id))
+          .limit(1);
+        const [venueOwn] = artistOwn
+          ? [null]
+          : await db
+              .select({ id: venues.id })
+              .from(venues)
+              .where(eq(venues.userId, appUser.id))
+              .limit(1);
+        if (artistOwn || venueOwn || appUser.role === "artist") {
+          return NextResponse.json(
+            {
+              error:
+                "Conturile de partener nu pot trimite cereri de rezervare. Folosește un cont de client.",
+            },
+            { status: 403 },
+          );
+        }
+      }
+      clientUserId = appUser.id;
+    }
   }
 
   // Create booking request — keep the eventPlanId through so in-plan

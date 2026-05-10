@@ -104,10 +104,13 @@ export default function OnboardingPage() {
       .catch(() => toast.error("Nu s-au putut încărca categoriile"));
 
     if (user) {
+      // Only seed Clerk values when the local fields are still empty.
+      // Without this guard, useUser re-emits (focus, tab switch, HMR)
+      // would clobber any photo the partner just uploaded.
       setData((d) => ({
         ...d,
-        name: user.fullName || "",
-        imageUrl: user.imageUrl || "",
+        name: d.name || user.fullName || "",
+        imageUrl: d.imageUrl || user.imageUrl || "",
       }));
     }
   }, [user]);
@@ -177,7 +180,9 @@ export default function OnboardingPage() {
           name: data.name || "Artistul",
           category: category.nameRo,
           location: data.baseCity,
-          existing: data.description,
+          // The /api/ai/generate schema reads `description`, not `existing`.
+          // It feeds Claude as the seed text for the rewrite pass.
+          description: data.description,
           language: "ro",
         }),
       });
@@ -185,9 +190,10 @@ export default function OnboardingPage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Generarea a eșuat");
       }
-      const { description } = await res.json();
-      if (description) {
-        update({ description });
+      // The endpoint returns { result: "..." }, not { description: "..." }.
+      const { result } = await res.json();
+      if (typeof result === "string" && result.trim().length > 0) {
+        update({ description: result });
         toast.success("Descriere generată cu AI!");
       } else {
         toast.error("AI nu a returnat un rezultat valid");
