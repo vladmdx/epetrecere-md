@@ -49,6 +49,7 @@ export async function GET(
       momentsCloseAt: eventPlans.momentsCloseAt,
       momentsRevealAt: eventPlans.momentsRevealAt,
       momentsShotLimit: eventPlans.momentsShotLimit,
+      momentsVintage: eventPlans.momentsVintage,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -61,6 +62,7 @@ export async function GET(
     closeAt: plan?.momentsCloseAt?.toISOString() ?? null,
     revealAt: plan?.momentsRevealAt?.toISOString() ?? null,
     shotLimit: plan?.momentsShotLimit ?? null,
+    vintage: plan?.momentsVintage ?? false,
   });
 }
 
@@ -98,6 +100,7 @@ const patchSchema = z.object({
   closeAt: z.union([z.string(), z.null()]).optional(),
   revealAt: z.union([z.string(), z.null()]).optional(),
   shotLimit: z.union([z.number().int().min(1).max(500), z.null()]).optional(),
+  vintage: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -136,6 +139,9 @@ export async function PATCH(
   if (parsed.data.shotLimit !== undefined) {
     update.momentsShotLimit = parsed.data.shotLimit;
   }
+  if (parsed.data.vintage !== undefined) {
+    update.momentsVintage = parsed.data.vintage;
+  }
 
   // Reject impossible windows up front so the owner gets a clear
   // error rather than silently saving a film that can never accept
@@ -162,6 +168,7 @@ export async function PATCH(
       momentsCloseAt: eventPlans.momentsCloseAt,
       momentsRevealAt: eventPlans.momentsRevealAt,
       momentsShotLimit: eventPlans.momentsShotLimit,
+      momentsVintage: eventPlans.momentsVintage,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -172,6 +179,7 @@ export async function PATCH(
     closeAt: plan?.momentsCloseAt?.toISOString() ?? null,
     revealAt: plan?.momentsRevealAt?.toISOString() ?? null,
     shotLimit: plan?.momentsShotLimit ?? null,
+    vintage: plan?.momentsVintage ?? false,
   });
 }
 

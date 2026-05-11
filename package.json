@@ -46,6 +46,7 @@
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^12.38.0",
     "inngest": "^4.1.2",
+    "jszip": "^3.10.1",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.7.0",
     "meilisearch": "^0.57.0",

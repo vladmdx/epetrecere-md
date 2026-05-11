@@ -27,6 +27,7 @@ interface MomentsPlan {
   momentsCloseAt: Date | null;
   momentsRevealAt: Date | null;
   momentsShotLimit: number | null;
+  momentsVintage: boolean;
 }
 
 async function findPlan(slug: string): Promise<MomentsPlan | null> {
@@ -40,6 +41,7 @@ async function findPlan(slug: string): Promise<MomentsPlan | null> {
       momentsCloseAt: eventPlans.momentsCloseAt,
       momentsRevealAt: eventPlans.momentsRevealAt,
       momentsShotLimit: eventPlans.momentsShotLimit,
+      momentsVintage: eventPlans.momentsVintage,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -128,6 +130,7 @@ export async function GET(
       closeAt: plan.momentsCloseAt?.toISOString() ?? null,
       revealAt: plan.momentsRevealAt?.toISOString() ?? null,
       shotLimit: plan.momentsShotLimit ?? null,
+      vintage: plan.momentsVintage,
     },
     uploadState: state,
     revealed,

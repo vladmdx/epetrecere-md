@@ -1209,6 +1209,10 @@ export const eventPlans = pgTable("event_plans", {
   /** Maximum photos per guest device. NULL = unlimited. Enforced
    *  via the device_id fingerprint on event_photos. */
   momentsShotLimit: integer("moments_shot_limit"),
+  /** When true the guest upload page applies a polaroid-style filter
+   *  (warm tint + sepia + soft vignette) client-side before uploading.
+   *  Default off so existing films keep their original photos. */
+  momentsVintage: boolean("moments_vintage").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [

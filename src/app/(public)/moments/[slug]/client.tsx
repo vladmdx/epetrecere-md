@@ -18,7 +18,8 @@
 // every guest's phone, including the older ones.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Camera, Upload, Check, Loader2, Image as ImageIcon, Lock, Clock, Eye } from "lucide-react";
+import { Camera, Upload, Check, Loader2, Image as ImageIcon, Lock, Clock, Eye, Sparkles } from "lucide-react";
+import { applyVintage } from "@/lib/moments/vintage-filter";
 
 interface Photo {
   id: number;
@@ -35,6 +36,7 @@ interface Props {
   closeAt: string | null;
   revealAt: string | null;
   shotLimit: number | null;
+  vintage: boolean;
 }
 
 type UploadState = "before" | "open" | "after";
@@ -91,6 +93,7 @@ export function MomentsUploadClient({
   closeAt,
   revealAt,
   shotLimit,
+  vintage,
 }: Props) {
   const deviceId = useMemo(() => getOrCreateDeviceId(slug), [slug]);
 
@@ -195,7 +198,14 @@ export function MomentsUploadClient({
     setUploading(true);
     const newPhotos: Photo[] = [];
     try {
-      for (const file of batch) {
+      for (const original of batch) {
+        // When the owner enabled vintage on the film, replace the raw
+        // photo with a filtered version client-side. The server upload
+        // pipeline doesn't change — it just receives a different blob.
+        const file =
+          vintage && original.type.startsWith("image/")
+            ? await applyVintage(original).catch(() => original)
+            : original;
         const fd = new FormData();
         fd.append("file", file);
         fd.append("folder", `moments/${slug}`);
@@ -276,6 +286,12 @@ export function MomentsUploadClient({
             ? "Pozele apar live în galerie."
             : "Galeria se deschide la finalul evenimentului."}
         </p>
+        {vintage && (
+          <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-medium text-gold">
+            <Sparkles className="h-3 w-3" /> Filtru polaroid activ — pozele
+            tale primesc automat un ton vintage cald
+          </p>
+        )}
       </header>
 
       {/* Window state banners — shown above the form so the gating is

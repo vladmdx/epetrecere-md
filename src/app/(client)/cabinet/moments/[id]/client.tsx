@@ -15,6 +15,8 @@ import {
   Settings,
   Save,
   LayoutGrid,
+  Download,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -57,7 +59,9 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   const [closeAtInput, setCloseAtInput] = useState("");
   const [revealAtInput, setRevealAtInput] = useState("");
   const [shotLimitInput, setShotLimitInput] = useState<string>("");
+  const [vintageInput, setVintageInput] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
@@ -88,6 +92,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
             ? String(j.shotLimit)
             : "",
         );
+        setVintageInput(Boolean(j.vintage));
       }
       if (photosRes.ok) {
         const j = await photosRes.json();
@@ -152,6 +157,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
           closeAt: localInputToIso(closeAtInput),
           revealAt: localInputToIso(revealAtInput),
           shotLimit: limitNumber,
+          vintage: vintageInput,
         }),
       });
       if (!res.ok) {
@@ -163,6 +169,30 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
       toast.error(err instanceof Error ? err.message : "Eroare la salvare");
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  async function downloadAll() {
+    setDownloading(true);
+    try {
+      // Use a temporary <a download> with the streamed ZIP URL —
+      // browser handles the file-save dialog. We attach the URL only
+      // after the click so the response headers (Content-Disposition)
+      // drive the filename.
+      const a = document.createElement("a");
+      a.href = `/api/event-plans/${planId}/moments/download`;
+      a.rel = "noopener";
+      // Hint a filename in case headers are stripped by a proxy. The
+      // server's Content-Disposition takes precedence when present.
+      a.download = "photo-moments.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      toast.success("Descărcare începută — vezi bara browserului.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare la descărcare");
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -405,6 +435,28 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               </div>
             </div>
 
+            {/* Vintage filter — its own row so the explainer can be
+                wider than the 2-col grid above. */}
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-border/40 bg-background/40 p-3">
+              <input
+                type="checkbox"
+                checked={vintageInput}
+                onChange={(e) => setVintageInput(e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0 accent-gold"
+              />
+              <span className="min-w-0 text-sm">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <Sparkles className="h-3.5 w-3.5 text-gold" />
+                  Filtru polaroid pe upload
+                </span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  Aplică automat un ton vintage cald + ramă albă pe fiecare
+                  poză trimisă de invitați. Efectul se face în browserul lor
+                  — serverul nu primește niciodată fotografia originală.
+                </span>
+              </span>
+            </label>
+
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => void saveSettings()}
@@ -422,16 +474,30 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
           </section>
 
           <section className="mt-10">
-            <div className="mb-3 flex items-center justify-between">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-heading text-lg font-bold">
                 Poze primite ({photos.length})
               </h2>
-              <button
-                onClick={() => void refreshPhotos()}
-                className="text-xs text-gold hover:underline"
-              >
-                Reîncarcă
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => void downloadAll()}
+                  disabled={downloading || photos.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 px-3 py-1.5 text-xs font-medium text-gold hover:bg-gold/10 disabled:opacity-50"
+                >
+                  {downloading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                  Descarcă toate (ZIP)
+                </button>
+                <button
+                  onClick={() => void refreshPhotos()}
+                  className="text-xs text-gold hover:underline"
+                >
+                  Reîncarcă
+                </button>
+              </div>
             </div>
             {photos.length === 0 ? (
               <p className="rounded-lg border border-dashed border-border/40 p-8 text-center text-sm text-muted-foreground">

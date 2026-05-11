@@ -31,6 +31,7 @@ export default async function MomentsPage({ params }: Props) {
       momentsCloseAt: eventPlans.momentsCloseAt,
       momentsRevealAt: eventPlans.momentsRevealAt,
       momentsShotLimit: eventPlans.momentsShotLimit,
+      momentsVintage: eventPlans.momentsVintage,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -47,6 +48,7 @@ export default async function MomentsPage({ params }: Props) {
       closeAt={plan.momentsCloseAt?.toISOString() ?? null}
       revealAt={plan.momentsRevealAt?.toISOString() ?? null}
       shotLimit={plan.momentsShotLimit ?? null}
+      vintage={plan.momentsVintage}
     />
   );
 }
