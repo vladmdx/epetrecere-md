@@ -12,6 +12,13 @@ const patchSchema = z.object({
   isPublic: z.boolean().optional(),
   taggedArtistId: z.number().int().positive().optional().nullable(),
   taggedVenueId: z.number().int().positive().optional().nullable(),
+  /** Phase 4B — owner-side approval flip used by the moderation
+   *  queue. Approving a previously-pending guest photo flips this to
+   *  true; rejecting it deletes the row (handled by DELETE). */
+  isApproved: z.boolean().optional(),
+  /** Phase 4B — favorite star. Filters the collage / ZIP / hero
+   *  selection. */
+  isFavorite: z.boolean().optional(),
 });
 
 export async function PATCH(

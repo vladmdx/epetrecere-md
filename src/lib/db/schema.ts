@@ -1219,6 +1219,13 @@ export const eventPlans = pgTable("event_plans", {
    *  through them one at a time instead of showing a single free-form
    *  upload field. NULL / empty array = legacy free-form mode. */
   momentsPrompts: jsonb("moments_prompts").$type<string[]>(),
+  /** Phase 4B — when true, every guest upload lands with
+   *  isApproved=false and only shows in the public gallery / slideshow
+   *  after the owner approves it from the moderation queue. Default
+   *  false so existing films keep their auto-approve behavior. */
+  momentsRequireApproval: boolean("moments_require_approval")
+    .default(false)
+    .notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [
@@ -1348,6 +1355,10 @@ export const eventPhotos = pgTable("event_photos", {
   }),
   isPublic: boolean("is_public").default(false).notNull(),
   isApproved: boolean("is_approved").default(false).notNull(),
+  /** Phase 4B — owner-side "favorite" star. Used to filter the
+   *  collage / ZIP download to a curated subset, and to highlight
+   *  hero photos in the slideshow. */
+  isFavorite: boolean("is_favorite").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

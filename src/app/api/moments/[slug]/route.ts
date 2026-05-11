@@ -29,6 +29,7 @@ interface MomentsPlan {
   momentsShotLimit: number | null;
   momentsVintage: boolean;
   momentsPrompts: string[] | null;
+  momentsRequireApproval: boolean;
 }
 
 async function findPlan(slug: string): Promise<MomentsPlan | null> {
@@ -44,6 +45,7 @@ async function findPlan(slug: string): Promise<MomentsPlan | null> {
       momentsShotLimit: eventPlans.momentsShotLimit,
       momentsVintage: eventPlans.momentsVintage,
       momentsPrompts: eventPlans.momentsPrompts,
+      momentsRequireApproval: eventPlans.momentsRequireApproval,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -301,12 +303,13 @@ export async function POST(
       source: "guest",
       deviceId: parsed.data.deviceId ?? null,
       prompt: promptToSave,
-      // Approve immediately when the guest UI is gating uploads via the
-      // open/close + reveal mechanic — the original moderation gate
-      // (isApproved=false → owner had to approve every photo) felt
-      // hostile in the once.film flow. Owner still has a "delete" path
-      // on the dashboard for anything inappropriate.
-      isApproved: true,
+      // Auto-approve unless the owner explicitly turned on the
+      // moderation queue (Phase 4B). In that mode every guest upload
+      // sits hidden until the owner clicks "Aprobă" — useful for
+      // family-friendly events / corporate. Reveal-based gating is a
+      // separate axis: a photo can be approved but still hidden until
+      // revealAt passes.
+      isApproved: !plan.momentsRequireApproval,
       isPublic: false,
     })
     .returning({ id: eventPhotos.id });

@@ -51,6 +51,7 @@ export async function GET(
       momentsShotLimit: eventPlans.momentsShotLimit,
       momentsVintage: eventPlans.momentsVintage,
       momentsPrompts: eventPlans.momentsPrompts,
+      momentsRequireApproval: eventPlans.momentsRequireApproval,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -65,6 +66,7 @@ export async function GET(
     shotLimit: plan?.momentsShotLimit ?? null,
     vintage: plan?.momentsVintage ?? false,
     prompts: plan?.momentsPrompts ?? [],
+    requireApproval: plan?.momentsRequireApproval ?? false,
   });
 }
 
@@ -109,6 +111,9 @@ const patchSchema = z.object({
   prompts: z
     .union([z.array(z.string().min(1).max(80)).max(50), z.null()])
     .optional(),
+  /** Phase 4B — when true, every guest upload sits in the moderation
+   *  queue until the owner approves it. */
+  requireApproval: z.boolean().optional(),
 });
 
 export async function PATCH(
@@ -149,6 +154,9 @@ export async function PATCH(
   }
   if (parsed.data.vintage !== undefined) {
     update.momentsVintage = parsed.data.vintage;
+  }
+  if (parsed.data.requireApproval !== undefined) {
+    update.momentsRequireApproval = parsed.data.requireApproval;
   }
   if (parsed.data.prompts !== undefined) {
     // Deduplicate + trim — owner often pastes a list with stray
@@ -197,6 +205,7 @@ export async function PATCH(
       momentsShotLimit: eventPlans.momentsShotLimit,
       momentsVintage: eventPlans.momentsVintage,
       momentsPrompts: eventPlans.momentsPrompts,
+      momentsRequireApproval: eventPlans.momentsRequireApproval,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -209,6 +218,7 @@ export async function PATCH(
     shotLimit: plan?.momentsShotLimit ?? null,
     vintage: plan?.momentsVintage ?? false,
     prompts: plan?.momentsPrompts ?? [],
+    requireApproval: plan?.momentsRequireApproval ?? false,
   });
 }
 

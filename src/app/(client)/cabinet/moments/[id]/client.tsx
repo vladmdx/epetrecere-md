@@ -18,6 +18,13 @@ import {
   Download,
   Sparkles,
   ListChecks,
+  ShieldCheck,
+  Star,
+  CheckCircle,
+  XCircle,
+  Users,
+  Award,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -26,6 +33,10 @@ interface Photo {
   url: string;
   guestName: string | null;
   guestMessage: string | null;
+  prompt?: string | null;
+  isApproved?: boolean;
+  isFavorite?: boolean;
+  deviceId?: string | null;
   createdAt: string;
 }
 
@@ -65,8 +76,15 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
    *  textarea. We split on newline when saving so the owner can
    *  paste a list straight in. */
   const [promptsInput, setPromptsInput] = useState("");
+  /** Phase 4B — when true, guest uploads land hidden until the owner
+   *  approves them. */
+  const [requireApprovalInput, setRequireApprovalInput] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  /** Phase 4B — current grid filter: all / pending / favorites. */
+  const [photoFilter, setPhotoFilter] = useState<"all" | "pending" | "favorites">(
+    "all",
+  );
 
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
@@ -103,6 +121,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
             ? (j.prompts as string[]).join("\n")
             : "",
         );
+        setRequireApprovalInput(Boolean(j.requireApproval));
       }
       if (photosRes.ok) {
         const j = await photosRes.json();
@@ -174,6 +193,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
           shotLimit: limitNumber,
           vintage: vintageInput,
           prompts: cleanedPrompts,
+          requireApproval: requireApprovalInput,
         }),
       });
       if (!res.ok) {
@@ -185,6 +205,51 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
       toast.error(err instanceof Error ? err.message : "Eroare la salvare");
     } finally {
       setSavingSettings(false);
+    }
+  }
+
+  /** Phase 4B helpers. Each writes through the existing
+   *  /api/event-plans/[id]/photos/[photoId] PATCH so the dashboard
+   *  doesn't need a new endpoint. */
+  async function patchPhoto(photoId: number, patch: Partial<Photo>) {
+    // Optimistic: flip immediately, reconcile from the response.
+    setPhotos((prev) =>
+      prev.map((p) => (p.id === photoId ? { ...p, ...patch } : p)),
+    );
+    try {
+      const res = await fetch(
+        `/api/event-plans/${planId}/photos/${photoId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        },
+      );
+      if (!res.ok) throw new Error();
+    } catch {
+      toast.error("Acțiune eșuată — încerc din nou");
+      void refreshPhotos();
+    }
+  }
+  function toggleApprove(photo: Photo) {
+    void patchPhoto(photo.id, { isApproved: !photo.isApproved });
+  }
+  function toggleFavorite(photo: Photo) {
+    void patchPhoto(photo.id, { isFavorite: !photo.isFavorite });
+  }
+  async function rejectPhoto(photo: Photo) {
+    if (!confirm("Ștergi această poză? Nu mai apare nici în galerie, nici în ZIP.")) {
+      return;
+    }
+    setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+    try {
+      await fetch(`/api/event-plans/${planId}/photos/${photo.id}`, {
+        method: "DELETE",
+      });
+      toast.success("Poză ștearsă");
+    } catch {
+      toast.error("Ștergere eșuată");
+      void refreshPhotos();
     }
   }
 
@@ -473,6 +538,30 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               </span>
             </label>
 
+            {/* Phase 4B — moderation queue toggle. Sits between
+                vintage (Phase 3) and prompts (Phase 4A) so the
+                settings card flows visual → flow → content. */}
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-border/40 bg-background/40 p-3">
+              <input
+                type="checkbox"
+                checked={requireApprovalInput}
+                onChange={(e) => setRequireApprovalInput(e.target.checked)}
+                className="mt-1 h-4 w-4 shrink-0 accent-gold"
+              />
+              <span className="min-w-0 text-sm">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <ShieldCheck className="h-3.5 w-3.5 text-gold" />
+                  Moderare înainte de publicare
+                </span>
+                <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                  Pozele invitaților rămân ascunse până le aprobi din tab-ul
+                  „În așteptare" — util pentru evenimente corporate sau
+                  familii cu copii mici. Implicit dezactivat (publicare
+                  imediată).
+                </span>
+              </span>
+            </label>
+
             {/* Phase 4A — shot prompts. One per line. Empty = free-form
                 mode (legacy behavior). */}
             <div className="mt-4 rounded-xl border border-border/40 bg-background/40 p-3">
@@ -512,6 +601,89 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
             </div>
           </section>
 
+          {/* Phase 4B — at-a-glance insights derived from the photo
+              list. Pure client-side aggregation — no extra round
+              trips. */}
+          {(() => {
+            if (photos.length === 0) return null;
+            // Top contributor by guestName fallback to deviceId.
+            const byContributor = new Map<string, number>();
+            const byHour = new Map<number, number>();
+            const devices = new Set<string>();
+            let favCount = 0;
+            let pendingCount = 0;
+            for (const p of photos) {
+              const key = p.guestName?.trim() || p.deviceId || "necunoscut";
+              byContributor.set(key, (byContributor.get(key) ?? 0) + 1);
+              if (p.deviceId) devices.add(p.deviceId);
+              if (p.isFavorite) favCount++;
+              if (p.isApproved === false) pendingCount++;
+              const h = new Date(p.createdAt).getHours();
+              byHour.set(h, (byHour.get(h) ?? 0) + 1);
+            }
+            const top = [...byContributor.entries()].sort((a, b) => b[1] - a[1])[0];
+            const peak = [...byHour.entries()].sort((a, b) => b[1] - a[1])[0];
+            return (
+              <section className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl border border-border/40 bg-card p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    Total cadre
+                  </p>
+                  <p className="mt-1 font-heading text-2xl font-bold">
+                    {photos.length}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {pendingCount > 0 && (
+                      <>
+                        <span className="font-medium text-amber-500">
+                          {pendingCount} în așteptare
+                        </span>
+                        <span> · </span>
+                      </>
+                    )}
+                    {favCount} ⭐ favorite
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/40 bg-card p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <Users className="-mt-0.5 mr-1 inline h-3 w-3" />
+                    Dispozitive
+                  </p>
+                  <p className="mt-1 font-heading text-2xl font-bold">
+                    {devices.size}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    Invitați diferiți care au încărcat
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/40 bg-card p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <Award className="-mt-0.5 mr-1 inline h-3 w-3" />
+                    Top contributor
+                  </p>
+                  <p className="mt-1 truncate font-heading text-lg font-bold">
+                    {top ? top[0] : "—"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {top ? `${top[1]} cadre încărcate` : "Nicio activitate"}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-border/40 bg-card p-4">
+                  <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    <Clock className="-mt-0.5 mr-1 inline h-3 w-3" />
+                    Oră de vârf
+                  </p>
+                  <p className="mt-1 font-heading text-2xl font-bold">
+                    {peak ? `${String(peak[0]).padStart(2, "0")}:00` : "—"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    {peak ? `${peak[1]} cadre în acea oră` : "—"}
+                  </p>
+                </div>
+              </section>
+            );
+          })()}
+
           <section className="mt-10">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h2 className="font-heading text-lg font-bold">
@@ -538,33 +710,145 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 </button>
               </div>
             </div>
-            {photos.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-border/40 p-8 text-center text-sm text-muted-foreground">
-                Încă nu au venit poze. Pozele noi apar automat aici.
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
-                {photos.map((p) => (
-                  <div
-                    key={p.id}
-                    className="group relative aspect-square overflow-hidden rounded-lg border border-border/40"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={p.url}
-                      alt={p.guestName ?? ""}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                    />
-                    {p.guestName && (
-                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 text-xs text-white">
-                        {p.guestName}
-                      </div>
-                    )}
-                  </div>
-                ))}
+
+            {/* Phase 4B — filter tabs. Pending tab only appears when
+                there's something pending; otherwise it'd just be dead
+                chrome for owners who haven't enabled moderation. */}
+            {photos.length > 0 && (
+              <div className="mb-3 flex flex-wrap gap-2">
+                {(
+                  [
+                    { key: "all" as const, label: `Toate (${photos.length})` },
+                    {
+                      key: "pending" as const,
+                      label: `În așteptare (${photos.filter((p) => p.isApproved === false).length})`,
+                      hidden:
+                        photos.filter((p) => p.isApproved === false).length === 0,
+                    },
+                    {
+                      key: "favorites" as const,
+                      label: `⭐ Favorite (${photos.filter((p) => p.isFavorite).length})`,
+                    },
+                  ] as const
+                )
+                  .filter((t) => !("hidden" in t) || !t.hidden)
+                  .map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setPhotoFilter(tab.key)}
+                      className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                        photoFilter === tab.key
+                          ? "bg-gold text-[#0D0D0D]"
+                          : "bg-muted text-muted-foreground hover:bg-muted/70"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
               </div>
             )}
+
+            {(() => {
+              const filtered = photos.filter((p) => {
+                if (photoFilter === "pending") return p.isApproved === false;
+                if (photoFilter === "favorites") return p.isFavorite === true;
+                return true;
+              });
+              if (photos.length === 0) {
+                return (
+                  <p className="rounded-lg border border-dashed border-border/40 p-8 text-center text-sm text-muted-foreground">
+                    Încă nu au venit poze. Pozele noi apar automat aici.
+                  </p>
+                );
+              }
+              if (filtered.length === 0) {
+                return (
+                  <p className="rounded-lg border border-dashed border-border/40 p-8 text-center text-sm text-muted-foreground">
+                    Niciun cadru în această secțiune.
+                  </p>
+                );
+              }
+              return (
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                  {filtered.map((p) => {
+                    const pending = p.isApproved === false;
+                    return (
+                      <div
+                        key={p.id}
+                        className={`group relative aspect-square overflow-hidden rounded-lg border ${
+                          pending
+                            ? "border-amber-500/50 ring-1 ring-amber-500/30"
+                            : "border-border/40"
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.url}
+                          alt={p.guestName ?? ""}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        />
+
+                        {/* Favorite star — top-right, always visible. */}
+                        <button
+                          type="button"
+                          onClick={() => toggleFavorite(p)}
+                          className={`absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full backdrop-blur-sm transition-colors ${
+                            p.isFavorite
+                              ? "bg-gold text-[#0D0D0D]"
+                              : "bg-black/40 text-white/80 hover:bg-black/60"
+                          }`}
+                          aria-label={p.isFavorite ? "Dezactivează favorit" : "Marchează favorit"}
+                        >
+                          <Star
+                            className="h-3.5 w-3.5"
+                            fill={p.isFavorite ? "currentColor" : "none"}
+                          />
+                        </button>
+
+                        {/* Pending badge + approve / reject controls. */}
+                        {pending && (
+                          <div className="absolute left-1.5 top-1.5 flex items-center gap-1">
+                            <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-amber-950">
+                              În așteptare
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Bottom action bar: approve when pending,
+                            reject (delete) always. Pulls into view on
+                            hover for desktop; tap-friendly stays on
+                            mobile via group-focus. */}
+                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/85 to-transparent p-2 text-xs text-white">
+                          <span className="truncate font-medium">
+                            {p.guestName ?? ""}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            {pending && (
+                              <button
+                                type="button"
+                                onClick={() => toggleApprove(p)}
+                                className="rounded-full bg-emerald-500/90 px-2 py-1 text-[10px] font-medium text-emerald-950 hover:bg-emerald-500"
+                              >
+                                <CheckCircle className="inline h-3 w-3" /> Aprobă
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => rejectPhoto(p)}
+                              className="rounded-full bg-red-500/80 px-2 py-1 text-[10px] font-medium text-white hover:bg-red-500"
+                              aria-label="Șterge poza"
+                            >
+                              <XCircle className="inline h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </section>
         </>
       )}
