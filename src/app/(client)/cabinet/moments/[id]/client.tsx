@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   Settings,
   Save,
+  LayoutGrid,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -294,6 +295,26 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                   className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gold px-3 py-2 text-xs font-medium text-[#0D0D0D] hover:bg-gold-dark"
                 >
                   <Monitor className="h-3.5 w-3.5" /> Deschide slideshow
+                </Link>
+              </div>
+
+              {/* Phase 2 — printable collage entry point. Lives next to
+                  the slideshow card so the owner sees both projector
+                  outputs at a glance. */}
+              <div className="rounded-2xl border border-gold/30 bg-gold/5 p-5">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <LayoutGrid className="h-4 w-4 text-gold" /> Colaj tipăribil
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Combină toate pozele într-un poster A4 — grid clasic,
+                  perete polaroid sau magazine. Salvează ca PDF din
+                  dialogul de tipărire.
+                </p>
+                <Link
+                  href={`/cabinet/moments/${planId}/colaj`}
+                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gold px-3 py-2 text-xs font-medium text-[#0D0D0D] hover:bg-gold-dark"
+                >
+                  <LayoutGrid className="h-3.5 w-3.5" /> Construiește colaj
                 </Link>
               </div>
 

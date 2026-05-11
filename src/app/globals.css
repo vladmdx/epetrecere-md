@@ -385,3 +385,40 @@ input[type="date"] {
   background: #C9A84C !important;
   color: #0D0D0D !important;
 }
+
+/* Print helpers used by the Photo Moments collage page. Owner triggers
+ * window.print() and the printer / PDF dialog receives only the poster
+ * sheet — sidebar, topbar and toolbar are hidden. Selectors stay narrow
+ * so other cabinet pages that someone might print one day aren't
+ * inadvertently stripped. */
+@media print {
+  body { background: white !important; }
+  .print-hide { display: none !important; }
+  .cabinet-shell aside,
+  .cabinet-shell header,
+  .cabinet-shell .admin-topbar {
+    display: none !important;
+  }
+  .cabinet-shell main {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+  .collage-sheet {
+    margin: 0 !important;
+    padding: 12mm !important;
+    min-height: 100vh;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+  }
+  @page { size: A4; margin: 0; }
+}
+
+/* Hand-written caption font for the polaroid collage layout. Falls
+ * back to Comic Sans which is everywhere; no webfont is loaded so the
+ * print preview doesn't wait on a network round-trip. */
+.font-handwriting {
+  font-family: "Caveat", "Comic Sans MS", cursive;
+}
