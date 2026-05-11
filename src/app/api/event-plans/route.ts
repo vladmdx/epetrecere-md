@@ -59,7 +59,19 @@ const createPlanSchema = z.object({
   // section and surface the "Săli" tab.
   venueNeeded: z.boolean().optional(),
   selectedCategories: z.array(z.number().int().positive()).optional(),
+  /** Standalone Photo Moments creation flow — when true we enable the
+   *  feature on the new plan and pre-generate the public slug so the
+   *  caller can immediately bounce the user to /cabinet/moments/{id}.
+   *  Used by /utilitati/momente-eveniment and the cabinet moments hub. */
+  momentsEnabled: z.boolean().optional(),
 });
+
+/** Random base36 slug for /moments/[slug]. Same recipe as the
+ *  /api/event-plans/[id]/moments POST endpoint so generated slugs are
+ *  visually consistent across creation paths. */
+function randomMomentsSlug(): string {
+  return Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4);
+}
 
 export async function POST(req: NextRequest) {
   // Plan creation is a client-only action — partners (artists/venues) are
@@ -108,7 +120,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { eventDate, selectedCategories, ...rest } = parsed.data;
+  const { eventDate, selectedCategories, momentsEnabled, ...rest } = parsed.data;
 
   const [plan] = await db
     .insert(eventPlans)
@@ -117,6 +129,11 @@ export async function POST(req: NextRequest) {
       ...rest,
       eventDate: eventDate || null,
       selectedCategories: selectedCategories ?? [],
+      // Standalone film creation flow: flip the flag AND pre-generate
+      // the public slug so the caller can deep-link straight into the
+      // dashboard without a separate /api/event-plans/[id]/moments POST.
+      momentsEnabled: momentsEnabled ?? false,
+      momentsSlug: momentsEnabled ? randomMomentsSlug() : null,
     })
     .returning();
 

@@ -43,7 +43,19 @@ const wizardSchema = z.object({
   budgetEnabled: z.boolean().optional(),
   guestsEnabled: z.boolean().optional(),
   seatingEnabled: z.boolean().optional(),
+  /** Photo Moments — when true we flip momentsEnabled on the plan and
+   *  pre-generate a public slug so the dashboard renders the QR + link
+   *  immediately. The standalone film flow (under /cabinet/moments)
+   *  reuses the same column. */
+  momentsEnabled: z.boolean().optional(),
 });
+
+/** Random 14-char base36 slug for the public /moments/[slug] page.
+ *  Kept here (and not pulled from the moments route) so creation in
+ *  one go doesn't need a follow-up POST. */
+function randomMomentsSlug(): string {
+  return Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-4);
+}
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   wedding: "Nuntă",
@@ -156,6 +168,11 @@ export async function POST(req: NextRequest) {
       // already enforces this client-side, the server enforces too.
       seatingEnabled:
         (w.seatingEnabled ?? false) && (w.guestsEnabled ?? false),
+      // Photo Moments — when opted-in we flip the feature flag AND
+      // generate a slug eagerly so the share/QR widget renders without
+      // requiring a follow-up "Activează" click on the dashboard.
+      momentsEnabled: w.momentsEnabled ?? false,
+      momentsSlug: w.momentsEnabled ? randomMomentsSlug() : null,
     })
     .returning();
 

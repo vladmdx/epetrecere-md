@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils";
 import {
   ArrowLeft, ArrowRight, Loader2, Send, Sparkles,
   PartyPopper, Calendar, Users, Wrench, Building2, ClipboardCheck,
-  ClipboardList, UtensilsCrossed, Check, LogIn,
+  ClipboardList, UtensilsCrossed, Check, LogIn, Camera,
 } from "lucide-react";
 import {
   getCategoryEmoji,
@@ -72,6 +72,11 @@ interface WizardData {
   checklistEnabled: boolean;
   guestsEnabled: boolean;
   seatingEnabled: boolean;
+  /** Photo Moments — turning this on activates the QR-driven guest photo
+   *  gallery and pre-generates a public slug so the plan dashboard can
+   *  immediately surface the share link and slideshow URL. Mirrors
+   *  /cabinet/moments. */
+  momentsEnabled: boolean;
 }
 
 /** Typical event durations in hours. The user still picks a start hour
@@ -143,6 +148,7 @@ const initialData: WizardData = {
   checklistEnabled: false,
   guestsEnabled: false,
   seatingEnabled: false,
+  momentsEnabled: false,
 };
 
 /** Country prefixes shown in the phone picker. Moldova first, then the
@@ -1025,7 +1031,7 @@ function StepServices({ data, update }: StepProps) {
 // ─────────────────────────────────────────────────
 function StepExtras({ data, update }: StepProps) {
   const options: Array<{
-    key: "checklistEnabled" | "guestsEnabled";
+    key: "checklistEnabled" | "guestsEnabled" | "momentsEnabled";
     icon: typeof ClipboardList;
     title: string;
     desc: string;
@@ -1041,6 +1047,12 @@ function StepExtras({ data, update }: StepProps) {
       icon: Users,
       title: "Listă invitați",
       desc: "Importă, RSVP, alocare la mese — toate datele invitaților într-un singur loc.",
+    },
+    {
+      key: "momentsEnabled",
+      icon: Camera,
+      title: "Photo Moments — galerie cu QR",
+      desc: "Invitații scanează un QR și încarcă instant poze. Vezi-le live pe proiector. Fără cont, fără aplicație. Le poți activa și separat din Utilități.",
     },
   ];
 
