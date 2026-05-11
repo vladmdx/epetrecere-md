@@ -1,10 +1,15 @@
 // F-C8 — Public guest upload page. Reached by scanning the QR code printed
 // on the event tables. No auth required, no app install. Mobile-first.
+//
+// Server fetch is intentionally minimal — the client fetches the full
+// gated state (photos hidden if pre-reveal, shot counter, window state)
+// from /api/moments/[slug] on mount so it can poll for new shots and
+// react to the reveal moment without a page reload.
 
 import { notFound } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { eventPhotos, eventPlans } from "@/lib/db/schema";
+import { eventPlans } from "@/lib/db/schema";
 import { MomentsUploadClient } from "./client";
 
 interface Props {
@@ -22,6 +27,10 @@ export default async function MomentsPage({ params }: Props) {
       title: eventPlans.title,
       eventDate: eventPlans.eventDate,
       momentsEnabled: eventPlans.momentsEnabled,
+      momentsOpenAt: eventPlans.momentsOpenAt,
+      momentsCloseAt: eventPlans.momentsCloseAt,
+      momentsRevealAt: eventPlans.momentsRevealAt,
+      momentsShotLimit: eventPlans.momentsShotLimit,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -29,29 +38,15 @@ export default async function MomentsPage({ params }: Props) {
 
   if (!plan || !plan.momentsEnabled) notFound();
 
-  const photos = await db
-    .select({
-      id: eventPhotos.id,
-      url: eventPhotos.url,
-      guestName: eventPhotos.guestName,
-      guestMessage: eventPhotos.guestMessage,
-    })
-    .from(eventPhotos)
-    .where(
-      and(
-        eq(eventPhotos.planId, plan.id),
-        eq(eventPhotos.isApproved, true),
-      ),
-    )
-    .orderBy(desc(eventPhotos.createdAt))
-    .limit(60);
-
   return (
     <MomentsUploadClient
       slug={slug}
       title={plan.title}
       eventDate={plan.eventDate}
-      initialPhotos={photos}
+      openAt={plan.momentsOpenAt?.toISOString() ?? null}
+      closeAt={plan.momentsCloseAt?.toISOString() ?? null}
+      revealAt={plan.momentsRevealAt?.toISOString() ?? null}
+      shotLimit={plan.momentsShotLimit ?? null}
     />
   );
 }

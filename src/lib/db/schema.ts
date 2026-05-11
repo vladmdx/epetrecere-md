@@ -1194,6 +1194,21 @@ export const eventPlans = pgTable("event_plans", {
    *  upload page via QR code. Anonymous upload, no auth required. */
   momentsSlug: text("moments_slug").unique(),
   momentsEnabled: boolean("moments_enabled").default(false).notNull(),
+  /** When uploads start being accepted from guests. NULL = open
+   *  immediately upon activation (legacy behavior). Used to create
+   *  the once.film-style "wait for the event to start" gate. */
+  momentsOpenAt: timestamp("moments_open_at"),
+  /** When uploads stop being accepted. NULL = always open.
+   *  Combined with momentsOpenAt to define the upload window. */
+  momentsCloseAt: timestamp("moments_close_at"),
+  /** When uploaded photos become visible to guests on the public
+   *  gallery + slideshow. NULL = visible immediately as before.
+   *  The owner always sees every photo regardless of this gate
+   *  (so moderation still works). */
+  momentsRevealAt: timestamp("moments_reveal_at"),
+  /** Maximum photos per guest device. NULL = unlimited. Enforced
+   *  via the device_id fingerprint on event_photos. */
+  momentsShotLimit: integer("moments_shot_limit"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [
@@ -1303,6 +1318,12 @@ export const eventPhotos = pgTable("event_photos", {
   /** Event Moments — source of the upload: "client" (plan owner) or
    *  "guest" (anonymous via QR). */
   source: text("source").default("client").notNull(),
+  /** Event Moments — anonymous per-device fingerprint (UUID stored in
+   *  the guest's localStorage). Lets us enforce the per-guest shot
+   *  limit without requiring auth. NULL for legacy rows and owner
+   *  uploads. Not a real identity — wipe the browser and you get a
+   *  fresh allowance, which we accept for a wedding-night use case. */
+  deviceId: text("device_id"),
   /** Optional FK to an artist the client tags as having been at the event. */
   taggedArtistId: integer("tagged_artist_id").references(() => artists.id, {
     onDelete: "set null",

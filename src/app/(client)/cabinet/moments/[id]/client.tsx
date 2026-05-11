@@ -12,6 +12,8 @@ import {
   Power,
   Trash2,
   ArrowLeft,
+  Settings,
+  Save,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -23,6 +25,22 @@ interface Photo {
   createdAt: string;
 }
 
+/** Convert ISO string ↔ <input type="datetime-local"> value.
+ *  The input wants "YYYY-MM-DDTHH:mm" in *local* time; we want UTC ISO
+ *  on the wire. Going through Date handles the offset correctly. */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function localInputToIso(local: string): string | null {
+  if (!local) return null;
+  const d = new Date(local);
+  return Number.isFinite(d.getTime()) ? d.toISOString() : null;
+}
+
 export function MomentsOwnerClient({ planId }: { planId: number }) {
   const [slug, setSlug] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -30,6 +48,15 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [origin, setOrigin] = useState("");
+
+  // Phase 1 settings — local mirror of the server state so the form
+  // can stay editable while we PATCH on save. Empty string = "unset"
+  // (will be sent as null).
+  const [openAtInput, setOpenAtInput] = useState("");
+  const [closeAtInput, setCloseAtInput] = useState("");
+  const [revealAtInput, setRevealAtInput] = useState("");
+  const [shotLimitInput, setShotLimitInput] = useState<string>("");
+  const [savingSettings, setSavingSettings] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
@@ -50,6 +77,16 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
         const j = await statusRes.json();
         setSlug(j.slug);
         setEnabled(j.enabled);
+        // Mirror window/reveal/limit settings into the form. Owner can
+        // tweak them once the gallery is enabled.
+        setOpenAtInput(isoToLocalInput(j.openAt));
+        setCloseAtInput(isoToLocalInput(j.closeAt));
+        setRevealAtInput(isoToLocalInput(j.revealAt));
+        setShotLimitInput(
+          typeof j.shotLimit === "number" && j.shotLimit > 0
+            ? String(j.shotLimit)
+            : "",
+        );
       }
       if (photosRes.ok) {
         const j = await photosRes.json();
@@ -95,6 +132,37 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
       toast.success("Galerie dezactivată");
     }
     setSaving(false);
+  }
+
+  async function saveSettings() {
+    const limit = shotLimitInput.trim();
+    const limitNumber = limit ? Number(limit) : null;
+    if (limit && (!Number.isFinite(limitNumber) || limitNumber! < 1 || limitNumber! > 500)) {
+      toast.error("Limita de cadre trebuie să fie între 1 și 500.");
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      const res = await fetch(`/api/event-plans/${planId}/moments`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          openAt: localInputToIso(openAtInput),
+          closeAt: localInputToIso(closeAtInput),
+          revealAt: localInputToIso(revealAtInput),
+          shotLimit: limitNumber,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Salvare eșuată");
+      }
+      toast.success("Setări salvate!");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare la salvare");
+    } finally {
+      setSavingSettings(false);
+    }
   }
 
   const publicUrl = slug && origin ? `${origin}/moments/${slug}` : "";
@@ -238,6 +306,99 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               </button>
             </div>
           </div>
+
+          {/* Phase 1 — once.film-style mechanics. Window/reveal/limit
+              are all optional; leaving everything empty restores the
+              pre-Phase-1 "everything live, no limit" behavior. */}
+          <section className="mt-10 rounded-2xl border border-border/40 bg-card p-5">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Settings className="h-4 w-4 text-gold" /> Setări Photo Moments
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Toate setările sunt opționale. Goale = comportament implicit
+              (galeria e mereu deschisă, pozele apar instant, fără limită
+              de cadre).
+            </p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Deschide uploadul la
+                </label>
+                <input
+                  type="datetime-local"
+                  value={openAtInput}
+                  onChange={(e) => setOpenAtInput(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Înainte de această oră, invitații văd un countdown.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Închide uploadul la
+                </label>
+                <input
+                  type="datetime-local"
+                  value={closeAtInput}
+                  onChange={(e) => setCloseAtInput(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  După această oră, nu se mai pot încărca poze noi.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Dezvăluie galeria la
+                </label>
+                <input
+                  type="datetime-local"
+                  value={revealAtInput}
+                  onChange={(e) => setRevealAtInput(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Pozele rămân ascunse pentru invitați până la această oră
+                  — surpriza la finalul evenimentului.
+                </p>
+              </div>
+              <div>
+                <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                  Cadre per invitat
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={500}
+                  value={shotLimitInput}
+                  onChange={(e) => setShotLimitInput(e.target.value)}
+                  placeholder="ex: 20"
+                  className="mt-1 w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Limita per dispozitiv. Stimulează intenția (ca aparatul
+                  foto de unică folosință).
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
+              <button
+                onClick={() => void saveSettings()}
+                disabled={savingSettings}
+                className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-50"
+              >
+                {savingSettings ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                Salvează setările
+              </button>
+            </div>
+          </section>
 
           <section className="mt-10">
             <div className="mb-3 flex items-center justify-between">
