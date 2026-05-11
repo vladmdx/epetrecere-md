@@ -32,6 +32,7 @@ export default async function MomentsPage({ params }: Props) {
       momentsRevealAt: eventPlans.momentsRevealAt,
       momentsShotLimit: eventPlans.momentsShotLimit,
       momentsVintage: eventPlans.momentsVintage,
+      momentsPrompts: eventPlans.momentsPrompts,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -49,6 +50,7 @@ export default async function MomentsPage({ params }: Props) {
       revealAt={plan.momentsRevealAt?.toISOString() ?? null}
       shotLimit={plan.momentsShotLimit ?? null}
       vintage={plan.momentsVintage}
+      prompts={plan.momentsPrompts ?? []}
     />
   );
 }

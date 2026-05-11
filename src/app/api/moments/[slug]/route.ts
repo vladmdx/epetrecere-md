@@ -12,10 +12,10 @@
 // /cabinet/moments/[id] which calls authenticated owner endpoints.
 
 import { NextRequest, NextResponse } from "next/server";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { eventPhotos, eventPlans } from "@/lib/db/schema";
+import { eventPhotos, eventPlans, photoReactions } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
 
 interface MomentsPlan {
@@ -28,6 +28,7 @@ interface MomentsPlan {
   momentsRevealAt: Date | null;
   momentsShotLimit: number | null;
   momentsVintage: boolean;
+  momentsPrompts: string[] | null;
 }
 
 async function findPlan(slug: string): Promise<MomentsPlan | null> {
@@ -42,6 +43,7 @@ async function findPlan(slug: string): Promise<MomentsPlan | null> {
       momentsRevealAt: eventPlans.momentsRevealAt,
       momentsShotLimit: eventPlans.momentsShotLimit,
       momentsVintage: eventPlans.momentsVintage,
+      momentsPrompts: eventPlans.momentsPrompts,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -109,6 +111,7 @@ export async function GET(
           url: eventPhotos.url,
           guestName: eventPhotos.guestName,
           guestMessage: eventPhotos.guestMessage,
+          prompt: eventPhotos.prompt,
           createdAt: eventPhotos.createdAt,
         })
         .from(eventPhotos)
@@ -122,6 +125,50 @@ export async function GET(
         .limit(500)
     : [];
 
+  // Phase 4A — pull per-photo reaction counts so the gallery can
+  // render "❤️ 5  🔥 3" badges without a second round trip. Only
+  // computed when photos are revealed (otherwise nothing to react to
+  // from the public perspective) AND when there are photos to look up.
+  let reactionsByPhoto: Record<number, Record<string, number>> = {};
+  let myReactions: Record<number, string[]> = {};
+  if (revealed && photos.length > 0) {
+    const ids = photos.map((p) => p.id);
+    const rows = await db
+      .select({
+        photoId: photoReactions.photoId,
+        emoji: photoReactions.emoji,
+        deviceId: photoReactions.deviceId,
+      })
+      .from(photoReactions)
+      .where(inArray(photoReactions.photoId, ids));
+    for (const r of rows) {
+      const bucket = (reactionsByPhoto[r.photoId] ??= {});
+      bucket[r.emoji] = (bucket[r.emoji] ?? 0) + 1;
+      if (deviceId && r.deviceId === deviceId) {
+        (myReactions[r.photoId] ??= []).push(r.emoji);
+      }
+    }
+  }
+
+  // Phase 4A — which prompts has THIS device already answered?
+  // Lets the guest UI skip past completed missions instead of
+  // re-showing them. Reads from event_photos.prompt directly.
+  let promptsDone: string[] = [];
+  if (deviceId && plan.momentsPrompts && plan.momentsPrompts.length > 0) {
+    const rows = await db
+      .selectDistinct({ prompt: eventPhotos.prompt })
+      .from(eventPhotos)
+      .where(
+        and(
+          eq(eventPhotos.planId, plan.id),
+          eq(eventPhotos.deviceId, deviceId),
+        ),
+      );
+    promptsDone = rows
+      .map((r) => r.prompt)
+      .filter((p): p is string => typeof p === "string" && p.length > 0);
+  }
+
   return NextResponse.json({
     plan: {
       title: plan.title,
@@ -131,12 +178,18 @@ export async function GET(
       revealAt: plan.momentsRevealAt?.toISOString() ?? null,
       shotLimit: plan.momentsShotLimit ?? null,
       vintage: plan.momentsVintage,
+      prompts: plan.momentsPrompts ?? [],
     },
     uploadState: state,
     revealed,
     totalPhotos: total,
     deviceUsed,
-    photos,
+    photos: photos.map((p) => ({
+      ...p,
+      reactions: reactionsByPhoto[p.id] ?? {},
+      myReactions: myReactions[p.id] ?? [],
+    })),
+    promptsDone,
   });
 }
 
@@ -149,6 +202,11 @@ const uploadSchema = z.object({
    *  threat model is "polite guests at a wedding," not adversaries.
    *  Wipe the browser → fresh allowance, and that's fine. */
   deviceId: z.string().min(6).max(80).optional(),
+  /** Phase 4A — which prompt label this upload answers. Owner-defined
+   *  list lives on the plan; the client picks one and sends it back.
+   *  We store the label rather than an id so the schema stays simple
+   *  and renames don't orphan history. */
+  prompt: z.string().max(80).optional(),
 });
 
 export async function POST(
@@ -221,6 +279,18 @@ export async function POST(
     }
   }
 
+  // Phase 4A — validate the prompt label against the owner's list
+  // when prompts mode is on. Out-of-list prompts get silently
+  // dropped (we still save the photo, just without the prompt tag) so
+  // an attacker can't poison the dashboard with fake mission labels.
+  let promptToSave: string | null = null;
+  if (parsed.data.prompt) {
+    const trimmed = parsed.data.prompt.trim();
+    if (plan.momentsPrompts && plan.momentsPrompts.includes(trimmed)) {
+      promptToSave = trimmed;
+    }
+  }
+
   const [photo] = await db
     .insert(eventPhotos)
     .values({
@@ -230,6 +300,7 @@ export async function POST(
       guestMessage: parsed.data.guestMessage ?? null,
       source: "guest",
       deviceId: parsed.data.deviceId ?? null,
+      prompt: promptToSave,
       // Approve immediately when the guest UI is gating uploads via the
       // open/close + reveal mechanic — the original moderation gate
       // (isApproved=false → owner had to approve every photo) felt

@@ -50,6 +50,7 @@ export async function GET(
       momentsRevealAt: eventPlans.momentsRevealAt,
       momentsShotLimit: eventPlans.momentsShotLimit,
       momentsVintage: eventPlans.momentsVintage,
+      momentsPrompts: eventPlans.momentsPrompts,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -63,6 +64,7 @@ export async function GET(
     revealAt: plan?.momentsRevealAt?.toISOString() ?? null,
     shotLimit: plan?.momentsShotLimit ?? null,
     vintage: plan?.momentsVintage ?? false,
+    prompts: plan?.momentsPrompts ?? [],
   });
 }
 
@@ -101,6 +103,12 @@ const patchSchema = z.object({
   revealAt: z.union([z.string(), z.null()]).optional(),
   shotLimit: z.union([z.number().int().min(1).max(500), z.null()]).optional(),
   vintage: z.boolean().optional(),
+  /** Phase 4A — ordered list of prompts. Empty array clears the
+   *  feature and the film falls back to free-form upload. Each
+   *  prompt is capped at 80 chars to keep the UI tidy. */
+  prompts: z
+    .union([z.array(z.string().min(1).max(80)).max(50), z.null()])
+    .optional(),
 });
 
 export async function PATCH(
@@ -142,6 +150,25 @@ export async function PATCH(
   if (parsed.data.vintage !== undefined) {
     update.momentsVintage = parsed.data.vintage;
   }
+  if (parsed.data.prompts !== undefined) {
+    // Deduplicate + trim — owner often pastes a list with stray
+    // whitespace and we don't want "Foto cu mireasa" vs "Foto cu
+    // mireasa " counted as different prompts.
+    if (parsed.data.prompts === null) {
+      update.momentsPrompts = null;
+    } else {
+      const cleaned = parsed.data.prompts
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+      const seen = new Set<string>();
+      update.momentsPrompts = cleaned.filter((p) => {
+        const key = p.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+  }
 
   // Reject impossible windows up front so the owner gets a clear
   // error rather than silently saving a film that can never accept
@@ -169,6 +196,7 @@ export async function PATCH(
       momentsRevealAt: eventPlans.momentsRevealAt,
       momentsShotLimit: eventPlans.momentsShotLimit,
       momentsVintage: eventPlans.momentsVintage,
+      momentsPrompts: eventPlans.momentsPrompts,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -180,6 +208,7 @@ export async function PATCH(
     revealAt: plan?.momentsRevealAt?.toISOString() ?? null,
     shotLimit: plan?.momentsShotLimit ?? null,
     vintage: plan?.momentsVintage ?? false,
+    prompts: plan?.momentsPrompts ?? [],
   });
 }
 

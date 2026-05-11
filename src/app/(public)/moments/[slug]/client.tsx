@@ -18,7 +18,7 @@
 // every guest's phone, including the older ones.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Camera, Upload, Check, Loader2, Image as ImageIcon, Lock, Clock, Eye, Sparkles } from "lucide-react";
+import { Camera, Upload, Check, Loader2, Image as ImageIcon, Lock, Clock, Eye, Sparkles, SkipForward, Trophy } from "lucide-react";
 import { applyVintage } from "@/lib/moments/vintage-filter";
 
 interface Photo {
@@ -26,6 +26,9 @@ interface Photo {
   url: string;
   guestName: string | null;
   guestMessage: string | null;
+  prompt?: string | null;
+  reactions?: Record<string, number>;
+  myReactions?: string[];
 }
 
 interface Props {
@@ -37,6 +40,7 @@ interface Props {
   revealAt: string | null;
   shotLimit: number | null;
   vintage: boolean;
+  prompts: string[];
 }
 
 type UploadState = "before" | "open" | "after";
@@ -47,7 +51,13 @@ interface MomentsState {
   deviceUsed: number | null;
   uploadState: UploadState;
   revealed: boolean;
+  promptsDone: string[];
 }
+
+/** Allowed emoji on the public reactions UI. Mirrors the server's
+ *  allowlist — keeping it tight here so the buttons don't drift out
+ *  of sync if someone fork-edits one side. */
+const REACTION_EMOJI = ["❤️", "🔥", "😂", "🥺", "🎉"] as const;
 
 /** Stable UUIDish for this device. Stored in localStorage so reloads /
  *  re-uploads keep the same identity. We don't try to defeat clearing
@@ -94,6 +104,7 @@ export function MomentsUploadClient({
   revealAt,
   shotLimit,
   vintage,
+  prompts,
 }: Props) {
   const deviceId = useMemo(() => getOrCreateDeviceId(slug), [slug]);
 
@@ -107,7 +118,40 @@ export function MomentsUploadClient({
     // otherwise. The server-side check on the first fetch is the
     // source of truth.
     revealed: !revealAt || new Date(revealAt) <= new Date(),
+    promptsDone: [],
   });
+
+  // Phase 4A — prompt walker state. When the film runs in prompts
+  // mode the guest answers one at a time; "skipped" prompts are kept
+  // in localStorage so a refresh doesn't pop the skipped one back to
+  // the front.
+  const skippedKey = `moments-skipped-${slug}`;
+  const [skipped, setSkipped] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(skippedKey);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(skippedKey, JSON.stringify(skipped));
+    } catch {
+      /* private mode → ephemeral, fine */
+    }
+  }, [skippedKey, skipped]);
+
+  const currentPrompt = useMemo(() => {
+    if (prompts.length === 0) return null;
+    const doneSet = new Set([...state.promptsDone, ...skipped]);
+    return prompts.find((p) => !doneSet.has(p)) ?? null;
+  }, [prompts, state.promptsDone, skipped]);
+
+  const promptsCompleted = state.promptsDone.length;
+  const promptsTotal = prompts.length;
+  const allPromptsDone = promptsTotal > 0 && currentPrompt === null;
   const [now, setNow] = useState(() => Date.now());
 
   const [guestName, setGuestName] = useState("");
@@ -116,6 +160,38 @@ export function MomentsUploadClient({
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  async function toggleReaction(photoId: number, emoji: string) {
+    // Optimistic update — flip locally first so the tap feels
+    // instantaneous, then reconcile with the server. On failure we
+    // roll back.
+    setState((s) => ({
+      ...s,
+      photos: s.photos.map((p) => {
+        if (p.id !== photoId) return p;
+        const mine = new Set(p.myReactions ?? []);
+        const next = { ...(p.reactions ?? {}) };
+        if (mine.has(emoji)) {
+          mine.delete(emoji);
+          next[emoji] = Math.max(0, (next[emoji] ?? 1) - 1);
+          if (next[emoji] === 0) delete next[emoji];
+        } else {
+          mine.add(emoji);
+          next[emoji] = (next[emoji] ?? 0) + 1;
+        }
+        return { ...p, reactions: next, myReactions: Array.from(mine) };
+      }),
+    }));
+    try {
+      await fetch(`/api/moments/${slug}/reactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoId, emoji, deviceId }),
+      });
+    } catch {
+      /* network blip — next poll will reconcile */
+    }
+  }
 
   // Persist the guest name across visits on the same device so they
   // don't retype it for every batch.
@@ -151,6 +227,7 @@ export function MomentsUploadClient({
           typeof data.deviceUsed === "number" ? data.deviceUsed : null,
         uploadState: (data.uploadState as UploadState) ?? "open",
         revealed: Boolean(data.revealed),
+        promptsDone: Array.isArray(data.promptsDone) ? data.promptsDone : [],
       });
     } catch {
       /* offline — try again on next tick */
@@ -224,6 +301,10 @@ export function MomentsUploadClient({
             guestName: guestName.trim(),
             guestMessage: guestMessage.trim() || undefined,
             deviceId,
+            // When the film runs in prompts mode, every upload is
+            // tagged with the prompt currently shown to the guest so
+            // the owner can later see who answered what.
+            prompt: currentPrompt ?? undefined,
           }),
         });
         if (!saveRes.ok) {
@@ -249,6 +330,12 @@ export function MomentsUploadClient({
           typeof s.deviceUsed === "number"
             ? s.deviceUsed + newPhotos.length
             : s.deviceUsed,
+        // Mark the current prompt as completed so the walker advances
+        // immediately, before the next 12s poll catches up.
+        promptsDone:
+          currentPrompt && !s.promptsDone.includes(currentPrompt)
+            ? [...s.promptsDone, currentPrompt]
+            : s.promptsDone,
       }));
       setFiles([]);
       setGuestMessage("");
@@ -323,6 +410,54 @@ export function MomentsUploadClient({
               Mulțumim pentru participare! Pozele tale sunt în galerie.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Phase 4A — current prompt card. Sits above the form so the
+          guest sees the "mission" before they tap the camera. */}
+      {!windowClosed && !windowPending && promptsTotal > 0 && (
+        <div className="mt-6 rounded-2xl border border-gold/40 bg-gold/5 p-4">
+          {allPromptsDone ? (
+            <div className="flex items-start gap-3 text-center sm:text-left">
+              <Trophy className="mt-0.5 h-6 w-6 shrink-0 text-gold" />
+              <div className="min-w-0 flex-1">
+                <p className="font-heading text-lg font-bold">
+                  Toate misiunile completate! 🎉
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Mulțumim — ai răspuns la toate {promptsTotal} provocările!
+                  Mai poți încărca poze libere mai jos.
+                </p>
+              </div>
+            </div>
+          ) : currentPrompt ? (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-medium uppercase tracking-wider text-gold">
+                  Provocare {promptsCompleted + 1}/{promptsTotal}
+                </p>
+                <div className="flex h-1.5 w-24 overflow-hidden rounded-full bg-gold/20">
+                  <div
+                    className="bg-gold transition-all"
+                    style={{
+                      width: `${Math.min(100, (promptsCompleted / promptsTotal) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <p className="mt-2 font-heading text-xl font-bold leading-tight">
+                {currentPrompt}
+              </p>
+              <button
+                type="button"
+                onClick={() => setSkipped((prev) => [...prev, currentPrompt])}
+                className="mt-3 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-gold"
+              >
+                <SkipForward className="h-3 w-3" /> Sari peste această
+                provocare
+              </button>
+            </>
+          ) : null}
         </div>
       )}
 
@@ -487,17 +622,55 @@ export function MomentsUploadClient({
             <ImageIcon className="h-4 w-4 text-gold" />
             Galerie live ({state.totalPhotos})
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {state.photos.map((p) => (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                key={p.id}
-                src={p.url}
-                alt={p.guestName ?? "Event photo"}
-                loading="lazy"
-                className="aspect-square w-full rounded-lg object-cover"
-              />
-            ))}
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {state.photos.map((p) => {
+              const mine = new Set(p.myReactions ?? []);
+              return (
+                <figure
+                  key={p.id}
+                  className="overflow-hidden rounded-lg border border-border/40 bg-card/40"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={p.url}
+                    alt={p.guestName ?? "Event photo"}
+                    loading="lazy"
+                    className="aspect-square w-full object-cover"
+                  />
+                  {p.prompt && (
+                    <p className="px-2 pt-1.5 text-[10px] font-medium uppercase tracking-wider text-gold/80">
+                      {p.prompt}
+                    </p>
+                  )}
+                  <figcaption className="flex flex-wrap items-center gap-1 px-1.5 py-1.5">
+                    {REACTION_EMOJI.map((emoji) => {
+                      const count = p.reactions?.[emoji] ?? 0;
+                      const active = mine.has(emoji);
+                      return (
+                        <button
+                          key={emoji}
+                          type="button"
+                          onClick={() => void toggleReaction(p.id, emoji)}
+                          className={`flex h-7 min-w-[34px] items-center justify-center gap-0.5 rounded-full px-1.5 text-[12px] transition-colors ${
+                            active
+                              ? "bg-gold/20 ring-1 ring-gold/50"
+                              : "bg-muted hover:bg-muted/80"
+                          }`}
+                          aria-label={`${active ? "Retrage" : "Adaugă"} reacția ${emoji}`}
+                        >
+                          <span className="leading-none">{emoji}</span>
+                          {count > 0 && (
+                            <span className="text-[10px] font-medium text-muted-foreground">
+                              {count}
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </figcaption>
+                </figure>
+              );
+            })}
           </div>
         </section>
       )}

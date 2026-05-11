@@ -12,6 +12,7 @@ import {
   serial,
   date,
   index,
+  uniqueIndex,
   primaryKey,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
@@ -1213,6 +1214,11 @@ export const eventPlans = pgTable("event_plans", {
    *  (warm tint + sepia + soft vignette) client-side before uploading.
    *  Default off so existing films keep their original photos. */
   momentsVintage: boolean("moments_vintage").default(false).notNull(),
+  /** Phase 4A — ordered list of shot prompts ("Foto cu mireasa",
+   *  "Selfie cu nașii", ...). When non-empty the guest UI walks
+   *  through them one at a time instead of showing a single free-form
+   *  upload field. NULL / empty array = legacy free-form mode. */
+  momentsPrompts: jsonb("moments_prompts").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [
@@ -1328,6 +1334,11 @@ export const eventPhotos = pgTable("event_photos", {
    *  uploads. Not a real identity — wipe the browser and you get a
    *  fresh allowance, which we accept for a wedding-night use case. */
   deviceId: text("device_id"),
+  /** Phase 4A — which prompt this photo answers. Stored as the prompt
+   *  label string rather than an FK so renaming a prompt mid-event
+   *  doesn't orphan the photos already submitted for it. NULL when the
+   *  film runs in free-form (no prompts) mode. */
+  prompt: text("prompt"),
   /** Optional FK to an artist the client tags as having been at the event. */
   taggedArtistId: integer("tagged_artist_id").references(() => artists.id, {
     onDelete: "set null",
@@ -1339,6 +1350,36 @@ export const eventPhotos = pgTable("event_photos", {
   isApproved: boolean("is_approved").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Phase 4A — emoji reactions on event photos. A device may stack
+// multiple emoji on the same photo but only one of each type
+// (enforced by the unique index). Counts aggregate to the gallery
+// view post-reveal.
+export const photoReactions = pgTable(
+  "photo_reactions",
+  {
+    id: serial("id").primaryKey(),
+    photoId: integer("photo_id")
+      .references(() => eventPhotos.id, { onDelete: "cascade" })
+      .notNull(),
+    /** Anonymous per-device fingerprint — same UUID the upload page
+     *  uses for the shot-limit accounting. Lets a guest toggle their
+     *  own reaction without auth. */
+    deviceId: text("device_id").notNull(),
+    /** Short emoji string. Validated server-side against a small
+     *  allowlist (❤️ 🔥 😂 🥺 🎉) so the table doesn't fill with junk. */
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    index("idx_photo_reactions_photo").on(t.photoId),
+    uniqueIndex("uq_photo_reactions_device_emoji").on(
+      t.photoId,
+      t.deviceId,
+      t.emoji,
+    ),
+  ],
+);
 
 // ═══════════════════════════════════════════════════════
 // LEAD ENGINE (M3)

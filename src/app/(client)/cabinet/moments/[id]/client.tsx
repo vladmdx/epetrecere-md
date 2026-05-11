@@ -17,6 +17,7 @@ import {
   LayoutGrid,
   Download,
   Sparkles,
+  ListChecks,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -60,6 +61,10 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   const [revealAtInput, setRevealAtInput] = useState("");
   const [shotLimitInput, setShotLimitInput] = useState<string>("");
   const [vintageInput, setVintageInput] = useState(false);
+  /** Phase 4A — prompts edited as a single multi-line string for the
+   *  textarea. We split on newline when saving so the owner can
+   *  paste a list straight in. */
+  const [promptsInput, setPromptsInput] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -93,6 +98,11 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
             : "",
         );
         setVintageInput(Boolean(j.vintage));
+        setPromptsInput(
+          Array.isArray(j.prompts) && j.prompts.length > 0
+            ? (j.prompts as string[]).join("\n")
+            : "",
+        );
       }
       if (photosRes.ok) {
         const j = await photosRes.json();
@@ -149,6 +159,11 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
     }
     setSavingSettings(true);
     try {
+      const cleanedPrompts = promptsInput
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .slice(0, 50);
       const res = await fetch(`/api/event-plans/${planId}/moments`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -158,6 +173,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
           revealAt: localInputToIso(revealAtInput),
           shotLimit: limitNumber,
           vintage: vintageInput,
+          prompts: cleanedPrompts,
         }),
       });
       if (!res.ok) {
@@ -456,6 +472,29 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 </span>
               </span>
             </label>
+
+            {/* Phase 4A — shot prompts. One per line. Empty = free-form
+                mode (legacy behavior). */}
+            <div className="mt-4 rounded-xl border border-border/40 bg-background/40 p-3">
+              <div className="flex items-center gap-1.5 text-sm font-medium">
+                <ListChecks className="h-3.5 w-3.5 text-gold" />
+                Provocări foto (opțional)
+              </div>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                O „misiune" pe linie. Invitații văd una pe rând cu progres
+                — „Provocare 3/10". Lasă gol pentru încărcare liberă.
+              </p>
+              <textarea
+                value={promptsInput}
+                onChange={(e) => setPromptsInput(e.target.value)}
+                rows={5}
+                placeholder={"Foto cu mireasa\nSelfie cu nașii\nFoto cu tortul\nFoto de pe ringul de dans\nCadru cu părinții"}
+                className="mt-2 w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Maxim 50 de provocări, fiecare până la 80 de caractere.
+              </p>
+            </div>
 
             <div className="mt-5 flex justify-end">
               <button
