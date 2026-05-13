@@ -1,6 +1,9 @@
 "use client";
 
-// Fullscreen slideshow for the event projector.
+// Fullscreen slideshow for the event projector. With music control
+// (Phase 5/C1) — when the owner sets a music URL in settings we load
+// it as a looping `<audio>`. Browsers block autoplay-with-sound, so
+// we render a big "Pornește muzica" overlay if playback fails.
 //
 // Phase 2 adds the once.film-style reveal moment:
 //   - Before reveal: a centered countdown to revealAt + the upload QR
@@ -17,6 +20,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { Music, VolumeX, Volume2, Play } from "lucide-react";
 
 interface Photo {
   id: number;
@@ -46,7 +50,15 @@ function formatCountdown(ms: number): string {
   return `${sec} sec`;
 }
 
-export function SlideshowClient({ slug, title }: { slug: string; title: string }) {
+export function SlideshowClient({
+  slug,
+  title,
+  musicUrl,
+}: {
+  slug: string;
+  title: string;
+  musicUrl: string | null;
+}) {
   const [state, setState] = useState<MomentsState>({
     photos: [],
     totalPhotos: 0,
@@ -60,6 +72,56 @@ export function SlideshowClient({ slug, title }: { slug: string; title: string }
   // Track which ids we've already shown so newcomers can be inserted
   // at the front of the carousel for instant highlight on the projector.
   const seenIds = useRef<Set<number>>(new Set());
+
+  // Phase 5/C1 — music state. autoplayBlocked goes true on the first
+  // attempt that the browser rejects (Safari + Chrome both require a
+  // user gesture for sound). We then surface a big "Pornește muzica"
+  // overlay until the owner taps once.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
+  const [muted, setMuted] = useState(false);
+
+  // Try autoplay once on mount when we have a URL. Falls back to the
+  // overlay if the browser refuses.
+  useEffect(() => {
+    if (!musicUrl) return;
+    const el = audioRef.current;
+    if (!el) return;
+    const onPlay = () => {
+      setMusicPlaying(true);
+      setAutoplayBlocked(false);
+    };
+    const onPause = () => setMusicPlaying(false);
+    el.addEventListener("play", onPlay);
+    el.addEventListener("pause", onPause);
+    el.volume = 0.7;
+    el.loop = true;
+    el.play().catch(() => setAutoplayBlocked(true));
+    return () => {
+      el.removeEventListener("play", onPlay);
+      el.removeEventListener("pause", onPause);
+    };
+  }, [musicUrl]);
+
+  function toggleMute() {
+    const el = audioRef.current;
+    if (!el) return;
+    el.muted = !el.muted;
+    setMuted(el.muted);
+  }
+  function startMusic() {
+    const el = audioRef.current;
+    if (!el) return;
+    el.play()
+      .then(() => {
+        setAutoplayBlocked(false);
+        setMusicPlaying(true);
+      })
+      .catch(() => {
+        /* still blocked — give up silently */
+      });
+  }
 
   // Upload-page QR — sized big so guests can scan from across the room.
   useEffect(() => {
@@ -237,6 +299,55 @@ export function SlideshowClient({ slug, title }: { slug: string; title: string }
             trimite poze
           </p>
         </div>
+      )}
+
+      {/* Phase 5/C1 — background music. Hidden <audio>, the discreet
+          mute toggle bottom-left, and the autoplay-blocked overlay. */}
+      {musicUrl && (
+        <>
+          <audio
+            ref={audioRef}
+            src={musicUrl}
+            loop
+            preload="auto"
+            playsInline
+          />
+          {/* Mute / unmute pill, bottom-left. Only renders once the
+              music is actually playing — before that we either show
+              the start overlay (autoplayBlocked) or nothing while we
+              wait for the first frame. */}
+          {musicPlaying && (
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="absolute bottom-8 left-8 flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-xs text-white/90 backdrop-blur hover:bg-black/80"
+              aria-label={muted ? "Activează sunetul" : "Oprește sunetul"}
+            >
+              {muted ? (
+                <VolumeX className="h-4 w-4" />
+              ) : (
+                <Volume2 className="h-4 w-4" />
+              )}
+              <span>{muted ? "Fără sunet" : "Muzică"}</span>
+            </button>
+          )}
+          {/* Autoplay-blocked overlay — Chrome and Safari refuse
+              first-load audio without a user gesture. One tap unblocks
+              everything. */}
+          {autoplayBlocked && (
+            <div className="absolute inset-x-0 bottom-32 flex justify-center">
+              <button
+                type="button"
+                onClick={startMusic}
+                className="flex items-center gap-3 rounded-full bg-gold px-6 py-3 text-base font-semibold text-[#0D0D0D] shadow-2xl hover:bg-gold-dark"
+              >
+                <Play className="h-5 w-5 fill-current" />
+                <Music className="h-5 w-5" />
+                Pornește muzica
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

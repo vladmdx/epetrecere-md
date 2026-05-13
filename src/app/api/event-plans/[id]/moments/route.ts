@@ -52,6 +52,7 @@ export async function GET(
       momentsVintage: eventPlans.momentsVintage,
       momentsPrompts: eventPlans.momentsPrompts,
       momentsRequireApproval: eventPlans.momentsRequireApproval,
+      momentsMusicUrl: eventPlans.momentsMusicUrl,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -67,6 +68,7 @@ export async function GET(
     vintage: plan?.momentsVintage ?? false,
     prompts: plan?.momentsPrompts ?? [],
     requireApproval: plan?.momentsRequireApproval ?? false,
+    musicUrl: plan?.momentsMusicUrl ?? null,
   });
 }
 
@@ -114,6 +116,9 @@ const patchSchema = z.object({
   /** Phase 4B — when true, every guest upload sits in the moderation
    *  queue until the owner approves it. */
   requireApproval: z.boolean().optional(),
+  /** Phase 5/C1 — direct audio URL the slideshow plays in loop.
+   *  Empty string + null both clear the field. */
+  musicUrl: z.union([z.string().url().max(2048), z.literal(""), z.null()]).optional(),
 });
 
 export async function PATCH(
@@ -157,6 +162,12 @@ export async function PATCH(
   }
   if (parsed.data.requireApproval !== undefined) {
     update.momentsRequireApproval = parsed.data.requireApproval;
+  }
+  if (parsed.data.musicUrl !== undefined) {
+    update.momentsMusicUrl =
+      parsed.data.musicUrl === "" || parsed.data.musicUrl === null
+        ? null
+        : parsed.data.musicUrl;
   }
   if (parsed.data.prompts !== undefined) {
     // Deduplicate + trim — owner often pastes a list with stray
@@ -206,6 +217,7 @@ export async function PATCH(
       momentsVintage: eventPlans.momentsVintage,
       momentsPrompts: eventPlans.momentsPrompts,
       momentsRequireApproval: eventPlans.momentsRequireApproval,
+      momentsMusicUrl: eventPlans.momentsMusicUrl,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -219,6 +231,7 @@ export async function PATCH(
     vintage: plan?.momentsVintage ?? false,
     prompts: plan?.momentsPrompts ?? [],
     requireApproval: plan?.momentsRequireApproval ?? false,
+    musicUrl: plan?.momentsMusicUrl ?? null,
   });
 }
 

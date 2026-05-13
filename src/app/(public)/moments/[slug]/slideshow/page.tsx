@@ -19,6 +19,7 @@ export default async function MomentsSlideshowPage({ params }: Props) {
     .select({
       title: eventPlans.title,
       momentsEnabled: eventPlans.momentsEnabled,
+      momentsMusicUrl: eventPlans.momentsMusicUrl,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -26,5 +27,11 @@ export default async function MomentsSlideshowPage({ params }: Props) {
 
   if (!plan || !plan.momentsEnabled) notFound();
 
-  return <SlideshowClient slug={slug} title={plan.title} />;
+  return (
+    <SlideshowClient
+      slug={slug}
+      title={plan.title}
+      musicUrl={plan.momentsMusicUrl ?? null}
+    />
+  );
 }

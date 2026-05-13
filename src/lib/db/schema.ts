@@ -1226,6 +1226,11 @@ export const eventPlans = pgTable("event_plans", {
   momentsRequireApproval: boolean("moments_require_approval")
     .default(false)
     .notNull(),
+  /** Phase 5/C1 — direct audio URL (mp3/wav/m4a/ogg) the projector
+   *  slideshow loops in the background. NULL = silent slideshow.
+   *  Owner can drop any HTTPS URL; we don't validate the codec here
+   *  because the <audio> element fails gracefully when it can't play. */
+  momentsMusicUrl: text("moments_music_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [

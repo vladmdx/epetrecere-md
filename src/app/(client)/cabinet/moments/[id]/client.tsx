@@ -25,6 +25,7 @@ import {
   Users,
   Award,
   Clock,
+  Music,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ interface Photo {
   url: string;
   guestName: string | null;
   guestMessage: string | null;
+  caption?: string | null;
   prompt?: string | null;
   isApproved?: boolean;
   isFavorite?: boolean;
@@ -79,6 +81,8 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   /** Phase 4B — when true, guest uploads land hidden until the owner
    *  approves them. */
   const [requireApprovalInput, setRequireApprovalInput] = useState(false);
+  /** Phase 5/C1 — direct audio URL the slideshow loops. */
+  const [musicUrlInput, setMusicUrlInput] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
   const [downloading, setDownloading] = useState(false);
   /** Phase 4B — current grid filter: all / pending / favorites. */
@@ -122,6 +126,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
             : "",
         );
         setRequireApprovalInput(Boolean(j.requireApproval));
+        setMusicUrlInput(typeof j.musicUrl === "string" ? j.musicUrl : "");
       }
       if (photosRes.ok) {
         const j = await photosRes.json();
@@ -194,6 +199,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
           vintage: vintageInput,
           prompts: cleanedPrompts,
           requireApproval: requireApprovalInput,
+          musicUrl: musicUrlInput.trim() || null,
         }),
       });
       if (!res.ok) {
@@ -237,6 +243,40 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   function toggleFavorite(photo: Photo) {
     void patchPhoto(photo.id, { isFavorite: !photo.isFavorite });
   }
+  async function generateCaption(photo: Photo) {
+    // Optimistic placeholder while Claude is thinking.
+    setPhotos((prev) =>
+      prev.map((p) =>
+        p.id === photo.id ? { ...p, caption: "Generez caption..." } : p,
+      ),
+    );
+    try {
+      const res = await fetch(
+        `/api/event-plans/${planId}/photos/${photo.id}/caption`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Eroare AI");
+      }
+      const { caption } = await res.json();
+      setPhotos((prev) =>
+        prev.map((p) => (p.id === photo.id ? { ...p, caption } : p)),
+      );
+      toast.success("Caption generat!");
+    } catch (err) {
+      // Revert the placeholder.
+      setPhotos((prev) =>
+        prev.map((p) =>
+          p.id === photo.id
+            ? { ...p, caption: photo.caption ?? null }
+            : p,
+        ),
+      );
+      toast.error(err instanceof Error ? err.message : "AI indisponibil");
+    }
+  }
+
   async function rejectPhoto(photo: Photo) {
     if (!confirm("Ștergi această poză? Nu mai apare nici în galerie, nici în ZIP.")) {
       return;
@@ -361,6 +401,15 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 Tipărește și pune pe mese la eveniment
               </p>
+              {/* Phase 5/C2 — branded printable card. The QR alone is
+                  ugly on a wedding table; the card page wraps it in a
+                  template with event name + date + decoration. */}
+              <Link
+                href={`/cabinet/moments/${planId}/qr-card`}
+                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gold/40 px-3 py-2 text-xs font-medium text-gold hover:bg-gold/10"
+              >
+                <QrCode className="h-3.5 w-3.5" /> Card tipăribil cu QR
+              </Link>
             </div>
 
             <div className="space-y-4">
@@ -561,6 +610,28 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 </span>
               </span>
             </label>
+
+            {/* Phase 5/C1 — slideshow background music URL. Direct
+                MP3/WAV/M4A/OGG only; YouTube/Spotify don't embed as
+                <audio> without a special player. */}
+            <div className="mt-4 rounded-xl border border-border/40 bg-background/40 p-3">
+              <label className="flex items-center gap-1.5 text-sm font-medium">
+                <Music className="h-3.5 w-3.5 text-gold" />
+                Muzică pentru slideshow (opțional)
+              </label>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Link direct la un fișier audio (MP3/WAV/M4A). Slideshow-ul
+                pe proiector îl reproduce în buclă. Lasă gol pentru
+                slideshow silențios.
+              </p>
+              <input
+                type="url"
+                value={musicUrlInput}
+                onChange={(e) => setMusicUrlInput(e.target.value)}
+                placeholder="https://exemplu.com/melodie.mp3"
+                className="mt-2 w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold focus:outline-none"
+              />
+            </div>
 
             {/* Phase 4A — shot prompts. One per line. Empty = free-form
                 mode (legacy behavior). */}
@@ -815,15 +886,35 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                           </div>
                         )}
 
+                        {/* Phase 5/E3 — AI caption button (top-left,
+                            below the pending badge). Generates a
+                            one-liner from prompt + guest name. */}
+                        <button
+                          type="button"
+                          onClick={() => void generateCaption(p)}
+                          className={`absolute ${pending ? "left-1.5 top-9" : "left-1.5 top-1.5"} flex h-7 w-7 items-center justify-center rounded-full bg-black/40 text-white/80 backdrop-blur-sm transition-colors hover:bg-black/60`}
+                          aria-label="Generează caption AI"
+                          title="Generează caption AI"
+                        >
+                          <Sparkles className="h-3.5 w-3.5" />
+                        </button>
+
                         {/* Bottom action bar: approve when pending,
                             reject (delete) always. Pulls into view on
                             hover for desktop; tap-friendly stays on
                             mobile via group-focus. */}
-                        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/85 to-transparent p-2 text-xs text-white">
-                          <span className="truncate font-medium">
-                            {p.guestName ?? ""}
-                          </span>
-                          <div className="flex items-center gap-1">
+                        <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-1 bg-gradient-to-t from-black/85 to-transparent p-2 text-xs text-white">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">
+                              {p.guestName ?? ""}
+                            </p>
+                            {p.caption && (
+                              <p className="mt-0.5 line-clamp-2 text-[10px] italic opacity-90">
+                                {p.caption}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
                             {pending && (
                               <button
                                 type="button"

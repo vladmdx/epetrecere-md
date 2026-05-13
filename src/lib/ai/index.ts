@@ -242,6 +242,43 @@ Return ONLY JSON: {"title": "...", "metaDescription": "..."}`,
   };
 }
 
+/** Phase 5/E3 — short caption for a Photo Moments entry. Uses the
+ *  context the photo already carries (prompt label, guest name,
+ *  guest message, event title) and produces a 1-line RO caption like
+ *  "Primul dans — un moment magic surprins de Ana". Cheap to run:
+ *  Haiku, ~100 tokens out. */
+export async function generatePhotoCaption(args: {
+  eventTitle: string;
+  prompt?: string | null;
+  guestName?: string | null;
+  guestMessage?: string | null;
+}): Promise<string> {
+  const facts = [
+    `Eveniment: ${args.eventTitle}`,
+    args.prompt ? `Misiunea pozei: ${args.prompt}` : null,
+    args.guestName ? `Trimis de: ${args.guestName}` : null,
+    args.guestMessage ? `Mesaj invitat: ${args.guestMessage}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const message = await getClient().messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 120,
+    system:
+      "Ești copywriter pentru un album foto de eveniment. Scrii un singur caption în română, sub 110 caractere, cald, concret, fără emoji. Nu inventa detalii care nu apar în date. Răspunzi DOAR cu caption-ul, fără ghilimele.",
+    messages: [
+      {
+        role: "user",
+        content: `Generează un caption pentru această poză de eveniment.\n\n${facts}`,
+      },
+    ],
+  });
+  const block = message.content[0];
+  const text = block?.type === "text" ? block.text : "";
+  return text.replace(/^["']|["']$/g, "").trim().slice(0, 200);
+}
+
 export async function chatWithAI(
   messages: { role: "user" | "assistant"; content: string }[],
   systemPrompt: string,
