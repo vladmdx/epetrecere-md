@@ -53,6 +53,7 @@ export async function GET(
       momentsPrompts: eventPlans.momentsPrompts,
       momentsRequireApproval: eventPlans.momentsRequireApproval,
       momentsMusicUrl: eventPlans.momentsMusicUrl,
+      momentsTables: eventPlans.momentsTables,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -69,6 +70,7 @@ export async function GET(
     prompts: plan?.momentsPrompts ?? [],
     requireApproval: plan?.momentsRequireApproval ?? false,
     musicUrl: plan?.momentsMusicUrl ?? null,
+    tables: plan?.momentsTables ?? [],
   });
 }
 
@@ -119,6 +121,10 @@ const patchSchema = z.object({
   /** Phase 5/C1 — direct audio URL the slideshow plays in loop.
    *  Empty string + null both clear the field. */
   musicUrl: z.union([z.string().url().max(2048), z.literal(""), z.null()]).optional(),
+  /** Phase 5/C3 — list of table labels for the per-table QR cards. */
+  tables: z
+    .union([z.array(z.string().min(1).max(40)).max(40), z.null()])
+    .optional(),
 });
 
 export async function PATCH(
@@ -169,6 +175,23 @@ export async function PATCH(
         ? null
         : parsed.data.musicUrl;
   }
+  if (parsed.data.tables !== undefined) {
+    if (parsed.data.tables === null) {
+      update.momentsTables = null;
+    } else {
+      // Same dedupe + trim treatment as prompts — owners paste lists.
+      const seen = new Set<string>();
+      update.momentsTables = parsed.data.tables
+        .map((t) => t.trim())
+        .filter((t) => {
+          if (t.length === 0) return false;
+          const key = t.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+    }
+  }
   if (parsed.data.prompts !== undefined) {
     // Deduplicate + trim — owner often pastes a list with stray
     // whitespace and we don't want "Foto cu mireasa" vs "Foto cu
@@ -218,6 +241,7 @@ export async function PATCH(
       momentsPrompts: eventPlans.momentsPrompts,
       momentsRequireApproval: eventPlans.momentsRequireApproval,
       momentsMusicUrl: eventPlans.momentsMusicUrl,
+      momentsTables: eventPlans.momentsTables,
     })
     .from(eventPlans)
     .where(eq(eventPlans.id, planId))
@@ -232,6 +256,7 @@ export async function PATCH(
     prompts: plan?.momentsPrompts ?? [],
     requireApproval: plan?.momentsRequireApproval ?? false,
     musicUrl: plan?.momentsMusicUrl ?? null,
+    tables: plan?.momentsTables ?? [],
   });
 }
 

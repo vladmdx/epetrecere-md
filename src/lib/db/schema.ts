@@ -1231,6 +1231,11 @@ export const eventPlans = pgTable("event_plans", {
    *  Owner can drop any HTTPS URL; we don't validate the codec here
    *  because the <audio> element fails gracefully when it can't play. */
   momentsMusicUrl: text("moments_music_url"),
+  /** Phase 5/C3 — list of table labels for per-table QR rolls.
+   *  ["Masa 1", "Masa 2", ...]. Used by the qr-tables page to render
+   *  one card per table and by stats to break down activity per
+   *  table. NULL / empty = no per-table mode. */
+  momentsTables: jsonb("moments_tables").$type<string[]>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [
@@ -1351,6 +1356,10 @@ export const eventPhotos = pgTable("event_photos", {
    *  doesn't orphan the photos already submitted for it. NULL when the
    *  film runs in free-form (no prompts) mode. */
   prompt: text("prompt"),
+  /** Phase 5/C3 — which table the guest scanned the QR at. Sourced
+   *  from the `?t=Masa+5` query param on the upload page. NULL for
+   *  guests who scanned the main QR (no table). */
+  tableLabel: text("table_label"),
   /** Optional FK to an artist the client tags as having been at the event. */
   taggedArtistId: integer("tagged_artist_id").references(() => artists.id, {
     onDelete: "set null",

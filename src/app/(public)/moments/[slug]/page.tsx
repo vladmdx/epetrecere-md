@@ -33,6 +33,7 @@ export default async function MomentsPage({ params }: Props) {
       momentsShotLimit: eventPlans.momentsShotLimit,
       momentsVintage: eventPlans.momentsVintage,
       momentsPrompts: eventPlans.momentsPrompts,
+      momentsTables: eventPlans.momentsTables,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -51,6 +52,7 @@ export default async function MomentsPage({ params }: Props) {
       shotLimit={plan.momentsShotLimit ?? null}
       vintage={plan.momentsVintage}
       prompts={plan.momentsPrompts ?? []}
+      tables={plan.momentsTables ?? []}
     />
   );
 }

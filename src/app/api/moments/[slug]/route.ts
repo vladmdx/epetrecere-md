@@ -30,6 +30,7 @@ interface MomentsPlan {
   momentsVintage: boolean;
   momentsPrompts: string[] | null;
   momentsRequireApproval: boolean;
+  momentsTables: string[] | null;
 }
 
 async function findPlan(slug: string): Promise<MomentsPlan | null> {
@@ -46,6 +47,7 @@ async function findPlan(slug: string): Promise<MomentsPlan | null> {
       momentsVintage: eventPlans.momentsVintage,
       momentsPrompts: eventPlans.momentsPrompts,
       momentsRequireApproval: eventPlans.momentsRequireApproval,
+      momentsTables: eventPlans.momentsTables,
     })
     .from(eventPlans)
     .where(eq(eventPlans.momentsSlug, slug))
@@ -181,6 +183,7 @@ export async function GET(
       shotLimit: plan.momentsShotLimit ?? null,
       vintage: plan.momentsVintage,
       prompts: plan.momentsPrompts ?? [],
+      tables: plan.momentsTables ?? [],
     },
     uploadState: state,
     revealed,
@@ -209,6 +212,10 @@ const uploadSchema = z.object({
    *  We store the label rather than an id so the schema stays simple
    *  and renames don't orphan history. */
   prompt: z.string().max(80).optional(),
+  /** Phase 5/C3 — which table label this upload was scanned from.
+   *  Same validation pattern as prompt: stored only if it matches
+   *  the owner's declared list. */
+  tableLabel: z.string().max(40).optional(),
 });
 
 export async function POST(
@@ -293,6 +300,16 @@ export async function POST(
     }
   }
 
+  // Phase 5/C3 — same allowlist treatment for table_label. Out-of-list
+  // tables get silently dropped so QR-card mods can't seed bogus rooms.
+  let tableLabelToSave: string | null = null;
+  if (parsed.data.tableLabel) {
+    const trimmed = parsed.data.tableLabel.trim();
+    if (plan.momentsTables && plan.momentsTables.includes(trimmed)) {
+      tableLabelToSave = trimmed;
+    }
+  }
+
   const [photo] = await db
     .insert(eventPhotos)
     .values({
@@ -303,6 +320,7 @@ export async function POST(
       source: "guest",
       deviceId: parsed.data.deviceId ?? null,
       prompt: promptToSave,
+      tableLabel: tableLabelToSave,
       // Auto-approve unless the owner explicitly turned on the
       // moderation queue (Phase 4B). In that mode every guest upload
       // sits hidden until the owner clicks "Aprobă" — useful for

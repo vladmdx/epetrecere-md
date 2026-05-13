@@ -41,6 +41,7 @@ interface Props {
   shotLimit: number | null;
   vintage: boolean;
   prompts: string[];
+  tables: string[];
 }
 
 type UploadState = "before" | "open" | "after";
@@ -105,8 +106,27 @@ export function MomentsUploadClient({
   shotLimit,
   vintage,
   prompts,
+  tables,
 }: Props) {
   const deviceId = useMemo(() => getOrCreateDeviceId(slug), [slug]);
+
+  /** Phase 5/C3 — table identifier from the QR code. Each table card
+   *  uses `?t=Masa%205`; the client tags every upload with the
+   *  matching label so the owner sees per-table contributions. */
+  const tableLabel = useMemo(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const url = new URL(window.location.href);
+      const raw = url.searchParams.get("t");
+      if (!raw) return null;
+      const trimmed = raw.trim();
+      // Only accept labels the owner declared — silently drop others
+      // so a hand-edited QR can't poison the table breakdown.
+      return tables.includes(trimmed) ? trimmed : null;
+    } catch {
+      return null;
+    }
+  }, [tables]);
 
   const [state, setState] = useState<MomentsState>({
     photos: [],
@@ -305,6 +325,9 @@ export function MomentsUploadClient({
             // tagged with the prompt currently shown to the guest so
             // the owner can later see who answered what.
             prompt: currentPrompt ?? undefined,
+            // Phase 5/C3 — table label sourced from the QR query
+            // param so the owner sees per-table breakdowns.
+            tableLabel: tableLabel ?? undefined,
           }),
         });
         if (!saveRes.ok) {
@@ -377,6 +400,11 @@ export function MomentsUploadClient({
           <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-medium text-gold">
             <Sparkles className="h-3 w-3" /> Filtru polaroid activ — pozele
             tale primesc automat un ton vintage cald
+          </p>
+        )}
+        {tableLabel && (
+          <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-gold/40 bg-gold/15 px-3 py-1 text-[11px] font-medium text-gold">
+            🪑 {tableLabel}
           </p>
         )}
       </header>

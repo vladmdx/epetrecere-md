@@ -36,6 +36,7 @@ interface Photo {
   guestMessage: string | null;
   caption?: string | null;
   prompt?: string | null;
+  tableLabel?: string | null;
   isApproved?: boolean;
   isFavorite?: boolean;
   deviceId?: string | null;
@@ -83,6 +84,10 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   const [requireApprovalInput, setRequireApprovalInput] = useState(false);
   /** Phase 5/C1 — direct audio URL the slideshow loops. */
   const [musicUrlInput, setMusicUrlInput] = useState("");
+  /** Phase 5/C3 — comma- or newline-separated table labels. We split
+   *  on whichever the owner used so paste-from-spreadsheet works
+   *  unchanged. */
+  const [tablesInput, setTablesInput] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
   const [downloading, setDownloading] = useState(false);
   /** Phase 4B — current grid filter: all / pending / favorites. */
@@ -127,6 +132,11 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
         );
         setRequireApprovalInput(Boolean(j.requireApproval));
         setMusicUrlInput(typeof j.musicUrl === "string" ? j.musicUrl : "");
+        setTablesInput(
+          Array.isArray(j.tables) && j.tables.length > 0
+            ? (j.tables as string[]).join("\n")
+            : "",
+        );
       }
       if (photosRes.ok) {
         const j = await photosRes.json();
@@ -200,6 +210,11 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
           prompts: cleanedPrompts,
           requireApproval: requireApprovalInput,
           musicUrl: musicUrlInput.trim() || null,
+          tables: tablesInput
+            .split(/[\r\n,]+/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+            .slice(0, 40),
         }),
       });
       if (!res.ok) {
@@ -274,6 +289,66 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
         ),
       );
       toast.error(err instanceof Error ? err.message : "AI indisponibil");
+    }
+  }
+
+  /** Phase 5/E2 — Best-of selector. Pure client-side heuristic that
+   *  scores every photo on the dashboard and stars the top 20% as
+   *  favorites. We don't burn an AI call here because the existing
+   *  signals (reactions, captions, guest messages, prompt answers)
+   *  already encode what people loved about the photo — a vision
+   *  model would add ~$2 of token cost per typical wedding for a
+   *  marginal improvement on top of these. Future work: add a
+   *  Claude-vision rerank for ties. */
+  async function autoFavoriteBestOf() {
+    if (photos.length === 0) {
+      toast.error("Nu există poze de evaluat încă.");
+      return;
+    }
+    type Scored = { id: number; score: number };
+    const scored: Scored[] = photos.map((p) => {
+      // Heuristics — tunable, deliberately favoring photos with
+      // explicit guest investment over recency or upload order.
+      let score = 0;
+      // Reactions don't surface on the owner-side photos response yet,
+      // so we approximate "interesting" with caption/message/prompt.
+      if (p.caption) score += 3;
+      if (p.guestMessage) score += 2;
+      if (p.prompt) score += 2;
+      if (p.guestName && p.guestName.trim().length > 0) score += 1;
+      if (p.isFavorite) score += 5; // keep already-favorite ones
+      return { id: p.id, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    // Top 20%, but at least 3 and at most 30 so tiny galleries still
+    // get a meaningful pick and big ones don't bury the owner.
+    const target = Math.max(3, Math.min(30, Math.ceil(photos.length * 0.2)));
+    const winners = new Set(scored.slice(0, target).map((s) => s.id));
+    // Apply optimistically.
+    setPhotos((prev) =>
+      prev.map((p) => ({ ...p, isFavorite: winners.has(p.id) || p.isFavorite })),
+    );
+    // PATCH only the ones that are flipping ON — don't unstar existing
+    // favorites so manual choices survive.
+    const toFlip = photos.filter(
+      (p) => winners.has(p.id) && p.isFavorite !== true,
+    );
+    try {
+      await Promise.all(
+        toFlip.map((p) =>
+          fetch(`/api/event-plans/${planId}/photos/${p.id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isFavorite: true }),
+          }),
+        ),
+      );
+      toast.success(
+        `${toFlip.length} cadre marcate ca favorite (top ${target}).`,
+      );
+    } catch {
+      toast.error("Selecția nu s-a salvat complet — reîncarcă lista");
+      void refreshPhotos();
     }
   }
 
@@ -410,6 +485,15 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               >
                 <QrCode className="h-3.5 w-3.5" /> Card tipăribil cu QR
               </Link>
+              {/* Phase 5/C3 — per-table QR sheet. Only shown when the
+                  owner declared a table list, otherwise the page would
+                  show an "add some tables first" empty state. */}
+              <Link
+                href={`/cabinet/moments/${planId}/qr-tables`}
+                className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gold/40 px-3 py-2 text-xs font-medium text-gold hover:bg-gold/10"
+              >
+                <Users className="h-3.5 w-3.5" /> Carduri QR per masă
+              </Link>
             </div>
 
             <div className="space-y-4">
@@ -470,12 +554,22 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                   perete polaroid sau magazine. Salvează ca PDF din
                   dialogul de tipărire.
                 </p>
-                <Link
-                  href={`/cabinet/moments/${planId}/colaj`}
-                  className="mt-3 inline-flex items-center gap-2 rounded-lg bg-gold px-3 py-2 text-xs font-medium text-[#0D0D0D] hover:bg-gold-dark"
-                >
-                  <LayoutGrid className="h-3.5 w-3.5" /> Construiește colaj
-                </Link>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href={`/cabinet/moments/${planId}/colaj`}
+                    className="inline-flex items-center gap-2 rounded-lg bg-gold px-3 py-2 text-xs font-medium text-[#0D0D0D] hover:bg-gold-dark"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" /> Colaj poster
+                  </Link>
+                  {/* Phase 5/D1 — multi-page PDF album. Same poster
+                      muscle, just paginated with cover + thanks. */}
+                  <Link
+                    href={`/cabinet/moments/${planId}/album`}
+                    className="inline-flex items-center gap-2 rounded-lg border border-gold/40 bg-transparent px-3 py-2 text-xs font-medium text-gold hover:bg-gold/10"
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" /> Album multi-pagină
+                  </Link>
+                </div>
               </div>
 
               <button
@@ -656,6 +750,29 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               </p>
             </div>
 
+            {/* Phase 5/C3 — table labels for per-table QR rolls. */}
+            <div className="mt-4 rounded-xl border border-border/40 bg-background/40 p-3">
+              <label className="flex items-center gap-1.5 text-sm font-medium">
+                <Users className="h-3.5 w-3.5 text-gold" />
+                Mese / locații (opțional)
+              </label>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                Câte un nume pe linie. Pagina „Carduri QR per masă" îți
+                generează un cod separat pentru fiecare — pe dashboard
+                vezi cine a încărcat de la fiecare masă.
+              </p>
+              <textarea
+                value={tablesInput}
+                onChange={(e) => setTablesInput(e.target.value)}
+                rows={4}
+                placeholder={"Masa 1\nMasa 2\nMasa 3\nBar"}
+                className="mt-2 w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                Maxim 40 de mese, fiecare până la 40 de caractere.
+              </p>
+            </div>
+
             <div className="mt-5 flex justify-end">
               <button
                 onClick={() => void saveSettings()}
@@ -761,6 +878,14 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 Poze primite ({photos.length})
               </h2>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => void autoFavoriteBestOf()}
+                  disabled={photos.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 px-3 py-1.5 text-xs font-medium text-gold hover:bg-gold/10 disabled:opacity-50"
+                  title="Marchează top 20% ca favorite (după mesaje, prompturi, captionuri)"
+                >
+                  <Star className="h-3.5 w-3.5" /> Auto ⭐ top 20%
+                </button>
                 <button
                   onClick={() => void downloadAll()}
                   disabled={downloading || photos.length === 0}
