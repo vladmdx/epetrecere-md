@@ -1360,6 +1360,11 @@ export const eventPhotos = pgTable("event_photos", {
    *  from the `?t=Masa+5` query param on the upload page. NULL for
    *  guests who scanned the main QR (no table). */
   tableLabel: text("table_label"),
+  /** Phase 5/E1 — Claude-classified category. One of "ceremonie",
+   *  "dans", "grup", "portret", "decor", "mancare", "candid", "other".
+   *  Free-text not enum so we can iterate the prompt without a
+   *  migration. NULL = not yet categorized. */
+  category: text("category"),
   /** Optional FK to an artist the client tags as having been at the event. */
   taggedArtistId: integer("tagged_artist_id").references(() => artists.id, {
     onDelete: "set null",

@@ -26,6 +26,8 @@ import {
   Award,
   Clock,
   Music,
+  Mail,
+  Film,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -37,6 +39,7 @@ interface Photo {
   caption?: string | null;
   prompt?: string | null;
   tableLabel?: string | null;
+  category?: string | null;
   isApproved?: boolean;
   isFavorite?: boolean;
   deviceId?: string | null;
@@ -94,6 +97,10 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   const [photoFilter, setPhotoFilter] = useState<"all" | "pending" | "favorites">(
     "all",
   );
+  /** Phase 5/E1 — categorization in progress. */
+  const [categorizing, setCategorizing] = useState(false);
+  /** Phase 5/D3 — email recap send-in-progress. */
+  const [sendingRecap, setSendingRecap] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") setOrigin(window.location.origin);
@@ -300,6 +307,53 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
    *  model would add ~$2 of token cost per typical wedding for a
    *  marginal improvement on top of these. Future work: add a
    *  Claude-vision rerank for ties. */
+  async function sendRecap() {
+    setSendingRecap(true);
+    try {
+      const res = await fetch(`/api/event-plans/${planId}/moments/recap`, {
+        method: "POST",
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Nu s-a putut trimite");
+      toast.success(`Recap trimis la ${body.to} (${body.photoCount} cadre)`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare email");
+    } finally {
+      setSendingRecap(false);
+    }
+  }
+
+  async function categorizePhotos() {
+    setCategorizing(true);
+    try {
+      const res = await fetch(
+        `/api/event-plans/${planId}/photos/categorize`,
+        { method: "POST" },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(body.error || "AI indisponibil");
+      }
+      const tally = body.tally as Record<string, number> | undefined;
+      const summary = tally
+        ? Object.entries(tally)
+            .filter(([, n]) => n > 0)
+            .map(([k, n]) => `${n} ${k}`)
+            .join(" · ")
+        : "";
+      toast.success(
+        `${body.processed} categorize${summary ? " — " + summary : ""}${
+          body.remaining ? ` · mai sunt ${body.remaining}` : ""
+        }`,
+      );
+      await refreshPhotos();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Eroare AI");
+    } finally {
+      setCategorizing(false);
+    }
+  }
+
   async function autoFavoriteBestOf() {
     if (photos.length === 0) {
       toast.error("Nu există poze de evaluat încă.");
@@ -494,6 +548,31 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               >
                 <Users className="h-3.5 w-3.5" /> Carduri QR per masă
               </Link>
+              {/* Phase 5/D2 — HTML5 highlight reel (in lieu of MP4
+                  export which would need ffmpeg). Opens a full-screen
+                  Ken Burns auto-player; owner screen-records if they
+                  want a shareable clip. */}
+              <Link
+                href={`/cabinet/moments/${planId}/reel`}
+                className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gold/40 px-3 py-2 text-xs font-medium text-gold hover:bg-gold/10"
+              >
+                <Film className="h-3.5 w-3.5" /> Highlight reel (proiectat)
+              </Link>
+              {/* Phase 5/D3 — email recap. Sends a stats + thumbnails
+                  email to the owner's account email. */}
+              <button
+                type="button"
+                onClick={() => void sendRecap()}
+                disabled={sendingRecap}
+                className="mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-gold/40 px-3 py-2 text-xs font-medium text-gold hover:bg-gold/10 disabled:opacity-50"
+              >
+                {sendingRecap ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Mail className="h-3.5 w-3.5" />
+                )}
+                Trimite recap pe email
+              </button>
             </div>
 
             <div className="space-y-4">
@@ -879,6 +958,19 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               </h2>
               <div className="flex items-center gap-3">
                 <button
+                  onClick={() => void categorizePhotos()}
+                  disabled={categorizing || photos.length === 0}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 px-3 py-1.5 text-xs font-medium text-gold hover:bg-gold/10 disabled:opacity-50"
+                  title="Claude clasifică fiecare poză (ceremonie / dans / grup / portret / ...)"
+                >
+                  {categorizing ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3.5 w-3.5" />
+                  )}
+                  Categorize AI
+                </button>
+                <button
                   onClick={() => void autoFavoriteBestOf()}
                   disabled={photos.length === 0}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-gold/40 px-3 py-1.5 text-xs font-medium text-gold hover:bg-gold/10 disabled:opacity-50"
@@ -1007,6 +1099,16 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                           <div className="absolute left-1.5 top-1.5 flex items-center gap-1">
                             <span className="rounded-full bg-amber-500/90 px-2 py-0.5 text-[10px] font-medium text-amber-950">
                               În așteptare
+                            </span>
+                          </div>
+                        )}
+                        {/* Phase 5/E1 — AI category chip, bottom-left
+                            corner so it doesn't fight with the
+                            pending/star badges. */}
+                        {p.category && (
+                          <div className="absolute bottom-12 left-1.5">
+                            <span className="rounded-full bg-black/70 px-2 py-0.5 text-[9px] font-medium uppercase tracking-wider text-gold backdrop-blur-sm">
+                              {p.category}
                             </span>
                           </div>
                         )}

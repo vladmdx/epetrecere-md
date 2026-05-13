@@ -279,6 +279,57 @@ export async function generatePhotoCaption(args: {
   return text.replace(/^["']|["']$/g, "").trim().slice(0, 200);
 }
 
+/** Phase 5/E1 — classify a single photo into one of a small fixed set
+ *  of event-photo categories. Uses Claude's vision API; cost is ~$0.001
+ *  per photo on Haiku. Owner usually triggers this in a bulk over the
+ *  whole gallery once at the end of the night.
+ *
+ *  Returns one of the strings in `PHOTO_CATEGORIES` or "other" if the
+ *  model returns something unrecognised. We don't accept free-text
+ *  answers to keep the dashboard filterable.
+ */
+export const PHOTO_CATEGORIES = [
+  "ceremonie",
+  "dans",
+  "grup",
+  "portret",
+  "decor",
+  "mancare",
+  "candid",
+  "other",
+] as const;
+export type PhotoCategory = (typeof PHOTO_CATEGORIES)[number];
+
+export async function classifyPhoto(imageUrl: string): Promise<PhotoCategory> {
+  const message = await getClient().messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 20,
+    system:
+      'Ești un asistent care clasifică poze de eveniment într-UNA dintre etichetele: "ceremonie", "dans", "grup", "portret", "decor", "mancare", "candid", "other". Răspunzi DOAR cu eticheta, fără ghilimele, fără explicații.',
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "url", url: imageUrl },
+          },
+          {
+            type: "text",
+            text: "Clasifică această poză într-o singură etichetă din lista dată.",
+          },
+        ],
+      },
+    ],
+  });
+  const block = message.content[0];
+  const text = block?.type === "text" ? block.text.trim().toLowerCase() : "";
+  const cleaned = text.replace(/[^a-z]/g, "");
+  return (PHOTO_CATEGORIES as readonly string[]).includes(cleaned)
+    ? (cleaned as PhotoCategory)
+    : "other";
+}
+
 export async function chatWithAI(
   messages: { role: "user" | "assistant"; content: string }[],
   systemPrompt: string,
