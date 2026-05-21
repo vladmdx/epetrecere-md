@@ -422,9 +422,9 @@ export default function ClientCabinetPage() {
           </p>
           <Link
             href="/planifica"
-            className="mt-5 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
+            className="group mt-5 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-medium text-[#0D0D0D] transition-all duration-200 hover:bg-gold-dark hover:shadow-[0_4px_20px_rgba(201,168,76,0.35)] active:scale-95"
           >
-            <Sparkles className="h-4 w-4" /> Începe să planifici
+            <Sparkles className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" /> Începe să planifici
           </Link>
         </div>
       ) : (
@@ -542,20 +542,20 @@ function HeroCard({
           {/* Right column — venue / event image */}
           <Link
             href={`/cabinet/planifica/${plan.id}`}
-            className="group relative aspect-[4/3] w-full max-w-[280px] shrink-0 overflow-hidden rounded-xl border border-border/40 sm:aspect-[16/10] sm:w-56"
+            className="group relative aspect-[4/3] w-full max-w-[280px] shrink-0 overflow-hidden rounded-xl border border-border/40 transition-all duration-300 hover:border-gold/40 hover:shadow-[0_8px_25px_rgba(201,168,76,0.15)] active:scale-[0.98] sm:aspect-[16/10] sm:w-56"
             aria-label="Deschide planul evenimentului"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={venueImage}
               alt={venueName ?? plan.title}
-              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+              className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-110"
               onError={(e) => {
                 e.currentTarget.src = "/images/backgrounds/party-dance.jpg";
               }}
             />
-            <span className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-colors group-hover:bg-black/80">
-              <ArrowRight className="h-4 w-4" />
+            <span className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-black/60 text-white backdrop-blur transition-all duration-200 group-hover:bg-gold group-hover:text-[#0D0D0D]">
+              <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </span>
           </Link>
         </div>
@@ -579,9 +579,9 @@ function HeroCard({
           </div>
           <Link
             href={`/cabinet/planifica/${plan.id}`}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-gold/40 px-4 py-2.5 text-sm font-medium text-gold hover:bg-gold/10"
+            className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-gold/40 px-4 py-2.5 text-sm font-medium text-gold transition-all duration-200 hover:border-gold hover:bg-gold/10 hover:shadow-[0_4px_14px_rgba(201,168,76,0.2)] active:scale-95"
           >
-            Vezi planul meu <ArrowRight className="h-4 w-4" />
+            Vezi planul meu <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
           </Link>
         </div>
       </div>
@@ -610,9 +610,9 @@ function NextStepCard({
   nextStep: { title: string; subtitle: string; href: string };
 }) {
   return (
-    <section className="flex flex-col gap-4 rounded-2xl border border-border/40 bg-card p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+    <section className="group/card flex flex-col gap-4 rounded-2xl border border-border/40 bg-card p-5 transition-all duration-300 hover:border-gold/20 hover:shadow-[0_4px_20px_rgba(201,168,76,0.05)] sm:flex-row sm:items-center sm:justify-between sm:p-6">
       <div className="flex min-w-0 items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold transition-transform duration-300 group-hover/card:scale-110 group-hover/card:rotate-3">
           <ClipboardList className="h-5 w-5" />
         </div>
         <div className="min-w-0">
@@ -629,9 +629,9 @@ function NextStepCard({
       </div>
       <Link
         href={nextStep.href}
-        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
+        className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-medium text-[#0D0D0D] transition-all duration-200 hover:bg-gold-dark hover:shadow-[0_4px_20px_rgba(201,168,76,0.35)] active:scale-95"
       >
-        Continuă organizarea <ArrowRight className="h-4 w-4" />
+        Continuă organizarea <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
       </Link>
     </section>
   );
@@ -704,18 +704,18 @@ function StatTile({
   return (
     <Link
       href={href}
-      className="flex items-center gap-4 rounded-2xl border border-border/40 bg-card p-4 transition-colors hover:border-gold/30"
+      className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-gold/30 hover:shadow-[0_8px_20px_rgba(201,168,76,0.08)] active:scale-[0.98]"
     >
       <div
         className={cn(
-          "flex h-12 w-12 shrink-0 items-center justify-center rounded-full ring-1",
+          "flex h-12 w-12 shrink-0 items-center justify-center rounded-full ring-1 transition-transform duration-200 group-hover:scale-110",
           tintMap[tint],
         )}
       >
         <Icon className="h-5 w-5" />
       </div>
       <div className="min-w-0">
-        <p className="font-heading text-2xl font-bold leading-tight">{big}</p>
+        <p className="font-heading text-2xl font-bold leading-tight transition-colors duration-200 group-hover:text-gold">{big}</p>
         <p className="text-xs text-muted-foreground">
           <span className="text-foreground/80">{primary}</span>
           {" "}
@@ -741,9 +741,9 @@ function ServicesStrip({
         </h3>
         <Link
           href={`/cabinet/planifica/${planId}?tab=bookings`}
-          className="inline-flex items-center gap-1 text-xs text-gold hover:underline"
+          className="group inline-flex items-center gap-1 text-xs text-gold transition-all duration-200 hover:gap-2 hover:underline"
         >
-          Vezi toate <ArrowRight className="h-3 w-3" />
+          Vezi toate <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
       {/* Horizontal-scroll on mobile so we never crush the 5 tiles into
@@ -784,20 +784,20 @@ function ServiceTileCard({
   return (
     <Link
       href={`/cabinet/planifica/${planId}?tab=${service.key === "venue" ? "venues" : "bookings"}`}
-      className="flex min-w-[7.5rem] flex-col items-center gap-2 rounded-xl border border-border/40 bg-background/40 p-3 text-center transition-colors hover:border-gold/40"
+      className="group flex min-w-[7.5rem] flex-col items-center gap-2 rounded-xl border border-border/40 bg-background/40 p-3 text-center transition-all duration-200 hover:-translate-y-1 hover:border-gold/40 hover:bg-background/70 hover:shadow-[0_8px_20px_rgba(201,168,76,0.08)] active:scale-[0.96]"
     >
       <div
         className={cn(
-          "flex h-10 w-10 items-center justify-center rounded-lg",
+          "flex h-10 w-10 items-center justify-center rounded-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3",
           statusCfg.iconBg,
         )}
       >
         <service.Icon className="h-5 w-5" />
       </div>
-      <p className="text-sm font-medium">{service.label}</p>
+      <p className="text-sm font-medium transition-colors duration-200 group-hover:text-gold">{service.label}</p>
       <span
         className={cn(
-          "rounded-full px-2 py-0.5 text-[10px] font-medium ring-1",
+          "rounded-full px-2 py-0.5 text-[10px] font-medium ring-1 transition-transform duration-200 group-hover:scale-105",
           statusCfg.pill,
         )}
       >
@@ -843,9 +843,9 @@ function BottomRow({
               <li key={c.id}>
                 <Link
                   href="/cabinet/mesaje"
-                  className="flex items-start gap-3 rounded-xl border border-transparent p-2 transition-colors hover:border-gold/30 hover:bg-gold/5"
+                  className="group flex items-start gap-3 rounded-xl border border-transparent p-2 transition-all duration-200 hover:translate-x-0.5 hover:border-gold/30 hover:bg-gold/5 active:scale-[0.99]"
                 >
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold/15 text-[11px] font-bold uppercase text-gold">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gold/15 text-[11px] font-bold uppercase text-gold transition-transform duration-200 group-hover:scale-110">
                     {(c.vendorName ?? "??").slice(0, 2)}
                   </div>
                   <div className="min-w-0 flex-1">
@@ -874,9 +874,9 @@ function BottomRow({
         )}
         <Link
           href="/cabinet/mesaje"
-          className="mt-auto inline-flex items-center gap-1 self-start pt-3 text-xs text-gold hover:underline"
+          className="group mt-auto inline-flex items-center gap-1 self-start pt-3 text-xs text-gold transition-all duration-200 hover:gap-2 hover:underline"
         >
-          Vezi toate mesajele <ArrowRight className="h-3 w-3" />
+          Vezi toate mesajele <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
 
@@ -926,16 +926,16 @@ function FeatureCard({
   return (
     <Link
       href={href}
-      className="flex items-center gap-4 rounded-2xl border border-border/40 bg-card p-5 transition-colors hover:border-gold/30"
+      className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-gold/30 hover:shadow-[0_8px_20px_rgba(201,168,76,0.08)] active:scale-[0.98]"
     >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold">
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-gold transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3">
         <Icon className="h-5 w-5" />
       </div>
       <div className="min-w-0 flex-1">
-        <h3 className="font-heading text-base font-bold">{title}</h3>
+        <h3 className="font-heading text-base font-bold transition-colors duration-200 group-hover:text-gold">{title}</h3>
         <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
       </div>
-      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-gold" />
     </Link>
   );
 }
