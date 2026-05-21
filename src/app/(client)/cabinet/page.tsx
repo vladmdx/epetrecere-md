@@ -80,7 +80,10 @@ interface ChecklistItem {
 
 interface Guest {
   id: number;
-  rsvp: "pending" | "yes" | "no" | "maybe";
+  // Matches the rsvp_status pg enum on guest_list (pending / accepted /
+  // declined / maybe). We had this typed as "yes/no" originally which
+  // never matched the DB enum — so the RSVP stat always rendered 0.
+  rsvp: "pending" | "accepted" | "declined" | "maybe";
   partySize: number;
 }
 
@@ -286,10 +289,13 @@ export default function ClientCabinetPage() {
     [conversations],
   );
 
+  // RSVP-confirmed seats: count partySize for every guest who replied
+  // "accepted". (The DB enum is accepted/declined/maybe/pending — not
+  // yes/no — see Guest interface above.)
   const rsvpYes = useMemo(
     () =>
       activeGuests
-        .filter((g) => g.rsvp === "yes")
+        .filter((g) => g.rsvp === "accepted")
         .reduce((sum, g) => sum + (g.partySize || 1), 0),
     [activeGuests],
   );
