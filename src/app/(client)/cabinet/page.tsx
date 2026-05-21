@@ -347,20 +347,42 @@ export default function ClientCabinetPage() {
     return null;
   }, [activePlan, services, activeChecklist]);
 
-  // Venue cover image — pulled from the venue booking if any. Falls back
-  // to a generic event-themed background.
-  const venueImage = useMemo(() => {
-    const venueBooking = planBookings.find(
-      (b) => b.venueId != null && b.venueSlug,
-    );
-    // We can't fetch venue.coverImage cheaply here — use the slug as a
-    // hint to a deterministic fallback. The CDN serves a "missing"
-    // placeholder so the layout never breaks.
-    if (venueBooking?.venueSlug) {
-      return `/images/venues/${venueBooking.venueSlug}.jpg`;
-    }
-    return "/images/backgrounds/party-dance.jpg";
+  // Venue cover image — fetched lazily by id from /api/venues/[id] so
+  // we get the actual uploaded cover (not a guessed file path). Falls
+  // back to a generic event-themed background when no venue is linked
+  // or the API call fails.
+  const venueId = useMemo(() => {
+    const b = planBookings.find((b) => b.venueId != null);
+    return b?.venueId ?? null;
   }, [planBookings]);
+  const [venueImage, setVenueImage] = useState<string>(
+    "/images/backgrounds/party-dance.jpg",
+  );
+  useEffect(() => {
+    if (!venueId) {
+      setVenueImage("/images/backgrounds/party-dance.jpg");
+      return;
+    }
+    let alive = true;
+    fetch(`/api/venues/${venueId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!alive || !d) return;
+        // /api/venues/[id] returns { ...venue, images: [...], reviews: [...] }
+        // — fields are flat at the root level. Try images[0].url first
+        // (uploaded cover), then any photoUrl/coverImageUrl alias.
+        const cover: string | null =
+          (Array.isArray(d.images) && d.images[0]?.url) ||
+          d.coverImageUrl ||
+          d.photoUrl ||
+          null;
+        if (cover) setVenueImage(cover);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [venueId]);
 
   const venueName = useMemo(() => {
     const venueBooking = planBookings.find((b) => b.venueId != null);
@@ -413,10 +435,15 @@ export default function ClientCabinetPage() {
             venueName={venueName}
             venueImage={venueImage}
             progressPct={progressPct}
-            progressLabel={
+            progressPrefix={
               activePlan.checklistEnabled && activeChecklist.length > 0
-                ? `Organizare ${progressPct}% completă`
-                : `Servicii confirmate ${progressPct}%`
+                ? "Organizare"
+                : "Servicii confirmate"
+            }
+            progressSuffix={
+              activePlan.checklistEnabled && activeChecklist.length > 0
+                ? "completă"
+                : ""
             }
           />
 
@@ -454,13 +481,20 @@ function HeroCard({
   venueName,
   venueImage,
   progressPct,
-  progressLabel,
+  progressPrefix,
+  progressSuffix,
 }: {
   plan: PlanSummary;
   venueName: string | null;
   venueImage: string;
   progressPct: number;
-  progressLabel: string;
+  /** Label parts so we can colour the percentage in gold between
+   *  prefix and suffix. The percentage is rendered separately to
+   *  avoid the "40% 40%" duplication a single-string template would
+   *  produce when there's no trailing word ("Servicii confirmate 40%"
+   *  has nothing after the number, "Organizare 35% completă" does). */
+  progressPrefix: string;
+  progressSuffix: string;
 }) {
   const dateLabel = plan.eventDate
     ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", {
@@ -530,12 +564,11 @@ function HeroCard({
         <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">
-              <span className="text-foreground">{progressLabel.split(" ")[0]} </span>
+              <span className="text-foreground">{progressPrefix} </span>
               <span className="text-gold">{progressPct}%</span>
-              <span className="text-foreground">
-                {" "}
-                {progressLabel.split(" ").slice(2).join(" ")}
-              </span>
+              {progressSuffix && (
+                <span className="text-foreground"> {progressSuffix}</span>
+              )}
             </p>
             <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <div
