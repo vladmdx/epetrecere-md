@@ -64,8 +64,10 @@ export async function getArtistStats(artistId: number): Promise<ArtistStats> {
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   const monthStartIso = monthStart.toISOString().slice(0, 10);
   const lastMonthStartIso = lastMonthStart.toISOString().slice(0, 10);
+  const nextMonthStartIso = nextMonthStart.toISOString().slice(0, 10);
 
   // Status values that count toward earned revenue. Includes accepted (price
   // agreed but client hasn't co-signed yet) so the partner sees a forward-
@@ -213,6 +215,7 @@ export async function getArtistStats(artistId: number): Promise<ArtistStats> {
           eq(bookingRequests.artistId, artistId),
           inArray(bookingRequests.status, earningStatuses),
           gte(bookingRequests.eventDate, monthStartIso),
+          lt(bookingRequests.eventDate, nextMonthStartIso),
         ),
       ),
     db
