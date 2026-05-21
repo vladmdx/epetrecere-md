@@ -887,8 +887,8 @@ function BottomRow({
           <FeatureCard
             Icon={Wallet}
             title="Buget"
-            description="Urmărește cheltuielile și planifică plățile."
-            href={`/cabinet/planifica/${plan.id}?tab=budget`}
+            description="Calculator de buget pentru evenimentul tău."
+            href="/calculatoare/buget"
           />
         )}
         {plan.momentsEnabled && (
