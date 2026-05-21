@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ePetrecere.md
 
-## Getting Started
+Marketplace pentru evenimente — web app (Next.js 15) + mobile app
+(React Native via Expo) pentru clienți care planifică evenimente și
+artiști/săli care le servesc.
 
-First, run the development server:
+## Repo layout — monorepo
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+.                           ← Next.js web app lives here at the root
+  src/                      ← web source
+  public/, scripts/, …      ← web assets, scripts, configs
+  packages/
+    shared/                 ← @epetrecere/shared — TS types, Zod
+                              validators, helpers used by BOTH web
+                              and mobile
+    mobile/                 ← @epetrecere/mobile — Expo React Native
+                              app for iOS + Android
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The web continues to live at the repo root so the Vercel deploy keeps
+working without any config changes. `packages/*` are siblings managed
+via npm workspaces.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Quick start
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+# Install both workspaces
+npm install
 
-## Learn More
+# Web (existing)
+npm run dev
 
-To learn more about Next.js, take a look at the following resources:
+# Mobile (Expo, requires .env first — see packages/mobile/README.md)
+npm run mobile
+# or
+npm run mobile:ios
+npm run mobile:android
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Workspaces
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+| Package | Purpose | Docs |
+|---|---|---|
+| (root) | Next.js 15 web app | This file + `AGENTS.md` |
+| `@epetrecere/shared` | Types, Zod schemas, formatters | `packages/shared/src/` |
+| `@epetrecere/mobile` | Expo RN app | `packages/mobile/README.md` |
 
-## Deploy on Vercel
+## Common scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run dev              # web dev server (port 3000)
+npm run build            # web production build (Vercel uses this)
+npm run typecheck        # web TS check
+npm run mobile           # Expo dev server (Metro)
+npm run mobile:typecheck # mobile TS check
+npm run db:studio        # Drizzle Studio (web DB)
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy
+
+- **Web** → Vercel auto-deploys `main` to `epetrecere.md`. No config
+  change from the monorepo migration — workspaces are transparent to
+  Next.js builds.
+- **Mobile** → EAS Build + EAS Submit. See `packages/mobile/README.md`
+  for the full guide.
