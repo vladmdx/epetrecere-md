@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -136,10 +137,19 @@ function formatDate(d: string | null): string {
 
 export default function VendorBookingsPage() {
   const { user, isLoaded } = useUser();
+  // Deep-link support: the partner dashboard sends users here with
+  // ?expand=<bookingId> when they click "Deschide cererea" or a row in
+  // the recent-requests list. We pre-open that booking on mount and
+  // scroll it into view so the partner lands on the right entry.
+  const searchParams = useSearchParams();
+  const expandParam = searchParams.get("expand");
+  const expandId = expandParam ? Number(expandParam) : null;
   const [loading, setLoading] = useState(true);
   const [artistId, setArtistId] = useState<number | null>(null);
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(
+    Number.isFinite(expandId) ? expandId : null,
+  );
   const [chats, setChats] = useState<Record<number, ChatMessage[]>>({});
   const [newMsg, setNewMsg] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
@@ -204,6 +214,17 @@ export default function VendorBookingsPage() {
       }
     })();
   }, [artistId]);
+
+  // Once bookings have rendered, scroll the deep-linked one into view.
+  // Wrapped in a small timeout so the layout has time to mount the card.
+  useEffect(() => {
+    if (!expandId || loading || bookings.length === 0) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById(`booking-${expandId}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 200);
+    return () => clearTimeout(t);
+  }, [expandId, loading, bookings.length]);
 
   async function requestReview(bookingId: number) {
     setBusy(bookingId);
@@ -650,7 +671,14 @@ export default function VendorBookingsPage() {
             return (
               <Card
                 key={booking.id}
-                className={cn("border-l-4 transition-all hover:border-gold/30", borderColor)}
+                id={`booking-${booking.id}`}
+                className={cn(
+                  "border-l-4 transition-all hover:border-gold/30",
+                  borderColor,
+                  isExpanded && booking.id === expandId
+                    ? "ring-2 ring-gold/40"
+                    : "",
+                )}
               >
                 <CardContent className="py-4">
                   <div className="flex items-start justify-between gap-4">

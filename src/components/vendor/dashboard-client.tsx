@@ -395,14 +395,14 @@ function NextEventCard({ event }: { event: NextEvent }) {
           {/* Actions */}
           <div className="flex flex-wrap gap-3 pt-1">
             <Link
-              href={`/dashboard/rezervari/${event.id}`}
+              href={`/dashboard/rezervari?expand=${event.id}`}
               className="group inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-medium text-[#0D0D0D] transition-all duration-200 hover:bg-gold-dark hover:shadow-[0_4px_20px_rgba(201,168,76,0.35)] active:scale-95"
             >
               <Eye className="h-4 w-4" /> Deschide cererea
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
             <Link
-              href={`/dashboard/mesaje?booking=${event.id}`}
+              href={`/dashboard/rezervari?expand=${event.id}#booking-${event.id}`}
               className="group inline-flex items-center gap-2 rounded-lg border border-border/60 px-4 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:border-gold/40 hover:bg-gold/5 active:scale-95"
             >
               <MessageSquare className="h-4 w-4" /> Mesaj client
@@ -470,7 +470,7 @@ function RecentRequestRow({ req }: { req: RecentRequest }) {
 
   return (
     <Link
-      href={`/dashboard/rezervari/${req.id}`}
+      href={`/dashboard/rezervari?expand=${req.id}`}
       className="group flex items-center gap-3 rounded-xl border border-transparent p-2 transition-all duration-200 hover:translate-x-0.5 hover:border-gold/30 hover:bg-gold/5 active:scale-[0.99]"
     >
       <div
