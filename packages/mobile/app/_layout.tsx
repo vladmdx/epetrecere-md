@@ -1,0 +1,93 @@
+// Root layout — wraps every route in the app.
+//
+// Sets up:
+//   - Clerk provider with secure-store token cache
+//   - SafeAreaProvider for notch/island-aware layouts
+//   - GestureHandlerRootView for Reanimated gestures
+//   - Status bar (light icons on dark theme)
+//   - Tailwind global stylesheet
+//
+// Navigation tree:
+//   /(auth)/sign-in     - public, only when signed-out
+//   /(client)/...       - default for user role
+//   /(partner)/...      - default for artist role
+// We route between them in `app/index.tsx` based on the Clerk session.
+
+import "../global.css";
+import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
+import * as SecureStore from "expo-secure-store";
+import { StatusBar } from "expo-status-bar";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Stack } from "expo-router";
+import { useFonts } from "expo-font";
+import { useEffect } from "react";
+import * as SplashScreen from "expo-splash-screen";
+
+// Keep the native splash visible until fonts load + Clerk hydrates so
+// users never see a flash of unstyled content.
+SplashScreen.preventAutoHideAsync();
+
+// Clerk token cache — uses expo-secure-store on device, NOT
+// AsyncStorage, because tokens should land in the iOS Keychain /
+// Android Keystore (encrypted, not readable from device backups).
+const tokenCache = {
+  async getToken(key: string) {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch {
+      return null;
+    }
+  },
+  async saveToken(key: string, value: string) {
+    try {
+      await SecureStore.setItemAsync(key, value);
+    } catch {
+      // No-op — Clerk handles the rejection by re-auth on next request.
+    }
+  },
+};
+
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? "";
+
+export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    // We'll ship Cormorant + Inter via expo-google-fonts in M1. For now
+    // the system fonts are an acceptable fallback while the project
+    // scaffolds.
+  });
+
+  useEffect(() => {
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!publishableKey) {
+    // We refuse to render anything without a Clerk key — better to
+    // crash loudly in dev than to render a half-broken auth flow that
+    // can't sign anyone in.
+    throw new Error(
+      "Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY — set it in .env or eas.json env block.",
+    );
+  }
+
+  return (
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <ClerkLoaded>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <SafeAreaProvider>
+            <StatusBar style="light" />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: "#0D0D0D" },
+                animation: "slide_from_right",
+              }}
+            />
+          </SafeAreaProvider>
+        </GestureHandlerRootView>
+      </ClerkLoaded>
+    </ClerkProvider>
+  );
+}

@@ -1,0 +1,31 @@
+node_modules/
+.expo/
+dist/
+npm-debug.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# macOS
+.DS_Store
+
+# Local env
+.env
+.env.local
+.env.*.local
+
+# Native build outputs
+ios/build/
+ios/Pods/
+ios/*.xcworkspace/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+
+# EAS
+google-play-service-account.json
