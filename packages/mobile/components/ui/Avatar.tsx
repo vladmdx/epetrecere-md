@@ -32,6 +32,8 @@ export function Avatar({
 }: Props) {
   return (
     <View
+      accessibilityRole="image"
+      accessibilityLabel={`Avatar ${name}`}
       className={cn(
         "items-center justify-center overflow-hidden rounded-full bg-muted",
         sizeClass,
