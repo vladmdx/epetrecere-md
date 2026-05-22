@@ -9,5 +9,6 @@
       "schedule": "0 4 * * *"
     }
   ],
-  "installCommand": "npm install --workspaces=false --legacy-peer-deps"
+  "installCommand": "npm install --workspaces=false --legacy-peer-deps",
+  "ignoreCommand": "sh scripts/vercel-ignore.sh"
 }
