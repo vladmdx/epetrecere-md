@@ -8,5 +8,6 @@
       "path": "/api/cron/expire-bookings",
       "schedule": "0 4 * * *"
     }
-  ]
+  ],
+  "installCommand": "npm install --omit=optional --include-workspace-root=false --workspaces=false --legacy-peer-deps"
 }
