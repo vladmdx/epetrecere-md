@@ -22,8 +22,9 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import * as SplashScreen from "expo-splash-screen";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { applyPersistedLocale } from "../lib/i18n";
 import {
   configureAndroidChannel,
@@ -64,6 +65,26 @@ export default function RootLayout() {
     // scaffolds.
   });
 
+  // Single QueryClient for the whole app. Sensible defaults:
+  //   - 2-min staleTime so card lists don't refetch on every screen
+  //     focus (mobile users tab around aggressively).
+  //   - 1 retry — the user's network is shaky enough that a single
+  //     retry usually wins; more retries delay the error toast.
+  const queryClient = useMemo(
+    () =>
+      new QueryClient({
+        defaultOptions: {
+          queries: {
+            staleTime: 2 * 60 * 1000,
+            gcTime: 10 * 60 * 1000,
+            retry: 1,
+            refetchOnWindowFocus: false,
+          },
+        },
+      }),
+    [],
+  );
+
   useEffect(() => {
     // Apply persisted locale override before the splash drops so the
     // user never sees a flash of the device-default language.
@@ -88,19 +109,21 @@ export default function RootLayout() {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ClerkLoaded>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <SafeAreaProvider>
-            <StatusBar style="light" />
-            <PushSetup />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: "#0D0D0D" },
-                animation: "slide_from_right",
-              }}
-            />
-          </SafeAreaProvider>
-        </GestureHandlerRootView>
+        <QueryClientProvider client={queryClient}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+              <StatusBar style="light" />
+              <PushSetup />
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: "#0D0D0D" },
+                  animation: "slide_from_right",
+                }}
+              />
+            </SafeAreaProvider>
+          </GestureHandlerRootView>
+        </QueryClientProvider>
       </ClerkLoaded>
     </ClerkProvider>
   );

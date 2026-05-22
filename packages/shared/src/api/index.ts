@@ -179,10 +179,13 @@ export const API_PATHS = {
   eventPlanChecklist: (id: number) => `/event-plans/${id}/checklist`,
 
   // Discovery
+  categories: "/categories",
   artists: "/artists",
   artist: (slug: string) => `/artists/${slug}`,
   venues: "/venues",
   venue: (slug: string) => `/venues/${slug}`,
+  wishlist: "/wishlist",
+  roleReference: "/me/role-preference",
 
   // Partner dashboard
   artistDashboard: "/me/artist/dashboard",
