@@ -23,6 +23,7 @@
         "NSPhotoLibraryUsageDescription": "ePetrecere are nevoie de acces la galerie ca să poți încărca poze ale evenimentului tău.",
         "NSPhotoLibraryAddUsageDescription": "ePetrecere salvează pozele descărcate din highlight reel în galeria ta.",
         "NSLocationWhenInUseUsageDescription": "ePetrecere folosește locația pentru a-ți arăta artiști și săli din apropierea ta.",
+        "NSMicrophoneUsageDescription": "ePetrecere are nevoie de acces la microfon pentru a transcrie întrebările tale către asistentul AI.",
         "NSUserTrackingUsageDescription": "Permite ePetrecere să măsoare anonim performanța aplicației ca să îți oferim o experiență mai bună. Nu împărtășim datele cu terți.",
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -37,6 +38,7 @@
       },
       "permissions": [
         "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.ACCESS_COARSE_LOCATION",
