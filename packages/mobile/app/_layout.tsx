@@ -14,7 +14,8 @@
 // We route between them in `app/index.tsx` based on the Clerk session.
 
 import "../global.css";
-import { ClerkProvider, ClerkLoaded } from "@clerk/clerk-expo";
+import "../lib/i18n"; // boots i18next before any screen renders
+import { ClerkProvider, ClerkLoaded, useAuth } from "@clerk/clerk-expo";
 import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -23,6 +24,12 @@ import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { useEffect } from "react";
 import * as SplashScreen from "expo-splash-screen";
+import { applyPersistedLocale } from "../lib/i18n";
+import {
+  configureAndroidChannel,
+  listenForNotificationTaps,
+  registerPushToken,
+} from "../lib/push";
 
 // Keep the native splash visible until fonts load + Clerk hydrates so
 // users never see a flash of unstyled content.
@@ -58,6 +65,12 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
+    // Apply persisted locale override before the splash drops so the
+    // user never sees a flash of the device-default language.
+    void applyPersistedLocale();
+  }, []);
+
+  useEffect(() => {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
@@ -78,6 +91,7 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
             <StatusBar style="light" />
+            <PushSetup />
             <Stack
               screenOptions={{
                 headerShown: false,
@@ -90,4 +104,30 @@ export default function RootLayout() {
       </ClerkLoaded>
     </ClerkProvider>
   );
+}
+
+/** Effect-only component that registers the device push token once
+ *  Clerk has a session, and tears down the tap-listener on unmount.
+ *  Kept separate so it can use the `useAuth` hook (which can't be
+ *  called above ClerkProvider). */
+function PushSetup() {
+  const { isLoaded, isSignedIn, getToken } = useAuth();
+
+  useEffect(() => {
+    void configureAndroidChannel();
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn) return;
+    void registerPushToken({
+      apiUrl: process.env.EXPO_PUBLIC_API_URL ?? "",
+      getToken: async () => getToken(),
+    });
+  }, [isLoaded, isSignedIn, getToken]);
+
+  useEffect(() => {
+    return listenForNotificationTaps();
+  }, []);
+
+  return null;
 }
