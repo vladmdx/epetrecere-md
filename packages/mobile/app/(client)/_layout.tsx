@@ -26,6 +26,16 @@ export default function ClientLayout() {
         name="map"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
       />
+      <Stack.Screen name="plan/[id]" />
+      <Stack.Screen name="chat/[id]" />
+      <Stack.Screen name="chat-list" />
+      <Stack.Screen name="bookings/index" />
+      <Stack.Screen name="bookings/[id]" />
+      <Stack.Screen name="moments/[id]" />
+      <Stack.Screen
+        name="booking-new"
+        options={{ presentation: "modal", animation: "slide_from_bottom" }}
+      />
     </Stack>
   );
 }
