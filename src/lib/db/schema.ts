@@ -1803,3 +1803,48 @@ export const invitationGuestsRelations = relations(
     }),
   }),
 );
+
+// ═══════════════════════════════════════════════════════
+// PUSH NOTIFICATIONS (mobile)
+//
+// Mobile devices register their Expo push token here so we can fan
+// out notifications when a booking event lands. A single user can
+// have multiple tokens (phone + tablet) and each row tracks when it
+// was last refreshed so we can prune stale ones (Apple/Google
+// recycle tokens — typical lifetime is 60 days of inactivity).
+// ═══════════════════════════════════════════════════════
+
+export const pushTokens = pgTable(
+  "push_tokens",
+  {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    /** Expo push token, e.g. "ExponentPushToken[xxx]". Stored verbatim
+     *  so the Expo push service accepts it. We do NOT store raw FCM /
+     *  APNs tokens — Expo abstracts those. */
+    expoToken: text("expo_token").notNull(),
+    platform: text("platform").notNull(), // "ios" | "android"
+    deviceLabel: text("device_label"), // e.g. "iPhone 17 Pro"
+    /** Bumped every time the mobile app starts and re-registers its
+     *  token. Lets a cron prune rows untouched for >60 days. */
+    lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => [
+    // One token per user can only be registered once; if the same
+    // device opens the app from a different account, the older row
+    // gets owned by the new userId. Unique on the token alone keeps
+    // the constraint clean.
+    uniqueIndex("idx_push_token_unique").on(t.expoToken),
+    index("idx_push_user").on(t.userId),
+  ],
+);
+
+export const pushTokensRelations = relations(pushTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [pushTokens.userId],
+    references: [users.id],
+  }),
+}));
