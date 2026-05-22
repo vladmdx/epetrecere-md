@@ -15,7 +15,11 @@
 
 import "../global.css";
 import "../lib/i18n"; // boots i18next before any screen renders
-import { ClerkProvider, ClerkLoaded, useAuth } from "@clerk/clerk-expo";
+import { initSentry, setSentryUser } from "../lib/sentry";
+// Init Sentry as the very first thing in app boot so any error
+// thrown during ClerkProvider hydration gets reported. Idempotent.
+initSentry();
+import { ClerkProvider, ClerkLoaded, useAuth, useUser } from "@clerk/clerk-expo";
 import * as SecureStore from "expo-secure-store";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -24,8 +28,14 @@ import { Stack } from "expo-router";
 import { useFonts } from "expo-font";
 import { useEffect, useMemo } from "react";
 import * as SplashScreen from "expo-splash-screen";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { applyPersistedLocale } from "../lib/i18n";
+import { PostHogProvider } from "../lib/posthog";
+import { useAppFocusSync } from "../lib/use-app-focus-sync";
 import {
   configureAndroidChannel,
   listenForNotificationTaps,
@@ -70,13 +80,16 @@ export default function RootLayout() {
   //     focus (mobile users tab around aggressively).
   //   - 1 retry — the user's network is shaky enough that a single
   //     retry usually wins; more retries delay the error toast.
+  //   - 24-hour gcTime so hydrated cache survives long enough to
+  //     hand the user content the next time they open the app, even
+  //     after a few hours offline.
   const queryClient = useMemo(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
             staleTime: 2 * 60 * 1000,
-            gcTime: 10 * 60 * 1000,
+            gcTime: 24 * 60 * 60 * 1000,
             retry: 1,
             refetchOnWindowFocus: false,
           },
@@ -84,6 +97,24 @@ export default function RootLayout() {
       }),
     [],
   );
+
+  // AsyncStorage-backed persister. We bust the cache when the app
+  // version bumps so a release with breaking response shapes can't
+  // hydrate stale rows into a fresh client.
+  const persister = useMemo(
+    () =>
+      createAsyncStoragePersister({
+        storage: AsyncStorage,
+        // Throttle writes — TanStack defaults to 1s; bumping to 2s
+        // halves the disk churn on chatty screens (chat thread, search).
+        throttleTime: 2_000,
+        // Key namespaced so other AsyncStorage keys can't collide.
+        key: "epetrecere.rq-cache.v1",
+      }),
+    [],
+  );
+
+  const APP_VERSION = Constants.expoConfig?.version ?? "0.0.0";
 
   useEffect(() => {
     // Apply persisted locale override before the splash drops so the
@@ -109,24 +140,78 @@ export default function RootLayout() {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <ClerkLoaded>
-        <QueryClientProvider client={queryClient}>
+        <PersistQueryClientProvider
+          client={queryClient}
+          persistOptions={{
+            persister,
+            maxAge: 24 * 60 * 60 * 1000,
+            buster: APP_VERSION,
+            // Skip persisting auth-y queries that change session-by-session.
+            // The booleans + simple equality keep this dehydrate filter
+            // cheap to run for every mutation.
+            dehydrateOptions: {
+              shouldDehydrateQuery: (q) => {
+                const key = q.queryKey?.[0];
+                // Don't persist chat threads (they poll constantly and
+                // would write to disk every ~8s) or anything tagged
+                // explicitly as ephemeral.
+                if (
+                  typeof key === "string" &&
+                  (key === "chat-messages" ||
+                    key === "conversation-meta" ||
+                    key.startsWith("__ephemeral"))
+                ) {
+                  return false;
+                }
+                return q.state.status === "success";
+              },
+            },
+          }}
+        >
           <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
-              <StatusBar style="light" />
-              <PushSetup />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: "#0D0D0D" },
-                  animation: "slide_from_right",
-                }}
-              />
+              <PostHogProvider>
+                <StatusBar style="light" />
+                <PushSetup />
+                <FocusSync />
+                <SentryUserTag />
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: { backgroundColor: "#0D0D0D" },
+                    animation: "slide_from_right",
+                  }}
+                />
+              </PostHogProvider>
             </SafeAreaProvider>
           </GestureHandlerRootView>
-        </QueryClientProvider>
+        </PersistQueryClientProvider>
       </ClerkLoaded>
     </ClerkProvider>
   );
+}
+
+/** Effect-only — kicks the focus sync hook. Must live inside the
+ *  PersistQueryClientProvider so useQueryClient resolves. */
+function FocusSync() {
+  useAppFocusSync();
+  return null;
+}
+
+/** Tag Sentry with the signed-in user as soon as Clerk produces one. */
+function SentryUserTag() {
+  const { user } = useUser();
+  useEffect(() => {
+    setSentryUser(
+      user
+        ? {
+            id: user.id,
+            email: user.primaryEmailAddress?.emailAddress,
+          }
+        : null,
+    );
+  }, [user]);
+  return null;
 }
 
 /** Effect-only component that registers the device push token once

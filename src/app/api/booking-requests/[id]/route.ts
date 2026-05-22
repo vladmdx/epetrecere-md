@@ -6,6 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { sendEmail } from "@/lib/email/send";
 import { reviewRequestEmail } from "@/lib/email/templates/review-request";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
+import { sendPushToUser, type PushKind } from "@/lib/push/expo";
 
 // UPDATE booking request — drives the bilateral confirmation flow (M0b #9):
 //   action=accept          → artist accepts, status becomes "accepted"
@@ -723,6 +724,30 @@ export async function PUT(
               ctaText: "Vezi detalii →",
               emoji: action === "accept" ? "🎉" : "📩",
             }),
+          });
+          // Mobile push for the client — deep-links to the booking
+          // detail on the client side so they can confirm + chat.
+          const pushKind: PushKind =
+            action === "accept"
+              ? "booking_accepted"
+              : action === "reject"
+                ? "booking_rejected"
+                : "booking_price_proposed";
+          void sendPushToUser({
+            userId: booking.clientUserId,
+            title:
+              action === "accept"
+                ? `${vendorName} a confirmat`
+                : action === "reject"
+                  ? `${vendorName} a refuzat`
+                  : `${vendorName} a propus un preț`,
+            body:
+              action === "accept"
+                ? `Rezervarea ta pe ${booking.eventDate} este acceptată. Confirmă din aplicație.`
+                : action === "reject"
+                  ? reply || "Vezi detaliile în aplicație."
+                  : `Vezi noua propunere și acceptă sau contraoferă.`,
+            data: { kind: pushKind, id: Number(id) },
           });
         } else if (booking.clientEmail) {
           const { sendEmail } = await import("@/lib/email/send");

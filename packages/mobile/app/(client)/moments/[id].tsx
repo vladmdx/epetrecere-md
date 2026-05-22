@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-expo";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { CameraView, useCameraPermissions, BarcodeScanningResult } from "expo-camera";
@@ -59,6 +60,7 @@ export default function MomentsScreen() {
   const planId = Number(id);
   const router = useRouter();
   const api = useApi();
+  const { getToken } = useAuth();
   const qc = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [showScanner, setShowScanner] = useState(false);
@@ -78,28 +80,42 @@ export default function MomentsScreen() {
 
   const uploadMutation = useMutation({
     mutationFn: async (asset: ImagePicker.ImagePickerAsset) => {
+      // Two-step upload:
+      //   1) POST the file as multipart to /api/v1/upload — server returns
+      //      the persisted URL (Vercel Blob or local fs depending on env).
+      //   2) POST the URL to /api/v1/event-plans/[id]/photos as JSON.
+      // This is cleaner than streaming through the photos endpoint
+      // because /upload already handles MIME validation + rate limit.
+      const token = await getToken();
+      if (!token) throw new Error("not_authenticated");
+
       const form = new FormData();
-      // RN FormData accepts {uri, name, type} for file blobs.
       form.append("file", {
         uri: asset.uri,
         name: asset.fileName ?? `photo-${Date.now()}.jpg`,
         type: asset.mimeType ?? "image/jpeg",
       } as unknown as Blob);
-      const res = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}${API_PATHS.eventPlanPhotos(planId)}`,
+      form.append("folder", "uploads");
+
+      const uploadRes = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL}/upload`,
         {
           method: "POST",
-          headers: {
-            // No Content-Type — fetch sets multipart boundary itself.
-            // Authorization handled by the api client; for FormData
-            // we duplicate the bearer header inline.
-            Authorization: `Bearer ${"placeholder-token-handled-by-clerk"}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
           body: form,
         },
       );
-      if (!res.ok) throw new Error(`upload_failed_${res.status}`);
-      return res.json();
+      if (!uploadRes.ok) throw new Error(`upload_failed_${uploadRes.status}`);
+      const { url } = (await uploadRes.json()) as { url: string };
+
+      // Now register the photo with the event plan
+      const registerRes = await api.post(API_PATHS.eventPlanPhotos(planId), {
+        url,
+        width: asset.width,
+        height: asset.height,
+      });
+      if (!registerRes.ok) throw new Error("register_failed");
+      return registerRes.data;
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["plan", planId, "photos"] });

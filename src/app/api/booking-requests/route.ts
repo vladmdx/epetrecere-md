@@ -8,6 +8,7 @@ import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
+import { sendPushToUser } from "@/lib/push/expo";
 import { sendEmail } from "@/lib/email/send";
 import { bookingRequestNewEmail } from "@/lib/email/templates/booking-request-new";
 
@@ -612,6 +613,15 @@ export async function POST(req: NextRequest) {
           title: "Cerere nouă de rezervare",
           message: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} · ${parsed.data.eventDate}${timePart}`,
           actionUrl: dashboardUrl,
+        });
+        // Mobile push (fire-and-forget). The mobile app's push tap
+        // handler reads `data.kind` and routes to the inbox with the
+        // booking expanded.
+        void sendPushToUser({
+          userId: artist.userId,
+          title: "Cerere nouă de rezervare",
+          body: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} pe ${parsed.data.eventDate}`,
+          data: { kind: "booking_new", id: booking.id },
         });
 
         // Spec 2.8 — pending-conflict alert: if 2+ pending requests now
