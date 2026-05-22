@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { chatMessages, conversations, users, artists, venues } from "@/lib/db/schema";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
+import { sendPushToUser } from "@/lib/push/expo";
 
 // M0b #10 — Messages for a persistent client↔artist conversation.
 // GET  lists messages (oldest → newest, capped at 200) and resets the caller's
@@ -264,6 +265,13 @@ export async function POST(
               emoji: "💬",
             }),
           });
+          // Mobile push to client — deep-link opens the chat thread.
+          void sendPushToUser({
+            userId: clientUser.id,
+            title: vendorName,
+            body: preview,
+            data: { kind: "message_new", id: conversationId },
+          });
         }
       } else {
         // Client sent a message → notify the vendor
@@ -283,6 +291,13 @@ export async function POST(
               ctaText: "Răspunde →",
               emoji: "💬",
             }),
+          });
+          // Mobile push to vendor — same deep-link contract.
+          void sendPushToUser({
+            userId: vendorUserId,
+            title: senderName,
+            body: preview,
+            data: { kind: "message_new", id: conversationId },
           });
         }
       }
