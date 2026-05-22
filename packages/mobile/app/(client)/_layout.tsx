@@ -31,6 +31,11 @@ export default function ClientLayout() {
       <Stack.Screen name="chat-list" />
       <Stack.Screen name="bookings/index" />
       <Stack.Screen name="bookings/[id]" />
+      <Stack.Screen name="moments/[id]" />
+      <Stack.Screen
+        name="booking-new"
+        options={{ presentation: "modal", animation: "slide_from_bottom" }}
+      />
     </Stack>
   );
 }

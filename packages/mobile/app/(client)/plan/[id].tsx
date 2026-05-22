@@ -31,11 +31,12 @@ import {
   CheckCircle,
   Clock,
   Camera,
-  ClipboardCheck,
   Sparkles,
 } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Card, ProgressBar, Badge } from "../../../components/ui";
+import { Card, ProgressBar } from "../../../components/ui";
+import { ChecklistTab } from "../../../components/plan/ChecklistTab";
+import { GuestsTab } from "../../../components/plan/GuestsTab";
 import { colors } from "../../../constants/theme";
 import { useApi } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
@@ -179,8 +180,8 @@ export default function PlanDetailScreen() {
         }}
       >
         {activeTab === "overview" && <OverviewTab detail={detail} />}
-        {activeTab === "checklist" && <ChecklistTabStub />}
-        {activeTab === "guests" && <GuestsTabStub />}
+        {activeTab === "checklist" && <ChecklistTab planId={planId} />}
+        {activeTab === "guests" && <GuestsTab planId={planId} />}
         {activeTab === "bookings" && <BookingsTabStub />}
         {activeTab === "moments" && (
           <MomentsTab
@@ -399,14 +400,8 @@ function useCountdown(eventDate: string | null) {
   }, [eventDate, now]);
 }
 
-// ─── Tab stubs (filled out in M3.5) ───────────────────
+// ─── Tab stubs (filled out next phase) ───────────────────
 
-function ChecklistTabStub() {
-  return <TabPlaceholder Icon={ClipboardCheck} title="Checklist" />;
-}
-function GuestsTabStub() {
-  return <TabPlaceholder Icon={Users} title="Invitați" />;
-}
 function BookingsTabStub() {
   return <TabPlaceholder Icon={Clock} title="Rezervări" />;
 }
@@ -428,7 +423,7 @@ function TabPlaceholder({
   Icon,
   title,
 }: {
-  Icon: typeof ClipboardCheck;
+  Icon: typeof Clock;
   title: string;
 }) {
   return (
