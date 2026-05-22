@@ -57,6 +57,13 @@ export function ProgressBar({
 
   return (
     <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{
+        min: 0,
+        max: 100,
+        now: Math.round(clamped),
+        text: `${Math.round(clamped)}%`,
+      }}
       className={className}
       style={{
         height,

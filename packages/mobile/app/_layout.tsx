@@ -35,6 +35,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 import { applyPersistedLocale } from "../lib/i18n";
 import { PostHogProvider } from "../lib/posthog";
+import { ThemeProvider } from "../lib/theme";
+import { ErrorBoundary } from "../components/ErrorBoundary";
 import { useAppFocusSync } from "../lib/use-app-focus-sync";
 import {
   configureAndroidChannel,
@@ -168,23 +170,27 @@ export default function RootLayout() {
             },
           }}
         >
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <SafeAreaProvider>
-              <PostHogProvider>
-                <StatusBar style="light" />
-                <PushSetup />
-                <FocusSync />
-                <SentryUserTag />
-                <Stack
-                  screenOptions={{
-                    headerShown: false,
-                    contentStyle: { backgroundColor: "#0D0D0D" },
-                    animation: "slide_from_right",
-                  }}
-                />
-              </PostHogProvider>
-            </SafeAreaProvider>
-          </GestureHandlerRootView>
+          <ErrorBoundary>
+            <ThemeProvider>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <SafeAreaProvider>
+                  <PostHogProvider>
+                    <StatusBar style="light" />
+                    <PushSetup />
+                    <FocusSync />
+                    <SentryUserTag />
+                    <Stack
+                      screenOptions={{
+                        headerShown: false,
+                        contentStyle: { backgroundColor: "#0D0D0D" },
+                        animation: "slide_from_right",
+                      }}
+                    />
+                  </PostHogProvider>
+                </SafeAreaProvider>
+              </GestureHandlerRootView>
+            </ThemeProvider>
+          </ErrorBoundary>
         </PersistQueryClientProvider>
       </ClerkLoaded>
     </ClerkProvider>
