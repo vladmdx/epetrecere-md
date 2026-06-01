@@ -9,7 +9,9 @@
       "distribution": "internal",
       "channel": "development",
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://epetrecere.md/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://epetrecere.md/api/v1",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuZXBldHJlY2VyZS5tZCQ",
+        "NODE_OPTIONS": "--max-old-space-size=8192"
       }
     },
     "preview": {
@@ -23,7 +25,9 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://epetrecere.md/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://epetrecere.md/api/v1",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuZXBldHJlY2VyZS5tZCQ",
+        "NODE_OPTIONS": "--max-old-space-size=8192"
       }
     },
     "production": {
@@ -36,7 +40,9 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://epetrecere.md/api/v1"
+        "EXPO_PUBLIC_API_URL": "https://epetrecere.md/api/v1",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuZXBldHJlY2VyZS5tZCQ",
+        "NODE_OPTIONS": "--max-old-space-size=8192"
       }
     }
   },

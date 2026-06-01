@@ -95,15 +95,15 @@
         "origin": false
       },
       "eas": {
-        "projectId": "TBD-fill-after-eas-init"
+        "projectId": "fc473892-d471-4fce-99d9-5b350c51e6a0"
       }
     },
     "updates": {
-      "url": "https://u.expo.dev/TBD-fill-after-eas-init"
+      "url": "https://u.expo.dev/fc473892-d471-4fce-99d9-5b350c51e6a0"
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "TBD-fill-with-expo-org-handle"
+    "owner": "vladmdx"
   }
 }
