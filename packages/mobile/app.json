@@ -26,8 +26,7 @@
         "NSMicrophoneUsageDescription": "ePetrecere are nevoie de acces la microfon pentru a transcrie întrebările tale către asistentul AI.",
         "NSUserTrackingUsageDescription": "Permite ePetrecere să măsoare anonim performanța aplicației ca să îți oferim o experiență mai bună. Nu împărtășim datele cu terți.",
         "ITSAppUsesNonExemptEncryption": false
-      },
-      "associatedDomains": ["applinks:epetrecere.md"]
+      }
     },
     "android": {
       "package": "md.epetrecere.app",
