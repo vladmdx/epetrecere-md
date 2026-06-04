@@ -1,5 +1,8 @@
-// Expo + NativeWind v4 + Reanimated. Order matters: NativeWind must run
-// before Reanimated; Reanimated plugin must be last. Don't reorder.
+// Expo SDK 54 + NativeWind v4.2 + Reanimated 4.
+// babel-preset-expo automatically adds the react-native-worklets/plugin
+// (Reanimated 4) when react-native-worklets is installed. Do NOT add
+// react-native-reanimated/plugin or react-native-worklets/plugin manually —
+// doing so double-registers the plugin and breaks the build.
 
 module.exports = function (api) {
   api.cache(true);
@@ -7,10 +10,6 @@ module.exports = function (api) {
     presets: [
       ["babel-preset-expo", { jsxImportSource: "nativewind" }],
       "nativewind/babel",
-    ],
-    plugins: [
-      // Reanimated MUST be the last plugin in the list.
-      "react-native-reanimated/plugin",
     ],
   };
 };
