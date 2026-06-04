@@ -49,9 +49,9 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "TBD-fill-with-apple-developer-email",
-        "ascAppId": "TBD-fill-with-app-store-connect-app-id",
-        "appleTeamId": "TBD-fill-with-apple-developer-team-id"
+        "ascApiKeyPath": "./credentials/AuthKey_32F8XDP8TG.p8",
+        "ascApiKeyId": "32F8XDP8TG",
+        "ascApiKeyIssuerId": "e1bc8239-40ff-47f8-ab49-a533302b4ef7"
       },
       "android": {
         "serviceAccountKeyPath": "./google-play-service-account.json",

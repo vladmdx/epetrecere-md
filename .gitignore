@@ -51,3 +51,7 @@ next-env.d.ts
 /e2e-report/
 /e2e/.auth/
 /playwright-report/
+
+# Apple credentials (.p8 keys)
+packages/mobile/credentials/
+*.p8
