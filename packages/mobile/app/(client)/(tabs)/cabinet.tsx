@@ -149,6 +149,12 @@ const SERVICE_BUCKETS = [
 
 type ServiceStatus = "confirmed" | "pending" | "missing";
 
+// The in-app budget calculator (/(client)/budget-calculator) is still a
+// ComingSoon stub, so advertising a tappable "Buget" card here is a
+// dead-end CTA. Keep the card gated off until the calculator ships, then
+// flip this to true (or remove the flag) to re-enable it.
+const BUDGET_CALCULATOR_READY = false;
+
 export default function CabinetScreen() {
   const { user } = useUser();
   const { isSignedIn } = useAuth();
@@ -739,7 +745,7 @@ function BottomRow({
       </Card>
 
       {/* Buget OR Photo Moments OR Recenzii fallback */}
-      {plan.budgetEnabled && (
+      {BUDGET_CALCULATOR_READY && plan.budgetEnabled && (
         <FeatureCard
           Icon={Wallet}
           title="Buget"

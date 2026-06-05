@@ -75,12 +75,12 @@ export default function AccountTab() {
         <Row
           Icon={User}
           label="Editează profilul"
-          onPress={() => router.push("/(client)/account/profile-edit")}
+          onPress={() => router.push("/(client)/settings/profile-edit")}
         />
         <Row
           Icon={Star}
           label="Recenzii date de mine"
-          onPress={() => router.push("/(client)/account/reviews")}
+          onPress={() => router.push("/(client)/settings/reviews")}
         />
       </Section>
 
@@ -94,7 +94,7 @@ export default function AccountTab() {
         <Row
           Icon={Bell}
           label="Notificări"
-          onPress={() => router.push("/(client)/account/notifications")}
+          onPress={() => router.push("/(client)/settings/notifications")}
         />
       </Section>
 

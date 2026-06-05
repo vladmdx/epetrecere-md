@@ -10,22 +10,25 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-expo";
 import { Heart, X } from "lucide-react-native";
-import { SafeScreen, Card, Avatar, Badge } from "../../../components/ui";
+import { SafeScreen, Card, Avatar } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { useApi } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
 
+// Field names mirror the wishlist handler payload exactly
+// (src/app/api/wishlist/route.ts builds each item with these keys).
+// The handler does NOT return photoUrl/isPremium/ratingAvg/ratingCount —
+// the cover image is `coverImageUrl`, and premium/rating data isn't selected.
 interface WishlistItem {
   entityType: "artist" | "venue";
   entityId: number;
   name: string;
   slug: string;
-  photoUrl: string | null;
-  ratingAvg: number | null;
-  ratingCount: number;
-  isPremium: boolean;
+  coverImageUrl: string | null;
   city: string | null;
   priceFrom: number | null;
+  categories: { id: number; name: string; slug: string }[];
+  addedAt: string;
 }
 
 export default function FavoritesScreen() {
@@ -130,7 +133,7 @@ function FavoriteRow({
     <Card onPress={onPress} className="flex-row gap-3 p-3">
       <View className="h-20 w-20 overflow-hidden rounded-xl">
         <Avatar
-          uri={item.photoUrl}
+          uri={item.coverImageUrl}
           name={item.name}
           sizeClass="h-full w-full"
         />
@@ -154,7 +157,9 @@ function FavoriteRow({
           </Text>
         </View>
         <View className="flex-row items-center justify-between">
-          {item.isPremium && <Badge tone="gold" size="sm">Premium</Badge>}
+          {/* The wishlist handler does not return an isPremium flag for
+              saved artists/venues, so the Premium badge was dead UI and
+              has been removed. Re-add it once the API selects isPremium. */}
           {item.priceFrom != null && (
             <Text className="ml-auto text-[12px] font-semibold text-gold">
               de la {item.priceFrom} €

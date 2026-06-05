@@ -11,16 +11,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const venueId = Number(id);
-  if (isNaN(venueId)) {
-    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
-  }
-
-  const result = await db.select().from(venues).where(eq(venues.id, venueId)).limit(1);
+  // Accept either a numeric id OR a slug (public catalog + the mobile app,
+  // which links venues by slug). Resolve the row first, then use its numeric
+  // id for the related sub-queries below.
+  const numericId = Number(id);
+  const result = await db
+    .select()
+    .from(venues)
+    .where(Number.isNaN(numericId) ? eq(venues.slug, id) : eq(venues.id, numericId))
+    .limit(1);
   const venue = result[0];
   if (!venue) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const venueId = venue.id;
 
   const [images, venueReviews] = await Promise.all([
     db.select().from(venueImages).where(eq(venueImages.venueId, venueId)).orderBy(asc(venueImages.sortOrder)),

@@ -51,6 +51,7 @@ export function PostHogProvider({ children }: ProviderProps) {
     >
       <Identifier />
       <ScreenTracker />
+      <InstanceCapture />
       {children}
     </RawPostHogProvider>
   );
@@ -76,6 +77,24 @@ function Identifier() {
   return null;
 }
 
+// Module-level handle to the live PostHog instance, captured from React
+// context by <InstanceCapture /> below. posthog-react-native exposes the
+// instance ONLY through `usePostHog()` and never assigns any global, so
+// non-component callers of track() read it from here.
+let _posthog: { capture: (e: string, p?: object) => void } | null = null;
+
+/** Capture the context instance into the module-level handle for track(). */
+function InstanceCapture() {
+  const posthog = usePostHog();
+  useEffect(() => {
+    _posthog = posthog ?? null;
+    return () => {
+      _posthog = null;
+    };
+  }, [posthog]);
+  return null;
+}
+
 /** Fire `$screen` whenever the pathname changes. */
 function ScreenTracker() {
   const pathname = usePathname();
@@ -92,10 +111,11 @@ function ScreenTracker() {
  *  returns a no-op when the key is missing. */
 export function track(event: string, props?: Record<string, unknown>) {
   if (!POSTHOG_KEY) return;
-  // Late binding via a global reference — posthog-react-native sets
-  // window/global.posthog on init.
-  const ph = (globalThis as unknown as { posthog?: { capture: (e: string, p?: object) => void } }).posthog;
-  ph?.capture(event, props);
+  // posthog-react-native does NOT attach the instance to any global — it
+  // lives only in React context. <InstanceCapture /> mirrors it into the
+  // module-level `_posthog` handle, which we read here. Stays a no-op until
+  // the provider has mounted (or when no key is configured).
+  _posthog?.capture(event, props);
 }
 
 // Re-export the hook so screen-level code can call analytics

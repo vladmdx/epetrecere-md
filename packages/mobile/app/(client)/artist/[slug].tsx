@@ -62,8 +62,8 @@ interface ArtistDetail {
   images?: { id: number; url: string; isCover?: boolean }[];
   packages?: {
     id: number;
-    title: string;
-    description: string | null;
+    nameRo: string;
+    descriptionRo: string | null;
     price: number;
     durationHours: number | null;
   }[];
@@ -71,7 +71,7 @@ interface ArtistDetail {
     id: number;
     authorName: string;
     rating: number;
-    comment: string | null;
+    text: string | null;
     createdAt: string;
   }[];
 }
@@ -249,11 +249,11 @@ export default function ArtistDetailScreen() {
                     <View className="flex-row items-start justify-between gap-3">
                       <View className="flex-1">
                         <Text className="text-[15px] font-semibold text-foreground">
-                          {pkg.title}
+                          {pkg.nameRo}
                         </Text>
-                        {pkg.description && (
+                        {pkg.descriptionRo && (
                           <Text className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
-                            {pkg.description}
+                            {pkg.descriptionRo}
                           </Text>
                         )}
                         {pkg.durationHours && (
@@ -303,9 +303,9 @@ export default function ArtistDetailScreen() {
                         ))}
                       </View>
                     </View>
-                    {r.comment && (
+                    {r.text && (
                       <Text className="mt-1 text-[13px] leading-5 text-foreground/85">
-                        {r.comment}
+                        {r.text}
                       </Text>
                     )}
                   </Card>

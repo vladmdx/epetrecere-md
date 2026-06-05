@@ -36,6 +36,16 @@ export default function ClientLayout() {
         name="booking-new"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
       />
+      {/* Planning + settings + placeholders — added to fix Unmatched Route */}
+      <Stack.Screen
+        name="planning"
+        options={{ presentation: "modal", animation: "slide_from_bottom" }}
+      />
+      <Stack.Screen name="budget-calculator" />
+      <Stack.Screen name="moments/scan-result" />
+      <Stack.Screen name="settings/profile-edit" />
+      <Stack.Screen name="settings/reviews" />
+      <Stack.Screen name="settings/notifications" />
     </Stack>
   );
 }

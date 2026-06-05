@@ -24,13 +24,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-expo";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
-import { CameraView, useCameraPermissions, BarcodeScanningResult } from "expo-camera";
+import { useCameraPermissions } from "expo-camera";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   ArrowLeft,
   Camera as CameraIcon,
   ImagePlus,
-  QrCode,
   Heart,
   X,
 } from "lucide-react-native";
@@ -47,8 +46,7 @@ const CELL_SIZE = (SCREEN_WIDTH - GRID_GAP * (GRID_COLS - 1) - 32) / GRID_COLS;
 interface Photo {
   id: number;
   url: string;
-  thumbUrl: string | null;
-  uploaderName: string | null;
+  guestName: string | null;
   caption: string | null;
   isFavorite: boolean;
   isApproved: boolean;
@@ -63,7 +61,6 @@ export default function MomentsScreen() {
   const { getToken } = useAuth();
   const qc = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const [showScanner, setShowScanner] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
 
@@ -160,23 +157,6 @@ export default function MomentsScreen() {
     }
   }, [permission, requestPermission, uploadMutation]);
 
-  const onQrScanned = useCallback(
-    (result: BarcodeScanningResult) => {
-      setShowScanner(false);
-      // QR codes encode /moments/<slug> URLs. We extract slug and
-      // navigate to the public upload view (signed-in users see it
-      // as a regular photos upload, anonymous via the web flow).
-      const m = result.data.match(/\/moments\/([a-z0-9-]+)/i);
-      if (m) {
-        router.push({
-          pathname: "/(client)/moments/scan-result",
-          params: { slug: m[1] },
-        } as never);
-      }
-    },
-    [router],
-  );
-
   const photos = photosQuery.data ?? [];
 
   return (
@@ -196,13 +176,9 @@ export default function MomentsScreen() {
             </Text>
           </View>
           <View className="flex-row gap-2">
-            <Pressable
-              hitSlop={8}
-              onPress={() => setShowScanner(true)}
-              className="h-10 w-10 items-center justify-center rounded-full bg-card"
-            >
-              <QrCode size={18} color={colors.gold} />
-            </Pressable>
+            {/* QR scanner entry point is hidden until the scan-result
+                screen is implemented — it currently dead-ends on a
+                ComingSoon stub (app/(client)/moments/scan-result.tsx). */}
             <Pressable
               hitSlop={8}
               onPress={pickFromLibrary}
@@ -244,7 +220,7 @@ export default function MomentsScreen() {
             className="overflow-hidden rounded-lg"
           >
             <Image
-              source={{ uri: item.thumbUrl ?? item.url }}
+              source={{ uri: item.url }}
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
               transition={150}
@@ -324,16 +300,16 @@ export default function MomentsScreen() {
                     contentFit="contain"
                     transition={200}
                   />
-                  {(item.caption || item.uploaderName) && (
+                  {(item.caption || item.guestName) && (
                     <View className="px-6 pt-4">
                       {item.caption && (
                         <Text className="text-center text-[15px] italic text-white/90">
                           “{item.caption}”
                         </Text>
                       )}
-                      {item.uploaderName && (
+                      {item.guestName && (
                         <Text className="mt-2 text-center text-[12px] text-white/60">
-                          — {item.uploaderName}
+                          — {item.guestName}
                         </Text>
                       )}
                     </View>
@@ -342,53 +318,6 @@ export default function MomentsScreen() {
               )}
             />
           )}
-        </View>
-      </Modal>
-
-      {/* QR scanner */}
-      <Modal
-        visible={showScanner}
-        animationType="slide"
-        onRequestClose={() => setShowScanner(false)}
-      >
-        <View className="flex-1 bg-black">
-          {permission?.granted ? (
-            <CameraView
-              style={{ flex: 1 }}
-              facing="back"
-              barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
-              onBarcodeScanned={onQrScanned}
-            />
-          ) : (
-            <SafeAreaView className="flex-1 items-center justify-center gap-4 p-6">
-              <Text className="font-heading text-[20px] font-bold text-white">
-                Permite accesul la cameră
-              </Text>
-              <Text className="text-center text-[13px] text-white/70">
-                Pentru a scana QR-ul de pe masa evenimentului.
-              </Text>
-              <Button onPress={requestPermission} fullWidth size="lg">
-                Permite
-              </Button>
-            </SafeAreaView>
-          )}
-          <SafeAreaView edges={["top"]} className="absolute inset-x-0 top-0">
-            <View className="flex-row items-center justify-between px-4 py-2">
-              <Pressable
-                hitSlop={8}
-                onPress={() => setShowScanner(false)}
-                className="h-10 w-10 items-center justify-center rounded-full bg-black/60"
-              >
-                <X size={20} color="#fff" />
-              </Pressable>
-              <View className="rounded-full bg-black/60 px-3 py-1">
-                <Text className="text-[12px] text-white">
-                  Scanează codul QR de la masa ta
-                </Text>
-              </View>
-              <View className="w-10" />
-            </View>
-          </SafeAreaView>
         </View>
       </Modal>
     </View>

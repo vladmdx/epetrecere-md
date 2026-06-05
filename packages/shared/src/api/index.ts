@@ -46,10 +46,12 @@ export function createApiClient(opts: ApiClientOptions) {
     init?: { signal?: AbortSignal; query?: Record<string, string | number | boolean | null | undefined> },
   ): Promise<ApiResponse<T>> {
     // Build URL with query string when query params are passed.
-    const url = new URL(
-      path.startsWith("/") ? path : `/${path}`,
-      opts.baseUrl.endsWith("/") ? opts.baseUrl : `${opts.baseUrl}/`,
-    );
+    // IMPORTANT: the base must end with "/" AND the path must NOT start with
+    // "/", otherwise `new URL("/categories", "https://host/api/v1/")` resolves
+    // to the ORIGIN root ("https://host/categories") and silently drops the
+    // "/api/v1" base path — breaking every endpoint.
+    const base = opts.baseUrl.endsWith("/") ? opts.baseUrl : `${opts.baseUrl}/`;
+    const url = new URL(path.replace(/^\/+/, ""), base);
     if (init?.query) {
       for (const [k, v] of Object.entries(init.query)) {
         if (v === undefined || v === null) continue;

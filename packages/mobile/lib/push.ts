@@ -119,13 +119,23 @@ export function listenForNotificationTaps(): () => void {
       // sender. Add new kinds here as we wire more events.
       switch (data.kind) {
         case "booking_new":
-          router.push(`/(partner)/bookings?expand=${data.id}`);
+          // Partner side: open the booking detail directly. `data.id` is
+          // the booking id (server sends { kind: "booking_new", id: booking.id }).
+          // The real route is the [id] detail under the booking group —
+          // there is no /(partner)/bookings screen.
+          router.push(`/(partner)/booking/${data.id}`);
           break;
         case "booking_accepted":
-          router.push(`/(client)/bookings?expand=${data.id}`);
+          // Client side: open the accepted booking's detail so they can
+          // confirm + chat. `data.id` is the booking id. The old `?expand=`
+          // param was silently dropped by the list screen.
+          router.push(`/(client)/bookings/${data.id}`);
           break;
         case "message_new":
-          router.push(`/(client)/messages/${data.id}`);
+          // Client side: open the chat thread. `data.id` is the
+          // conversationId (server sends { kind: "message_new", id: conversationId }).
+          // The real route is /(client)/chat/[id]; there is no messages/[id].
+          router.push(`/(client)/chat/${data.id}`);
           break;
         default:
           router.push("/");

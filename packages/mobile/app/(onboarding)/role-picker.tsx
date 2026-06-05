@@ -54,9 +54,9 @@ export default function OnboardingRolePicker() {
         // Artists land on /dashboard which auto-detects the
         // pending state and shows the onboarding shell from the web
         // (eventually we'll port that to native too).
-        router.replace("/(partner)/dashboard");
+        router.replace("/(partner)/(tabs)");
       } else {
-        router.replace("/(client)/cabinet");
+        router.replace("/(client)/(tabs)");
       }
     } finally {
       setSubmitting(false);

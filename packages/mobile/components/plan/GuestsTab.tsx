@@ -255,11 +255,19 @@ function AddGuestModal({
     }
     setSubmitting(true);
     try {
+      // The server derives partySize from guestType: single→1, couple→2,
+      // family→clamp(2..8, partySize). It ignores a raw partySize unless
+      // guestType==='family', so map the entered count to a guestType to
+      // avoid every guest being silently saved as 1 person.
+      const size = Math.max(1, Number(partySize) || 1);
+      const guestType =
+        size <= 1 ? "single" : size === 2 ? "couple" : "family";
       const res = await api.post(
         `${API_PATHS.eventPlan(planId)}/guests`,
         {
           fullName: name.trim(),
-          partySize: Math.max(1, Number(partySize) || 1),
+          guestType,
+          partySize: size,
           contactChannel: "whatsapp",
           contactValue: contactValue.trim() || null,
         },

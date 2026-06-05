@@ -30,6 +30,7 @@ interface BookingRow {
   eventType: string | null;
   clientName: string;
   agreedPrice: number | null;
+  paidStatus: "unpaid" | "partial" | "paid";
 }
 
 export default function FinanciarScreen() {
@@ -67,12 +68,23 @@ export default function FinanciarScreen() {
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
       .toISOString()
       .slice(0, 10);
+    const nextMonthStart = new Date(today.getFullYear(), today.getMonth() + 1, 1)
+      .toISOString()
+      .slice(0, 10);
     const todayIso = today.toISOString().slice(0, 10);
     const earning = (s: string) =>
       ["accepted", "confirmed_by_client", "completed"].includes(s);
     return {
+      // Whole current calendar month (incl. future-dated bookings), matching
+      // the server's revenueThisMonthEUR (artist-stats.ts gte monthStart / lt
+      // nextMonthStart) so this tile agrees with the dashboard 'Venit luna'.
       thisMonth: all
-        .filter((b) => earning(b.status) && b.eventDate >= monthStart && b.eventDate < todayIso)
+        .filter(
+          (b) =>
+            earning(b.status) &&
+            b.eventDate >= monthStart &&
+            b.eventDate < nextMonthStart,
+        )
         .reduce((s, b) => s + (b.agreedPrice ?? 0), 0),
       upcoming: all
         .filter((b) => earning(b.status) && b.eventDate >= todayIso)
@@ -80,8 +92,14 @@ export default function FinanciarScreen() {
       confirmed: all.filter(
         (b) => b.status === "confirmed_by_client" || b.status === "completed",
       ).length,
+      // Confirmed gigs with money still owed — exclude fully-paid bookings.
       pendingPayments: all
-        .filter((b) => b.status === "confirmed_by_client" && b.agreedPrice != null)
+        .filter(
+          (b) =>
+            b.status === "confirmed_by_client" &&
+            b.agreedPrice != null &&
+            b.paidStatus !== "paid",
+        )
         .reduce((s, b) => s + (b.agreedPrice ?? 0), 0),
     };
   }, [bookingsQuery.data]);

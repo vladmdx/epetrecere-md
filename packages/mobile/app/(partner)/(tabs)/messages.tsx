@@ -1,10 +1,13 @@
 // Partner messages — list of conversations with clients.
 //
 // We reuse the same /api/v1/conversations endpoint that the client
-// side uses. For partners, the avatar shows the CLIENT name (not
-// vendor name, because the partner IS the vendor here). The chat
-// thread screen at /(client)/chat/[id] auto-detects the user role
-// from Clerk and flips the bubble alignment accordingly.
+// side uses, but request it with ?role=vendor so the server returns the
+// conversations where this user is the VENDOR (their artist + venue
+// inboxes) instead of the buyer chats they opened themselves. For
+// partners, the avatar shows the CLIENT name (not vendor name, because
+// the partner IS the vendor here). The chat thread screen at
+// /(client)/chat/[id] auto-detects the user role from Clerk and flips
+// the bubble alignment accordingly.
 
 import { useCallback } from "react";
 import { View, Text, Pressable, FlatList, RefreshControl } from "react-native";
@@ -20,15 +23,16 @@ import { relativeTimeRO, initials as toInitials } from "@epetrecere/shared/utils
 
 interface PartnerConversation {
   id: number;
-  // The client side names this `vendorName`. On the partner side we
-  // actually want the CLIENT name — the endpoint returns both, but
-  // labels them differently. We'll display whatever name is in the
-  // payload's `clientName` or fall back to the `lastMessagePreview`
-  // signature.
+  // Fetched with ?role=vendor, so each row carries the CLIENT name
+  // (the buyer who opened the chat) in `clientName`. The client-role
+  // payload would instead label the other party `vendorName`; we keep
+  // that field optional purely as a defensive fallback for display.
   clientName?: string;
   vendorName?: string | null;
   lastMessageAt: string;
   lastMessagePreview: string | null;
+  // Vendor-side unread counter — incremented when the client sends a
+  // message the partner hasn't read yet.
   artistUnread: number;
   clientUnread: number;
 }
@@ -42,7 +46,16 @@ export default function PartnerMessagesScreen() {
     queryKey: ["partner-conversations"],
     enabled: !!isSignedIn,
     queryFn: async () => {
-      const res = await api.get<PartnerConversation[]>(API_PATHS.conversations);
+      // The partner inbox must list conversations where the signed-in
+      // user is the VENDOR (artist and/or venue), not the buyer chats
+      // they opened themselves. The endpoint defaults role to "client"
+      // when no param is sent, so we explicitly request role=vendor —
+      // that branch merges the user's artist + venue conversations and
+      // returns `clientName` / `artistUnread`, which is what this screen
+      // renders.
+      const res = await api.get<PartnerConversation[]>(API_PATHS.conversations, {
+        query: { role: "vendor" },
+      });
       return Array.isArray(res.data) ? res.data : [];
     },
   });

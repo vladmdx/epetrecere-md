@@ -83,10 +83,11 @@ export async function GET(req: NextRequest) {
   const artistId = req.nextUrl.searchParams.get("artist_id");
   const clientEmail = req.nextUrl.searchParams.get("client_email");
   const eventPlanId = req.nextUrl.searchParams.get("event_plan_id");
+  const bookingId = req.nextUrl.searchParams.get("id");
 
-  if (!artistId && !clientEmail && !eventPlanId) {
+  if (!artistId && !clientEmail && !eventPlanId && !bookingId) {
     return NextResponse.json(
-      { error: "artist_id, client_email or event_plan_id required" },
+      { error: "artist_id, client_email, event_plan_id or id required" },
       { status: 400 },
     );
   }
@@ -137,6 +138,47 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
     }
+
+    // Single-booking fetch by id — the caller must own it: either the client
+    // (clientUserId / clientEmail) or the vendor (artist/venue owner).
+    // Without this gate, any signed-in user could read another user's booking
+    // + contact details.
+    if (bookingId) {
+      const [b] = await db
+        .select({
+          clientUserId: bookingRequests.clientUserId,
+          clientEmail: bookingRequests.clientEmail,
+          artistId: bookingRequests.artistId,
+          venueId: bookingRequests.venueId,
+        })
+        .from(bookingRequests)
+        .where(eq(bookingRequests.id, Number(bookingId)))
+        .limit(1);
+      if (!b) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      let owns =
+        b.clientUserId === appUser.id || b.clientEmail === appUser.email;
+      if (!owns && b.artistId) {
+        const [a] = await db
+          .select({ userId: artists.userId })
+          .from(artists)
+          .where(eq(artists.id, b.artistId))
+          .limit(1);
+        owns = a?.userId === appUser.id;
+      }
+      if (!owns && b.venueId) {
+        const [v] = await db
+          .select({ userId: venues.userId })
+          .from(venues)
+          .where(eq(venues.id, b.venueId))
+          .limit(1);
+        owns = v?.userId === appUser.id;
+      }
+      if (!owns) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+    }
   }
 
   const conditions = [];
@@ -145,6 +187,7 @@ export async function GET(req: NextRequest) {
   if (eventPlanId) {
     conditions.push(eq(bookingRequests.eventPlanId, Number(eventPlanId)));
   }
+  if (bookingId) conditions.push(eq(bookingRequests.id, Number(bookingId)));
 
   const result = await db
     .select({

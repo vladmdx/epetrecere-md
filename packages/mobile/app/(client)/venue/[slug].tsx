@@ -24,7 +24,6 @@ import {
   Users,
   Eye,
   Send,
-  CheckCircle2,
 } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, Badge } from "../../../components/ui";
@@ -39,16 +38,13 @@ interface VenueDetail {
   nameRo: string;
   slug: string;
   descriptionRo: string | null;
-  photoUrl: string | null;
-  coverImageUrl: string | null;
   ratingAvg: number | null;
   ratingCount: number;
-  isVerified: boolean;
-  isPremium: boolean;
+  isFeatured: boolean;
   capacityMin: number | null;
   capacityMax: number | null;
   pricePerPerson: number | null;
-  location: string | null;
+  city: string | null;
   virtualTourUrl: string | null;
   facilities: string[] | null;
   images?: { id: number; url: string }[];
@@ -77,8 +73,9 @@ export default function VenueDetailScreen() {
     );
   }
 
-  const gallery = venue.images?.map((img) => img.url) ??
-    [venue.coverImageUrl ?? venue.photoUrl ?? "/images/backgrounds/party-dance.jpg"];
+  const gallery = venue.images && venue.images.length > 0
+    ? venue.images.map((img) => img.url)
+    : ["/images/backgrounds/party-dance.jpg"];
 
   return (
     <View className="flex-1 bg-background">
@@ -150,19 +147,11 @@ export default function VenueDetailScreen() {
 
         <View className="gap-5 px-5 pb-32 pt-5">
           <View className="gap-2">
-            <View className="flex-row items-center gap-2">
-              {venue.isPremium && <Badge tone="gold">Premium</Badge>}
-              {venue.isVerified && (
-                <Badge tone="info">
-                  <View className="flex-row items-center gap-1">
-                    <CheckCircle2 size={10} color={colors.info} />
-                    <Text className="text-[11px] font-semibold text-info">
-                      Verificat
-                    </Text>
-                  </View>
-                </Badge>
-              )}
-            </View>
+            {venue.isFeatured && (
+              <View className="flex-row items-center gap-2">
+                <Badge tone="gold">Premium</Badge>
+              </View>
+            )}
             <Text className="font-heading text-[28px] font-bold leading-tight text-foreground">
               {venue.nameRo}
             </Text>
@@ -178,11 +167,11 @@ export default function VenueDetailScreen() {
                   </Text>
                 </View>
               )}
-              {venue.location && (
+              {venue.city && (
                 <View className="flex-row items-center gap-1">
                   <MapPin size={14} color={colors.mutedForeground} />
                   <Text className="text-[13px] text-muted-foreground">
-                    {venue.location}
+                    {venue.city}
                   </Text>
                 </View>
               )}

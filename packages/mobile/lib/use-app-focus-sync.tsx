@@ -23,10 +23,11 @@ const LIVE_KEYS = new Set([
   "partner-bookings",
   "partner-bookings-cal",
   "partner-conversations",
-  "my-bookings",
-  "my-conversations",
-  "my-event-plans",
-  "my-event-plan-detail",
+  // Client live queries all namespace under a single "my" head with the
+  // real name as the second segment (e.g. ["my","bookings"],
+  // ["my","conversations"], ["my","event-plans","active"],
+  // ["my","event-plan-detail", id]). Matching the head covers them all.
+  "my",
   "wishlist",
   "chat-messages",
   "booking",

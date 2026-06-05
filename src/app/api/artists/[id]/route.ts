@@ -19,16 +19,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const artistId = Number(id);
-  if (isNaN(artistId)) {
-    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
-  }
-
-  const result = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
+  // Accept either a numeric id (admin/dashboard) OR a slug (public catalog +
+  // the mobile app, which links artists by slug). Resolve the row first, then
+  // use its numeric id for the related sub-queries below.
+  const numericId = Number(id);
+  const result = await db
+    .select()
+    .from(artists)
+    .where(Number.isNaN(numericId) ? eq(artists.slug, id) : eq(artists.id, numericId))
+    .limit(1);
   const artist = result[0];
   if (!artist) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const artistId = artist.id;
 
   const [images, videos, packages, artistReviews] = await Promise.all([
     db.select().from(artistImages).where(eq(artistImages.artistId, artistId)).orderBy(asc(artistImages.sortOrder)),

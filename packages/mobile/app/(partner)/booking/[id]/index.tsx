@@ -34,6 +34,8 @@ import {
 interface BookingDetail {
   id: number;
   status: string;
+  artistId: number | null;
+  venueId: number | null;
   clientName: string;
   clientPhone: string;
   clientEmail: string | null;
@@ -51,7 +53,6 @@ interface BookingDetail {
     message?: string;
     at: string;
   }>;
-  conversationId?: number | null;
 }
 
 export default function PartnerBookingDetailScreen() {
@@ -84,6 +85,34 @@ export default function PartnerBookingDetailScreen() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["partner-booking", bookingId] });
       void qc.invalidateQueries({ queryKey: ["partner-bookings"] });
+    },
+  });
+
+  // The booking GET never returns a conversationId, so we find-or-create the
+  // conversation on press: POST /conversations with the booking's artistId or
+  // venueId returns { id }, which is the chat thread to open.
+  const openChatMutation = useMutation({
+    mutationFn: async () => {
+      const booking = detailQuery.data;
+      if (!booking) throw new Error("no_booking");
+      const target =
+        booking.artistId != null
+          ? { artistId: booking.artistId }
+          : booking.venueId != null
+            ? { venueId: booking.venueId }
+            : null;
+      if (!target) throw new Error("no_vendor");
+      const res = await api.post<{ id: number; created: boolean }>(
+        API_PATHS.conversations,
+        target,
+      );
+      if (!res.ok || !res.data) {
+        throw new Error(res.error?.message ?? "open_chat_failed");
+      }
+      return res.data.id;
+    },
+    onSuccess: (conversationId) => {
+      router.push(`/(client)/chat/${conversationId}`);
     },
   });
 
@@ -289,10 +318,11 @@ export default function PartnerBookingDetailScreen() {
           </Button>
         )}
 
-        {b.conversationId != null && (
+        {(b.artistId != null || b.venueId != null) && (
           <Button
             variant="outline"
-            onPress={() => router.push(`/(client)/chat/${b.conversationId}`)}
+            onPress={() => openChatMutation.mutate()}
+            loading={openChatMutation.isPending}
             fullWidth
             size="md"
             leftIcon={<MessageCircle size={16} color={colors.gold} />}

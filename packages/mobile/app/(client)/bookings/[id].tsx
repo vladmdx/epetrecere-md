@@ -65,7 +65,6 @@ interface BookingDetail {
   guestCount: number | null;
   message: string | null;
   artistReply: string | null;
-  conversationId?: number | null;
 }
 
 const STATUS_TIMELINE = [
@@ -97,8 +96,12 @@ export default function BookingDetailScreen() {
 
   const confirmMutation = useMutation({
     mutationFn: async () => {
+      // The PUT /booking-requests/[id] handler is an ACTION dispatcher keyed
+      // on body.action (accept / reject / client_confirm / …). Sending
+      // `status` would hit the "Unknown action" branch → 400. The client
+      // promotes an "accepted" booking via action="client_confirm".
       const res = await api.put(API_PATHS.bookingRequest(bookingId), {
-        status: "confirmed_by_client",
+        action: "client_confirm",
       });
       if (!res.ok) throw new Error(res.error?.message ?? "confirm_failed");
       return res.data;
@@ -106,6 +109,26 @@ export default function BookingDetailScreen() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["booking", bookingId] });
       void qc.invalidateQueries({ queryKey: ["my", "bookings"] });
+    },
+  });
+
+  // The booking-requests GET never returns a conversationId, so we can't gate
+  // the chat CTA on it. Instead find-or-create the conversation for this
+  // booking's vendor on press (POST /conversations { artistId | venueId }
+  // returns { id }) and navigate to the returned thread.
+  const openChatMutation = useMutation({
+    mutationFn: async (vars: { artistId?: number; venueId?: number }) => {
+      const res = await api.post<{ id: number; created: boolean }>(
+        API_PATHS.conversations,
+        vars,
+      );
+      if (!res.ok || !res.data) {
+        throw new Error(res.error?.message ?? "conversation_failed");
+      }
+      return res.data;
+    },
+    onSuccess: (data) => {
+      router.push(`/(client)/chat/${data.id}`);
     },
   });
 
@@ -310,10 +333,17 @@ export default function BookingDetailScreen() {
           </View>
         )}
 
-        {b.conversationId != null && (
+        {(b.artistId != null || b.venueId != null) && (
           <Button
             variant="outline"
-            onPress={() => router.push(`/(client)/chat/${b.conversationId}`)}
+            onPress={() =>
+              openChatMutation.mutate(
+                b.artistId != null
+                  ? { artistId: b.artistId }
+                  : { venueId: b.venueId! },
+              )
+            }
+            loading={openChatMutation.isPending}
             fullWidth
             size="md"
             leftIcon={<MessageCircle size={16} color={colors.gold} />}

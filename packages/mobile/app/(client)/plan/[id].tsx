@@ -69,7 +69,13 @@ interface PlanDetail {
     rsvp: "pending" | "accepted" | "declined" | "maybe";
     partySize: number;
   }>;
-  bookings?: Array<{ id: number; status: string }>;
+}
+
+// Booking requests linked to this plan. Fetched separately from
+// /booking-requests?event_plan_id=… — the plan GET does not include them.
+interface PlanBooking {
+  id: number;
+  status: string;
 }
 
 type Tab = "overview" | "checklist" | "guests" | "bookings" | "moments";
@@ -90,6 +96,22 @@ export default function PlanDetailScreen() {
     queryFn: async () => {
       const res = await api.get<PlanDetail>(API_PATHS.eventPlan(planId));
       return res.data;
+    },
+  });
+
+  // The plan GET (/event-plans/[id]) returns plan/checklist/guests/tables/seats
+  // but NOT the linked booking requests, so the "Parteneri" progress can't be
+  // derived from it. Fetch them separately from /booking-requests, which
+  // accepts ?event_plan_id and gates on plan ownership. The endpoint returns a
+  // bare array, so guard with Array.isArray.
+  const bookingsQuery = useQuery({
+    queryKey: ["plan-bookings", planId],
+    enabled: Number.isFinite(planId),
+    queryFn: async () => {
+      const res = await api.get<PlanBooking[]>(API_PATHS.bookingRequests, {
+        query: { event_plan_id: planId },
+      });
+      return Array.isArray(res.data) ? res.data : [];
     },
   });
 
@@ -179,7 +201,9 @@ export default function PlanDetailScreen() {
           gap: 16,
         }}
       >
-        {activeTab === "overview" && <OverviewTab detail={detail} />}
+        {activeTab === "overview" && (
+          <OverviewTab detail={detail} bookings={bookingsQuery.data ?? []} />
+        )}
         {activeTab === "checklist" && <ChecklistTab planId={planId} />}
         {activeTab === "guests" && <GuestsTab planId={planId} />}
         {activeTab === "bookings" && <BookingsTabStub />}
@@ -221,7 +245,13 @@ function TabChip({
 
 // ─── Overview tab ──────────────────────────────────────
 
-function OverviewTab({ detail }: { detail: PlanDetail }) {
+function OverviewTab({
+  detail,
+  bookings,
+}: {
+  detail: PlanDetail;
+  bookings: PlanBooking[];
+}) {
   const { plan } = detail;
   const dateLabel = plan.eventDate ? formatDateRO(plan.eventDate) : null;
   const countdown = useCountdown(plan.eventDate);
@@ -242,11 +272,19 @@ function OverviewTab({ detail }: { detail: PlanDetail }) {
     ? Math.min(100, Math.round((guestAccepted / guestTotal) * 100))
     : 0;
 
-  const bookingTotal = detail.bookings?.length ?? 0;
-  const bookingConfirmed =
-    detail.bookings?.filter(
-      (b) => b.status === "accepted" || b.status === "confirmed_by_client",
-    ).length ?? 0;
+  // Count only bookings that still represent a live partner slot. Dead
+  // requests (rejected / cancelled / expired) free the slot up again on the
+  // server, so they shouldn't inflate the "Parteneri" denominator.
+  const activeBookings = bookings.filter(
+    (b) =>
+      b.status !== "rejected" &&
+      b.status !== "cancelled" &&
+      b.status !== "expired",
+  );
+  const bookingTotal = activeBookings.length;
+  const bookingConfirmed = activeBookings.filter(
+    (b) => b.status === "accepted" || b.status === "confirmed_by_client",
+  ).length;
   const bookingPct = bookingTotal
     ? Math.round((bookingConfirmed / bookingTotal) * 100)
     : 0;
@@ -288,11 +326,13 @@ function OverviewTab({ detail }: { detail: PlanDetail }) {
           Verde = confirmat · Galben = în așteptare · Gri = neînceput
         </Text>
 
-        <ProgressLine
-          label="Parteneri"
-          value={bookingPct}
-          extraRight={`${bookingConfirmed}/${bookingTotal || 0} confirmați`}
-        />
+        {bookingTotal > 0 && (
+          <ProgressLine
+            label="Parteneri"
+            value={bookingPct}
+            extraRight={`${bookingConfirmed}/${bookingTotal} confirmați`}
+          />
+        )}
         {plan.guestsEnabled && (
           <ProgressLine
             label="Invitați"

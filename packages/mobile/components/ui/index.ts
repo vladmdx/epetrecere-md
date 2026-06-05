@@ -15,3 +15,4 @@ export {
   CardSkeleton,
 } from "./Skeleton";
 export { StatTile, type StatTint } from "./StatTile";
+export { ComingSoon } from "./ComingSoon";

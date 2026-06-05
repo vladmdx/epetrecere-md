@@ -15,8 +15,8 @@ import { useApi } from "../../../lib/api";
 
 interface Package {
   id: number;
-  title: string;
-  description: string | null;
+  nameRo: string;
+  descriptionRo: string | null;
   price: number;
   durationHours: number | null;
 }
@@ -34,10 +34,10 @@ export default function TarifeScreen() {
     queryKey: ["artist-packages", artistId],
     enabled: Number.isFinite(artistId),
     queryFn: async () => {
-      const res = await api.get<{ packages: Package[] }>(
+      const res = await api.get<Package[]>(
         `/artist-packages?artist_id=${artistId}`,
       );
-      return res.data?.packages ?? [];
+      return Array.isArray(res.data) ? res.data : [];
     },
   });
 
@@ -54,7 +54,7 @@ export default function TarifeScreen() {
   function handleDelete(pkg: Package) {
     Alert.alert(
       "Șterge pachetul",
-      `Sigur ștergi "${pkg.title}"?`,
+      `Sigur ștergi "${pkg.nameRo}"?`,
       [
         { text: "Anulează", style: "cancel" },
         {
@@ -104,11 +104,11 @@ export default function TarifeScreen() {
             <View className="flex-row items-start justify-between gap-3">
               <View className="flex-1">
                 <Text className="text-[15px] font-semibold text-foreground">
-                  {item.title}
+                  {item.nameRo}
                 </Text>
-                {item.description && (
+                {item.descriptionRo && (
                   <Text className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
-                    {item.description}
+                    {item.descriptionRo}
                   </Text>
                 )}
                 <View className="mt-1.5 flex-row items-center gap-3">
@@ -188,8 +188,8 @@ function PackageSheet({
   onSaved: () => void;
 }) {
   const api = useApi();
-  const [title, setTitle] = useState(pkg?.title ?? "");
-  const [description, setDescription] = useState(pkg?.description ?? "");
+  const [title, setTitle] = useState(pkg?.nameRo ?? "");
+  const [description, setDescription] = useState(pkg?.descriptionRo ?? "");
   const [price, setPrice] = useState(pkg?.price != null ? String(pkg.price) : "");
   const [duration, setDuration] = useState(
     pkg?.durationHours != null ? String(pkg.durationHours) : "",
@@ -197,7 +197,7 @@ function PackageSheet({
   const [submitting, setSubmitting] = useState(false);
 
   // Re-sync when editing different package
-  if (pkg && title !== pkg.title && !visible) {
+  if (pkg && title !== pkg.nameRo && !visible) {
     // no-op — we just want fresh state on next open
   }
 
@@ -206,8 +206,8 @@ function PackageSheet({
     setSubmitting(true);
     try {
       const body = {
-        title: title.trim(),
-        description: description.trim() || null,
+        nameRo: title.trim(),
+        descriptionRo: description.trim() || null,
         price: Number(price),
         durationHours: duration ? Number(duration) : null,
       };
@@ -220,6 +220,11 @@ function PackageSheet({
         setDescription("");
         setPrice("");
         setDuration("");
+      } else {
+        Alert.alert(
+          "Eroare",
+          "Pachetul nu a putut fi salvat. Verifică datele și încearcă din nou.",
+        );
       }
     } finally {
       setSubmitting(false);

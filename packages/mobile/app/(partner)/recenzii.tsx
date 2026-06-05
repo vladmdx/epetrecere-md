@@ -16,7 +16,7 @@ interface Review {
   id: number;
   authorName: string;
   rating: number;
-  comment: string | null;
+  text: string | null;
   createdAt: string;
 }
 
@@ -41,10 +41,10 @@ export default function RecenziiScreen() {
     queryKey: ["my-reviews", artistQuery.data?.id],
     enabled: !!artistQuery.data?.id,
     queryFn: async () => {
-      const res = await api.get<{ reviews: Review[] }>(
+      const res = await api.get<Review[]>(
         `/reviews?artist_id=${artistQuery.data!.id}`,
       );
-      return res.data?.reviews ?? [];
+      return Array.isArray(res.data) ? res.data : [];
     },
   });
 
@@ -151,9 +151,9 @@ export default function RecenziiScreen() {
                 />
               ))}
             </View>
-            {item.comment && (
+            {item.text && (
               <Text className="text-[13px] leading-5 text-foreground/85">
-                {item.comment}
+                {item.text}
               </Text>
             )}
           </Card>

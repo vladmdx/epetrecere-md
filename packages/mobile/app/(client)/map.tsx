@@ -33,6 +33,19 @@ interface MapPoint {
   city: string | null;
 }
 
+// Raw venue row as returned by GET /venues (items[]). The list endpoint
+// projects the DB columns verbatim, so the name field is `nameRo` (not
+// `name`) and the premium flag is `isFeatured` (venues have no `isPremium`).
+interface VenueListItem {
+  id: number;
+  nameRo: string;
+  slug: string;
+  city: string | null;
+  lat: number | null;
+  lng: number | null;
+  isFeatured: boolean | null;
+}
+
 // Centered on Chișinău by default — most users are from Moldova.
 const DEFAULT_REGION: Region = {
   latitude: 47.0105,
@@ -48,26 +61,27 @@ export default function MapScreen() {
   const { data: points, isLoading } = useQuery({
     queryKey: ["map", "points"],
     queryFn: async () => {
-      // The artists + venues endpoints return lat/lng when the entity
-      // has been geocoded. We hit both in parallel and merge.
-      const [artistsRes, venuesRes] = await Promise.all([
-        publicApi.get<{ items: MapPoint[] }>("/artists", {
-          query: { hasLocation: 1, limit: 100 },
-        }),
-        publicApi.get<{ items: MapPoint[] }>("/venues", {
-          query: { hasLocation: 1, limit: 100 },
-        }),
-      ]);
-      const allPoints = [
-        ...(artistsRes.data?.items ?? []).map((a) => ({
-          ...a,
-          type: "artist" as const,
-        })),
-        ...(venuesRes.data?.items ?? []).map((v) => ({
-          ...v,
-          type: "venue" as const,
-        })),
-      ];
+      // Only venues carry geocoordinates (lat/lng columns). Artists have no
+      // lat/lng in the schema, so they can never produce a map marker — we
+      // therefore fetch venues only. The list endpoint returns raw DB rows,
+      // so we map each row's real columns (nameRo, city, isFeatured) into the
+      // MapPoint shape explicitly rather than spreading mismatched fields.
+      const venuesRes = await publicApi.get<{ items: VenueListItem[] }>(
+        "/venues",
+        { query: { limit: 100 } },
+      );
+      const allPoints: MapPoint[] = (venuesRes.data?.items ?? []).map((v) => ({
+        id: v.id,
+        type: "venue" as const,
+        name: v.nameRo,
+        slug: v.slug,
+        // Venues have no `isPremium` column; `isFeatured` is the premium flag.
+        isPremium: v.isFeatured ?? false,
+        lat: v.lat ?? null,
+        lng: v.lng ?? null,
+        city: v.city ?? null,
+      }));
+      // Keep only venues that have actually been geocoded.
       return allPoints.filter((p) => p.lat != null && p.lng != null);
     },
   });

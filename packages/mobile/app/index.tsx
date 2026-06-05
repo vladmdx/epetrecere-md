@@ -1,16 +1,16 @@
 // Root route — splits between signed-in and signed-out flows.
 //
 // Behaviour:
-//   - Clerk loading → SplashGate (returns nothing while parent splash
-//     is up).
+//   - Clerk loading → spinner (parent splash is still up).
 //   - Signed-out   → redirect to /(auth)/sign-in
-//   - Signed-in    → redirect to either /(partner)/dashboard (if the
-//                    user has an artist row) or /(client)/cabinet
-//                    (everyone else).
+//   - Signed-in    → redirect to either /(partner)/(tabs) (artist role)
+//                    or /(client)/(tabs) (everyone else).
 //
-// Role resolution calls /api/v1/me which the web side already exposes.
-// We cache the result in SecureStore so subsequent cold-starts skip the
-// network round-trip and land on the right tab instantly.
+// Role resolution: the role the user picked in onboarding is cached in
+// SecureStore ("partner"/"client") and is AUTHORITATIVE. The server
+// artist-row check can only UPGRADE a client to partner — it must never
+// downgrade a picked "partner" back to "client" (that bug landed every
+// fresh artist on the client tabs).
 
 import { Redirect } from "expo-router";
 import { useAuth } from "@clerk/clerk-expo";
@@ -33,12 +33,14 @@ export default function Index() {
       return;
     }
     (async () => {
-      // 1. Hot path — last known role from SecureStore.
+      // 1. Hot path — last known role from SecureStore (the choice the
+      //    user made in onboarding).
       const cached = await SecureStore.getItemAsync(ROLE_CACHE_KEY);
       if (cached === "client" || cached === "partner") {
         setRole(cached);
       }
-      // 2. Cold path — confirm with the API (and update cache).
+      // 2. Cold path — confirm with the API. The picked "partner" role
+      //    wins; the artist-row check only upgrades client → partner.
       try {
         const token = await getToken();
         const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "";
@@ -46,11 +48,12 @@ export default function Index() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = r.ok ? await r.json() : null;
-        const resolved: Role = data?.artist ? "partner" : "client";
+        const resolved: Role =
+          cached === "partner" || data?.artist ? "partner" : "client";
         setRole(resolved);
         await SecureStore.setItemAsync(ROLE_CACHE_KEY, resolved);
       } catch {
-        // Network failed — fall back to client view.
+        // Network failed — keep the cached role, or default to client.
         if (!cached) setRole("client");
       } finally {
         setResolving(false);
@@ -67,6 +70,6 @@ export default function Index() {
   }
 
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
-  if (role === "partner") return <Redirect href="/(partner)/dashboard" />;
-  return <Redirect href="/(client)/cabinet" />;
+  if (role === "partner") return <Redirect href="/(partner)/(tabs)" />;
+  return <Redirect href="/(client)/(tabs)" />;
 }
