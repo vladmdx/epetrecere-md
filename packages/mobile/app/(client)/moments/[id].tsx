@@ -32,6 +32,7 @@ import {
   ImagePlus,
   Heart,
   X,
+  QrCode,
 } from "lucide-react-native";
 import { Button } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
@@ -176,9 +177,13 @@ export default function MomentsScreen() {
             </Text>
           </View>
           <View className="flex-row gap-2">
-            {/* QR scanner entry point is hidden until the scan-result
-                screen is implemented — it currently dead-ends on a
-                ComingSoon stub (app/(client)/moments/scan-result.tsx). */}
+            <Pressable
+              hitSlop={8}
+              onPress={() => router.push("/(client)/moments/scan-result" as never)}
+              className="h-10 w-10 items-center justify-center rounded-full bg-card"
+            >
+              <QrCode size={18} color={colors.gold} />
+            </Pressable>
             <Pressable
               hitSlop={8}
               onPress={pickFromLibrary}
