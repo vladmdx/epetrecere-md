@@ -193,6 +193,15 @@ export const API_PATHS = {
   artistDashboard: "/me/artist/dashboard",
   venueDashboard: "/me/venue/dashboard",
 
+  // Availability calendar (GET month / POST bulk-set blocked|available days)
+  calendar: "/calendar",
+
+  // Settings
+  notificationPreferences: "/me/notification-preferences",
+
+  // Photo Moments (public album resolved by QR slug)
+  momentsBySlug: (slug: string) => `/moments/${slug}`,
+
   // Mobile-only
   pushTokens: "/push-tokens",
 } as const;

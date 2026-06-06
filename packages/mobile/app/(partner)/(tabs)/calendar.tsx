@@ -9,14 +9,15 @@
 // gestures land in M5 with the rest of the gesture work.
 
 import { useMemo, useState } from "react";
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-expo";
 import {
   ChevronLeft,
   ChevronRight,
-  Plus,
+  Lock,
+  Unlock,
 } from "lucide-react-native";
 import { SafeScreen, Card, Badge } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
@@ -91,6 +92,59 @@ export default function PartnerCalendarScreen() {
     return map;
   }, [bookingsQuery.data]);
 
+  // Manually-blocked days for the visible month. Fetched from the
+  // availability calendar (separate from bookings) so the partner can mark
+  // days off even when there's no booking on them.
+  const queryClient = useQueryClient();
+  const monthStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+
+  const calendarQuery = useQuery({
+    queryKey: ["partner-calendar-events", artistQuery.data, monthStr],
+    enabled: !!artistQuery.data,
+    queryFn: async () => {
+      const res = await api.get<{ date: string; status: string }[]>(
+        API_PATHS.calendar,
+        {
+          query: {
+            entity_type: "artist",
+            entity_id: artistQuery.data ?? "",
+            month: monthStr,
+          },
+        },
+      );
+      return Array.isArray(res.data) ? res.data : [];
+    },
+  });
+
+  const blockedDates = useMemo(() => {
+    const s = new Set<string>();
+    for (const e of calendarQuery.data ?? []) {
+      if (e.status === "blocked") s.add(e.date);
+    }
+    return s;
+  }, [calendarQuery.data]);
+
+  const blockMutation = useMutation({
+    mutationFn: async ({ date, block }: { date: string; block: boolean }) => {
+      if (!artistQuery.data) throw new Error("no-artist");
+      const res = await api.post(API_PATHS.calendar, {
+        entity_type: "artist",
+        entity_id: artistQuery.data,
+        dates: [date],
+        status: block ? "blocked" : "available",
+      });
+      if (!res.ok) throw new Error(res.error?.message ?? "failed");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["partner-calendar-events"],
+      });
+    },
+    onError: () => {
+      Alert.alert("Eroare", "Nu am putut actualiza ziua. Încearcă din nou.");
+    },
+  });
+
   const cells = useMemo(() => buildMonthGrid(cursor), [cursor]);
   const monthLabel = `${MONTHS_RO[cursor.getMonth()]} ${cursor.getFullYear()}`;
 
@@ -104,6 +158,7 @@ export default function PartnerCalendarScreen() {
   const selectedBookings = selectedDate
     ? bookingsByDay.get(selectedDate) ?? []
     : [];
+  const selectedIsBlocked = selectedDate ? blockedDates.has(selectedDate) : false;
 
   return (
     <SafeScreen padded scroll>
@@ -144,6 +199,7 @@ export default function PartnerCalendarScreen() {
                   key={`${wIdx}-${dIdx}`}
                   cell={cell}
                   bookings={cell.iso ? bookingsByDay.get(cell.iso) ?? [] : []}
+                  blocked={cell.iso ? blockedDates.has(cell.iso) : false}
                   selected={cell.iso === selectedDate}
                   onPress={() => cell.iso && setSelectedDate(cell.iso)}
                 />
@@ -159,6 +215,10 @@ export default function PartnerCalendarScreen() {
         <LegendDot color={colors.warning} label="Așteaptă confirmare" />
         <LegendDot color={colors.indigo} label="Nou" />
         <LegendDot color={colors.danger} label="Refuzat" />
+        <View className="flex-row items-center gap-1.5">
+          <Lock size={11} color={colors.mutedForeground} />
+          <Text className="text-[11px] text-muted-foreground">Blocat</Text>
+        </View>
       </View>
 
       {/* Selected day panel */}
@@ -174,7 +234,9 @@ export default function PartnerCalendarScreen() {
           </View>
           {selectedBookings.length === 0 ? (
             <Text className="text-[13px] text-muted-foreground">
-              Nicio rezervare în această zi. Atinge + să blochezi ziua manual.
+              {selectedIsBlocked
+                ? "Zi blocată manual — nu primești cereri în această zi."
+                : "Nicio rezervare în această zi. Poți bloca ziua manual mai jos."}
             </Text>
           ) : (
             <View className="gap-2">
@@ -184,13 +246,37 @@ export default function PartnerCalendarScreen() {
             </View>
           )}
           <Pressable
-            disabled
-            className="flex-row items-center justify-center gap-2 rounded-lg border border-dashed border-gold/40 px-3 py-2 opacity-60"
+            disabled={blockMutation.isPending}
+            onPress={() =>
+              selectedDate &&
+              blockMutation.mutate({
+                date: selectedDate,
+                block: !selectedIsBlocked,
+              })
+            }
+            className={`flex-row items-center justify-center gap-2 rounded-lg border px-3 py-2.5 ${
+              selectedIsBlocked
+                ? "border-rose-500/40 bg-rose-500/10"
+                : "border-dashed border-gold/40"
+            } ${blockMutation.isPending ? "opacity-50" : "active:opacity-80"}`}
           >
-            <Plus size={14} color={colors.gold} />
-            <Text className="text-[12px] text-gold">
-              Blochează ziua (în curând)
-            </Text>
+            {blockMutation.isPending ? (
+              <ActivityIndicator size="small" color={colors.gold} />
+            ) : selectedIsBlocked ? (
+              <>
+                <Unlock size={14} color={colors.danger} />
+                <Text className="text-[12px] font-medium text-rose-300">
+                  Deblochează ziua
+                </Text>
+              </>
+            ) : (
+              <>
+                <Lock size={14} color={colors.gold} />
+                <Text className="text-[12px] font-medium text-gold">
+                  Blochează ziua
+                </Text>
+              </>
+            )}
           </Pressable>
         </Card>
       )}
@@ -259,11 +345,13 @@ function formatDay(iso: string): string {
 function DayCell({
   cell,
   bookings,
+  blocked,
   selected,
   onPress,
 }: {
   cell: Cell;
   bookings: BookingRow[];
+  blocked: boolean;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -277,22 +365,34 @@ function DayCell({
     <Pressable
       onPress={onPress}
       className={`aspect-square flex-1 items-center justify-center rounded-lg ${
-        selected ? "border-2 border-gold bg-gold/15" : cell.isToday ? "border border-gold/40 bg-card" : "bg-card"
+        selected
+          ? "border-2 border-gold bg-gold/15"
+          : blocked
+            ? "border border-rose-500/30 bg-rose-500/10"
+            : cell.isToday
+              ? "border border-gold/40 bg-card"
+              : "bg-card"
       }`}
     >
       <Text
         className={`text-[14px] font-semibold ${
-          cell.isToday ? "text-gold" : "text-foreground"
+          cell.isToday
+            ? "text-gold"
+            : blocked
+              ? "text-rose-300/80"
+              : "text-foreground"
         }`}
       >
         {cell.dayNum}
       </Text>
-      {dotColor && (
+      {blocked ? (
+        <Lock size={9} color={colors.danger} style={{ marginTop: 2 }} />
+      ) : dotColor ? (
         <View
           style={{ backgroundColor: dotColor }}
           className="mt-0.5 h-1.5 w-1.5 rounded-full"
         />
-      )}
+      ) : null}
     </Pressable>
   );
 }

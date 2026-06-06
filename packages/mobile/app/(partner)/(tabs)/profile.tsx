@@ -26,6 +26,7 @@ import { colors } from "../../../constants/theme";
 import { useApi } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
 import { useLanguagePicker } from "../../../lib/use-language-picker";
+import { openExternal, WEB_LINKS } from "../../../lib/links";
 
 interface ArtistProfile {
   id: number;
@@ -117,10 +118,14 @@ export default function PartnerProfileTab() {
         <Row
           Icon={ExternalLink}
           label="Vezi profilul public"
-          onPress={() => {
-            // Open in browser later — for now just navigate to a
-            // placeholder. M4 Phase B will integrate expo-web-browser.
-          }}
+          onPress={() =>
+            artist?.slug
+              ? openExternal(WEB_LINKS.artist(artist.slug))
+              : Alert.alert(
+                  "Profil indisponibil",
+                  "Completează-ți profilul înainte să-l poți vedea public.",
+                )
+          }
         />
       </Section>
 
@@ -157,8 +162,16 @@ export default function PartnerProfileTab() {
       </Section>
 
       <Section title="Suport">
-        <Row Icon={HelpCircle} label="Centrul de ajutor" onPress={() => {}} />
-        <Row Icon={Shield} label="Termeni & Confidențialitate" onPress={() => {}} />
+        <Row
+          Icon={HelpCircle}
+          label="Centrul de ajutor"
+          onPress={() => openExternal(WEB_LINKS.contact)}
+        />
+        <Row
+          Icon={Shield}
+          label="Termeni & Confidențialitate"
+          onPress={() => openExternal(WEB_LINKS.terms)}
+        />
       </Section>
 
       <Pressable

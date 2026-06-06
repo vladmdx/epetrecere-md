@@ -21,6 +21,7 @@ import {
 import { SafeScreen, Avatar } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { useLanguagePicker } from "../../../lib/use-language-picker";
+import { openExternal, WEB_LINKS } from "../../../lib/links";
 
 export default function AccountTab() {
   const { user } = useUser();
@@ -102,12 +103,12 @@ export default function AccountTab() {
         <Row
           Icon={HelpCircle}
           label="Centrul de ajutor"
-          onPress={() => {}}
+          onPress={() => openExternal(WEB_LINKS.contact)}
         />
         <Row
           Icon={Shield}
           label="Termeni & Confidențialitate"
-          onPress={() => {}}
+          onPress={() => openExternal(WEB_LINKS.terms)}
         />
       </Section>
 

@@ -28,13 +28,14 @@ import {
   Calendar,
   MapPin,
   Users,
-  CheckCircle,
   Clock,
   Camera,
   Sparkles,
+  ChevronRight,
+  Search,
 } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Card, ProgressBar } from "../../../components/ui";
+import { Card, ProgressBar, Badge } from "../../../components/ui";
 import { ChecklistTab } from "../../../components/plan/ChecklistTab";
 import { GuestsTab } from "../../../components/plan/GuestsTab";
 import { colors } from "../../../constants/theme";
@@ -76,6 +77,12 @@ interface PlanDetail {
 interface PlanBooking {
   id: number;
   status: string;
+  artistName: string | null;
+  venueName: string | null;
+  eventType: string | null;
+  eventDate: string | null;
+  startTime: string | null;
+  agreedPrice: number | null;
 }
 
 type Tab = "overview" | "checklist" | "guests" | "bookings" | "moments";
@@ -206,7 +213,14 @@ export default function PlanDetailScreen() {
         )}
         {activeTab === "checklist" && <ChecklistTab planId={planId} />}
         {activeTab === "guests" && <GuestsTab planId={planId} />}
-        {activeTab === "bookings" && <BookingsTabStub />}
+        {activeTab === "bookings" && (
+          <BookingsTab
+            bookings={bookingsQuery.data ?? []}
+            loading={bookingsQuery.isLoading}
+            onOpen={(bid) => router.push(`/(client)/bookings/${bid}` as never)}
+            onFind={() => router.push("/(client)/(tabs)/search" as never)}
+          />
+        )}
         {activeTab === "moments" && (
           <MomentsTab
             onOpen={() => router.push(`/(client)/moments/${planId}` as never)}
@@ -440,10 +454,106 @@ function useCountdown(eventDate: string | null) {
   }, [eventDate, now]);
 }
 
-// ─── Tab stubs (filled out next phase) ───────────────────
+// ─── Bookings tab — partners requested for this plan ─────
 
-function BookingsTabStub() {
-  return <TabPlaceholder Icon={Clock} title="Rezervări" />;
+const BOOKING_STATUS_RO: Record<
+  string,
+  { label: string; tone: "success" | "warning" | "default" | "danger" }
+> = {
+  pending: { label: "În așteptare", tone: "default" },
+  accepted: { label: "Acceptat — confirmă", tone: "warning" },
+  confirmed_by_client: { label: "Confirmat", tone: "success" },
+  completed: { label: "Finalizat", tone: "success" },
+  rejected: { label: "Refuzat", tone: "danger" },
+  cancelled: { label: "Anulat", tone: "default" },
+  expired: { label: "Expirat", tone: "default" },
+};
+
+function BookingsTab({
+  bookings,
+  loading,
+  onOpen,
+  onFind,
+}: {
+  bookings: PlanBooking[];
+  loading: boolean;
+  onOpen: (id: number) => void;
+  onFind: () => void;
+}) {
+  if (loading) {
+    return (
+      <View className="items-center py-12">
+        <ActivityIndicator color={colors.gold} />
+      </View>
+    );
+  }
+
+  if (bookings.length === 0) {
+    return (
+      <Card className="items-center gap-3 p-8">
+        <Clock size={40} color={colors.mutedForeground} />
+        <Text className="font-heading text-[16px] font-bold text-foreground">
+          Nicio rezervare încă
+        </Text>
+        <Text className="text-center text-[12px] leading-5 text-muted-foreground">
+          Caută artiști sau săli și trimite cereri de rezervare — vor apărea aici
+          legate de acest eveniment.
+        </Text>
+        <Pressable
+          onPress={onFind}
+          className="mt-1 flex-row items-center gap-2 rounded-xl bg-gold px-4 py-2.5 active:opacity-80"
+        >
+          <Search size={16} color={colors.background} />
+          <Text className="text-[13px] font-semibold text-background">
+            Caută parteneri
+          </Text>
+        </Pressable>
+      </Card>
+    );
+  }
+
+  return (
+    <View className="gap-3">
+      {bookings.map((b) => {
+        const meta =
+          BOOKING_STATUS_RO[b.status] ?? { label: b.status, tone: "default" as const };
+        const name = b.artistName ?? b.venueName ?? "Partener";
+        const dateLabel = b.eventDate ? formatDateRO(b.eventDate) : null;
+        return (
+          <Card key={b.id} onPress={() => onOpen(b.id)} className="gap-2 p-4">
+            <View className="flex-row items-center gap-2">
+              <Text
+                className="flex-1 text-[15px] font-semibold text-foreground"
+                numberOfLines={1}
+              >
+                {name}
+              </Text>
+              <Badge tone={meta.tone} size="sm">
+                {meta.label}
+              </Badge>
+              <ChevronRight size={16} color={colors.mutedForeground} />
+            </View>
+            <View className="flex-row items-center gap-3">
+              {dateLabel && (
+                <View className="flex-row items-center gap-1">
+                  <Calendar size={12} color={colors.mutedForeground} />
+                  <Text className="text-[12px] text-muted-foreground">
+                    {dateLabel}
+                    {b.startTime ? `, ${b.startTime}` : ""}
+                  </Text>
+                </View>
+              )}
+              {b.agreedPrice != null && (
+                <Text className="text-[12px] font-semibold text-gold">
+                  {b.agreedPrice} €
+                </Text>
+              )}
+            </View>
+          </Card>
+        );
+      })}
+    </View>
+  );
 }
 function MomentsTab({ onOpen }: { onOpen: () => void }) {
   return (
@@ -459,22 +569,3 @@ function MomentsTab({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function TabPlaceholder({
-  Icon,
-  title,
-}: {
-  Icon: typeof Clock;
-  title: string;
-}) {
-  return (
-    <Card className="items-center gap-3 p-8">
-      <Icon size={40} color={colors.mutedForeground} />
-      <Text className="font-heading text-[16px] font-bold text-foreground">
-        {title}
-      </Text>
-      <Text className="text-center text-[12px] text-muted-foreground">
-        În curând — această secțiune se construiește în M3 partea 2.
-      </Text>
-    </Card>
-  );
-}

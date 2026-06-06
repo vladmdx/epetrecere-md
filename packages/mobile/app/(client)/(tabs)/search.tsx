@@ -10,7 +10,7 @@
 // so deep links from the home screen ("?category=dj") just work — and
 // the back-stack restores filters on swipe-back.
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -19,10 +19,11 @@ import {
   RefreshControl,
   TextInput,
   ScrollView,
+  Modal,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { Search, X, SlidersHorizontal, Star } from "lucide-react-native";
+import { Search, X, SlidersHorizontal, Star, Check } from "lucide-react-native";
 import { SafeScreen, Card, Avatar, Badge } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { publicApi } from "../../../lib/api";
@@ -50,6 +51,54 @@ interface ArtistListResponse {
 
 const PAGE_SIZE = 20;
 
+// Advanced filters live in local state (not the URL) — they're set via the
+// bottom-sheet and feed straight into the artists query params the API
+// already supports (sort / price_min / price_max / rating_min / city).
+type SortKey = "popular" | "price_asc" | "price_desc" | "rating" | "newest";
+
+interface AdvFilters {
+  sort: SortKey | null;
+  priceMin: string;
+  priceMax: string;
+  ratingMin: number | null;
+  city: string | null;
+}
+
+const EMPTY_ADV: AdvFilters = {
+  sort: null,
+  priceMin: "",
+  priceMax: "",
+  ratingMin: null,
+  city: null,
+};
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "popular", label: "Populare" },
+  { key: "rating", label: "Cele mai bine notate" },
+  { key: "price_asc", label: "Preț crescător" },
+  { key: "price_desc", label: "Preț descrescător" },
+  { key: "newest", label: "Cele mai noi" },
+];
+
+const CITY_OPTIONS = [
+  "Chișinău",
+  "Bălți",
+  "Cahul",
+  "Orhei",
+  "Ungheni",
+  "Comrat",
+];
+
+function countAdv(a: AdvFilters): number {
+  return (
+    (a.sort ? 1 : 0) +
+    (a.priceMin ? 1 : 0) +
+    (a.priceMax ? 1 : 0) +
+    (a.ratingMin ? 1 : 0) +
+    (a.city ? 1 : 0)
+  );
+}
+
 export default function SearchScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -59,13 +108,18 @@ export default function SearchScreen() {
   }>();
 
   const [queryText, setQueryText] = useState(params.q ?? "");
+  const [adv, setAdv] = useState<AdvFilters>(EMPTY_ADV);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const advCount = countAdv(adv);
+
   const filters = useMemo(
     () => ({
       category: params.category ?? null,
       featured: params.featured === "1",
       q: queryText.trim() || null,
+      adv,
     }),
-    [params.category, params.featured, queryText],
+    [params.category, params.featured, queryText, adv],
   );
 
   const artistsQuery = useInfiniteQuery<ArtistListResponse>({
@@ -79,6 +133,11 @@ export default function SearchScreen() {
           category: filters.category,
           featured: filters.featured ? 1 : undefined,
           q: filters.q,
+          sort: adv.sort ?? undefined,
+          price_min: adv.priceMin ? Number(adv.priceMin) : undefined,
+          price_max: adv.priceMax ? Number(adv.priceMax) : undefined,
+          rating_min: adv.ratingMin ?? undefined,
+          city: adv.city ?? undefined,
         },
       });
       return (
@@ -138,12 +197,10 @@ export default function SearchScreen() {
           contentContainerStyle={{ gap: 8, paddingTop: 12 }}
         >
           <FilterChip
-            label="Filtre"
+            label={advCount > 0 ? `Filtre · ${advCount}` : "Filtre"}
             Icon={SlidersHorizontal}
-            active={false}
-            onPress={() => {
-              // Modal sheet ships in M2.5 — for now this is a stub.
-            }}
+            active={advCount > 0}
+            onPress={() => setFilterOpen(true)}
           />
           {filters.category && (
             <FilterChip
@@ -195,7 +252,191 @@ export default function SearchScreen() {
           ) : null
         }
       />
+
+      <FilterSheet
+        visible={filterOpen}
+        initial={adv}
+        onClose={() => setFilterOpen(false)}
+        onApply={(next) => {
+          setAdv(next);
+          setFilterOpen(false);
+        }}
+      />
     </SafeScreen>
+  );
+}
+
+// ─── Filter bottom-sheet ───────────────────────────────────
+
+function FilterSheet({
+  visible,
+  initial,
+  onClose,
+  onApply,
+}: {
+  visible: boolean;
+  initial: AdvFilters;
+  onClose: () => void;
+  onApply: (next: AdvFilters) => void;
+}) {
+  const [draft, setDraft] = useState<AdvFilters>(initial);
+
+  // Re-seed the draft each time the sheet opens so it reflects the
+  // currently-applied filters. Intentionally keyed on `visible` only — we
+  // don't want parent re-renders to wipe in-progress edits while it's open.
+  useEffect(() => {
+    if (visible) setDraft(initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <Pressable className="flex-1 justify-end bg-black/60" onPress={onClose}>
+        <Pressable
+          className="rounded-t-3xl border-t border-border bg-background px-5 pb-8 pt-3"
+          onPress={(e) => e.stopPropagation()}
+        >
+          <View className="mb-3 h-1 w-10 self-center rounded-full bg-border" />
+          <View className="mb-4 flex-row items-center justify-between">
+            <Text className="font-heading text-[18px] font-bold text-foreground">
+              Filtre
+            </Text>
+            <Pressable hitSlop={8} onPress={() => setDraft(EMPTY_ADV)}>
+              <Text className="text-[13px] text-gold">Resetează</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} className="max-h-[460px]">
+            {/* Sort */}
+            <FilterLabel>Sortează după</FilterLabel>
+            <View className="mb-4 flex-row flex-wrap gap-2">
+              {SORT_OPTIONS.map((o) => (
+                <OptionChip
+                  key={o.key}
+                  label={o.label}
+                  active={draft.sort === o.key}
+                  onPress={() =>
+                    setDraft((d) => ({
+                      ...d,
+                      sort: d.sort === o.key ? null : o.key,
+                    }))
+                  }
+                />
+              ))}
+            </View>
+
+            {/* Price range */}
+            <FilterLabel>Preț (€)</FilterLabel>
+            <View className="mb-4 flex-row items-center gap-3">
+              <View className="flex-1 flex-row items-center rounded-xl bg-card px-3 py-2.5">
+                <Text className="mr-1 text-[13px] text-muted-foreground">de la</Text>
+                <TextInput
+                  value={draft.priceMin}
+                  onChangeText={(t) =>
+                    setDraft((d) => ({ ...d, priceMin: t.replace(/[^0-9]/g, "") }))
+                  }
+                  keyboardType="number-pad"
+                  placeholder="0"
+                  placeholderTextColor={colors.mutedForeground}
+                  className="flex-1 text-[15px] text-foreground"
+                />
+              </View>
+              <View className="flex-1 flex-row items-center rounded-xl bg-card px-3 py-2.5">
+                <Text className="mr-1 text-[13px] text-muted-foreground">până la</Text>
+                <TextInput
+                  value={draft.priceMax}
+                  onChangeText={(t) =>
+                    setDraft((d) => ({ ...d, priceMax: t.replace(/[^0-9]/g, "") }))
+                  }
+                  keyboardType="number-pad"
+                  placeholder="∞"
+                  placeholderTextColor={colors.mutedForeground}
+                  className="flex-1 text-[15px] text-foreground"
+                />
+              </View>
+            </View>
+
+            {/* Rating */}
+            <FilterLabel>Rating minim</FilterLabel>
+            <View className="mb-4 flex-row gap-2">
+              {[3, 4, 4.5].map((r) => (
+                <OptionChip
+                  key={r}
+                  label={`${r}★+`}
+                  active={draft.ratingMin === r}
+                  onPress={() =>
+                    setDraft((d) => ({ ...d, ratingMin: d.ratingMin === r ? null : r }))
+                  }
+                />
+              ))}
+            </View>
+
+            {/* City */}
+            <FilterLabel>Oraș</FilterLabel>
+            <View className="mb-2 flex-row flex-wrap gap-2">
+              {CITY_OPTIONS.map((c) => (
+                <OptionChip
+                  key={c}
+                  label={c}
+                  active={draft.city === c}
+                  onPress={() =>
+                    setDraft((d) => ({ ...d, city: d.city === c ? null : c }))
+                  }
+                />
+              ))}
+            </View>
+          </ScrollView>
+
+          <Pressable
+            onPress={() => onApply(draft)}
+            className="mt-4 items-center rounded-2xl bg-gold py-3.5 active:opacity-80"
+          >
+            <Text className="text-[15px] font-bold text-background">
+              Aplică filtrele
+            </Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function FilterLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <Text className="mb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+      {children}
+    </Text>
+  );
+}
+
+function OptionChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`flex-row items-center gap-1.5 rounded-full border px-3.5 py-2 ${
+        active ? "border-gold bg-gold/15" : "border-border bg-card"
+      }`}
+    >
+      {active && <Check size={13} color={colors.gold} />}
+      <Text
+        className={`text-[13px] font-medium ${active ? "text-gold" : "text-foreground"}`}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
