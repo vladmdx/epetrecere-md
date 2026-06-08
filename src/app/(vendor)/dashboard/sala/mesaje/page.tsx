@@ -325,7 +325,6 @@ export default function VenueMessagesPage() {
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-medium">
                           {thread.clientName ||
-                            thread.clientEmail ||
                             `Client #${thread.clientUserId.slice(0, 8)}`}
                         </span>
                         <span className="shrink-0 text-xs text-muted-foreground">
@@ -377,12 +376,9 @@ export default function VenueMessagesPage() {
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">
-                    {selected.clientName || selected.clientEmail || "Client"}
+                    {selected.clientName || "Client"}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    {selected.clientEmail && selected.clientName && (
-                      <span className="truncate">{selected.clientEmail}</span>
-                    )}
                     {selected.linkedBooking && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
                         <CalendarIcon className="h-2.5 w-2.5" />

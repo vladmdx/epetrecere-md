@@ -4926,14 +4926,9 @@ function VenueDiscoveryCard({
           venues. Shows whom they're waiting on with the same 72h
           countdown the holder card has. */}
       {!existingBooking && blockedByOtherVenue && (
-        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-500">
-          <div className="font-medium">
-            Așteaptă răspunsul de la {blockedByOtherVenue.venueName}
-          </div>
-          <PendingCountdown
-            createdAt={blockedByOtherVenue.createdAt ?? null}
-            windowHours={72}
-          />
+        <div className="mt-3 rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Ai deja o cerere în așteptare la {blockedByOtherVenue.venueName}. Vei
+          putea trimite o solicitare aici după ce răspunde.
         </div>
       )}
 

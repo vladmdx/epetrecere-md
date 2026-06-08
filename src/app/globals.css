@@ -163,14 +163,18 @@
        nested overflowing element could still produce a phantom scroll
        on touch (iOS in particular). Pinning the html scroll axis to
        vertical kills the horizontal swipe. */
+    overflow-x: hidden;
     overflow-x: clip;
     overscroll-behavior-x: none;
+    max-width: 100%;
     touch-action: pan-y;
   }
   html {
     @apply font-sans;
+    overflow-x: hidden;
     overflow-x: clip;
     overscroll-behavior-x: none;
+    max-width: 100%;
   }
 
   /* Gold focus ring on interactive elements */
