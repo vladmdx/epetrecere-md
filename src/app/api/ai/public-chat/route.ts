@@ -5,6 +5,7 @@
 // and RAG-lite: we inject live counts of artists/venues in the system prompt.
 
 import { NextResponse } from "next/server";
+import { MODELS } from "@/lib/ai/models";
 import { z } from "zod/v4";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: MODELS.CHAT,
       max_tokens: 500,
       system: buildSystemPrompt(stats),
       messages: parsed.data.messages.map((m) => ({

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { MODELS } from "@/lib/ai/models";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import Anthropic from "@anthropic-ai/sdk";
@@ -128,7 +129,7 @@ export async function POST(req: Request) {
   try {
     // Loop to handle tool calls
     let response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: MODELS.CHAT,
       max_tokens: 1500,
       system: systemPrompt,
       tools,
@@ -162,7 +163,7 @@ export async function POST(req: Request) {
 
       // Get next response
       response = await client.messages.create({
-        model: "claude-sonnet-4-20250514",
+        model: MODELS.CHAT,
         max_tokens: 1500,
         system: systemPrompt,
         tools,

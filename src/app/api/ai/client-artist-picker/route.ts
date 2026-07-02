@@ -9,6 +9,7 @@
 // POST body: { messages: [...], eventPlanId: number }
 
 import { NextRequest, NextResponse } from "next/server";
+import { MODELS } from "@/lib/ai/models";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
@@ -29,7 +30,7 @@ function getClient() {
   return new Anthropic({ apiKey });
 }
 
-const MODEL = "claude-sonnet-4-5";
+const MODEL = MODELS.CHAT;
 
 type ClientMessage = {
   role: "user" | "assistant";

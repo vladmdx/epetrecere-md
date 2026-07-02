@@ -9,6 +9,7 @@
 // the vendor reads the advice and edits manually).
 
 import { NextRequest, NextResponse } from "next/server";
+import { MODELS } from "@/lib/ai/models";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
@@ -17,7 +18,7 @@ import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
 
-const MODEL = "claude-sonnet-4-5";
+const MODEL = MODELS.CHAT;
 
 function getClient() {
   const apiKey = process.env.ANTHROPIC_API_KEY;

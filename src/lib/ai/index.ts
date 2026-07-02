@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { MODELS } from "./models";
 
 let client: Anthropic | null = null;
 
@@ -20,7 +21,7 @@ export async function generateArtistDescription(
   const langNames = { ro: "Romanian", ru: "Russian", en: "English" };
 
   const message = await getClient().messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: MODELS.CHAT,
     max_tokens: 500,
     messages: [
       {
@@ -47,7 +48,7 @@ export async function generateArtistDescriptionFromScratch(
   const langNames = { ro: "Romanian", ru: "Russian", en: "English" };
 
   const message = await getClient().messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: MODELS.CHAT,
     max_tokens: 600,
     messages: [
       {
@@ -122,7 +123,7 @@ ${facts}
 Return ONLY the HTML body (no <html>, <body>, or code fences).`;
 
   const message = await getClient().messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: MODELS.CHAT,
     max_tokens: 1200,
     system: systemPrompt,
     messages: [{ role: "user", content: userPrompt }],
@@ -154,7 +155,7 @@ export async function translateMenuStrings(
     .join("\n");
 
   const message = await getClient().messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: MODELS.CHAT,
     max_tokens: 4000,
     system: `You translate Moldovan restaurant menu strings. Output strict JSON: {"ru": ["...", ...], "en": ["...", ...]}.
 - Keep the same order as input.
@@ -213,7 +214,7 @@ export async function generateSEOTexts(
   language: "ro" | "ru" | "en" = "ro",
 ): Promise<{ title: string; metaDescription: string }> {
   const message = await getClient().messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: MODELS.CHAT,
     max_tokens: 300,
     messages: [
       {
@@ -263,7 +264,7 @@ export async function generatePhotoCaption(args: {
     .join("\n");
 
   const message = await getClient().messages.create({
-    model: "claude-haiku-4-5",
+    model: MODELS.FAST,
     max_tokens: 120,
     system:
       "Ești copywriter pentru un album foto de eveniment. Scrii un singur caption în română, sub 110 caractere, cald, concret, fără emoji. Nu inventa detalii care nu apar în date. Răspunzi DOAR cu caption-ul, fără ghilimele.",
@@ -302,7 +303,7 @@ export type PhotoCategory = (typeof PHOTO_CATEGORIES)[number];
 
 export async function classifyPhoto(imageUrl: string): Promise<PhotoCategory> {
   const message = await getClient().messages.create({
-    model: "claude-haiku-4-5",
+    model: MODELS.FAST,
     max_tokens: 20,
     system:
       'Ești un asistent care clasifică poze de eveniment într-UNA dintre etichetele: "ceremonie", "dans", "grup", "portret", "decor", "mancare", "candid", "other". Răspunzi DOAR cu eticheta, fără ghilimele, fără explicații.',
@@ -335,7 +336,7 @@ export async function chatWithAI(
   systemPrompt: string,
 ): Promise<string> {
   const response = await getClient().messages.create({
-    model: "claude-sonnet-4-20250514",
+    model: MODELS.CHAT,
     max_tokens: 1000,
     system: systemPrompt,
     messages: messages.map((m) => ({

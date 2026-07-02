@@ -15,6 +15,7 @@
 // Acceptable as long as we rate-limit per user.
 
 import { auth } from "@clerk/nextjs/server";
+import { MODELS } from "@/lib/ai/models";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
   // we pass through.
   const forward = new FormData();
   forward.append("file", file, file.name || "voice.m4a");
-  forward.append("model", "whisper-1");
+  forward.append("model", MODELS.TRANSCRIBE);
   // Hint Romanian — Whisper's language detection is good but giving
   // it a hint shaves 100-200ms and improves diacritics.
   forward.append("language", "ro");

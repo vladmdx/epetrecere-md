@@ -8,6 +8,7 @@
 // from their own plan — no reason to return-then-save in two steps).
 
 import { NextRequest, NextResponse } from "next/server";
+import { MODELS } from "@/lib/ai/models";
 import { z } from "zod/v4";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
@@ -16,7 +17,7 @@ import { db } from "@/lib/db";
 import { users, eventPlans } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
 
-const MODEL = "claude-sonnet-4-5";
+const MODEL = MODELS.CHAT;
 
 const schema = z.object({
   planId: z.number().int().positive(),

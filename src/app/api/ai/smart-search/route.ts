@@ -22,6 +22,7 @@
 // Rate-limited per IP to prevent Anthropic API abuse.
 
 import { NextRequest, NextResponse } from "next/server";
+import { MODELS } from "@/lib/ai/models";
 import { z } from "zod/v4";
 import Anthropic from "@anthropic-ai/sdk";
 import { rateLimit } from "@/lib/rate-limit";
@@ -151,7 +152,7 @@ export async function POST(req: NextRequest) {
   let out: ParsedQuery;
   try {
     const msg = await getClient().messages.create({
-      model: "claude-sonnet-4-5",
+      model: MODELS.CHAT,
       max_tokens: 400,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: parsed.data.q }],

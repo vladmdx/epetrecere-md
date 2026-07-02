@@ -5,6 +5,7 @@
 // so a tab refresh doesn't burn tokens.
 
 import { NextRequest, NextResponse } from "next/server";
+import { MODELS } from "@/lib/ai/models";
 import { z } from "zod/v4";
 import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
@@ -123,7 +124,7 @@ Dacă prețul e mult peste medie fără rating superior, menționează asta.`;
 
   try {
     const message = await getClient().messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: MODELS.CHAT,
       max_tokens: 400,
       system: systemPrompt,
       messages: [

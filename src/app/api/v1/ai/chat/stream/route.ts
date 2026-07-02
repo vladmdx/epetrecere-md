@@ -22,6 +22,7 @@
 //   data: {"code":"…","message":"…"}
 
 import { auth } from "@clerk/nextjs/server";
+import { MODELS } from "@/lib/ai/models";
 import { z } from "zod/v4";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
@@ -121,7 +122,7 @@ export async function POST(req: Request) {
   (async () => {
     try {
       const anthropicStream = await client.messages.stream({
-        model: "claude-sonnet-4-20250514",
+        model: MODELS.CHAT,
         max_tokens: 1500,
         system,
         messages: body.messages.map((m) => ({ role: m.role, content: m.content })),
