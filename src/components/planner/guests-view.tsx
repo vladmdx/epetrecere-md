@@ -817,7 +817,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                       <input
                         ref={iconFileInputRef}
                         type="file"
-                        accept="image/png,image/jpeg,image/webp,image/svg+xml,image/gif"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
                         className="hidden"
                         onChange={(e) => {
                           const f = e.target.files?.[0];
