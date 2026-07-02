@@ -6,6 +6,7 @@ import { useUser, useAuth } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import * as WebBrowser from "expo-web-browser";
 import {
   ChevronRight,
   User,
@@ -35,6 +36,11 @@ interface ArtistProfile {
   isPremium: boolean;
   isVerified: boolean;
 }
+
+// Public site base, derived from the API URL (strip the /api/v1 suffix).
+const SITE_URL = (
+  process.env.EXPO_PUBLIC_API_URL ?? "https://epetrecere.md/api/v1"
+).replace(/\/api\/v1\/?$/, "");
 
 export default function PartnerProfileTab() {
   const { user } = useUser();
@@ -117,9 +123,17 @@ export default function PartnerProfileTab() {
         <Row
           Icon={ExternalLink}
           label="Vezi profilul public"
-          onPress={() => {
-            // Open in browser later — for now just navigate to a
-            // placeholder. M4 Phase B will integrate expo-web-browser.
+          onPress={async () => {
+            if (!artist?.slug) {
+              Alert.alert(
+                "Profil indisponibil",
+                "Completează-ți profilul înainte de a-l previzualiza public.",
+              );
+              return;
+            }
+            await WebBrowser.openBrowserAsync(
+              `${SITE_URL}/artisti/${artist.slug}`,
+            );
           }}
         />
       </Section>

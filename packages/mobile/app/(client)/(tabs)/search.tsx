@@ -21,7 +21,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Search, X, SlidersHorizontal, Star } from "lucide-react-native";
 import { SafeScreen, Card, Avatar, Badge } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
@@ -48,6 +48,13 @@ interface ArtistListResponse {
   totalPages: number;
 }
 
+interface Category {
+  id: number;
+  nameRo: string;
+  slug: string;
+  icon?: string | null;
+}
+
 const PAGE_SIZE = 20;
 
 export default function SearchScreen() {
@@ -59,6 +66,7 @@ export default function SearchScreen() {
   }>();
 
   const [queryText, setQueryText] = useState(params.q ?? "");
+  const [showCats, setShowCats] = useState(false);
   const filters = useMemo(
     () => ({
       category: params.category ?? null,
@@ -87,6 +95,20 @@ export default function SearchScreen() {
     },
     getNextPageParam: (last) =>
       last.page < last.totalPages ? last.page + 1 : undefined,
+  });
+
+  // Category list for the inline filter picker (same source + shape handling
+  // as the home screen). `category` is a slug — matches the home deep-links.
+  const categoriesQuery = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const res = await publicApi.get<{ categories: Category[] } | Category[]>(
+        API_PATHS.categories,
+      );
+      const body = res.data;
+      if (Array.isArray(body)) return body;
+      return body?.categories ?? [];
+    },
   });
 
   const items = useMemo(
@@ -140,10 +162,8 @@ export default function SearchScreen() {
           <FilterChip
             label="Filtre"
             Icon={SlidersHorizontal}
-            active={false}
-            onPress={() => {
-              // Modal sheet ships in M2.5 — for now this is a stub.
-            }}
+            active={showCats}
+            onPress={() => setShowCats((v) => !v)}
           />
           {filters.category && (
             <FilterChip
@@ -164,6 +184,29 @@ export default function SearchScreen() {
             />
           )}
         </ScrollView>
+
+        {/* Inline category picker — toggled by the Filtre chip. */}
+        {showCats && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingTop: 10 }}
+          >
+            {(categoriesQuery.data ?? []).map((c) => (
+              <FilterChip
+                key={c.id}
+                label={c.nameRo}
+                active={filters.category === c.slug}
+                onPress={() => {
+                  router.setParams({
+                    category: filters.category === c.slug ? undefined : c.slug,
+                  });
+                  setShowCats(false);
+                }}
+              />
+            ))}
+          </ScrollView>
+        )}
       </View>
 
       <FlatList
