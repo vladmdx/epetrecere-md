@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import { useUser } from "@clerk/clerk-expo";
 import {
   ArrowLeft,
   Calendar,
@@ -182,7 +183,9 @@ export default function PlanDetailScreen() {
         {activeTab === "overview" && <OverviewTab detail={detail} />}
         {activeTab === "checklist" && <ChecklistTab planId={planId} />}
         {activeTab === "guests" && <GuestsTab planId={planId} />}
-        {activeTab === "bookings" && <BookingsTabStub />}
+        {activeTab === "bookings" && (
+          <BookingsTab planId={planId} eventDate={plan.eventDate} />
+        )}
         {activeTab === "moments" && (
           <MomentsTab
             onOpen={() => router.push(`/(client)/moments/${planId}` as never)}
@@ -400,11 +403,142 @@ function useCountdown(eventDate: string | null) {
   }, [eventDate, now]);
 }
 
-// ─── Tab stubs (filled out next phase) ───────────────────
+// ─── Bookings tab ────────────────────────────────────────
 
-function BookingsTabStub() {
-  return <TabPlaceholder Icon={Clock} title="Rezervări" />;
+interface BookingRequest {
+  id: number;
+  eventPlanId: number | null;
+  artistId: number | null;
+  venueId: number | null;
+  status: string;
+  artistName: string | null;
+  venueName: string | null;
+  categoryNames?: string[] | null;
+  eventDate: string;
 }
+
+const BOOKING_STATUS: Record<string, { label: string; tint: string }> = {
+  pending: { label: "În așteptare", tint: colors.gold },
+  accepted: { label: "Acceptată", tint: colors.success },
+  confirmed_by_client: { label: "Confirmată", tint: colors.success },
+  rejected: { label: "Refuzată", tint: "#EF4444" },
+  cancelled: { label: "Anulată", tint: colors.mutedForeground },
+  completed: { label: "Finalizată", tint: colors.success },
+  expired: { label: "Expirată", tint: colors.mutedForeground },
+};
+
+function BookingsTab({
+  planId,
+  eventDate,
+}: {
+  planId: number;
+  eventDate: string | null;
+}) {
+  const api = useApi();
+  const router = useRouter();
+  const { user } = useUser();
+
+  // Same source + filter as the cabinet: fetch the client's bookings and keep
+  // the ones linked to this plan (or same-date bookings not yet linked).
+  const bookingsQuery = useQuery({
+    queryKey: ["plan-bookings", planId],
+    queryFn: async () => {
+      const res = await api.get<BookingRequest[]>(API_PATHS.bookingRequests, {
+        query: { client_email: user?.primaryEmailAddress?.emailAddress ?? "" },
+      });
+      const all = Array.isArray(res.data) ? res.data : [];
+      return all.filter(
+        (b) =>
+          b.eventPlanId === planId ||
+          (b.eventPlanId == null &&
+            eventDate != null &&
+            b.eventDate === eventDate),
+      );
+    },
+  });
+
+  if (bookingsQuery.isLoading) {
+    return (
+      <View className="items-center py-10">
+        <ActivityIndicator color={colors.gold} />
+      </View>
+    );
+  }
+
+  const bookings = bookingsQuery.data ?? [];
+
+  if (bookings.length === 0) {
+    return (
+      <Card className="items-center gap-3 p-8">
+        <Clock size={40} color={colors.mutedForeground} />
+        <Text className="font-heading text-[16px] font-bold text-foreground">
+          Nicio cerere încă
+        </Text>
+        <Text className="text-center text-[12px] text-muted-foreground">
+          Trimite cereri către artiști și săli — apar aici, legate de eveniment.
+        </Text>
+        <Pressable
+          onPress={() => router.push("/(client)/(tabs)/search")}
+          className="mt-1 flex-row items-center gap-2 rounded-lg bg-gold px-5 py-2.5"
+        >
+          <Sparkles size={16} color={colors.background} />
+          <Text className="text-[14px] font-semibold text-background">
+            Caută furnizori
+          </Text>
+        </Pressable>
+      </Card>
+    );
+  }
+
+  return (
+    <View className="gap-3">
+      {bookings.map((b) => {
+        const cfg = BOOKING_STATUS[b.status] ?? {
+          label: b.status,
+          tint: colors.mutedForeground,
+        };
+        const name = b.artistName ?? b.venueName ?? "Furnizor";
+        const category = b.categoryNames?.[0] ?? (b.venueId ? "Sală" : "Artist");
+        return (
+          <Pressable
+            key={b.id}
+            onPress={() => router.push(`/(client)/bookings/${b.id}`)}
+          >
+            <Card className="flex-row items-center gap-3">
+              <View className="flex-1">
+                <Text
+                  className="text-[15px] font-semibold text-foreground"
+                  numberOfLines={1}
+                >
+                  {name}
+                </Text>
+                <Text
+                  className="mt-0.5 text-[12px] text-muted-foreground"
+                  numberOfLines={1}
+                >
+                  {category}
+                  {b.eventDate ? ` · ${formatDateRO(b.eventDate)}` : ""}
+                </Text>
+              </View>
+              <View
+                style={{ backgroundColor: cfg.tint + "22" }}
+                className="rounded-full px-3 py-1"
+              >
+                <Text
+                  style={{ color: cfg.tint }}
+                  className="text-[11px] font-semibold"
+                >
+                  {cfg.label}
+                </Text>
+              </View>
+            </Card>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function MomentsTab({ onOpen }: { onOpen: () => void }) {
   return (
     <Card onPress={onOpen} className="items-center gap-3 p-6">
@@ -419,22 +553,3 @@ function MomentsTab({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function TabPlaceholder({
-  Icon,
-  title,
-}: {
-  Icon: typeof Clock;
-  title: string;
-}) {
-  return (
-    <Card className="items-center gap-3 p-8">
-      <Icon size={40} color={colors.mutedForeground} />
-      <Text className="font-heading text-[16px] font-bold text-foreground">
-        {title}
-      </Text>
-      <Text className="text-center text-[12px] text-muted-foreground">
-        În curând — această secțiune se construiește în M3 partea 2.
-      </Text>
-    </Card>
-  );
-}
