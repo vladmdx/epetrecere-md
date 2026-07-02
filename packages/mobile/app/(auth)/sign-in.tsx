@@ -10,10 +10,10 @@
 // in alert() dialogs — alerts are interruptive and feel un-native.
 
 import { useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Platform } from "react-native";
 import { useRouter, Link } from "expo-router";
 import { useSignIn, useOAuth } from "@clerk/clerk-expo";
-import { Eye, EyeOff, Mail, Lock } from "lucide-react-native";
+import { Eye, EyeOff, Mail, Lock, Apple } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import * as WebBrowser from "expo-web-browser";
 import { Button, Input, SafeScreen } from "../../components/ui";
@@ -28,6 +28,7 @@ export default function SignIn() {
   const router = useRouter();
   const { signIn, setActive, isLoaded } = useSignIn();
   const googleOAuth = useOAuth({ strategy: "oauth_google" });
+  const appleOAuth = useOAuth({ strategy: "oauth_apple" });
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -76,11 +77,15 @@ export default function SignIn() {
     }
   }
 
-  async function handleGoogleSignIn() {
+  // Shared OAuth runner — Clerk's browser flow both signs in and, for a new
+  // Apple/Google account, signs up. Same redirect scheme for every provider.
+  async function runOAuth(
+    startOAuthFlow: (typeof googleOAuth)["startOAuthFlow"],
+  ) {
     setGeneralError(null);
     setSubmitting(true);
     try {
-      const result = await googleOAuth.startOAuthFlow({
+      const result = await startOAuthFlow({
         redirectUrl: "epetrecere://oauth-callback",
       });
       if (result.createdSessionId && result.setActive) {
@@ -96,6 +101,9 @@ export default function SignIn() {
       setSubmitting(false);
     }
   }
+
+  const handleGoogleSignIn = () => runOAuth(googleOAuth.startOAuthFlow);
+  const handleAppleSignIn = () => runOAuth(appleOAuth.startOAuthFlow);
 
   return (
     <SafeScreen padded keyboardAvoiding>
@@ -197,6 +205,21 @@ export default function SignIn() {
         >
           {t("auth.signInWithGoogle")}
         </Button>
+
+        {/* Sign in with Apple — iOS only. Required by App Store review when
+            any other third-party sign-in (Google) is offered. */}
+        {Platform.OS === "ios" && (
+          <Button
+            variant="outline"
+            onPress={handleAppleSignIn}
+            loading={submitting}
+            fullWidth
+            size="lg"
+            leftIcon={<Apple size={18} color={colors.gold} />}
+          >
+            {t("auth.signInWithApple")}
+          </Button>
+        )}
 
         {/* Sign-up footer */}
         <View className="flex-row items-center justify-center gap-1.5">
