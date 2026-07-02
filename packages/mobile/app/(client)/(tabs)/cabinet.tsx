@@ -292,10 +292,9 @@ export default function CabinetScreen() {
       </View>
 
       {!activePlan ? (
-        // NOTE: the 7-step planning wizard isn't ported to mobile yet
-        // (web-only at /planifica). Until it is, "start planning" sends the
-        // user to the search tab to begin discovering vendors.
-        <EmptyState onPress={() => router.push("/(client)/(tabs)/search")} />
+        // Opens the native "create event plan" screen — the mobile
+        // counterpart of the web /planifica wizard.
+        <EmptyState onPress={() => router.push("/(client)/plan/new")} />
       ) : (
         <>
           <HeroCard
