@@ -17,10 +17,11 @@
 // or pre-sent via email).
 
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { invitationGuests, invitations } from "@/lib/db/schema";
+import { invitationGuests, invitations, users } from "@/lib/db/schema";
 
 const schema = z.object({
   token: z.string().min(8).max(200),
@@ -97,13 +98,44 @@ export async function POST(req: NextRequest) {
 }
 
 // GET — host fetches live check-in stats for their invitation.
+//
+// Security: unlike POST (which is authorized by the unguessable per-guest
+// rsvpToken), GET returns the FULL guest list — names, RSVP status, plus-one
+// details, check-in times — which is host-only PII. invitation_id is a
+// sequential serial, so without an ownership check anyone could enumerate
+// ids and dump every event's guest list (IDOR). We therefore require the
+// caller to be signed in AND to own the invitation.
 export async function GET(req: NextRequest) {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const invitationId = Number(req.nextUrl.searchParams.get("invitation_id"));
   if (!Number.isFinite(invitationId)) {
     return NextResponse.json(
       { error: "invitation_id required" },
       { status: 400 },
     );
+  }
+
+  // Resolve the caller's DB user and confirm they own this invitation.
+  // Return 404 (not 403) for both missing and not-owned so the endpoint
+  // doesn't leak which invitation ids exist.
+  const [inv] = await db
+    .select({ ownerId: invitations.userId })
+    .from(invitations)
+    .where(eq(invitations.id, invitationId))
+    .limit(1);
+
+  const [caller] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+
+  if (!inv || !caller || inv.ownerId !== caller.id) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const guests = await db

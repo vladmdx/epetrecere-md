@@ -25,18 +25,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  // Prefer Clerk session auth over email param to avoid enumeration
+  // PII/role data is only ever returned for the authenticated caller. The
+  // `email` query param is intentionally NOT used to identify a user —
+  // that previously let an unauthenticated caller enumerate role + phone
+  // for any known email (`?email=victim@…`). Every legitimate caller (the
+  // post-signup redirect, dashboard pages) is signed in, so requiring a
+  // Clerk session here breaks no flow. The param is left ignored so
+  // existing callers that still append it keep working.
   const { userId: clerkId } = await auth();
-
-  const email = req.nextUrl.searchParams.get("email");
-  if (!clerkId && !email) {
+  if (!clerkId) {
     return NextResponse.json({ role: "user", isNewUser: true });
   }
 
-  // Try to find the user by clerkId first, then by email
+  // Find the user by their Clerk id.
   let dbUser: typeof users.$inferSelect | null = null;
-
-  if (clerkId) {
+  {
     const [found] = await db
       .select()
       .from(users)
@@ -45,53 +48,63 @@ export async function GET(req: NextRequest) {
     dbUser = found ?? null;
   }
 
-  if (!dbUser && email) {
-    const [found] = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-    dbUser = found ?? null;
-  }
-
-  // User not in DB yet (webhook hasn't fired or CLERK_WEBHOOK_SECRET missing).
-  // Create the user record as a fallback so the flow isn't broken.
-  if (!dbUser && clerkId) {
+  // Not linked yet (webhook hasn't fired, CLERK_WEBHOOK_SECRET missing, or
+  // the row predates the Clerk account — e.g. an admin-imported vendor).
+  // Resolve the caller's OWN verified email from Clerk (never a client
+  // param) to link a pre-existing row or create a new one.
+  if (!dbUser) {
     try {
       const client = await clerkClient();
       const clerkUser = await client.users.getUser(clerkId);
-      const fallbackEmail =
-        clerkUser.emailAddresses[0]?.emailAddress || email || "";
-      const fallbackName = [clerkUser.firstName, clerkUser.lastName]
-        .filter(Boolean)
-        .join(" ") || null;
+      const ownEmail = clerkUser.emailAddresses[0]?.emailAddress || "";
 
-      if (fallbackEmail) {
-        const [created] = await db
-          .insert(users)
-          .values({
-            clerkId,
-            email: fallbackEmail,
-            name: fallbackName,
-            avatarUrl: clerkUser.imageUrl || null,
-            role: "user",
-          })
-          .onConflictDoNothing()
-          .returning();
-        dbUser = created ?? null;
+      if (ownEmail) {
+        const [existing] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, ownEmail))
+          .limit(1);
 
-        // If insert was a no-op (conflict), try fetching again
-        if (!dbUser) {
-          const [found] = await db
-            .select()
-            .from(users)
-            .where(eq(users.clerkId, clerkId))
-            .limit(1);
-          dbUser = found ?? null;
+        if (existing) {
+          // Link the caller's Clerk id onto their own pre-existing row.
+          if (!existing.clerkId) {
+            await db
+              .update(users)
+              .set({ clerkId, updatedAt: new Date() })
+              .where(eq(users.id, existing.id));
+          }
+          dbUser = existing;
+        } else {
+          const fallbackName = [clerkUser.firstName, clerkUser.lastName]
+            .filter(Boolean)
+            .join(" ") || null;
+
+          const [created] = await db
+            .insert(users)
+            .values({
+              clerkId,
+              email: ownEmail,
+              name: fallbackName,
+              avatarUrl: clerkUser.imageUrl || null,
+              role: "user",
+            })
+            .onConflictDoNothing()
+            .returning();
+          dbUser = created ?? null;
+
+          // If insert was a no-op (race/conflict), fetch again by clerkId.
+          if (!dbUser) {
+            const [found] = await db
+              .select()
+              .from(users)
+              .where(eq(users.clerkId, clerkId))
+              .limit(1);
+            dbUser = found ?? null;
+          }
         }
       }
     } catch (err) {
-      console.error("[check-role] Fallback user creation failed:", err);
+      console.error("[check-role] Fallback user resolution failed:", err);
     }
   }
 

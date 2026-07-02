@@ -35,8 +35,14 @@ export default function TestLoginPage() {
   // Probe the sign-in-token API first — if it's gated off in this env,
   // render 404 instead of leaking which test emails the app uses.
   const [enabled, setEnabled] = useState<null | boolean>(null);
+  // The demo link carries the shared secret as ?key=… — read it client-side
+  // and forward it to every call. Without the right key the API answers
+  // "disabled" and we render a 404, so a bare /test-login stays hidden.
+  const [accessKey, setAccessKey] = useState("");
   useEffect(() => {
-    fetch("/api/dev/sign-in-token?user=__probe__")
+    const key = new URLSearchParams(window.location.search).get("key") || "";
+    setAccessKey(key);
+    fetch(`/api/dev/sign-in-token?user=__probe__&key=${encodeURIComponent(key)}`)
       .then((r) => r.json())
       .then((d) => {
         // 400 "unknown user" → endpoint is reachable & enabled (the
@@ -51,8 +57,10 @@ export default function TestLoginPage() {
     setBusy(who);
     setError(null);
     try {
-      // 1. Get a dev sign-in token from our API
-      const r = await fetch(`/api/dev/sign-in-token?user=${who}`);
+      // 1. Get a dev sign-in token from our API (forward the secret key)
+      const r = await fetch(
+        `/api/dev/sign-in-token?user=${who}&key=${encodeURIComponent(accessKey)}`,
+      );
       const { token, error: err } = await r.json();
       if (err || !token) throw new Error(err || "no token");
 
@@ -153,8 +161,10 @@ export default function TestLoginPage() {
           )}
 
           <p className="pt-2 text-center text-xs text-muted-foreground">
-            Gated by <code className="text-gold">ENABLE_TEST_LOGIN=1</code> env var.
-            Unset it on Vercel to hide these accounts from the public.
+            Gated by <code className="text-gold">ENABLE_TEST_LOGIN=1</code> +
+            a secret <code className="text-gold">?key=</code> in the link
+            (<code className="text-gold">TEST_LOGIN_SECRET</code>). Fără cheia
+            corectă, pagina rămâne ascunsă.
           </p>
         </CardContent>
       </Card>

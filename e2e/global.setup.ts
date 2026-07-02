@@ -21,10 +21,17 @@ async function signInAs(
   // Retry up to 3 times — the ticket flow occasionally races the Clerk
   // frontend SDK bootstrap and fails with "Cannot read properties of
   // undefined (reading 'signIn')" until clerk.client is ready.
+  // When TEST_LOGIN_SECRET is configured (e.g. against prod) the page needs
+  // the secret in the link; locally the flag-only gate accepts a bare URL.
+  const key = process.env.TEST_LOGIN_SECRET ?? "";
+  const testLoginUrl = key
+    ? `/test-login?key=${encodeURIComponent(key)}`
+    : "/test-login";
+
   let lastError: unknown;
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      await page.goto("/test-login", { waitUntil: "domcontentloaded" });
+      await page.goto(testLoginUrl, { waitUntil: "domcontentloaded" });
 
       // Wait for Clerk's frontend SDK to finish initialising `clerk.client`.
       // We poll a window flag rather than a selector because the button
