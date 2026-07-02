@@ -17,6 +17,7 @@
 import { db } from "@/lib/db";
 import { notifications, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import type { PushKind } from "@/lib/push/expo";
 
 const CRITICAL_TYPES = new Set<string>([
   "booking_request_status_changed",
@@ -24,6 +25,27 @@ const CRITICAL_TYPES = new Set<string>([
   "registration_approved",
   "registration_rejected",
 ]);
+
+// Map a central notification type to the mobile push routing key. The mobile
+// push router (packages/mobile/lib/push.ts) only deep-links booking_new →
+// partner bookings, booking_accepted → client bookings, and message_new →
+// chat; every other kind falls through to the app home. Types without a
+// dedicated screen are mapped to a kind that opens home. Keep in sync with
+// the mobile router as it grows more cases.
+function toPushKind(type: string): PushKind {
+  switch (type) {
+    case "booking_request_new":
+    case "booking_request_status_changed":
+      return "booking_new"; // vendor-facing → partner bookings
+    case "booking_status_changed":
+      return "booking_accepted"; // client-facing → client bookings
+    case "review_new":
+    case "review_request":
+      return "review_new";
+    default:
+      return "event_upcoming"; // no dedicated screen yet → opens home
+  }
+}
 
 export type NotificationType =
   // Vendor (Artist / Venue)
@@ -137,9 +159,11 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
 
     const prefs = await resolvePrefs(input.userId, String(input.type));
 
-    // Web Push — gated by the recipient's push preference for this type's
-    // category. Still fire-and-forget so a slow push API doesn't stall.
+    // Push — gated by the recipient's push preference for this type's
+    // category. Both channels fire-and-forget so a slow push API doesn't
+    // stall the request.
     if (prefs.push) {
+      // Web Push (browser, via VAPID subscriptions).
       void (async () => {
         try {
           const { sendPushToUser } = await import("@/lib/push/send");
@@ -150,7 +174,29 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
             tag: String(input.type),
           });
         } catch (err) {
-          console.error("[notifications] push failed:", err);
+          console.error("[notifications] web push failed:", err);
+        }
+      })();
+
+      // Mobile Push (Expo). The web push above only reaches browsers; users
+      // with only a mobile device have an Expo token, not a web subscription,
+      // and were previously never notified by the central dispatcher. Aliased
+      // import — push/expo also exports a `sendPushToUser` with a different
+      // signature.
+      void (async () => {
+        try {
+          const { sendPushToUser: sendExpoPush } = await import("@/lib/push/expo");
+          await sendExpoPush({
+            userId: input.userId,
+            title: input.title,
+            body: input.message ?? "",
+            data: {
+              kind: toPushKind(String(input.type)),
+              ...(input.actionUrl ? { url: input.actionUrl } : {}),
+            },
+          });
+        } catch (err) {
+          console.error("[notifications] expo push failed:", err);
         }
       })();
     }
@@ -176,31 +222,17 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
     // frequency, unless the event is critical (time-sensitive updates
     // that always ship instantly).
     if (input.email && input.emailHtml && prefs.email) {
-      const isCritical = CRITICAL_TYPES.has(String(input.type));
-      let shouldEmailNow = true;
-      if (!isCritical) {
-        const [userRow] = await db
-          .select({ freq: users.notificationDigestFrequency })
-          .from(users)
-          .where(eq(users.id, input.userId))
-          .limit(1);
-        const freq = (userRow?.freq ?? "instant").toLowerCase();
-        if (freq === "daily" || freq === "weekly") {
-          // Queued for digest cron — skip immediate send. The notification row
-          // above is the source of truth the cron reads from.
-          shouldEmailNow = false;
-        }
-      }
-      if (shouldEmailNow) {
-        const { sendEmail } = await import("@/lib/email/send");
-        await sendEmail({
-          to: input.email,
-          subject: input.emailSubject || input.title,
-          html: input.emailHtml,
-        }).catch((err) =>
-          console.error("[notifications] email failed:", err),
-        );
-      }
+      // NOTE: the daily/weekly digest cron was never implemented, so honoring
+      // `users.notificationDigestFrequency` here used to DROP those emails
+      // entirely (only the in-app row survived). Until a digest job exists,
+      // send every email immediately regardless of the frequency preference —
+      // a slightly chattier inbox beats silently losing notifications.
+      const { sendEmail } = await import("@/lib/email/send");
+      await sendEmail({
+        to: input.email,
+        subject: input.emailSubject || input.title,
+        html: input.emailHtml,
+      }).catch((err) => console.error("[notifications] email failed:", err));
     }
   } catch (err) {
     console.error("[notifications] dispatch failed", err);
