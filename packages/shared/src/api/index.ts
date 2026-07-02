@@ -178,6 +178,9 @@ export const API_PATHS = {
   eventPlanGuests: (id: number) => `/event-plans/${id}/guests`,
   eventPlanChecklist: (id: number) => `/event-plans/${id}/checklist`,
 
+  // Calendar — GET month events + POST bulk-set status (block/unblock).
+  calendar: "/calendar",
+
   // Discovery
   categories: "/categories",
   artists: "/artists",

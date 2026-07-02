@@ -11,12 +11,12 @@
 import { useMemo, useState } from "react";
 import { View, Text, Pressable, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-expo";
 import {
   ChevronLeft,
   ChevronRight,
-  Plus,
+  Lock,
 } from "lucide-react-native";
 import { SafeScreen, Card, Badge } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
@@ -29,6 +29,12 @@ interface BookingRow {
   status: string;
   clientName: string;
   startTime: string | null;
+}
+
+interface CalendarEvent {
+  id: number;
+  date: string;
+  status: string;
 }
 
 const WEEKDAY_SHORT_RO = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
@@ -91,6 +97,50 @@ export default function PartnerCalendarScreen() {
     return map;
   }, [bookingsQuery.data]);
 
+  // Manually blocked days for the visible month (calendar_events, status
+  // "blocked"). Same endpoint the web owner-dashboard uses, exposed via v1.
+  const monthKey = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
+  const eventsQuery = useQuery({
+    queryKey: ["partner-cal-events", artistQuery.data, monthKey],
+    enabled: !!artistQuery.data,
+    queryFn: async () => {
+      const res = await api.get<CalendarEvent[]>(API_PATHS.calendar, {
+        query: {
+          entity_type: "artist",
+          entity_id: artistQuery.data ?? "",
+          month: monthKey,
+        },
+      });
+      return Array.isArray(res.data) ? res.data : [];
+    },
+  });
+
+  const blockedDays = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of eventsQuery.data ?? []) {
+      if (e.status === "blocked") set.add(e.date);
+    }
+    return set;
+  }, [eventsQuery.data]);
+
+  const queryClient = useQueryClient();
+  const blockMutation = useMutation({
+    mutationFn: async ({ date, block }: { date: string; block: boolean }) => {
+      const res = await api.post(API_PATHS.calendar, {
+        entity_type: "artist",
+        entity_id: artistQuery.data,
+        dates: [date],
+        status: block ? "blocked" : "available",
+      });
+      if (!res.ok) throw new Error(res.error?.message ?? "Nu s-a putut salva.");
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["partner-cal-events", artistQuery.data, monthKey],
+      });
+    },
+  });
+
   const cells = useMemo(() => buildMonthGrid(cursor), [cursor]);
   const monthLabel = `${MONTHS_RO[cursor.getMonth()]} ${cursor.getFullYear()}`;
 
@@ -144,6 +194,7 @@ export default function PartnerCalendarScreen() {
                   key={`${wIdx}-${dIdx}`}
                   cell={cell}
                   bookings={cell.iso ? bookingsByDay.get(cell.iso) ?? [] : []}
+                  blocked={cell.iso ? blockedDays.has(cell.iso) : false}
                   selected={cell.iso === selectedDate}
                   onPress={() => cell.iso && setSelectedDate(cell.iso)}
                 />
@@ -172,9 +223,20 @@ export default function PartnerCalendarScreen() {
               <Text className="text-[12px] text-gold">Închide</Text>
             </Pressable>
           </View>
+          {selectedDate && blockedDays.has(selectedDate) && (
+            <View
+              className="flex-row items-center gap-2 rounded-lg px-3 py-2"
+              style={{ backgroundColor: colors.danger + "1A" }}
+            >
+              <Lock size={14} color={colors.danger} />
+              <Text className="text-[12px]" style={{ color: colors.danger }}>
+                Zi blocată — nu apari ca disponibil în această zi.
+              </Text>
+            </View>
+          )}
           {selectedBookings.length === 0 ? (
             <Text className="text-[13px] text-muted-foreground">
-              Nicio rezervare în această zi. Atinge + să blochezi ziua manual.
+              Nicio rezervare în această zi.
             </Text>
           ) : (
             <View className="gap-2">
@@ -183,15 +245,35 @@ export default function PartnerCalendarScreen() {
               ))}
             </View>
           )}
-          <Pressable
-            disabled
-            className="flex-row items-center justify-center gap-2 rounded-lg border border-dashed border-gold/40 px-3 py-2 opacity-60"
-          >
-            <Plus size={14} color={colors.gold} />
-            <Text className="text-[12px] text-gold">
-              Blochează ziua (în curând)
-            </Text>
-          </Pressable>
+          {(() => {
+            const isBlocked = selectedDate
+              ? blockedDays.has(selectedDate)
+              : false;
+            // Can't block a day that already has bookings on it.
+            if (selectedBookings.length > 0 && !isBlocked) return null;
+            const tint = isBlocked ? colors.danger : colors.gold;
+            return (
+              <Pressable
+                onPress={() =>
+                  selectedDate &&
+                  blockMutation.mutate({
+                    date: selectedDate,
+                    block: !isBlocked,
+                  })
+                }
+                disabled={blockMutation.isPending}
+                style={{ borderColor: tint + "66" }}
+                className={`flex-row items-center justify-center gap-2 rounded-lg border px-3 py-2 ${
+                  blockMutation.isPending ? "opacity-50" : ""
+                }`}
+              >
+                <Lock size={14} color={tint} />
+                <Text className="text-[12px]" style={{ color: tint }}>
+                  {isBlocked ? "Deblochează ziua" : "Blochează ziua"}
+                </Text>
+              </Pressable>
+            );
+          })()}
         </Card>
       )}
     </SafeScreen>
@@ -259,11 +341,13 @@ function formatDay(iso: string): string {
 function DayCell({
   cell,
   bookings,
+  blocked,
   selected,
   onPress,
 }: {
   cell: Cell;
   bookings: BookingRow[];
+  blocked: boolean;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -276,23 +360,41 @@ function DayCell({
   return (
     <Pressable
       onPress={onPress}
+      // Blocked days get a red tint via inline style (colors.danger isn't a
+      // NativeWind class token, only a JS color) so it always renders.
+      style={
+        blocked && !selected
+          ? {
+              backgroundColor: colors.danger + "1A",
+              borderColor: colors.danger + "66",
+              borderWidth: 1,
+            }
+          : undefined
+      }
       className={`aspect-square flex-1 items-center justify-center rounded-lg ${
         selected ? "border-2 border-gold bg-gold/15" : cell.isToday ? "border border-gold/40 bg-card" : "bg-card"
       }`}
     >
       <Text
-        className={`text-[14px] font-semibold ${
-          cell.isToday ? "text-gold" : "text-foreground"
-        }`}
+        className="text-[14px] font-semibold"
+        style={{
+          color: blocked
+            ? colors.danger
+            : cell.isToday
+              ? colors.gold
+              : colors.foreground,
+        }}
       >
         {cell.dayNum}
       </Text>
-      {dotColor && (
+      {blocked ? (
+        <Lock size={9} color={colors.danger} style={{ marginTop: 2 }} />
+      ) : dotColor ? (
         <View
           style={{ backgroundColor: dotColor }}
           className="mt-0.5 h-1.5 w-1.5 rounded-full"
         />
-      )}
+      ) : null}
     </Pressable>
   );
 }
