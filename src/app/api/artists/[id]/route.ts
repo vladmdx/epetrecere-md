@@ -19,16 +19,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const artistId = Number(id);
-  if (isNaN(artistId)) {
-    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
-  }
+  // Accept a numeric id (admin/web) OR a slug. The mobile app deep-links
+  // by slug (/artists/<slug>), and v1 re-exports this GET, so both forms
+  // must resolve.
+  const numericId = /^\d+$/.test(id) ? Number(id) : null;
 
-  const result = await db.select().from(artists).where(eq(artists.id, artistId)).limit(1);
-  const artist = result[0];
+  const [artist] = await db
+    .select()
+    .from(artists)
+    .where(numericId !== null ? eq(artists.id, numericId) : eq(artists.slug, id))
+    .limit(1);
   if (!artist) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const artistId = artist.id;
 
   const [images, videos, packages, artistReviews] = await Promise.all([
     db.select().from(artistImages).where(eq(artistImages.artistId, artistId)).orderBy(asc(artistImages.sortOrder)),

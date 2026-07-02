@@ -3855,6 +3855,9 @@ function SettingsTab({
           eventDate: eventDate || null,
           location: location || null,
           guestCountTarget: guestCount ? Number(guestCount) : null,
+          // Was omitted — the Buget input edited local state but the value
+          // never reached the server, so budget edits silently vanished.
+          budgetTarget: budget ? Number(budget) : null,
           notes: notes || null,
           venueNeeded,
           checklistEnabled,

@@ -11,16 +11,20 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const venueId = Number(id);
-  if (isNaN(venueId)) {
-    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
-  }
+  // Accept a numeric id (admin/web) OR a slug. The mobile app deep-links
+  // by slug (/venues/<slug>), and v1 re-exports this GET, so both forms
+  // must resolve.
+  const numericId = /^\d+$/.test(id) ? Number(id) : null;
 
-  const result = await db.select().from(venues).where(eq(venues.id, venueId)).limit(1);
-  const venue = result[0];
+  const [venue] = await db
+    .select()
+    .from(venues)
+    .where(numericId !== null ? eq(venues.id, numericId) : eq(venues.slug, id))
+    .limit(1);
   if (!venue) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  const venueId = venue.id;
 
   const [images, venueReviews] = await Promise.all([
     db.select().from(venueImages).where(eq(venueImages.venueId, venueId)).orderBy(asc(venueImages.sortOrder)),
