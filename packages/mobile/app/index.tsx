@@ -4,9 +4,10 @@
 //   - Clerk loading → SplashGate (returns nothing while parent splash
 //     is up).
 //   - Signed-out   → redirect to /(auth)/sign-in
-//   - Signed-in    → redirect to either /(partner)/dashboard (if the
-//                    user has an artist row) or /(client)/cabinet
-//                    (everyone else).
+//   - Signed-in    → redirect to either the partner tab bar (if the
+//                    user has an artist row) or the client tab bar
+//                    (everyone else). Both targets are the (tabs) group
+//                    root, which resolves to each area's index tab.
 //
 // Role resolution calls /api/v1/me which the web side already exposes.
 // We cache the result in SecureStore so subsequent cold-starts skip the
@@ -67,6 +68,6 @@ export default function Index() {
   }
 
   if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
-  if (role === "partner") return <Redirect href="/(partner)/dashboard" />;
-  return <Redirect href="/(client)/cabinet" />;
+  if (role === "partner") return <Redirect href="/(partner)/(tabs)" />;
+  return <Redirect href="/(client)/(tabs)" />;
 }

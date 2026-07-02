@@ -51,12 +51,11 @@ export default function OnboardingRolePicker() {
       });
 
       if (role === "artist") {
-        // Artists land on /dashboard which auto-detects the
-        // pending state and shows the onboarding shell from the web
-        // (eventually we'll port that to native too).
-        router.replace("/(partner)/dashboard");
+        // Artists land on the partner tab bar; its home tab surfaces the
+        // "complete your profile" CTA until the artist row exists.
+        router.replace("/(partner)/(tabs)");
       } else {
-        router.replace("/(client)/cabinet");
+        router.replace("/(client)/(tabs)");
       }
     } finally {
       setSubmitting(false);

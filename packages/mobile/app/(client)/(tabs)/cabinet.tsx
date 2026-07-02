@@ -292,7 +292,10 @@ export default function CabinetScreen() {
       </View>
 
       {!activePlan ? (
-        <EmptyState onPress={() => router.push("/(client)/planning")} />
+        // NOTE: the 7-step planning wizard isn't ported to mobile yet
+        // (web-only at /planifica). Until it is, "start planning" sends the
+        // user to the search tab to begin discovering vendors.
+        <EmptyState onPress={() => router.push("/(client)/(tabs)/search")} />
       ) : (
         <>
           <HeroCard
@@ -744,7 +747,9 @@ function BottomRow({
           Icon={Wallet}
           title="Buget"
           description="Calculator de buget pentru evenimentul tău."
-          onPress={() => router.push("/(client)/budget-calculator" as never)}
+          // NOTE: no dedicated budget screen (or plan/[id] budget tab) on
+          // mobile yet — open the plan so the CTA isn't a dead end.
+          onPress={() => router.push(`/(client)/plan/${plan.id}` as never)}
         />
       )}
       {plan.momentsEnabled && (

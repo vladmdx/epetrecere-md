@@ -119,13 +119,16 @@ export function listenForNotificationTaps(): () => void {
       // sender. Add new kinds here as we wire more events.
       switch (data.kind) {
         case "booking_new":
-          router.push(`/(partner)/bookings?expand=${data.id}`);
+          // Partner bookings live under the (tabs) group.
+          router.push(`/(partner)/(tabs)/bookings?expand=${data.id}`);
           break;
         case "booking_accepted":
+          // Client bookings is a stack screen (not a tab): (client)/bookings.
           router.push(`/(client)/bookings?expand=${data.id}`);
           break;
         case "message_new":
-          router.push(`/(client)/messages/${data.id}`);
+          // Shared chat detail screen — used by both client and partner.
+          router.push(`/(client)/chat/${data.id}`);
           break;
         default:
           router.push("/");
