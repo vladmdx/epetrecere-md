@@ -9,6 +9,7 @@ import { ArrowLeft, Calendar, Tag, Edit } from "lucide-react";
 import { auth } from "@clerk/nextjs/server";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { articleJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
+import { sanitizeRichHtml } from "@/lib/sanitize-html";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -142,7 +143,7 @@ export default async function BlogPostPage({ params }: Props) {
         {post.contentRo ? (
           <article
             className="prose prose-invert prose-gold max-w-none prose-headings:font-heading prose-headings:text-gold prose-p:text-[#D4D4E0] prose-a:text-gold"
-            dangerouslySetInnerHTML={{ __html: post.contentRo }}
+            dangerouslySetInnerHTML={{ __html: sanitizeRichHtml(post.contentRo) }}
           />
         ) : (
           <p className="text-muted-foreground">Conținutul articolului nu este disponibil momentan.</p>

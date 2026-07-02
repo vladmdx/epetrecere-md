@@ -1,3 +1,5 @@
+import { escapeHtml } from "../escape";
+
 interface AdminNotificationProps {
   leadName: string;
   phone: string;
@@ -12,6 +14,14 @@ interface AdminNotificationProps {
 }
 
 export function adminNotificationEmail(props: AdminNotificationProps): string {
+  // Escape user-controlled fields (public lead form) before HTML interpolation.
+  const leadName = escapeHtml(props.leadName);
+  const phone = escapeHtml(props.phone);
+  const email = props.email ? escapeHtml(props.email) : undefined;
+  const eventType = escapeHtml(props.eventType);
+  const eventDate = escapeHtml(props.eventDate);
+  const location = props.location ? escapeHtml(props.location) : undefined;
+  const source = escapeHtml(props.source);
   return `
 <!DOCTYPE html>
 <html>
@@ -24,15 +34,15 @@ export function adminNotificationEmail(props: AdminNotificationProps): string {
     </div>
     <div style="background:#1A1A2E;border-radius:12px;padding:32px;border:1px solid rgba(201,168,76,0.15);">
       <h1 style="color:#FAF8F2;font-size:20px;margin:0 0 8px;">🔔 Solicitare Nouă</h1>
-      <p style="color:#C9A84C;font-size:14px;margin:0 0 24px;">Scor: ${props.score}/100 · Sursa: ${props.source}</p>
+      <p style="color:#C9A84C;font-size:14px;margin:0 0 24px;">Scor: ${props.score}/100 · Sursa: ${source}</p>
 
       <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Nume</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;font-weight:bold;">${props.leadName}</td></tr>
-        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Telefon</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${props.phone}</td></tr>
-        ${props.email ? `<tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Email</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${props.email}</td></tr>` : ""}
-        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Eveniment</td><td style="color:#C9A84C;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;font-weight:bold;">${props.eventType}</td></tr>
-        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Data</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${props.eventDate}</td></tr>
-        ${props.location ? `<tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Locație</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${props.location}</td></tr>` : ""}
+        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Nume</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;font-weight:bold;">${leadName}</td></tr>
+        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Telefon</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${phone}</td></tr>
+        ${props.email ? `<tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Email</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${email}</td></tr>` : ""}
+        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Eveniment</td><td style="color:#C9A84C;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;font-weight:bold;">${eventType}</td></tr>
+        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Data</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${eventDate}</td></tr>
+        ${props.location ? `<tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Locație</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${location}</td></tr>` : ""}
         ${props.guestCount ? `<tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);">Invitați</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">${props.guestCount}</td></tr>` : ""}
         ${props.budget ? `<tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;">Buget</td><td style="color:#C9A84C;padding:8px 0;font-size:14px;text-align:right;font-weight:bold;">${props.budget}€</td></tr>` : ""}
       </table>

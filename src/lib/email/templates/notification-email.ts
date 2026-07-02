@@ -1,4 +1,11 @@
-/** Universal notification email template with dark theme and gold accents. */
+import { escapeHtml } from "../escape";
+
+/** Universal notification email template with dark theme and gold accents.
+ *
+ * `title` is treated as plain text and escaped here, so callers can pass a
+ * user-derived name safely. `message` is intentional HTML (callers use
+ * <strong>/<br>/<div>), so callers MUST escape any user-supplied text they
+ * interpolate into it themselves (see the chat/message routes). */
 export function notificationEmail(opts: {
   title: string;
   message: string;
@@ -27,7 +34,7 @@ export function notificationEmail(opts: {
     </div>
     <div style="background:#1A1A2E;border-radius:12px;padding:32px;border:1px solid rgba(201,168,76,0.15);">
       ${emojiBlock}
-      <h1 style="color:#FAF8F2;font-size:20px;margin:0 0 16px;text-align:center;">${opts.title}</h1>
+      <h1 style="color:#FAF8F2;font-size:20px;margin:0 0 16px;text-align:center;">${escapeHtml(opts.title)}</h1>
       <p style="color:#B0B0C0;font-size:15px;line-height:1.6;text-align:center;margin:0;">${opts.message}</p>
       ${cta}
     </div>

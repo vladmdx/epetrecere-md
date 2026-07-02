@@ -1,3 +1,5 @@
+import { escapeHtml } from "../escape";
+
 interface RegistrationStatusProps {
   name: string;
   type: "artist" | "venue";
@@ -10,9 +12,10 @@ export function registrationStatusEmail(props: RegistrationStatusProps): string 
   const statusColor = props.approved ? "#22c55e" : "#ef4444";
   const statusText = props.approved ? "APROBAT" : "REFUZAT";
 
+  const safeName = escapeHtml(props.name);
   const message = props.approved
-    ? `Felicitări! Profilul <strong>${props.name}</strong> a fost verificat și aprobat de echipa noastră. Acum ${typeLabel} tău este vizibil pe platforma ePetrecere.md și poți primi cereri de ofertă.`
-    : `Din păcate, profilul <strong>${props.name}</strong> nu a fost aprobat de echipa noastră. Dacă consideri că este o greșeală, te rugăm să ne contactezi.`;
+    ? `Felicitări! Profilul <strong>${safeName}</strong> a fost verificat și aprobat de echipa noastră. Acum ${typeLabel} tău este vizibil pe platforma ePetrecere.md și poți primi cereri de ofertă.`
+    : `Din păcate, profilul <strong>${safeName}</strong> nu a fost aprobat de echipa noastră. Dacă consideri că este o greșeală, te rugăm să ne contactezi.`;
 
   const ctaUrl = props.approved
     ? "https://epetrecere.md/dashboard"

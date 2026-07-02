@@ -10,6 +10,7 @@ import {
   venues,
 } from "@/lib/db/schema";
 import { eq, and, sql, isNull, or } from "drizzle-orm";
+import { escapeHtml } from "@/lib/email/escape";
 
 // Verify the signed-in user is either the client or the artist/venue on this booking
 async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
@@ -317,7 +318,7 @@ export async function POST(req: Request) {
             emailSubject: `💬 Mesaj nou de la ${senderName}`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
-              message: `<em>"${message}"</em>`,
+              message: `<em>"${escapeHtml(message)}"</em>`,
               ctaUrl: conversationId
                 ? `https://epetrecere.md/cabinet/mesaje?conversation=${conversationId}`
                 : "https://epetrecere.md/cabinet/rezervari",
@@ -362,7 +363,7 @@ export async function POST(req: Request) {
             emailSubject: `💬 Mesaj nou de la ${senderName}`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
-              message: `<em>"${message}"</em>`,
+              message: `<em>"${escapeHtml(message)}"</em>`,
               ctaUrl: conversationId
                 ? `https://epetrecere.md${vendorDashboardUrl}?conversation=${conversationId}`
                 : "https://epetrecere.md/dashboard/rezervari",

@@ -7,6 +7,7 @@ import { sendEmail } from "@/lib/email/send";
 import { reviewRequestEmail } from "@/lib/email/templates/review-request";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendPushToUser, type PushKind } from "@/lib/push/expo";
+import { escapeHtml } from "@/lib/email/escape";
 
 // UPDATE booking request — drives the bilateral confirmation flow (M0b #9):
 //   action=accept          → artist accepts, status becomes "accepted"
@@ -479,8 +480,8 @@ export async function PUT(
         const { notificationEmail } = await import(
           "@/lib/email/templates/notification-email"
         );
-        const emailBody = `<strong>${vendorName}</strong> a anulat rezervarea confirmată pentru ${booking.eventDate}.${
-          reply ? `<br><br>Motiv: <em>${reply}</em>` : ""
+        const emailBody = `<strong>${escapeHtml(vendorName)}</strong> a anulat rezervarea confirmată pentru ${booking.eventDate}.${
+          reply ? `<br><br>Motiv: <em>${escapeHtml(reply)}</em>` : ""
         }<br><br>Poți alege un alt furnizor disponibil la această dată pe ePetrecere.md.`;
 
         if (booking.clientUserId) {
@@ -683,14 +684,14 @@ export async function PUT(
         // On accept the booking is auto-finalized — include partner
         // contact info so the client can reach out directly.
         const contactBlock = action === "accept"
-          ? `<br><br><strong>Date de contact ${vendorName}:</strong>${
-              vendorPhone ? `<br>📞 ${vendorPhone}` : ""
-            }${vendorEmail ? `<br>📧 ${vendorEmail}` : ""}`
+          ? `<br><br><strong>Date de contact ${escapeHtml(vendorName)}:</strong>${
+              vendorPhone ? `<br>📞 ${escapeHtml(vendorPhone)}` : ""
+            }${vendorEmail ? `<br>📧 ${escapeHtml(vendorEmail)}` : ""}`
           : "";
 
         const emailBody = action === "accept"
-          ? `<strong>${vendorName}</strong> a confirmat rezervarea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Mesaj: <em>${reply}</em>` : ""}${contactBlock}`
-          : `<strong>${vendorName}</strong> a răspuns la cererea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Motivul: <em>${reply}</em>` : ""}`;
+          ? `<strong>${escapeHtml(vendorName)}</strong> a confirmat rezervarea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Mesaj: <em>${escapeHtml(reply)}</em>` : ""}${contactBlock}`
+          : `<strong>${escapeHtml(vendorName)}</strong> a răspuns la cererea ta pentru ${booking.eventDate}.${timePart}${reply ? `<br><br>Motivul: <em>${escapeHtml(reply)}</em>` : ""}`;
 
         // Notify the CLIENT
         if (booking.clientUserId) {
@@ -768,9 +769,9 @@ export async function PUT(
 
         // On accept also notify the PARTNER with the client's contact info.
         if (action === "accept" && vendorUserId) {
-          const clientContactBlock = `<br><br><strong>Date de contact client:</strong><br>👤 ${booking.clientName}${
-            booking.clientPhone ? `<br>📞 ${booking.clientPhone}` : ""
-          }${booking.clientEmail ? `<br>📧 ${booking.clientEmail}` : ""}`;
+          const clientContactBlock = `<br><br><strong>Date de contact client:</strong><br>👤 ${escapeHtml(booking.clientName)}${
+            booking.clientPhone ? `<br>📞 ${escapeHtml(booking.clientPhone)}` : ""
+          }${booking.clientEmail ? `<br>📧 ${escapeHtml(booking.clientEmail)}` : ""}`;
           await dispatchNotification({
             userId: vendorUserId,
             type: "booking_status_changed",
@@ -783,7 +784,7 @@ export async function PUT(
             emailSubject: `🎉 Rezervare confirmată cu ${booking.clientName}`,
             emailHtml: notificationEmail({
               title: "Rezervare confirmată!",
-              message: `Ai confirmat rezervarea cu <strong>${booking.clientName}</strong> pentru ${booking.eventDate}.${timePart}${clientContactBlock}`,
+              message: `Ai confirmat rezervarea cu <strong>${escapeHtml(booking.clientName)}</strong> pentru ${booking.eventDate}.${timePart}${clientContactBlock}`,
               ctaUrl: "https://epetrecere.md/dashboard/rezervari",
               ctaText: "Vezi rezervarea →",
               emoji: "🎉",
@@ -835,7 +836,7 @@ export async function PUT(
               emailSubject: `💰 Contraofertă: ${priceText} de la ${booking.clientName}`,
               emailHtml: notificationEmail({
                 title: "Contraofertă Nouă",
-                message: `<strong>${booking.clientName}</strong> a propus prețul <strong>${priceText}</strong> pentru evenimentul din ${booking.eventDate}.${reply ? `<br><br>"${reply}"` : ""}`,
+                message: `<strong>${escapeHtml(booking.clientName)}</strong> a propus prețul <strong>${priceText}</strong> pentru evenimentul din ${booking.eventDate}.${reply ? `<br><br>"${escapeHtml(reply)}"` : ""}`,
                 ctaUrl: "https://epetrecere.md/dashboard/rezervari",
                 ctaText: "Vezi oferta →",
                 emoji: "💰",
@@ -858,7 +859,7 @@ export async function PUT(
               emailSubject: `💰 Ofertă nouă: ${priceText} de la ${vendorInfo?.nameRo ?? "Partener"}`,
               emailHtml: notificationEmail({
                 title: "Ofertă Nouă de Preț",
-                message: `<strong>${vendorInfo?.nameRo ?? "Partenerul"}</strong> a propus prețul <strong>${priceText}</strong> pentru evenimentul din ${booking.eventDate}.${reply ? `<br><br>"${reply}"` : ""}`,
+                message: `<strong>${escapeHtml(vendorInfo?.nameRo ?? "Partenerul")}</strong> a propus prețul <strong>${priceText}</strong> pentru evenimentul din ${booking.eventDate}.${reply ? `<br><br>"${escapeHtml(reply)}"` : ""}`,
                 ctaUrl: "https://epetrecere.md/cabinet/rezervari",
                 ctaText: "Vezi oferta →",
                 emoji: "💰",
@@ -897,7 +898,7 @@ export async function PUT(
             emailSubject: `✅ ${booking.clientName} a confirmat rezervarea!`,
             emailHtml: notificationEmail({
               title: "Rezervare Confirmată de Client!",
-              message: `<strong>${booking.clientName}</strong> a confirmat rezervarea pentru ${booking.eventDate}. Evenimentul este acum confirmat!`,
+              message: `<strong>${escapeHtml(booking.clientName)}</strong> a confirmat rezervarea pentru ${booking.eventDate}. Evenimentul este acum confirmat!`,
               ctaUrl: "https://epetrecere.md/dashboard/rezervari",
               ctaText: "Vezi rezervarea →",
               emoji: "🎉",

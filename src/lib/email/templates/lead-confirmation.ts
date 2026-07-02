@@ -1,3 +1,5 @@
+import { escapeHtml } from "../escape";
+
 interface LeadConfirmationProps {
   name: string;
   eventType: string;
@@ -5,6 +7,9 @@ interface LeadConfirmationProps {
 }
 
 export function leadConfirmationEmail({ name, eventType, eventDate }: LeadConfirmationProps): string {
+  const safeName = escapeHtml(name);
+  const safeEventType = escapeHtml(eventType);
+  const safeEventDate = escapeHtml(eventDate);
   return `
 <!DOCTYPE html>
 <html>
@@ -15,9 +20,9 @@ export function leadConfirmationEmail({ name, eventType, eventDate }: LeadConfir
       <span style="color:#C9A84C;font-size:24px;font-weight:bold;">ePetrecere.md</span>
     </div>
     <div style="background:#1A1A2E;border-radius:12px;padding:32px;border:1px solid rgba(201,168,76,0.15);">
-      <h1 style="color:#FAF8F2;font-size:22px;margin:0 0 16px;">Mulțumim, ${name}!</h1>
+      <h1 style="color:#FAF8F2;font-size:22px;margin:0 0 16px;">Mulțumim, ${safeName}!</h1>
       <p style="color:#A0A0B0;font-size:15px;line-height:1.6;margin:0 0 24px;">
-        Am primit solicitarea ta pentru <strong style="color:#C9A84C;">${eventType}</strong> pe data de <strong style="color:#C9A84C;">${eventDate}</strong>.
+        Am primit solicitarea ta pentru <strong style="color:#C9A84C;">${safeEventType}</strong> pe data de <strong style="color:#C9A84C;">${safeEventDate}</strong>.
       </p>
       <p style="color:#A0A0B0;font-size:15px;line-height:1.6;margin:0 0 24px;">
         Echipa noastră te va contacta în cel mult 24 de ore cu cele mai bune opțiuni.

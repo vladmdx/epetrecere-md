@@ -5,6 +5,7 @@ import { chatMessages, conversations, users, artists, venues } from "@/lib/db/sc
 import { and, asc, eq, sql } from "drizzle-orm";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendPushToUser } from "@/lib/push/expo";
+import { escapeHtml } from "@/lib/email/escape";
 
 // M0b #10 — Messages for a persistent client↔artist conversation.
 // GET  lists messages (oldest → newest, capped at 200) and resets the caller's
@@ -259,7 +260,7 @@ export async function POST(
             emailSubject: `💬 Mesaj nou de la ${vendorName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${vendorName}`,
-              message: `<strong>${vendorName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
+              message: `<strong>${escapeHtml(vendorName)}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${escapeHtml(preview)}</div>`,
               ctaUrl: `https://epetrecere.md/cabinet/mesaje?conversation=${conversationId}`,
               ctaText: "Răspunde →",
               emoji: "💬",
@@ -286,7 +287,7 @@ export async function POST(
             emailSubject: `💬 Mesaj nou de la ${senderName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
-              message: `<strong>${senderName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
+              message: `<strong>${escapeHtml(senderName)}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${escapeHtml(preview)}</div>`,
               ctaUrl: `https://epetrecere.md${vendorDashboardUrl}?conversation=${conversationId}`,
               ctaText: "Răspunde →",
               emoji: "💬",
