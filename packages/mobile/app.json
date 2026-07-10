@@ -13,7 +13,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0D0D0D"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "md.epetrecere.app",
@@ -27,7 +29,9 @@
         "NSUserTrackingUsageDescription": "Permite ePetrecere să măsoare anonim performanța aplicației ca să îți oferim o experiență mai bună. Nu împărtășim datele cu terți.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "associatedDomains": ["applinks:epetrecere.md"]
+      "associatedDomains": [
+        "applinks:epetrecere.md"
+      ]
     },
     "android": {
       "package": "md.epetrecere.app",
@@ -50,8 +54,16 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "https", "host": "epetrecere.md" }],
-          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "epetrecere.md"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "autoVerify": true
         }
       ]
@@ -95,15 +107,15 @@
         "origin": false
       },
       "eas": {
-        "projectId": "TBD-fill-after-eas-init"
+        "projectId": "fc473892-d471-4fce-99d9-5b350c51e6a0"
       }
     },
     "updates": {
-      "url": "https://u.expo.dev/TBD-fill-after-eas-init"
+      "url": "https://u.expo.dev/fc473892-d471-4fce-99d9-5b350c51e6a0"
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "owner": "TBD-fill-with-expo-org-handle"
+    "owner": "vladmdx"
   }
 }
