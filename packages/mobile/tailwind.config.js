@@ -15,12 +15,14 @@ module.exports = {
     path.join(__dirname, "components/**/*.{ts,tsx}"),
   ],
   presets: [require("nativewind/preset")],
+  // The app drives the color scheme manually via `colorScheme.set()` (see
+  // lib/theme.tsx). NativeWind needs darkMode:"class" for that to work; with
+  // the default "media" the manual scheme and the color resolution disagree.
+  darkMode: "class",
   // css-interop 0.1.x doesn't resolve the `var(--tw-*-opacity)` fallback that
-  // Tailwind bakes into color utilities. Disabling the opacity core plugins
-  // makes colors emit a plain value (e.g. `background-color: #C9A84C`) with no
-  // runtime var, so bg/border/ring colors apply reliably.
-  // NOTE: text color on <Text> is still not applied by css-interop 0.1.22 (a
-  // separate known limitation) — low-contrast text remains a tracked follow-up.
+  // Tailwind bakes into color utilities, so `text-foreground` etc. computed to
+  // no/near-zero opacity (dark, invisible text). Disabling the opacity core
+  // plugins makes colors emit a plain `color: #F7F5EE` with no runtime var.
   corePlugins: {
     textOpacity: false,
     backgroundOpacity: false,

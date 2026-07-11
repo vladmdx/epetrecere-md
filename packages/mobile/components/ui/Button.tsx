@@ -65,6 +65,22 @@ const TEXT_BY_VARIANT: Record<Variant, string> = {
   danger: "text-white",
 };
 
+// css-interop 0.1.x drops color/background utilities (see lib/textColorPatch),
+// so variant colors are applied inline from the theme constants instead.
+const CONTAINER_STYLE_BY_VARIANT: Record<Variant, ViewStyle> = {
+  primary: { backgroundColor: colors.gold },
+  outline: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.gold + "66" },
+  ghost: { backgroundColor: "transparent" },
+  danger: { backgroundColor: colors.danger },
+};
+
+const TEXT_COLOR_BY_VARIANT: Record<Variant, string> = {
+  primary: colors.background,
+  outline: colors.gold,
+  ghost: colors.gold,
+  danger: colors.white,
+};
+
 const SIZES: Record<Size, { container: string; text: string; minHeight: number }> = {
   sm: { container: "px-3 py-2 gap-1.5 rounded-lg", text: "text-[13px] font-semibold", minHeight: 36 },
   md: { container: "px-4 py-3 gap-2 rounded-xl", text: "text-[14px] font-semibold", minHeight: 44 },
@@ -121,6 +137,7 @@ export const Button = forwardRef<React.ElementRef<typeof Pressable>, Props>(
         style={[
           animatedStyle,
           { minHeight: Math.max(sizeCfg.minHeight, a11y.minTapTarget) },
+          CONTAINER_STYLE_BY_VARIANT[variant],
           style,
         ]}
         className={cn(
@@ -140,7 +157,10 @@ export const Button = forwardRef<React.ElementRef<typeof Pressable>, Props>(
         ) : (
           <>
             {leftIcon}
-            <Text className={cn(sizeCfg.text, TEXT_BY_VARIANT[variant])}>
+            <Text
+              className={cn(sizeCfg.text, TEXT_BY_VARIANT[variant])}
+              style={{ color: TEXT_COLOR_BY_VARIANT[variant] }}
+            >
               {children}
             </Text>
             {rightIcon}

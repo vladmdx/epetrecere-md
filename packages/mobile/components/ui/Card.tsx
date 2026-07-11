@@ -19,10 +19,18 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { motion } from "../../constants/theme";
+import { colors, motion } from "../../constants/theme";
 import { cn } from "../../lib/cn";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+// css-interop 0.1.x drops bg/border color utilities — apply the card surface
+// inline so cards are actually visible (see lib/textColorPatch for context).
+const CARD_SURFACE: ViewStyle = {
+  backgroundColor: colors.card,
+  borderWidth: 1,
+  borderColor: colors.border,
+};
 
 interface PressProps
   extends Omit<PressableProps, "style"> {
@@ -56,7 +64,7 @@ export const Card = forwardRef<
       <View
         ref={ref}
         className={baseClasses}
-        style={props.style}
+        style={[CARD_SURFACE, props.style]}
         {...viewProps}
       />
     );
@@ -91,7 +99,7 @@ const PressableCard = forwardRef<
         onPressOut?.(e);
       }}
       onPress={onPress}
-      style={[animatedStyle, style]}
+      style={[CARD_SURFACE, animatedStyle, style]}
       className={cn(
         "rounded-2xl border border-border bg-card p-4 active:border-gold/30",
         className,

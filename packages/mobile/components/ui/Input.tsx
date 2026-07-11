@@ -57,26 +57,31 @@ export const Input = forwardRef<TextInput, Props>(function Input(
   return (
     <View style={containerStyle}>
       <View
-        className={cn(
-          "relative rounded-xl border bg-card px-4 py-3",
-          error
-            ? "border-[#EF4444]"
+        // bg/border applied inline — css-interop 0.1.x drops color utilities.
+        style={{
+          backgroundColor: colors.card,
+          borderWidth: 1,
+          borderColor: error
+            ? colors.danger
             : focused
-              ? "border-gold"
-              : "border-border",
-        )}
+              ? colors.gold
+              : colors.border,
+        }}
+        className="relative rounded-xl px-4 py-3"
       >
         <View pointerEvents="none" className="absolute left-4 top-3">
           <Animated.Text
-            style={labelStyle}
-            className={cn(
-              "text-[14px]",
-              error
-                ? "text-[#EF4444]"
-                : focused
-                  ? "text-gold"
-                  : "text-muted-foreground",
-            )}
+            style={[
+              labelStyle,
+              {
+                color: error
+                  ? colors.danger
+                  : focused
+                    ? colors.gold
+                    : colors.mutedForeground,
+              },
+            ]}
+            className="text-[14px]"
           >
             {label}
           </Animated.Text>
@@ -100,8 +105,8 @@ export const Input = forwardRef<TextInput, Props>(function Input(
             }}
             placeholderTextColor={colors.mutedForeground}
             selectionColor={colors.gold}
-            className="flex-1 pt-3 text-[15px] text-foreground"
-            style={{ minHeight: 24 }}
+            className="flex-1 pt-3 text-[15px]"
+            style={{ minHeight: 24, color: colors.foreground }}
             {...rest}
           />
           {rightSlot && <View className="self-center">{rightSlot}</View>}
