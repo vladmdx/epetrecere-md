@@ -14,6 +14,7 @@
 // We route between them in `app/index.tsx` based on the Clerk session.
 
 import "../global.css";
+import "../lib/textColorPatch"; // css-interop 0.1.x doesn't apply text color — patch it
 import "../lib/i18n"; // boots i18next before any screen renders
 import { initSentry, setSentryUser } from "../lib/sentry";
 // Init Sentry as the very first thing in app boot so any error
