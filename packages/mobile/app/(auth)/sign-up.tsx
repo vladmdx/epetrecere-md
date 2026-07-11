@@ -104,12 +104,12 @@ export default function SignUp() {
 
   return (
     <SafeScreen padded keyboardAvoiding>
-      <View className="flex-1 justify-center gap-6 py-12">
-        <View className="gap-1">
-          <Text className="font-heading text-[28px] font-bold text-foreground">
+      <View style={{ gap: 24, paddingTop: 20, paddingBottom: 24 }}>
+        <View style={{ gap: 4 }}>
+          <Text style={{ fontSize: 28, fontWeight: "700", color: colors.foreground }}>
             {step === "form" ? t("auth.signUpTitle") : "Verifică emailul"}
           </Text>
-          <Text className="text-[14px] text-muted-foreground">
+          <Text style={{ fontSize: 14, color: colors.mutedForeground }}>
             {step === "form"
               ? t("auth.signUpSubtitle")
               : `Am trimis un cod de 6 cifre la ${email}.`}
@@ -117,7 +117,7 @@ export default function SignUp() {
         </View>
 
         {step === "form" ? (
-          <View className="gap-3">
+          <View style={{ gap: 12 }}>
             <Input
               label={t("auth.firstName")}
               value={firstName}
@@ -166,11 +166,11 @@ export default function SignUp() {
               }
             />
             {errors.general && (
-              <Text className="text-center text-[13px] text-[#EF4444]">
+              <Text style={{ textAlign: "center", fontSize: 13, color: colors.danger }}>
                 {errors.general}
               </Text>
             )}
-            <Text className="mt-2 text-center text-[11px] leading-4 text-muted-foreground">
+            <Text style={{ marginTop: 8, textAlign: "center", fontSize: 11, lineHeight: 16, color: colors.mutedForeground }}>
               {t("auth.agreeTerms")}
             </Text>
             <Button
@@ -183,7 +183,7 @@ export default function SignUp() {
             </Button>
           </View>
         ) : (
-          <View className="gap-3">
+          <View style={{ gap: 12 }}>
             <Input
               label={t("auth.enterCode")}
               value={code}
@@ -195,7 +195,7 @@ export default function SignUp() {
               maxLength={6}
             />
             {errors.general && (
-              <Text className="text-center text-[13px] text-[#EF4444]">
+              <Text style={{ textAlign: "center", fontSize: 13, color: colors.danger }}>
                 {errors.general}
               </Text>
             )}
@@ -219,13 +219,13 @@ export default function SignUp() {
         )}
 
         {step === "form" && (
-          <View className="flex-row items-center justify-center gap-1.5">
-            <Text className="text-[14px] text-muted-foreground">
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+            <Text style={{ fontSize: 14, color: colors.mutedForeground }}>
               {t("auth.hasAccount")}
             </Text>
             <Link href="/(auth)/sign-in" asChild>
               <Pressable hitSlop={8}>
-                <Text className="text-[14px] font-semibold text-gold">
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.gold }}>
                   {t("auth.signIn")}
                 </Text>
               </Pressable>

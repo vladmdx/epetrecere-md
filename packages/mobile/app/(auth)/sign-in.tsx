@@ -107,29 +107,29 @@ export default function SignIn() {
 
   return (
     <SafeScreen padded keyboardAvoiding>
-      <View className="flex-1 justify-center gap-6 py-12">
+      <View style={{ gap: 24, paddingTop: 20, paddingBottom: 24 }}>
         {/* Brand */}
-        <View className="items-center">
-          <Text className="font-heading text-[36px] font-bold text-foreground">
+        <View style={{ alignItems: "center", gap: 4 }}>
+          <Text style={{ fontSize: 34, fontWeight: "700", color: colors.foreground }}>
             ePetrecere
           </Text>
-          <Text className="mt-1 text-[13px] text-muted-foreground">
+          <Text style={{ fontSize: 13, color: colors.mutedForeground }}>
             {t("common.tagline")}
           </Text>
         </View>
 
         {/* Title */}
-        <View className="gap-1">
-          <Text className="font-heading text-[24px] font-bold text-foreground">
+        <View style={{ gap: 4 }}>
+          <Text style={{ fontSize: 24, fontWeight: "700", color: colors.foreground }}>
             {t("auth.signInTitle")}
           </Text>
-          <Text className="text-[14px] text-muted-foreground">
+          <Text style={{ fontSize: 14, color: colors.mutedForeground }}>
             {t("auth.signInSubtitle")}
           </Text>
         </View>
 
         {/* Form */}
-        <View className="gap-3">
+        <View style={{ gap: 12 }}>
           <Input
             label={t("auth.email")}
             value={email}
@@ -164,13 +164,13 @@ export default function SignIn() {
             }
           />
           {generalError && (
-            <Text className="text-center text-[13px] text-[#EF4444]">
+            <Text style={{ textAlign: "center", fontSize: 13, color: colors.danger }}>
               {generalError}
             </Text>
           )}
           <Link href="/(auth)/forgot-password" asChild>
-            <Pressable hitSlop={8} className="self-end">
-              <Text className="text-[13px] text-gold">
+            <Pressable hitSlop={8} style={{ alignSelf: "flex-end" }}>
+              <Text style={{ fontSize: 13, color: colors.gold }}>
                 {t("auth.forgotPassword")}
               </Text>
             </Pressable>
@@ -187,12 +187,12 @@ export default function SignIn() {
         </Button>
 
         {/* Divider */}
-        <View className="flex-row items-center gap-3">
-          <View className="h-px flex-1 bg-border" />
-          <Text className="text-[11px] uppercase tracking-widest text-muted-foreground">
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <View style={{ height: 1, flex: 1, backgroundColor: colors.border }} />
+          <Text style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: colors.mutedForeground }}>
             sau
           </Text>
-          <View className="h-px flex-1 bg-border" />
+          <View style={{ height: 1, flex: 1, backgroundColor: colors.border }} />
         </View>
 
         <Button
@@ -222,13 +222,13 @@ export default function SignIn() {
         )}
 
         {/* Sign-up footer */}
-        <View className="flex-row items-center justify-center gap-1.5">
-          <Text className="text-[14px] text-muted-foreground">
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <Text style={{ fontSize: 14, color: colors.mutedForeground }}>
             {t("auth.noAccount")}
           </Text>
           <Link href="/(auth)/sign-up" asChild>
             <Pressable hitSlop={8}>
-              <Text className="text-[14px] font-semibold text-gold">
+              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.gold }}>
                 {t("auth.signUp")}
               </Text>
             </Pressable>

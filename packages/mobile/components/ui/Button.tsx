@@ -31,7 +31,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
-import { colors, motion, a11y } from "../../constants/theme";
+import { colors, motion, a11y, radii } from "../../constants/theme";
 import { cn } from "../../lib/cn";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -87,6 +87,17 @@ const SIZES: Record<Size, { container: string; text: string; minHeight: number }
   lg: { container: "px-5 py-4 gap-2 rounded-2xl", text: "text-[16px] font-semibold", minHeight: 52 },
 };
 
+// css-interop 0.1.x drops layout utilities (padding/rounded/gap/align) too, so
+// the size + centering come from inline style (see lib/textColorPatch context).
+const SIZE_STYLE: Record<
+  Size,
+  { paddingHorizontal: number; paddingVertical: number; borderRadius: number; gap: number; fontSize: number; minHeight: number }
+> = {
+  sm: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: radii.md, gap: 6, fontSize: 13, minHeight: 36 },
+  md: { paddingHorizontal: 16, paddingVertical: 12, borderRadius: radii.lg, gap: 8, fontSize: 14, minHeight: 44 },
+  lg: { paddingHorizontal: 20, paddingVertical: 16, borderRadius: radii.xl, gap: 8, fontSize: 16, minHeight: 52 },
+};
+
 export const Button = forwardRef<React.ElementRef<typeof Pressable>, Props>(
   function Button(
     {
@@ -113,6 +124,7 @@ export const Button = forwardRef<React.ElementRef<typeof Pressable>, Props>(
     }));
 
     const sizeCfg = SIZES[size];
+    const sz = SIZE_STYLE[size];
     const isDisabled = disabled || loading;
 
     return (
@@ -135,9 +147,20 @@ export const Button = forwardRef<React.ElementRef<typeof Pressable>, Props>(
         }}
         onPress={onPress}
         style={[
-          animatedStyle,
-          { minHeight: Math.max(sizeCfg.minHeight, a11y.minTapTarget) },
+          {
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: sz.paddingHorizontal,
+            paddingVertical: sz.paddingVertical,
+            borderRadius: sz.borderRadius,
+            gap: sz.gap,
+            minHeight: Math.max(sz.minHeight, a11y.minTapTarget),
+          },
           CONTAINER_STYLE_BY_VARIANT[variant],
+          fullWidth && { alignSelf: "stretch" },
+          isDisabled && { opacity: 0.5 },
+          animatedStyle,
           style,
         ]}
         className={cn(
@@ -159,7 +182,12 @@ export const Button = forwardRef<React.ElementRef<typeof Pressable>, Props>(
             {leftIcon}
             <Text
               className={cn(sizeCfg.text, TEXT_BY_VARIANT[variant])}
-              style={{ color: TEXT_COLOR_BY_VARIANT[variant] }}
+              style={{
+                color: TEXT_COLOR_BY_VARIANT[variant],
+                fontSize: sz.fontSize,
+                fontWeight: "600",
+                textAlign: "center",
+              }}
             >
               {children}
             </Text>

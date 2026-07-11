@@ -35,19 +35,24 @@ export function SafeScreen({
   keyboardAvoiding = true,
   className,
 }: Props) {
-  const padding = padded ? "px-5" : "";
+  // px-5 is dropped by css-interop 0.1.x, so horizontal padding is applied
+  // inline (on the ScrollView content container / the View).
+  const padStyle = padded ? { paddingHorizontal: 20 } : null;
 
   const Body = scroll ? (
     <ScrollView
-      className={cn("flex-1", padding, className)}
-      contentContainerStyle={{ paddingBottom: 32, gap: 24 }}
+      className={cn("flex-1", className)}
+      style={{ flex: 1 }}
+      contentContainerStyle={{ paddingBottom: 32, gap: 24, ...(padStyle ?? {}) }}
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
     >
       {children}
     </ScrollView>
   ) : (
-    <View className={cn("flex-1", padding, className)}>{children}</View>
+    <View style={[{ flex: 1 }, padStyle]} className={cn("flex-1", className)}>
+      {children}
+    </View>
   );
 
   const Wrapped = keyboardAvoiding ? (

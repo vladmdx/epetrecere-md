@@ -8,6 +8,7 @@ import { useRouter } from "expo-router";
 import { useSignIn } from "@clerk/clerk-expo";
 import { useTranslation } from "react-i18next";
 import { Button, Input, SafeScreen } from "../../components/ui";
+import { colors } from "../../constants/theme";
 
 export default function ForgotPassword() {
   const { t } = useTranslation();
@@ -75,12 +76,12 @@ export default function ForgotPassword() {
 
   return (
     <SafeScreen padded keyboardAvoiding>
-      <View className="flex-1 justify-center gap-6 py-12">
-        <View className="gap-1">
-          <Text className="font-heading text-[28px] font-bold text-foreground">
+      <View style={{ gap: 20, paddingTop: 20, paddingBottom: 24 }}>
+        <View style={{ gap: 4 }}>
+          <Text style={{ fontSize: 28, fontWeight: "700", color: colors.foreground }}>
             {t("auth.forgotTitle")}
           </Text>
-          <Text className="text-[14px] text-muted-foreground">
+          <Text style={{ fontSize: 14, color: colors.mutedForeground }}>
             {step === "request"
               ? t("auth.forgotSubtitle")
               : `Cod trimis la ${email}. Introdu-l mai jos cu parola nouă.`}

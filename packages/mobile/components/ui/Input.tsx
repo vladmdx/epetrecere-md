@@ -1,13 +1,9 @@
-// Input — text field with floating label, gold focus ring, error state.
+// Input — text field with a static top label, gold focus ring, error state.
 //
-// Design choices:
-//   - Borderless when blurred, gold border when focused — matches the
-//     web's input style. Avoids a constant heavy border on the screen.
-//   - Floating label that slides up + shrinks on focus / when filled.
-//     This is the iOS-y / Material-y pattern users expect; placeholders
-//     alone are a accessibility anti-pattern (disappear on input).
-//   - Error text drops in below with a small slide. Always reserves
-//     the vertical space so the form doesn't jitter when errors arrive.
+// Layout + colors are applied INLINE (not via className): css-interop 0.1.x
+// (pinned by NativeWind 4.1.x) drops color AND layout utilities on RN Views,
+// so a className-driven input renders with no padding / rounding / label. See
+// lib/textColorPatch for the parallel text-color workaround.
 
 import { forwardRef, useState } from "react";
 import {
@@ -17,13 +13,7 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from "react-native";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
-import { colors, motion } from "../../constants/theme";
-import { cn } from "../../lib/cn";
+import { colors, radii } from "../../constants/theme";
 
 interface Props extends Omit<TextInputProps, "style" | "placeholder"> {
   label: string;
@@ -39,86 +29,75 @@ export const Input = forwardRef<TextInput, Props>(function Input(
   ref,
 ) {
   const [focused, setFocused] = useState(false);
-  const hasValue = value != null && value !== "";
-  const floating = focused || hasValue;
 
-  const labelAnim = useSharedValue(floating ? 1 : 0);
-  // We don't set transformOrigin here — RN computes scale from the
-  // view centre by default and translate-y is enough to give a
-  // floating-label effect. Setting origin to top-left requires a
-  // negative left offset on the parent which complicates the layout.
-  const labelStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: -10 * labelAnim.value },
-      { scale: 1 - 0.18 * labelAnim.value },
-    ],
-  }));
+  const borderColor = error
+    ? colors.danger
+    : focused
+      ? colors.gold
+      : colors.border;
+  const labelColor = error
+    ? colors.danger
+    : focused
+      ? colors.gold
+      : colors.mutedForeground;
 
   return (
     <View style={containerStyle}>
       <View
-        // bg/border applied inline — css-interop 0.1.x drops color utilities.
         style={{
           backgroundColor: colors.card,
           borderWidth: 1,
-          borderColor: error
-            ? colors.danger
-            : focused
-              ? colors.gold
-              : colors.border,
+          borderColor,
+          borderRadius: radii.xl,
+          paddingHorizontal: 16,
+          paddingTop: 10,
+          paddingBottom: 12,
         }}
-        className="relative rounded-xl px-4 py-3"
       >
-        <View pointerEvents="none" className="absolute left-4 top-3">
-          <Animated.Text
-            style={[
-              labelStyle,
-              {
-                color: error
-                  ? colors.danger
-                  : focused
-                    ? colors.gold
-                    : colors.mutedForeground,
-              },
-            ]}
-            className="text-[14px]"
-          >
-            {label}
-          </Animated.Text>
-        </View>
+        <Text
+          style={{
+            fontSize: 12,
+            fontWeight: "600",
+            color: labelColor,
+            marginBottom: 3,
+          }}
+        >
+          {label}
+        </Text>
 
-        <View className="flex-row items-end gap-2">
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <TextInput
             ref={ref}
             value={value}
             onFocus={(e) => {
               setFocused(true);
-              labelAnim.value = withTiming(1, { duration: motion.fast });
               onFocus?.(e);
             }}
             onBlur={(e) => {
               setFocused(false);
-              if (!hasValue) {
-                labelAnim.value = withTiming(0, { duration: motion.fast });
-              }
               onBlur?.(e);
             }}
             placeholderTextColor={colors.mutedForeground}
             selectionColor={colors.gold}
-            className="flex-1 pt-3 text-[15px]"
-            style={{ minHeight: 24, color: colors.foreground }}
+            style={{
+              flex: 1,
+              fontSize: 15,
+              color: colors.foreground,
+              minHeight: 22,
+              padding: 0,
+            }}
             {...rest}
           />
-          {rightSlot && <View className="self-center">{rightSlot}</View>}
+          {rightSlot ? <View>{rightSlot}</View> : null}
         </View>
       </View>
 
-      {/* Always reserve a 16px error slot so the form doesn't jump. */}
-      <View className="mt-1 min-h-[16px]">
+      {/* Always reserve an error slot so the form doesn't jump. */}
+      <View style={{ marginTop: 4, minHeight: 16 }}>
         {error ? (
-          <Text className="text-[12px] text-[#EF4444]">{error}</Text>
+          <Text style={{ fontSize: 12, color: colors.danger }}>{error}</Text>
         ) : hint ? (
-          <Text className="text-[12px] text-muted-foreground">{hint}</Text>
+          <Text style={{ fontSize: 12, color: colors.mutedForeground }}>{hint}</Text>
         ) : null}
       </View>
     </View>
