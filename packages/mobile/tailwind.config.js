@@ -3,9 +3,32 @@
 // on mobile). We mirror the web palette so the design system stays in
 // sync visually.
 
+const path = require("path");
+
 module.exports = {
-  content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
+  // Absolute globs so the content scan works no matter what cwd NativeWind's
+  // Tailwind invocation runs in — in the monorepo it runs from the workspace
+  // root, where relative "./app" would resolve to the (empty) repo root and
+  // no utilities would be generated (→ every className silently no-ops).
+  content: [
+    path.join(__dirname, "app/**/*.{ts,tsx}"),
+    path.join(__dirname, "components/**/*.{ts,tsx}"),
+  ],
   presets: [require("nativewind/preset")],
+  // css-interop 0.1.x doesn't resolve the `var(--tw-*-opacity)` fallback that
+  // Tailwind bakes into color utilities. Disabling the opacity core plugins
+  // makes colors emit a plain value (e.g. `background-color: #C9A84C`) with no
+  // runtime var, so bg/border/ring colors apply reliably.
+  // NOTE: text color on <Text> is still not applied by css-interop 0.1.22 (a
+  // separate known limitation) — low-contrast text remains a tracked follow-up.
+  corePlugins: {
+    textOpacity: false,
+    backgroundOpacity: false,
+    borderOpacity: false,
+    ringOpacity: false,
+    placeholderOpacity: false,
+    divideOpacity: false,
+  },
   theme: {
     extend: {
       colors: {

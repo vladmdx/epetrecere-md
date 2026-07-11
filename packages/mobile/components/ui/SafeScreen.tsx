@@ -62,7 +62,7 @@ export function SafeScreen({
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-background" edges={edges}>
+    <SafeAreaView style={{ flex: 1 }} className="bg-background" edges={edges}>
       {Wrapped}
     </SafeAreaView>
   );
