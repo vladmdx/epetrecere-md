@@ -46,33 +46,57 @@ export default function AcceptBookingSheet() {
   });
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center justify-between border-b border-border px-3 py-2">
-          <View className="flex-row items-center gap-2">
+        <View
+          className="flex-row items-center justify-between border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
+          <View className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Pressable
               hitSlop={8}
               onPress={() => router.back()}
               className="h-10 w-10 items-center justify-center rounded-full"
+              style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999 }}
             >
               <X size={20} color={colors.foreground} />
             </Pressable>
-            <Text className="font-heading text-[18px] font-bold text-foreground">
+            <Text
+              className="font-heading text-[18px] font-bold text-foreground"
+              style={{ fontFamily: "Cormorant", fontSize: 18, fontWeight: "700", color: colors.foreground }}
+            >
               Acceptă cererea
             </Text>
           </View>
         </View>
       </SafeAreaView>
 
-      <View className="gap-4 p-5">
-        <Card className="bg-emerald-500/5 border-emerald-500/30">
-          <View className="flex-row items-start gap-3">
+      <View className="gap-4 p-5" style={{ gap: 16, padding: 20 }}>
+        <Card
+          className="bg-emerald-500/5 border-emerald-500/30"
+          style={{ backgroundColor: "rgba(16,185,129,0.05)", borderColor: "rgba(16,185,129,0.3)" }}
+        >
+          <View className="flex-row items-start gap-3" style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
             <CheckCircle size={22} color={colors.success} />
-            <View className="flex-1">
-              <Text className="text-[14px] font-semibold text-foreground">
+            <View className="flex-1" style={{ flex: 1 }}>
+              <Text
+                className="text-[14px] font-semibold text-foreground"
+                style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}
+              >
                 Cererea va fi marcată ca acceptată
               </Text>
-              <Text className="mt-1 text-[12px] leading-5 text-muted-foreground">
+              <Text
+                className="mt-1 text-[12px] leading-5 text-muted-foreground"
+                style={{ marginTop: 4, fontSize: 12, lineHeight: 20, color: colors.mutedForeground }}
+              >
                 Clientul va primi o notificare să confirme. Până atunci,
                 disponibilitatea ta în calendar va fi rezervată provizoriu.
               </Text>

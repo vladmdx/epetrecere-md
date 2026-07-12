@@ -157,23 +157,42 @@ export default function PartnerCalendarScreen() {
 
   return (
     <SafeScreen padded scroll>
-      <View className="flex-row items-center justify-between pt-2">
-        <Pressable onPress={goPrev} hitSlop={8} className="h-10 w-10 items-center justify-center rounded-full bg-card">
+      <View
+        className="flex-row items-center justify-between pt-2"
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingTop: 8 }}
+      >
+        <Pressable
+          onPress={goPrev}
+          hitSlop={8}
+          className="h-10 w-10 items-center justify-center rounded-full bg-card"
+          style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999, backgroundColor: colors.card }}
+        >
           <ChevronLeft size={20} color={colors.foreground} />
         </Pressable>
-        <Text className="font-heading text-[20px] font-bold text-foreground">
+        <Text
+          className="font-heading text-[20px] font-bold text-foreground"
+          style={{ fontSize: 20, fontWeight: "700", color: colors.foreground }}
+        >
           {monthLabel}
         </Text>
-        <Pressable onPress={goNext} hitSlop={8} className="h-10 w-10 items-center justify-center rounded-full bg-card">
+        <Pressable
+          onPress={goNext}
+          hitSlop={8}
+          className="h-10 w-10 items-center justify-center rounded-full bg-card"
+          style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999, backgroundColor: colors.card }}
+        >
           <ChevronRight size={20} color={colors.foreground} />
         </Pressable>
       </View>
 
       {/* Weekday header */}
-      <View className="flex-row">
+      <View className="flex-row" style={{ flexDirection: "row" }}>
         {WEEKDAY_SHORT_RO.map((d) => (
-          <View key={d} className="flex-1 items-center py-1">
-            <Text className="text-[11px] uppercase tracking-widest text-muted-foreground">
+          <View key={d} className="flex-1 items-center py-1" style={{ flex: 1, alignItems: "center", paddingVertical: 4 }}>
+            <Text
+              className="text-[11px] uppercase tracking-widest text-muted-foreground"
+              style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 2, color: colors.mutedForeground }}
+            >
               {d}
             </Text>
           </View>
@@ -182,13 +201,13 @@ export default function PartnerCalendarScreen() {
 
       {/* Grid */}
       {bookingsQuery.isLoading ? (
-        <View className="items-center py-12">
+        <View className="items-center py-12" style={{ alignItems: "center", paddingVertical: 48 }}>
           <ActivityIndicator color={colors.gold} />
         </View>
       ) : (
         <View>
           {chunkArray(cells, 7).map((week, wIdx) => (
-            <View key={wIdx} className="flex-row gap-1 mb-1">
+            <View key={wIdx} className="flex-row gap-1 mb-1" style={{ flexDirection: "row", gap: 4, marginBottom: 4 }}>
               {week.map((cell, dIdx) => (
                 <DayCell
                   key={`${wIdx}-${dIdx}`}
@@ -205,7 +224,7 @@ export default function PartnerCalendarScreen() {
       )}
 
       {/* Legend */}
-      <View className="flex-row flex-wrap gap-2 pt-2">
+      <View className="flex-row flex-wrap gap-2 pt-2" style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 8 }}>
         <LegendDot color={colors.success} label="Confirmat" />
         <LegendDot color={colors.warning} label="Așteaptă confirmare" />
         <LegendDot color={colors.indigo} label="Nou" />
@@ -214,32 +233,48 @@ export default function PartnerCalendarScreen() {
 
       {/* Selected day panel */}
       {selectedDate && (
-        <Card className="gap-3 mt-2">
-          <View className="flex-row items-center justify-between">
-            <Text className="font-heading text-[16px] font-bold text-foreground">
+        <Card className="gap-3 mt-2" style={{ gap: 12, marginTop: 8 }}>
+          <View className="flex-row items-center justify-between" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text
+              className="font-heading text-[16px] font-bold text-foreground"
+              style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}
+            >
               {formatDay(selectedDate)}
             </Text>
             <Pressable hitSlop={8} onPress={() => setSelectedDate(null)}>
-              <Text className="text-[12px] text-gold">Închide</Text>
+              <Text className="text-[12px] text-gold" style={{ fontSize: 12, color: colors.gold }}>
+                Închide
+              </Text>
             </Pressable>
           </View>
           {selectedDate && blockedDays.has(selectedDate) && (
             <View
               className="flex-row items-center gap-2 rounded-lg px-3 py-2"
-              style={{ backgroundColor: colors.danger + "1A" }}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 8,
+                borderRadius: 14,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                backgroundColor: colors.danger + "1A",
+              }}
             >
               <Lock size={14} color={colors.danger} />
-              <Text className="text-[12px]" style={{ color: colors.danger }}>
+              <Text className="text-[12px]" style={{ fontSize: 12, color: colors.danger }}>
                 Zi blocată — nu apari ca disponibil în această zi.
               </Text>
             </View>
           )}
           {selectedBookings.length === 0 ? (
-            <Text className="text-[13px] text-muted-foreground">
+            <Text
+              className="text-[13px] text-muted-foreground"
+              style={{ fontSize: 13, color: colors.mutedForeground }}
+            >
               Nicio rezervare în această zi.
             </Text>
           ) : (
-            <View className="gap-2">
+            <View className="gap-2" style={{ gap: 8 }}>
               {selectedBookings.map((b) => (
                 <BookingRowInPanel key={b.id} booking={b} />
               ))}
@@ -262,13 +297,24 @@ export default function PartnerCalendarScreen() {
                   })
                 }
                 disabled={blockMutation.isPending}
-                style={{ borderColor: tint + "66" }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderColor: tint + "66",
+                  opacity: blockMutation.isPending ? 0.5 : 1,
+                }}
                 className={`flex-row items-center justify-center gap-2 rounded-lg border px-3 py-2 ${
                   blockMutation.isPending ? "opacity-50" : ""
                 }`}
               >
                 <Lock size={14} color={tint} />
-                <Text className="text-[12px]" style={{ color: tint }}>
+                <Text className="text-[12px]" style={{ fontSize: 12, color: tint }}>
                   {isBlocked ? "Deblochează ziua" : "Blochează ziua"}
                 </Text>
               </Pressable>
@@ -354,23 +400,31 @@ function DayCell({
   const dotColor = dominantStatusColor(bookings);
 
   if (cell.iso === null) {
-    return <View className="aspect-square flex-1 opacity-30" />;
+    return <View className="aspect-square flex-1 opacity-30" style={{ aspectRatio: 1, flex: 1, opacity: 0.3 }} />;
   }
+
+  const stateStyle = selected
+    ? { borderWidth: 2, borderColor: colors.gold, backgroundColor: "rgba(201,168,76,0.15)" }
+    : cell.isToday
+      ? { borderWidth: 1, borderColor: "rgba(201,168,76,0.4)", backgroundColor: colors.card }
+      : { backgroundColor: colors.card };
 
   return (
     <Pressable
       onPress={onPress}
       // Blocked days get a red tint via inline style (colors.danger isn't a
       // NativeWind class token, only a JS color) so it always renders.
-      style={
+      style={[
+        { aspectRatio: 1, flex: 1, alignItems: "center", justifyContent: "center", borderRadius: 14 },
+        stateStyle,
         blocked && !selected
           ? {
               backgroundColor: colors.danger + "1A",
               borderColor: colors.danger + "66",
               borderWidth: 1,
             }
-          : undefined
-      }
+          : undefined,
+      ]}
       className={`aspect-square flex-1 items-center justify-center rounded-lg ${
         selected ? "border-2 border-gold bg-gold/15" : cell.isToday ? "border border-gold/40 bg-card" : "bg-card"
       }`}
@@ -378,6 +432,8 @@ function DayCell({
       <Text
         className="text-[14px] font-semibold"
         style={{
+          fontSize: 14,
+          fontWeight: "600",
           color: blocked
             ? colors.danger
             : cell.isToday
@@ -391,7 +447,7 @@ function DayCell({
         <Lock size={9} color={colors.danger} style={{ marginTop: 2 }} />
       ) : dotColor ? (
         <View
-          style={{ backgroundColor: dotColor }}
+          style={{ backgroundColor: dotColor, marginTop: 2, height: 6, width: 6, borderRadius: 9999 }}
           className="mt-0.5 h-1.5 w-1.5 rounded-full"
         />
       ) : null}
@@ -414,9 +470,11 @@ function dominantStatusColor(bookings: BookingRow[]): string | null {
 
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
-    <View className="flex-row items-center gap-1.5">
-      <View style={{ backgroundColor: color }} className="h-2 w-2 rounded-full" />
-      <Text className="text-[11px] text-muted-foreground">{label}</Text>
+    <View className="flex-row items-center gap-1.5" style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+      <View style={{ backgroundColor: color, height: 8, width: 8, borderRadius: 9999 }} className="h-2 w-2 rounded-full" />
+      <Text className="text-[11px] text-muted-foreground" style={{ fontSize: 11, color: colors.mutedForeground }}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -427,17 +485,33 @@ function BookingRowInPanel({ booking }: { booking: BookingRow }) {
     <Pressable
       onPress={() => router.push(`/(partner)/booking/${booking.id}`)}
       className="flex-row items-center gap-3 rounded-xl border border-border bg-background/40 p-2.5 active:bg-gold/5"
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.background + "66",
+        padding: 10,
+      }}
     >
       <View
-        style={{ backgroundColor: dominantStatusColor([booking]) ?? colors.mutedForeground }}
+        style={{ backgroundColor: dominantStatusColor([booking]) ?? colors.mutedForeground, height: 8, width: 8, borderRadius: 9999 }}
         className="h-2 w-2 rounded-full"
       />
-      <View className="flex-1">
-        <Text className="text-[14px] font-medium text-foreground">
+      <View className="flex-1" style={{ flex: 1 }}>
+        <Text
+          className="text-[14px] font-medium text-foreground"
+          style={{ fontSize: 14, fontWeight: "500", color: colors.foreground }}
+        >
           {booking.clientName}
         </Text>
         {booking.startTime && (
-          <Text className="text-[11px] text-muted-foreground">
+          <Text
+            className="text-[11px] text-muted-foreground"
+            style={{ fontSize: 11, color: colors.mutedForeground }}
+          >
             {booking.startTime}
           </Text>
         )}

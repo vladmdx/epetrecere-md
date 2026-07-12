@@ -156,31 +156,56 @@ export default function ChatThreadScreen() {
   const meta = metaQuery.data;
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center gap-3 border-b border-border px-3 py-2">
+        <View
+          className="flex-row items-center gap-3 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+            }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
           {meta && (
-            <View className="flex-row flex-1 items-center gap-2">
+            <View
+              className="flex-row flex-1 items-center gap-2"
+              style={{ flexDirection: "row", flex: 1, alignItems: "center", gap: 8 }}
+            >
               <Avatar
                 uri={null}
                 name={meta.vendorName ?? "?"}
                 sizeClass="h-9 w-9"
               />
-              <View className="flex-1">
+              <View className="flex-1" style={{ flex: 1 }}>
                 <Text
                   className="font-heading text-[15px] font-bold text-foreground"
                   numberOfLines={1}
+                  style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}
                 >
                   {meta.vendorName ?? "Furnizor"}
                 </Text>
-                <Text className="text-[11px] text-muted-foreground">
+                <Text
+                  className="text-[11px] text-muted-foreground"
+                  style={{ fontSize: 11, color: colors.mutedForeground }}
+                >
                   {meta.vendorKind === "artist" ? "Artist" : "Sală"}
                 </Text>
               </View>
@@ -190,7 +215,10 @@ export default function ChatThreadScreen() {
       </SafeAreaView>
 
       {messagesQuery.isLoading && allMessages.length === 0 ? (
-        <View className="flex-1 items-center justify-center">
+        <View
+          className="flex-1 items-center justify-center"
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator color={colors.gold} />
         </View>
       ) : (
@@ -202,8 +230,11 @@ export default function ChatThreadScreen() {
           renderItem={({ item }) => <Bubble msg={item} />}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
-            <View className="items-center py-8">
-              <Text className="text-[13px] text-muted-foreground">
+            <View className="items-center py-8" style={{ alignItems: "center", paddingVertical: 32 }}>
+              <Text
+                className="text-[13px] text-muted-foreground"
+                style={{ fontSize: 13, color: colors.mutedForeground }}
+              >
                 Începe conversația — trimite primul mesaj.
               </Text>
             </View>
@@ -212,7 +243,19 @@ export default function ChatThreadScreen() {
       )}
 
       <SafeAreaView edges={["bottom"]}>
-        <View className="flex-row items-end gap-2 border-t border-border bg-background px-3 py-2">
+        <View
+          className="flex-row items-end gap-2 border-t border-border bg-background px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "flex-end",
+            gap: 8,
+            borderTopWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.background,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <TextInput
             ref={inputRef}
             value={draft}
@@ -223,7 +266,21 @@ export default function ChatThreadScreen() {
             multiline
             maxLength={4000}
             className="max-h-[120px] flex-1 rounded-2xl border border-border bg-card px-4 py-2.5 text-[15px] text-foreground"
-            style={{ minHeight: 40 }}
+            style={[
+              {
+                maxHeight: 120,
+                flex: 1,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.card,
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                fontSize: 15,
+                color: colors.foreground,
+              },
+              { minHeight: 40 },
+            ]}
           />
           <Pressable
             disabled={!draft.trim() || sendMutation.isPending}
@@ -234,6 +291,14 @@ export default function ChatThreadScreen() {
             className={`h-10 w-10 items-center justify-center rounded-full ${
               draft.trim() ? "bg-gold" : "bg-muted"
             }`}
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+              backgroundColor: draft.trim() ? colors.gold : colors.muted,
+            }}
           >
             <Send
               size={18}
@@ -249,27 +314,55 @@ export default function ChatThreadScreen() {
 function Bubble({ msg }: { msg: ChatMessage }) {
   const isMine = msg.senderType === "client";
   return (
-    <View className={isMine ? "items-end" : "items-start"}>
+    <View
+      className={isMine ? "items-end" : "items-start"}
+      style={{ alignItems: isMine ? "flex-end" : "flex-start" }}
+    >
       <View
         className={`max-w-[78%] rounded-2xl px-4 py-2 ${
           isMine
             ? "rounded-br-md bg-gold"
             : "rounded-bl-md border border-border bg-card"
         }`}
+        style={{
+          maxWidth: "78%",
+          borderRadius: 20,
+          paddingHorizontal: 16,
+          paddingVertical: 8,
+          ...(isMine
+            ? { borderBottomRightRadius: 10, backgroundColor: colors.gold }
+            : {
+                borderBottomLeftRadius: 10,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.card,
+              }),
+        }}
       >
         <Text
           className={`text-[14px] leading-5 ${
             isMine ? "text-background" : "text-foreground"
           }`}
+          style={{
+            fontSize: 14,
+            lineHeight: 20,
+            color: isMine ? colors.background : colors.foreground,
+          }}
         >
           {msg.message}
         </Text>
       </View>
-      <View className="mt-0.5 flex-row items-center gap-1">
+      <View
+        className="mt-0.5 flex-row items-center gap-1"
+        style={{ marginTop: 2, flexDirection: "row", alignItems: "center", gap: 4 }}
+      >
         {msg._failed && (
           <AlertCircle size={11} color={colors.danger} />
         )}
-        <Text className="text-[10px] text-muted-foreground">
+        <Text
+          className="text-[10px] text-muted-foreground"
+          style={{ fontSize: 10, color: colors.mutedForeground }}
+        >
           {msg._temp
             ? "Se trimite…"
             : msg._failed

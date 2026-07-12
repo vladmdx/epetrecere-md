@@ -72,7 +72,7 @@ export function ChecklistTab({ planId }: { planId: number }) {
 
   if (detailQuery.isLoading) {
     return (
-      <View className="py-8 items-center">
+      <View className="py-8 items-center" style={{ paddingVertical: 32, alignItems: "center" }}>
         <ActivityIndicator color={colors.gold} />
       </View>
     );
@@ -83,11 +83,20 @@ export function ChecklistTab({ planId }: { planId: number }) {
 
   if (list.length === 0) {
     return (
-      <Card className="items-center gap-2 p-6">
-        <Text className="font-heading text-[15px] font-bold text-foreground">
+      <Card
+        className="items-center gap-2 p-6"
+        style={{ alignItems: "center", gap: 8, padding: 24 }}
+      >
+        <Text
+          className="font-heading text-[15px] font-bold text-foreground"
+          style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}
+        >
           Niciun task încă
         </Text>
-        <Text className="text-center text-[12px] text-muted-foreground">
+        <Text
+          className="text-center text-[12px] text-muted-foreground"
+          style={{ textAlign: "center", fontSize: 12, color: colors.mutedForeground }}
+        >
           Activează checklist-ul în Setări sau generează unul cu AI.
         </Text>
       </Card>
@@ -95,8 +104,8 @@ export function ChecklistTab({ planId }: { planId: number }) {
   }
 
   return (
-    <View className="gap-2">
-      <Text className="text-[12px] text-muted-foreground">
+    <View className="gap-2" style={{ gap: 8 }}>
+      <Text className="text-[12px] text-muted-foreground" style={{ fontSize: 12, color: colors.mutedForeground }}>
         {done} din {list.length} bifate
       </Text>
       {list.map((item) => (
@@ -121,22 +130,40 @@ function ChecklistRow({
     <Pressable
       onPress={onToggle}
       className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3 active:bg-gold/5"
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+        padding: 12,
+      }}
     >
       {item.done ? (
         <CheckCircle size={22} color={colors.success} />
       ) : (
         <Circle size={22} color={colors.mutedForeground} />
       )}
-      <View className="flex-1">
+      <View className="flex-1" style={{ flex: 1 }}>
         <Text
           className={`text-[14px] ${
             item.done ? "text-muted-foreground line-through" : "text-foreground"
           }`}
+          style={{
+            fontSize: 14,
+            color: item.done ? colors.mutedForeground : colors.foreground,
+            textDecorationLine: item.done ? "line-through" : "none",
+          }}
         >
           {item.title}
         </Text>
         {(item.category || item.dueDaysBefore != null) && (
-          <Text className="mt-0.5 text-[11px] text-muted-foreground">
+          <Text
+            className="mt-0.5 text-[11px] text-muted-foreground"
+            style={{ marginTop: 2, fontSize: 11, color: colors.mutedForeground }}
+          >
             {item.category ?? ""}
             {item.dueDaysBefore != null
               ? ` · ${item.dueDaysBefore} zile înainte`

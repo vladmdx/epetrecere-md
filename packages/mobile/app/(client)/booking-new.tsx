@@ -102,18 +102,33 @@ export default function BookingNewScreen() {
   });
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center justify-between border-b border-border px-3 py-2">
-          <View className="flex-row items-center gap-2">
+        <View
+          className="flex-row items-center justify-between border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
+          <View className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Pressable
               hitSlop={8}
               onPress={() => router.back()}
               className="h-10 w-10 items-center justify-center rounded-full"
+              style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999 }}
             >
               <X size={20} color={colors.foreground} />
             </Pressable>
-            <Text className="font-heading text-[18px] font-bold text-foreground">
+            <Text
+              className="font-heading text-[18px] font-bold text-foreground"
+              style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+            >
               Trimite cerere
             </Text>
           </View>
@@ -122,6 +137,7 @@ export default function BookingNewScreen() {
 
       <ScrollView
         className="flex-1"
+        style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 20,
@@ -132,7 +148,17 @@ export default function BookingNewScreen() {
       >
         {/* Event type */}
         <View>
-          <Text className="mb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <Text
+            className="mb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground"
+            style={{
+              marginBottom: 8,
+              fontSize: 12,
+              fontWeight: "600",
+              textTransform: "uppercase",
+              letterSpacing: 2,
+              color: colors.mutedForeground,
+            }}
+          >
             Tip eveniment
           </Text>
           <ScrollView
@@ -149,11 +175,24 @@ export default function BookingNewScreen() {
                     ? "border-gold bg-gold/15"
                     : "border-border bg-card"
                 }`}
+                style={{
+                  borderRadius: 9999,
+                  borderWidth: 1,
+                  paddingHorizontal: 16,
+                  paddingVertical: 8,
+                  borderColor: eventType === t ? colors.gold : colors.border,
+                  backgroundColor: eventType === t ? "rgba(201,168,76,0.15)" : colors.card,
+                }}
               >
                 <Text
                   className={`text-[13px] font-semibold ${
                     eventType === t ? "text-gold" : "text-foreground/80"
                   }`}
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: eventType === t ? colors.gold : "rgba(247,245,238,0.8)",
+                  }}
                 >
                   {eventTypeLabel(t)}
                 </Text>
@@ -164,13 +203,22 @@ export default function BookingNewScreen() {
 
         {/* Date */}
         <Pressable onPress={() => setShowDatePicker(true)}>
-          <Card className="flex-row items-center gap-3">
+          <Card
+            className="flex-row items-center gap-3"
+            style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+          >
             <Calendar size={20} color={colors.gold} />
-            <View className="flex-1">
-              <Text className="text-[11px] uppercase tracking-widest text-muted-foreground">
+            <View className="flex-1" style={{ flex: 1 }}>
+              <Text
+                className="text-[11px] uppercase tracking-widest text-muted-foreground"
+                style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 2, color: colors.mutedForeground }}
+              >
                 Data evenimentului
               </Text>
-              <Text className="mt-0.5 text-[15px] font-semibold text-foreground">
+              <Text
+                className="mt-0.5 text-[15px] font-semibold text-foreground"
+                style={{ marginTop: 2, fontSize: 15, fontWeight: "600", color: colors.foreground }}
+              >
                 {formatDateRO(eventDate.toISOString().slice(0, 10))}
               </Text>
             </View>
@@ -179,13 +227,22 @@ export default function BookingNewScreen() {
 
         {/* Time */}
         <Pressable onPress={() => setShowTimePicker(true)}>
-          <Card className="flex-row items-center gap-3">
+          <Card
+            className="flex-row items-center gap-3"
+            style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+          >
             <Clock size={20} color={colors.gold} />
-            <View className="flex-1">
-              <Text className="text-[11px] uppercase tracking-widest text-muted-foreground">
+            <View className="flex-1" style={{ flex: 1 }}>
+              <Text
+                className="text-[11px] uppercase tracking-widest text-muted-foreground"
+                style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 2, color: colors.mutedForeground }}
+              >
                 Ora de început
               </Text>
-              <Text className="mt-0.5 text-[15px] font-semibold text-foreground">
+              <Text
+                className="mt-0.5 text-[15px] font-semibold text-foreground"
+                style={{ marginTop: 2, fontSize: 15, fontWeight: "600", color: colors.foreground }}
+              >
                 {String(startTime.getHours()).padStart(2, "0")}:
                 {String(startTime.getMinutes()).padStart(2, "0")}
               </Text>
@@ -217,7 +274,12 @@ export default function BookingNewScreen() {
         </View>
 
         {error && (
-          <Text className="text-center text-[13px] text-[#EF4444]">{error}</Text>
+          <Text
+            className="text-center text-[13px] text-[#EF4444]"
+            style={{ textAlign: "center", fontSize: 13, color: colors.danger }}
+          >
+            {error}
+          </Text>
         )}
 
         <Button
@@ -229,7 +291,10 @@ export default function BookingNewScreen() {
           Trimite cererea
         </Button>
 
-        <Text className="text-center text-[11px] leading-4 text-muted-foreground">
+        <Text
+          className="text-center text-[11px] leading-4 text-muted-foreground"
+          style={{ textAlign: "center", fontSize: 11, lineHeight: 16, color: colors.mutedForeground }}
+        >
           Continuând, accepți ca furnizorul să te contacteze cu privire la
           eveniment.
         </Text>

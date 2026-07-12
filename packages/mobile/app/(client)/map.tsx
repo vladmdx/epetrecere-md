@@ -75,7 +75,10 @@ export default function MapScreen() {
   const markers = useMemo(() => points ?? [], [points]);
 
   return (
-    <View className="flex-1 bg-background">
+    <View
+      className="flex-1 bg-background"
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
       <MapView
         provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
@@ -100,13 +103,31 @@ export default function MapScreen() {
       <SafeAreaView
         edges={["top"]}
         className="absolute inset-x-0 top-0"
+        style={{ position: "absolute", left: 0, right: 0, top: 0 }}
         pointerEvents="box-none"
       >
-        <View className="flex-row items-center justify-between px-4 py-2">
+        <View
+          className="flex-row items-center justify-between px-4 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full bg-background/90 backdrop-blur"
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+              backgroundColor: "rgba(13,13,13,0.9)",
+            }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
@@ -116,17 +137,51 @@ export default function MapScreen() {
 
       {/* Bottom sheet (simple version) */}
       {selected && (
-        <SafeAreaView edges={["bottom"]} className="absolute inset-x-0 bottom-0">
-          <View className="mx-4 mb-3 rounded-2xl border border-border bg-card p-4">
-            <View className="flex-row items-center gap-3">
-              <View className="h-10 w-10 items-center justify-center rounded-full bg-gold/15">
+        <SafeAreaView
+          edges={["bottom"]}
+          className="absolute inset-x-0 bottom-0"
+          style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
+        >
+          <View
+            className="mx-4 mb-3 rounded-2xl border border-border bg-card p-4"
+            style={{
+              marginHorizontal: 16,
+              marginBottom: 12,
+              borderRadius: 20,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.card,
+              padding: 16,
+            }}
+          >
+            <View
+              className="flex-row items-center gap-3"
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <View
+                className="h-10 w-10 items-center justify-center rounded-full bg-gold/15"
+                style={{
+                  height: 40,
+                  width: 40,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 9999,
+                  backgroundColor: "rgba(201,168,76,0.15)",
+                }}
+              >
                 <MapPin size={20} color={colors.gold} />
               </View>
-              <View className="flex-1">
-                <Text className="text-[15px] font-semibold text-foreground">
+              <View className="flex-1" style={{ flex: 1 }}>
+                <Text
+                  className="text-[15px] font-semibold text-foreground"
+                  style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}
+                >
                   {selected.name}
                 </Text>
-                <Text className="text-[12px] text-muted-foreground">
+                <Text
+                  className="text-[12px] text-muted-foreground"
+                  style={{ fontSize: 12, color: colors.mutedForeground }}
+                >
                   {selected.type === "artist" ? "Artist" : "Sală"}
                   {selected.city ? ` · ${selected.city}` : ""}
                 </Text>
@@ -141,8 +196,17 @@ export default function MapScreen() {
                   );
                 }}
                 className="rounded-lg bg-gold px-3 py-2"
+                style={{
+                  borderRadius: 14,
+                  backgroundColor: colors.gold,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                }}
               >
-                <Text className="text-[12px] font-semibold text-background">
+                <Text
+                  className="text-[12px] font-semibold text-background"
+                  style={{ fontSize: 12, fontWeight: "600", color: colors.background }}
+                >
                   Vezi
                 </Text>
               </Pressable>

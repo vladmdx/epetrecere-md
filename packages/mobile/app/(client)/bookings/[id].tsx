@@ -111,7 +111,15 @@ export default function BookingDetailScreen() {
 
   if (detailQuery.isLoading || !detailQuery.data) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-background">
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-background"
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.background,
+        }}
+      >
         <ActivityIndicator color={colors.gold} />
       </SafeAreaView>
     );
@@ -124,17 +132,38 @@ export default function BookingDetailScreen() {
   );
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center gap-3 border-b border-border px-3 py-2">
+        <View
+          className="flex-row items-center gap-3 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+            }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
-          <Text className="font-heading text-[18px] font-bold text-foreground">
+          <Text
+            className="font-heading text-[18px] font-bold text-foreground"
+            style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             Detaliu cerere
           </Text>
         </View>
@@ -142,6 +171,7 @@ export default function BookingDetailScreen() {
 
       <ScrollView
         className="flex-1"
+        style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 20,
@@ -158,17 +188,24 @@ export default function BookingDetailScreen() {
               router.push(`/(client)/venue/${b.venueSlug}`);
           }}
           className="flex-row items-center gap-3"
+          style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
         >
           <Avatar
             uri={b.artistPhotoUrl ?? null}
             name={vendorName}
             sizeClass="h-14 w-14"
           />
-          <View className="flex-1">
-            <Text className="text-[15px] font-semibold text-foreground">
+          <View className="flex-1" style={{ flex: 1 }}>
+            <Text
+              className="text-[15px] font-semibold text-foreground"
+              style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}
+            >
               {vendorName}
             </Text>
-            <Text className="text-[12px] text-muted-foreground">
+            <Text
+              className="text-[12px] text-muted-foreground"
+              style={{ fontSize: 12, color: colors.mutedForeground }}
+            >
               {b.artistId ? "Artist" : "Sală"}
             </Text>
           </View>
@@ -179,8 +216,11 @@ export default function BookingDetailScreen() {
 
         {/* Status timeline */}
         {!isTerminal && (
-          <Card className="gap-3">
-            <Text className="font-heading text-[14px] font-bold text-foreground">
+          <Card className="gap-3" style={{ gap: 12 }}>
+            <Text
+              className="font-heading text-[14px] font-bold text-foreground"
+              style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}
+            >
               Progresul rezervării
             </Text>
             <Timeline status={b.status} />
@@ -188,8 +228,11 @@ export default function BookingDetailScreen() {
         )}
 
         {/* Event details */}
-        <Card className="gap-3">
-          <Text className="font-heading text-[14px] font-bold text-foreground">
+        <Card className="gap-3" style={{ gap: 12 }}>
+          <Text
+            className="font-heading text-[14px] font-bold text-foreground"
+            style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}
+          >
             Detalii eveniment
           </Text>
           <DetailLine
@@ -230,11 +273,23 @@ export default function BookingDetailScreen() {
 
         {/* Your message */}
         {b.message && (
-          <Card className="gap-2">
-            <Text className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <Card className="gap-2" style={{ gap: 8 }}>
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground"
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                color: colors.mutedForeground,
+              }}
+            >
               Mesajul tău
             </Text>
-            <Text className="text-[14px] leading-5 text-foreground/85">
+            <Text
+              className="text-[14px] leading-5 text-foreground/85"
+              style={{ fontSize: 14, lineHeight: 20, color: "rgba(247,245,238,0.85)" }}
+            >
               {b.message}
             </Text>
           </Card>
@@ -242,11 +297,30 @@ export default function BookingDetailScreen() {
 
         {/* Artist reply */}
         {b.artistReply && (
-          <Card className="gap-2 border-gold/20 bg-gold/5">
-            <Text className="text-[11px] font-semibold uppercase tracking-widest text-gold">
+          <Card
+            className="gap-2 border-gold/20 bg-gold/5"
+            style={{
+              gap: 8,
+              borderColor: "rgba(201,168,76,0.2)",
+              backgroundColor: "rgba(201,168,76,0.05)",
+            }}
+          >
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-widest text-gold"
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                color: colors.gold,
+              }}
+            >
               Răspuns {vendorName}
             </Text>
-            <Text className="text-[14px] leading-5 text-foreground">
+            <Text
+              className="text-[14px] leading-5 text-foreground"
+              style={{ fontSize: 14, lineHeight: 20, color: colors.foreground }}
+            >
               {b.artistReply}
             </Text>
           </Card>
@@ -254,28 +328,44 @@ export default function BookingDetailScreen() {
 
         {/* Price offers */}
         {b.priceOffers && b.priceOffers.length > 0 && (
-          <Card className="gap-3">
-            <Text className="font-heading text-[14px] font-bold text-foreground">
+          <Card className="gap-3" style={{ gap: 12 }}>
+            <Text
+              className="font-heading text-[14px] font-bold text-foreground"
+              style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}
+            >
               Istoric negociere
             </Text>
             {b.priceOffers.map((offer, i) => (
-              <View key={i} className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
+              <View
+                key={i}
+                className="flex-row items-center justify-between"
+                style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+              >
+                <View className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <ArrowLeftRight
                     size={14}
                     color={
                       offer.from === "client" ? colors.gold : colors.info
                     }
                   />
-                  <Text className="text-[13px] text-foreground">
+                  <Text
+                    className="text-[13px] text-foreground"
+                    style={{ fontSize: 13, color: colors.foreground }}
+                  >
                     {offer.from === "client" ? "Tu" : vendorName}
                   </Text>
                 </View>
-                <View className="flex-row items-center gap-3">
-                  <Text className="text-[14px] font-semibold text-foreground">
+                <View className="flex-row items-center gap-3" style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <Text
+                    className="text-[14px] font-semibold text-foreground"
+                    style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}
+                  >
                     {offer.amount} €
                   </Text>
-                  <Text className="text-[11px] text-muted-foreground">
+                  <Text
+                    className="text-[11px] text-muted-foreground"
+                    style={{ fontSize: 11, color: colors.mutedForeground }}
+                  >
                     {relativeTimeRO(offer.at)}
                   </Text>
                 </View>
@@ -286,7 +376,7 @@ export default function BookingDetailScreen() {
 
         {/* Actions */}
         {b.status === "accepted" && (
-          <View className="gap-2">
+          <View className="gap-2" style={{ gap: 8 }}>
             <Button
               onPress={() => confirmMutation.mutate()}
               loading={confirmMutation.isPending}
@@ -337,11 +427,28 @@ function DetailLine({
   value: string;
   valueClass?: string;
 }) {
+  const isGoldValue = valueClass?.includes("text-gold") ?? false;
+  const isSemiboldValue = valueClass?.includes("font-semibold") ?? false;
   return (
-    <View className="flex-row items-center gap-3">
+    <View
+      className="flex-row items-center gap-3"
+      style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+    >
       <Icon size={16} color={colors.mutedForeground} />
-      <Text className="flex-1 text-[13px] text-muted-foreground">{label}</Text>
-      <Text className={`text-[14px] text-foreground ${valueClass ?? ""}`}>
+      <Text
+        className="flex-1 text-[13px] text-muted-foreground"
+        style={{ flex: 1, fontSize: 13, color: colors.mutedForeground }}
+      >
+        {label}
+      </Text>
+      <Text
+        className={`text-[14px] text-foreground ${valueClass ?? ""}`}
+        style={{
+          fontSize: 14,
+          color: isGoldValue ? colors.gold : colors.foreground,
+          fontWeight: isSemiboldValue ? "600" : undefined,
+        }}
+      >
         {value}
       </Text>
     </View>
@@ -353,24 +460,42 @@ function Timeline({ status }: { status: string }) {
   // Final state (completed) is the last item; for accepted/confirmed_by_client
   // findIndex returns the correct cursor.
   return (
-    <View className="flex-row items-center">
+    <View className="flex-row items-center" style={{ flexDirection: "row", alignItems: "center" }}>
       {STATUS_TIMELINE.map((step, i) => {
         const reached = i <= currentIndex;
         const isLast = i === STATUS_TIMELINE.length - 1;
         return (
-          <View key={step.key} className="flex-row items-center" style={{ flex: isLast ? 0 : 1 }}>
-            <View className="items-center gap-1">
+          <View
+            key={step.key}
+            className="flex-row items-center"
+            style={[{ flexDirection: "row", alignItems: "center" }, { flex: isLast ? 0 : 1 }]}
+          >
+            <View className="items-center gap-1" style={{ alignItems: "center", gap: 4 }}>
               <View
                 className={`h-6 w-6 items-center justify-center rounded-full ${
                   reached
                     ? "bg-gold"
                     : "border-2 border-border bg-card"
                 }`}
+                style={{
+                  height: 24,
+                  width: 24,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 9999,
+                  backgroundColor: reached ? colors.gold : colors.card,
+                  ...(reached ? {} : { borderWidth: 2, borderColor: colors.border }),
+                }}
               >
                 {reached && <CheckCircle size={14} color={colors.background} />}
               </View>
               <Text
                 className={`text-[10px] ${reached ? "text-foreground font-semibold" : "text-muted-foreground"}`}
+                style={{
+                  fontSize: 10,
+                  color: reached ? colors.foreground : colors.mutedForeground,
+                  fontWeight: reached ? "600" : undefined,
+                }}
               >
                 {step.label}
               </Text>
@@ -378,7 +503,15 @@ function Timeline({ status }: { status: string }) {
             {!isLast && (
               <View
                 className={`mx-1 h-px flex-1 ${reached ? "bg-gold" : "bg-border"}`}
-                style={{ marginTop: -14 }}
+                style={[
+                  {
+                    marginHorizontal: 4,
+                    height: 1,
+                    flex: 1,
+                    backgroundColor: reached ? colors.gold : colors.border,
+                  },
+                  { marginTop: -14 },
+                ]}
               />
             )}
           </View>

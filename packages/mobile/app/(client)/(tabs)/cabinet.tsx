@@ -272,7 +272,10 @@ export default function CabinetScreen() {
   if (!isSignedIn || plansQuery.isLoading) {
     return (
       <SafeScreen scroll={false}>
-        <View className="flex-1 items-center justify-center">
+        <View
+          className="flex-1 items-center justify-center"
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator color={colors.gold} />
         </View>
       </SafeScreen>
@@ -282,11 +285,17 @@ export default function CabinetScreen() {
   return (
     <SafeScreen padded scroll>
       {/* Welcome */}
-      <View className="pt-2">
-        <Text className="font-heading text-[28px] font-bold leading-tight text-foreground">
+      <View className="pt-2" style={{ paddingTop: 8 }}>
+        <Text
+          className="font-heading text-[28px] font-bold leading-tight text-foreground"
+          style={{ fontSize: 28, fontWeight: "700", lineHeight: 32, color: colors.foreground }}
+        >
           Bun venit, {user?.firstName ?? "utilizator"}!
         </Text>
-        <Text className="mt-1 text-[13px] text-muted-foreground">
+        <Text
+          className="mt-1 text-[13px] text-muted-foreground"
+          style={{ marginTop: 4, fontSize: 13, color: colors.mutedForeground }}
+        >
           Administrează evenimentul tău dintr-un singur loc.
         </Text>
       </View>
@@ -348,20 +357,38 @@ export default function CabinetScreen() {
 
 function EmptyState({ onPress }: { onPress: () => void }) {
   return (
-    <Card className="items-center gap-3 p-8">
+    <Card className="items-center gap-3 p-8" style={{ alignItems: "center", gap: 12, padding: 32 }}>
       <Calendar size={40} color={colors.gold} opacity={0.4} />
-      <Text className="font-heading text-[18px] font-bold text-foreground">
+      <Text
+        className="font-heading text-[18px] font-bold text-foreground"
+        style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+      >
         Nu ai încă un eveniment activ
       </Text>
-      <Text className="text-center text-[13px] text-muted-foreground">
+      <Text
+        className="text-center text-[13px] text-muted-foreground"
+        style={{ textAlign: "center", fontSize: 13, color: colors.mutedForeground }}
+      >
         Pornește planificarea în 7 pași — îți pregătim panoul complet.
       </Text>
       <Pressable
         onPress={onPress}
         className="flex-row items-center gap-2 rounded-lg bg-gold px-5 py-2.5"
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 8,
+          borderRadius: 14,
+          backgroundColor: colors.gold,
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+        }}
       >
         <Sparkles size={16} color={colors.background} />
-        <Text className="text-[14px] font-semibold text-background">
+        <Text
+          className="text-[14px] font-semibold text-background"
+          style={{ fontSize: 14, fontWeight: "600", color: colors.background }}
+        >
           Începe să planifici
         </Text>
       </Pressable>
@@ -386,15 +413,24 @@ function HeroCard({
   const dateLabel = plan.eventDate ? formatDateRO(plan.eventDate) : null;
 
   return (
-    <Card className="gap-4 border-gold/30 p-5">
-      <Text className="text-[10px] font-semibold uppercase tracking-[3px] text-gold">
+    <Card
+      className="gap-4 border-gold/30 p-5"
+      style={{ gap: 16, padding: 20, borderColor: "rgba(201,168,76,0.3)" }}
+    >
+      <Text
+        className="text-[10px] font-semibold uppercase tracking-[3px] text-gold"
+        style={{ fontSize: 10, fontWeight: "600", textTransform: "uppercase", letterSpacing: 3, color: colors.gold }}
+      >
         Evenimentul tău activ
       </Text>
 
-      <View className="flex-row gap-4">
-        <View className="flex-1 gap-2">
-          <Text className="font-heading text-[22px] font-bold leading-tight text-foreground">
-            <Text className="text-foreground/70">{eventLabel} · </Text>
+      <View className="flex-row gap-4" style={{ flexDirection: "row", gap: 16 }}>
+        <View className="flex-1 gap-2" style={{ flex: 1, gap: 8 }}>
+          <Text
+            className="font-heading text-[22px] font-bold leading-tight text-foreground"
+            style={{ fontSize: 22, fontWeight: "700", lineHeight: 26, color: colors.foreground }}
+          >
+            <Text className="text-foreground/70" style={{ color: "rgba(247,245,238,0.7)" }}>{eventLabel} · </Text>
             {plan.title}
           </Text>
 
@@ -406,14 +442,37 @@ function HeroCard({
         </View>
 
         <Pressable onPress={onPressOpen}>
-          <View className="aspect-[4/3] w-32 overflow-hidden rounded-xl border border-border">
+          <View
+            className="aspect-[4/3] w-32 overflow-hidden rounded-xl border border-border"
+            style={{
+              aspectRatio: 4 / 3,
+              width: 128,
+              overflow: "hidden",
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
             <Image
               source={{ uri: "/images/backgrounds/party-dance.jpg" }}
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
               transition={200}
             />
-            <View className="absolute bottom-2 right-2 h-8 w-8 items-center justify-center rounded-full bg-black/60">
+            <View
+              className="absolute bottom-2 right-2 h-8 w-8 items-center justify-center rounded-full bg-black/60"
+              style={{
+                position: "absolute",
+                bottom: 8,
+                right: 8,
+                height: 32,
+                width: 32,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 9999,
+                backgroundColor: "rgba(0,0,0,0.6)",
+              }}
+            >
               <ArrowRight size={16} color="#fff" />
             </View>
           </View>
@@ -421,13 +480,16 @@ function HeroCard({
       </View>
 
       {/* Progress + CTA */}
-      <View className="gap-3">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-[13px] text-foreground">
+      <View className="gap-3" style={{ gap: 12 }}>
+        <View
+          className="flex-row items-center justify-between"
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+        >
+          <Text className="text-[13px] text-foreground" style={{ fontSize: 13, color: colors.foreground }}>
             {progressLabel}{" "}
-            <Text className="text-gold">{progressPct}%</Text>
+            <Text className="text-gold" style={{ color: colors.gold }}>{progressPct}%</Text>
             {progressSuffix && (
-              <Text className="text-foreground"> {progressSuffix}</Text>
+              <Text className="text-foreground" style={{ color: colors.foreground }}> {progressSuffix}</Text>
             )}
           </Text>
         </View>
@@ -435,8 +497,21 @@ function HeroCard({
         <Pressable
           onPress={onPressOpen}
           className="flex-row items-center justify-center gap-2 rounded-lg border border-gold/40 py-2.5"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: "rgba(201,168,76,0.4)",
+            paddingVertical: 10,
+          }}
         >
-          <Text className="text-[13px] font-medium text-gold">
+          <Text
+            className="text-[13px] font-medium text-gold"
+            style={{ fontSize: 13, fontWeight: "500", color: colors.gold }}
+          >
             Vezi planul meu
           </Text>
           <ArrowRight size={14} color={colors.gold} />
@@ -448,9 +523,13 @@ function HeroCard({
 
 function MetaRow({ Icon, label }: { Icon: LucideIcon; label: string }) {
   return (
-    <View className="flex-row items-center gap-2">
+    <View className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
       <Icon size={14} color={colors.gold} opacity={0.8} />
-      <Text className="flex-1 text-[13px] text-foreground/85" numberOfLines={1}>
+      <Text
+        className="flex-1 text-[13px] text-foreground/85"
+        style={{ flex: 1, fontSize: 13, color: "rgba(247,245,238,0.85)" }}
+        numberOfLines={1}
+      >
         {label}
       </Text>
     </View>
@@ -495,18 +574,46 @@ function NextStepCard({
   if (!step) return null;
 
   return (
-    <Card className="flex-row items-center gap-3 p-4">
-      <View className="h-11 w-11 items-center justify-center rounded-xl bg-gold/15">
+    <Card
+      className="flex-row items-center gap-3 p-4"
+      style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 16 }}
+    >
+      <View
+        className="h-11 w-11 items-center justify-center rounded-xl bg-gold/15"
+        style={{
+          height: 44,
+          width: 44,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 16,
+          backgroundColor: "rgba(201,168,76,0.15)",
+        }}
+      >
         <ClipboardList size={20} color={colors.gold} />
       </View>
-      <View className="flex-1">
-        <Text className="text-[10px] font-semibold uppercase tracking-[2px] text-muted-foreground">
+      <View className="flex-1" style={{ flex: 1 }}>
+        <Text
+          className="text-[10px] font-semibold uppercase tracking-[2px] text-muted-foreground"
+          style={{
+            fontSize: 10,
+            fontWeight: "600",
+            textTransform: "uppercase",
+            letterSpacing: 2,
+            color: colors.mutedForeground,
+          }}
+        >
           Următorul pas
         </Text>
-        <Text className="mt-0.5 font-heading text-[15px] font-bold leading-tight text-foreground">
+        <Text
+          className="mt-0.5 font-heading text-[15px] font-bold leading-tight text-foreground"
+          style={{ marginTop: 2, fontSize: 15, fontWeight: "700", lineHeight: 18, color: colors.foreground }}
+        >
           {step.title}
         </Text>
-        <Text className="mt-1 text-[11px] text-muted-foreground">
+        <Text
+          className="mt-1 text-[11px] text-muted-foreground"
+          style={{ marginTop: 4, fontSize: 11, color: colors.mutedForeground }}
+        >
           {step.subtitle}
         </Text>
       </View>
@@ -526,7 +633,10 @@ function StatTilesRow({
   unreadMessages: number;
 }) {
   return (
-    <View className="flex-row flex-wrap gap-3">
+    <View
+      className="flex-row flex-wrap gap-3"
+      style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}
+    >
       {plan.guestsEnabled && plan.guestCountTarget != null && (
         <StatTileMini
           Icon={CheckCircle}
@@ -568,19 +678,43 @@ function StatTileMini({
   extra: string;
 }) {
   return (
-    <Card className="min-w-[31%] flex-1 flex-row items-center gap-3 p-3">
+    <Card
+      className="min-w-[31%] flex-1 flex-row items-center gap-3 p-3"
+      style={{
+        minWidth: "31%",
+        flex: 1,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        padding: 12,
+      }}
+    >
       <View
-        style={{ backgroundColor: tint + "26" }}
+        style={{
+          backgroundColor: tint + "26",
+          height: 40,
+          width: 40,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 9999,
+        }}
         className="h-10 w-10 items-center justify-center rounded-full"
       >
         <Icon size={18} color={tint} />
       </View>
-      <View className="flex-1">
-        <Text className="font-heading text-[20px] font-bold text-foreground">
+      <View className="flex-1" style={{ flex: 1 }}>
+        <Text
+          className="font-heading text-[20px] font-bold text-foreground"
+          style={{ fontSize: 20, fontWeight: "700", color: colors.foreground }}
+        >
           {big}
         </Text>
-        <Text className="text-[11px] text-muted-foreground" numberOfLines={2}>
-          <Text className="text-foreground/80">{label}</Text> {extra}
+        <Text
+          className="text-[11px] text-muted-foreground"
+          style={{ fontSize: 11, color: colors.mutedForeground }}
+          numberOfLines={2}
+        >
+          <Text className="text-foreground/80" style={{ color: "rgba(247,245,238,0.8)" }}>{label}</Text> {extra}
         </Text>
       </View>
     </Card>
@@ -601,9 +735,15 @@ function ServicesStrip({
 }) {
   const router = useRouter();
   return (
-    <Card className="p-4">
-      <View className="mb-3 flex-row items-center justify-between">
-        <Text className="font-heading text-[15px] font-bold text-foreground">
+    <Card className="p-4" style={{ padding: 16 }}>
+      <View
+        className="mb-3 flex-row items-center justify-between"
+        style={{ marginBottom: 12, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <Text
+          className="font-heading text-[15px] font-bold text-foreground"
+          style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}
+        >
           Servicii pentru eveniment
         </Text>
         <Pressable
@@ -615,7 +755,7 @@ function ServicesStrip({
             })
           }
         >
-          <Text className="text-[12px] text-gold">Vezi toate</Text>
+          <Text className="text-[12px] text-gold" style={{ fontSize: 12, color: colors.gold }}>Vezi toate</Text>
         </Pressable>
       </View>
       <ScrollView
@@ -641,22 +781,50 @@ function ServiceTile({
       label: "Confirmat",
       bg: "bg-emerald-500/15",
       text: "text-emerald-400",
+      bgColor: "rgba(16,185,129,0.15)",
+      textColor: "#34D399",
     },
     pending: {
       label: "În așteptare",
       bg: "bg-gold/15",
       text: "text-gold",
+      bgColor: "rgba(201,168,76,0.15)",
+      textColor: colors.gold,
     },
     missing: {
       label: "De ales",
       bg: "bg-muted",
       text: "text-muted-foreground",
+      bgColor: colors.muted,
+      textColor: colors.mutedForeground,
     },
   }[service.status];
 
   return (
-    <View className="w-[100px] items-center gap-1.5 rounded-xl border border-border bg-background/40 p-3">
-      <View className={`h-10 w-10 items-center justify-center rounded-lg ${statusCfg.bg}`}>
+    <View
+      className="w-[100px] items-center gap-1.5 rounded-xl border border-border bg-background/40 p-3"
+      style={{
+        width: 100,
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: "rgba(13,13,13,0.4)",
+        padding: 12,
+      }}
+    >
+      <View
+        className={`h-10 w-10 items-center justify-center rounded-lg ${statusCfg.bg}`}
+        style={{
+          height: 40,
+          width: 40,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 14,
+          backgroundColor: statusCfg.bgColor,
+        }}
+      >
         <service.Icon
           size={18}
           color={
@@ -668,8 +836,16 @@ function ServiceTile({
           }
         />
       </View>
-      <Text className="text-[12px] font-medium text-foreground">{service.label}</Text>
-      <Text className={`text-[10px] font-medium ${statusCfg.text}`}>
+      <Text
+        className="text-[12px] font-medium text-foreground"
+        style={{ fontSize: 12, fontWeight: "500", color: colors.foreground }}
+      >
+        {service.label}
+      </Text>
+      <Text
+        className={`text-[10px] font-medium ${statusCfg.text}`}
+        style={{ fontSize: 10, fontWeight: "500", color: statusCfg.textColor }}
+      >
         {statusCfg.label}
       </Text>
     </View>
@@ -687,14 +863,20 @@ function BottomRow({
   const recent = conversations.slice(0, 3);
 
   return (
-    <View className="gap-4">
+    <View className="gap-4" style={{ gap: 16 }}>
       {/* Recent messages */}
-      <Card className="gap-2 p-4">
-        <Text className="font-heading text-[15px] font-bold text-foreground">
+      <Card className="gap-2 p-4" style={{ gap: 8, padding: 16 }}>
+        <Text
+          className="font-heading text-[15px] font-bold text-foreground"
+          style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}
+        >
           Mesaje recente
         </Text>
         {recent.length === 0 ? (
-          <Text className="text-[12px] text-muted-foreground">
+          <Text
+            className="text-[12px] text-muted-foreground"
+            style={{ fontSize: 12, color: colors.mutedForeground }}
+          >
             Nu ai mesaje încă. Deschide o conversație din pagina unui partener.
           </Text>
         ) : (
@@ -703,30 +885,58 @@ function BottomRow({
               key={c.id}
               onPress={() => router.push(`/(client)/chat/${c.id}`)}
               className="flex-row items-center gap-3 rounded-xl py-2 active:bg-gold/5"
+              style={{ flexDirection: "row", alignItems: "center", gap: 12, borderRadius: 16, paddingVertical: 8 }}
             >
-              <View className="h-9 w-9 items-center justify-center rounded-lg bg-gold/15">
-                <Text className="text-[12px] font-bold text-gold">
+              <View
+                className="h-9 w-9 items-center justify-center rounded-lg bg-gold/15"
+                style={{
+                  height: 36,
+                  width: 36,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 14,
+                  backgroundColor: "rgba(201,168,76,0.15)",
+                }}
+              >
+                <Text
+                  className="text-[12px] font-bold text-gold"
+                  style={{ fontSize: 12, fontWeight: "700", color: colors.gold }}
+                >
                   {(c.vendorName ?? "??").slice(0, 2).toUpperCase()}
                 </Text>
               </View>
-              <View className="flex-1">
-                <View className="flex-row items-center justify-between">
+              <View className="flex-1" style={{ flex: 1 }}>
+                <View
+                  className="flex-row items-center justify-between"
+                  style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+                >
                   <Text
                     className="flex-1 text-[14px] font-medium text-foreground"
+                    style={{ flex: 1, fontSize: 14, fontWeight: "500", color: colors.foreground }}
                     numberOfLines={1}
                   >
                     {c.vendorName ?? "Furnizor"}
                   </Text>
-                  <Text className="text-[11px] text-muted-foreground">
+                  <Text
+                    className="text-[11px] text-muted-foreground"
+                    style={{ fontSize: 11, color: colors.mutedForeground }}
+                  >
                     {relativeTimeRO(c.lastMessageAt)}
                   </Text>
                 </View>
-                <Text className="text-[12px] text-muted-foreground" numberOfLines={1}>
+                <Text
+                  className="text-[12px] text-muted-foreground"
+                  style={{ fontSize: 12, color: colors.mutedForeground }}
+                  numberOfLines={1}
+                >
                   {c.lastMessagePreview ?? "—"}
                 </Text>
               </View>
               {c.clientUnread > 0 && (
-                <View className="h-2 w-2 rounded-full bg-gold" />
+                <View
+                  className="h-2 w-2 rounded-full bg-gold"
+                  style={{ height: 8, width: 8, borderRadius: 9999, backgroundColor: colors.gold }}
+                />
               )}
             </Pressable>
           ))
@@ -734,8 +944,9 @@ function BottomRow({
         <Pressable
           onPress={() => router.push("/(client)/chat-list" as never)}
           className="flex-row items-center gap-1"
+          style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
         >
-          <Text className="text-[12px] text-gold">Vezi toate mesajele</Text>
+          <Text className="text-[12px] text-gold" style={{ fontSize: 12, color: colors.gold }}>Vezi toate mesajele</Text>
           <ArrowRight size={12} color={colors.gold} />
         </Pressable>
       </Card>
@@ -775,15 +986,37 @@ function FeatureCard({
   onPress: () => void;
 }) {
   return (
-    <Card onPress={onPress} className="flex-row items-center gap-3 p-4">
-      <View className="h-11 w-11 items-center justify-center rounded-xl bg-gold/15">
+    <Card
+      onPress={onPress}
+      className="flex-row items-center gap-3 p-4"
+      style={{ flexDirection: "row", alignItems: "center", gap: 12, padding: 16 }}
+    >
+      <View
+        className="h-11 w-11 items-center justify-center rounded-xl bg-gold/15"
+        style={{
+          height: 44,
+          width: 44,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 16,
+          backgroundColor: "rgba(201,168,76,0.15)",
+        }}
+      >
         <Icon size={20} color={colors.gold} />
       </View>
-      <View className="flex-1">
-        <Text className="font-heading text-[15px] font-bold text-foreground">
+      <View className="flex-1" style={{ flex: 1 }}>
+        <Text
+          className="font-heading text-[15px] font-bold text-foreground"
+          style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}
+        >
           {title}
         </Text>
-        <Text className="text-[12px] text-muted-foreground">{description}</Text>
+        <Text
+          className="text-[12px] text-muted-foreground"
+          style={{ fontSize: 12, color: colors.mutedForeground }}
+        >
+          {description}
+        </Text>
       </View>
       <ArrowRight size={16} color={colors.mutedForeground} />
     </Card>

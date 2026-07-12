@@ -133,8 +133,28 @@ export default function SearchScreen() {
   return (
     <SafeScreen padded={false} scroll={false}>
       {/* Search bar */}
-      <View className="border-b border-border bg-background px-5 py-3">
-        <View className="flex-row items-center gap-3 rounded-2xl bg-card px-4 py-2.5">
+      <View
+        className="border-b border-border bg-background px-5 py-3"
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          backgroundColor: colors.background,
+          paddingHorizontal: 20,
+          paddingVertical: 12,
+        }}
+      >
+        <View
+          className="flex-row items-center gap-3 rounded-2xl bg-card px-4 py-2.5"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            borderRadius: 20,
+            backgroundColor: colors.card,
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+          }}
+        >
           <Search size={18} color={colors.mutedForeground} />
           <TextInput
             value={queryText}
@@ -143,6 +163,7 @@ export default function SearchScreen() {
             placeholderTextColor={colors.mutedForeground}
             selectionColor={colors.gold}
             className="flex-1 text-[15px] text-foreground"
+            style={{ flex: 1, fontSize: 15, color: colors.foreground }}
             returnKeyType="search"
             autoCorrect={false}
           />
@@ -232,7 +253,15 @@ export default function SearchScreen() {
         }
         ListFooterComponent={
           artistsQuery.isFetchingNextPage ? (
-            <Text className="py-4 text-center text-[13px] text-muted-foreground">
+            <Text
+              className="py-4 text-center text-[13px] text-muted-foreground"
+              style={{
+                paddingVertical: 16,
+                textAlign: "center",
+                fontSize: 13,
+                color: colors.mutedForeground,
+              }}
+            >
               Se încarcă…
             </Text>
           ) : null
@@ -264,10 +293,26 @@ function FilterChip({
       className={`flex-row items-center gap-1.5 rounded-full border px-3 py-1.5 ${
         active ? "border-gold/40 bg-gold/15" : "border-border bg-card"
       }`}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 9999,
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderColor: active ? "rgba(201,168,76,0.4)" : colors.border,
+        backgroundColor: active ? "rgba(201,168,76,0.15)" : colors.card,
+      }}
     >
       {Icon && <Icon size={14} color={active ? colors.gold : colors.mutedForeground} />}
       <Text
         className={`text-[12px] font-medium ${active ? "text-gold" : "text-foreground"}`}
+        style={{
+          fontSize: 12,
+          fontWeight: "500",
+          color: active ? colors.gold : colors.foreground,
+        }}
       >
         {label}
       </Text>
@@ -284,8 +329,15 @@ function ArtistRow({
   onPress: () => void;
 }) {
   return (
-    <Card onPress={onPress} className="flex-row gap-3 p-3">
-      <View className="h-20 w-20 overflow-hidden rounded-xl">
+    <Card
+      onPress={onPress}
+      className="flex-row gap-3 p-3"
+      style={{ flexDirection: "row", gap: 12, padding: 12 }}
+    >
+      <View
+        className="h-20 w-20 overflow-hidden rounded-xl"
+        style={{ width: 80, height: 80, overflow: "hidden", borderRadius: 16 }}
+      >
         <Avatar
           uri={artist.photoUrl}
           name={artist.nameRo}
@@ -293,12 +345,19 @@ function ArtistRow({
           ring={artist.isPremium ? "gold" : "none"}
         />
       </View>
-      <View className="flex-1 justify-between py-0.5">
+      <View
+        className="flex-1 justify-between py-0.5"
+        style={{ flex: 1, justifyContent: "space-between", paddingVertical: 2 }}
+      >
         <View>
-          <View className="flex-row items-center gap-2">
+          <View
+            className="flex-row items-center gap-2"
+            style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+          >
             <Text
               numberOfLines={1}
               className="flex-1 text-[15px] font-semibold text-foreground"
+              style={{ flex: 1, fontSize: 15, fontWeight: "600", color: colors.foreground }}
             >
               {artist.nameRo}
             </Text>
@@ -312,31 +371,55 @@ function ArtistRow({
             <Text
               numberOfLines={2}
               className="mt-0.5 text-[12px] leading-4 text-muted-foreground"
+              style={{
+                marginTop: 2,
+                fontSize: 12,
+                lineHeight: 16,
+                color: colors.mutedForeground,
+              }}
             >
               {artist.descriptionRo}
             </Text>
           )}
         </View>
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row items-center gap-1">
+        <View
+          className="flex-row items-center justify-between"
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+        >
+          <View
+            className="flex-row items-center gap-1"
+            style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+          >
             {artist.ratingAvg != null && artist.ratingCount > 0 ? (
               <>
                 <Star size={12} color={colors.warning} fill={colors.warning} />
-                <Text className="text-[12px] text-foreground">
+                <Text
+                  className="text-[12px] text-foreground"
+                  style={{ fontSize: 12, color: colors.foreground }}
+                >
                   {artist.ratingAvg.toFixed(1)}
                 </Text>
-                <Text className="text-[11px] text-muted-foreground">
+                <Text
+                  className="text-[11px] text-muted-foreground"
+                  style={{ fontSize: 11, color: colors.mutedForeground }}
+                >
                   ({artist.ratingCount})
                 </Text>
               </>
             ) : (
-              <Text className="text-[11px] text-muted-foreground">
+              <Text
+                className="text-[11px] text-muted-foreground"
+                style={{ fontSize: 11, color: colors.mutedForeground }}
+              >
                 Fără recenzii
               </Text>
             )}
           </View>
           {artist.priceFrom != null && (
-            <Text className="text-[12px] font-semibold text-gold">
+            <Text
+              className="text-[12px] font-semibold text-gold"
+              style={{ fontSize: 12, fontWeight: "600", color: colors.gold }}
+            >
               de la {artist.priceFrom} €
             </Text>
           )}
@@ -348,17 +431,38 @@ function ArtistRow({
 
 function ListSkeleton() {
   return (
-    <View className="gap-3">
+    <View className="gap-3" style={{ gap: 12 }}>
       {Array.from({ length: 6 }).map((_, i) => (
         <View
           key={i}
           className="flex-row gap-3 rounded-2xl border border-border bg-card p-3"
+          style={{
+            flexDirection: "row",
+            gap: 12,
+            borderRadius: 20,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.card,
+            padding: 12,
+          }}
         >
-          <View className="h-20 w-20 rounded-xl bg-muted" />
-          <View className="flex-1 gap-2 py-1">
-            <View className="h-4 w-32 rounded bg-muted" />
-            <View className="h-3 w-48 rounded bg-muted" />
-            <View className="h-3 w-24 rounded bg-muted" />
+          <View
+            className="h-20 w-20 rounded-xl bg-muted"
+            style={{ width: 80, height: 80, borderRadius: 16, backgroundColor: colors.muted }}
+          />
+          <View className="flex-1 gap-2 py-1" style={{ flex: 1, gap: 8, paddingVertical: 4 }}>
+            <View
+              className="h-4 w-32 rounded bg-muted"
+              style={{ height: 16, width: 128, borderRadius: 12, backgroundColor: colors.muted }}
+            />
+            <View
+              className="h-3 w-48 rounded bg-muted"
+              style={{ height: 12, width: 192, borderRadius: 12, backgroundColor: colors.muted }}
+            />
+            <View
+              className="h-3 w-24 rounded bg-muted"
+              style={{ height: 12, width: 96, borderRadius: 12, backgroundColor: colors.muted }}
+            />
           </View>
         </View>
       ))}
@@ -368,12 +472,21 @@ function ListSkeleton() {
 
 function EmptyState() {
   return (
-    <View className="items-center gap-3 py-16">
+    <View
+      className="items-center gap-3 py-16"
+      style={{ alignItems: "center", gap: 12, paddingVertical: 64 }}
+    >
       <Search size={48} color={colors.mutedForeground} />
-      <Text className="font-heading text-[18px] font-bold text-foreground">
+      <Text
+        className="font-heading text-[18px] font-bold text-foreground"
+        style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+      >
         Niciun rezultat
       </Text>
-      <Text className="max-w-[260px] text-center text-[13px] text-muted-foreground">
+      <Text
+        className="max-w-[260px] text-center text-[13px] text-muted-foreground"
+        style={{ maxWidth: 260, textAlign: "center", fontSize: 13, color: colors.mutedForeground }}
+      >
         Încearcă alte cuvinte cheie sau elimină câteva filtre.
       </Text>
     </View>

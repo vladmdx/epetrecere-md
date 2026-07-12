@@ -57,17 +57,23 @@ export default function OnboardingPermissions() {
 
   return (
     <SafeScreen padded>
-      <View className="gap-6 py-8">
-        <View className="gap-2">
-          <Text className="font-heading text-[28px] font-bold text-foreground">
+      <View className="gap-6 py-8" style={{ gap: 24, paddingVertical: 32 }}>
+        <View className="gap-2" style={{ gap: 8 }}>
+          <Text
+            className="font-heading text-[28px] font-bold text-foreground"
+            style={{ fontSize: 28, fontWeight: "700", color: colors.foreground }}
+          >
             {t("onboarding.permissionsTitle")}
           </Text>
-          <Text className="text-[14px] text-muted-foreground">
+          <Text
+            className="text-[14px] text-muted-foreground"
+            style={{ fontSize: 14, color: colors.mutedForeground }}
+          >
             {t("onboarding.permissionsBody")}
           </Text>
         </View>
 
-        <View className="gap-3">
+        <View className="gap-3" style={{ gap: 12 }}>
           <PermissionRow
             Icon={Bell}
             title={t("onboarding.permissionNotifications")}
@@ -88,7 +94,7 @@ export default function OnboardingPermissions() {
           />
         </View>
 
-        <View className="flex-1" />
+        <View className="flex-1" style={{ flex: 1 }} />
 
         <Button
           onPress={() => router.replace("/(onboarding)/role-picker")}
@@ -122,20 +128,39 @@ function PermissionRow({
   const granted = status === "granted";
   return (
     <Card>
-      <View className="flex-row items-start gap-3">
-        <View className="h-11 w-11 items-center justify-center rounded-xl bg-gold/15">
+      <View
+        className="flex-row items-start gap-3"
+        style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}
+      >
+        <View
+          className="h-11 w-11 items-center justify-center rounded-xl bg-gold/15"
+          style={{
+            height: 44,
+            width: 44,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 16,
+            backgroundColor: "rgba(201,168,76,0.15)",
+          }}
+        >
           <Icon size={22} color={colors.gold} />
         </View>
-        <View className="flex-1">
-          <Text className="text-[15px] font-semibold text-foreground">
+        <View className="flex-1" style={{ flex: 1 }}>
+          <Text
+            className="text-[15px] font-semibold text-foreground"
+            style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}
+          >
             {title}
           </Text>
-          <Text className="mt-0.5 text-[13px] leading-5 text-muted-foreground">
+          <Text
+            className="mt-0.5 text-[13px] leading-5 text-muted-foreground"
+            style={{ marginTop: 2, fontSize: 13, lineHeight: 20, color: colors.mutedForeground }}
+          >
             {description}
           </Text>
         </View>
       </View>
-      <View className="mt-3 flex-row gap-2">
+      <View className="mt-3 flex-row gap-2" style={{ marginTop: 12, flexDirection: "row", gap: 8 }}>
         {granted ? (
           <Button variant="ghost" size="sm" onPress={() => {}} disabled>
             ✓ {t("common.done")}

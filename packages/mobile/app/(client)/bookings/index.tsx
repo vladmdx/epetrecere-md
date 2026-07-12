@@ -84,17 +84,38 @@ export default function MyBookingsScreen() {
   }, [grouped]);
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center gap-3 border-b border-border px-3 py-2">
+        <View
+          className="flex-row items-center gap-3 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{
+              width: 40,
+              height: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+            }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
-          <Text className="font-heading text-[20px] font-bold text-foreground">
+          <Text
+            className="font-heading text-[20px] font-bold text-foreground"
+            style={{ fontSize: 20, fontWeight: "700", color: colors.foreground }}
+          >
             Rezervările Mele
           </Text>
         </View>
@@ -118,7 +139,17 @@ export default function MyBookingsScreen() {
         }
         renderItem={({ item }) =>
           item.type === "header" ? (
-            <Text className="mt-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            <Text
+              className="mt-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground"
+              style={{
+                marginTop: 12,
+                fontSize: 11,
+                fontWeight: "600",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                color: colors.mutedForeground,
+              }}
+            >
               {item.title}
             </Text>
           ) : (
@@ -132,12 +163,26 @@ export default function MyBookingsScreen() {
         }
         ListEmptyComponent={
           bookingsQuery.isLoading ? null : (
-            <View className="items-center gap-3 py-16">
+            <View
+              className="items-center gap-3 py-16"
+              style={{ alignItems: "center", gap: 12, paddingVertical: 64 }}
+            >
               <BookOpen size={48} color={colors.mutedForeground} />
-              <Text className="font-heading text-[18px] font-bold text-foreground">
+              <Text
+                className="font-heading text-[18px] font-bold text-foreground"
+                style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+              >
                 Nicio rezervare încă
               </Text>
-              <Text className="max-w-[260px] text-center text-[13px] text-muted-foreground">
+              <Text
+                className="max-w-[260px] text-center text-[13px] text-muted-foreground"
+                style={{
+                  maxWidth: 260,
+                  textAlign: "center",
+                  fontSize: 13,
+                  color: colors.mutedForeground,
+                }}
+              >
                 Caută artiști sau săli și trimite o cerere — apar aici imediat.
               </Text>
             </View>
@@ -159,26 +204,48 @@ function BookingRow({
   const pill = statusPill(booking.status);
 
   return (
-    <Card onPress={onPress} className="flex-row items-center gap-3">
+    <Card
+      onPress={onPress}
+      className="flex-row items-center gap-3"
+      style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+    >
       <View
         className={`h-10 w-10 items-center justify-center rounded-xl ${pill.bg}`}
+        style={{
+          width: 40,
+          height: 40,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 16,
+          backgroundColor: pill.bgColor,
+        }}
       >
         <BookOpen size={18} color={pill.iconColor} />
       </View>
-      <View className="flex-1">
+      <View className="flex-1" style={{ flex: 1 }}>
         <Text
           className="text-[15px] font-semibold text-foreground"
           numberOfLines={1}
+          style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}
         >
           {vendor}
         </Text>
-        <View className="mt-0.5 flex-row items-center gap-2">
-          <Text className="text-[12px] text-muted-foreground">
+        <View
+          className="mt-0.5 flex-row items-center gap-2"
+          style={{ marginTop: 2, flexDirection: "row", alignItems: "center", gap: 8 }}
+        >
+          <Text
+            className="text-[12px] text-muted-foreground"
+            style={{ fontSize: 12, color: colors.mutedForeground }}
+          >
             {eventTypeLabel(booking.eventType)} ·{" "}
             {formatDateShortRO(booking.eventDate)}
           </Text>
           {booking.agreedPrice != null && (
-            <Text className="text-[12px] font-semibold text-gold">
+            <Text
+              className="text-[12px] font-semibold text-gold"
+              style={{ fontSize: 12, fontWeight: "600", color: colors.gold }}
+            >
               {booking.agreedPrice} €
             </Text>
           )}
@@ -196,6 +263,10 @@ function statusPill(status: string): {
   label: string;
   tone: BadgeTone;
   bg: string;
+  // Inline equivalent of `bg` above — css-interop drops the tinted bg-*/N
+  // utility classes at render, so the icon chip's background is applied
+  // via inline style using this value.
+  bgColor: string;
   iconColor: string;
 } {
   switch (status) {
@@ -204,6 +275,7 @@ function statusPill(status: string): {
         label: "Trimisă",
         tone: "indigo",
         bg: "bg-indigo-500/15",
+        bgColor: "rgba(99,102,241,0.15)",
         iconColor: colors.indigo,
       };
     case "accepted":
@@ -211,6 +283,7 @@ function statusPill(status: string): {
         label: "Confirmare",
         tone: "warning",
         bg: "bg-amber-500/15",
+        bgColor: "rgba(245,158,11,0.15)",
         iconColor: colors.warning,
       };
     case "confirmed_by_client":
@@ -218,6 +291,7 @@ function statusPill(status: string): {
         label: "Confirmat",
         tone: "success",
         bg: "bg-emerald-500/15",
+        bgColor: "rgba(16,185,129,0.15)",
         iconColor: colors.success,
       };
     case "completed":
@@ -225,6 +299,7 @@ function statusPill(status: string): {
         label: "Finalizat",
         tone: "success",
         bg: "bg-emerald-500/15",
+        bgColor: "rgba(16,185,129,0.15)",
         iconColor: colors.success,
       };
     case "rejected":
@@ -232,6 +307,7 @@ function statusPill(status: string): {
         label: "Refuzat",
         tone: "danger",
         bg: "bg-rose-500/15",
+        bgColor: "rgba(244,63,94,0.15)",
         iconColor: colors.danger,
       };
     case "cancelled":
@@ -239,6 +315,7 @@ function statusPill(status: string): {
         label: "Anulat",
         tone: "danger",
         bg: "bg-rose-500/15",
+        bgColor: "rgba(244,63,94,0.15)",
         iconColor: colors.danger,
       };
     case "expired":
@@ -246,6 +323,7 @@ function statusPill(status: string): {
         label: "Expirat",
         tone: "default",
         bg: "bg-muted",
+        bgColor: colors.muted,
         iconColor: colors.mutedForeground,
       };
     default:
@@ -253,6 +331,7 @@ function statusPill(status: string): {
         label: status,
         tone: "default",
         bg: "bg-muted",
+        bgColor: colors.muted,
         iconColor: colors.mutedForeground,
       };
   }

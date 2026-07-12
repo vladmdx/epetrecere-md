@@ -49,12 +49,21 @@ export default function FavoritesScreen() {
   if (!isSignedIn) {
     return (
       <SafeScreen padded scroll={false}>
-        <View className="flex-1 items-center justify-center gap-3 py-16">
+        <View
+          className="flex-1 items-center justify-center gap-3 py-16"
+          style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 12, paddingVertical: 64 }}
+        >
           <Heart size={48} color={colors.mutedForeground} />
-          <Text className="font-heading text-[18px] font-bold text-foreground">
+          <Text
+            className="font-heading text-[18px] font-bold text-foreground"
+            style={{ fontFamily: "Cormorant", fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             Conectează-te pentru favorite
           </Text>
-          <Text className="max-w-[260px] text-center text-[13px] text-muted-foreground">
+          <Text
+            className="max-w-[260px] text-center text-[13px] text-muted-foreground"
+            style={{ maxWidth: 260, textAlign: "center", fontSize: 13, color: colors.mutedForeground }}
+          >
             Salvează artiști și săli ca să le revezi rapid.
           </Text>
         </View>
@@ -64,11 +73,17 @@ export default function FavoritesScreen() {
 
   return (
     <SafeScreen padded={false} scroll={false}>
-      <View className="px-5 py-3">
-        <Text className="font-heading text-[28px] font-bold text-foreground">
+      <View className="px-5 py-3" style={{ paddingHorizontal: 20, paddingVertical: 12 }}>
+        <Text
+          className="font-heading text-[28px] font-bold text-foreground"
+          style={{ fontFamily: "Cormorant", fontSize: 28, fontWeight: "700", color: colors.foreground }}
+        >
           Favorite
         </Text>
-        <Text className="mt-1 text-[13px] text-muted-foreground">
+        <Text
+          className="mt-1 text-[13px] text-muted-foreground"
+          style={{ marginTop: 4, fontSize: 13, color: colors.mutedForeground }}
+        >
           {wishlistQuery.data?.length ?? 0} salvate
         </Text>
       </View>
@@ -103,12 +118,21 @@ export default function FavoritesScreen() {
         )}
         ListEmptyComponent={
           wishlistQuery.isLoading ? null : (
-            <View className="items-center gap-3 py-16">
+            <View
+              className="items-center gap-3 py-16"
+              style={{ alignItems: "center", gap: 12, paddingVertical: 64 }}
+            >
               <Heart size={48} color={colors.mutedForeground} />
-              <Text className="font-heading text-[18px] font-bold text-foreground">
+              <Text
+                className="font-heading text-[18px] font-bold text-foreground"
+                style={{ fontFamily: "Cormorant", fontSize: 18, fontWeight: "700", color: colors.foreground }}
+              >
                 Nicio favorită încă
               </Text>
-              <Text className="max-w-[260px] text-center text-[13px] text-muted-foreground">
+              <Text
+                className="max-w-[260px] text-center text-[13px] text-muted-foreground"
+                style={{ maxWidth: 260, textAlign: "center", fontSize: 13, color: colors.mutedForeground }}
+              >
                 Apasă inima pe profilul artiștilor sau sălilor pentru a le salva.
               </Text>
             </View>
@@ -127,20 +151,28 @@ function FavoriteRow({
   onPress: () => void;
 }) {
   return (
-    <Card onPress={onPress} className="flex-row gap-3 p-3">
-      <View className="h-20 w-20 overflow-hidden rounded-xl">
+    <Card
+      onPress={onPress}
+      className="flex-row gap-3 p-3"
+      style={{ flexDirection: "row", gap: 12, padding: 12 }}
+    >
+      <View
+        className="h-20 w-20 overflow-hidden rounded-xl"
+        style={{ width: 80, height: 80, overflow: "hidden", borderRadius: 16 }}
+      >
         <Avatar
           uri={item.photoUrl}
           name={item.name}
           sizeClass="h-full w-full"
         />
       </View>
-      <View className="flex-1 justify-between py-1">
+      <View className="flex-1 justify-between py-1" style={{ flex: 1, justifyContent: "space-between", paddingVertical: 4 }}>
         <View>
-          <View className="flex-row items-center gap-2">
+          <View className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Text
               numberOfLines={1}
               className="flex-1 text-[15px] font-semibold text-foreground"
+              style={{ flex: 1, fontSize: 15, fontWeight: "600", color: colors.foreground }}
             >
               {item.name}
             </Text>
@@ -148,15 +180,21 @@ function FavoriteRow({
               <X size={14} color={colors.mutedForeground} />
             </Pressable>
           </View>
-          <Text className="mt-0.5 text-[12px] text-muted-foreground">
+          <Text
+            className="mt-0.5 text-[12px] text-muted-foreground"
+            style={{ marginTop: 2, fontSize: 12, color: colors.mutedForeground }}
+          >
             {item.entityType === "artist" ? "Artist" : "Sală"}
             {item.city ? ` · ${item.city}` : ""}
           </Text>
         </View>
-        <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center justify-between" style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
           {item.isPremium && <Badge tone="gold" size="sm">Premium</Badge>}
           {item.priceFrom != null && (
-            <Text className="ml-auto text-[12px] font-semibold text-gold">
+            <Text
+              className="ml-auto text-[12px] font-semibold text-gold"
+              style={{ marginLeft: "auto", fontSize: 12, fontWeight: "600", color: colors.gold }}
+            >
               de la {item.priceFrom} €
             </Text>
           )}

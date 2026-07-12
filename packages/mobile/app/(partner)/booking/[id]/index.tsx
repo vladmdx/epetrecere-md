@@ -89,7 +89,10 @@ export default function PartnerBookingDetailScreen() {
 
   if (detailQuery.isLoading || !detailQuery.data) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-background">
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-background"
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.background }}
+      >
         <ActivityIndicator color={colors.gold} />
       </SafeAreaView>
     );
@@ -98,17 +101,32 @@ export default function PartnerBookingDetailScreen() {
   const b = detailQuery.data;
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center gap-2 border-b border-border px-3 py-2">
+        <View
+          className="flex-row items-center gap-2 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999 }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
-          <Text className="font-heading text-[18px] font-bold text-foreground">
+          <Text
+            className="font-heading text-[18px] font-bold text-foreground"
+            style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             Cerere detaliu
           </Text>
         </View>
@@ -116,6 +134,7 @@ export default function PartnerBookingDetailScreen() {
 
       <ScrollView
         className="flex-1"
+        style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 16,
@@ -124,13 +143,22 @@ export default function PartnerBookingDetailScreen() {
         }}
       >
         {/* Client card */}
-        <Card className="gap-3">
-          <View className="flex-row items-start justify-between gap-3">
-            <View className="flex-1">
-              <Text className="font-heading text-[20px] font-bold text-foreground">
+        <Card className="gap-3" style={{ gap: 12 }}>
+          <View
+            className="flex-row items-start justify-between gap-3"
+            style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}
+          >
+            <View className="flex-1" style={{ flex: 1 }}>
+              <Text
+                className="font-heading text-[20px] font-bold text-foreground"
+                style={{ fontSize: 20, fontWeight: "700", color: colors.foreground }}
+              >
                 {b.clientName}
               </Text>
-              <Text className="text-[12px] text-muted-foreground">
+              <Text
+                className="text-[12px] text-muted-foreground"
+                style={{ fontSize: 12, color: colors.mutedForeground }}
+              >
                 {eventTypeLabel(b.eventType)}
               </Text>
             </View>
@@ -142,7 +170,7 @@ export default function PartnerBookingDetailScreen() {
           {(b.status === "accepted" ||
             b.status === "confirmed_by_client" ||
             b.status === "completed") && (
-            <View className="gap-1">
+            <View className="gap-1" style={{ gap: 4 }}>
               <ContactRow Icon={Phone} value={b.clientPhone} />
               {b.clientEmail && <ContactRow Icon={Mail} value={b.clientEmail} />}
             </View>
@@ -150,8 +178,11 @@ export default function PartnerBookingDetailScreen() {
         </Card>
 
         {/* Event details */}
-        <Card className="gap-3">
-          <Text className="font-heading text-[14px] font-bold text-foreground">
+        <Card className="gap-3" style={{ gap: 12 }}>
+          <Text
+            className="font-heading text-[14px] font-bold text-foreground"
+            style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}
+          >
             Detalii eveniment
           </Text>
           <DetailLine
@@ -185,11 +216,23 @@ export default function PartnerBookingDetailScreen() {
 
         {/* Client message */}
         {b.message && (
-          <Card className="gap-2">
-            <Text className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+          <Card className="gap-2" style={{ gap: 8 }}>
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground"
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                color: colors.mutedForeground,
+              }}
+            >
               Mesaj client
             </Text>
-            <Text className="text-[14px] italic leading-5 text-foreground/85">
+            <Text
+              className="text-[14px] italic leading-5 text-foreground/85"
+              style={{ fontSize: 14, fontStyle: "italic", lineHeight: 20, color: "rgba(247,245,238,0.85)" }}
+            >
               "{b.message}"
             </Text>
           </Card>
@@ -197,11 +240,26 @@ export default function PartnerBookingDetailScreen() {
 
         {/* Your reply */}
         {b.artistReply && (
-          <Card className="gap-2 border-gold/20 bg-gold/5">
-            <Text className="text-[11px] font-semibold uppercase tracking-widest text-gold">
+          <Card
+            className="gap-2 border-gold/20 bg-gold/5"
+            style={{ gap: 8, borderColor: "rgba(201,168,76,0.2)", backgroundColor: "rgba(201,168,76,0.05)" }}
+          >
+            <Text
+              className="text-[11px] font-semibold uppercase tracking-widest text-gold"
+              style={{
+                fontSize: 11,
+                fontWeight: "600",
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                color: colors.gold,
+              }}
+            >
               Răspunsul tău
             </Text>
-            <Text className="text-[14px] leading-5 text-foreground">
+            <Text
+              className="text-[14px] leading-5 text-foreground"
+              style={{ fontSize: 14, lineHeight: 20, color: colors.foreground }}
+            >
               {b.artistReply}
             </Text>
           </Card>
@@ -209,26 +267,42 @@ export default function PartnerBookingDetailScreen() {
 
         {/* Price offer history */}
         {b.priceOffers && b.priceOffers.length > 0 && (
-          <Card className="gap-3">
-            <Text className="font-heading text-[14px] font-bold text-foreground">
+          <Card className="gap-3" style={{ gap: 12 }}>
+            <Text
+              className="font-heading text-[14px] font-bold text-foreground"
+              style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}
+            >
               Istoric negociere
             </Text>
             {b.priceOffers.map((offer, i) => (
-              <View key={i} className="flex-row items-center justify-between">
-                <View className="flex-row items-center gap-2">
+              <View
+                key={i}
+                className="flex-row items-center justify-between"
+                style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+              >
+                <View className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <ArrowLeftRight
                     size={14}
                     color={offer.from === "artist" ? colors.gold : colors.info}
                   />
-                  <Text className="text-[13px] text-foreground">
+                  <Text
+                    className="text-[13px] text-foreground"
+                    style={{ fontSize: 13, color: colors.foreground }}
+                  >
                     {offer.from === "artist" ? "Tu" : b.clientName}
                   </Text>
                 </View>
-                <View className="flex-row items-center gap-3">
-                  <Text className="text-[14px] font-semibold text-foreground">
+                <View className="flex-row items-center gap-3" style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                  <Text
+                    className="text-[14px] font-semibold text-foreground"
+                    style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}
+                  >
                     {offer.amount} €
                   </Text>
-                  <Text className="text-[11px] text-muted-foreground">
+                  <Text
+                    className="text-[11px] text-muted-foreground"
+                    style={{ fontSize: 11, color: colors.mutedForeground }}
+                  >
                     {relativeTimeRO(offer.at)}
                   </Text>
                 </View>
@@ -239,7 +313,7 @@ export default function PartnerBookingDetailScreen() {
 
         {/* Actions */}
         {b.status === "pending" && (
-          <View className="gap-2">
+          <View className="gap-2" style={{ gap: 8 }}>
             <Button
               onPress={() =>
                 router.push(`/(partner)/booking/${bookingId}/accept` as never)
@@ -250,7 +324,7 @@ export default function PartnerBookingDetailScreen() {
             >
               Acceptă cererea
             </Button>
-            <View className="flex-row gap-2">
+            <View className="flex-row gap-2" style={{ flexDirection: "row", gap: 8 }}>
               <Button
                 variant="outline"
                 onPress={() =>
@@ -313,9 +387,11 @@ function ContactRow({
   value: string;
 }) {
   return (
-    <View className="flex-row items-center gap-2">
+    <View className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
       <Icon size={14} color={colors.mutedForeground} />
-      <Text className="text-[13px] text-foreground">{value}</Text>
+      <Text className="text-[13px] text-foreground" style={{ fontSize: 13, color: colors.foreground }}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -331,11 +407,26 @@ function DetailLine({
   value: string;
   valueClass?: string;
 }) {
+  const isGold = valueClass?.includes("text-gold");
+  const isSemibold = valueClass?.includes("font-semibold");
+
   return (
-    <View className="flex-row items-center gap-3">
+    <View className="flex-row items-center gap-3" style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
       <Icon size={16} color={colors.mutedForeground} />
-      <Text className="flex-1 text-[13px] text-muted-foreground">{label}</Text>
-      <Text className={`text-[14px] text-foreground ${valueClass ?? ""}`}>
+      <Text
+        className="flex-1 text-[13px] text-muted-foreground"
+        style={{ flex: 1, fontSize: 13, color: colors.mutedForeground }}
+      >
+        {label}
+      </Text>
+      <Text
+        className={`text-[14px] text-foreground ${valueClass ?? ""}`}
+        style={{
+          fontSize: 14,
+          color: isGold ? colors.gold : colors.foreground,
+          fontWeight: isSemibold ? "600" : "400",
+        }}
+      >
         {value}
       </Text>
     </View>

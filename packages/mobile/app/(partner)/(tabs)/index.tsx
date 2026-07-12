@@ -155,7 +155,10 @@ export default function PartnerDashboardScreen() {
   if (dashQuery.isLoading || !dashQuery.data) {
     return (
       <SafeScreen scroll={false}>
-        <View className="flex-1 items-center justify-center">
+        <View
+          className="flex-1 items-center justify-center"
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator color={colors.gold} />
         </View>
       </SafeScreen>
@@ -166,22 +169,46 @@ export default function PartnerDashboardScreen() {
     // Pending onboarding shell
     return (
       <SafeScreen padded>
-        <View className="pt-2">
-          <Text className="font-heading text-[28px] font-bold text-foreground">
+        <View className="pt-2" style={{ paddingTop: 8 }}>
+          <Text
+            className="font-heading text-[28px] font-bold text-foreground"
+            style={{ fontSize: 28, fontWeight: "700", color: colors.foreground }}
+          >
             Panoul Meu
           </Text>
-          <Text className="mt-1 text-[13px] text-muted-foreground">
+          <Text
+            className="mt-1 text-[13px] text-muted-foreground"
+            style={{ marginTop: 4, fontSize: 13, color: colors.mutedForeground }}
+          >
             Completează profilul pentru a fi vizibil pe site.
           </Text>
         </View>
-        <Card className="mt-4 gap-3 border-gold/40 bg-gold/5 p-5">
-          <View className="flex-row items-center gap-3">
+        <Card
+          className="mt-4 gap-3 border-gold/40 bg-gold/5 p-5"
+          style={{
+            marginTop: 16,
+            gap: 12,
+            borderColor: "rgba(201,168,76,0.4)",
+            backgroundColor: "rgba(201,168,76,0.05)",
+            padding: 20,
+          }}
+        >
+          <View
+            className="flex-row items-center gap-3"
+            style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+          >
             <Sparkles size={24} color={colors.gold} />
-            <View className="flex-1">
-              <Text className="font-heading text-[16px] font-bold text-foreground">
+            <View className="flex-1" style={{ flex: 1 }}>
+              <Text
+                className="font-heading text-[16px] font-bold text-foreground"
+                style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}
+              >
                 Profilul tău nu este încă creat
               </Text>
-              <Text className="mt-0.5 text-[12px] text-muted-foreground">
+              <Text
+                className="mt-0.5 text-[12px] text-muted-foreground"
+                style={{ marginTop: 2, fontSize: 12, color: colors.mutedForeground }}
+              >
                 Completează onboarding-ul ca să primești cereri.
               </Text>
             </View>
@@ -215,11 +242,17 @@ export default function PartnerDashboardScreen() {
   return (
     <SafeScreen padded scroll>
       {/* Welcome header */}
-      <View className="pt-2">
-        <Text className="font-heading text-[28px] font-bold text-foreground">
+      <View className="pt-2" style={{ paddingTop: 8 }}>
+        <Text
+          className="font-heading text-[28px] font-bold text-foreground"
+          style={{ fontSize: 28, fontWeight: "700", color: colors.foreground }}
+        >
           Panoul Meu
         </Text>
-        <Text className="mt-1 text-[13px] text-muted-foreground">
+        <Text
+          className="mt-1 text-[13px] text-muted-foreground"
+          style={{ marginTop: 4, fontSize: 13, color: colors.mutedForeground }}
+        >
           Gestionează cererile, calendarul și veniturile dintr-un singur loc.
         </Text>
       </View>
@@ -231,7 +264,10 @@ export default function PartnerDashboardScreen() {
       />
 
       {/* Stat tiles */}
-      <View className="flex-row flex-wrap gap-3">
+      <View
+        className="flex-row flex-wrap gap-3"
+        style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}
+      >
         <StatTile
           Icon={BookOpen}
           tint="indigo"
@@ -281,7 +317,7 @@ export default function PartnerDashboardScreen() {
       />
 
       {/* Bottom shortcuts */}
-      <View className="flex-row gap-3">
+      <View className="flex-row gap-3" style={{ flexDirection: "row", gap: 12 }}>
         <ShortcutTile
           Icon={CalendarDays}
           title="Calendar"
@@ -303,9 +339,21 @@ export default function PartnerDashboardScreen() {
       </View>
 
       {/* Footer */}
-      <View className="flex-row items-center justify-center gap-2 pt-2">
+      <View
+        className="flex-row items-center justify-center gap-2 pt-2"
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 8,
+          paddingTop: 8,
+        }}
+      >
         <Sparkles size={14} color={colors.gold} />
-        <Text className="text-center text-[11px] text-muted-foreground">
+        <Text
+          className="text-center text-[11px] text-muted-foreground"
+          style={{ textAlign: "center", fontSize: 11, color: colors.mutedForeground }}
+        >
           Succesul tău începe cu o organizare impecabilă.
         </Text>
       </View>
@@ -325,9 +373,25 @@ function HeroCard({
   const planLabel = profile.isPremium ? "Plan Premium" : "Plan Standard";
 
   return (
-    <Card className="gap-4 border-gold/30 p-5">
-      <View className="flex-row items-center gap-4">
-        <View className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-gold/40">
+    <Card
+      className="gap-4 border-gold/30 p-5"
+      style={{ gap: 16, borderColor: "rgba(201,168,76,0.3)", padding: 20 }}
+    >
+      <View
+        className="flex-row items-center gap-4"
+        style={{ flexDirection: "row", alignItems: "center", gap: 16 }}
+      >
+        <View
+          className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-gold/40"
+          style={{
+            height: 80,
+            width: 80,
+            overflow: "hidden",
+            borderRadius: 20,
+            borderWidth: 2,
+            borderColor: "rgba(201,168,76,0.4)",
+          }}
+        >
           {profile.photoUrl ? (
             <Image
               source={{ uri: profile.photoUrl }}
@@ -335,28 +399,56 @@ function HeroCard({
               contentFit="cover"
             />
           ) : (
-            <View className="flex-1 items-center justify-center bg-card">
-              <Text className="font-heading text-[22px] font-bold text-gold">
+            <View
+              className="flex-1 items-center justify-center bg-card"
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: colors.card,
+              }}
+            >
+              <Text
+                className="font-heading text-[22px] font-bold text-gold"
+                style={{ fontSize: 22, fontWeight: "700", color: colors.gold }}
+              >
                 {initials(profile.nameRo)}
               </Text>
             </View>
           )}
         </View>
-        <View className="flex-1">
+        <View className="flex-1" style={{ flex: 1 }}>
           <Text
             className="font-heading text-[20px] font-bold text-foreground"
+            style={{ fontSize: 20, fontWeight: "700", color: colors.foreground }}
             numberOfLines={1}
           >
             {profile.nameRo}
           </Text>
-          <Text className="text-[13px] text-muted-foreground">{planLabel}</Text>
+          <Text
+            className="text-[13px] text-muted-foreground"
+            style={{ fontSize: 13, color: colors.mutedForeground }}
+          >
+            {planLabel}
+          </Text>
         </View>
       </View>
 
-      <View className="gap-2">
-        <View className="flex-row items-center justify-between">
-          <Text className="text-[12px] text-foreground/80">Profil completat</Text>
-          <Text className="text-[12px] font-semibold text-gold">
+      <View className="gap-2" style={{ gap: 8 }}>
+        <View
+          className="flex-row items-center justify-between"
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+        >
+          <Text
+            className="text-[12px] text-foreground/80"
+            style={{ fontSize: 12, color: "rgba(247,245,238,0.8)" }}
+          >
+            Profil completat
+          </Text>
+          <Text
+            className="text-[12px] font-semibold text-gold"
+            style={{ fontSize: 12, fontWeight: "600", color: colors.gold }}
+          >
             {profile.profileCompletionPct}%
           </Text>
         </View>
@@ -386,24 +478,60 @@ function NextEventCard({
   const image = event.venueImage || "/images/backgrounds/party-dance.jpg";
 
   return (
-    <Card className="overflow-hidden p-0">
+    <Card
+      className="overflow-hidden p-0"
+      style={{ overflow: "hidden", padding: 0 }}
+    >
       {/* Header strip */}
-      <View className="flex-row items-center justify-between gap-2 border-b border-border bg-gold/5 px-4 py-3">
-        <View className="flex-row items-center gap-2">
+      <View
+        className="flex-row items-center justify-between gap-2 border-b border-border bg-gold/5 px-4 py-3"
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: colors.border,
+          backgroundColor: "rgba(201,168,76,0.05)",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+        }}
+      >
+        <View
+          className="flex-row items-center gap-2"
+          style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+        >
           <CalendarDays size={16} color={colors.gold} />
-          <Text className="font-heading text-[14px] font-bold text-foreground">
+          <Text
+            className="font-heading text-[14px] font-bold text-foreground"
+            style={{ fontSize: 14, fontWeight: "700", color: colors.foreground }}
+          >
             Următorul eveniment
           </Text>
         </View>
-        <View className="rounded-full bg-background/60 px-3 py-1">
-          <Text className="text-[11px] text-muted-foreground">
+        <View
+          className="rounded-full bg-background/60 px-3 py-1"
+          style={{
+            borderRadius: 9999,
+            backgroundColor: "rgba(13,13,13,0.6)",
+            paddingHorizontal: 12,
+            paddingVertical: 4,
+          }}
+        >
+          <Text
+            className="text-[11px] text-muted-foreground"
+            style={{ fontSize: 11, color: colors.mutedForeground }}
+          >
             {headerDate}
           </Text>
         </View>
       </View>
 
-      <View className="gap-3 p-4">
-        <View className="aspect-[16/10] w-full overflow-hidden rounded-xl">
+      <View className="gap-3 p-4" style={{ gap: 12, padding: 16 }}>
+        <View
+          className="aspect-[16/10] w-full overflow-hidden rounded-xl"
+          style={{ aspectRatio: 16 / 10, width: "100%", overflow: "hidden", borderRadius: 16 }}
+        >
           <Image
             source={{ uri: image }}
             style={{ width: "100%", height: "100%" }}
@@ -412,12 +540,15 @@ function NextEventCard({
           />
         </View>
 
-        <Text className="font-heading text-[18px] font-bold leading-tight text-foreground">
-          <Text className="text-foreground/70">{eventLabel} — </Text>
+        <Text
+          className="font-heading text-[18px] font-bold leading-tight text-foreground"
+          style={{ fontSize: 18, fontWeight: "700", lineHeight: 22, color: colors.foreground }}
+        >
+          <Text className="text-foreground/70" style={{ color: "rgba(247,245,238,0.7)" }}>{eventLabel} — </Text>
           {event.clientName}
         </Text>
 
-        <View className="gap-1.5">
+        <View className="gap-1.5" style={{ gap: 6 }}>
           <MetaRow Icon={CalendarDays} label={dateLabel} />
           {event.startTime && <MetaRow Icon={Clock} label={event.startTime} />}
           {event.location && <MetaRow Icon={MapPin} label={event.location} />}
@@ -426,7 +557,7 @@ function NextEventCard({
           )}
         </View>
 
-        <View className="flex-row gap-2 pt-1">
+        <View className="flex-row gap-2 pt-1" style={{ flexDirection: "row", gap: 8, paddingTop: 4 }}>
           <Button
             onPress={() => router.push(`/(partner)/booking/${event.id}`)}
             size="md"
@@ -450,9 +581,17 @@ function NextEventCard({
 
 function MetaRow({ Icon, label }: { Icon: LucideIcon; label: string }) {
   return (
-    <View className="flex-row items-center gap-2">
+    <View
+      className="flex-row items-center gap-2"
+      style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+    >
       <Icon size={14} color={colors.gold} opacity={0.8} />
-      <Text className="text-[13px] text-foreground/85">{label}</Text>
+      <Text
+        className="text-[13px] text-foreground/85"
+        style={{ fontSize: 13, color: "rgba(247,245,238,0.85)" }}
+      >
+        {label}
+      </Text>
     </View>
   );
 }
@@ -467,22 +606,48 @@ function RecentRequests({
   onPressItem: (id: number) => void;
 }) {
   return (
-    <Card className="p-4">
-      <View className="mb-3 flex-row items-center justify-between">
-        <Text className="font-heading text-[15px] font-bold text-foreground">
+    <Card className="p-4" style={{ padding: 16 }}>
+      <View
+        className="mb-3 flex-row items-center justify-between"
+        style={{
+          marginBottom: 12,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <Text
+          className="font-heading text-[15px] font-bold text-foreground"
+          style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}
+        >
           Cereri recente
         </Text>
-        <Pressable hitSlop={8} onPress={onSeeAll} className="flex-row items-center gap-1">
-          <Text className="text-[12px] text-gold">Vezi toate</Text>
+        <Pressable
+          hitSlop={8}
+          onPress={onSeeAll}
+          className="flex-row items-center gap-1"
+          style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+        >
+          <Text className="text-[12px] text-gold" style={{ fontSize: 12, color: colors.gold }}>
+            Vezi toate
+          </Text>
           <ArrowRight size={12} color={colors.gold} />
         </Pressable>
       </View>
       {items.length === 0 ? (
-        <Text className="py-4 text-center text-[12px] text-muted-foreground">
+        <Text
+          className="py-4 text-center text-[12px] text-muted-foreground"
+          style={{
+            paddingVertical: 16,
+            textAlign: "center",
+            fontSize: 12,
+            color: colors.mutedForeground,
+          }}
+        >
           Încă nu ai cereri. Profilul tău e online — clienții te pot găsi oricând.
         </Text>
       ) : (
-        <View className="gap-2">
+        <View className="gap-2" style={{ gap: 8 }}>
           {items.map((req) => (
             <RecentRequestRow
               key={req.id}
@@ -495,6 +660,19 @@ function RecentRequests({
     </Card>
   );
 }
+
+// Styling-only lookup for the dynamic `pill.iconBg` Tailwind class below —
+// css-interop drops it at render, so we mirror the same tint as an inline
+// rgba value keyed off the badge tone. Does not touch statusPill()'s logic.
+const ICON_BG_BY_TONE: Record<BadgeTone, string> = {
+  default: colors.muted,
+  indigo: "rgba(99,102,241,0.15)",
+  gold: "rgba(201,168,76,0.15)",
+  success: "rgba(16,185,129,0.15)",
+  warning: "rgba(245,158,11,0.15)",
+  danger: "rgba(244,63,94,0.15)",
+  info: "rgba(14,165,233,0.15)",
+};
 
 function RecentRequestRow({
   req,
@@ -514,26 +692,68 @@ function RecentRequestRow({
     <Pressable
       onPress={onPress}
       className="flex-row items-center gap-3 rounded-xl border border-transparent p-2 active:border-gold/30 active:bg-gold/5"
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: "transparent",
+        padding: 8,
+      }}
     >
       <View
         className={`h-10 w-10 items-center justify-center rounded-xl ${pill.iconBg}`}
+        style={{
+          height: 40,
+          width: 40,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 16,
+          backgroundColor: ICON_BG_BY_TONE[pill.tone],
+        }}
       >
         <BookOpen size={18} color={pill.iconColor} />
       </View>
-      <View className="flex-1">
-        <Text className="text-[13px] font-medium text-foreground" numberOfLines={1}>
-          <Text className="text-foreground">{eventLabel}</Text>
-          <Text className="text-foreground/60"> — {req.clientName}</Text>
+      <View className="flex-1" style={{ flex: 1 }}>
+        <Text
+          className="text-[13px] font-medium text-foreground"
+          style={{ fontSize: 13, fontWeight: "500", color: colors.foreground }}
+          numberOfLines={1}
+        >
+          <Text className="text-foreground" style={{ color: colors.foreground }}>
+            {eventLabel}
+          </Text>
+          <Text className="text-foreground/60" style={{ color: "rgba(247,245,238,0.6)" }}> — {req.clientName}</Text>
         </Text>
-        <View className="mt-0.5 flex-row items-center gap-2">
-          <Text className="text-[11px] text-muted-foreground">{dateLabel}</Text>
+        <View
+          className="mt-0.5 flex-row items-center gap-2"
+          style={{ marginTop: 2, flexDirection: "row", alignItems: "center", gap: 8 }}
+        >
+          <Text
+            className="text-[11px] text-muted-foreground"
+            style={{ fontSize: 11, color: colors.mutedForeground }}
+          >
+            {dateLabel}
+          </Text>
           {req.location && (
-            <Text className="text-[11px] text-muted-foreground">· {req.location}</Text>
+            <Text
+              className="text-[11px] text-muted-foreground"
+              style={{ fontSize: 11, color: colors.mutedForeground }}
+            >
+              · {req.location}
+            </Text>
           )}
           {req.guestCount != null && (
-            <View className="flex-row items-center gap-1">
+            <View
+              className="flex-row items-center gap-1"
+              style={{ flexDirection: "row", alignItems: "center", gap: 4 }}
+            >
               <Users size={10} color={colors.mutedForeground} />
-              <Text className="text-[11px] text-muted-foreground">
+              <Text
+                className="text-[11px] text-muted-foreground"
+                style={{ fontSize: 11, color: colors.mutedForeground }}
+              >
                 {req.guestCount}
               </Text>
             </View>
@@ -560,18 +780,33 @@ function ShortcutTile({
   onPress: () => void;
 }) {
   return (
-    <Card onPress={onPress} className="flex-1 gap-2 p-3">
-      <View className="h-10 w-10 items-center justify-center rounded-xl bg-gold/15">
+    <Card onPress={onPress} className="flex-1 gap-2 p-3" style={{ flex: 1, gap: 8, padding: 12 }}>
+      <View
+        className="h-10 w-10 items-center justify-center rounded-xl bg-gold/15"
+        style={{
+          height: 40,
+          width: 40,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 16,
+          backgroundColor: "rgba(201,168,76,0.15)",
+        }}
+      >
         <Icon size={18} color={colors.gold} />
       </View>
       <View>
         <Text
           className="font-heading text-[13px] font-bold text-foreground"
+          style={{ fontSize: 13, fontWeight: "700", color: colors.foreground }}
           numberOfLines={1}
         >
           {title}
         </Text>
-        <Text className="text-[10px] text-muted-foreground" numberOfLines={1}>
+        <Text
+          className="text-[10px] text-muted-foreground"
+          style={{ fontSize: 10, color: colors.mutedForeground }}
+          numberOfLines={1}
+        >
           {description}
         </Text>
       </View>

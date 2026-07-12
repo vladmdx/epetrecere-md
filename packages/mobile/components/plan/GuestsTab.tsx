@@ -97,9 +97,9 @@ export function GuestsTab({ planId }: { planId: number }) {
   };
 
   return (
-    <View className="gap-3">
+    <View className="gap-3" style={{ gap: 12 }}>
       {/* Stats */}
-      <View className="flex-row gap-2">
+      <View className="flex-row gap-2" style={{ flexDirection: "row", gap: 8 }}>
         <StatChip label="Total" value={`${counts.total}/${target || "—"}`} tone="default" />
         <StatChip label="Confirmați" value={String(counts.accepted)} tone="success" />
         <StatChip label="În așteptare" value={String(counts.pending)} tone="warning" />
@@ -119,13 +119,13 @@ export function GuestsTab({ planId }: { planId: number }) {
         data={guests}
         keyExtractor={(g) => String(g.id)}
         scrollEnabled={false}
-        ItemSeparatorComponent={() => <View className="h-2" />}
+        ItemSeparatorComponent={() => <View className="h-2" style={{ height: 8 }} />}
         renderItem={({ item }) => (
           <GuestRow guest={item} onPress={() => rsvpMutation.mutate(item)} />
         )}
         ListEmptyComponent={
-          <Card className="items-center gap-2 p-6">
-            <Text className="text-[13px] text-muted-foreground">
+          <Card className="items-center gap-2 p-6" style={{ alignItems: "center", gap: 8, padding: 24 }}>
+            <Text className="text-[13px] text-muted-foreground" style={{ fontSize: 13, color: colors.mutedForeground }}>
               Niciun invitat încă. Adaugă unul cu butonul de mai sus.
             </Text>
           </Card>
@@ -151,8 +151,22 @@ function StatChip({
   tone: BadgeTone;
 }) {
   return (
-    <View className="flex-1 items-center rounded-xl border border-border bg-card p-2">
-      <Text className="font-heading text-[16px] font-bold text-foreground">
+    <View
+      className="flex-1 items-center rounded-xl border border-border bg-card p-2"
+      style={{
+        flex: 1,
+        alignItems: "center",
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.card,
+        padding: 8,
+      }}
+    >
+      <Text
+        className="font-heading text-[16px] font-bold text-foreground"
+        style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}
+      >
         {value}
       </Text>
       <Badge tone={tone} size="sm">
@@ -168,18 +182,44 @@ function GuestRow({ guest, onPress }: { guest: Guest; onPress: () => void }) {
     <Pressable
       onPress={onPress}
       className="flex-row items-center gap-3 rounded-2xl border border-border bg-card p-3 active:bg-gold/5"
+      style={({ pressed }) => [
+        {
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: pressed ? "rgba(201,168,76,0.05)" : colors.card,
+          padding: 12,
+        },
+      ]}
     >
       <View
         className={`h-10 w-10 items-center justify-center rounded-full ${cfg.bg}`}
+        style={{
+          width: 40,
+          height: 40,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 9999,
+          backgroundColor: cfg.bgColor,
+        }}
       >
         <cfg.Icon size={18} color={cfg.color} />
       </View>
-      <View className="flex-1">
-        <Text className="text-[14px] font-semibold text-foreground">
+      <View className="flex-1" style={{ flex: 1 }}>
+        <Text
+          className="text-[14px] font-semibold text-foreground"
+          style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}
+        >
           {guest.fullName}
         </Text>
         {(guest.partySize > 1 || guest.contactValue) && (
-          <Text className="text-[12px] text-muted-foreground">
+          <Text
+            className="text-[12px] text-muted-foreground"
+            style={{ fontSize: 12, color: colors.mutedForeground }}
+          >
             {guest.partySize > 1 ? `${guest.partySize} persoane` : ""}
             {guest.partySize > 1 && guest.contactValue ? " · " : ""}
             {guest.contactValue ?? ""}
@@ -202,6 +242,7 @@ function rsvpConfig(rsvp: Guest["rsvp"]) {
         Icon: CheckCircle,
         color: colors.success,
         bg: "bg-emerald-500/15",
+        bgColor: colors.successBg,
       };
     case "declined":
       return {
@@ -210,6 +251,7 @@ function rsvpConfig(rsvp: Guest["rsvp"]) {
         Icon: XCircle,
         color: colors.danger,
         bg: "bg-rose-500/15",
+        bgColor: colors.dangerBg,
       };
     case "maybe":
       return {
@@ -218,6 +260,7 @@ function rsvpConfig(rsvp: Guest["rsvp"]) {
         Icon: HelpCircle,
         color: colors.warning,
         bg: "bg-amber-500/15",
+        bgColor: colors.warningBg,
       };
     default:
       return {
@@ -226,6 +269,7 @@ function rsvpConfig(rsvp: Guest["rsvp"]) {
         Icon: Clock,
         color: colors.mutedForeground,
         bg: "bg-muted",
+        bgColor: colors.muted,
       };
   }
 }
@@ -285,16 +329,30 @@ function AddGuestModal({
       presentationStyle="pageSheet"
       onRequestClose={onDismiss}
     >
-      <View className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between border-b border-border px-5 py-3">
-          <Text className="font-heading text-[18px] font-bold text-foreground">
+      <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
+        <View
+          className="flex-row items-center justify-between border-b border-border px-5 py-3"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+          }}
+        >
+          <Text
+            className="font-heading text-[18px] font-bold text-foreground"
+            style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             Adaugă invitat
           </Text>
           <Pressable hitSlop={8} onPress={onDismiss}>
             <X size={22} color={colors.foreground} />
           </Pressable>
         </View>
-        <View className="gap-3 p-5">
+        <View className="gap-3 p-5" style={{ gap: 12, padding: 20 }}>
           <Input
             label="Nume invitat"
             value={name}

@@ -2,13 +2,13 @@
 // dashboards. Hero number + label + delta sub-label, with an icon
 // chip in a tinted square at the top-left.
 //
-// Mirrors the web's StatTile but native-feeling: icon scales on press,
-// number transitions to gold, card lifts subtly.
+// Layout + tint colors applied INLINE — css-interop 0.1.x drops the
+// layout/color utilities (see lib/textColorPatch for context).
 
 import { View, Text } from "react-native";
 import { type LucideIcon } from "lucide-react-native";
 import { Card } from "./Card";
-import { cn } from "../../lib/cn";
+import { colors } from "../../constants/theme";
 
 export type StatTint = "indigo" | "success" | "info" | "gold" | "danger";
 
@@ -23,11 +23,11 @@ interface Props {
 }
 
 const TINT_BG: Record<StatTint, string> = {
-  indigo: "bg-indigo-500/15",
-  success: "bg-emerald-500/15",
-  info: "bg-sky-500/15",
-  gold: "bg-gold/15",
-  danger: "bg-rose-500/15",
+  indigo: "rgba(99,102,241,0.15)",
+  success: "rgba(16,185,129,0.15)",
+  info: "rgba(14,165,233,0.15)",
+  gold: "rgba(201,168,76,0.15)",
+  danger: "rgba(244,63,94,0.15)",
 };
 
 const TINT_FG: Record<StatTint, string> = {
@@ -50,30 +50,40 @@ export function StatTile({
   return (
     <Card
       onPress={onPress as () => void}
-      className="flex-1 gap-3"
+      style={{ flex: 1, gap: 12 }}
       pressIntensity="subtle"
     >
       <View
-        className={cn(
-          "h-10 w-10 items-center justify-center rounded-xl",
-          TINT_BG[tint],
-        )}
+        style={{
+          height: 40,
+          width: 40,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 12,
+          backgroundColor: TINT_BG[tint],
+        }}
       >
         <Icon size={20} color={TINT_FG[tint]} />
       </View>
       <View>
-        <Text className="text-[11px] text-muted-foreground">{label}</Text>
-        <Text className="mt-0.5 font-heading text-[26px] font-bold leading-tight text-foreground">
+        <Text style={{ fontSize: 11, color: colors.mutedForeground }}>{label}</Text>
+        <Text
+          style={{
+            marginTop: 2,
+            fontSize: 26,
+            fontWeight: "700",
+            color: colors.foreground,
+          }}
+        >
           {big}
         </Text>
         {deltaLabel && (
           <Text
-            className={cn(
-              "mt-1 text-[11px]",
-              deltaPositive === false
-                ? "text-rose-400"
-                : "text-emerald-400",
-            )}
+            style={{
+              marginTop: 4,
+              fontSize: 11,
+              color: deltaPositive === false ? "#FB7185" : "#34D399",
+            }}
           >
             {deltaLabel}
           </Text>

@@ -72,9 +72,15 @@ export default function OnboardingWelcome() {
   return (
     <SafeScreen padded scroll={false}>
       {/* Skip in top-right */}
-      <View className="flex-row justify-end pt-2">
+      <View
+        className="flex-row justify-end pt-2"
+        style={{ flexDirection: "row", justifyContent: "flex-end", paddingTop: 8 }}
+      >
         <Pressable hitSlop={12} onPress={skip}>
-          <Text className="text-[14px] text-muted-foreground">
+          <Text
+            className="text-[14px] text-muted-foreground"
+            style={{ fontSize: 14, color: colors.mutedForeground }}
+          >
             {t("common.skip")}
           </Text>
         </Pressable>
@@ -88,6 +94,7 @@ export default function OnboardingWelcome() {
           paused.current = false;
         }}
         className="flex-1 items-center justify-center gap-6"
+        style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 24 }}
       >
         <SlideCard
           key={index}
@@ -97,7 +104,10 @@ export default function OnboardingWelcome() {
       </Pressable>
 
       {/* Pagination dots */}
-      <View className="mb-6 flex-row justify-center gap-2">
+      <View
+        className="mb-6 flex-row justify-center gap-2"
+        style={{ marginBottom: 24, flexDirection: "row", justifyContent: "center", gap: 8 }}
+      >
         {SLIDES.map((_, i) => (
           <Pressable
             key={i}
@@ -107,6 +117,12 @@ export default function OnboardingWelcome() {
               "h-2 rounded-full transition-all",
               i === index ? "w-6 bg-gold" : "w-2 bg-muted",
             )}
+            style={{
+              height: 8,
+              borderRadius: 9999,
+              width: i === index ? 24 : 8,
+              backgroundColor: i === index ? colors.gold : colors.muted,
+            }}
           />
         ))}
       </View>
@@ -146,14 +162,47 @@ function SlideCard({
 
   const Icon = slide.icon;
   return (
-    <Animated.View style={animatedStyle} className="items-center gap-6 px-6">
-      <View className="h-28 w-28 items-center justify-center rounded-3xl bg-gold/15 ring-1 ring-gold/30">
+    <Animated.View
+      className="items-center gap-6 px-6"
+      style={[{ alignItems: "center", gap: 24, paddingHorizontal: 24 }, animatedStyle]}
+    >
+      <View
+        className="h-28 w-28 items-center justify-center rounded-3xl bg-gold/15 ring-1 ring-gold/30"
+        style={{
+          height: 112,
+          width: 112,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 24,
+          backgroundColor: "rgba(201,168,76,0.15)",
+          borderWidth: 1,
+          borderColor: "rgba(201,168,76,0.3)",
+        }}
+      >
         <Icon size={48} color={colors.gold} />
       </View>
-      <Text className="text-center font-heading text-[28px] font-bold leading-tight text-foreground">
+      <Text
+        className="text-center font-heading text-[28px] font-bold leading-tight text-foreground"
+        style={{
+          textAlign: "center",
+          fontSize: 28,
+          fontWeight: "700",
+          lineHeight: 34,
+          color: colors.foreground,
+        }}
+      >
         {t(slide.titleKey)}
       </Text>
-      <Text className="max-w-[280px] text-center text-[15px] leading-6 text-muted-foreground">
+      <Text
+        className="max-w-[280px] text-center text-[15px] leading-6 text-muted-foreground"
+        style={{
+          maxWidth: 280,
+          textAlign: "center",
+          fontSize: 15,
+          lineHeight: 24,
+          color: colors.mutedForeground,
+        }}
+      >
         {t(slide.bodyKey)}
       </Text>
     </Animated.View>

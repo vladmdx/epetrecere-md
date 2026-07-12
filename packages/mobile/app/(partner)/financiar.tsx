@@ -109,24 +109,48 @@ export default function FinanciarScreen() {
   }, [bookingsQuery.data]);
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center gap-2 border-b border-border px-3 py-2">
+        <View
+          className="flex-row items-center gap-2 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+            }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
-          <Text className="font-heading text-[18px] font-bold text-foreground">
+          <Text
+            className="font-heading text-[18px] font-bold text-foreground"
+            style={{ fontFamily: "Cormorant", fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             Financiar
           </Text>
         </View>
       </SafeAreaView>
 
       {bookingsQuery.isLoading ? (
-        <View className="flex-1 items-center justify-center">
+        <View
+          className="flex-1 items-center justify-center"
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
           <ActivityIndicator color={colors.gold} />
         </View>
       ) : (
@@ -139,7 +163,11 @@ export default function FinanciarScreen() {
           }}
         >
           {/* Totals grid */}
-          <View className="flex-row flex-wrap gap-3">
+          <View
+            className="flex-row flex-wrap gap-3"
+            style={{ flexDirection: "row", flexWrap: "wrap", gap: 12 }}
+          >
+
             <FinanceTile
               Icon={DollarSign}
               label="Venit luna"
@@ -189,16 +217,34 @@ function FinanceTile({
   tint: string;
 }) {
   return (
-    <Card className="min-w-[45%] flex-1 gap-2 p-3">
+    <Card
+      className="min-w-[45%] flex-1 gap-2 p-3"
+      style={{ minWidth: "45%", flex: 1, gap: 8, padding: 12 }}
+    >
       <View
-        style={{ backgroundColor: tint + "26" }}
+        style={{
+          backgroundColor: tint + "26",
+          height: 36,
+          width: 36,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 14,
+        }}
         className="h-9 w-9 items-center justify-center rounded-lg"
       >
         <Icon size={18} color={tint} />
       </View>
       <View>
-        <Text className="text-[11px] text-muted-foreground">{label}</Text>
-        <Text className="font-heading text-[20px] font-bold text-foreground">
+        <Text
+          className="text-[11px] text-muted-foreground"
+          style={{ fontSize: 11, color: colors.mutedForeground }}
+        >
+          {label}
+        </Text>
+        <Text
+          className="font-heading text-[20px] font-bold text-foreground"
+          style={{ fontFamily: "Cormorant", fontSize: 20, fontWeight: "700", color: colors.foreground }}
+        >
           {value}
         </Text>
       </View>
@@ -216,8 +262,11 @@ function Section({
   const router = useRouter();
   if (items.length === 0) return null;
   return (
-    <Card className="gap-2">
-      <Text className="font-heading text-[15px] font-bold text-foreground">
+    <Card className="gap-2" style={{ gap: 8 }}>
+      <Text
+        className="font-heading text-[15px] font-bold text-foreground"
+        style={{ fontFamily: "Cormorant", fontSize: 15, fontWeight: "700", color: colors.foreground }}
+      >
         {title}
       </Text>
       {items.map((b) => (
@@ -225,17 +274,37 @@ function Section({
           key={b.id}
           onPress={() => router.push(`/(partner)/booking/${b.id}` as never)}
           className="flex-row items-center gap-3 rounded-xl border border-border bg-background/40 p-2.5 active:bg-gold/5"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 12,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: "rgba(13,13,13,0.4)",
+            padding: 10,
+          }}
         >
-          <View className="flex-1">
-            <Text className="text-[14px] font-medium text-foreground" numberOfLines={1}>
+          <View className="flex-1" style={{ flex: 1 }}>
+            <Text
+              className="text-[14px] font-medium text-foreground"
+              style={{ fontSize: 14, fontWeight: "500", color: colors.foreground }}
+              numberOfLines={1}
+            >
               {eventTypeLabel(b.eventType)} — {b.clientName}
             </Text>
-            <Text className="text-[11px] text-muted-foreground">
+            <Text
+              className="text-[11px] text-muted-foreground"
+              style={{ fontSize: 11, color: colors.mutedForeground }}
+            >
               {formatDateShortRO(b.eventDate)}
             </Text>
           </View>
           {b.agreedPrice != null && (
-            <Text className="text-[14px] font-bold text-gold">
+            <Text
+              className="text-[14px] font-bold text-gold"
+              style={{ fontSize: 14, fontWeight: "700", color: colors.gold }}
+            >
               {b.agreedPrice} €
             </Text>
           )}

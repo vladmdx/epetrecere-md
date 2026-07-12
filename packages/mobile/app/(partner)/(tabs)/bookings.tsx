@@ -145,11 +145,31 @@ export default function PartnerBookingsScreen() {
 
   return (
     <SafeScreen padded={false} scroll={false}>
-      <View className="border-b border-border px-5 pb-3 pt-2">
-        <Text className="font-heading text-[24px] font-bold text-foreground">
+      <View
+        className="border-b border-border px-5 pb-3 pt-2"
+        style={{
+          borderBottomWidth: 1,
+          borderColor: colors.border,
+          paddingHorizontal: 20,
+          paddingBottom: 12,
+          paddingTop: 8,
+        }}
+      >
+        <Text
+          className="font-heading text-[24px] font-bold text-foreground"
+          style={{
+            fontFamily: "Cormorant",
+            fontSize: 24,
+            fontWeight: "700",
+            color: colors.foreground,
+          }}
+        >
           Rezervări
         </Text>
-        <Text className="text-[12px] text-muted-foreground">
+        <Text
+          className="text-[12px] text-muted-foreground"
+          style={{ fontSize: 12, color: colors.mutedForeground }}
+        >
           {(bookingsQuery.data ?? []).length} rezervări
         </Text>
 
@@ -246,9 +266,25 @@ function TabPill({
       className={`flex-row items-center gap-2 rounded-full border px-3 py-1.5 ${
         active ? "border-gold bg-gold/15" : "border-border bg-card"
       }`}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        borderRadius: 9999,
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderColor: active ? colors.gold : colors.border,
+        backgroundColor: active ? "rgba(201,168,76,0.15)" : colors.card,
+      }}
     >
       <Text
         className={`text-[13px] font-semibold ${active ? "text-gold" : "text-foreground/70"}`}
+        style={{
+          fontSize: 13,
+          fontWeight: "600",
+          color: active ? colors.gold : "rgba(247,245,238,0.7)",
+        }}
       >
         {label}
       </Text>
@@ -260,6 +296,18 @@ function TabPill({
     </Pressable>
   );
 }
+
+// Lead-score badge colors — computeLeadScore() returns tailwind class
+// strings (still used for className); this maps the same three tones to
+// the inline RGBA values css-interop won't apply on its own.
+const LEAD_SCORE_COLORS: Record<
+  string,
+  { border: string; bg: string; text: string }
+> = {
+  Hot: { border: "rgba(244,63,94,0.4)", bg: "rgba(244,63,94,0.1)", text: "#FB7185" },
+  Warm: { border: "rgba(245,158,11,0.4)", bg: "rgba(245,158,11,0.1)", text: "#FCD34D" },
+  Cold: { border: "rgba(14,165,233,0.4)", bg: "rgba(14,165,233,0.1)", text: "#7DD3FC" },
+};
 
 function BookingCard({
   booking,
@@ -279,18 +327,46 @@ function BookingCard({
   const leadScore = computeLeadScore(booking);
   const pill = statusPill(booking.status);
   const eventLabel = eventTypeLabel(booking.eventType);
+  const lsColor = leadScore ? LEAD_SCORE_COLORS[leadScore.label] : null;
 
   return (
-    <Card onPress={onOpen} className="gap-3 p-4">
+    <Card onPress={onOpen} className="gap-3 p-4" style={{ gap: 12 }}>
       {/* Header: lead score + status + date + price */}
-      <View className="flex-row items-center justify-between gap-2">
-        <View className="flex-row items-center gap-2">
+      <View
+        className="flex-row items-center justify-between gap-2"
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <View
+          className="flex-row items-center gap-2"
+          style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+        >
           {leadScore && (
             <View
               className={`flex-row items-center gap-1 rounded-full border px-2 py-0.5 ${leadScore.bg}`}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 4,
+                borderRadius: 9999,
+                borderWidth: 1,
+                paddingHorizontal: 8,
+                paddingVertical: 2,
+                borderColor: lsColor?.border,
+                backgroundColor: lsColor?.bg,
+              }}
             >
-              <Text className="text-[10px]">{leadScore.emoji}</Text>
-              <Text className={`text-[10px] font-semibold ${leadScore.text}`}>
+              <Text className="text-[10px]" style={{ fontSize: 10 }}>
+                {leadScore.emoji}
+              </Text>
+              <Text
+                className={`text-[10px] font-semibold ${leadScore.text}`}
+                style={{ fontSize: 10, fontWeight: "600", color: lsColor?.text }}
+              >
                 {leadScore.label}
               </Text>
             </View>
@@ -300,7 +376,10 @@ function BookingCard({
           </Badge>
         </View>
         {booking.agreedPrice != null && (
-          <Text className="text-[14px] font-bold text-gold">
+          <Text
+            className="text-[14px] font-bold text-gold"
+            style={{ fontSize: 14, fontWeight: "700", color: colors.gold }}
+          >
             {booking.agreedPrice} €
           </Text>
         )}
@@ -308,10 +387,21 @@ function BookingCard({
 
       {/* Client + event */}
       <View>
-        <Text className="font-heading text-[16px] font-bold text-foreground">
+        <Text
+          className="font-heading text-[16px] font-bold text-foreground"
+          style={{
+            fontFamily: "Cormorant",
+            fontSize: 16,
+            fontWeight: "700",
+            color: colors.foreground,
+          }}
+        >
           {booking.clientName}
         </Text>
-        <Text className="text-[12px] text-muted-foreground">
+        <Text
+          className="text-[12px] text-muted-foreground"
+          style={{ fontSize: 12, color: colors.mutedForeground }}
+        >
           {eventLabel} · {formatDateShortRO(booking.eventDate)}
           {booking.startTime ? ` · ${booking.startTime}` : ""}
           {booking.guestCount != null ? ` · ${booking.guestCount} invitați` : ""}
@@ -323,19 +413,26 @@ function BookingCard({
         <Text
           className="text-[12px] italic text-foreground/85"
           numberOfLines={2}
+          style={{ fontSize: 12, fontStyle: "italic", color: "rgba(247,245,238,0.85)" }}
         >
           “{booking.message}”
         </Text>
       )}
 
       {/* Footer: timestamp */}
-      <Text className="text-[11px] text-muted-foreground">
+      <Text
+        className="text-[11px] text-muted-foreground"
+        style={{ fontSize: 11, color: colors.mutedForeground }}
+      >
         Primită {relativeTimeRO(booking.createdAt)}
       </Text>
 
       {/* Actions */}
       {booking.status === "pending" && (
-        <View className="flex-row flex-wrap gap-2 pt-1">
+        <View
+          className="flex-row flex-wrap gap-2 pt-1"
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 4 }}
+        >
           <Button
             size="sm"
             onPress={onAccept}
@@ -370,7 +467,10 @@ function BookingCard({
         </View>
       )}
       {booking.status === "accepted" && (
-        <View className="flex-row flex-wrap gap-2 pt-1">
+        <View
+          className="flex-row flex-wrap gap-2 pt-1"
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 4 }}
+        >
           <Button
             variant="outline"
             size="sm"
@@ -385,7 +485,10 @@ function BookingCard({
         </View>
       )}
       {booking.status === "confirmed_by_client" && (
-        <View className="flex-row flex-wrap gap-2 pt-1">
+        <View
+          className="flex-row flex-wrap gap-2 pt-1"
+          style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingTop: 4 }}
+        >
           <Button
             variant="outline"
             size="sm"
@@ -417,12 +520,31 @@ function EmptyState({ tab }: { tab: Tab }) {
             body: "Aici vor apărea evenimentele finalizate sau anulate.",
           };
   return (
-    <View className="items-center gap-3 py-16">
+    <View
+      className="items-center gap-3 py-16"
+      style={{ alignItems: "center", gap: 12, paddingVertical: 64 }}
+    >
       <Sparkles size={48} color={colors.mutedForeground} />
-      <Text className="font-heading text-[18px] font-bold text-foreground">
+      <Text
+        className="font-heading text-[18px] font-bold text-foreground"
+        style={{
+          fontFamily: "Cormorant",
+          fontSize: 18,
+          fontWeight: "700",
+          color: colors.foreground,
+        }}
+      >
         {copy.title}
       </Text>
-      <Text className="max-w-[260px] text-center text-[13px] text-muted-foreground">
+      <Text
+        className="max-w-[260px] text-center text-[13px] text-muted-foreground"
+        style={{
+          maxWidth: 260,
+          textAlign: "center",
+          fontSize: 13,
+          color: colors.mutedForeground,
+        }}
+      >
         {copy.body}
       </Text>
     </View>

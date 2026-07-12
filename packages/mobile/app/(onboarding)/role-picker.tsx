@@ -64,17 +64,23 @@ export default function OnboardingRolePicker() {
 
   return (
     <SafeScreen padded>
-      <View className="flex-1 gap-6 py-8">
-        <View className="gap-2">
-          <Text className="font-heading text-[28px] font-bold text-foreground">
+      <View className="flex-1 gap-6 py-8" style={{ flex: 1, gap: 24, paddingVertical: 32 }}>
+        <View className="gap-2" style={{ gap: 8 }}>
+          <Text
+            className="font-heading text-[28px] font-bold text-foreground"
+            style={{ fontFamily: "Cormorant", fontSize: 28, fontWeight: "700", color: colors.foreground }}
+          >
             {t("onboarding.rolePickerTitle")}
           </Text>
-          <Text className="text-[14px] text-muted-foreground">
+          <Text
+            className="text-[14px] text-muted-foreground"
+            style={{ fontSize: 14, color: colors.mutedForeground }}
+          >
             {t("onboarding.rolePickerBody")}
           </Text>
         </View>
 
-        <View className="gap-3">
+        <View className="gap-3" style={{ gap: 12 }}>
           <RoleOption
             Icon={Calendar}
             title={t("onboarding.roleClient")}
@@ -91,7 +97,7 @@ export default function OnboardingRolePicker() {
           />
         </View>
 
-        <View className="flex-1" />
+        <View className="flex-1" style={{ flex: 1 }} />
 
         <Button
           onPress={handleContinue}
@@ -121,27 +127,53 @@ function RoleOption({
   onPress: () => void;
 }) {
   return (
-    <Card onPress={onPress} className={cn(selected && "border-gold")}>
-      <View className="flex-row items-start gap-3">
+    <Card
+      onPress={onPress}
+      className={cn(selected && "border-gold")}
+      style={selected ? { borderColor: colors.gold } : undefined}
+    >
+      <View className="flex-row items-start gap-3" style={{ flexDirection: "row", alignItems: "flex-start", gap: 12 }}>
         <View
           className={cn(
             "h-11 w-11 items-center justify-center rounded-xl",
             selected ? "bg-gold/30" : "bg-muted",
           )}
+          style={{
+            height: 44,
+            width: 44,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 16,
+            backgroundColor: selected ? "rgba(201,168,76,0.3)" : colors.muted,
+          }}
         >
           <Icon size={22} color={selected ? colors.gold : colors.mutedForeground} />
         </View>
-        <View className="flex-1">
-          <Text className="text-[16px] font-semibold text-foreground">
+        <View className="flex-1" style={{ flex: 1 }}>
+          <Text
+            className="text-[16px] font-semibold text-foreground"
+            style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}
+          >
             {title}
           </Text>
-          <Text className="mt-1 text-[13px] leading-5 text-muted-foreground">
+          <Text
+            className="mt-1 text-[13px] leading-5 text-muted-foreground"
+            style={{ marginTop: 4, fontSize: 13, lineHeight: 20, color: colors.mutedForeground }}
+          >
             {description}
           </Text>
         </View>
         {selected && (
-          <View className="h-6 w-6 items-center justify-center rounded-full bg-gold">
-            <Text className="text-[12px] font-bold text-background">✓</Text>
+          <View
+            className="h-6 w-6 items-center justify-center rounded-full bg-gold"
+            style={{ height: 24, width: 24, alignItems: "center", justifyContent: "center", borderRadius: 9999, backgroundColor: colors.gold }}
+          >
+            <Text
+              className="text-[12px] font-bold text-background"
+              style={{ fontSize: 12, fontWeight: "700", color: colors.background }}
+            >
+              ✓
+            </Text>
           </View>
         )}
       </View>

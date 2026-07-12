@@ -1,9 +1,12 @@
 // Badge — small status pill (Nou / În așteptare / Confirmat). Mirrors
 // the web's status-pill colours so users see the same visual language
 // on both sides.
+//
+// Colors + layout applied INLINE — css-interop 0.1.x drops the tinted
+// bg/text/border utilities (see lib/textColorPatch for context).
 
 import { View, Text } from "react-native";
-import { cn } from "../../lib/cn";
+import { colors } from "../../constants/theme";
 
 export type BadgeTone =
   | "default"
@@ -21,28 +24,39 @@ interface Props {
   size?: "sm" | "md";
 }
 
-const TONE: Record<BadgeTone, string> = {
-  default: "bg-muted text-muted-foreground border-border",
-  indigo: "bg-indigo-500/15 text-indigo-300 border-indigo-500/30",
-  gold: "bg-gold/15 text-gold border-gold/30",
-  success: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  warning: "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  danger: "bg-rose-500/15 text-rose-300 border-rose-500/30",
-  info: "bg-sky-500/15 text-sky-300 border-sky-500/30",
+const TONE: Record<BadgeTone, { bg: string; fg: string; border: string }> = {
+  default: { bg: colors.muted, fg: colors.mutedForeground, border: colors.border },
+  indigo: { bg: "rgba(99,102,241,0.15)", fg: "#A5B4FC", border: "rgba(99,102,241,0.30)" },
+  gold: { bg: "rgba(201,168,76,0.15)", fg: colors.gold, border: "rgba(201,168,76,0.30)" },
+  success: { bg: "rgba(16,185,129,0.15)", fg: "#34D399", border: "rgba(16,185,129,0.30)" },
+  warning: { bg: "rgba(245,158,11,0.15)", fg: "#FCD34D", border: "rgba(245,158,11,0.30)" },
+  danger: { bg: "rgba(244,63,94,0.15)", fg: "#FCA5A5", border: "rgba(244,63,94,0.30)" },
+  info: { bg: "rgba(14,165,233,0.15)", fg: "#7DD3FC", border: "rgba(14,165,233,0.30)" },
 };
 
 const SIZE = {
-  sm: { container: "px-2 py-0.5 rounded-full", text: "text-[11px] font-semibold" },
-  md: { container: "px-3 py-1 rounded-full", text: "text-[12px] font-semibold" },
+  sm: { paddingHorizontal: 8, paddingVertical: 2, fontSize: 11 },
+  md: { paddingHorizontal: 12, paddingVertical: 4, fontSize: 12 },
 };
 
 export function Badge({ tone = "default", size = "sm", children }: Props) {
   const t = TONE[tone];
   const s = SIZE[size];
-  // Tone classes are split into bg, text, and border — find each:
   return (
-    <View className={cn("border self-start", s.container, t)}>
-      <Text className={cn(s.text, t)}>{children}</Text>
+    <View
+      style={{
+        alignSelf: "flex-start",
+        backgroundColor: t.bg,
+        borderColor: t.border,
+        borderWidth: 1,
+        borderRadius: 9999,
+        paddingHorizontal: s.paddingHorizontal,
+        paddingVertical: s.paddingVertical,
+      }}
+    >
+      <Text style={{ color: t.fg, fontSize: s.fontSize, fontWeight: "600" }}>
+        {children}
+      </Text>
     </View>
   );
 }

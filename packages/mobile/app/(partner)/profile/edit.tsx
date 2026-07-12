@@ -67,7 +67,15 @@ export default function ProfileEditScreen() {
 
   if (artistQuery.isLoading || !artistQuery.data) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-background">
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-background"
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.background,
+        }}
+      >
         <ActivityIndicator color={colors.gold} />
       </SafeAreaView>
     );
@@ -76,17 +84,41 @@ export default function ProfileEditScreen() {
   const artist = artistQuery.data;
 
   return (
-    <View className="flex-1 bg-background">
+    <View
+      className="flex-1 bg-background"
+      style={{ flex: 1, backgroundColor: colors.background }}
+    >
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center gap-2 border-b border-border px-3 py-2">
+        <View
+          className="flex-row items-center gap-2 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+            }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
-          <Text className="font-heading text-[18px] font-bold text-foreground">
+          <Text
+            className="font-heading text-[18px] font-bold text-foreground"
+            style={{ fontFamily: "Cormorant", fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             Editează profilul
           </Text>
         </View>
@@ -114,6 +146,7 @@ export default function ProfileEditScreen() {
 
       <ScrollView
         className="flex-1"
+        style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 16,
@@ -158,9 +191,22 @@ function SectionChip({
       className={`rounded-full border px-3 py-1.5 ${
         active ? "border-gold bg-gold/15" : "border-border bg-card"
       }`}
+      style={{
+        borderRadius: 9999,
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderColor: active ? colors.gold : colors.border,
+        backgroundColor: active ? "rgba(201,168,76,0.15)" : colors.card,
+      }}
     >
       <Text
         className={`text-[13px] font-semibold ${active ? "text-gold" : "text-foreground/70"}`}
+        style={{
+          fontSize: 13,
+          fontWeight: "600",
+          color: active ? colors.gold : "rgba(247,245,238,0.7)",
+        }}
       >
         {label}
       </Text>
@@ -203,7 +249,7 @@ function GeneralSection({
   });
 
   return (
-    <View className="gap-3">
+    <View className="gap-3" style={{ gap: 12 }}>
       <Input label="Nume artistic" value={name} onChangeText={setName} />
       <Input
         label="Descriere"
@@ -269,7 +315,7 @@ function ContactSection({
   });
 
   return (
-    <View className="gap-3">
+    <View className="gap-3" style={{ gap: 12 }}>
       <Input label="Telefon" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
       <Input label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
       <Input label="Instagram (handle)" value={instagram} onChangeText={setInstagram} autoCapitalize="none" />
@@ -318,7 +364,7 @@ function PricingSection({
   });
 
   return (
-    <View className="gap-3">
+    <View className="gap-3" style={{ gap: 12 }}>
       <Input
         label="Preț de la (€)"
         value={priceFrom}
@@ -326,12 +372,21 @@ function PricingSection({
         keyboardType="number-pad"
         hint="Afișat pe profilul public ca punct de plecare al negocierii."
       />
-      <Card className="flex-row items-center justify-between">
-        <View className="flex-1">
-          <Text className="text-[14px] font-semibold text-foreground">
+      <Card
+        className="flex-row items-center justify-between"
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <View className="flex-1" style={{ flex: 1 }}>
+          <Text
+            className="text-[14px] font-semibold text-foreground"
+            style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}
+          >
             Ascunde prețul
           </Text>
-          <Text className="text-[12px] text-muted-foreground">
+          <Text
+            className="text-[12px] text-muted-foreground"
+            style={{ fontSize: 12, color: colors.mutedForeground }}
+          >
             Clienții văd "La cerere" în loc de suma — pentru negociere de la zero.
           </Text>
         </View>
@@ -361,11 +416,20 @@ function TarifeSection({ artist }: { artist: ArtistDetail }) {
   // Full CRUD ships next. For M4 we link to the dedicated tarife screen.
   const router = useRouter();
   return (
-    <Card className="gap-3 items-center p-8">
-      <Text className="font-heading text-[18px] font-bold text-foreground">
+    <Card
+      className="gap-3 items-center p-8"
+      style={{ gap: 12, alignItems: "center", padding: 32 }}
+    >
+      <Text
+        className="font-heading text-[18px] font-bold text-foreground"
+        style={{ fontFamily: "Cormorant", fontSize: 18, fontWeight: "700", color: colors.foreground }}
+      >
         Pachete & Tarife
       </Text>
-      <Text className="text-center text-[13px] text-muted-foreground">
+      <Text
+        className="text-center text-[13px] text-muted-foreground"
+        style={{ textAlign: "center", fontSize: 13, color: colors.mutedForeground }}
+      >
         Gestionează listele de prețuri pe pachete (set de 2h, format complet,
         adăugări speciale).
       </Text>
@@ -388,7 +452,7 @@ function NotificationsSection() {
   const [reviewPush, setReviewPush] = useState(true);
 
   return (
-    <View className="gap-3">
+    <View className="gap-3" style={{ gap: 12 }}>
       <ToggleCard
         label="Cereri noi"
         description="Notificare imediat ce un client trimite o cerere."
@@ -407,7 +471,10 @@ function NotificationsSection() {
         value={reviewPush}
         onChange={setReviewPush}
       />
-      <Text className="text-center text-[11px] text-muted-foreground">
+      <Text
+        className="text-center text-[11px] text-muted-foreground"
+        style={{ textAlign: "center", fontSize: 11, color: colors.mutedForeground }}
+      >
         Preferințele se sincronizează cu serverul în M5.
       </Text>
     </View>
@@ -426,10 +493,23 @@ function ToggleCard({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <Card className="flex-row items-center justify-between">
-      <View className="flex-1">
-        <Text className="text-[14px] font-semibold text-foreground">{label}</Text>
-        <Text className="text-[12px] text-muted-foreground">{description}</Text>
+    <Card
+      className="flex-row items-center justify-between"
+      style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+    >
+      <View className="flex-1" style={{ flex: 1 }}>
+        <Text
+          className="text-[14px] font-semibold text-foreground"
+          style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}
+        >
+          {label}
+        </Text>
+        <Text
+          className="text-[12px] text-muted-foreground"
+          style={{ fontSize: 12, color: colors.mutedForeground }}
+        >
+          {description}
+        </Text>
       </View>
       <Switch
         value={value}

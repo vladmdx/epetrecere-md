@@ -53,30 +53,65 @@ export default function RecenziiScreen() {
   const ratingCount = artist?.ratingCount ?? 0;
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center gap-2 border-b border-border px-3 py-2">
+        <View
+          className="flex-row items-center gap-2 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+            }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
-          <Text className="font-heading text-[18px] font-bold text-foreground">
+          <Text
+            className="font-heading text-[18px] font-bold text-foreground"
+            style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             Recenzii
           </Text>
         </View>
       </SafeAreaView>
 
       {/* Aggregate header */}
-      <View className="border-b border-border px-5 py-4">
-        <View className="flex-row items-center gap-4">
-          <View className="items-center">
-            <Text className="font-heading text-[40px] font-bold text-foreground">
+      <View
+        className="border-b border-border px-5 py-4"
+        style={{
+          borderBottomWidth: 1,
+          borderColor: colors.border,
+          paddingHorizontal: 20,
+          paddingVertical: 16,
+        }}
+      >
+        <View
+          className="flex-row items-center gap-4"
+          style={{ flexDirection: "row", alignItems: "center", gap: 16 }}
+        >
+          <View className="items-center" style={{ alignItems: "center" }}>
+            <Text
+              className="font-heading text-[40px] font-bold text-foreground"
+              style={{ fontSize: 40, fontWeight: "700", color: colors.foreground }}
+            >
               {ratingAvg != null ? ratingAvg.toFixed(1) : "—"}
             </Text>
-            <View className="flex-row gap-0.5">
+            <View className="flex-row gap-0.5" style={{ flexDirection: "row", gap: 2 }}>
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
@@ -90,29 +125,59 @@ export default function RecenziiScreen() {
                 />
               ))}
             </View>
-            <Text className="mt-1 text-[12px] text-muted-foreground">
+            <Text
+              className="mt-1 text-[12px] text-muted-foreground"
+              style={{ marginTop: 4, fontSize: 12, color: colors.mutedForeground }}
+            >
               {ratingCount} recenzii
             </Text>
           </View>
-          <View className="flex-1 gap-1.5">
+          <View className="flex-1 gap-1.5" style={{ flex: 1, gap: 6 }}>
             {[5, 4, 3, 2, 1].map((stars) => {
               const count = (reviewsQuery.data ?? []).filter(
                 (r) => r.rating === stars,
               ).length;
               const pct = ratingCount > 0 ? (count / ratingCount) * 100 : 0;
               return (
-                <View key={stars} className="flex-row items-center gap-2">
-                  <Text className="w-3 text-[11px] text-muted-foreground">
+                <View
+                  key={stars}
+                  className="flex-row items-center gap-2"
+                  style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
+                >
+                  <Text
+                    className="w-3 text-[11px] text-muted-foreground"
+                    style={{ width: 12, fontSize: 11, color: colors.mutedForeground }}
+                  >
                     {stars}
                   </Text>
                   <Star size={10} color={colors.warning} fill={colors.warning} />
-                  <View className="flex-1 h-1.5 overflow-hidden rounded-full bg-muted">
+                  <View
+                    className="flex-1 h-1.5 overflow-hidden rounded-full bg-muted"
+                    style={{
+                      flex: 1,
+                      height: 6,
+                      overflow: "hidden",
+                      borderRadius: 9999,
+                      backgroundColor: colors.muted,
+                    }}
+                  >
                     <View
-                      style={{ width: `${pct}%`, backgroundColor: colors.gold }}
+                      style={[
+                        { height: "100%" },
+                        { width: `${pct}%`, backgroundColor: colors.gold },
+                      ]}
                       className="h-full"
                     />
                   </View>
-                  <Text className="w-6 text-right text-[11px] text-muted-foreground">
+                  <Text
+                    className="w-6 text-right text-[11px] text-muted-foreground"
+                    style={{
+                      width: 24,
+                      textAlign: "right",
+                      fontSize: 11,
+                      color: colors.mutedForeground,
+                    }}
+                  >
                     {count}
                   </Text>
                 </View>
@@ -132,16 +197,25 @@ export default function RecenziiScreen() {
           gap: 8,
         }}
         renderItem={({ item }) => (
-          <Card className="gap-2">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-[14px] font-semibold text-foreground">
+          <Card className="gap-2" style={{ gap: 8 }}>
+            <View
+              className="flex-row items-center justify-between"
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Text
+                className="text-[14px] font-semibold text-foreground"
+                style={{ fontSize: 14, fontWeight: "600", color: colors.foreground }}
+              >
                 {item.authorName}
               </Text>
-              <Text className="text-[11px] text-muted-foreground">
+              <Text
+                className="text-[11px] text-muted-foreground"
+                style={{ fontSize: 11, color: colors.mutedForeground }}
+              >
                 {relativeTimeRO(item.createdAt)}
               </Text>
             </View>
-            <View className="flex-row gap-0.5">
+            <View className="flex-row gap-0.5" style={{ flexDirection: "row", gap: 2 }}>
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
                   key={i}
@@ -152,7 +226,10 @@ export default function RecenziiScreen() {
               ))}
             </View>
             {item.comment && (
-              <Text className="text-[13px] leading-5 text-foreground/85">
+              <Text
+                className="text-[13px] leading-5 text-foreground/85"
+                style={{ fontSize: 13, lineHeight: 20, color: "rgba(247,245,238,0.85)" }}
+              >
                 {item.comment}
               </Text>
             )}
@@ -160,16 +237,30 @@ export default function RecenziiScreen() {
         )}
         ListEmptyComponent={
           reviewsQuery.isLoading ? (
-            <View className="items-center py-12">
+            <View className="items-center py-12" style={{ alignItems: "center", paddingVertical: 48 }}>
               <ActivityIndicator color={colors.gold} />
             </View>
           ) : (
-            <View className="items-center gap-3 py-12">
+            <View
+              className="items-center gap-3 py-12"
+              style={{ alignItems: "center", gap: 12, paddingVertical: 48 }}
+            >
               <MessageSquare size={48} color={colors.mutedForeground} />
-              <Text className="font-heading text-[16px] font-bold text-foreground">
+              <Text
+                className="font-heading text-[16px] font-bold text-foreground"
+                style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}
+              >
                 Nicio recenzie încă
               </Text>
-              <Text className="max-w-[260px] text-center text-[13px] text-muted-foreground">
+              <Text
+                className="max-w-[260px] text-center text-[13px] text-muted-foreground"
+                style={{
+                  maxWidth: 260,
+                  textAlign: "center",
+                  fontSize: 13,
+                  color: colors.mutedForeground,
+                }}
+              >
                 După fiecare eveniment finalizat poți cere clientului o recenzie.
               </Text>
             </View>

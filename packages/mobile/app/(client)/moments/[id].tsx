@@ -180,26 +180,43 @@ export default function MomentsScreen() {
   const photos = photosQuery.data ?? [];
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center justify-between gap-3 border-b border-border px-3 py-2">
-          <View className="flex-row items-center gap-2">
+        <View
+          className="flex-row items-center justify-between gap-3 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
+          <View className="flex-row items-center gap-2" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Pressable
               hitSlop={8}
               onPress={() => router.back()}
               className="h-10 w-10 items-center justify-center rounded-full"
+              style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999 }}
             >
               <ArrowLeft size={20} color={colors.foreground} />
             </Pressable>
-            <Text className="font-heading text-[18px] font-bold text-foreground">
+            <Text
+              className="font-heading text-[18px] font-bold text-foreground"
+              style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+            >
               Photo Moments
             </Text>
           </View>
-          <View className="flex-row gap-2">
+          <View className="flex-row gap-2" style={{ flexDirection: "row", gap: 8 }}>
             <Pressable
               hitSlop={8}
               onPress={() => setShowScanner(true)}
               className="h-10 w-10 items-center justify-center rounded-full bg-card"
+              style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999, backgroundColor: colors.card }}
             >
               <QrCode size={18} color={colors.gold} />
             </Pressable>
@@ -207,6 +224,7 @@ export default function MomentsScreen() {
               hitSlop={8}
               onPress={pickFromLibrary}
               className="h-10 w-10 items-center justify-center rounded-full bg-card"
+              style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999, backgroundColor: colors.card }}
             >
               <ImagePlus size={18} color={colors.gold} />
             </Pressable>
@@ -214,6 +232,7 @@ export default function MomentsScreen() {
               hitSlop={8}
               onPress={captureFromCamera}
               className="h-10 w-10 items-center justify-center rounded-full bg-gold"
+              style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999, backgroundColor: colors.gold }}
             >
               <CameraIcon size={18} color={colors.background} />
             </Pressable>
@@ -222,9 +241,21 @@ export default function MomentsScreen() {
       </SafeAreaView>
 
       {uploading && (
-        <View className="flex-row items-center justify-center gap-2 bg-gold/15 py-2">
+        <View
+          className="flex-row items-center justify-center gap-2 bg-gold/15 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            backgroundColor: "rgba(201,168,76,0.15)",
+            paddingVertical: 8,
+          }}
+        >
           <ActivityIndicator size="small" color={colors.gold} />
-          <Text className="text-[12px] text-gold">Se încarcă pozele…</Text>
+          <Text className="text-[12px] text-gold" style={{ fontSize: 12, color: colors.gold }}>
+            Se încarcă pozele…
+          </Text>
         </View>
       )}
 
@@ -240,7 +271,7 @@ export default function MomentsScreen() {
         renderItem={({ item, index }) => (
           <Pressable
             onPress={() => setLightboxIndex(index)}
-            style={{ width: CELL_SIZE, height: CELL_SIZE }}
+            style={[{ overflow: "hidden", borderRadius: 14 }, { width: CELL_SIZE, height: CELL_SIZE }]}
             className="overflow-hidden rounded-lg"
           >
             <Image
@@ -251,7 +282,20 @@ export default function MomentsScreen() {
               recyclingKey={String(item.id)}
             />
             {item.isFavorite && (
-              <View className="absolute right-1 top-1 h-6 w-6 items-center justify-center rounded-full bg-black/50">
+              <View
+                className="absolute right-1 top-1 h-6 w-6 items-center justify-center rounded-full bg-black/50"
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: 4,
+                  height: 24,
+                  width: 24,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: 9999,
+                  backgroundColor: "rgba(0,0,0,0.5)",
+                }}
+              >
                 <Heart size={12} color={colors.gold} fill={colors.gold} />
               </View>
             )}
@@ -259,16 +303,22 @@ export default function MomentsScreen() {
         )}
         ListEmptyComponent={
           photosQuery.isLoading ? (
-            <View className="items-center py-16">
+            <View className="items-center py-16" style={{ alignItems: "center", paddingVertical: 64 }}>
               <ActivityIndicator color={colors.gold} />
             </View>
           ) : (
-            <View className="items-center gap-3 py-16">
+            <View className="items-center gap-3 py-16" style={{ alignItems: "center", gap: 12, paddingVertical: 64 }}>
               <CameraIcon size={48} color={colors.mutedForeground} />
-              <Text className="font-heading text-[18px] font-bold text-foreground">
+              <Text
+                className="font-heading text-[18px] font-bold text-foreground"
+                style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+              >
                 Niciun moment încă
               </Text>
-              <Text className="max-w-[280px] text-center text-[13px] text-muted-foreground">
+              <Text
+                className="max-w-[280px] text-center text-[13px] text-muted-foreground"
+                style={{ maxWidth: 280, textAlign: "center", fontSize: 13, color: colors.mutedForeground }}
+              >
                 Apasă pe camera de mai sus să adaugi prima poză sau invită oaspeții cu QR-ul evenimentului.
               </Text>
               <Button variant="outline" size="md" onPress={pickFromLibrary}>
@@ -286,13 +336,17 @@ export default function MomentsScreen() {
         transparent
         onRequestClose={() => setLightboxIndex(null)}
       >
-        <View className="flex-1 bg-black">
+        <View className="flex-1 bg-black" style={{ flex: 1, backgroundColor: "#000" }}>
           <SafeAreaView edges={["top"]}>
-            <View className="flex-row justify-end px-4 py-2">
+            <View
+              className="flex-row justify-end px-4 py-2"
+              style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 16, paddingVertical: 8 }}
+            >
               <Pressable
                 hitSlop={8}
                 onPress={() => setLightboxIndex(null)}
                 className="h-10 w-10 items-center justify-center rounded-full bg-black/60"
+                style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999, backgroundColor: "rgba(0,0,0,0.6)" }}
               >
                 <X size={20} color="#fff" />
               </Pressable>
@@ -325,14 +379,20 @@ export default function MomentsScreen() {
                     transition={200}
                   />
                   {(item.caption || item.uploaderName) && (
-                    <View className="px-6 pt-4">
+                    <View className="px-6 pt-4" style={{ paddingHorizontal: 24, paddingTop: 16 }}>
                       {item.caption && (
-                        <Text className="text-center text-[15px] italic text-white/90">
+                        <Text
+                          className="text-center text-[15px] italic text-white/90"
+                          style={{ textAlign: "center", fontSize: 15, fontStyle: "italic", color: "rgba(255,255,255,0.9)" }}
+                        >
                           “{item.caption}”
                         </Text>
                       )}
                       {item.uploaderName && (
-                        <Text className="mt-2 text-center text-[12px] text-white/60">
+                        <Text
+                          className="mt-2 text-center text-[12px] text-white/60"
+                          style={{ marginTop: 8, textAlign: "center", fontSize: 12, color: "rgba(255,255,255,0.6)" }}
+                        >
                           — {item.uploaderName}
                         </Text>
                       )}
@@ -351,7 +411,7 @@ export default function MomentsScreen() {
         animationType="slide"
         onRequestClose={() => setShowScanner(false)}
       >
-        <View className="flex-1 bg-black">
+        <View className="flex-1 bg-black" style={{ flex: 1, backgroundColor: "#000" }}>
           {permission?.granted ? (
             <CameraView
               style={{ flex: 1 }}
@@ -360,11 +420,20 @@ export default function MomentsScreen() {
               onBarcodeScanned={onQrScanned}
             />
           ) : (
-            <SafeAreaView className="flex-1 items-center justify-center gap-4 p-6">
-              <Text className="font-heading text-[20px] font-bold text-white">
+            <SafeAreaView
+              className="flex-1 items-center justify-center gap-4 p-6"
+              style={{ flex: 1, alignItems: "center", justifyContent: "center", gap: 16, padding: 24 }}
+            >
+              <Text
+                className="font-heading text-[20px] font-bold text-white"
+                style={{ fontSize: 20, fontWeight: "700", color: "#fff" }}
+              >
                 Permite accesul la cameră
               </Text>
-              <Text className="text-center text-[13px] text-white/70">
+              <Text
+                className="text-center text-[13px] text-white/70"
+                style={{ textAlign: "center", fontSize: 13, color: "rgba(255,255,255,0.7)" }}
+              >
                 Pentru a scana QR-ul de pe masa evenimentului.
               </Text>
               <Button onPress={requestPermission} fullWidth size="lg">
@@ -372,21 +441,32 @@ export default function MomentsScreen() {
               </Button>
             </SafeAreaView>
           )}
-          <SafeAreaView edges={["top"]} className="absolute inset-x-0 top-0">
-            <View className="flex-row items-center justify-between px-4 py-2">
+          <SafeAreaView
+            edges={["top"]}
+            className="absolute inset-x-0 top-0"
+            style={{ position: "absolute", left: 0, right: 0, top: 0 }}
+          >
+            <View
+              className="flex-row items-center justify-between px-4 py-2"
+              style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 8 }}
+            >
               <Pressable
                 hitSlop={8}
                 onPress={() => setShowScanner(false)}
                 className="h-10 w-10 items-center justify-center rounded-full bg-black/60"
+                style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999, backgroundColor: "rgba(0,0,0,0.6)" }}
               >
                 <X size={20} color="#fff" />
               </Pressable>
-              <View className="rounded-full bg-black/60 px-3 py-1">
-                <Text className="text-[12px] text-white">
+              <View
+                className="rounded-full bg-black/60 px-3 py-1"
+                style={{ borderRadius: 9999, backgroundColor: "rgba(0,0,0,0.6)", paddingHorizontal: 12, paddingVertical: 4 }}
+              >
+                <Text className="text-[12px] text-white" style={{ fontSize: 12, color: "#fff" }}>
                   Scanează codul QR de la masa ta
                 </Text>
               </View>
-              <View className="w-10" />
+              <View className="w-10" style={{ width: 40 }} />
             </View>
           </SafeAreaView>
         </View>

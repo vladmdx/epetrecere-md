@@ -67,23 +67,46 @@ export default function TarifeScreen() {
   }
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
-        <View className="flex-row items-center gap-2 border-b border-border px-3 py-2">
+        <View
+          className="flex-row items-center gap-2 border-b border-border px-3 py-2"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            paddingHorizontal: 12,
+            paddingVertical: 8,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{ height: 40, width: 40, alignItems: "center", justifyContent: "center", borderRadius: 9999 }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
-          <Text className="flex-1 font-heading text-[18px] font-bold text-foreground">
+          <Text
+            className="flex-1 font-heading text-[18px] font-bold text-foreground"
+            style={{ flex: 1, fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             Pachete & Tarife
           </Text>
           <Pressable
             hitSlop={8}
             onPress={() => setShowAdd(true)}
             className="h-10 w-10 items-center justify-center rounded-full bg-gold"
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+              backgroundColor: colors.gold,
+            }}
           >
             <Plus size={20} color={colors.background} />
           </Pressable>
@@ -101,32 +124,58 @@ export default function TarifeScreen() {
         }}
         renderItem={({ item }) => (
           <Card>
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="flex-1">
-                <Text className="text-[15px] font-semibold text-foreground">
+            <View
+              className="flex-row items-start justify-between gap-3"
+              style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}
+            >
+              <View className="flex-1" style={{ flex: 1 }}>
+                <Text
+                  className="text-[15px] font-semibold text-foreground"
+                  style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}
+                >
                   {item.title}
                 </Text>
                 {item.description && (
-                  <Text className="mt-0.5 text-[12px] leading-5 text-muted-foreground">
+                  <Text
+                    className="mt-0.5 text-[12px] leading-5 text-muted-foreground"
+                    style={{ marginTop: 2, fontSize: 12, lineHeight: 20, color: colors.mutedForeground }}
+                  >
                     {item.description}
                   </Text>
                 )}
-                <View className="mt-1.5 flex-row items-center gap-3">
+                <View
+                  className="mt-1.5 flex-row items-center gap-3"
+                  style={{ marginTop: 6, flexDirection: "row", alignItems: "center", gap: 12 }}
+                >
                   {item.durationHours != null && (
-                    <Text className="text-[12px] text-muted-foreground">
+                    <Text
+                      className="text-[12px] text-muted-foreground"
+                      style={{ fontSize: 12, color: colors.mutedForeground }}
+                    >
                       {item.durationHours}h
                     </Text>
                   )}
-                  <Text className="text-[16px] font-bold text-gold">
+                  <Text
+                    className="text-[16px] font-bold text-gold"
+                    style={{ fontSize: 16, fontWeight: "700", color: colors.gold }}
+                  >
                     {item.price} €
                   </Text>
                 </View>
               </View>
-              <View className="gap-1">
+              <View className="gap-1" style={{ gap: 4 }}>
                 <Pressable
                   hitSlop={6}
                   onPress={() => setEditingPkg(item)}
                   className="h-8 w-8 items-center justify-center rounded-lg bg-card"
+                  style={{
+                    height: 32,
+                    width: 32,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 14,
+                    backgroundColor: colors.card,
+                  }}
                 >
                   <Edit2 size={14} color={colors.foreground} />
                 </Pressable>
@@ -134,6 +183,14 @@ export default function TarifeScreen() {
                   hitSlop={6}
                   onPress={() => handleDelete(item)}
                   className="h-8 w-8 items-center justify-center rounded-lg bg-rose-500/15"
+                  style={{
+                    height: 32,
+                    width: 32,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderRadius: 14,
+                    backgroundColor: "rgba(244,63,94,0.15)",
+                  }}
                 >
                   <Trash2 size={14} color={colors.danger} />
                 </Pressable>
@@ -143,11 +200,20 @@ export default function TarifeScreen() {
         )}
         ListEmptyComponent={
           pkgsQuery.isLoading ? null : (
-            <View className="items-center gap-3 py-16">
-              <Text className="font-heading text-[18px] font-bold text-foreground">
+            <View
+              className="items-center gap-3 py-16"
+              style={{ alignItems: "center", gap: 12, paddingVertical: 64 }}
+            >
+              <Text
+                className="font-heading text-[18px] font-bold text-foreground"
+                style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+              >
                 Niciun pachet încă
               </Text>
-              <Text className="max-w-[260px] text-center text-[13px] text-muted-foreground">
+              <Text
+                className="max-w-[260px] text-center text-[13px] text-muted-foreground"
+                style={{ maxWidth: 260, textAlign: "center", fontSize: 13, color: colors.mutedForeground }}
+              >
                 Adaugă-ți pachetele tale (Set de 2h, Format complet, etc.) ca să
                 le poți propune rapid clienților.
               </Text>
@@ -233,16 +299,30 @@ function PackageSheet({
       presentationStyle="pageSheet"
       onRequestClose={onDismiss}
     >
-      <View className="flex-1 bg-background">
-        <View className="flex-row items-center justify-between border-b border-border px-5 py-3">
-          <Text className="font-heading text-[18px] font-bold text-foreground">
+      <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
+        <View
+          className="flex-row items-center justify-between border-b border-border px-5 py-3"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            paddingHorizontal: 20,
+            paddingVertical: 12,
+          }}
+        >
+          <Text
+            className="font-heading text-[18px] font-bold text-foreground"
+            style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+          >
             {pkg ? "Editează pachet" : "Pachet nou"}
           </Text>
           <Pressable hitSlop={8} onPress={onDismiss}>
             <X size={22} color={colors.foreground} />
           </Pressable>
         </View>
-        <View className="gap-3 p-5">
+        <View className="gap-3 p-5" style={{ gap: 12, padding: 20 }}>
           <Input label="Titlu" value={title} onChangeText={setTitle} autoFocus />
           <Input
             label="Descriere (opțional)"
@@ -251,8 +331,8 @@ function PackageSheet({
             multiline
             numberOfLines={3}
           />
-          <View className="flex-row gap-3">
-            <View className="flex-1">
+          <View className="flex-row gap-3" style={{ flexDirection: "row", gap: 12 }}>
+            <View className="flex-1" style={{ flex: 1 }}>
               <Input
                 label="Preț (€)"
                 value={price}
@@ -260,7 +340,7 @@ function PackageSheet({
                 keyboardType="number-pad"
               />
             </View>
-            <View className="flex-1">
+            <View className="flex-1" style={{ flex: 1 }}>
               <Input
                 label="Durata (ore)"
                 value={duration}

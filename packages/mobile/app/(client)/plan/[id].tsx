@@ -96,7 +96,15 @@ export default function PlanDetailScreen() {
 
   if (planQuery.isLoading || !planQuery.data) {
     return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-background">
+      <SafeAreaView
+        className="flex-1 items-center justify-center bg-background"
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.background,
+        }}
+      >
         <ActivityIndicator color={colors.gold} />
       </SafeAreaView>
     );
@@ -106,24 +114,49 @@ export default function PlanDetailScreen() {
   const plan = detail.plan;
 
   return (
-    <View className="flex-1 bg-background">
+    <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
       <SafeAreaView edges={["top"]}>
         {/* Header */}
-        <View className="flex-row items-center gap-2 px-4 py-3">
+        <View
+          className="flex-row items-center gap-2 px-4 py-3"
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+          }}
+        >
           <Pressable
             hitSlop={8}
             onPress={() => router.back()}
             className="h-10 w-10 items-center justify-center rounded-full"
+            style={{
+              height: 40,
+              width: 40,
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 9999,
+            }}
           >
             <ArrowLeft size={20} color={colors.foreground} />
           </Pressable>
-          <View className="flex-1">
-            <Text className="text-[11px] uppercase tracking-widest text-muted-foreground">
+          <View className="flex-1" style={{ flex: 1 }}>
+            <Text
+              className="text-[11px] uppercase tracking-widest text-muted-foreground"
+              style={{
+                fontSize: 11,
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                color: colors.mutedForeground,
+              }}
+            >
               {eventTypeLabel(plan.eventType)}
             </Text>
             <Text
               className="font-heading text-[18px] font-bold text-foreground"
               numberOfLines={1}
+              style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
             >
               {plan.title}
             </Text>
@@ -136,6 +169,12 @@ export default function PlanDetailScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, gap: 6 }}
           className="border-b border-border pb-3 pt-1"
+          style={{
+            borderBottomWidth: 1,
+            borderColor: colors.border,
+            paddingBottom: 12,
+            paddingTop: 4,
+          }}
         >
           <TabChip
             label="Prezentare"
@@ -173,6 +212,7 @@ export default function PlanDetailScreen() {
 
       <ScrollView
         className="flex-1"
+        style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 20,
@@ -212,9 +252,22 @@ function TabChip({
       className={`rounded-full border px-3 py-1.5 ${
         active ? "border-gold bg-gold/15" : "border-border bg-card"
       }`}
+      style={{
+        borderRadius: 9999,
+        borderWidth: 1,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderColor: active ? colors.gold : colors.border,
+        backgroundColor: active ? "rgba(201,168,76,0.15)" : colors.card,
+      }}
     >
       <Text
         className={`text-[13px] font-semibold ${active ? "text-gold" : "text-foreground/70"}`}
+        style={{
+          fontSize: 13,
+          fontWeight: "600",
+          color: active ? colors.gold : "rgba(247,245,238,0.7)",
+        }}
       >
         {label}
       </Text>
@@ -257,7 +310,7 @@ function OverviewTab({ detail }: { detail: PlanDetail }) {
   return (
     <>
       {/* Meta card */}
-      <Card className="gap-3">
+      <Card className="gap-3" style={{ gap: 12 }}>
         {dateLabel && (
           <MetaLine Icon={Calendar} value={dateLabel} secondary={plan.startTime ?? undefined} />
         )}
@@ -269,11 +322,25 @@ function OverviewTab({ detail }: { detail: PlanDetail }) {
 
       {/* Countdown */}
       {countdown && (
-        <Card className="items-center gap-2 p-5">
-          <Text className="text-[11px] uppercase tracking-widest text-muted-foreground">
+        <Card
+          className="items-center gap-2 p-5"
+          style={{ alignItems: "center", gap: 8, padding: 20 }}
+        >
+          <Text
+            className="text-[11px] uppercase tracking-widest text-muted-foreground"
+            style={{
+              fontSize: 11,
+              textTransform: "uppercase",
+              letterSpacing: 2,
+              color: colors.mutedForeground,
+            }}
+          >
             Mai e până la eveniment
           </Text>
-          <View className="flex-row items-end gap-4">
+          <View
+            className="flex-row items-end gap-4"
+            style={{ flexDirection: "row", alignItems: "flex-end", gap: 16 }}
+          >
             <CountdownBlock value={countdown.days} label="zile" />
             <CountdownBlock value={countdown.hours} label="ore" />
             <CountdownBlock value={countdown.minutes} label="min" />
@@ -283,11 +350,17 @@ function OverviewTab({ detail }: { detail: PlanDetail }) {
       )}
 
       {/* Progress bars */}
-      <Card className="gap-4 p-5">
-        <Text className="font-heading text-[16px] font-bold text-foreground">
+      <Card className="gap-4 p-5" style={{ gap: 16, padding: 20 }}>
+        <Text
+          className="font-heading text-[16px] font-bold text-foreground"
+          style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}
+        >
           Progresul evenimentului
         </Text>
-        <Text className="text-[12px] text-muted-foreground">
+        <Text
+          className="text-[12px] text-muted-foreground"
+          style={{ fontSize: 12, color: colors.mutedForeground }}
+        >
           Verde = confirmat · Galben = în așteptare · Gri = neînceput
         </Text>
 
@@ -313,9 +386,24 @@ function OverviewTab({ detail }: { detail: PlanDetail }) {
       </Card>
 
       {/* Footer note */}
-      <View className="flex-row items-start gap-2 rounded-2xl border border-gold/20 bg-gold/5 p-4">
+      <View
+        className="flex-row items-start gap-2 rounded-2xl border border-gold/20 bg-gold/5 p-4"
+        style={{
+          flexDirection: "row",
+          alignItems: "flex-start",
+          gap: 8,
+          borderRadius: 20,
+          borderWidth: 1,
+          borderColor: "rgba(201,168,76,0.2)",
+          backgroundColor: "rgba(201,168,76,0.05)",
+          padding: 16,
+        }}
+      >
         <Sparkles size={16} color={colors.gold} />
-        <Text className="flex-1 text-[12px] leading-5 text-foreground/85">
+        <Text
+          className="flex-1 text-[12px] leading-5 text-foreground/85"
+          style={{ flex: 1, fontSize: 12, lineHeight: 20, color: "rgba(247,245,238,0.85)" }}
+        >
           Evenimentul poate fi marcat ca finalizat după ce a avut loc și toate
           cererile au răspuns.
         </Text>
@@ -334,14 +422,37 @@ function MetaLine({
   secondary?: string;
 }) {
   return (
-    <View className="flex-row items-center gap-3">
-      <View className="h-9 w-9 items-center justify-center rounded-lg bg-gold/15">
+    <View
+      className="flex-row items-center gap-3"
+      style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+    >
+      <View
+        className="h-9 w-9 items-center justify-center rounded-lg bg-gold/15"
+        style={{
+          height: 36,
+          width: 36,
+          alignItems: "center",
+          justifyContent: "center",
+          borderRadius: 14,
+          backgroundColor: "rgba(201,168,76,0.15)",
+        }}
+      >
         <Icon size={16} color={colors.gold} />
       </View>
-      <View className="flex-1">
-        <Text className="text-[14px] text-foreground">{value}</Text>
+      <View className="flex-1" style={{ flex: 1 }}>
+        <Text
+          className="text-[14px] text-foreground"
+          style={{ fontSize: 14, color: colors.foreground }}
+        >
+          {value}
+        </Text>
         {secondary && (
-          <Text className="text-[12px] text-muted-foreground">{secondary}</Text>
+          <Text
+            className="text-[12px] text-muted-foreground"
+            style={{ fontSize: 12, color: colors.mutedForeground }}
+          >
+            {secondary}
+          </Text>
         )}
       </View>
     </View>
@@ -350,11 +461,22 @@ function MetaLine({
 
 function CountdownBlock({ value, label }: { value: number; label: string }) {
   return (
-    <View className="items-center">
-      <Text className="font-heading text-[32px] font-bold text-foreground">
+    <View className="items-center" style={{ alignItems: "center" }}>
+      <Text
+        className="font-heading text-[32px] font-bold text-foreground"
+        style={{ fontSize: 32, fontWeight: "700", color: colors.foreground }}
+      >
         {String(value).padStart(2, "0")}
       </Text>
-      <Text className="text-[10px] uppercase tracking-widest text-muted-foreground">
+      <Text
+        className="text-[10px] uppercase tracking-widest text-muted-foreground"
+        style={{
+          fontSize: 10,
+          textTransform: "uppercase",
+          letterSpacing: 2,
+          color: colors.mutedForeground,
+        }}
+      >
         {label}
       </Text>
     </View>
@@ -371,11 +493,24 @@ function ProgressLine({
   extraRight?: string;
 }) {
   return (
-    <View className="gap-1.5">
-      <View className="flex-row items-center justify-between">
-        <Text className="text-[13px] font-semibold text-foreground">{label}</Text>
+    <View className="gap-1.5" style={{ gap: 6 }}>
+      <View
+        className="flex-row items-center justify-between"
+        style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+      >
+        <Text
+          className="text-[13px] font-semibold text-foreground"
+          style={{ fontSize: 13, fontWeight: "600", color: colors.foreground }}
+        >
+          {label}
+        </Text>
         {extraRight && (
-          <Text className="text-[11px] text-muted-foreground">{extraRight}</Text>
+          <Text
+            className="text-[11px] text-muted-foreground"
+            style={{ fontSize: 11, color: colors.mutedForeground }}
+          >
+            {extraRight}
+          </Text>
         )}
       </View>
       <ProgressBar value={value} />
@@ -459,7 +594,10 @@ function BookingsTab({
 
   if (bookingsQuery.isLoading) {
     return (
-      <View className="items-center py-10">
+      <View
+        className="items-center py-10"
+        style={{ alignItems: "center", paddingVertical: 40 }}
+      >
         <ActivityIndicator color={colors.gold} />
       </View>
     );
@@ -469,20 +607,42 @@ function BookingsTab({
 
   if (bookings.length === 0) {
     return (
-      <Card className="items-center gap-3 p-8">
+      <Card
+        className="items-center gap-3 p-8"
+        style={{ alignItems: "center", gap: 12, padding: 32 }}
+      >
         <Clock size={40} color={colors.mutedForeground} />
-        <Text className="font-heading text-[16px] font-bold text-foreground">
+        <Text
+          className="font-heading text-[16px] font-bold text-foreground"
+          style={{ fontSize: 16, fontWeight: "700", color: colors.foreground }}
+        >
           Nicio cerere încă
         </Text>
-        <Text className="text-center text-[12px] text-muted-foreground">
+        <Text
+          className="text-center text-[12px] text-muted-foreground"
+          style={{ textAlign: "center", fontSize: 12, color: colors.mutedForeground }}
+        >
           Trimite cereri către artiști și săli — apar aici, legate de eveniment.
         </Text>
         <Pressable
           onPress={() => router.push("/(client)/(tabs)/search")}
           className="mt-1 flex-row items-center gap-2 rounded-lg bg-gold px-5 py-2.5"
+          style={{
+            marginTop: 4,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 8,
+            borderRadius: 14,
+            backgroundColor: colors.gold,
+            paddingHorizontal: 20,
+            paddingVertical: 10,
+          }}
         >
           <Sparkles size={16} color={colors.background} />
-          <Text className="text-[14px] font-semibold text-background">
+          <Text
+            className="text-[14px] font-semibold text-background"
+            style={{ fontSize: 14, fontWeight: "600", color: colors.background }}
+          >
             Caută furnizori
           </Text>
         </Pressable>
@@ -491,7 +651,7 @@ function BookingsTab({
   }
 
   return (
-    <View className="gap-3">
+    <View className="gap-3" style={{ gap: 12 }}>
       {bookings.map((b) => {
         const cfg = BOOKING_STATUS[b.status] ?? {
           label: b.status,
@@ -504,28 +664,36 @@ function BookingsTab({
             key={b.id}
             onPress={() => router.push(`/(client)/bookings/${b.id}`)}
           >
-            <Card className="flex-row items-center gap-3">
-              <View className="flex-1">
+            <Card
+              className="flex-row items-center gap-3"
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <View className="flex-1" style={{ flex: 1 }}>
                 <Text
                   className="text-[15px] font-semibold text-foreground"
                   numberOfLines={1}
+                  style={{ fontSize: 15, fontWeight: "600", color: colors.foreground }}
                 >
                   {name}
                 </Text>
                 <Text
                   className="mt-0.5 text-[12px] text-muted-foreground"
                   numberOfLines={1}
+                  style={{ marginTop: 2, fontSize: 12, color: colors.mutedForeground }}
                 >
                   {category}
                   {b.eventDate ? ` · ${formatDateRO(b.eventDate)}` : ""}
                 </Text>
               </View>
               <View
-                style={{ backgroundColor: cfg.tint + "22" }}
+                style={[
+                  { borderRadius: 9999, paddingHorizontal: 12, paddingVertical: 4 },
+                  { backgroundColor: cfg.tint + "22" },
+                ]}
                 className="rounded-full px-3 py-1"
               >
                 <Text
-                  style={{ color: cfg.tint }}
+                  style={[{ fontSize: 11, fontWeight: "600" }, { color: cfg.tint }]}
                   className="text-[11px] font-semibold"
                 >
                   {cfg.label}
@@ -541,12 +709,22 @@ function BookingsTab({
 
 function MomentsTab({ onOpen }: { onOpen: () => void }) {
   return (
-    <Card onPress={onOpen} className="items-center gap-3 p-6">
+    <Card
+      onPress={onOpen}
+      className="items-center gap-3 p-6"
+      style={{ alignItems: "center", gap: 12, padding: 24 }}
+    >
       <Camera size={40} color={colors.gold} />
-      <Text className="font-heading text-[18px] font-bold text-foreground">
+      <Text
+        className="font-heading text-[18px] font-bold text-foreground"
+        style={{ fontSize: 18, fontWeight: "700", color: colors.foreground }}
+      >
         Deschide Photo Moments
       </Text>
-      <Text className="text-center text-[13px] text-muted-foreground">
+      <Text
+        className="text-center text-[13px] text-muted-foreground"
+        style={{ textAlign: "center", fontSize: 13, color: colors.mutedForeground }}
+      >
         Vezi pozele, scanează QR-ul, descarcă album.
       </Text>
     </Card>
