@@ -46,10 +46,13 @@ export function createApiClient(opts: ApiClientOptions) {
     init?: { signal?: AbortSignal; query?: Record<string, string | number | boolean | null | undefined> },
   ): Promise<ApiResponse<T>> {
     // Build URL with query string when query params are passed.
-    const url = new URL(
-      path.startsWith("/") ? path : `/${path}`,
-      opts.baseUrl.endsWith("/") ? opts.baseUrl : `${opts.baseUrl}/`,
-    );
+    // IMPORTANT: strip any leading slash from `path` so the baseUrl's own
+    // path segment is preserved. `new URL("/artists", "https://x/api/v1/")`
+    // resolves to "https://x/artists" (host root) — dropping "/api/v1" and
+    // 404-ing every request. With the slash stripped, the relative path
+    // joins onto the base: "https://x/api/v1/artists".
+    const base = opts.baseUrl.endsWith("/") ? opts.baseUrl : `${opts.baseUrl}/`;
+    const url = new URL(path.startsWith("/") ? path.slice(1) : path, base);
     if (init?.query) {
       for (const [k, v] of Object.entries(init.query)) {
         if (v === undefined || v === null) continue;
