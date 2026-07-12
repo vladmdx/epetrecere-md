@@ -75,19 +75,24 @@ export default function BookingNewScreen() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      // Send `undefined` (omitted by JSON) rather than `null` for optional
+      // fields: the server's create schema uses `.optional()` (not
+      // `.nullable()`), so a literal null fails validation with a 400 — which
+      // otherwise breaks EVERY booking (venueId is null on the artist flow and
+      // vice-versa, plus empty message/guestCount).
       const body = BookingRequestCreateSchema.parse({
-        artistId,
-        venueId,
+        artistId: artistId ?? undefined,
+        venueId: venueId ?? undefined,
         clientName:
           `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() ||
           "Client",
         clientPhone: user?.phoneNumbers?.[0]?.phoneNumber ?? "+37300000000",
-        clientEmail: user?.primaryEmailAddress?.emailAddress ?? null,
+        clientEmail: user?.primaryEmailAddress?.emailAddress ?? undefined,
         eventDate: eventDate.toISOString().slice(0, 10),
         startTime: `${String(startTime.getHours()).padStart(2, "0")}:${String(startTime.getMinutes()).padStart(2, "0")}`,
         eventType,
-        guestCount: Number(guestCount) || null,
-        message: message.trim() || null,
+        guestCount: Number(guestCount) || undefined,
+        message: message.trim() || undefined,
       });
       const res = await api.post(API_PATHS.bookingRequests, body);
       if (!res.ok) throw new Error(res.error?.message ?? "submit_failed");

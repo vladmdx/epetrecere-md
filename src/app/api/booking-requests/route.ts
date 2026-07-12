@@ -13,12 +13,16 @@ import { sendEmail } from "@/lib/email/send";
 import { bookingRequestNewEmail } from "@/lib/email/templates/booking-request-new";
 
 const bookingSchema = z.object({
+  // NOTE: these are `.nullable().optional()` (not just `.optional()`) so a
+  // client that sends an explicit `null` for an unused field — e.g. venueId
+  // on the artist flow, or an empty message/guestCount — passes validation
+  // instead of 400-ing. The shared client schema is nullable; keep both in sync.
   /** Either artistId or venueId must be set. */
-  artistId: z.number().optional(),
-  venueId: z.number().optional(),
+  artistId: z.number().nullable().optional(),
+  venueId: z.number().nullable().optional(),
   clientName: z.string().min(2),
   clientPhone: z.string().min(6),
-  clientEmail: z.string().optional(),
+  clientEmail: z.string().nullable().optional(),
   eventDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "eventDate must be YYYY-MM-DD")
@@ -30,11 +34,11 @@ const bookingSchema = z.object({
       const todayStr = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
       return d >= todayStr;
     }, "Event date cannot be in the past"),
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
-  eventType: z.string().optional(),
-  guestCount: z.number().optional(),
-  message: z.string().optional(),
+  startTime: z.string().nullable().optional(),
+  endTime: z.string().nullable().optional(),
+  eventType: z.string().nullable().optional(),
+  guestCount: z.number().nullable().optional(),
+  message: z.string().nullable().optional(),
   /** Optional — when the client sends the request from inside an event
    *  plan we link the booking so its agreed price flows into the budget. */
   eventPlanId: z.number().int().positive().optional(),
