@@ -16,8 +16,10 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useUser } from "@clerk/clerk-expo";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -81,15 +83,21 @@ export default function BookingDetailScreen() {
   const router = useRouter();
   const api = useApi();
   const qc = useQueryClient();
+  const { user } = useUser();
+  const clientEmail = user?.primaryEmailAddress?.emailAddress ?? "";
 
   const detailQuery = useQuery({
-    queryKey: ["booking", bookingId],
-    enabled: Number.isFinite(bookingId),
+    queryKey: ["booking", bookingId, clientEmail],
+    enabled: Number.isFinite(bookingId) && clientEmail.length > 0,
     queryFn: async () => {
+      // The list endpoint is scoped by client_email — a bare `?id` is rejected
+      // by the server (needs artist_id / client_email / event_plan_id), so
+      // fetch the caller's own bookings and pick this one out. Without this the
+      // detail could only ever show the just-created row from cache and never
+      // refetch to reflect the artist's accept/price.
       const list = await api.get<BookingDetail[]>(API_PATHS.bookingRequests, {
-        query: { id: bookingId },
+        query: { client_email: clientEmail },
       });
-      // The /booking-requests endpoint returns an array; we filter to ours.
       const arr = Array.isArray(list.data) ? list.data : [];
       return arr.find((b) => b.id === bookingId) ?? null;
     },
@@ -172,6 +180,13 @@ export default function BookingDetailScreen() {
       <ScrollView
         className="flex-1"
         style={{ flex: 1 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={detailQuery.isRefetching}
+            onRefresh={() => detailQuery.refetch()}
+            tintColor={colors.gold}
+          />
+        }
         contentContainerStyle={{
           paddingHorizontal: 20,
           paddingTop: 20,
