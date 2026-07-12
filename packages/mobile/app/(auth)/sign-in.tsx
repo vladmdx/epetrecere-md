@@ -1,19 +1,19 @@
 // Sign-in screen.
 //
-// Auth strategies supported (in priority order):
-//   1. Google OAuth — one tap, dominant for the Moldovan market.
-//   2. Email + password — fallback, with show/hide toggle.
-//   3. Magic link by email — for users who forgot their password and
-//      don't want to reset it right now.
+// Auth strategies (must match the website, which is PASSWORDLESS):
+//   1. Email + one-time code (OTP) — primary. Accounts created on the site
+//      have no password, so sign-in emails a 6-digit code and verifies it.
+//   2. Google OAuth — one tap, dominant for the Moldovan market.
+//   3. Apple OAuth — iOS only (App Store requirement alongside Google).
 //
-// Errors surface inline (red text under the relevant field) and never
-// in alert() dialogs — alerts are interruptive and feel un-native.
+// Two steps on the same screen: enter email → enter the emailed code. Errors
+// surface inline (red text under the field), never in alert() dialogs.
 
 import { useState } from "react";
 import { View, Text, Pressable, Platform } from "react-native";
 import { useRouter, Link } from "expo-router";
 import { useSignIn, useOAuth } from "@clerk/clerk-expo";
-import { Eye, EyeOff, Mail, Lock, Apple } from "lucide-react-native";
+import { Lock, Apple } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import * as WebBrowser from "expo-web-browser";
 import { Button, Input, SafeScreen } from "../../components/ui";
@@ -30,48 +30,83 @@ export default function SignIn() {
   const googleOAuth = useOAuth({ strategy: "oauth_google" });
   const appleOAuth = useOAuth({ strategy: "oauth_apple" });
 
+  const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [code, setCode] = useState("");
   const [emailError, setEmailError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [codeError, setCodeError] = useState<string | null>(null);
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function handlePasswordSignIn() {
+  // Step 1 — look the user up by email and send them a one-time code.
+  async function handleSendCode() {
     if (!isLoaded || !signIn) return;
     setEmailError(null);
-    setPasswordError(null);
     setGeneralError(null);
 
     if (!email.includes("@")) {
       setEmailError(t("errors.invalidEmail"));
       return;
     }
-    if (password.length < 8) {
-      setPasswordError(t("errors.passwordTooShort"));
+
+    setSubmitting(true);
+    try {
+      const attempt = await signIn.create({ identifier: email.trim() });
+      const emailFactor = (attempt.supportedFirstFactors ?? []).find(
+        (ff) => ff.strategy === "email_code",
+      );
+      if (!emailFactor || !("emailAddressId" in emailFactor)) {
+        setGeneralError(t("errors.generic"));
+        return;
+      }
+      await signIn.prepareFirstFactor({
+        strategy: "email_code",
+        emailAddressId: emailFactor.emailAddressId,
+      });
+      setStep("code");
+    } catch (err: unknown) {
+      const code = (err as { errors?: { code?: string }[] })?.errors?.[0]?.code;
+      if (code === "form_identifier_not_found") {
+        setEmailError(t("errors.noAccountEmail"));
+      } else {
+        const msg =
+          (err as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+          t("errors.generic");
+        setGeneralError(msg);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  // Step 2 — verify the code and open the session.
+  async function handleVerifyCode() {
+    if (!isLoaded || !signIn) return;
+    setCodeError(null);
+    setGeneralError(null);
+
+    if (code.length !== 6) {
+      setCodeError(t("errors.codeLength"));
       return;
     }
 
     setSubmitting(true);
     try {
-      const result = await signIn.create({
-        identifier: email,
-        password,
+      const result = await signIn.attemptFirstFactor({
+        strategy: "email_code",
+        code,
       });
       if (result.status === "complete") {
         await setActive({ session: result.createdSessionId });
         router.replace("/");
       } else {
-        // Multi-factor / verification needed. M1 ships the happy path
-        // only; MFA UI lands in M2.
-        setGeneralError("Verificare suplimentară necesară.");
+        setGeneralError(t("errors.generic"));
       }
     } catch (err: unknown) {
       const msg =
         (err as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
-        t("errors.wrongPassword");
-      setGeneralError(msg);
+        t("errors.generic");
+      setCodeError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -124,116 +159,131 @@ export default function SignIn() {
             {t("auth.signInTitle")}
           </Text>
           <Text style={{ fontSize: 14, color: colors.mutedForeground }}>
-            {t("auth.signInSubtitle")}
+            {step === "email"
+              ? t("auth.signInSubtitle")
+              : t("auth.codeSentTo", { email })}
           </Text>
         </View>
 
-        {/* Form */}
-        <View style={{ gap: 12 }}>
-          <Input
-            label={t("auth.email")}
-            value={email}
-            onChangeText={setEmail}
-            error={emailError}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            textContentType="emailAddress"
-            rightSlot={<Mail size={18} color={colors.mutedForeground} />}
-          />
-          <Input
-            label={t("auth.password")}
-            value={password}
-            onChangeText={setPassword}
-            error={passwordError}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            autoComplete="password"
-            textContentType="password"
-            rightSlot={
-              <Pressable
-                hitSlop={8}
-                onPress={() => setShowPassword((s) => !s)}
+        {step === "email" ? (
+          <>
+            {/* Email + send code */}
+            <View style={{ gap: 12 }}>
+              <Input
+                label={t("auth.email")}
+                value={email}
+                onChangeText={setEmail}
+                error={emailError}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                onSubmitEditing={handleSendCode}
+                returnKeyType="send"
+              />
+              {generalError && (
+                <Text style={{ textAlign: "center", fontSize: 13, color: colors.danger }}>
+                  {generalError}
+                </Text>
+              )}
+            </View>
+
+            <Button onPress={handleSendCode} loading={submitting} fullWidth size="lg">
+              {t("auth.sendResetCode")}
+            </Button>
+
+            {/* Divider */}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <View style={{ height: 1, flex: 1, backgroundColor: colors.border }} />
+              <Text style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: colors.mutedForeground }}>
+                sau
+              </Text>
+              <View style={{ height: 1, flex: 1, backgroundColor: colors.border }} />
+            </View>
+
+            <Button
+              variant="outline"
+              onPress={handleGoogleSignIn}
+              loading={submitting}
+              fullWidth
+              size="lg"
+              leftIcon={<Lock size={18} color={colors.gold} />}
+            >
+              {t("auth.signInWithGoogle")}
+            </Button>
+
+            {/* Sign in with Apple — iOS only. Required by App Store review when
+                any other third-party sign-in (Google) is offered. */}
+            {Platform.OS === "ios" && (
+              <Button
+                variant="outline"
+                onPress={handleAppleSignIn}
+                loading={submitting}
+                fullWidth
+                size="lg"
+                leftIcon={<Apple size={18} color={colors.gold} />}
               >
-                {showPassword ? (
-                  <EyeOff size={18} color={colors.mutedForeground} />
-                ) : (
-                  <Eye size={18} color={colors.mutedForeground} />
-                )}
-              </Pressable>
-            }
-          />
-          {generalError && (
-            <Text style={{ textAlign: "center", fontSize: 13, color: colors.danger }}>
-              {generalError}
-            </Text>
-          )}
-          <Link href="/(auth)/forgot-password" asChild>
-            <Pressable hitSlop={8} style={{ alignSelf: "flex-end" }}>
-              <Text style={{ fontSize: 13, color: colors.gold }}>
-                {t("auth.forgotPassword")}
+                {t("auth.signInWithApple")}
+              </Button>
+            )}
+
+            {/* Sign-up footer */}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              <Text style={{ fontSize: 14, color: colors.mutedForeground }}>
+                {t("auth.noAccount")}
               </Text>
-            </Pressable>
-          </Link>
-        </View>
+              <Link href="/(auth)/sign-up" asChild>
+                <Pressable hitSlop={8}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.gold }}>
+                    {t("auth.signUp")}
+                  </Text>
+                </Pressable>
+              </Link>
+            </View>
+          </>
+        ) : (
+          <>
+            {/* Code entry */}
+            <View style={{ gap: 12 }}>
+              <Input
+                label={t("auth.enterCode")}
+                value={code}
+                onChangeText={(v) => setCode(v.replace(/\D/g, "").slice(0, 6))}
+                error={codeError}
+                keyboardType="number-pad"
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
+                maxLength={6}
+                autoFocus
+                onSubmitEditing={handleVerifyCode}
+                returnKeyType="done"
+              />
+              {generalError && (
+                <Text style={{ textAlign: "center", fontSize: 13, color: colors.danger }}>
+                  {generalError}
+                </Text>
+              )}
+            </View>
 
-        <Button
-          onPress={handlePasswordSignIn}
-          loading={submitting}
-          fullWidth
-          size="lg"
-        >
-          {t("auth.signIn")}
-        </Button>
+            <Button onPress={handleVerifyCode} loading={submitting} fullWidth size="lg">
+              {t("auth.signIn")}
+            </Button>
 
-        {/* Divider */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={{ height: 1, flex: 1, backgroundColor: colors.border }} />
-          <Text style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", color: colors.mutedForeground }}>
-            sau
-          </Text>
-          <View style={{ height: 1, flex: 1, backgroundColor: colors.border }} />
-        </View>
-
-        <Button
-          variant="outline"
-          onPress={handleGoogleSignIn}
-          loading={submitting}
-          fullWidth
-          size="lg"
-          leftIcon={<Lock size={18} color={colors.gold} />}
-        >
-          {t("auth.signInWithGoogle")}
-        </Button>
-
-        {/* Sign in with Apple — iOS only. Required by App Store review when
-            any other third-party sign-in (Google) is offered. */}
-        {Platform.OS === "ios" && (
-          <Button
-            variant="outline"
-            onPress={handleAppleSignIn}
-            loading={submitting}
-            fullWidth
-            size="lg"
-            leftIcon={<Apple size={18} color={colors.gold} />}
-          >
-            {t("auth.signInWithApple")}
-          </Button>
+            <Button
+              variant="ghost"
+              onPress={() => {
+                setStep("email");
+                setCode("");
+                setCodeError(null);
+                setGeneralError(null);
+              }}
+              fullWidth
+              size="md"
+            >
+              {t("auth.changeEmail")}
+            </Button>
+          </>
         )}
-
-        {/* Sign-up footer */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
-          <Text style={{ fontSize: 14, color: colors.mutedForeground }}>
-            {t("auth.noAccount")}
-          </Text>
-          <Link href="/(auth)/sign-up" asChild>
-            <Pressable hitSlop={8}>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: colors.gold }}>
-                {t("auth.signUp")}
-              </Text>
-            </Pressable>
-          </Link>
-        </View>
       </View>
     </SafeScreen>
   );
