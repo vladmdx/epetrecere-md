@@ -13,6 +13,7 @@ import { ReactNode } from "react";
 import { ScrollView, View, KeyboardAvoidingView, Platform } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 import { cn } from "../../lib/cn";
+import { colors } from "../../constants/theme";
 
 interface Props {
   children: ReactNode;
@@ -67,7 +68,11 @@ export function SafeScreen({
   );
 
   return (
-    <SafeAreaView style={{ flex: 1 }} className="bg-background" edges={edges}>
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      className="bg-background"
+      edges={edges}
+    >
       {Wrapped}
     </SafeAreaView>
   );

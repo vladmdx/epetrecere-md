@@ -31,6 +31,7 @@ export default function ClientTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        sceneStyle: { backgroundColor: colors.background },
         tabBarActiveTintColor: colors.gold,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarStyle: {

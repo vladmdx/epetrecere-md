@@ -19,7 +19,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from "react-native-reanimated";
-import { colors, motion } from "../../constants/theme";
+import { colors, motion, radii } from "../../constants/theme";
 import { cn } from "../../lib/cn";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -30,6 +30,8 @@ const CARD_SURFACE: ViewStyle = {
   backgroundColor: colors.card,
   borderWidth: 1,
   borderColor: colors.border,
+  borderRadius: radii["2xl"],
+  padding: 16,
 };
 
 interface PressProps

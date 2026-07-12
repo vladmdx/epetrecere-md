@@ -24,6 +24,7 @@ export default function PartnerTabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
+        sceneStyle: { backgroundColor: colors.background },
         tabBarActiveTintColor: colors.gold,
         tabBarInactiveTintColor: colors.mutedForeground,
         tabBarStyle: {
