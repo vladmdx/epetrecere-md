@@ -36,7 +36,9 @@ import { relativeTimeRO } from "@epetrecere/shared/utils";
 interface ChatMessage {
   id: number;
   conversationId: number;
-  senderType: "client" | "artist" | "admin";
+  // The server stamps senderType with the sender's side of the conversation:
+  // "client", "artist" or "venue" (see POST /conversations/[id]/messages).
+  senderType: "client" | "artist" | "venue" | "admin";
   senderName: string;
   message: string;
   createdAt: string;
@@ -46,16 +48,26 @@ interface ChatMessage {
 
 interface ConversationMeta {
   id: number;
-  vendorName: string | null;
-  vendorSlug: string | null;
-  vendorKind: "artist" | "venue";
+  // Present when fetched as the CLIENT (role=client): the vendor we're talking to.
+  vendorName?: string | null;
+  vendorSlug?: string | null;
+  vendorKind?: "artist" | "venue";
+  // Present when fetched as the VENDOR (role=vendor): the client on the other side.
+  clientName?: string | null;
 }
 
 const POLL_MS = 8000;
 
 export default function ChatThreadScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // This thread screen is SHARED: the client opens it from their chat-list,
+  // and the partner/vendor opens it from their Mesaje tab (they navigate to
+  // the same /(client)/chat/[id] route with ?as=vendor). Without knowing the
+  // viewer's side, bubble alignment + the header name would always assume the
+  // viewer is the client — so the vendor saw the client's messages aligned as
+  // their own and an empty header. `as` fixes both.
+  const { id, as } = useLocalSearchParams<{ id: string; as?: string }>();
   const conversationId = Number(id);
+  const viewerIsVendor = as === "vendor" || as === "artist" || as === "venue";
   const router = useRouter();
   const api = useApi();
   const qc = useQueryClient();
@@ -66,10 +78,16 @@ export default function ChatThreadScreen() {
   // Meta (vendor name) — comes from the conversations list cache when
   // we navigate here; otherwise we fetch.
   const metaQuery = useQuery({
-    queryKey: ["conversation-meta", conversationId],
+    queryKey: ["conversation-meta", conversationId, viewerIsVendor],
     enabled: Number.isFinite(conversationId),
     queryFn: async () => {
-      const list = await api.get<ConversationMeta[]>(API_PATHS.conversations);
+      // The vendor's conversations only surface under role=vendor (role=client,
+      // the default, never lists them) — and that payload carries the client's
+      // name, which is what the vendor's header should show.
+      const list = await api.get<ConversationMeta[]>(
+        API_PATHS.conversations,
+        viewerIsVendor ? { query: { role: "vendor" } } : undefined,
+      );
       return (
         list.data?.find((c) => c.id === conversationId) ?? null
       );
@@ -124,7 +142,9 @@ export default function ChatThreadScreen() {
       {
         id: tempId,
         conversationId,
-        senderType: "client",
+        // Stamp the optimistic row with the viewer's own side so it aligns as
+        // "mine" (the server will stamp the real row the same way).
+        senderType: viewerIsVendor ? "artist" : "client",
         senderName: "Tu",
         message: trimmed,
         createdAt: new Date().toISOString(),
@@ -154,6 +174,9 @@ export default function ChatThreadScreen() {
   }, [messagesQuery.data, tempMessages]);
 
   const meta = metaQuery.data;
+  const headerName = viewerIsVendor
+    ? meta?.clientName ?? "Client"
+    : meta?.vendorName ?? "Furnizor";
 
   return (
     <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>
@@ -191,7 +214,7 @@ export default function ChatThreadScreen() {
             >
               <Avatar
                 uri={null}
-                name={meta.vendorName ?? "?"}
+                name={headerName}
                 sizeClass="h-9 w-9"
               />
               <View className="flex-1" style={{ flex: 1 }}>
@@ -200,13 +223,17 @@ export default function ChatThreadScreen() {
                   numberOfLines={1}
                   style={{ fontSize: 15, fontWeight: "700", color: colors.foreground }}
                 >
-                  {meta.vendorName ?? "Furnizor"}
+                  {headerName}
                 </Text>
                 <Text
                   className="text-[11px] text-muted-foreground"
                   style={{ fontSize: 11, color: colors.mutedForeground }}
                 >
-                  {meta.vendorKind === "artist" ? "Artist" : "Sală"}
+                  {viewerIsVendor
+                    ? "Client"
+                    : meta.vendorKind === "artist"
+                      ? "Artist"
+                      : "Sală"}
                 </Text>
               </View>
             </View>
@@ -227,7 +254,9 @@ export default function ChatThreadScreen() {
           keyExtractor={(m) => String(m.id)}
           inverted
           contentContainerStyle={{ padding: 16, gap: 10 }}
-          renderItem={({ item }) => <Bubble msg={item} />}
+          renderItem={({ item }) => (
+            <Bubble msg={item} viewerIsVendor={viewerIsVendor} />
+          )}
           keyboardShouldPersistTaps="handled"
           ListEmptyComponent={
             <View className="items-center py-8" style={{ alignItems: "center", paddingVertical: 32 }}>
@@ -311,8 +340,19 @@ export default function ChatThreadScreen() {
   );
 }
 
-function Bubble({ msg }: { msg: ChatMessage }) {
-  const isMine = msg.senderType === "client";
+function Bubble({
+  msg,
+  viewerIsVendor,
+}: {
+  msg: ChatMessage;
+  viewerIsVendor: boolean;
+}) {
+  // "Mine" depends on who is looking: the client owns "client" messages, the
+  // vendor owns "artist"/"venue" messages. (admin messages are nobody's — they
+  // stay left-aligned for both sides.)
+  const isMine = viewerIsVendor
+    ? msg.senderType === "artist" || msg.senderType === "venue"
+    : msg.senderType === "client";
   return (
     <View
       className={isMine ? "items-end" : "items-start"}

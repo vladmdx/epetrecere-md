@@ -107,7 +107,9 @@ export default function PartnerMessagesScreen() {
           const displayName = item.clientName ?? item.vendorName ?? "Client";
           return (
             <Pressable
-              onPress={() => router.push(`/(client)/chat/${item.id}` as never)}
+              onPress={() =>
+                router.push(`/(client)/chat/${item.id}?as=vendor` as never)
+              }
               className="flex-row items-center gap-3 py-3 active:bg-gold/5"
               style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 }}
             >

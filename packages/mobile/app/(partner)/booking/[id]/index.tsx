@@ -366,7 +366,9 @@ export default function PartnerBookingDetailScreen() {
         {b.conversationId != null && (
           <Button
             variant="outline"
-            onPress={() => router.push(`/(client)/chat/${b.conversationId}`)}
+            onPress={() =>
+              router.push(`/(client)/chat/${b.conversationId}?as=vendor`)
+            }
             fullWidth
             size="md"
             leftIcon={<MessageCircle size={16} color={colors.gold} />}
