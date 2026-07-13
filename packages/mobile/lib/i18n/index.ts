@@ -46,7 +46,15 @@ void i18n.use(initReactI18next).init({
   fallbackLng: "ro",
   interpolation: { escapeValue: false }, // RN handles XSS at render time
   returnNull: false,
-  compatibilityJSON: "v4",
+  // v3, not v4: the v4 plural resolver requires `Intl.PluralRules`, which the
+  // Hermes runtime doesn't ship — that mismatch is what prints the noisy
+  // "i18next::pluralResolver: Your environment seems not to be Intl API
+  // compatible" LogBox warning on every launch. v3 uses i18next's built-in
+  // plural rules (no Intl needed). We use ZERO plural keys (no `_one`/`_other`
+  // suffixes, no `t(key, { count })`), so this is purely a warning-silencing
+  // change with no effect on rendered strings. If CLDR plurals are ever needed,
+  // add the `@formatjs/intl-pluralrules` polyfill and switch back to v4.
+  compatibilityJSON: "v3",
 });
 
 /** Read the persisted user-override locale and apply it. Call this
