@@ -94,7 +94,7 @@ export default function AccountTab() {
         />
         <Row
           Icon={Star}
-          label="Recenzii date de mine"
+          label="Lasă o recenzie"
           onPress={() => router.push("/(client)/account/reviews")}
         />
       </Section>
