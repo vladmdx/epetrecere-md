@@ -17,6 +17,7 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
@@ -114,6 +115,33 @@ export default function BookingDetailScreen() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["booking", bookingId] });
       void qc.invalidateQueries({ queryKey: ["my", "bookings"] });
+    },
+  });
+
+  // Open (or find-or-create) the conversation with this vendor, then jump into
+  // the chat. The server's POST /conversations is idempotent per client+artist,
+  // so this both starts a new chat and re-opens an existing one.
+  const openChatMutation = useMutation({
+    mutationFn: async () => {
+      const bk = detailQuery.data;
+      if (bk?.conversationId != null) return bk.conversationId;
+      const payload = bk?.artistId
+        ? { artistId: bk.artistId }
+        : { venueId: bk?.venueId };
+      const res = await api.post<{ id: number }>(
+        API_PATHS.conversations,
+        payload,
+      );
+      if (!res.ok || !res.data?.id) {
+        throw new Error(res.error?.message ?? "chat_failed");
+      }
+      return res.data.id;
+    },
+    onSuccess: (convId) => {
+      router.push(`/(client)/chat/${convId}`);
+    },
+    onError: () => {
+      Alert.alert("Eroare", "Nu am putut deschide conversația. Încearcă din nou.");
     },
   });
 
@@ -415,10 +443,11 @@ export default function BookingDetailScreen() {
           </View>
         )}
 
-        {b.conversationId != null && (
+        {(b.artistId != null || b.venueId != null) && (
           <Button
             variant="outline"
-            onPress={() => router.push(`/(client)/chat/${b.conversationId}`)}
+            onPress={() => openChatMutation.mutate()}
+            loading={openChatMutation.isPending}
             fullWidth
             size="md"
             leftIcon={<MessageCircle size={16} color={colors.gold} />}

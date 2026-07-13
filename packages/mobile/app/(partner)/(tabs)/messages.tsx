@@ -42,7 +42,12 @@ export default function PartnerMessagesScreen() {
     queryKey: ["partner-conversations"],
     enabled: !!isSignedIn,
     queryFn: async () => {
-      const res = await api.get<PartnerConversation[]>(API_PATHS.conversations);
+      // MUST pass role=artist — the server defaults to role=client, so without
+      // this the partner never sees the conversations clients started with them.
+      const res = await api.get<PartnerConversation[]>(
+        API_PATHS.conversations,
+        { query: { role: "artist" } },
+      );
       return Array.isArray(res.data) ? res.data : [];
     },
   });

@@ -74,6 +74,9 @@ export default function PlanNewScreen() {
       if (trimmed.length < 2) {
         throw new Error("Dă un titlu evenimentului (minim 2 caractere).");
       }
+      if (selectedCategories.length === 0) {
+        throw new Error("Alege cel puțin o categorie de artist / serviciu.");
+      }
       // Build the body manually — only the fields the server persists.
       const guests = Number(guestCount);
       const budgetVal = Number(budget);
@@ -364,7 +367,7 @@ export default function PlanNewScreen() {
               color: colors.mutedForeground,
             }}
           >
-            Ce artiști / servicii cauți? (opțional)
+            Ce artiști / servicii cauți?
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {(categoriesQuery.data ?? []).map((c) => {
