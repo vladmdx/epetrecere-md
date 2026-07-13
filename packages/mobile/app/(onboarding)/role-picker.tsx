@@ -51,9 +51,10 @@ export default function OnboardingRolePicker() {
       });
 
       if (role === "artist") {
-        // Artists land on the partner tab bar; its home tab surfaces the
-        // "complete your profile" CTA until the artist row exists.
-        router.replace("/(partner)/(tabs)");
+        // Collect the minimal artist profile and create the `artists` row —
+        // role-preference alone doesn't, so the partner dashboard would 404
+        // and a cold start would bounce them back to the client tabs.
+        router.replace("/(onboarding)/artist-register");
       } else {
         router.replace("/(client)/(tabs)");
       }
