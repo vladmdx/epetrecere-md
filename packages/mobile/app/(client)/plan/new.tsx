@@ -10,17 +10,17 @@
 // straight into the new plan and refresh the cabinet's active-plan query.
 
 import { useState } from "react";
-import { View, Text, Pressable, ScrollView, Platform } from "react-native";
+import { View, Text, Pressable, ScrollView } from "react-native";
 import { useRouter } from "expo-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { X, Calendar, Users, Wallet, Building2 } from "lucide-react-native";
-import { Button, Input, Card } from "../../../components/ui";
+import { X, Calendar, Users, Wallet, Building2, MapPin } from "lucide-react-native";
+import { Button, Input, Card, CalendarPicker } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { useApi } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared";
 import { eventTypeLabel, formatDateRO } from "@epetrecere/shared/utils";
+import { toLocalYMD } from "../../../lib/dates";
 
 const EVENT_TYPES = [
   "wedding",
@@ -45,11 +45,28 @@ export default function PlanNewScreen() {
     d.setDate(d.getDate() + 60); // default ~2 months out
     return d;
   });
+  const [location, setLocation] = useState("Chișinău");
   const [guestCount, setGuestCount] = useState("");
   const [budget, setBudget] = useState("");
   const [venueNeeded, setVenueNeeded] = useState(true);
+  const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const categoriesQuery = useQuery({
+    queryKey: ["categories"],
+    queryFn: async () => {
+      const res = await api.get<{ id: number; nameRo: string }[]>(
+        API_PATHS.categories,
+      );
+      return Array.isArray(res.data) ? res.data : [];
+    },
+  });
+
+  const toggleCategory = (id: number) =>
+    setSelectedCategories((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
 
   const submitMutation = useMutation({
     mutationFn: async () => {
@@ -65,11 +82,14 @@ export default function PlanNewScreen() {
         {
           title: trimmed,
           eventType,
-          eventDate: eventDate.toISOString().slice(0, 10),
+          eventDate: toLocalYMD(eventDate),
+          location: location.trim() || undefined,
           guestCountTarget:
             guestCount && guests > 0 ? guests : undefined,
           budgetTarget: budget && budgetVal >= 0 ? budgetVal : undefined,
           venueNeeded,
+          selectedCategories:
+            selectedCategories.length > 0 ? selectedCategories : undefined,
         },
       );
       if (!res.ok || !res.data?.plan?.id) {
@@ -234,11 +254,20 @@ export default function PlanNewScreen() {
                   color: colors.foreground,
                 }}
               >
-                {formatDateRO(eventDate.toISOString().slice(0, 10))}
+                {formatDateRO(toLocalYMD(eventDate))}
               </Text>
             </View>
           </Card>
         </Pressable>
+
+        {/* Location */}
+        <Input
+          label="Oraș"
+          value={location}
+          onChangeText={setLocation}
+          autoCapitalize="words"
+          rightSlot={<MapPin size={18} color={colors.mutedForeground} />}
+        />
 
         {/* Guests */}
         <Input
@@ -323,6 +352,53 @@ export default function PlanNewScreen() {
           </View>
         </View>
 
+        {/* Services / artist categories */}
+        <View>
+          <Text
+            style={{
+              marginBottom: 8,
+              fontSize: 12,
+              fontWeight: "600",
+              textTransform: "uppercase",
+              letterSpacing: 2,
+              color: colors.mutedForeground,
+            }}
+          >
+            Ce artiști / servicii cauți? (opțional)
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {(categoriesQuery.data ?? []).map((c) => {
+              const selected = selectedCategories.includes(c.id);
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => toggleCategory(c.id)}
+                  style={{
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 9999,
+                    borderWidth: 1,
+                    borderColor: selected ? colors.gold : colors.border,
+                    backgroundColor: selected
+                      ? "rgba(201,168,76,0.15)"
+                      : colors.card,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      fontWeight: "600",
+                      color: selected ? colors.gold : "rgba(247,245,238,0.8)",
+                    }}
+                  >
+                    {c.nameRo}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
         {error && (
           <Text
             className="text-center text-[13px] text-[#EF4444]"
@@ -342,17 +418,14 @@ export default function PlanNewScreen() {
         </Button>
       </ScrollView>
 
-      {showDatePicker && (
-        <DateTimePicker
-          value={eventDate}
-          mode="date"
-          minimumDate={new Date()}
-          onChange={(e, d) => {
-            setShowDatePicker(Platform.OS === "ios" && e.type !== "set");
-            if (d) setEventDate(d);
-          }}
-        />
-      )}
+      <CalendarPicker
+        visible={showDatePicker}
+        value={eventDate}
+        minDate={new Date()}
+        onChange={setEventDate}
+        onClose={() => setShowDatePicker(false)}
+        title="Data evenimentului"
+      />
     </View>
   );
 }

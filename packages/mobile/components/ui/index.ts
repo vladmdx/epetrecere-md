@@ -4,6 +4,7 @@
 export { Avatar } from "./Avatar";
 export { Badge, type BadgeTone } from "./Badge";
 export { Button } from "./Button";
+export { CalendarPicker } from "./CalendarPicker";
 export { Card } from "./Card";
 export { Input } from "./Input";
 export { ProgressBar } from "./ProgressBar";

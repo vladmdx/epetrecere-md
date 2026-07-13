@@ -25,9 +25,10 @@ import { useUser } from "@clerk/clerk-expo";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { X, Calendar, Clock, Users } from "lucide-react-native";
-import { Button, Input, Card } from "../../components/ui";
+import { Button, Input, Card, CalendarPicker } from "../../components/ui";
 import { colors } from "../../constants/theme";
 import { useApi } from "../../lib/api";
+import { toLocalYMD } from "../../lib/dates";
 import {
   API_PATHS,
   BookingRequestCreateSchema,
@@ -88,7 +89,7 @@ export default function BookingNewScreen() {
           "Client",
         clientPhone: user?.phoneNumbers?.[0]?.phoneNumber ?? "+37300000000",
         clientEmail: user?.primaryEmailAddress?.emailAddress ?? undefined,
-        eventDate: eventDate.toISOString().slice(0, 10),
+        eventDate: toLocalYMD(eventDate),
         startTime: `${String(startTime.getHours()).padStart(2, "0")}:${String(startTime.getMinutes()).padStart(2, "0")}`,
         eventType,
         guestCount: Number(guestCount) || undefined,
@@ -224,7 +225,7 @@ export default function BookingNewScreen() {
                 className="mt-0.5 text-[15px] font-semibold text-foreground"
                 style={{ marginTop: 2, fontSize: 15, fontWeight: "600", color: colors.foreground }}
               >
-                {formatDateRO(eventDate.toISOString().slice(0, 10))}
+                {formatDateRO(toLocalYMD(eventDate))}
               </Text>
             </View>
           </Card>
@@ -305,22 +306,15 @@ export default function BookingNewScreen() {
         </Text>
       </ScrollView>
 
-      {/* Native date pickers */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={eventDate}
-          mode="date"
-          minimumDate={new Date()}
-          onChange={(e, d) => {
-            // On Android the picker closes on selection — set state on
-            // the first event. On iOS it stays open inline so we keep
-            // showing until the user explicitly confirms; here we close
-            // for both to keep behavior consistent.
-            setShowDatePicker(Platform.OS === "ios" && e.type !== "set");
-            if (d) setEventDate(d);
-          }}
-        />
-      )}
+      {/* Date = website-style calendar; time = native wheel */}
+      <CalendarPicker
+        visible={showDatePicker}
+        value={eventDate}
+        minDate={new Date()}
+        onChange={setEventDate}
+        onClose={() => setShowDatePicker(false)}
+        title="Data evenimentului"
+      />
       {showTimePicker && (
         <DateTimePicker
           value={startTime}

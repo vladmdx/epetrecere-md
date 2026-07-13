@@ -219,7 +219,7 @@ export default function HomeScreen() {
 
       {/* Plan CTA */}
       <Pressable
-        onPress={() => router.push("/(client)/(tabs)/cabinet")}
+        onPress={() => router.push("/(client)/plan/new")}
         className="overflow-hidden rounded-2xl border border-gold/30 bg-card"
         style={{
           overflow: "hidden",
