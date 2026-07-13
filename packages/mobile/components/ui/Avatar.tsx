@@ -12,6 +12,7 @@ import { Image } from "expo-image";
 import { View, Text } from "react-native";
 import { initials as toInitials } from "@epetrecere/shared/utils";
 import { colors } from "../../constants/theme";
+import { mediaUrl } from "../../lib/media";
 
 interface Props {
   uri?: string | null;
@@ -47,6 +48,7 @@ export function Avatar({
   const fill = size == null && /(^|\s)(h-full|w-full)(\s|$)/.test(sizeClass);
   const dim = resolveDiameter(sizeClass, size);
   const ringColor = RING_COLOR[ring];
+  const src = mediaUrl(uri);
   return (
     <View
       accessibilityRole="image"
@@ -62,9 +64,9 @@ export function Avatar({
         ...(ringColor ? { borderWidth: 2, borderColor: ringColor } : null),
       }}
     >
-      {uri ? (
+      {src ? (
         <Image
-          source={{ uri }}
+          source={{ uri: src }}
           style={{ width: "100%", height: "100%" }}
           contentFit="cover"
           transition={150}

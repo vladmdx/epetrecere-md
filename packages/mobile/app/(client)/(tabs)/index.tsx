@@ -70,7 +70,15 @@ export default function HomeScreen() {
         API_PATHS.artists,
         { query: { featured: 1, limit: 10 } },
       );
-      return res.data?.items ?? [];
+      const items = res.data?.items ?? [];
+      if (items.length > 0) return items;
+      // No artists are flagged `featured` — fall back to the top artists so
+      // the "Artiști recomandați" row isn't empty.
+      const fallback = await publicApi.get<{ items: ArtistCardData[] }>(
+        API_PATHS.artists,
+        { query: { limit: 10 } },
+      );
+      return fallback.data?.items ?? [];
     },
   });
 
@@ -187,10 +195,7 @@ export default function HomeScreen() {
         title="Artiști recomandați"
         actionLabel={t("common.seeAll")}
         onAction={() =>
-          router.push({
-            pathname: "/(client)/(tabs)/search",
-            params: { featured: "1" },
-          })
+          router.push({ pathname: "/(client)/(tabs)/search" })
         }
       >
         {featuredQuery.isLoading ? (

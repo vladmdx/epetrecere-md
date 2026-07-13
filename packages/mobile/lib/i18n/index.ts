@@ -25,19 +25,15 @@ const SUPPORTED = ["ro", "ru", "en"] as const;
 export type SupportedLocale = (typeof SUPPORTED)[number];
 
 function detectInitialLocale(): SupportedLocale {
-  // 1. User override from SecureStore (read synchronously elsewhere
-  //    on first launch — we don't await here because i18next setup is
-  //    synchronous. The override is applied via setLocale() once the
-  //    app is mounted; until then the device default is fine.)
-  // 2. Device locale (first matching SUPPORTED).
-  const locales = getLocales();
-  for (const l of locales) {
-    const code = (l.languageCode ?? "").toLowerCase();
-    if (SUPPORTED.includes(code as SupportedLocale)) {
-      return code as SupportedLocale;
-    }
-  }
-  return "ro"; // Moldovan market default.
+  // Moldova-first: default to Romanian. We only auto-adopt the device
+  // language when the phone's primary locale is Russian (the other local
+  // language). An English (or any other) device still starts in Romanian —
+  // English is the least likely real preference for this market and users
+  // can switch any time via the language picker (persisted in SecureStore,
+  // applied by applyPersistedLocale() on launch).
+  const primary = (getLocales()[0]?.languageCode ?? "").toLowerCase();
+  if (primary === "ru") return "ru";
+  return "ro";
 }
 
 void i18n.use(initReactI18next).init({

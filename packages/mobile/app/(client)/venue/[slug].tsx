@@ -30,6 +30,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, Badge } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { publicApi } from "../../../lib/api";
+import { mediaUrl } from "../../../lib/media";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GALLERY_HEIGHT = 360;
@@ -80,8 +81,10 @@ export default function VenueDetailScreen() {
     );
   }
 
-  const gallery = venue.images?.map((img) => img.url) ??
-    [venue.coverImageUrl ?? venue.photoUrl ?? "/images/backgrounds/party-dance.jpg"];
+  const gallery = (venue.images?.map((img) => img.url) ??
+    [venue.coverImageUrl ?? venue.photoUrl ?? "/images/backgrounds/party-dance.jpg"]).map(
+    (u) => mediaUrl(u) ?? u,
+  );
 
   return (
     <View className="flex-1 bg-background" style={{ flex: 1, backgroundColor: colors.background }}>

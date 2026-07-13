@@ -16,6 +16,7 @@ import {
   Shield,
   LogOut,
   Star,
+  CalendarCheck,
   type LucideIcon,
 } from "lucide-react-native";
 import { SafeScreen, Avatar } from "../../../components/ui";
@@ -81,6 +82,11 @@ export default function AccountTab() {
 
       {/* Settings sections */}
       <Section title="Cont">
+        <Row
+          Icon={CalendarCheck}
+          label="Rezervările mele"
+          onPress={() => router.push("/(client)/bookings")}
+        />
         <Row
           Icon={User}
           label="Editează profilul"

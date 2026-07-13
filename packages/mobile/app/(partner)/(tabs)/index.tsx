@@ -42,6 +42,7 @@ import {
 } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { useApi } from "../../../lib/api";
+import { mediaUrl } from "../../../lib/media";
 import { initials } from "@epetrecere/shared/utils";
 
 interface DashboardResponse {
@@ -394,7 +395,7 @@ function HeroCard({
         >
           {profile.photoUrl ? (
             <Image
-              source={{ uri: profile.photoUrl }}
+              source={{ uri: mediaUrl(profile.photoUrl) ?? undefined }}
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
             />

@@ -37,6 +37,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, Badge, Card } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { publicApi } from "../../../lib/api";
+import { mediaUrl } from "../../../lib/media";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GALLERY_HEIGHT = 380;
@@ -107,12 +108,13 @@ export default function ArtistDetailScreen() {
     );
   }
 
-  const gallery =
+  const gallery = (
     artist.images && artist.images.length > 0
       ? artist.images.map((img) => img.url)
       : artist.photoUrl
         ? [artist.photoUrl]
-        : ["/images/backgrounds/party-dance.jpg"];
+        : ["/images/backgrounds/party-dance.jpg"]
+  ).map((u) => mediaUrl(u) ?? u);
 
   return (
     <View
