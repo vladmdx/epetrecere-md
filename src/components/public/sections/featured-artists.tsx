@@ -67,7 +67,9 @@ export function FeaturedArtistsSection({ artists }: Props) {
         id: a.id,
         slug: a.slug,
         name: a.nameRo,
-        role: a.location ?? "Artist",
+        // Real artist rows expose `location` (a city), not a display role/
+        // category, so leave role blank rather than repeat the city.
+        role: "",
         city: a.location ?? "",
         price: a.priceFrom,
         rating: a.ratingAvg,
@@ -120,7 +122,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
               </span>
               <div className="relative z-10 p-6">
                 <h3 className="font-heading text-2xl font-bold text-white">{hero.name}</h3>
-                <p className="mt-1 text-gold">{hero.role}</p>
+                {hero.role && <p className="mt-1 text-gold">{hero.role}</p>}
                 <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-white/80">
                   {hero.city && (
                     <span className="flex items-center gap-1.5">
@@ -158,7 +160,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col justify-center">
                     <h3 className="truncate font-heading text-base font-bold text-white">{a.name}</h3>
-                    <p className="truncate text-sm text-gold">{a.role}</p>
+                    {a.role && <p className="truncate text-sm text-gold">{a.role}</p>}
                     {a.city && (
                       <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-white/60">
                         <MapPin className="h-3 w-3" /> {a.city}
