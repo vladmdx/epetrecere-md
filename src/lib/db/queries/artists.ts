@@ -300,11 +300,20 @@ export async function getArtistBySlug(slug: string) {
 }
 
 export async function getFeaturedArtists(limit = 8) {
+  // Showcase priority for the homepage: explicitly featured artists first,
+  // then the top-rated ones, then a random fill from all active artists — so a
+  // brand-new platform with nothing featured (and nobody rated yet) still
+  // populates the section instead of hiding it.
   const items = await db
     .select()
     .from(artists)
-    .where(and(eq(artists.isActive, true), eq(artists.isFeatured, true)))
-    .orderBy(asc(artists.sortOrder))
+    .where(eq(artists.isActive, true))
+    .orderBy(
+      desc(artists.isFeatured),
+      sql`${artists.ratingAvg} DESC NULLS LAST`,
+      sql`${artists.ratingCount} DESC NULLS LAST`,
+      sql`random()`,
+    )
     .limit(limit);
 
   // Add cover images
