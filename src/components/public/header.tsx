@@ -3,16 +3,14 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles, ChevronDown, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
+import { Menu, X, Sparkles, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { SearchAutocomplete } from "@/components/public/search-autocomplete";
 import { NotificationBell } from "@/components/public/notification-bell";
 import { ChatBell } from "@/components/public/chat-bell";
 import { useLocale } from "@/hooks/use-locale";
 import { useUserRole, isClientOrGuest } from "@/hooks/use-user-role";
-import { cn } from "@/lib/utils";
 import { useUser, useClerk } from "@clerk/nextjs";
 
 // Fallback list rendered on first paint before /api/categories resolves —
@@ -84,61 +82,9 @@ function useCategories() {
   return { artist, service };
 }
 
-function DropdownMenu({ label, items, href }: { label: string; items: { slug: string; label: string }[]; href: string }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      <Link
-        href={href}
-        className="flex items-center gap-1 text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap"
-      >
-        {label}
-        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
-      </Link>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-50 mt-2 max-h-[70vh] w-64 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
-          >
-            {items.map((item) => (
-              <Link
-                key={item.slug}
-                href={`/categorie/${item.slug}`}
-                className="block rounded-lg px-3 py-2 text-sm text-white/80 transition-colors hover:bg-accent hover:text-gold"
-                onClick={() => setOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
-            <Link
-              href={href}
-              className="mt-1 block rounded-lg border-t border-border/30 px-3 pt-2.5 pb-1 text-xs font-medium text-gold hover:bg-gold/10"
-              onClick={() => setOpen(false)}
-            >
-              Vezi toate →
-            </Link>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-// "Utilități" dropdown — instead of a list of slugs (like categories), it
-// renders a curated list of in-app tools + a nested "Calculatoare" submenu.
-// Each top-level tool links to a public landing page (/utilitati/[slug])
-// optimized for SEO, where the CTA pushes users into the corresponding
-// /cabinet/* tool after login.
+// "Utilități" tools — still surfaced in the mobile menu (the desktop nav was
+// simplified to plain links in the redesign). Each links to a public landing
+// page (/utilitati/[slug]) optimized for SEO.
 const UTILITATI_TOOLS = [
   { slug: "checklist", label: "Checklist Eveniment", emoji: "✅" },
   { slug: "budget", label: "Budget & Cheltuieli", emoji: "💰" },
@@ -146,120 +92,6 @@ const UTILITATI_TOOLS = [
   { slug: "lista-invitati", label: "Listă Invitați & Așezare Mese", emoji: "👥" },
   { slug: "momente-eveniment", label: "Momente Eveniment", emoji: "📸" },
 ];
-
-const UTILITATI_CALCULATORS = [
-  { slug: "buget", label: "Calculator Buget" },
-  { slug: "invitati", label: "Calculator Invitați & Mese" },
-  { slug: "dar-nunta", label: "Calculator Dar Nuntă" },
-  { slug: "nunta", label: "Calculator Cost Nuntă" },
-  { slug: "alcool", label: "Calculator Băuturi" },
-  { slug: "meniu", label: "Calculator Meniu" },
-];
-
-function UtilitatiDropdown() {
-  const [open, setOpen] = useState(false);
-  const [calcOpen, setCalcOpen] = useState(false);
-
-  return (
-    <div
-      className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => {
-        setOpen(false);
-        setCalcOpen(false);
-      }}
-    >
-      <Link
-        href="/utilitati"
-        className="flex items-center gap-1 text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap"
-      >
-        Utilități
-        <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
-      </Link>
-
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 4 }}
-            transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
-          >
-            {/* Tools */}
-            {UTILITATI_TOOLS.map((tool) => (
-              <Link
-                key={tool.slug}
-                href={`/utilitati/${tool.slug}`}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/80 transition-colors hover:bg-accent hover:text-gold"
-                onClick={() => setOpen(false)}
-              >
-                <span className="text-base">{tool.emoji}</span>
-                <span>{tool.label}</span>
-              </Link>
-            ))}
-
-            {/* Calculatoare — clickable to /calculatoare AND has nested
-                submenu on hover */}
-            <div
-              className="relative mt-1 border-t border-border/30 pt-1"
-              onMouseEnter={() => setCalcOpen(true)}
-              onMouseLeave={() => setCalcOpen(false)}
-            >
-              <Link
-                href="/calculatoare"
-                className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/90 transition-colors hover:bg-accent hover:text-gold"
-                onClick={() => setOpen(false)}
-              >
-                <span className="flex items-center gap-2">
-                  <span className="text-base">🧮</span>
-                  Calculatoare
-                </span>
-                <ChevronDown className={cn("h-3.5 w-3.5 -rotate-90 transition-transform", calcOpen && "rotate-0")} />
-              </Link>
-
-              <AnimatePresence>
-                {calcOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, x: -6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -6 }}
-                    transition={{ duration: 0.12 }}
-                    className="absolute left-full top-0 ml-1 w-64 rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
-                  >
-                    {UTILITATI_CALCULATORS.map((calc) => (
-                      <Link
-                        key={calc.slug}
-                        href={`/calculatoare/${calc.slug}`}
-                        className="block rounded-lg px-3 py-2 text-sm text-white/80 transition-colors hover:bg-accent hover:text-gold"
-                        onClick={() => {
-                          setCalcOpen(false);
-                          setOpen(false);
-                        }}
-                      >
-                        {calc.label}
-                      </Link>
-                    ))}
-                    <Link
-                      href="/calculatoare"
-                      className="mt-1 block rounded-lg border-t border-border/30 px-3 pt-2.5 pb-1 text-xs font-medium text-gold hover:bg-gold/10"
-                      onClick={() => {
-                        setCalcOpen(false);
-                        setOpen(false);
-                      }}
-                    >
-                      Vezi toate →
-                    </Link>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 function UserMenu() {
   const { isSignedIn, user } = useUser();
@@ -363,32 +195,33 @@ export function Header() {
           </span>
         </Link>
 
-        {/* Desktop Nav */}
-        <nav className="hidden items-center gap-5 xl:flex">
-          <DropdownMenu label={t("nav.artists")} items={artistCategories} href="/artisti" />
-          <Link href="/sali" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
-            {t("nav.venues")}
+        {/* Desktop Nav — plain links matching the redesign */}
+        <nav className="hidden items-center gap-7 xl:flex">
+          <Link href="/sali" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
+            {t("nav.locations")}
           </Link>
-          <DropdownMenu label={t("nav.services")} items={serviceCategories} href="/servicii" />
-          <UtilitatiDropdown />
-          <Link href="/blog" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
-            {t("nav.blog")}
+          <Link href="/artisti" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
+            {t("nav.artists")}
           </Link>
-          <Link href="/contact" className="text-sm font-medium text-white/90 transition-colors hover:text-gold whitespace-nowrap">
-            {t("nav.contact")}
+          <Link href="/servicii" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
+            {t("nav.services")}
+          </Link>
+          <Link href="/planifica" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
+            {t("nav.event_types")}
+          </Link>
+          <Link href="/#cum-functioneaza" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
+            {t("nav.how_it_works")}
           </Link>
         </nav>
 
         {/* Right Actions — always on dark header bg, so force light icon/text in both themes */}
         <div className="flex items-center gap-2 text-white/90">
-          <div className="hidden lg:block">
-            <SearchAutocomplete />
-          </div>
+          {/* Bells self-gate to signed-in users, so the signed-out marketing
+              header stays clean (matches the design). */}
           <ChatBell />
           <NotificationBell />
-          <UserMenu />
           <LanguageSwitcher />
-          <ThemeToggle />
+          <UserMenu />
           {showPlannerCta && (
             <Link href="/planifica" className="hidden lg:block">
               <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark font-medium">

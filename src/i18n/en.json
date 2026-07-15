@@ -36,17 +36,21 @@
     "artists": "Artists",
     "venues": "Venues & Restaurants",
     "services": "Services",
-    "planner": "Plan Event",
+    "planner": "Plan an event",
     "blog": "Blog",
     "contact": "Contact",
-    "about": "About Us"
+    "about": "About Us",
+    "locations": "Venues",
+    "event_types": "Event types",
+    "how_it_works": "How it works",
+    "explore_vendors": "Explore vendors"
   },
   "hero": {
-    "subtitle": "Event Marketplace",
-    "title": "Plan Your Perfect Event",
-    "description": "Discover the best artists, venues, and services for your event in Moldova",
-    "cta_primary": "Explore Artists",
-    "cta_secondary": "Plan Event",
+    "subtitle": "The complete events platform",
+    "title": "Memorable events, planned without compromise.",
+    "description": "Discover premium venues, artists and verified services for any type of event in Moldova.",
+    "cta_primary": "Start planning",
+    "cta_secondary": "Explore vendors",
     "stats_artists": "Artists",
     "stats_events": "Events",
     "stats_years": "Years of experience"
@@ -57,7 +61,16 @@
     "date": "Date",
     "category": "Category",
     "search_button": "Search",
-    "placeholder": "Search artists, venues, services..."
+    "placeholder": "Search artists, venues, services...",
+    "tab_venues": "Venues",
+    "tab_artists": "Artists",
+    "tab_services": "Services",
+    "what": "What are you looking for?",
+    "what_ph": "e.g. venue, DJ, band...",
+    "location_ph": "City or region",
+    "date_label": "Event date",
+    "guests": "Guests",
+    "guests_ph": "No. of guests"
   },
   "categories": {
     "title": "Categories",

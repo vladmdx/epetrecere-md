@@ -1,52 +1,70 @@
 "use client";
 
-import { Phone, MessageSquare, Search, FileCheck, PartyPopper } from "lucide-react";
-import { useLocale } from "@/hooks/use-locale";
-import { GoldDivider } from "@/components/shared/gold-divider";
+import { Fragment } from "react";
+import { Search, SlidersHorizontal, CalendarCheck, ArrowRight } from "lucide-react";
+import { ScrollReveal } from "@/components/shared/scroll-reveal";
 
-const steps = [
-  { icon: Phone, key: "step1" },
-  { icon: MessageSquare, key: "step2" },
-  { icon: Search, key: "step3" },
-  { icon: FileCheck, key: "step4" },
-  { icon: PartyPopper, key: "step5" },
+const STEPS = [
+  {
+    num: "01",
+    icon: Search,
+    title: "Spune-ne ce cauți",
+    desc: "Completează detaliile evenimentului tău: tip, dată, număr de invitați și buget.",
+  },
+  {
+    num: "02",
+    icon: SlidersHorizontal,
+    title: "Compară opțiunile",
+    desc: "Primești recomandări personalizate. Compară și alege ce ți se potrivește.",
+  },
+  {
+    num: "03",
+    icon: CalendarCheck,
+    title: "Rezervă și organizează",
+    desc: "Rezervă furnizorii preferați și coordonează totul direct prin platformă.",
+  },
 ];
 
 export function ProcessSection() {
-  const { t } = useLocale();
-
   return (
-    <section className="bg-card py-20">
-      <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        <div className="mb-16 text-center">
-          <GoldDivider />
-          <h2 className="mt-4 font-heading text-3xl font-bold md:text-4xl">
-            {t("process.title")}
-          </h2>
-        </div>
-
-        <div className="relative flex flex-col items-center gap-12 md:flex-row md:justify-between md:gap-0">
-          {/* Animated connecting line */}
-          <div className="absolute left-1/2 top-0 hidden h-full w-px bg-gold/10 md:left-[10%] md:right-[10%] md:top-[calc(50%-20px)] md:h-[2px] md:w-[80%] md:bg-gold/10 md:block">
-            <div className="absolute inset-0 process-line-animated h-full rounded-full" />
+    <section id="cum-functioneaza" className="scroll-mt-20 py-20">
+      <div className="mx-auto max-w-6xl px-4 lg:px-8">
+        <ScrollReveal>
+          <div className="mb-14 text-center">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[3px] text-gold">
+              Cum funcționează
+            </p>
+            <h2 className="font-heading text-3xl font-bold text-[#FAF8F2] md:text-[40px]">
+              Trei pași până la evenimentul perfect
+            </h2>
           </div>
+        </ScrollReveal>
 
-          {steps.map((step, i) => (
-            <div
-              key={step.key}
-              className="relative z-10 flex flex-col items-center text-center md:flex-1 animate-fade-up"
-              style={{ animationDelay: `${i * 100}ms` }}
-            >
-              <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-full border-2 border-gold bg-background text-gold shadow-[0_0_20px_rgba(201,168,76,0.15)]">
-                <step.icon className="h-7 w-7" />
-              </div>
-              <h3 className="mb-1 font-heading text-sm font-bold">
-                {t(`process.${step.key}_title`)}
-              </h3>
-              <p className="max-w-[160px] text-xs text-muted-foreground">
-                {t(`process.${step.key}_desc`)}
-              </p>
-            </div>
+        <div className="grid items-start gap-8 md:grid-cols-[1fr_auto_1fr_auto_1fr]">
+          {STEPS.map((step, i) => (
+            <Fragment key={step.num}>
+              <ScrollReveal delay={i * 0.12}>
+                <div className="text-center">
+                  <div className="relative mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full border border-gold/40 bg-[#1A1A2E] text-gold shadow-[0_0_25px_rgba(201,168,76,0.12)]">
+                    <step.icon className="h-7 w-7" />
+                    <span className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-gold text-xs font-bold text-[#0D0D0D]">
+                      {step.num}
+                    </span>
+                  </div>
+                  <h3 className="mb-2 font-heading text-lg font-bold text-[#FAF8F2]">
+                    {step.title}
+                  </h3>
+                  <p className="mx-auto max-w-[240px] text-sm leading-relaxed text-[#B0B0C0]">
+                    {step.desc}
+                  </p>
+                </div>
+              </ScrollReveal>
+              {i < STEPS.length - 1 && (
+                <div className="hidden items-center justify-center pt-5 text-gold/40 md:flex">
+                  <ArrowRight className="h-6 w-6" />
+                </div>
+              )}
+            </Fragment>
           ))}
         </div>
       </div>

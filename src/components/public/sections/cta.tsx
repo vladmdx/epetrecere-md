@@ -19,10 +19,11 @@ export function CTASection() {
 
       <div className="relative z-10 mx-auto max-w-3xl px-4 text-center lg:px-8 animate-fade-up">
         <h2 className="font-heading text-3xl font-bold md:text-5xl text-white">
-          Pregătit să-ți planifici evenimentul?
+          Evenimentul tău începe aici.
         </h2>
         <p className="mt-6 text-lg md:text-xl text-[#D4D4E0]">
-          Trimite-ne o solicitare și te contactăm în cel mai scurt timp cu cele mai bune opțiuni.
+          Descoperă furnizorii potriviți și construiește fiecare detaliu într-un
+          singur loc.
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
           <Link href="/planifica">
@@ -30,13 +31,13 @@ export function CTASection() {
               size="lg"
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2 px-8 text-base font-medium shadow-[0_4px_20px_rgba(201,168,76,0.3)]"
             >
-              Planifică Evenimentul
+              Începe planificarea
               <ArrowRight className="h-4 w-4" />
             </Button>
           </Link>
-          <Link href="/contact">
-            <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8">
-              Contactează-ne
+          <Link href="/sign-up">
+            <Button size="lg" variant="outline" className="border-white/40 bg-white/5 text-white hover:border-gold hover:bg-gold/10 hover:text-gold px-8 backdrop-blur-sm">
+              Devino furnizor
             </Button>
           </Link>
         </div>

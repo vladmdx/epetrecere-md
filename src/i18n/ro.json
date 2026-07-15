@@ -36,17 +36,21 @@
     "artists": "Artiști",
     "venues": "Săli & Restaurante",
     "services": "Servicii",
-    "planner": "Planifică Eveniment",
+    "planner": "Planifică un eveniment",
     "blog": "Blog",
     "contact": "Contact",
-    "about": "Despre Noi"
+    "about": "Despre Noi",
+    "locations": "Locații",
+    "event_types": "Tipuri de evenimente",
+    "how_it_works": "Cum funcționează",
+    "explore_vendors": "Explorează furnizorii"
   },
   "hero": {
-    "subtitle": "Marketplace pentru Evenimente",
-    "title": "Planifică-ți Evenimentul Perfect",
-    "description": "Descoperă cei mai buni artiști, săli și servicii pentru evenimentul tău în Republica Moldova",
-    "cta_primary": "Explorează Artiști",
-    "cta_secondary": "Planifică Eveniment",
+    "subtitle": "Platforma completă pentru evenimente",
+    "title": "Evenimente memorabile, planificate fără compromisuri.",
+    "description": "Descoperă locații premium, artiști și servicii verificate pentru orice tip de eveniment din Republica Moldova.",
+    "cta_primary": "Începe planificarea",
+    "cta_secondary": "Explorează furnizorii",
     "stats_artists": "Artiști",
     "stats_events": "Evenimente",
     "stats_years": "Ani experiență"
@@ -57,7 +61,16 @@
     "date": "Dată",
     "category": "Categorie",
     "search_button": "Caută",
-    "placeholder": "Caută artiști, săli, servicii..."
+    "placeholder": "Caută artiști, săli, servicii...",
+    "tab_venues": "Locații",
+    "tab_artists": "Artiști",
+    "tab_services": "Servicii",
+    "what": "Ce cauți?",
+    "what_ph": "Ex: sală, DJ, formație...",
+    "location_ph": "Oraș sau regiune",
+    "date_label": "Data evenimentului",
+    "guests": "Invitați",
+    "guests_ph": "Nr. invitați"
   },
   "categories": {
     "title": "Categorii",

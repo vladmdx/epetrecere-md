@@ -5,23 +5,17 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/hooks/use-locale";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
-import { SmartSearchBar } from "@/components/public/smart-search-bar";
-
-const stats = [
-  { key: "stats_artists", value: "500+" },
-  { key: "stats_events", value: "200+" },
-  { key: "stats_years", value: "12" },
-];
+import { HeroSearch } from "@/components/public/hero-search";
 
 export function HeroSection() {
   const { t } = useLocale();
 
   return (
-    <section className="relative flex min-h-[90vh] items-center justify-center overflow-hidden -mt-16 pt-16">
-      {/* Video/Image Background */}
+    <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden -mt-16 pt-16">
+      {/* Video/Image Background — kept as-is per design */}
       <div className="absolute inset-0">
         {/* Gradient overlay — always visible */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/50 to-[#0D0D0D] z-10" />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/75 via-black/55 to-[#0D0D0D] z-10" />
         {/* Radial gold glow */}
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gold/8 via-transparent to-transparent z-10" />
         {/* Background video (desktop) / image (mobile) */}
@@ -45,37 +39,34 @@ export function HeroSection() {
         />
       </div>
 
-      <div className="relative z-20 mx-auto max-w-7xl px-4 py-24 text-center lg:px-8">
+      <div className="relative z-20 mx-auto w-full max-w-6xl px-4 py-24 text-center lg:px-8">
         <ScrollReveal>
-          <p className="mb-4 text-sm font-medium uppercase tracking-[4px] text-gold">
+          <p className="mb-5 text-xs font-semibold uppercase tracking-[4px] text-gold sm:text-sm">
             {t("hero.subtitle")}
           </p>
         </ScrollReveal>
 
         <ScrollReveal delay={0.15}>
-          <h1 className="mx-auto max-w-4xl font-heading text-3xl font-bold leading-tight text-[#FAF8F2] sm:text-4xl md:text-5xl lg:text-6xl">
+          <h1 className="mx-auto max-w-4xl font-heading text-4xl font-bold leading-[1.08] text-[#FAF8F2] sm:text-5xl md:text-6xl lg:text-[64px]">
             {t("hero.title")}
           </h1>
         </ScrollReveal>
 
         <ScrollReveal delay={0.3}>
-          <p className="mx-auto mt-6 max-w-2xl text-base text-[#D4D4E0] sm:text-lg">
+          <p className="mx-auto mt-6 max-w-2xl text-base leading-relaxed text-[#D4D4E0] sm:text-lg">
             {t("hero.description")}
           </p>
         </ScrollReveal>
 
         <ScrollReveal delay={0.45}>
-          <div className="mx-auto mt-10 max-w-2xl">
-            <SmartSearchBar />
-          </div>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-4">
-            <Link href="/artisti">
-              <Button size="lg" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark px-8 text-base font-medium shadow-[0_4px_20px_rgba(201,168,76,0.3)]">
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/planifica">
+              <Button size="lg" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark px-8 text-base font-semibold shadow-[0_4px_20px_rgba(201,168,76,0.3)]">
                 {t("hero.cta_primary")}
               </Button>
             </Link>
-            <Link href="/planifica">
-              <Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold/10 px-8 text-base">
+            <Link href="/artisti">
+              <Button size="lg" variant="outline" className="border-white/30 bg-white/5 text-white hover:border-gold hover:bg-gold/10 hover:text-gold px-8 text-base backdrop-blur-sm">
                 {t("hero.cta_secondary")}
               </Button>
             </Link>
@@ -83,17 +74,8 @@ export function HeroSection() {
         </ScrollReveal>
 
         <ScrollReveal delay={0.6}>
-          <div className="mt-16 flex flex-wrap items-center justify-center gap-8 md:gap-16">
-            {stats.map((stat) => (
-              <div key={stat.key} className="text-center">
-                <p className="font-accent text-3xl font-semibold text-gold md:text-4xl">
-                  {stat.value}
-                </p>
-                <p className="mt-1 text-sm text-[#D4D4E0]">
-                  {t(`hero.${stat.key}`)}
-                </p>
-              </div>
-            ))}
+          <div className="mt-12">
+            <HeroSearch />
           </div>
         </ScrollReveal>
       </div>

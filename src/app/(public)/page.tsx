@@ -1,14 +1,11 @@
 import { HeroSection } from "@/components/public/sections/hero";
-import { SearchBarSection } from "@/components/public/sections/search-bar";
+import { FeatureHighlightsSection } from "@/components/public/sections/feature-highlights";
 import { CategoriesSection } from "@/components/public/sections/categories";
 import { FeaturedArtistsSection } from "@/components/public/sections/featured-artists";
 import { FeaturedVenuesSection } from "@/components/public/sections/featured-venues";
+import { RecommendationsSection } from "@/components/public/sections/recommendations";
 import { ProcessSection } from "@/components/public/sections/process";
-import { TestimonialsSection } from "@/components/public/sections/testimonials";
-import { StatsCounterSection } from "@/components/public/sections/stats-counter";
-import { ClientLogosSection } from "@/components/public/sections/client-logos";
-import { BlogPreviewSection } from "@/components/public/sections/blog-preview";
-import { PackagesSection } from "@/components/public/sections/packages";
+import { CommunitySection } from "@/components/public/sections/community";
 import { CTASection } from "@/components/public/sections/cta";
 import { FloatingCTA } from "@/components/shared/floating-cta";
 import { websiteJsonLd, organizationJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
@@ -27,23 +24,23 @@ export async function generateMetadata() {
   });
 }
 
-// Section type → wrapper style mapping
+// Section type → wrapper style mapping. Light sections (features, venues,
+// recommendations) own their background inside the component, so they get no
+// dark wrapper here.
 const sectionStyles: Record<string, string> = {
   categories: "section-dark relative",
   featured_artists: "section-navy relative",
-  featured_venues: "section-mid",
   process: "section-dark border-t border-b border-gold/10",
-  testimonials: "section-navy relative",
-  stats: "section-mid relative",
-  clients: "section-dark",
-  blog: "section-navy relative",
-  packages: "section-dark border-t border-gold/10",
+  community: "section-navy relative",
 };
 
-// Default section config used when DB is empty or unreachable
+// Default section config used when DB is empty or unreachable. Matches the
+// redesigned homepage order. NOTE: the search now lives inside the hero, so
+// the standalone "search_bar" section is dropped; "clients"/"blog"/"packages"
+// are no longer part of the homepage layout.
 const defaultSectionOrder = [
-  "hero", "search_bar", "categories", "featured_artists", "featured_venues",
-  "process", "testimonials", "stats", "clients", "blog", "packages", "cta",
+  "hero", "features", "categories", "featured_venues", "featured_artists",
+  "recommendations", "process", "community", "cta",
 ];
 
 export default async function HomePage() {
@@ -77,26 +74,20 @@ export default async function HomePage() {
     switch (type) {
       case "hero":
         return <HeroSection key={type} />;
-      case "search_bar":
-        return <SearchBarSection key={type} />;
+      case "features":
+        return <FeatureHighlightsSection key={type} />;
       case "categories":
         return <CategoriesSection key={type} />;
-      case "featured_artists":
-        return <FeaturedArtistsSection key={type} artists={featuredArtists} />;
       case "featured_venues":
         return <FeaturedVenuesSection key={type} venues={featuredVenues} />;
+      case "featured_artists":
+        return <FeaturedArtistsSection key={type} artists={featuredArtists} />;
+      case "recommendations":
+        return <RecommendationsSection key={type} />;
       case "process":
         return <ProcessSection key={type} />;
-      case "testimonials":
-        return <TestimonialsSection key={type} />;
-      case "stats":
-        return <StatsCounterSection key={type} />;
-      case "clients":
-        return <ClientLogosSection key={type} />;
-      case "blog":
-        return <BlogPreviewSection key={type} />;
-      case "packages":
-        return <PackagesSection key={type} />;
+      case "community":
+        return <CommunitySection key={type} />;
       case "cta":
         return <CTASection key={type} />;
       default:
