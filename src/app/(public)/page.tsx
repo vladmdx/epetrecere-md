@@ -12,9 +12,6 @@ import { websiteJsonLd, organizationJsonLd, safeJsonLd } from "@/lib/seo/jsonld"
 import { getFeaturedArtists } from "@/lib/db/queries/artists";
 import { getFeaturedVenues } from "@/lib/db/queries/venues";
 import { metaForPath } from "@/lib/seo/page-meta";
-import { db } from "@/lib/db";
-import { homepageSections } from "@/lib/db/schema";
-import { asc } from "drizzle-orm";
 
 export async function generateMetadata() {
   return metaForPath("/", {
@@ -46,27 +43,21 @@ const defaultSectionOrder = [
 export default async function HomePage() {
   let featuredArtists: Awaited<ReturnType<typeof getFeaturedArtists>> = [];
   let featuredVenues: Awaited<ReturnType<typeof getFeaturedVenues>> = [];
-  let visibleSections: string[] = defaultSectionOrder;
+  // The redesigned homepage renders a FIXED section order. The legacy
+  // DB-driven `homepageSections` config predates the new section types
+  // (features / recommendations / community), so using it for ordering here
+  // would drop those sections on prod. Ordering is intentionally code-owned now.
+  const visibleSections: string[] = defaultSectionOrder;
 
   try {
-    const [artists, venues, dbSections] = await Promise.all([
+    const [artists, venues] = await Promise.all([
       getFeaturedArtists(8),
       getFeaturedVenues(6),
-      db
-        .select({ type: homepageSections.type, isVisible: homepageSections.isVisible })
-        .from(homepageSections)
-        .orderBy(asc(homepageSections.sortOrder)),
     ]);
     featuredArtists = artists;
     featuredVenues = venues;
-
-    if (dbSections.length > 0) {
-      visibleSections = dbSections
-        .filter((s) => s.isVisible)
-        .map((s) => s.type);
-    }
   } catch {
-    // DB not connected — show default sections
+    // DB not connected — sections still render; featured lists stay empty.
   }
 
   // Map section type to React element
