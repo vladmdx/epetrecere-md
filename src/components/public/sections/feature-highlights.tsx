@@ -32,8 +32,8 @@ const CARDS = [
     title: "Planifică întregul eveniment",
     description:
       "Servicii complete: decor, floristică, catering, tehnică și multe altele, într-un singur loc.",
-    cta: "Explorează servicii",
-    href: "/servicii",
+    cta: "Deschide planificatorul",
+    href: "/planifica",
   },
 ];
 
@@ -53,7 +53,7 @@ export function FeatureHighlightsSection() {
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           {CARDS.map((card, i) => (
             <ScrollReveal key={card.title} delay={i * 0.1}>
-              <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#E4DECF] bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)]">
+              <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-[#E4DECF] bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)]">
                 {/* Image */}
                 <div className="relative h-44 overflow-hidden">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -64,10 +64,12 @@ export function FeatureHighlightsSection() {
                     loading="lazy"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
-                  {/* Icon badge */}
-                  <div className="absolute -bottom-6 left-6 flex h-12 w-12 items-center justify-center rounded-full border border-gold/30 bg-[#1A1A2E] shadow-lg">
-                    <card.icon className="h-5 w-5 text-gold" />
-                  </div>
+                </div>
+
+                {/* Icon badge — sits on the image/body seam, at card level so
+                    the image's overflow-hidden doesn't clip it. */}
+                <div className="absolute left-6 top-[152px] flex h-12 w-12 items-center justify-center rounded-full border border-gold/30 bg-[#1A1A2E] shadow-lg">
+                  <card.icon className="h-5 w-5 text-gold" />
                 </div>
 
                 {/* Body */}
