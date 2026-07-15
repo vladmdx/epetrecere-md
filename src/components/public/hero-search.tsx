@@ -2,11 +2,25 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, MapPin, Calendar, Users } from "lucide-react";
+import { Search, MapPin, Users } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
+import { CustomCalendar } from "@/components/public/custom-calendar";
 import { cn } from "@/lib/utils";
 
 type Tab = "venues" | "artists" | "services";
+
+function getTomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
+/** Local calendar date → YYYY-MM-DD (no UTC shift). */
+function toYMD(d: Date) {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
 
 const TAB_ROUTES: Record<Tab, string> = {
   venues: "/sali",
@@ -26,7 +40,7 @@ export function HeroSearch() {
   const [tab, setTab] = useState<Tab>("venues");
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState<Date | null>(getTomorrow());
   const [guests, setGuests] = useState("");
 
   const tabs: { key: Tab; label: string }[] = [
@@ -40,7 +54,7 @@ export function HeroSearch() {
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
     if (city.trim()) params.set("city", city.trim());
-    if (date) params.set("date", date);
+    if (date) params.set("date", toYMD(date));
     if (guests.trim()) params.set("guests", guests.trim());
     const qs = params.toString();
     router.push(`${TAB_ROUTES[tab]}${qs ? `?${qs}` : ""}`);
@@ -93,14 +107,17 @@ export function HeroSearch() {
           />
         </Field>
 
-        <Field label={t("search.date_label") ?? "Data evenimentului"} icon={Calendar}>
-          <input
-            type="date"
+        <div className="flex-1">
+          <label className="mb-1.5 block text-left text-[11px] font-medium uppercase tracking-wider text-white/50">
+            {t("search.date_label") ?? "Data evenimentului"}
+          </label>
+          <CustomCalendar
             value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] pl-9 pr-3 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-gold/50 focus:bg-white/[0.06]"
+            onChange={setDate}
+            variant="onDark"
+            placeholder="Selectează data"
           />
-        </Field>
+        </div>
 
         <Field label={t("search.guests") ?? "Invitați"} icon={Users}>
           <input

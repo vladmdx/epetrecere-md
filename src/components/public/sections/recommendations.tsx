@@ -4,6 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { MapPin, Music, Sparkles, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
+import { CustomCalendar } from "@/components/public/custom-calendar";
+
+function getTomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d;
+}
+
+/** Local calendar date → YYYY-MM-DD (no UTC shift). */
+function toYMD(d: Date) {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day}`;
+}
 
 // "Nu știi de unde să începi?" — a lightweight lead-in to the /planifica wizard.
 // The reco counts are indicative (marketing) figures; the real matching happens
@@ -33,7 +47,7 @@ const RECOS = [
 export function RecommendationsSection() {
   const router = useRouter();
   const [eventType, setEventType] = useState("wedding");
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState<Date | null>(getTomorrow());
   const [guests, setGuests] = useState("120");
   const [budget, setBudget] = useState("30000-50000");
 
@@ -41,7 +55,7 @@ export function RecommendationsSection() {
     e.preventDefault();
     const params = new URLSearchParams();
     if (eventType) params.set("eventType", eventType);
-    if (date) params.set("date", date);
+    if (date) params.set("date", toYMD(date));
     if (guests) params.set("guests", guests);
     if (budget) params.set("budget", budget);
     router.push(`/planifica?${params.toString()}`);
@@ -94,17 +108,17 @@ export function RecommendationsSection() {
                 </label>
 
                 <div className="grid grid-cols-2 gap-4">
-                  <label className="block">
+                  <div>
                     <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[#6B6B7B]">
                       Data
                     </span>
-                    <input
-                      type="date"
+                    <CustomCalendar
                       value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className="h-11 w-full rounded-xl border border-[#D4CFC4] bg-[#FAF8F2] px-3 text-sm outline-none focus:border-gold"
+                      onChange={setDate}
+                      variant="light"
+                      placeholder="Selectează data"
                     />
-                  </label>
+                  </div>
                   <label className="block">
                     <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-[#6B6B7B]">
                       Invitați

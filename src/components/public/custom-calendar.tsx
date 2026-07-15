@@ -25,7 +25,33 @@ interface CustomCalendarProps {
   placeholder?: string;
   /** Extra classes applied to the outer wrapper */
   className?: string;
+  /**
+   * Trigger theming so the same premium calendar fits different sections:
+   *  - "default": navy trigger (used by /planifica, unchanged)
+   *  - "onDark":  subtle translucent trigger for dark hero rows
+   *  - "light":   light trigger for cream sections
+   * The popover itself stays dark/gold in every variant.
+   */
+  variant?: "default" | "onDark" | "light";
 }
+
+const TRIGGER_VARIANTS = {
+  default: {
+    trigger: "bg-card/80 backdrop-blur-sm border-border/60 hover:border-gold/30",
+    value: "text-foreground/90",
+    placeholder: "text-muted-foreground",
+  },
+  onDark: {
+    trigger: "bg-white/[0.04] backdrop-blur-sm border-white/10 hover:border-gold/40",
+    value: "text-white/90",
+    placeholder: "text-white/40",
+  },
+  light: {
+    trigger: "bg-white border-[#D4CFC4] hover:border-gold/50",
+    value: "text-[#2C2C3A]",
+    placeholder: "text-[#6B6B7B]",
+  },
+} as const;
 
 /**
  * The custom dark-themed calendar used both in the homepage search bar
@@ -38,7 +64,9 @@ export function CustomCalendar({
   onChange,
   placeholder = "Alege data",
   className,
+  variant = "default",
 }: CustomCalendarProps) {
+  const v = TRIGGER_VARIANTS[variant];
   const [open, setOpen] = useState(false);
   // Track the visible month as an offset from the "base" month (selected value
   // or today). This way the view auto-follows external value changes without
@@ -111,17 +139,16 @@ export function CustomCalendar({
         onClick={() => setOpen(!open)}
         className={cn(
           "relative flex h-12 w-full items-center gap-3 rounded-xl border px-4 text-sm transition-all duration-200",
-          "bg-card/80 backdrop-blur-sm",
-          open
-            ? "border-gold/50 shadow-[0_0_15px_rgba(201,168,76,0.15)] ring-1 ring-gold/20"
-            : "border-border/60 hover:border-gold/30 hover:shadow-[0_0_10px_rgba(201,168,76,0.08)]"
+          v.trigger,
+          open &&
+            "border-gold/50 shadow-[0_0_15px_rgba(201,168,76,0.15)] ring-1 ring-gold/20",
         )}
       >
         <CalendarDays className="h-4 w-4 text-gold shrink-0" />
         <span
           className={cn(
             "flex-1 text-left",
-            value ? "text-foreground/90" : "text-muted-foreground",
+            value ? v.value : v.placeholder,
           )}
         >
           {value ? formatDisplay(value) : placeholder}
