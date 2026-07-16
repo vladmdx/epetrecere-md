@@ -10,8 +10,12 @@ import { HeroSearch } from "@/components/public/hero-search";
 export function HeroSection() {
   const { t } = useLocale();
 
+  // NOTE: the section deliberately has no `overflow-hidden` — the search bar's
+  // calendar popover opens downward past the hero's bottom edge, and clipping
+  // the section would cut it in half. The background layers are all `inset-0`
+  // (exactly section-sized), so nothing overflows anyway.
   return (
-    <section className="relative flex min-h-[92vh] items-center justify-center overflow-hidden -mt-16 pt-16">
+    <section className="relative flex min-h-[92vh] items-center justify-center -mt-16 pt-16">
       {/* Video/Image Background — kept as-is per design */}
       <div className="absolute inset-0">
         {/* Gradient overlay — always visible */}
