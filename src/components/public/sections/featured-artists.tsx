@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Star, MapPin, Play, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
+import { useLocale } from "@/hooks/use-locale";
 
 interface ArtistRow {
   id: number;
@@ -62,6 +63,7 @@ function fmt(n: number) {
 }
 
 export function FeaturedArtistsSection({ artists }: Props) {
+  const { t } = useLocale();
   const display: DisplayArtist[] = artists.length
     ? artists.slice(0, 5).map((a, i) => ({
         id: a.id,
@@ -90,13 +92,13 @@ export function FeaturedArtistsSection({ artists }: Props) {
         <ScrollReveal>
           <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
             <h2 className="font-heading text-3xl font-bold text-[#FAF8F2] md:text-[40px]">
-              Artiști care dau personalitate evenimentului tău
+              {t("home.artists.title")}
             </h2>
             <Link
               href="/artisti"
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-gold transition-colors hover:text-gold-soft"
             >
-              Explorează toți artiștii <ArrowRight className="h-4 w-4" />
+              {t("home.artists.viewAll")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </ScrollReveal>
@@ -129,7 +131,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
                       <MapPin className="h-4 w-4 text-gold" /> {hero.city}
                     </span>
                   )}
-                  {hero.price ? <span>de la {fmt(hero.price)} MDL</span> : null}
+                  {hero.price ? <span>{t("home.common.from", { price: fmt(hero.price) })}</span> : null}
                   {hero.rating ? (
                     <span className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-gold text-gold" /> {hero.rating.toFixed(1)}
@@ -167,7 +169,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
                       </p>
                     )}
                     <div className="mt-1.5 flex items-center justify-between text-xs">
-                      {a.price ? <span className="text-white/80">de la {fmt(a.price)} MDL</span> : <span />}
+                      {a.price ? <span className="text-white/80">{t("home.common.from", { price: fmt(a.price) })}</span> : <span />}
                       {a.rating ? (
                         <span className="flex items-center gap-1 text-white/80">
                           <Star className="h-3 w-3 fill-gold text-gold" /> {a.rating.toFixed(1)}

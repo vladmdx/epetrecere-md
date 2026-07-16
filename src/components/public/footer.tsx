@@ -4,36 +4,37 @@ import Link from "next/link";
 import { Sparkles, Send, Globe, Camera, Music2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useLocale } from "@/hooks/use-locale";
 
-const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
+const COLUMNS: { title: string; links: { key: string; href: string }[] }[] = [
   {
-    title: "Pentru clienți",
+    title: "footer.colClients",
     links: [
-      { label: "Caută locații", href: "/sali" },
-      { label: "Caută artiști", href: "/artisti" },
-      { label: "Caută servicii", href: "/servicii" },
-      { label: "Tipuri de evenimente", href: "/planifica" },
-      { label: "Blog & Sfaturi", href: "/blog" },
+      { key: "footer.searchVenues", href: "/sali" },
+      { key: "footer.searchArtists", href: "/artisti" },
+      { key: "footer.searchServices", href: "/servicii" },
+      { key: "footer.eventTypes", href: "/planifica" },
+      { key: "footer.blogTips", href: "/blog" },
     ],
   },
   {
-    title: "Pentru furnizori",
+    title: "footer.colVendors",
     links: [
-      { label: "Înregistrează-te", href: "/sign-up" },
-      { label: "Cum funcționează", href: "/#cum-functioneaza" },
-      { label: "Abonament", href: "/pachete" },
-      { label: "Resurse pentru furnizori", href: "/blog" },
-      { label: "Promovează-te", href: "/contact" },
+      { key: "footer.register", href: "/sign-up" },
+      { key: "footer.howItWorks", href: "/#cum-functioneaza" },
+      { key: "footer.subscription", href: "/pachete" },
+      { key: "footer.resources", href: "/blog" },
+      { key: "footer.promote", href: "/contact" },
     ],
   },
   {
-    title: "Companie & Suport",
+    title: "footer.colCompany",
     links: [
-      { label: "Despre noi", href: "/despre" },
-      { label: "Contact", href: "/contact" },
-      { label: "Termeni și condiții", href: "/termeni" },
-      { label: "Politica de confidențialitate", href: "/confidentialitate" },
-      { label: "Întrebări frecvente", href: "/contact" },
+      { key: "footer.about", href: "/despre" },
+      { key: "nav.contact", href: "/contact" },
+      { key: "footer.terms", href: "/termeni" },
+      { key: "footer.privacy", href: "/confidentialitate" },
+      { key: "footer.faq", href: "/contact" },
     ],
   },
 ];
@@ -46,6 +47,7 @@ const SOCIALS = [
 ];
 
 export function Footer() {
+  const { t } = useLocale();
   const year = new Date().getFullYear();
 
   return (
@@ -61,8 +63,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm leading-relaxed text-[#9A9AAB]">
-              Platforma completă pentru planificarea evenimentelor în Republica
-              Moldova.
+              {t("footer.tagline")}
             </p>
             <div className="flex gap-3">
               {SOCIALS.map((s) => (
@@ -82,13 +83,13 @@ export function Footer() {
           {COLUMNS.map((col) => (
             <div key={col.title}>
               <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-gold">
-                {col.title}
+                {t(col.title)}
               </h3>
               <ul className="space-y-2.5 text-sm">
                 {col.links.map((l) => (
-                  <li key={l.label}>
+                  <li key={l.key}>
                     <Link href={l.href} className="text-[#9A9AAB] transition-colors hover:text-gold">
-                      {l.label}
+                      {t(l.key)}
                     </Link>
                   </li>
                 ))}
@@ -99,18 +100,19 @@ export function Footer() {
           {/* Newsletter */}
           <div>
             <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-gold">
-              Abonează-te la noutăți
+              {t("footer.colNewsletter")}
             </h3>
             <p className="mb-3 text-sm leading-relaxed text-[#9A9AAB]">
-              Primește inspirație și oferte exclusive pentru evenimentul tău.
+              {t("footer.newsletterDesc")}
             </p>
             <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
               <Input
                 type="email"
-                placeholder="Email-ul tău"
+                placeholder={t("footer.emailPlaceholder")}
                 className="flex-1 border-white/10 bg-white/[0.04] text-white placeholder:text-white/40"
+                aria-label={t("footer.emailPlaceholder")}
               />
-              <Button className="shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark" aria-label="Abonează-te">
+              <Button className="shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark" aria-label={t("footer.colNewsletter")}>
                 <Send className="h-4 w-4" />
               </Button>
             </form>
@@ -118,7 +120,7 @@ export function Footer() {
         </div>
 
         <div className="mt-12 border-t border-white/10 pt-6 text-center text-xs text-[#7A7A8A]">
-          © {year} ePetrecere.md. Toate drepturile rezervate.
+          {t("footer.copyright", { year })}
         </div>
       </div>
     </footer>

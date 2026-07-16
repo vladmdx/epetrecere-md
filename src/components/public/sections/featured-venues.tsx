@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Star, MapPin, Users, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
+import { useLocale } from "@/hooks/use-locale";
 
 interface VenueRow {
   id: number;
@@ -37,6 +38,7 @@ function fmt(n: number) {
 }
 
 export function FeaturedVenuesSection({ venues }: Props) {
+  const { t } = useLocale();
   const list = venues.length
     ? venues
     : process.env.NODE_ENV === "development"
@@ -51,17 +53,17 @@ export function FeaturedVenuesSection({ venues }: Props) {
           <div className="mb-10 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-[3px] text-gold-dark">
-                Categorii populare
+                {t("home.venues.eyebrow")}
               </p>
               <h2 className="font-heading text-3xl font-bold md:text-[40px]">
-                Spații care transformă orice eveniment
+                {t("home.venues.title")}
               </h2>
             </div>
             <Link
               href="/sali"
               className="inline-flex items-center gap-1.5 text-sm font-semibold text-gold-dark transition-colors hover:text-gold"
             >
-              Vezi toate locațiile <ArrowRight className="h-4 w-4" />
+              {t("home.venues.viewAll")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
         </ScrollReveal>
@@ -69,7 +71,7 @@ export function FeaturedVenuesSection({ venues }: Props) {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {list.slice(0, 3).map((v, i) => {
             const name = v.nameRo;
-            const badge = v.isFeatured ? "Premium" : "Recomandat";
+            const badge = v.isFeatured ? t("home.venues.premium") : t("home.venues.recommended");
             return (
               <ScrollReveal key={v.id} delay={i * 0.1}>
                 <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#E4DECF] bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)]">
@@ -96,11 +98,11 @@ export function FeaturedVenuesSection({ venues }: Props) {
                     <div className="mt-3 space-y-1.5 text-sm text-[#6B6B7B]">
                       {v.capacityMax && (
                         <p className="flex items-center gap-1.5">
-                          <Users className="h-3.5 w-3.5 text-gold-dark" /> Până la {v.capacityMax} invitați
+                          <Users className="h-3.5 w-3.5 text-gold-dark" /> {t("home.venues.capacity", { n: v.capacityMax })}
                         </p>
                       )}
                       {v.pricePerPerson ? (
-                        <p className="font-semibold text-[#2C2C3A]">de la {fmt(v.pricePerPerson)} MDL</p>
+                        <p className="font-semibold text-[#2C2C3A]">{t("home.common.from", { price: fmt(v.pricePerPerson) })}</p>
                       ) : null}
                     </div>
 
@@ -118,7 +120,7 @@ export function FeaturedVenuesSection({ venues }: Props) {
                         href={`/sali/${v.slug}`}
                         className="rounded-lg border border-gold/40 bg-gold/10 px-4 py-2 text-sm font-semibold text-gold-dark transition-colors hover:bg-gold hover:text-[#0D0D0D]"
                       >
-                        Vezi locația
+                        {t("home.venues.view")}
                       </Link>
                     </div>
                   </div>
