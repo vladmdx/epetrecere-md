@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 function getTomorrow() {
   const d = new Date();
@@ -10,8 +11,15 @@ function getTomorrow() {
   return d;
 }
 
-function formatDisplay(d: Date) {
-  return d.toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" });
+/** App locale → BCP-47 tag for Intl date formatting. */
+const INTL_LOCALE: Record<string, string> = { ro: "ro-RO", ru: "ru-RU", en: "en-GB" };
+
+function formatDisplay(d: Date, locale: string) {
+  return d.toLocaleDateString(INTL_LOCALE[locale] ?? "ro-RO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
 }
 
 interface CustomCalendarProps {
@@ -62,10 +70,11 @@ export function CustomCalendar({
   label,
   value,
   onChange,
-  placeholder = "Alege data",
+  placeholder,
   className,
   variant = "default",
 }: CustomCalendarProps) {
+  const { t, locale } = useLocale();
   const v = TRIGGER_VARIANTS[variant];
   const [open, setOpen] = useState(false);
   // Track the visible month as an offset from the "base" month (selected value
@@ -94,8 +103,8 @@ export function CustomCalendar({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysInPrevMonth = new Date(year, month, 0).getDate();
 
-  const monthNames = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie", "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
-  const dayNames = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
+  const monthNames = Array.from({ length: 12 }, (_, i) => t(`calendar.months.${i}`));
+  const dayNames = Array.from({ length: 7 }, (_, i) => t(`calendar.days.${i}`));
 
   // Start from Monday (adjust firstDay)
   const startDay = firstDay === 0 ? 6 : firstDay - 1;
@@ -151,7 +160,7 @@ export function CustomCalendar({
             value ? v.value : v.placeholder,
           )}
         >
-          {value ? formatDisplay(value) : placeholder}
+          {value ? formatDisplay(value, locale) : (placeholder ?? t("calendar.placeholder"))}
         </span>
         <ChevronDown className={cn("h-4 w-4 text-gold/60 transition-transform duration-200", open && "rotate-180")} />
       </button>
@@ -225,7 +234,7 @@ export function CustomCalendar({
               }}
               className="text-xs text-gold/70 hover:text-gold transition-colors"
             >
-              Mâine
+              {t("calendar.tomorrow")}
             </button>
             <button
               type="button"
@@ -238,7 +247,7 @@ export function CustomCalendar({
               }}
               className="text-xs text-gold/70 hover:text-gold transition-colors"
             >
-              Sâmbătă viitoare
+              {t("calendar.nextSaturday")}
             </button>
           </div>
         </div>

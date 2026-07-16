@@ -159,7 +159,26 @@
     "newsletter_title": "Newsletter",
     "newsletter_placeholder": "Your email",
     "newsletter_button": "Subscribe",
-    "copyright": "© {year} ePetrecere.md. All rights reserved."
+    "copyright": "© {year} ePetrecere.md. All rights reserved.",
+    "tagline": "The complete event-planning platform for the Republic of Moldova.",
+    "colClients": "For clients",
+    "colVendors": "For vendors",
+    "colCompany": "Company & Support",
+    "colNewsletter": "Subscribe to updates",
+    "searchVenues": "Search venues",
+    "searchArtists": "Search artists",
+    "searchServices": "Search services",
+    "eventTypes": "Event types",
+    "blogTips": "Blog & Tips",
+    "register": "Sign up",
+    "howItWorks": "How it works",
+    "subscription": "Subscription",
+    "resources": "Vendor resources",
+    "promote": "Promote yourself",
+    "about": "About us",
+    "faq": "FAQ",
+    "newsletterDesc": "Get inspiration and exclusive offers for your event.",
+    "emailPlaceholder": "Your email"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -187,5 +206,129 @@
     "financial": "Financial",
     "reviews": "Reviews",
     "ai_assistant": "AI Assistant"
+  },
+  "calendar": {
+    "months": [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December"
+    ],
+    "days": [
+      "Mo",
+      "Tu",
+      "We",
+      "Th",
+      "Fr",
+      "Sa",
+      "Su"
+    ],
+    "tomorrow": "Tomorrow",
+    "nextSaturday": "Next Saturday",
+    "placeholder": "Choose a date",
+    "selectDate": "Select a date"
+  },
+  "home": {
+    "features": {
+      "title": "Everything you need for a successful event",
+      "venuesTitle": "Find the ideal venue",
+      "venuesDesc": "Discover premium spaces for weddings, baptisms, private parties and corporate events.",
+      "venuesCta": "Explore venues",
+      "artistsTitle": "Discover artists and vendors",
+      "artistsDesc": "Musicians, DJs, hosts, photographers and other professionals who bring your event to life.",
+      "artistsCta": "Explore artists",
+      "plannerTitle": "Plan the whole event",
+      "plannerDesc": "Complete services: decor, floristry, catering, equipment and much more — all in one place.",
+      "plannerCta": "Open the planner"
+    },
+    "categories": {
+      "eyebrow": "Popular categories",
+      "title": "Explore the most requested services",
+      "viewAll": "View all categories",
+      "suppliers": "{n}+ vendors",
+      "venues": "Venues & Restaurants",
+      "bands": "Musicians & Bands",
+      "dj": "DJ",
+      "photo": "Photographers & Videographers",
+      "hosts": "Hosts",
+      "decor": "Decor & Floristry"
+    },
+    "venues": {
+      "eyebrow": "Popular categories",
+      "title": "Spaces that transform any event",
+      "viewAll": "View all venues",
+      "premium": "Premium",
+      "recommended": "Recommended",
+      "capacity": "Up to {n} guests",
+      "view": "View venue"
+    },
+    "artists": {
+      "title": "Artists who give your event personality",
+      "viewAll": "Explore all artists"
+    },
+    "common": {
+      "from": "from {price} MDL"
+    },
+    "reco": {
+      "eyebrow": "Smart recommendations",
+      "title": "Not sure where to start?",
+      "desc": "Tell us a few details about your event and we'll recommend the best venues, artists and services for you.",
+      "formTitle": "Your event preferences",
+      "eventType": "Event type",
+      "date": "Date",
+      "guests": "Guests",
+      "budget": "Budget",
+      "submit": "Plan the event",
+      "resultsTitle": "Recommendations for you",
+      "matchVenues": "Matching venues",
+      "matchArtists": "Matching artists",
+      "matchServices": "Matching services",
+      "typeWedding": "Wedding",
+      "typeBaptism": "Baptism",
+      "typeCumatrie": "Cumătrie",
+      "typeBirthday": "Birthday",
+      "typeCorporate": "Corporate event",
+      "typeOther": "Other party",
+      "budgetUnder30": "under 30,000 MDL",
+      "budget30_50": "30,000 - 50,000 MDL",
+      "budget50_100": "50,000 - 100,000 MDL",
+      "budgetOver100": "over 100,000 MDL"
+    },
+    "community": {
+      "title": "A community you can trust",
+      "statVendors": "Verified vendors",
+      "statVenues": "Premium venues",
+      "statCategories": "Service categories",
+      "statRequests": "Completed requests",
+      "t1": "Thanks to ePetrecere.md we found the perfect venue and exactly the team we needed. Everything was organised flawlessly!",
+      "t2": "We compared dozens of vendors in one place and booked everything within days. Highly recommended!",
+      "t3": "The platform saved us an enormous amount of time. We found quality musicians and decor right within our budget.",
+      "evWedding": "Wedding",
+      "evBaptism": "Baptism",
+      "evCumatrie": "Cumătrie"
+    },
+    "process": {
+      "eyebrow": "How it works",
+      "title": "Three steps to the perfect event",
+      "s1t": "Tell us what you need",
+      "s1d": "Fill in your event details: type, date, guest count and budget.",
+      "s2t": "Compare the options",
+      "s2d": "Get personalised recommendations. Compare and pick what fits you.",
+      "s3t": "Book and organise",
+      "s3d": "Book your chosen vendors and coordinate everything through the platform."
+    },
+    "cta": {
+      "title": "Your event starts here.",
+      "desc": "Find the right vendors and build every detail in one place.",
+      "secondary": "Become a vendor"
+    }
   }
 }

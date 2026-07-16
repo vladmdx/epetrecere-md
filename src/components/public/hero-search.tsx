@@ -115,7 +115,7 @@ export function HeroSearch() {
             value={date}
             onChange={setDate}
             variant="onDark"
-            placeholder="Selectează data"
+            placeholder={t("calendar.selectDate")}
           />
         </div>
 

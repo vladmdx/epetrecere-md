@@ -3,39 +3,27 @@
 import { Fragment } from "react";
 import { Search, SlidersHorizontal, CalendarCheck, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
+import { useLocale } from "@/hooks/use-locale";
 
 const STEPS = [
-  {
-    num: "01",
-    icon: Search,
-    title: "Spune-ne ce cauți",
-    desc: "Completează detaliile evenimentului tău: tip, dată, număr de invitați și buget.",
-  },
-  {
-    num: "02",
-    icon: SlidersHorizontal,
-    title: "Compară opțiunile",
-    desc: "Primești recomandări personalizate. Compară și alege ce ți se potrivește.",
-  },
-  {
-    num: "03",
-    icon: CalendarCheck,
-    title: "Rezervă și organizează",
-    desc: "Rezervă furnizorii preferați și coordonează totul direct prin platformă.",
-  },
-];
+  { num: "01", icon: Search, key: "s1" },
+  { num: "02", icon: SlidersHorizontal, key: "s2" },
+  { num: "03", icon: CalendarCheck, key: "s3" },
+] as const;
 
 export function ProcessSection() {
+  const { t } = useLocale();
+
   return (
     <section id="cum-functioneaza" className="scroll-mt-20 py-20">
       <div className="mx-auto max-w-6xl px-4 lg:px-8">
         <ScrollReveal>
           <div className="mb-14 text-center">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[3px] text-gold">
-              Cum funcționează
+              {t("home.process.eyebrow")}
             </p>
             <h2 className="font-heading text-3xl font-bold text-[#FAF8F2] md:text-[40px]">
-              Trei pași până la evenimentul perfect
+              {t("home.process.title")}
             </h2>
           </div>
         </ScrollReveal>
@@ -52,10 +40,10 @@ export function ProcessSection() {
                     </span>
                   </div>
                   <h3 className="mb-2 font-heading text-lg font-bold text-[#FAF8F2]">
-                    {step.title}
+                    {t(`home.process.${step.key}t`)}
                   </h3>
                   <p className="mx-auto max-w-[240px] text-sm leading-relaxed text-[#B0B0C0]">
-                    {step.desc}
+                    {t(`home.process.${step.key}d`)}
                   </p>
                 </div>
               </ScrollReveal>

@@ -159,7 +159,26 @@
     "newsletter_title": "Newsletter",
     "newsletter_placeholder": "Adresa ta de email",
     "newsletter_button": "Abonează-te",
-    "copyright": "© {year} ePetrecere.md. Toate drepturile rezervate."
+    "copyright": "© {year} ePetrecere.md. Toate drepturile rezervate.",
+    "tagline": "Platforma completă pentru planificarea evenimentelor în Republica Moldova.",
+    "colClients": "Pentru clienți",
+    "colVendors": "Pentru furnizori",
+    "colCompany": "Companie & Suport",
+    "colNewsletter": "Abonează-te la noutăți",
+    "searchVenues": "Caută locații",
+    "searchArtists": "Caută artiști",
+    "searchServices": "Caută servicii",
+    "eventTypes": "Tipuri de evenimente",
+    "blogTips": "Blog & Sfaturi",
+    "register": "Înregistrează-te",
+    "howItWorks": "Cum funcționează",
+    "subscription": "Abonament",
+    "resources": "Resurse pentru furnizori",
+    "promote": "Promovează-te",
+    "about": "Despre noi",
+    "faq": "Întrebări frecvente",
+    "newsletterDesc": "Primește inspirație și oferte exclusive pentru evenimentul tău.",
+    "emailPlaceholder": "Email-ul tău"
   },
   "admin": {
     "dashboard": "Panou de Control",
@@ -187,5 +206,129 @@
     "financial": "Financiar",
     "reviews": "Recenzii",
     "ai_assistant": "AI Assistant"
+  },
+  "calendar": {
+    "months": [
+      "Ianuarie",
+      "Februarie",
+      "Martie",
+      "Aprilie",
+      "Mai",
+      "Iunie",
+      "Iulie",
+      "August",
+      "Septembrie",
+      "Octombrie",
+      "Noiembrie",
+      "Decembrie"
+    ],
+    "days": [
+      "Lu",
+      "Ma",
+      "Mi",
+      "Jo",
+      "Vi",
+      "Sâ",
+      "Du"
+    ],
+    "tomorrow": "Mâine",
+    "nextSaturday": "Sâmbătă viitoare",
+    "placeholder": "Alege data",
+    "selectDate": "Selectează data"
+  },
+  "home": {
+    "features": {
+      "title": "Tot ce ai nevoie pentru un eveniment reușit",
+      "venuesTitle": "Găsește locația ideală",
+      "venuesDesc": "Descoperă spații premium pentru nunți, botezuri, petreceri private și evenimente corporate.",
+      "venuesCta": "Explorează locații",
+      "artistsTitle": "Descoperă artiști și prestatori",
+      "artistsDesc": "Muzicieni, DJ, prezentatori, fotografi și alți profesioniști care aduc evenimentul tău la viață.",
+      "artistsCta": "Explorează artiști",
+      "plannerTitle": "Planifică întregul eveniment",
+      "plannerDesc": "Servicii complete: decor, floristică, catering, tehnică și multe altele, într-un singur loc.",
+      "plannerCta": "Deschide planificatorul"
+    },
+    "categories": {
+      "eyebrow": "Categorii populare",
+      "title": "Explorează cele mai căutate servicii",
+      "viewAll": "Vezi toate categoriile",
+      "suppliers": "{n}+ furnizori",
+      "venues": "Săli & Restaurante",
+      "bands": "Muzicieni și Formații",
+      "dj": "DJ",
+      "photo": "Fotografi & Videografi",
+      "hosts": "Prezentatori",
+      "decor": "Decor & Floristică"
+    },
+    "venues": {
+      "eyebrow": "Categorii populare",
+      "title": "Spații care transformă orice eveniment",
+      "viewAll": "Vezi toate locațiile",
+      "premium": "Premium",
+      "recommended": "Recomandat",
+      "capacity": "Până la {n} invitați",
+      "view": "Vezi locația"
+    },
+    "artists": {
+      "title": "Artiști care dau personalitate evenimentului tău",
+      "viewAll": "Explorează toți artiștii"
+    },
+    "common": {
+      "from": "de la {price} MDL"
+    },
+    "reco": {
+      "eyebrow": "Recomandări inteligente",
+      "title": "Nu știi de unde să începi?",
+      "desc": "Spune-ne câteva detalii despre evenimentul tău, iar noi îți recomandăm cele mai bune locații, artiști și servicii potrivite pentru tine.",
+      "formTitle": "Preferințele evenimentului tău",
+      "eventType": "Tip eveniment",
+      "date": "Data",
+      "guests": "Invitați",
+      "budget": "Buget",
+      "submit": "Planifică evenimentul",
+      "resultsTitle": "Recomandări pentru tine",
+      "matchVenues": "Locații potrivite",
+      "matchArtists": "Artiști potriviți",
+      "matchServices": "Servicii potrivite",
+      "typeWedding": "Nuntă",
+      "typeBaptism": "Botez",
+      "typeCumatrie": "Cumătrie",
+      "typeBirthday": "Zi de naștere",
+      "typeCorporate": "Eveniment corporate",
+      "typeOther": "Altă petrecere",
+      "budgetUnder30": "sub 30.000 MDL",
+      "budget30_50": "30.000 - 50.000 MDL",
+      "budget50_100": "50.000 - 100.000 MDL",
+      "budgetOver100": "peste 100.000 MDL"
+    },
+    "community": {
+      "title": "O comunitate de încredere",
+      "statVendors": "Furnizori verificați",
+      "statVenues": "Locații premium",
+      "statCategories": "Categorii de servicii",
+      "statRequests": "Solicitări finalizate",
+      "t1": "Datorită ePetrecere.md am găsit locația perfectă și echipa de care aveam nevoie. Totul a fost organizat impecabil!",
+      "t2": "Am comparat zeci de furnizori într-un singur loc și am rezervat totul în câteva zile. Recomand cu încredere!",
+      "t3": "Platforma ne-a economisit timp enorm. Am găsit muzicieni și decor de calitate, exact în bugetul nostru.",
+      "evWedding": "Nuntă",
+      "evBaptism": "Botez",
+      "evCumatrie": "Cumătrie"
+    },
+    "process": {
+      "eyebrow": "Cum funcționează",
+      "title": "Trei pași până la evenimentul perfect",
+      "s1t": "Spune-ne ce cauți",
+      "s1d": "Completează detaliile evenimentului tău: tip, dată, număr de invitați și buget.",
+      "s2t": "Compară opțiunile",
+      "s2d": "Primești recomandări personalizate. Compară și alege ce ți se potrivește.",
+      "s3t": "Rezervă și organizează",
+      "s3d": "Rezervă furnizorii preferați și coordonează totul direct prin platformă."
+    },
+    "cta": {
+      "title": "Evenimentul tău începe aici.",
+      "desc": "Descoperă furnizorii potriviți și construiește fiecare detaliu într-un singur loc.",
+      "secondary": "Devino furnizor"
+    }
   }
 }
