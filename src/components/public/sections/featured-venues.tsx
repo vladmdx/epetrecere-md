@@ -19,6 +19,7 @@ interface VenueRow {
   ratingAvg: number | null;
   ratingCount: number | null;
   isFeatured: boolean;
+  coverImageUrl?: string | null;
 }
 
 interface Props {
@@ -78,7 +79,7 @@ export function FeaturedVenuesSection({ venues }: Props) {
                   <div className="relative aspect-[16/10] overflow-hidden">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`/images/venues/hall-${(v.id % 6) + 1}.jpg`}
+                      src={v.coverImageUrl || `/images/venues/hall-${(v.id % 6) + 1}.jpg`}
                       alt={name}
                       className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                       loading="lazy"

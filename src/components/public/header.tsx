@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
+import { Menu, X, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { SearchAutocomplete } from "@/components/public/search-autocomplete";
@@ -12,6 +12,7 @@ import { ChatBell } from "@/components/public/chat-bell";
 import { useLocale } from "@/hooks/use-locale";
 import { useUserRole, isClientOrGuest } from "@/hooks/use-user-role";
 import { useUser, useClerk } from "@clerk/nextjs";
+import { BrandMark } from "@/components/public/brand-mark";
 
 // Fallback list rendered on first paint before /api/categories resolves —
 // covers the most-clicked items so the menu is never empty. The full list is
@@ -189,7 +190,7 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 lg:px-8">
         {/* Logo */}
         <Link href="/" className="flex shrink-0 items-center gap-2 text-white">
-          <Sparkles className="h-6 w-6 text-gold" />
+          <BrandMark className="text-[#e8bd59]" />
           <span className="font-heading text-xl font-bold tracking-tight">
             e<span className="text-gold">Petrecere</span>.md
           </span>

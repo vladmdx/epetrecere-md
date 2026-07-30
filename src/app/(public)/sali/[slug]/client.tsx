@@ -6,7 +6,6 @@ import { Star, MapPin, Users, Check, Lock, ChevronDown, Clock } from "lucide-rea
 import { formatWorkingHours } from "@/components/vendor/working-hours-editor";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
-import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { WishlistButton } from "@/components/public/wishlist-button";
@@ -104,19 +103,32 @@ export function VenueDetailClient({
   const description = getLocalized(venue, "description", locale);
   // M0a #8 — price gated behind login
   const canSeePrice = isLoaded && isSignedIn;
+  const venueHeroImages = [
+    "/images/redesign/venue-chateau-hero.webp",
+    "/images/venues/hall-1.jpg",
+    "/images/venues/hall-2.jpg",
+    "/images/venues/hall-3.jpg",
+    "/images/venues/hall-4.jpg",
+    "/images/venues/hall-5.jpg",
+    "/images/venues/hall-6.jpg",
+  ];
+  const venueHeroImage =
+    venue.slug === "chateau-vartely-events"
+      ? "/images/redesign/venue-chateau-hero.webp"
+      : venueHeroImages[venue.id % venueHeroImages.length];
 
   useEffect(() => {
     import("@/hooks/use-recently-viewed").then(({ trackRecentView }) => {
       trackRecentView("venue", {
         slug: venue.slug,
         name,
-        imageUrl: venue.images?.[0]?.url ?? null,
+        imageUrl: venueHeroImage,
       });
     });
-  }, [venue.slug, venue.images, name]);
+  }, [venue.slug, name, venueHeroImage]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 text-[#f5efe4] lg:px-8">
       <nav className="mb-6 text-xs text-muted-foreground">
         <Link href="/" className="hover:text-gold">Acasă</Link>
         <span className="mx-2">/</span>
@@ -128,13 +140,13 @@ export function VenueDetailClient({
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="font-heading text-2xl font-bold md:text-3xl">{name}</h1>
+            <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-5xl">{name}</h1>
             <div className="ml-auto">
               <WishlistButton entityType="venue" entityId={venue.id} />
             </div>
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/58">
             {venue.city && (
               <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {venue.address || venue.city}</span>
             )}
@@ -158,17 +170,57 @@ export function VenueDetailClient({
               interacts with any thumbnail (debounced in the endpoint via
               session dedupe). */}
           <div
-            className="mt-6"
+            className="mt-6 grid gap-2"
             onClickCapture={() => trackClick("venue", venue.id, "gallery")}
           >
-            <ImageGallery images={(venue.images || []).map((img) => ({ url: img.url, alt: img.altRo }))} />
+            <a
+              href={venueHeroImage}
+              target="_blank"
+              rel="noreferrer"
+              className="group relative block aspect-[16/8] overflow-hidden rounded-xl border border-[#e6b84d]/45"
+            >
+              <img
+                src={venueHeroImage}
+                alt={`${name} — vedere exterioară`}
+                className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.02]"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+              <span className="absolute bottom-4 left-4 rounded-lg border border-white/20 bg-black/46 px-4 py-2 text-xs font-medium text-white backdrop-blur">
+                Vezi galeria ({Math.max(venue.images.length, 1)})
+              </span>
+            </a>
+            {venue.images.length > 0 && (
+              <div className="grid grid-cols-4 gap-2">
+                {venue.images.slice(0, 4).map((image, index) => (
+                  <a
+                    key={image.id}
+                    href={image.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group relative aspect-[16/7] overflow-hidden rounded-lg border border-white/10"
+                  >
+                    <img
+                      src={image.url}
+                      alt={image.altRo || `${name} — galerie ${index + 1}`}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      loading="lazy"
+                    />
+                    {index === 3 && venue.images.length > 4 && (
+                      <span className="absolute inset-0 flex items-center justify-center bg-black/55 font-heading text-xl text-white">
+                        +{venue.images.length - 4}
+                      </span>
+                    )}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Description */}
           {description && (
-            <div className="mt-6">
-              <h2 className="mb-3 font-heading text-lg font-bold">{t("artist.description")}</h2>
-              <p className="text-muted-foreground">{description}</p>
+            <div className="mt-8 rounded-xl border border-white/8 bg-white/[.025] p-5">
+              <h2 className="mb-3 font-heading text-2xl font-semibold">{t("artist.description")}</h2>
+              <p className="text-sm leading-relaxed text-white/62">{description}</p>
             </div>
           )}
 
@@ -178,8 +230,8 @@ export function VenueDetailClient({
               <h2 className="mb-3 font-heading text-lg font-bold">{t("venue.facilities")}</h2>
               <div className="flex flex-wrap gap-2">
                 {venue.facilities.map((f) => (
-                  <Badge key={f} variant="secondary" className="gap-1">
-                    <Check className="h-3 w-3 text-success" /> {f}
+                  <Badge key={f} variant="secondary" className="gap-1 border border-[#e6b84d]/20 bg-[#e6b84d]/7 text-white/68">
+                    <Check className="h-3 w-3 text-[#e6b84d]" /> {f}
                   </Badge>
                 ))}
               </div>
@@ -395,7 +447,7 @@ export function VenueDetailClient({
 
         {/* Sidebar */}
         <div className="space-y-4">
-          <div className="space-y-3 rounded-xl border border-border/40 bg-card p-6 lg:sticky lg:top-20">
+          <div className="space-y-3 rounded-2xl border border-[#e6b84d]/55 bg-[linear-gradient(180deg,#11151d,#0b1017)] p-5 shadow-[0_24px_60px_rgba(0,0,0,.28)] lg:sticky lg:top-20">
             {venue.pricePerPerson && (
               <div className="text-center">
                 {canSeePrice ? (

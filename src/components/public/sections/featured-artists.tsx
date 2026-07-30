@@ -22,6 +22,7 @@ interface ArtistRow {
   isFeatured: boolean;
   isPremium: boolean;
   location: string | null;
+  coverImageUrl?: string | null;
 }
 
 interface Props {
@@ -43,19 +44,19 @@ interface DisplayArtist {
 // Dev-only sample so the bento is visible locally without a DB. Production
 // renders the real featured artists.
 const SAMPLE: DisplayArtist[] = [
-  { id: 1, slug: "formatia-noroc", name: "Formația Noroc", role: "Live band", city: "Chișinău", price: 15000, rating: 4.9, count: 145, image: "/images/categories/formatii.jpg" },
-  { id: 2, slug: "dj-alex-mm", name: "DJ Alex MM", role: "DJ", city: "Chișinău", price: 6000, rating: 4.8, count: 98, image: "/images/categories/dj.jpg" },
-  { id: 3, slug: "mc-paul-event", name: "MC Paul Event", role: "Prezentator", city: "Chișinău", price: 6000, rating: 4.9, count: 72, image: "/images/categories/moderatori.jpg" },
-  { id: 4, slug: "vitalie-bantas", name: "Vitalie Bantaș", role: "Fotograf", city: "Chișinău", price: 5000, rating: 4.8, count: 88, image: "/images/categories/fotografi.jpg" },
-  { id: 5, slug: "flower-design", name: "Flower Design", role: "Decor & Floristică", city: "Chișinău", price: 6000, rating: 4.8, count: 64, image: "/images/categories/decor.jpg" },
+  { id: 1, slug: "formatia-noroc", name: "Formația Noroc", role: "Live band", city: "Chișinău", price: 15000, rating: 4.9, count: 145, image: "/images/artists/victoria-lungu.jpg" },
+  { id: 2, slug: "dj-alex-mm", name: "DJ Alex MM", role: "DJ", city: "Chișinău", price: 6000, rating: 4.8, count: 98, image: "/images/artists/liviu-gulca.jpg" },
+  { id: 3, slug: "mc-paul-event", name: "MC Paul Event", role: "Prezentator", city: "Chișinău", price: 6000, rating: 4.9, count: 72, image: "/images/artists/igor-nedoseikin.jpg" },
+  { id: 4, slug: "vitalie-bantas", name: "Vitalie Bantaș", role: "Fotograf", city: "Chișinău", price: 5000, rating: 4.8, count: 88, image: "/images/artists/serj-kuzenkov.jpg" },
+  { id: 5, slug: "flower-design", name: "Flower Design", role: "Decor & Floristică", city: "Chișinău", price: 6000, rating: 4.8, count: 64, image: "/images/artists/irina-grekova.jpg" },
 ];
 
 const CARD_IMAGES = [
-  "/images/categories/formatii.jpg",
-  "/images/categories/dj.jpg",
-  "/images/categories/moderatori.jpg",
-  "/images/categories/fotografi.jpg",
-  "/images/categories/decor.jpg",
+  "/images/artists/victoria-lungu.jpg",
+  "/images/artists/liviu-gulca.jpg",
+  "/images/artists/igor-nedoseikin.jpg",
+  "/images/artists/serj-kuzenkov.jpg",
+  "/images/artists/irina-grekova.jpg",
 ];
 
 function fmt(n: number) {
@@ -76,7 +77,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
         price: a.priceFrom,
         rating: a.ratingAvg,
         count: a.ratingCount,
-        image: CARD_IMAGES[i % CARD_IMAGES.length],
+        image: a.coverImageUrl || CARD_IMAGES[i % CARD_IMAGES.length],
       }))
     : process.env.NODE_ENV === "development"
       ? SAMPLE
