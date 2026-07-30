@@ -85,8 +85,29 @@ export async function getVenues(filters: VenueFilters = {}) {
     db.select({ count: sql<number>`count(*)` }).from(venues).where(where),
   ]);
 
+  const ids = items.map((venue) => venue.id);
+  const covers = ids.length
+    ? await db
+        .select({
+          venueId: venueImages.venueId,
+          url: venueImages.url,
+          isCover: venueImages.isCover,
+          sortOrder: venueImages.sortOrder,
+        })
+        .from(venueImages)
+        .where(sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`)
+        .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder))
+    : [];
+  const coverMap = new Map<number, string>();
+  for (const image of covers) {
+    if (!coverMap.has(image.venueId)) coverMap.set(image.venueId, image.url);
+  }
+
   return {
-    items,
+    items: items.map((venue) => ({
+      ...venue,
+      coverImageUrl: coverMap.get(venue.id) ?? null,
+    })),
     total: Number(countResult[0]?.count ?? 0),
     page,
     totalPages: Math.ceil(Number(countResult[0]?.count ?? 0) / limit),

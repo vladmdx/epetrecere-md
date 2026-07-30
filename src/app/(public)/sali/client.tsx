@@ -1,30 +1,49 @@
 "use client";
 
+import { FormEvent, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ArrowRight,
+  CalendarDays,
+  MapPin,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
+  Users,
+} from "lucide-react";
 import { VenueCard } from "@/components/public/venue-card";
 import { SortBar } from "@/components/public/sort-bar";
 import { PaginationBar } from "@/components/public/pagination-bar";
-import { CityFilter, CapacityFilter, ActiveFiltersReset } from "@/components/public/filter-bar";
 import { CompareBar } from "@/components/public/compare-bar";
 import { RecentlyViewed } from "@/components/public/recently-viewed";
+import { ViewSwitcher, gridClassName, useViewMode } from "@/components/public/view-switcher";
+import { WishlistButton } from "@/components/public/wishlist-button";
 import { useLocale } from "@/hooks/use-locale";
+import { getLocalized } from "@/i18n";
+import { cn } from "@/lib/utils";
+
+interface Venue {
+  id: number;
+  slug: string;
+  nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
+  address: string | null;
+  city: string | null;
+  capacityMin: number | null;
+  capacityMax: number | null;
+  pricePerPerson: number | null;
+  ratingAvg: number | null;
+  ratingCount: number | null;
+  isFeatured: boolean;
+  coverImageUrl?: string | null;
+}
 
 interface Props {
-  venues: Array<{
-    id: number;
-    slug: string;
-    nameRo: string;
-    nameRu: string | null;
-    nameEn: string | null;
-    address: string | null;
-    city: string | null;
-    capacityMin: number | null;
-    capacityMax: number | null;
-    pricePerPerson: number | null;
-    ratingAvg: number | null;
-    ratingCount: number | null;
-    isFeatured: boolean;
-  }>;
+  venues: Venue[];
   total: number;
   page: number;
   totalPages: number;
@@ -32,84 +51,337 @@ interface Props {
   cities: string[];
   currentCity: string;
   currentCapacityMin: string;
+  currentDate: string;
 }
 
 const sortOptions = [
-  { value: "popular", label: "Popular" },
-  { value: "price_asc", label: "Preț ↑" },
-  { value: "price_desc", label: "Preț ↓" },
+  { value: "popular", label: "Popularitate" },
+  { value: "price_asc", label: "Preț crescător" },
+  { value: "price_desc", label: "Preț descrescător" },
   { value: "rating", label: "Rating" },
   { value: "capacity", label: "Capacitate" },
 ];
 
-export function VenuesListClient({ venues, total, page, totalPages, currentSort, cities, currentCity, currentCapacityMin }: Props) {
+const capacityOptions = [
+  { value: "", label: "Orice capacitate" },
+  { value: "50", label: "50+ invitați" },
+  { value: "100", label: "100+ invitați" },
+  { value: "200", label: "200+ invitați" },
+  { value: "300", label: "300+ invitați" },
+  { value: "500", label: "500+ invitați" },
+];
+
+const knownCities = ["Chișinău", "Bălți", "Orhei", "Cahul", "Ungheni", "Soroca"];
+
+export function VenuesListClient({
+  venues,
+  total,
+  page,
+  totalPages,
+  currentSort,
+  cities,
+  currentCity,
+  currentCapacityMin,
+  currentDate,
+}: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t } = useLocale();
+  const [city, setCity] = useState(currentCity);
+  const [capacity, setCapacity] = useState(currentCapacityMin);
+  const [date, setDate] = useState(currentDate);
+  const [viewMode, setViewMode] = useViewMode();
+  const locations = Array.from(new Set([...knownCities, ...cities].filter(Boolean)));
 
-  function updateParams(key: string, value: string | undefined) {
+  function navigate(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value);
-    else params.delete(key);
-    if (key !== "page") params.delete("page");
-    router.push(`/sali?${params.toString()}`);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    if (!("page" in updates)) params.delete("page");
+    const suffix = params.toString();
+    router.push(suffix ? `/sali?${suffix}` : "/sali");
   }
 
-  function resetFilters() {
-    router.push("/sali");
+  function handleSearch(event: FormEvent) {
+    event.preventDefault();
+    navigate({
+      city: city || undefined,
+      capacity_min: capacity || undefined,
+      date: date || undefined,
+    });
   }
 
-  const hasFilters = !!(currentCity || currentCapacityMin);
+  const hasFilters = Boolean(currentCity || currentCapacityMin || currentDate);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
+    <div className="-mt-16 min-h-screen bg-[#05080d] text-[#f6f0e5]">
       <CompareBar entityType="venue" />
-      <div className="mb-8">
-        <h1 className="font-heading text-3xl font-bold md:text-4xl">{t("nav.venues")}</h1>
-        <p className="mt-2 text-muted-foreground">{total} rezultate</p>
-      </div>
 
-      <div className="mb-6">
-        <SortBar
-          options={sortOptions}
-          current={currentSort}
-          onChange={(v) => updateParams("sort", v)}
+      <section className="relative isolate overflow-hidden border-b border-[#e4b747]/12 pt-16">
+        <Image
+          src="/images/redesign/venues-catalog-hero.webp"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="absolute -z-20 object-cover object-center"
         />
-      </div>
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,8,13,.98)_0%,rgba(5,8,13,.86)_50%,rgba(5,8,13,.28)_82%,rgba(5,8,13,.56)_100%)]" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-transparent to-[#05080d]" />
 
-      {/* Filters */}
-      <div className="mb-6 flex flex-col gap-3">
-        <CityFilter
-          cities={cities}
-          currentCity={currentCity || undefined}
-          onChange={(city) => updateParams("city", city)}
-        />
-        <CapacityFilter
-          currentMin={currentCapacityMin || undefined}
-          onChange={(min) => updateParams("capacity_min", min)}
-        />
-        <ActiveFiltersReset hasFilters={hasFilters} onReset={resetFilters} />
-      </div>
+        <div className="mx-auto max-w-[1480px] px-4 pb-9 pt-7 lg:px-8">
+          <nav className="text-xs text-white/48">
+            <Link href="/" className="hover:text-[#e6b84d]">Acasă</Link>
+            <span className="mx-2">›</span>
+            <span>Săli</span>
+          </nav>
 
-      {venues.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {venues.map((venue) => <VenueCard key={venue.id} venue={venue} />)}
+          <div className="mt-8 max-w-4xl">
+            <h1 className="max-w-3xl font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
+              Săli pentru evenimentul tău
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/68 sm:text-base">
+              Descoperă restaurante, săli de nuntă și locații premium pentru orice tip de eveniment din Republica Moldova.
+            </p>
+
+            <form
+              onSubmit={handleSearch}
+              className="mt-6 grid gap-2 rounded-xl border border-white/12 bg-[#090d14]/82 p-3 shadow-[0_20px_50px_rgba(0,0,0,.25)] backdrop-blur-xl sm:grid-cols-2 lg:grid-cols-[1fr_220px_190px_auto]"
+            >
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
+                <MapPin className="h-4 w-4 text-[#e6b84d]" />
+                <select
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
+                >
+                  <option value="" className="bg-[#0a1019]">Toată Moldova</option>
+                  {locations.map((item) => (
+                    <option key={item} value={item} className="bg-[#0a1019]">{item}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
+                <Users className="h-4 w-4 text-[#e6b84d]" />
+                <select
+                  value={capacity}
+                  onChange={(event) => setCapacity(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
+                >
+                  {capacityOptions.map((item) => (
+                    <option key={item.value} value={item.value} className="bg-[#0a1019]">{item.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
+                <CalendarDays className="h-4 w-4 text-[#e6b84d]" />
+                <input
+                  type="date"
+                  value={date}
+                  min={new Date().toISOString().slice(0, 10)}
+                  onChange={(event) => setDate(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none [color-scheme:dark]"
+                />
+              </label>
+              <button className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] hover:brightness-105">
+                <Search className="h-4 w-4" /> Caută
+              </button>
+            </form>
+          </div>
         </div>
-      ) : (
-        <div className="py-20 text-center">
-          <p className="text-lg text-muted-foreground">{t("common.noResults")}</p>
+      </section>
+
+      <main className="mx-auto max-w-[1480px] px-4 py-7 lg:px-8">
+        <div className="grid items-start gap-5 lg:grid-cols-[245px_minmax(0,1fr)]">
+          <aside className="rounded-xl border border-white/8 bg-[linear-gradient(180deg,#0d1017,#090c12)] p-4 shadow-[0_24px_55px_rgba(0,0,0,.18)] lg:sticky lg:top-20">
+            <div className="flex items-center justify-between border-b border-white/8 pb-4">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-[#e8c05f]">
+                <SlidersHorizontal className="h-4 w-4" />
+                Filtrează rezultate
+              </h2>
+              {hasFilters && (
+                <button onClick={() => router.push("/sali")} className="text-[10px] text-white/45 hover:text-white">
+                  Resetează
+                </button>
+              )}
+            </div>
+
+            <div className="border-b border-white/8 py-4">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">Localitate</p>
+              <select
+                value={city}
+                onChange={(event) => {
+                  setCity(event.target.value);
+                  navigate({ city: event.target.value || undefined });
+                }}
+                className="h-10 w-full rounded-lg border border-white/10 bg-[#090d14] px-3 text-xs text-white/76 outline-none"
+              >
+                <option value="">Toate localitățile</option>
+                {locations.map((item) => <option key={item} value={item}>{item}</option>)}
+              </select>
+            </div>
+
+            <div className="border-b border-white/8 py-4">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">Capacitate</p>
+              <div className="grid grid-cols-2 gap-2">
+                {capacityOptions.slice(1).map((item) => {
+                  const selected = currentCapacityMin === item.value;
+                  return (
+                    <button
+                      key={item.value}
+                      onClick={() => {
+                        const next = selected ? "" : item.value;
+                        setCapacity(next);
+                        navigate({ capacity_min: next || undefined });
+                      }}
+                      className={cn(
+                        "rounded-lg border px-2 py-2 text-xs",
+                        selected
+                          ? "border-[#e6b84d] bg-[#e6b84d]/12 text-[#e6b84d]"
+                          : "border-white/10 text-white/58 hover:border-[#e6b84d]/35",
+                      )}
+                    >
+                      {item.label.replace(" invitați", "")}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="py-4">
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">Data evenimentului</p>
+              <input
+                type="date"
+                value={date}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={(event) => setDate(event.target.value)}
+                className="h-10 w-full rounded-lg border border-white/10 bg-[#090d14] px-3 text-xs text-white/76 outline-none [color-scheme:dark]"
+              />
+            </div>
+
+            <button
+              onClick={() => navigate({ city: city || undefined, capacity_min: capacity || undefined, date: date || undefined })}
+              className="h-11 w-full rounded-lg border border-[#e6b84d]/65 bg-[#e6b84d]/8 text-xs font-semibold text-[#edc666] hover:bg-[#e6b84d]/15"
+            >
+              Aplică filtrele
+            </button>
+          </aside>
+
+          <section className="min-w-0">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-white/68">
+                  <span className="font-semibold text-white">{total}</span> locații găsite
+                </p>
+                {hasFilters && <p className="mt-0.5 text-[10px] text-[#e6b84d]">Filtre active</p>}
+              </div>
+              <div className="flex items-center gap-2">
+                <SortBar
+                  options={sortOptions}
+                  current={currentSort}
+                  onChange={(value) => navigate({ sort: value })}
+                />
+                <ViewSwitcher mode={viewMode} onChange={setViewMode} />
+              </div>
+            </div>
+
+            {venues.length > 0 ? (
+              viewMode.kind === "grid" ? (
+                <div className={gridClassName(viewMode.cols)}>
+                  {venues.map((venue, index) => <VenueCard key={venue.id} venue={venue} imageIndex={index} />)}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {venues.map((venue, index) => (
+                    <VenueListCard key={venue.id} venue={venue} imageIndex={index} detailed={viewMode.density === "detailed"} />
+                  ))}
+                </div>
+              )
+            ) : (
+              <div className="rounded-xl border border-white/8 bg-white/[.02] py-24 text-center">
+                <Sparkles className="mx-auto h-9 w-9 text-[#e6b84d]/60" />
+                <p className="mt-4 text-sm text-white/58">{t("common.noResults")}</p>
+                <button onClick={() => router.push("/sali")} className="mt-4 text-xs text-[#e6b84d]">
+                  Resetează filtrele
+                </button>
+              </div>
+            )}
+
+            <PaginationBar
+              page={page}
+              totalPages={totalPages}
+              onPageChange={(value) => navigate({ page: String(value) })}
+            />
+
+            <div className="mt-7 flex flex-col items-center gap-5 rounded-xl border border-[#e6b84d]/25 bg-[radial-gradient(circle_at_15%_30%,rgba(230,184,77,.11),transparent_28%),linear-gradient(100deg,#0d1019,#151022,#0c101a)] px-6 py-7 text-center sm:flex-row sm:text-left">
+              <VenueIllustration />
+              <div className="flex-1">
+                <h2 className="font-heading text-2xl font-semibold text-[#edd08a]">
+                  Nu știi ce locație să alegi?
+                </h2>
+                <p className="mt-1 text-sm text-white/56">
+                  Spune-ne numărul de invitați, data și stilul evenimentului, iar noi îți recomandăm sălile potrivite.
+                </p>
+              </div>
+              <Link
+                href="/planifica"
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-6 text-xs font-semibold text-[#07101d]"
+              >
+                Primește recomandări <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="mt-10 border-t border-white/8 pt-7">
+              <RecentlyViewed type="venue" />
+            </div>
+          </section>
         </div>
-      )}
+      </main>
+    </div>
+  );
+}
 
-      <PaginationBar
-        page={page}
-        totalPages={totalPages}
-        onPageChange={(p) => updateParams("page", String(p))}
-      />
+function VenueListCard({ venue, detailed, imageIndex }: { venue: Venue; detailed: boolean; imageIndex: number }) {
+  const { locale, t } = useLocale();
+  const name = getLocalized(venue, "name", locale);
+  const fallback = `/images/venues/hall-${(imageIndex % 6) + 1}.jpg`;
+  const image = venue.coverImageUrl || fallback;
 
-      <div className="mt-12 border-t border-border/30 pt-8">
-        <RecentlyViewed type="venue" />
+  return (
+    <div className={cn("flex gap-3 rounded-xl border border-white/8 bg-[#111522] p-3 transition-colors hover:border-[#e6b84d]/35", detailed && "gap-4 p-4")}>
+      <Link href={`/sali/${venue.slug}`} className={cn("relative shrink-0 overflow-hidden rounded-lg", detailed ? "h-28 w-40" : "h-16 w-24")}>
+        <Image src={image} alt={name} fill sizes={detailed ? "160px" : "96px"} className="object-cover" unoptimized={image.includes("r2.cloudflarestorage.com")} />
+      </Link>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Link href={`/sali/${venue.slug}`} className="line-clamp-1 font-heading font-semibold text-white hover:text-[#e6b84d]">
+              {name}
+            </Link>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/48">
+              {venue.city && <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-[#e6b84d]" />{venue.city}</span>}
+              {venue.capacityMax && <span className="flex items-center gap-1"><Users className="h-3 w-3" />până la {venue.capacityMax} {t("common.guests")}</span>}
+              <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-[#e6b84d] text-[#e6b84d]" />{venue.ratingAvg?.toFixed(1) || "Nou"}</span>
+            </div>
+            {detailed && venue.address && <p className="mt-3 text-xs text-white/46">{venue.address}</p>}
+          </div>
+          <WishlistButton entityType="venue" entityId={venue.id} />
+        </div>
       </div>
+    </div>
+  );
+}
+
+function VenueIllustration() {
+  return (
+    <div className="relative flex h-20 w-24 shrink-0 items-center justify-center text-[#e6b84d]">
+      <span className="absolute inset-0 rounded-full bg-[#e6b84d]/5 blur-xl" />
+      <svg viewBox="0 0 100 76" className="relative h-full w-full" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M16 59h68M23 59V35h54v24M31 35V24h38v11M39 24v-8h22v8M31 45h38M39 45v14M61 45v14" />
+        <path d="M13 59h74M46 16h8M24 31h52" />
+      </svg>
     </div>
   );
 }

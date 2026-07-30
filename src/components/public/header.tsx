@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
+import { CalendarPlus, Menu, X, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { SearchAutocomplete } from "@/components/public/search-autocomplete";
@@ -224,9 +224,12 @@ export function Header() {
           <LanguageSwitcher />
           <UserMenu />
           {showPlannerCta && (
-            <Link href="/planifica" className="hidden lg:block">
-              <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark font-medium">
-                {t("nav.planner")}
+            <Link href="/planifica" aria-label={t("nav.planner")} title={t("nav.planner")}>
+              <Button className="h-9 min-w-9 rounded-full bg-gold px-2 text-[#0D0D0D] shadow-[0_4px_18px_rgba(201,168,76,.22)] hover:bg-gold-dark sm:rounded-lg sm:px-4">
+                <CalendarPlus className="h-4 w-4 sm:mr-2" aria-hidden />
+                <span className="hidden whitespace-nowrap text-sm font-semibold sm:inline">
+                  {t("nav.planner")}
+                </span>
               </Button>
             </Link>
           )}

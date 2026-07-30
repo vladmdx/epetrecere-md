@@ -70,6 +70,7 @@ export default async function VenuesPage({ searchParams }: Props) {
         cities={allCities}
         currentCity={(sp.city as string) || ""}
         currentCapacityMin={(sp.capacity_min as string) || ""}
+        currentDate={(sp.date as string) || ""}
       />
     </>
   );

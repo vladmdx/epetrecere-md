@@ -9,7 +9,7 @@ import {
   venueMenuPackages,
   redirects,
 } from "@/lib/db/schema";
-import { getVenueBySlug } from "@/lib/db/queries/venues";
+import { getVenueBySlug, getVenues } from "@/lib/db/queries/venues";
 
 /** When a venue slug is not found, check the redirects table — the
  *  owner may have renamed their slug and we inserted a 301 row. Follows
@@ -91,7 +91,7 @@ export default async function VenuePage({ params }: Props) {
   const name = getLocalized(venue, "name", "ro");
 
   // Load digital menu data (packages, categories, items)
-  const [menuCategories, menuPackages] = await Promise.all([
+  const [menuCategories, menuPackages, relatedResult] = await Promise.all([
     db
       .select()
       .from(venueMenuCategories)
@@ -102,6 +102,11 @@ export default async function VenuePage({ params }: Props) {
       .from(venueMenuPackages)
       .where(eq(venueMenuPackages.venueId, venue.id))
       .orderBy(asc(venueMenuPackages.sortOrder), asc(venueMenuPackages.id)),
+    getVenues({
+      city: venue.city || undefined,
+      limit: 5,
+      sort: "rating",
+    }),
   ]);
 
   const catIds = menuCategories.map((c) => c.id);
@@ -146,6 +151,10 @@ export default async function VenuePage({ params }: Props) {
           items: menuItems,
           packages: menuPackages,
         }}
+        similar={relatedResult.items
+          .filter((item) => item.id !== venue.id)
+          .slice(0, 4)
+          .map((item) => userId ? item : { ...item, pricePerPerson: null })}
       />
       <ViewTracker kind="venue" id={venue.id} />
     </>
