@@ -30,6 +30,7 @@ export default async function ArtistsPage({ searchParams }: Props) {
     page: sp.page ? Number(sp.page) : 1,
     priceMin: sp.price_min ? Number(sp.price_min) : undefined,
     priceMax: sp.price_max ? Number(sp.price_max) : undefined,
+    ratingMin: sp.rating_min ? Number(sp.rating_min) : undefined,
     // Availability filter — when present we exclude artists booked/blocked on
     // that date via the calendar_events join in getArtists().
     availableDate: (sp.date as string) || undefined,

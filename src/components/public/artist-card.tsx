@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Star, BadgeCheck, Crown, Lock } from "lucide-react";
+import { Star, BadgeCheck, Crown, Lock, MapPin } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
 import { useLocale } from "@/hooks/use-locale";
@@ -40,31 +40,48 @@ export function ArtistCard({ artist }: ArtistCardProps) {
   // Price is gated behind login (M0a #8). We only show the locked pill once
   // Clerk has hydrated so we don't flash a "Lock" state for authed users.
   const showPrice = isLoaded && isSignedIn;
+  const fallbackImages = [
+    "/images/artists/aleksei-atamanyuk.jpg",
+    "/images/artists/anna-danilchenko.jpeg",
+    "/images/artists/igor-nedoseikin.jpg",
+    "/images/artists/irina-grekova.jpg",
+    "/images/artists/liviu-gulca.jpg",
+    "/images/artists/roxana.jpg",
+    "/images/artists/serj-kuzenkov.jpg",
+    "/images/artists/stas-pindus.jpg",
+    "/images/artists/victoria-lungu.jpg",
+  ];
+  const hasRealCover =
+    artist.coverImageUrl &&
+    !artist.coverImageUrl.endsWith("/images/artists/placeholder.svg") &&
+    !artist.coverImageUrl.endsWith("placeholder.svg");
+  const image = hasRealCover
+    ? artist.coverImageUrl!
+    : fallbackImages[artist.id % fallbackImages.length];
 
   return (
     <Link
       href={`/artisti/${artist.slug}`}
-      className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all duration-300 hover:border-gold/30 hover:shadow-[0_4px_20px_rgba(201,168,76,0.15)] hover:-translate-y-1"
+      className="group flex flex-col overflow-hidden rounded-xl border border-white/8 bg-[#111522] transition-all duration-300 hover:-translate-y-1 hover:border-[#e6b84d]/45 hover:shadow-[0_18px_38px_rgba(0,0,0,.28)]"
     >
-      <div className="relative aspect-[4/5] bg-muted overflow-hidden">
-        {artist.coverImageUrl ? (
-          <Image
-            src={artist.coverImageUrl}
-            alt={name}
-            fill
-            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover object-[center_20%] transition-transform duration-300 group-hover:scale-105"
-            unoptimized={artist.coverImageUrl?.includes("r2.cloudflarestorage.com") ?? false}
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
-            <span className="text-4xl">🎵</span>
-          </div>
-        )}
+      <div className="relative aspect-[4/5] overflow-hidden bg-[#0a0d14]">
+        <Image
+          src={image}
+          alt={name}
+          fill
+          sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
+          className="object-cover object-[center_20%] transition-transform duration-500 group-hover:scale-105"
+          unoptimized={image.includes("r2.cloudflarestorage.com")}
+        />
+        <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#111522] to-transparent" />
+        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#06110d]/85 px-2 py-1 text-[9px] font-medium text-[#53df86] backdrop-blur">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#4fe47f]" />
+          Disponibil
+        </span>
         {/* Badges */}
         <div className="absolute left-2 top-2 flex gap-1">
           {artist.isVerified && (
-            <Badge className="bg-gold/90 text-[#0D0D0D] text-xs gap-1">
+            <Badge className="gap-1 bg-gold/90 text-[9px] text-[#0D0D0D]">
               <BadgeCheck className="h-3 w-3" /> Verificat
             </Badge>
           )}
@@ -86,26 +103,26 @@ export function ArtistCard({ artist }: ArtistCardProps) {
         </div>
       </div>
 
-      <div className="flex flex-1 flex-col p-4">
-        <h3 className="font-heading text-base font-bold line-clamp-1">
+      <div className="flex flex-1 flex-col p-3.5">
+        <h3 className="line-clamp-1 font-heading text-base font-semibold text-white">
           {name}
         </h3>
 
         {description && (
-          <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
-            {description}
+          <p className="mt-0.5 line-clamp-1 text-[10px] text-white/50">
+            {description.replace(/<[^>]+>/g, "")}
           </p>
         )}
 
-        <div className="mt-auto flex items-center justify-between pt-3">
+        <div className="mt-2 flex items-center justify-between border-t border-white/7 pt-2">
           {/* Rating */}
           <div className="flex items-center gap-1">
             <Star className="h-3.5 w-3.5 fill-gold text-gold" />
-            <span className="text-xs font-medium">
+            <span className="text-xs font-medium text-white/84">
               {artist.ratingAvg ? artist.ratingAvg.toFixed(1) : "—"}
             </span>
             {artist.ratingCount ? (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-[10px] text-white/38">
                 ({artist.ratingCount})
               </span>
             ) : null}
@@ -114,7 +131,7 @@ export function ArtistCard({ artist }: ArtistCardProps) {
           {/* Price — gated behind login */}
           {artist.priceFrom ? (
             showPrice ? (
-              <p className="font-accent text-sm font-semibold text-gold">
+              <p className="text-[10px] font-semibold text-white/76">
                 {t("common.from")} {artist.priceFrom}€
               </p>
             ) : (
@@ -126,8 +143,8 @@ export function ArtistCard({ artist }: ArtistCardProps) {
         </div>
 
         {artist.location && (
-          <p className="mt-1 text-xs text-muted-foreground">
-            📍 {artist.location}
+          <p className="mt-2 flex items-center gap-1 text-[10px] text-white/47">
+            <MapPin className="h-3 w-3 text-[#e6b84d]" /> {artist.location}
           </p>
         )}
       </div>

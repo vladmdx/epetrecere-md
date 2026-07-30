@@ -121,9 +121,33 @@ export async function getVenueBySlug(slug: string) {
 }
 
 export async function getFeaturedVenues(limit = 6) {
-  return db
+  const items = await db
     .select()
     .from(venues)
     .where(and(eq(venues.isActive, true), eq(venues.isFeatured, true)))
     .limit(limit);
+
+  const ids = items.map((venue) => venue.id);
+  if (!ids.length) return [];
+
+  const covers = await db
+    .select({
+      venueId: venueImages.venueId,
+      url: venueImages.url,
+      isCover: venueImages.isCover,
+      sortOrder: venueImages.sortOrder,
+    })
+    .from(venueImages)
+    .where(sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`)
+    .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder));
+
+  const coverMap = new Map<number, string>();
+  for (const image of covers) {
+    if (!coverMap.has(image.venueId)) coverMap.set(image.venueId, image.url);
+  }
+
+  return items.map((venue) => ({
+    ...venue,
+    coverImageUrl: coverMap.get(venue.id) ?? null,
+  }));
 }

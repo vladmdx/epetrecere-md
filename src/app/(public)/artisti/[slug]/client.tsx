@@ -3,10 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Star, BadgeCheck, Crown, MapPin, Globe, CalendarDays, X, ZoomIn, Lock, Camera } from "lucide-react";
+import { Star, BadgeCheck, Crown, MapPin, Globe, X, ZoomIn, Lock, Camera } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArtistCard } from "@/components/public/artist-card";
 import { ImageGallery } from "@/components/public/image-gallery";
@@ -96,6 +95,18 @@ interface Props {
   }>;
 }
 
+const ARTIST_FALLBACK_IMAGES = [
+  "/images/artists/aleksei-atamanyuk.jpg",
+  "/images/artists/anna-danilchenko.jpeg",
+  "/images/artists/igor-nedoseikin.jpg",
+  "/images/artists/irina-grekova.jpg",
+  "/images/artists/liviu-gulca.jpg",
+  "/images/artists/roxana.jpg",
+  "/images/artists/serj-kuzenkov.jpg",
+  "/images/artists/stas-pindus.jpg",
+  "/images/artists/victoria-lungu.jpg",
+];
+
 export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
@@ -103,6 +114,11 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
   const [avatarOpen, setAvatarOpen] = useState(false);
+  const rawProfilePhotoUrl = artist.photoUrl || artist.images?.[0]?.url || null;
+  const profilePhotoUrl =
+    rawProfilePhotoUrl && !rawProfilePhotoUrl.includes("placeholder.svg")
+      ? rawProfilePhotoUrl
+      : ARTIST_FALLBACK_IMAGES[artist.id % ARTIST_FALLBACK_IMAGES.length];
 
   // Track recent views so the homepage/cabinet "Recently viewed" widget has data
   useEffect(() => {
@@ -110,10 +126,10 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
       trackRecentView("artist", {
         slug: artist.slug,
         name,
-        imageUrl: artist.photoUrl ?? null,
+        imageUrl: profilePhotoUrl,
       });
     });
-  }, [artist.slug, artist.photoUrl, name]);
+  }, [artist.slug, name, profilePhotoUrl]);
 
   // Resolve the event plan this booking should attach to. Priority order:
   // explicit `?plan=X` URL param (used by dashboard discovery links) →
@@ -132,15 +148,12 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
       : null;
     if (fromSession) setEventPlanId(Number(fromSession));
   }, [searchParams]);
-  // Profile photo: prefer dedicated photoUrl, fallback to first gallery image
-  const profilePhotoUrl = artist.photoUrl || artist.images?.[0]?.url || null;
-  const isPlaceholder = profilePhotoUrl?.includes("placeholder.svg") ?? false;
   // M0a #8 — contact info and price are gated behind login. We wait for Clerk
   // to hydrate so we don't flash a "Lock" state for authenticated visitors.
   const canSeeContact = isLoaded && isSignedIn;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-8 text-[#f5efe4] lg:px-8">
       {/* Breadcrumb */}
       <nav className="mb-6 text-xs text-muted-foreground">
         <Link href="/" className="hover:text-gold">Acasă</Link>
@@ -150,30 +163,28 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
         <span className="text-foreground">{name}</span>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         {/* Main Content */}
-        <div className="lg:col-span-2">
+        <div>
           {/* Profile Header */}
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="mb-6 grid gap-5 sm:grid-cols-[270px_minmax(0,1fr)]">
             <button
               type="button"
-              onClick={() => !isPlaceholder && profilePhotoUrl && setAvatarOpen(true)}
-              disabled={isPlaceholder || !profilePhotoUrl}
-              className="group relative flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-gold bg-card shadow-[0_0_20px_rgba(201,168,76,0.15)] transition-all hover:shadow-[0_0_30px_rgba(201,168,76,0.35)] disabled:cursor-default disabled:hover:shadow-[0_0_20px_rgba(201,168,76,0.15)]"
-              aria-label={isPlaceholder ? name : `Vezi poza mare a lui ${name}`}
+              onClick={() => profilePhotoUrl && setAvatarOpen(true)}
+              disabled={!profilePhotoUrl}
+              className="group relative flex aspect-[4/5] w-full shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#e6b84d]/70 bg-[#11151d] shadow-[0_14px_40px_rgba(0,0,0,.28)] transition-all hover:shadow-[0_18px_50px_rgba(201,168,76,.2)] disabled:cursor-default"
+              aria-label={`Vezi poza mare a lui ${name}`}
             >
               {profilePhotoUrl ? (
                 <>
                   <img
                     src={profilePhotoUrl}
                     alt={name}
-                    className={`h-full w-full object-cover transition-transform duration-300 ${!isPlaceholder ? "group-hover:scale-105" : ""}`}
+                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
-                  {!isPlaceholder && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
-                      <ZoomIn className="h-6 w-6 text-white" />
-                    </div>
-                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all group-hover:bg-black/40 group-hover:opacity-100">
+                    <ZoomIn className="h-6 w-6 text-white" />
+                  </div>
                 </>
               ) : (
                 <span className="text-3xl">🎵</span>
@@ -181,7 +192,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             </button>
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-heading text-2xl font-bold md:text-3xl">{name}</h1>
+                <h1 className="font-heading text-3xl font-semibold tracking-tight md:text-5xl">{name}</h1>
                 {artist.isVerified && (
                   <Badge className="bg-gold/10 text-gold border-gold/30 gap-1">
                     <BadgeCheck className="h-3 w-3" /> Verificat
@@ -201,7 +212,9 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 </div>
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <p className="mt-2 text-base font-medium text-[#e6b84d]">Artist pentru evenimente</p>
+
+              <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/58">
                 {artist.location && (
                   <span className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" /> {artist.location}
@@ -237,12 +250,26 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                   )
                 ) : null}
               </div>
+
+              {description && (
+                <p className="mt-4 line-clamp-4 text-sm leading-relaxed text-white/58">
+                  {description.replace(/<[^>]+>/g, "")}
+                </p>
+              )}
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                {["Răspuns rapid", "Evenimente private", "Program personalizat"].map((item) => (
+                  <span key={item} className="rounded-md border border-white/10 bg-white/[.035] px-2.5 py-1 text-[10px] text-white/58">
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
 
           {/* Tabs */}
           <Tabs defaultValue="description" className="mt-6">
-            <TabsList className="w-full justify-start">
+            <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-white/8 bg-[#0c111b] p-1">
               <TabsTrigger value="description">{t("artist.description")}</TabsTrigger>
               <TabsTrigger value="gallery">{t("artist.gallery")} ({artist.images.length})</TabsTrigger>
               {artist.videos.length > 0 && (
@@ -259,9 +286,9 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               )}
             </TabsList>
 
-            <TabsContent value="description" className="mt-4">
+            <TabsContent value="description" className="mt-4 rounded-xl border border-white/8 bg-white/[.025] p-5">
               {description ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+                <div className="prose prose-sm dark:prose-invert max-w-none text-white/62">
                   <p>{description}</p>
                 </div>
               ) : (
@@ -333,15 +360,6 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                   {artist.packages.map((pkg) => {
                     const pkgName = getLocalized(pkg, "name", locale);
                     const pkgDesc = getLocalized(pkg, "description", locale);
-                    // M1 #5 — prefill the booking request message so the
-                    // artist sees which package triggered the lead.
-                    const presetMessage = [
-                      `Sunt interesat de pachetul "${pkgName}"`,
-                      pkg.price ? `— ${pkg.price}€` : "",
-                      pkg.durationHours ? `(${pkg.durationHours}h)` : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ") + ".";
                     return (
                       <div key={pkg.id} className="flex flex-col rounded-lg border border-border/40 bg-card p-4">
                         <h3 className="font-heading text-base font-bold">{pkgName}</h3>
@@ -476,7 +494,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 (RequestPriceForm), no booking button (price negotiated)
               - Logged in + price visible → both Cere preț + Solicită
                 rezervare buttons (existing UX) */}
-          <div className="space-y-3 lg:sticky lg:top-20">
+          <div className="space-y-3 rounded-2xl border border-[#e6b84d]/55 bg-[linear-gradient(180deg,#11151d,#0b1017)] p-5 shadow-[0_24px_60px_rgba(0,0,0,.28)] lg:sticky lg:top-20">
             {!canSeeContact ? (
               <a
                 href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}

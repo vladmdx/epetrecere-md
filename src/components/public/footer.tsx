@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Sparkles, Send, Globe, Camera, Music2 } from "lucide-react";
+import { Send, Globe, Camera, Music2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
+import { BrandMark } from "@/components/public/brand-mark";
 
 const COLUMNS: { title: string; links: { key: string; href: string }[] }[] = [
   {
@@ -57,7 +58,7 @@ export function Footer() {
           {/* Brand */}
           <div className="space-y-4 lg:col-span-1">
             <Link href="/" className="flex items-center gap-2 text-white">
-              <Sparkles className="h-6 w-6 text-gold" />
+              <BrandMark className="text-[#e8bd59]" />
               <span className="font-heading text-xl font-bold">
                 e<span className="text-gold">Petrecere</span>.md
               </span>

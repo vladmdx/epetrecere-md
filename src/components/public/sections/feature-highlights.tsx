@@ -9,9 +9,9 @@ import { useLocale } from "@/hooks/use-locale";
 // (venues / artists / planner) on a light section. Copy lives in i18n under
 // home.features.<key>{Title,Desc,Cta}.
 const CARDS = [
-  { key: "venues", icon: MapPin, image: "/images/categories/sali.jpg", href: "/sali" },
-  { key: "artists", icon: Music, image: "/images/categories/formatii.jpg", href: "/artisti" },
-  { key: "planner", icon: ClipboardList, image: "/images/categories/decor.jpg", href: "/planifica" },
+  { key: "venues", icon: MapPin, image: "/images/blog-wedding.jpg", href: "/sali" },
+  { key: "artists", icon: Music, image: "/images/parallax/categories.jpg", href: "/artisti" },
+  { key: "planner", icon: ClipboardList, image: "/images/hero-poster.jpg", href: "/planifica" },
 ] as const;
 
 export function FeatureHighlightsSection() {
