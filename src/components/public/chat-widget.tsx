@@ -46,6 +46,8 @@ export function ChatWidget({
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
+  const isVenueChat = Boolean(venueId);
+  const chatTargetLabel = isVenueChat ? "locația" : "artistul";
 
   useEffect(() => {
     setMounted(true);
@@ -108,9 +110,9 @@ export function ChatWidget({
     return (
       <a
         href={`/sign-in?redirect_url=${encodeURIComponent(`/${slugPrefix}/${artistSlug}`)}`}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2.5 text-sm font-medium text-gold hover:bg-gold/20"
-      >
-        <Lock className="h-4 w-4" /> Chat cu artistul (autentifică-te)
+      className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2.5 text-sm font-medium text-gold hover:bg-gold/20"
+    >
+        <Lock className="h-4 w-4" /> Chat cu {chatTargetLabel} (autentifică-te)
       </a>
     );
   }
@@ -152,7 +154,7 @@ export function ChatWidget({
                 </div>
               ) : messages.length === 0 ? (
                 <p className="py-8 text-center text-xs text-muted-foreground">
-                  Scrie primul mesaj — artistul va primi notificare.
+                  Scrie primul mesaj — {isVenueChat ? "echipa locației" : "artistul"} va primi notificare.
                 </p>
               ) : (
                 messages.map((m) => (
