@@ -15,7 +15,7 @@ import { ArtistCard } from "@/components/public/artist-card";
 import { ArtistListCard } from "@/components/public/artist-list-card";
 import { PaginationBar } from "@/components/public/pagination-bar";
 import { SortBar } from "@/components/public/sort-bar";
-import { ViewSwitcher, useViewMode } from "@/components/public/view-switcher";
+import { ViewSwitcher, gridClassName, useViewMode } from "@/components/public/view-switcher";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -104,12 +104,18 @@ function FilterPanel({
   onApply,
   onReset,
 }: FilterPanelProps) {
+  const { locale } = useLocale();
+  const labels = {
+    ro: { filter: "Filtrează rezultate", reset: "Resetează", price: "Preț", location: "Locație", all: "Toată Moldova", rating: "Rating minim", apply: "Aplică filtrele" },
+    ru: { filter: "Фильтры", reset: "Сбросить", price: "Цена", location: "Город", all: "Вся Молдова", rating: "Минимальный рейтинг", apply: "Применить фильтры" },
+    en: { filter: "Filter results", reset: "Reset", price: "Price", location: "Location", all: "All Moldova", rating: "Minimum rating", apply: "Apply filters" },
+  }[locale];
   return (
     <div className="rounded-xl border border-white/8 bg-[linear-gradient(180deg,#0d1017,#090c12)] p-4 shadow-[0_24px_55px_rgba(0,0,0,.18)]">
       <div className="flex items-center justify-between border-b border-white/8 pb-4">
         <h2 className="flex items-center gap-2 text-sm font-semibold text-[#e8c05f]">
           <SlidersHorizontal className="h-4 w-4" />
-          Filtrează rezultate
+          {labels.filter}
         </h2>
         {hasFilters && (
           <button
@@ -117,14 +123,14 @@ function FilterPanel({
             onClick={onReset}
             className="text-[10px] text-white/45 hover:text-white"
           >
-            Resetează
+            {labels.reset}
           </button>
         )}
       </div>
 
       <div className="border-b border-white/8 py-4">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">
-          Preț
+          {labels.price}
         </p>
         <div className="grid grid-cols-2 gap-2">
           <input
@@ -150,14 +156,14 @@ function FilterPanel({
 
       <div className="border-b border-white/8 py-4">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">
-          Locație
+          {labels.location}
         </p>
         <select
           value={city}
           onChange={(event) => onCityChange(event.target.value)}
           className="h-10 w-full rounded-lg border border-white/10 bg-[#090d14] px-3 text-xs text-white/76 outline-none"
         >
-          <option value="">Toată Moldova</option>
+          <option value="">{labels.all}</option>
           {locations.slice(1).map((location) => (
             <option key={location} value={location}>
               {location}
@@ -168,7 +174,7 @@ function FilterPanel({
 
       <div className="py-4">
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">
-          Rating minim
+          {labels.rating}
         </p>
         <div className="flex gap-1">
           {[3, 4, 5].map((value) => (
@@ -196,7 +202,7 @@ function FilterPanel({
         onClick={onApply}
         className="h-11 w-full rounded-lg border border-[#e6b84d]/65 bg-[#e6b84d]/8 text-xs font-semibold text-[#edc666] hover:bg-[#e6b84d]/15"
       >
-        Aplică filtrele
+        {labels.apply}
       </button>
     </div>
   );
@@ -226,9 +232,14 @@ export function CategoryPageClient({
 
   const name = getLocalized(category, "name", locale);
   const description = getLocalized(category, "description", locale);
-  const entityLabel = category.type === "service" ? "furnizori" : "artiști";
+  const labels = {
+    ro: { home: "Acasă", services: "Servicii", artists: "Artiști", suppliers: "furnizori", artistEntities: "artiști", premium: "Categorie premium", fallback: "Descoperă profesioniști potriviți pentru evenimentul tău, într-o selecție modernă și ușor de filtrat.", search: "Caută", inCategory: "Caută în", allMoldova: "Toată Moldova", found: "găsiți", active: "Filtre active", filters: "Filtre", reset: "Resetează filtrele", heroAlt: "Profesioniști pentru evenimente din Moldova" },
+    ru: { home: "Главная", services: "Услуги", artists: "Артисты", suppliers: "поставщиков", artistEntities: "артистов", premium: "Премиальная категория", fallback: "Найдите подходящих профессионалов для события в современной подборке с удобными фильтрами.", search: "Найти", inCategory: "Поиск в", allMoldova: "Вся Молдова", found: "найдено", active: "Фильтры активны", filters: "Фильтры", reset: "Сбросить фильтры", heroAlt: "Профессионалы для событий в Молдове" },
+    en: { home: "Home", services: "Services", artists: "Artists", suppliers: "vendors", artistEntities: "artists", premium: "Premium category", fallback: "Discover suitable event professionals in a modern selection with easy filters.", search: "Search", inCategory: "Search in", allMoldova: "All Moldova", found: "found", active: "Active filters", filters: "Filters", reset: "Reset filters", heroAlt: "Event professionals in Moldova" },
+  }[locale];
+  const entityLabel = category.type === "service" ? labels.suppliers : labels.artistEntities;
   const parentHref = category.type === "service" ? "/servicii" : "/artisti";
-  const parentLabel = category.type === "service" ? "Servicii" : "Artiști";
+  const parentLabel = category.type === "service" ? labels.services : labels.artists;
   const hasFilters = Boolean(
     searchQuery ||
       currentCity ||
@@ -296,7 +307,7 @@ export function CategoryPageClient({
       <section className="relative isolate overflow-hidden border-b border-[#e4b747]/12 pt-16">
         <img
           src="/images/redesign/artists-hero.webp"
-          alt=""
+          alt={labels.heroAlt}
           className="absolute inset-0 -z-20 h-full w-full object-cover object-center"
         />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,8,13,.98)_0%,rgba(5,8,13,.9)_50%,rgba(5,8,13,.48)_100%)]" />
@@ -305,7 +316,7 @@ export function CategoryPageClient({
         <div className="mx-auto max-w-[1480px] px-4 pb-9 pt-7 lg:px-8">
           <nav className="text-xs text-white/48">
             <Link href="/" className="hover:text-[#e6b84d]">
-              Acasă
+              {labels.home}
             </Link>
             <span className="mx-2">›</span>
             <Link href={parentHref} className="hover:text-[#e6b84d]">
@@ -317,14 +328,13 @@ export function CategoryPageClient({
 
           <div className="mt-8 max-w-3xl">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.28em] text-[#e6b84d]">
-              Categorie premium
+              {labels.premium}
             </p>
             <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
               {name}
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/68 sm:text-base">
-              {description ||
-                `Descoperă ${entityLabel} potriviți pentru evenimentul tău, într-o selecție modernă și ușor de filtrat.`}
+              {description || labels.fallback}
             </p>
 
             <form
@@ -336,7 +346,7 @@ export function CategoryPageClient({
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder={`Caută în ${name.toLowerCase()}...`}
+                  placeholder={`${labels.inCategory} ${name.toLowerCase()}...`}
                   className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
                 />
               </label>
@@ -348,7 +358,7 @@ export function CategoryPageClient({
                   className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
                 >
                   <option value="" className="bg-[#0a1019]">
-                    Toată Moldova
+                    {labels.allMoldova}
                   </option>
                   {locations.slice(1).map((location) => (
                     <option
@@ -362,7 +372,7 @@ export function CategoryPageClient({
                 </select>
               </label>
               <button className="min-h-11 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] hover:brightness-105">
-                Caută
+                {labels.search}
               </button>
             </form>
           </div>
@@ -380,11 +390,11 @@ export function CategoryPageClient({
               <div>
                 <p className="text-sm text-white/68">
                   <span className="font-semibold text-white">{total}</span>{" "}
-                  {entityLabel} găsiți
+                  {entityLabel} {labels.found}
                 </p>
                 {hasFilters && (
                   <p className="mt-0.5 text-[10px] text-[#e6b84d]">
-                    Filtre active
+                    {labels.active}
                   </p>
                 )}
               </div>
@@ -395,7 +405,7 @@ export function CategoryPageClient({
                   className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#e6b84d]/30 px-3 text-xs text-[#e6b84d] lg:hidden"
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" />
-                  Filtre
+                  {labels.filters}
                 </button>
                 <SortBar
                   options={sortOptions}
@@ -408,7 +418,7 @@ export function CategoryPageClient({
 
             {artists.length > 0 ? (
               viewMode.kind === "grid" ? (
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                <div className={gridClassName(viewMode.cols)}>
                   {artists.map((artist) => (
                     <ArtistCard key={artist.id} artist={artist} />
                   ))}
@@ -435,7 +445,7 @@ export function CategoryPageClient({
                   onClick={resetFilters}
                   className="mt-4 text-xs text-[#e6b84d]"
                 >
-                  Resetează filtrele
+                  {labels.reset}
                 </button>
               </div>
             )}

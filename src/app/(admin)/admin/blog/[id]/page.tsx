@@ -25,8 +25,11 @@ export default function BlogEditorPage() {
   const [post, setPost] = useState({
     titleRo: "", titleRu: "", titleEn: "",
     contentRo: "", contentRu: "", contentEn: "",
-    excerptRo: "", category: "", coverImageUrl: "",
-    status: "draft", seoTitleRo: "", seoDescRo: "",
+    excerptRo: "", excerptRu: "", excerptEn: "",
+    category: "", coverImageUrl: "",
+    status: "draft",
+    seoTitleRo: "", seoTitleRu: "", seoTitleEn: "",
+    seoDescRo: "", seoDescRu: "", seoDescEn: "",
     publishedAt: "",
   });
   const [loading, setLoading] = useState(!isNew);
@@ -106,7 +109,9 @@ export default function BlogEditorPage() {
               <div><Label>Titlu (RO) *</Label><Input value={post.titleRo} onChange={e => update({ titleRo: e.target.value })} /></div>
               <div><Label>Conținut (RO)</Label><RichEditor content={post.contentRo} onChange={html => update({ contentRo: html })} /></div>
               <div><Label>Titlu (RU)</Label><Input value={post.titleRu} onChange={e => update({ titleRu: e.target.value })} /></div>
+              <div><Label>Conținut (RU)</Label><RichEditor content={post.contentRu} onChange={html => update({ contentRu: html })} /></div>
               <div><Label>Titlu (EN)</Label><Input value={post.titleEn} onChange={e => update({ titleEn: e.target.value })} /></div>
+              <div><Label>Conținut (EN)</Label><RichEditor content={post.contentEn} onChange={html => update({ contentEn: html })} /></div>
             </CardContent>
           </Card>
         </div>
@@ -117,14 +122,20 @@ export default function BlogEditorPage() {
             <CardContent className="space-y-3">
               <div><Label>Categorie</Label><Input value={post.category} onChange={e => update({ category: e.target.value })} placeholder="Nunți, Sfaturi..." /></div>
               <div><Label>Excerpt (RO)</Label><Input value={post.excerptRo} onChange={e => update({ excerptRo: e.target.value })} /></div>
+              <div><Label>Excerpt (RU)</Label><Input value={post.excerptRu} onChange={e => update({ excerptRu: e.target.value })} /></div>
+              <div><Label>Excerpt (EN)</Label><Input value={post.excerptEn} onChange={e => update({ excerptEn: e.target.value })} /></div>
               <div><Label>Cover Image URL</Label><Input value={post.coverImageUrl} onChange={e => update({ coverImageUrl: e.target.value })} /></div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader><CardTitle>SEO</CardTitle></CardHeader>
             <CardContent className="space-y-3">
-              <div><Label>Meta Title</Label><Input value={post.seoTitleRo} onChange={e => update({ seoTitleRo: e.target.value })} maxLength={60} /></div>
-              <div><Label>Meta Description</Label><Input value={post.seoDescRo} onChange={e => update({ seoDescRo: e.target.value })} maxLength={155} /></div>
+              <div><Label>Meta Title (RO)</Label><Input value={post.seoTitleRo} onChange={e => update({ seoTitleRo: e.target.value })} maxLength={60} /></div>
+              <div><Label>Meta Description (RO)</Label><Input value={post.seoDescRo} onChange={e => update({ seoDescRo: e.target.value })} maxLength={155} /></div>
+              <div><Label>Meta Title (RU)</Label><Input value={post.seoTitleRu} onChange={e => update({ seoTitleRu: e.target.value })} maxLength={60} /></div>
+              <div><Label>Meta Description (RU)</Label><Input value={post.seoDescRu} onChange={e => update({ seoDescRu: e.target.value })} maxLength={155} /></div>
+              <div><Label>Meta Title (EN)</Label><Input value={post.seoTitleEn} onChange={e => update({ seoTitleEn: e.target.value })} maxLength={60} /></div>
+              <div><Label>Meta Description (EN)</Label><Input value={post.seoDescEn} onChange={e => update({ seoDescEn: e.target.value })} maxLength={155} /></div>
             </CardContent>
           </Card>
         </div>

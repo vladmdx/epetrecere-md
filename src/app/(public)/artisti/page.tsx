@@ -4,12 +4,18 @@ import { getAllCategories } from "@/lib/db/queries/categories";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { ArtistsListClient } from "./client";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 
 export async function generateMetadata() {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: ["Artiști pentru Evenimente în Chișinău și Moldova", "Descoperă artiști, DJ, formații și prezentatori pentru nunți și evenimente în Chișinău și Republica Moldova în 2026."],
+    ru: ["Артисты на события в Кишиневе и Молдове", "Найдите артистов, DJ, группы и ведущих для свадеб и событий в Кишиневе и Молдове в 2026 году."],
+    en: ["Event Artists in Chișinău and Moldova", "Discover artists, DJs, bands and hosts for weddings and events in Chișinău and Moldova in 2026."],
+  }[locale];
   return metaForPath("/artisti", {
-    title: "Artiști pentru Evenimente",
-    description:
-      "Descoperă cei mai buni artiști pentru nunta, botezul sau evenimentul tău în Republica Moldova.",
+    title: meta[0],
+    description: meta[1],
   });
 }
 
@@ -18,6 +24,7 @@ interface Props {
 }
 
 export default async function ArtistsPage({ searchParams }: Props) {
+  const locale = await getServerLocale();
   const sp = await searchParams;
 
   const filters = {
@@ -48,7 +55,7 @@ export default async function ArtistsPage({ searchParams }: Props) {
     : result.items.map((a) => ({ ...a, priceFrom: null }));
 
   const jsonLdItems = result.items.slice(0, 20).map((a) => ({
-    name: a.nameRo,
+    name: locale === "ru" ? a.nameRu || a.nameRo : locale === "en" ? a.nameEn || a.nameRo : a.nameRo,
     url: `https://epetrecere.md/artisti/${a.slug}`,
   }));
 
@@ -58,15 +65,15 @@ export default async function ArtistsPage({ searchParams }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: safeJsonLd(breadcrumbJsonLd([
-            { name: "Acasă", url: "https://epetrecere.md" },
-            { name: "Artiști", url: "https://epetrecere.md/artisti" },
+            { name: locale === "ru" ? "Главная" : locale === "en" ? "Home" : "Acasă", url: "https://epetrecere.md" },
+            { name: locale === "ru" ? "Артисты" : locale === "en" ? "Artists" : "Artiști", url: "https://epetrecere.md/artisti" },
           ])),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: safeJsonLd(itemListJsonLd(jsonLdItems, "Artiști pentru Evenimente")),
+          __html: safeJsonLd(itemListJsonLd(jsonLdItems, locale === "ru" ? "Артисты на события" : locale === "en" ? "Event Artists" : "Artiști pentru Evenimente")),
         }}
       />
     <ArtistsListClient
@@ -76,7 +83,7 @@ export default async function ArtistsPage({ searchParams }: Props) {
       totalPages={result.totalPages}
       currentSort={filters.sort}
       searchQuery={(sp.q as string) || ""}
-      categories={cats.map((c) => ({ id: c.id, nameRo: c.nameRo }))}
+      categories={cats.map((c) => ({ id: c.id, nameRo: c.nameRo, nameRu: c.nameRu, nameEn: c.nameEn }))}
       currentCategory={(sp.category as string) || ""}
       currentPriceMin={(sp.price_min as string) || ""}
       currentPriceMax={(sp.price_max as string) || ""}

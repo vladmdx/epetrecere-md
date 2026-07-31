@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, LogIn } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   /** Cabinet path the user should land on (e.g. "/cabinet/buget"). */
@@ -23,12 +24,18 @@ interface Props {
 
 export function ToolCta({ cabinetPath, label }: Props) {
   const { isLoaded, isSignedIn } = useUser();
+  const { locale, t } = useLocale();
+  const defaults = {
+    ro: { start: "Începe acum", next: "Continuă" },
+    ru: { start: "Начать", next: "Продолжить" },
+    en: { start: "Start now", next: "Continue" },
+  }[locale];
 
   if (!isLoaded) {
     // Reserve space so the layout doesn't jump on hydration.
     return (
       <Button disabled className="bg-gold/40 text-[#0D0D0D]">
-        Se încarcă...
+        {t("common.loading")}
       </Button>
     );
   }
@@ -37,7 +44,7 @@ export function ToolCta({ cabinetPath, label }: Props) {
     return (
       <Link href={cabinetPath}>
         <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
-          {label ?? "Continuă"}
+          {label ?? defaults.next}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </Link>
@@ -57,7 +64,7 @@ export function ToolCta({ cabinetPath, label }: Props) {
     >
       <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
         <LogIn className="h-4 w-4" />
-        {label ?? "Începe acum"}
+        {label ?? defaults.start}
       </Button>
     </Link>
   );

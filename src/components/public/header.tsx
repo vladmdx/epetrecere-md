@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   CalendarPlus,
+  Gift,
+  Heart,
   ChevronDown,
   LayoutDashboard,
   LogIn,
@@ -14,6 +16,10 @@ import {
   Shield,
   User,
   UserCircle,
+  UsersRound,
+  UtensilsCrossed,
+  WalletCards,
+  Wine,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,24 +33,25 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { BrandMark } from "@/components/public/brand-mark";
 
 const UTILITATI_TOOLS = [
-  { slug: "checklist", label: "Checklist Eveniment", emoji: "✅" },
-  { slug: "budget", label: "Budget & Cheltuieli", emoji: "💰" },
-  { slug: "invitatii-electronice", label: "Invitații Electronice", emoji: "✉️" },
-  { slug: "lista-invitati", label: "Listă Invitați & Așezare Mese", emoji: "👥" },
-  { slug: "momente-eveniment", label: "Momente Eveniment", emoji: "📸" },
+  { slug: "checklist", key: "tools.checklist", emoji: "✅" },
+  { slug: "budget", key: "tools.budget", emoji: "💰" },
+  { slug: "invitatii-electronice", key: "tools.electronicInvites", emoji: "✉️" },
+  { slug: "lista-invitati", key: "tools.guestList", emoji: "👥" },
+  { slug: "momente-eveniment", key: "tools.moments", emoji: "📸" },
 ];
 
 const CALCULATOR_TOOLS = [
-  { slug: "dar-nunta", label: "Calculator Dar Nuntă" },
-  { slug: "nunta", label: "Calculator Cost Nuntă" },
-  { slug: "buget", label: "Calculator Buget" },
-  { slug: "invitati", label: "Invitați & Mese" },
-  { slug: "alcool", label: "Băuturi" },
-  { slug: "meniu", label: "Meniu" },
+  { slug: "dar-nunta", key: "tools.giftCalculator", icon: Gift },
+  { slug: "nunta", key: "tools.weddingCalculator", icon: Heart },
+  { slug: "buget", key: "tools.budgetCalculator", icon: WalletCards },
+  { slug: "invitati", key: "tools.guestCalculator", icon: UsersRound },
+  { slug: "alcool", key: "tools.drinksCalculator", icon: Wine },
+  { slug: "meniu", key: "tools.menuCalculator", icon: UtensilsCrossed },
 ];
 
 function UtilitiesMenu({ label }: { label: string }) {
   const [open, setOpen] = useState(false);
+  const { t } = useLocale();
 
   function closeMenu() {
     setOpen(false);
@@ -76,14 +83,14 @@ function UtilitiesMenu({ label }: { label: string }) {
               <div className="rounded-xl bg-white/[.025] p-2">
                 <div className="mb-2 flex items-center justify-between px-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-gold">
-                    Organizare
+                    {t("tools.organization")}
                   </p>
                   <Link
                     href="/utilitati"
                     onClick={closeMenu}
                     className="text-[10px] text-white/45 hover:text-gold"
                   >
-                    Toate
+                    {t("tools.all")}
                   </Link>
                 </div>
                 {UTILITATI_TOOLS.map((tool) => (
@@ -96,7 +103,7 @@ function UtilitiesMenu({ label }: { label: string }) {
                     <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/9 text-base">
                       {tool.emoji}
                     </span>
-                    {tool.label}
+                    {t(tool.key)}
                   </Link>
                 ))}
               </div>
@@ -104,35 +111,38 @@ function UtilitiesMenu({ label }: { label: string }) {
               <div className="rounded-xl bg-white/[.025] p-2">
                 <div className="mb-2 flex items-center justify-between px-2">
                   <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-gold">
-                    Calculatoare
+                    {t("tools.calculators")}
                   </p>
                   <Link
                     href="/calculatoare"
                     onClick={closeMenu}
                     className="text-[10px] text-white/45 hover:text-gold"
                   >
-                    Toate
+                    {t("tools.all")}
                   </Link>
                 </div>
-                {CALCULATOR_TOOLS.map((tool) => (
-                  <Link
-                    key={tool.slug}
-                    href={`/calculatoare/${tool.slug}`}
-                    onClick={closeMenu}
-                    className="flex items-center gap-3 rounded-lg px-2 py-2 text-xs text-white/72 transition hover:bg-white/[.055] hover:text-gold"
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/9 text-base">
-                      🧮
-                    </span>
-                    {tool.label}
-                  </Link>
-                ))}
+                {CALCULATOR_TOOLS.map((tool) => {
+                  const Icon = tool.icon;
+                  return (
+                    <Link
+                      key={tool.slug}
+                      href={`/calculatoare/${tool.slug}`}
+                      onClick={closeMenu}
+                      className="flex items-center gap-3 rounded-lg px-2 py-2 text-xs text-white/72 transition hover:bg-white/[.055] hover:text-gold"
+                    >
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/9 text-gold">
+                        <Icon className="h-4 w-4" aria-hidden />
+                      </span>
+                      {t(tool.key)}
+                    </Link>
+                  );
+                })}
                 <Link
                   href="/utilitati"
                   onClick={closeMenu}
                   className="mt-2 flex items-center justify-between rounded-lg border border-gold/20 bg-gold/[.06] px-3 py-2.5 text-xs font-semibold text-gold hover:bg-gold/10"
                 >
-                  Vezi toate instrumentele
+                  {t("tools.viewAll")}
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -315,17 +325,21 @@ export function Header() {
               {UTILITATI_TOOLS.map((tool) => (
                 <Link key={tool.slug} href={`/utilitati/${tool.slug}`} onClick={() => setMobileOpen(false)}
                   className="rounded-lg px-3 py-2 text-sm text-white/66 hover:bg-white/[.05] hover:text-gold">
-                  {tool.emoji} {tool.label}
+                  {tool.emoji} {t(tool.key)}
                 </Link>
               ))}
-              {CALCULATOR_TOOLS.map((tool) => (
-                <Link key={tool.slug} href={`/calculatoare/${tool.slug}`} onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm text-white/66 hover:bg-white/[.05] hover:text-gold">
-                  🧮 {tool.label}
-                </Link>
-              ))}
+              {CALCULATOR_TOOLS.map((tool) => {
+                const Icon = tool.icon;
+                return (
+                  <Link key={tool.slug} href={`/calculatoare/${tool.slug}`} onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-white/66 hover:bg-white/[.05] hover:text-gold">
+                    <Icon className="h-4 w-4 text-gold" aria-hidden />
+                    {t(tool.key)}
+                  </Link>
+                );
+              })}
               <Link href="/utilitati" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-gold hover:bg-gold/10">
-                Vezi toate instrumentele →
+                {t("tools.viewAll")} →
               </Link>
               {showPlannerCta && (
                 <Link href="/planifica" onClick={() => setMobileOpen(false)}>

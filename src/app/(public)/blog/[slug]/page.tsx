@@ -6,8 +6,11 @@ import { ArrowLeft, Calendar, Tag } from "lucide-react";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
+import { getLocalized } from "@/i18n";
+import { getServerLocale } from "@/lib/i18n/server-locale";
+import { findEditorialPost2026 } from "@/lib/blog/editorial-posts-2026";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { articleJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
+import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -22,13 +25,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .limit(1);
 
   if (!post) return {};
+  const locale = await getServerLocale();
+  const title = getLocalized(post, "seoTitle", locale) || getLocalized(post, "title", locale);
+  const excerpt = getLocalized(post, "seoDesc", locale) || getLocalized(post, "excerpt", locale);
+  const content = getLocalized(post, "content", locale);
 
   return generateMeta({
-    title: post.seoTitleRo || post.titleRo,
+    title,
     description:
-      post.seoDescRo ||
-      post.excerptRo ||
-      post.contentRo?.replace(/<[^>]+>/g, "").substring(0, 155) ||
+      excerpt ||
+      content.replace(/<[^>]+>/g, "").substring(0, 155) ||
       "",
     entity: post,
     path: `/blog/${slug}`,
@@ -47,12 +53,31 @@ export default async function BlogPostPage({ params }: Props) {
 
   if (!post || post.status !== "published") notFound();
 
+  const locale = await getServerLocale();
+  const title = getLocalized(post, "title", locale);
+  const excerpt = getLocalized(post, "excerpt", locale);
+  const content = getLocalized(post, "content", locale);
+  const editorial = findEditorialPost2026(slug);
+  const coverAlt = editorial
+    ? locale === "ru"
+      ? editorial.coverAltRu
+      : locale === "en"
+        ? editorial.coverAltEn
+        : editorial.coverAltRo
+    : title;
+  const faq = editorial?.faq[locale] || [];
+  const labels = {
+    ro: { home: "Acasă", back: "Înapoi la blog", plan: "Planifică", cta: "Transformă inspirația într-un plan clar pentru evenimentul tău." },
+    ru: { home: "Главная", back: "Вернуться в блог", plan: "Планировать", cta: "Превратите вдохновение в четкий план вашего события." },
+    en: { home: "Home", back: "Back to blog", plan: "Start planning", cta: "Turn inspiration into a clear plan for your event." },
+  }[locale];
+  const dateLocale = locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-RO";
   const publishedDate = post.publishedAt || post.createdAt;
   const jsonLd = articleJsonLd({
-    title: post.titleRo,
+    title,
     description:
-      post.excerptRo ||
-      post.contentRo?.replace(/<[^>]+>/g, "").substring(0, 155) ||
+      excerpt ||
+      content.replace(/<[^>]+>/g, "").substring(0, 155) ||
       "",
     url: `/blog/${slug}`,
     image: post.coverImageUrl || undefined,
@@ -61,9 +86,9 @@ export default async function BlogPostPage({ params }: Props) {
     category: post.category || undefined,
   });
   const crumbs = breadcrumbJsonLd([
-    { name: "Acasă", url: "/" },
+    { name: labels.home, url: "/" },
     { name: "Blog", url: "/blog" },
-    { name: post.titleRo, url: `/blog/${slug}` },
+    { name: title, url: `/blog/${slug}` },
   ]);
 
   return (
@@ -76,12 +101,18 @@ export default async function BlogPostPage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(crumbs) }}
       />
+      {faq.length > 0 && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: safeJsonLd(faqJsonLd(faq)) }}
+        />
+      )}
 
       <header className="relative isolate overflow-hidden border-b border-white/8">
         {post.coverImageUrl ? (
           <Image
             src={post.coverImageUrl}
-            alt={post.titleRo}
+            alt={coverAlt}
             fill
             priority
             sizes="100vw"
@@ -99,7 +130,7 @@ export default async function BlogPostPage({ params }: Props) {
             className="inline-flex items-center gap-2 text-xs text-white/52 transition hover:text-gold"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Înapoi la blog
+            {labels.back}
           </Link>
           <div className="mt-10 flex flex-wrap items-center gap-3 text-[11px]">
             {post.category && (
@@ -110,7 +141,7 @@ export default async function BlogPostPage({ params }: Props) {
             )}
             <span className="inline-flex items-center gap-1.5 text-white/48">
               <Calendar className="h-3.5 w-3.5" />
-              {publishedDate.toLocaleDateString("ro-RO", {
+              {publishedDate.toLocaleDateString(dateLocale, {
                 day: "numeric",
                 month: "long",
                 year: "numeric",
@@ -118,11 +149,11 @@ export default async function BlogPostPage({ params }: Props) {
             </span>
           </div>
           <h1 className="mt-5 max-w-4xl font-heading text-4xl font-semibold leading-[1.08] tracking-tight text-white sm:text-5xl lg:text-6xl">
-            {post.titleRo}
+            {title}
           </h1>
-          {post.excerptRo && (
+          {excerpt && (
             <p className="mt-6 max-w-2xl text-base leading-7 text-white/64 sm:text-lg">
-              {post.excerptRo}
+              {excerpt}
             </p>
           )}
         </div>
@@ -130,10 +161,10 @@ export default async function BlogPostPage({ params }: Props) {
 
       <main className="mx-auto grid max-w-5xl gap-10 px-4 py-12 lg:grid-cols-[minmax(0,1fr)_190px] lg:px-8 lg:py-16">
         <div>
-          {post.contentRo ? (
+          {content ? (
             <article
               className="prose prose-lg prose-invert max-w-none prose-headings:font-heading prose-headings:font-semibold prose-headings:text-[#edcf87] prose-p:leading-8 prose-p:text-white/68 prose-a:text-gold prose-a:no-underline hover:prose-a:underline prose-strong:text-white prose-li:text-white/66 prose-blockquote:border-gold prose-blockquote:text-white/56"
-              dangerouslySetInnerHTML={{ __html: post.contentRo }}
+              dangerouslySetInnerHTML={{ __html: content }}
             />
           ) : (
             <div className="rounded-xl border border-white/8 bg-white/[.025] p-6 text-sm text-white/52">
@@ -148,13 +179,13 @@ export default async function BlogPostPage({ params }: Props) {
               ePetrecere.md
             </p>
             <p className="mt-3 text-xs leading-5 text-white/48">
-              Transformă inspirația într-un plan clar pentru evenimentul tău.
+              {labels.cta}
             </p>
             <Link
               href="/planifica"
               className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-gold px-3 py-2.5 text-xs font-semibold text-[#0b0d12] hover:bg-gold-dark"
             >
-              Planifică
+              {labels.plan}
             </Link>
           </div>
         </aside>

@@ -1,14 +1,16 @@
 "use client";
 
-// Shared view switcher for listing pages — grid (3/4/5 cols) or
-// list (compact/detailed). State is kept in localStorage so the
+// Shared view switcher for listing pages. Mobile users can choose one or
+// two columns, while larger screens keep the denser desktop options.
+// State is kept in localStorage so the
 // user's preference persists across category pages.
 
 import { useEffect, useState } from "react";
 import { LayoutGrid, List as ListIcon, Rows2, Rows3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
-export type GridCols = 3 | 4 | 5;
+export type GridCols = 1 | 2 | 3 | 4 | 5;
 export type ListDensity = "compact" | "detailed";
 export type ViewMode =
   | { kind: "grid"; cols: GridCols }
@@ -22,20 +24,23 @@ export function useViewMode(): [ViewMode, (v: ViewMode) => void, boolean] {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as ViewMode;
-        if (
-          (parsed.kind === "grid" && [3, 4, 5].includes(parsed.cols)) ||
-          (parsed.kind === "list" &&
-            ["compact", "detailed"].includes(parsed.density))
-        ) {
-          setMode(parsed);
+    const hydrationTimer = window.setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw) as ViewMode;
+          if (
+            (parsed.kind === "grid" && [1, 2, 3, 4, 5].includes(parsed.cols)) ||
+            (parsed.kind === "list" &&
+              ["compact", "detailed"].includes(parsed.density))
+          ) {
+            setMode(parsed);
+          }
         }
-      }
-    } catch {}
-    setHydrated(true);
+      } catch {}
+      setHydrated(true);
+    }, 0);
+    return () => window.clearTimeout(hydrationTimer);
   }, []);
 
   const update = (v: ViewMode) => {
@@ -49,11 +54,12 @@ export function useViewMode(): [ViewMode, (v: ViewMode) => void, boolean] {
 }
 
 export function gridClassName(cols: GridCols): string {
-  // Responsive up to the chosen desktop column count
-  if (cols === 3) return "grid gap-4 sm:grid-cols-2 md:grid-cols-3";
+  if (cols === 1) return "grid grid-cols-1 gap-4";
+  if (cols === 2) return "grid grid-cols-2 gap-3";
+  if (cols === 3) return "grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4";
   if (cols === 4)
-    return "grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4";
-  return "grid gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
+    return "grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4";
+  return "grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5";
 }
 
 interface Props {
@@ -62,6 +68,7 @@ interface Props {
 }
 
 export function ViewSwitcher({ mode, onChange }: Props) {
+  const { t } = useLocale();
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       {/* Grid mode + column count */}
@@ -75,8 +82,8 @@ export function ViewSwitcher({ mode, onChange }: Props) {
       >
         <button
           type="button"
-          onClick={() => onChange({ kind: "grid", cols: 4 })}
-          aria-label="Grid view"
+          onClick={() => onChange({ kind: "grid", cols: 2 })}
+          aria-label={t("catalog.grid")}
           className={cn(
             "flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-all",
             mode.kind === "grid"
@@ -85,19 +92,19 @@ export function ViewSwitcher({ mode, onChange }: Props) {
           )}
         >
           <LayoutGrid className="h-3.5 w-3.5" />
-          Grid
+          {t("catalog.grid")}
         </button>
         {mode.kind === "grid" && (
           <div className="flex items-center gap-0.5 border-l border-gold/20 pl-1 ml-0.5">
-            {([3, 4, 5] as const).map((c) => (
+            {([1, 2] as const).map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => onChange({ kind: "grid", cols: c })}
-                aria-label={`${c} coloane`}
+                aria-label={t("catalog.columns", { count: c })}
                 className={cn(
                   "flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold transition-all",
-                  mode.cols === c
+                  (c === 1 ? mode.cols === 1 : mode.cols !== 1)
                     ? "bg-gold text-[#0D0D0D]"
                     : "text-muted-foreground hover:bg-muted/50",
                 )}
@@ -105,6 +112,24 @@ export function ViewSwitcher({ mode, onChange }: Props) {
                 {c}
               </button>
             ))}
+            <span className="hidden items-center gap-0.5 md:flex">
+              {([3, 4, 5] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => onChange({ kind: "grid", cols: c })}
+                  aria-label={t("catalog.columns", { count: c })}
+                  className={cn(
+                    "flex h-6 w-6 items-center justify-center rounded-md text-[10px] font-bold transition-all",
+                    mode.cols === c
+                      ? "bg-gold text-[#0D0D0D]"
+                      : "text-muted-foreground hover:bg-muted/50",
+                  )}
+                >
+                  {c}
+                </button>
+              ))}
+            </span>
           </div>
         )}
       </div>
@@ -121,7 +146,7 @@ export function ViewSwitcher({ mode, onChange }: Props) {
         <button
           type="button"
           onClick={() => onChange({ kind: "list", density: "compact" })}
-          aria-label="List view"
+          aria-label={t("catalog.list")}
           className={cn(
             "flex items-center gap-1 rounded-md px-2 py-1 text-xs transition-all",
             mode.kind === "list"
@@ -130,14 +155,14 @@ export function ViewSwitcher({ mode, onChange }: Props) {
           )}
         >
           <ListIcon className="h-3.5 w-3.5" />
-          Listă
+          {t("catalog.list")}
         </button>
         {mode.kind === "list" && (
           <div className="flex items-center gap-0.5 border-l border-gold/20 pl-1 ml-0.5">
             <button
               type="button"
               onClick={() => onChange({ kind: "list", density: "compact" })}
-              aria-label="Compact"
+              aria-label={t("catalog.compact")}
               className={cn(
                 "flex h-6 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium transition-all",
                 mode.density === "compact"
@@ -146,12 +171,12 @@ export function ViewSwitcher({ mode, onChange }: Props) {
               )}
             >
               <Rows3 className="h-3 w-3" />
-              Compact
+              {t("catalog.compact")}
             </button>
             <button
               type="button"
               onClick={() => onChange({ kind: "list", density: "detailed" })}
-              aria-label="Detaliat"
+              aria-label={t("catalog.detailed")}
               className={cn(
                 "flex h-6 items-center gap-1 rounded-md px-1.5 text-[10px] font-medium transition-all",
                 mode.density === "detailed"
@@ -160,7 +185,7 @@ export function ViewSwitcher({ mode, onChange }: Props) {
               )}
             >
               <Rows2 className="h-3 w-3" />
-              Detaliat
+              {t("catalog.detailed")}
             </button>
           </div>
         )}

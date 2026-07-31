@@ -7,7 +7,7 @@ import { DataPrivacyClient } from "./client";
 export const metadata: Metadata = generateMeta({
   title: "Datele mele — GDPR",
   description:
-    "Exportă sau șterge datele tale personale conform GDPR și Legii 133/2011.",
+    "Exportă sau șterge datele personale conform GDPR și Legii nr. 195/2024 din Republica Moldova.",
   path: "/cabinet/date",
 });
 

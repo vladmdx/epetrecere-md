@@ -10,6 +10,10 @@
 
 import { useEffect } from "react";
 import { useUser } from "@clerk/nextjs";
+import {
+  CONSENT_UPDATED_EVENT,
+  hasPrivacyConsent,
+} from "@/lib/privacy/consent";
 
 const LS_KEY = "referral-captured";
 
@@ -19,36 +23,41 @@ export function ReferralCapture() {
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
 
-    // Read ?ref= from current URL.
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("ref")?.trim().toLowerCase();
-    if (!code) return;
+    const capture = () => {
+      if (!hasPrivacyConsent("marketing")) return;
+      // Read ?ref= from current URL.
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("ref")?.trim().toLowerCase();
+      if (!code) return;
 
-    // Skip if we've already tried for this code.
-    try {
-      const captured = localStorage.getItem(LS_KEY);
-      if (captured === code) return;
-    } catch {
-      // private mode — proceed anyway
-    }
+      // Skip if we've already tried for this code.
+      try {
+        const captured = localStorage.getItem(LS_KEY);
+        if (captured === code) return;
+      } catch {
+        // private mode: proceed without persistent attribution
+      }
 
-    void fetch("/api/referrals/capture", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
-    })
-      .then((r) => {
-        if (r.ok) {
-          try {
-            localStorage.setItem(LS_KEY, code);
-          } catch {
-            /* noop */
-          }
-        }
+      void fetch("/api/referrals/capture", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
       })
-      .catch(() => {
-        // silent — analytics style
-      });
+        .then((r) => {
+          if (r.ok) {
+            try {
+              localStorage.setItem(LS_KEY, code);
+            } catch {
+              /* noop */
+            }
+          }
+        })
+        .catch(() => {});
+    };
+
+    capture();
+    window.addEventListener(CONSENT_UPDATED_EVENT, capture);
+    return () => window.removeEventListener(CONSENT_UPDATED_EVENT, capture);
   }, [isLoaded, isSignedIn]);
 
   return null;

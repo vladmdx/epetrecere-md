@@ -50,7 +50,7 @@ export default function ServicesPage() {
       <section className="relative isolate overflow-hidden border-b border-[#e6b84d]/15 pt-16">
         <img
           src="/images/redesign/services-hero.webp"
-          alt=""
+          alt="Servicii pentru nunți și evenimente în Chișinău și Moldova"
           className="absolute inset-0 -z-20 h-full w-full object-cover"
         />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(2,8,20,.46),rgba(2,8,20,.84)_65%,#020814)]" />
@@ -101,7 +101,7 @@ export default function ServicesPage() {
             >
               <img
                 src={service.image}
-                alt=""
+                alt={`${service.name} pentru evenimente în Moldova`}
                 className="absolute inset-0 h-full w-full object-cover opacity-24 transition duration-500 group-hover:scale-105 group-hover:opacity-34"
                 loading="lazy"
               />
@@ -173,7 +173,7 @@ export default function ServicesPage() {
               >
                 <img
                   src={item.image}
-                  alt=""
+                  alt={`${item.name} pentru nunți și evenimente în Moldova`}
                   className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
                   loading="lazy"
                 />

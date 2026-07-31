@@ -23,6 +23,7 @@ import {
   ViewSwitcher,
   useViewMode,
   gridClassName,
+  type GridCols,
   type ListDensity,
 } from "@/components/public/view-switcher";
 
@@ -306,7 +307,7 @@ function GridView({
   removing,
 }: {
   items: WishlistItem[];
-  cols: 3 | 4 | 5;
+  cols: GridCols;
   onRemove: (item: WishlistItem) => void;
   removing: string | null;
 }) {

@@ -86,8 +86,8 @@ export function DataPrivacyClient() {
           Datele mele
         </h1>
         <p className="mt-2 text-sm text-muted-foreground md:text-base">
-          Conform GDPR și Legii 133/2011, ai dreptul să îți accesezi, exporti
-          și ștergi datele personale de pe ePetrecere.md.
+          Îți poți accesa, exporta și șterge datele personale conform cadrului
+          GDPR și Legii nr. 195/2024, aplicabilă din 23 august 2026.
         </p>
       </header>
 

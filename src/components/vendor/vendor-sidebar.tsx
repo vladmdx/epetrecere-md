@@ -22,33 +22,35 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
+import { LanguageSwitcher } from "@/components/shared/language-switcher";
 
 const artistNav = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Panoul Meu" },
-  { href: "/dashboard/calendar", icon: CalendarDays, label: "Calendar" },
-  { href: "/dashboard/rezervari", icon: BookOpen, label: "Rezervări" },
-  { href: "/dashboard/tarife", icon: Clock, label: "Tarife" },
-  { href: "/dashboard/profil", icon: User, label: "Profil" },
-  { href: "/dashboard/mesaje", icon: MessageSquare, label: "Mesaje" },
-  { href: "/dashboard/financiar", icon: DollarSign, label: "Financiar" },
-  { href: "/dashboard/analytics", icon: BarChart3, label: "Analitice" },
-  { href: "/dashboard/recenzii", icon: Star, label: "Recenzii" },
-  { href: "/dashboard/ai-assistant", icon: Bot, label: "AI Assistant" },
-  { href: "/dashboard/setari", icon: Settings, label: "Setări" },
+  { href: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
+  { href: "/dashboard/calendar", icon: CalendarDays, labelKey: "dashboard.calendar" },
+  { href: "/dashboard/rezervari", icon: BookOpen, labelKey: "dashboard.bookings" },
+  { href: "/dashboard/tarife", icon: Clock, labelKey: "dashboard.rates" },
+  { href: "/dashboard/profil", icon: User, labelKey: "dashboard.profile" },
+  { href: "/dashboard/mesaje", icon: MessageSquare, labelKey: "dashboard.messages" },
+  { href: "/dashboard/financiar", icon: DollarSign, labelKey: "dashboard.financial" },
+  { href: "/dashboard/analytics", icon: BarChart3, labelKey: "dashboard.analytics" },
+  { href: "/dashboard/recenzii", icon: Star, labelKey: "dashboard.reviews" },
+  { href: "/dashboard/ai-assistant", icon: Bot, labelKey: "vendor.ai_assistant" },
+  { href: "/dashboard/setari", icon: Settings, labelKey: "dashboard.settings" },
 ];
 
 // M12 — Venue owner sidebar. Shown when /api/me/venue returns a venue.
 // Reuses the same calendar / rezervari / mesaje / recenzii routes (they're
 // entity-agnostic on the backend).
 const venueNav = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Panoul Meu" },
-  { href: "/dashboard/calendar", icon: CalendarDays, label: "Calendar" },
-  { href: "/dashboard/rezervari", icon: BookOpen, label: "Rezervări" },
-  { href: "/dashboard/venue-profil", icon: Building2, label: "Profil Sală" },
-  { href: "/dashboard/mesaje", icon: MessageSquare, label: "Mesaje" },
-  { href: "/dashboard/analytics", icon: BarChart3, label: "Analitice" },
-  { href: "/dashboard/recenzii", icon: Star, label: "Recenzii" },
-  { href: "/dashboard/setari", icon: Settings, label: "Setări" },
+  { href: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
+  { href: "/dashboard/calendar", icon: CalendarDays, labelKey: "dashboard.calendar" },
+  { href: "/dashboard/rezervari", icon: BookOpen, labelKey: "dashboard.bookings" },
+  { href: "/dashboard/venue-profil", icon: Building2, labelKey: "dashboard.venueProfile" },
+  { href: "/dashboard/mesaje", icon: MessageSquare, labelKey: "dashboard.messages" },
+  { href: "/dashboard/analytics", icon: BarChart3, labelKey: "dashboard.analytics" },
+  { href: "/dashboard/recenzii", icon: Star, labelKey: "dashboard.reviews" },
+  { href: "/dashboard/setari", icon: Settings, labelKey: "dashboard.settings" },
 ];
 
 function NavList({
@@ -60,6 +62,7 @@ function NavList({
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const { t } = useLocale();
   return (
     <nav className="flex-1 overflow-y-auto p-2">
       {items.map((item) => {
@@ -81,7 +84,7 @@ function NavList({
             )}
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            <span>{item.label}</span>
+            <span>{t(item.labelKey)}</span>
           </Link>
         );
       })}
@@ -90,6 +93,7 @@ function NavList({
 }
 
 export function VendorSidebar() {
+  const { locale, t } = useLocale();
   const pathname = usePathname();
   const [isVenue, setIsVenue] = useState(false);
   const [profileSlug, setProfileSlug] = useState<string | null>(null);
@@ -121,7 +125,9 @@ export function VendorSidebar() {
   }, []);
 
   const navItems = isVenue ? venueNav : artistNav;
-  const roleLabel = isVenue ? "Sală" : "Partener";
+  const roleLabel = isVenue
+    ? locale === "ru" ? "Зал" : locale === "en" ? "Venue" : "Sală"
+    : locale === "ru" ? "Партнёр" : locale === "en" ? "Partner" : "Partener";
   // "Vezi profil" link target — falls back to homepage when slug isn't
   // resolved yet (mid-onboarding) so the link is never broken.
   const profileHref = profileSlug
@@ -146,13 +152,14 @@ export function VendorSidebar() {
         <NavList items={navItems} pathname={pathname} />
 
         <div className="border-t border-border/40 p-2">
+          <LanguageSwitcher />
           <Link
             href={profileHref}
             target="_blank"
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
           >
             <Globe className="h-4 w-4 shrink-0" />
-            <span>Vezi profil</span>
+            <span>{t("dashboard.viewProfile")}</span>
           </Link>
         </div>
       </aside>
@@ -202,6 +209,7 @@ export function VendorSidebar() {
               onNavigate={() => setMobileOpen(false)}
             />
             <div className="border-t border-border/40 p-2">
+              <LanguageSwitcher />
               <Link
                 href={profileHref}
                 target="_blank"
@@ -209,7 +217,7 @@ export function VendorSidebar() {
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
               >
                 <Globe className="h-4 w-4 shrink-0" />
-                <span>Vezi profil</span>
+                <span>{t("dashboard.viewProfile")}</span>
               </Link>
             </div>
           </aside>

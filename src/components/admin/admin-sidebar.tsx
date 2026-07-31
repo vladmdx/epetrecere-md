@@ -9,7 +9,6 @@ import {
   Grid3X3,
   Building2,
   MessageSquare,
-  CalendarDays,
   FileText,
   Globe,
   Upload,
@@ -30,6 +29,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/hooks/use-locale";
+import { LanguageSwitcher } from "@/components/shared/language-switcher";
 
 const navItems = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
@@ -55,6 +56,50 @@ const navItems = [
   { href: "/admin/setari", icon: Settings, label: "Setări" },
 ];
 
+const translatedLabels: Record<"ro" | "ru" | "en", Record<string, string>> = {
+  ro: {},
+  ru: {
+    Dashboard: "Панель управления",
+    "Eveniment Nou": "Новое событие",
+    "Cereri Înregistrare": "Заявки на регистрацию",
+    "Cereri Oferte": "Запросы предложений",
+    Artiști: "Артисты",
+    Categorii: "Категории",
+    Săli: "Залы",
+    Recenzii: "Отзывы",
+    "Fotografii UGC": "Фотографии UGC",
+    Blog: "Блог",
+    Pagini: "Страницы",
+    "Meta Pagini": "Мета страниц",
+    Import: "Импорт",
+    Homepage: "Главная",
+    Analitice: "Аналитика",
+    Duplicate: "Дубликаты",
+    "Audit log": "Журнал аудита",
+    Setări: "Настройки",
+  },
+  en: {
+    Dashboard: "Dashboard",
+    "Eveniment Nou": "New Event",
+    "Cereri Înregistrare": "Registration Requests",
+    "Cereri Oferte": "Quote Requests",
+    Artiști: "Artists",
+    Categorii: "Categories",
+    Săli: "Venues",
+    Recenzii: "Reviews",
+    "Fotografii UGC": "UGC Photos",
+    Blog: "Blog",
+    Pagini: "Pages",
+    "Meta Pagini": "Page Metadata",
+    Import: "Import",
+    Homepage: "Homepage",
+    Analitice: "Analytics",
+    Duplicate: "Duplicates",
+    "Audit log": "Audit Log",
+    Setări: "Settings",
+  },
+};
+
 function NavList({
   pathname,
   collapsed,
@@ -64,6 +109,7 @@ function NavList({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
+  const { locale } = useLocale();
   return (
     <nav className="flex-1 overflow-y-auto p-2">
       {navItems.map((item) => {
@@ -84,10 +130,10 @@ function NavList({
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
               collapsed && "justify-center px-0",
             )}
-            title={collapsed ? item.label : undefined}
+            title={collapsed ? translatedLabels[locale][item.label] || item.label : undefined}
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            {!collapsed && <span>{item.label}</span>}
+            {!collapsed && <span>{translatedLabels[locale][item.label] || item.label}</span>}
           </Link>
         );
       })}
@@ -96,6 +142,7 @@ function NavList({
 }
 
 export function AdminSidebar() {
+  const { t } = useLocale();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -138,6 +185,7 @@ export function AdminSidebar() {
 
       {/* View Site */}
       <div className="border-t border-border/40 p-2">
+        {!collapsed && <LanguageSwitcher />}
         <Link
           href="/"
           target="_blank"
@@ -147,7 +195,7 @@ export function AdminSidebar() {
           )}
         >
           <Globe className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Vezi site</span>}
+          {!collapsed && <span>{t("dashboard.viewSite")}</span>}
         </Link>
       </div>
     </aside>
@@ -197,6 +245,7 @@ export function AdminSidebar() {
               onNavigate={() => setMobileOpen(false)}
             />
             <div className="border-t border-border/40 p-2">
+              <LanguageSwitcher />
               <Link
                 href="/"
                 target="_blank"
@@ -204,7 +253,7 @@ export function AdminSidebar() {
                 className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
               >
                 <Globe className="h-4 w-4 shrink-0" />
-                <span>Vezi site</span>
+                <span>{t("dashboard.viewSite")}</span>
               </Link>
             </div>
           </aside>

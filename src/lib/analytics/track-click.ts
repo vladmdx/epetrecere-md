@@ -1,3 +1,5 @@
+import { hasPrivacyConsent } from "@/lib/privacy/consent";
+
 // Client-side helper for firing a track-click beacon. Non-blocking,
 // swallows all errors so the CTA flow is never delayed by analytics.
 
@@ -9,6 +11,7 @@ export function trackClick(
   clickType: ClickType,
 ): void {
   if (typeof window === "undefined") return;
+  if (!hasPrivacyConsent("analytics")) return;
 
   // Use sendBeacon when available so the request survives even if the user
   // navigates away immediately after clicking a tel: / anchor link.

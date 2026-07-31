@@ -3,12 +3,18 @@ import { getVenues } from "@/lib/db/queries/venues";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { VenuesListClient } from "./client";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 
 export async function generateMetadata() {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: ["Săli de Nuntă și Restaurante în Chișinău, Moldova", "Compară săli de nuntă, restaurante și locații pentru evenimente în Chișinău și Republica Moldova în 2026."],
+    ru: ["Свадебные залы и рестораны Кишинева, Молдова", "Сравните свадебные залы, рестораны и площадки для событий в Кишиневе и Молдове в 2026 году."],
+    en: ["Wedding Venues and Restaurants in Chișinău, Moldova", "Compare wedding venues, restaurants and event locations in Chișinău and Moldova in 2026."],
+  }[locale];
   return metaForPath("/sali", {
-    title: "Săli & Restaurante pentru Evenimente",
-    description:
-      "Găsește sala perfectă pentru nunta sau evenimentul tău în Republica Moldova.",
+    title: meta[0],
+    description: meta[1],
   });
 }
 
@@ -17,6 +23,7 @@ interface Props {
 }
 
 export default async function VenuesPage({ searchParams }: Props) {
+  const locale = await getServerLocale();
   const sp = await searchParams;
 
   const filters = {
@@ -24,8 +31,6 @@ export default async function VenuesPage({ searchParams }: Props) {
     capacityMin: sp.capacity_min ? Number(sp.capacity_min) : undefined,
     sort: (sp.sort as "popular" | "price_asc" | "price_desc" | "rating" | "capacity") || "popular",
     page: sp.page ? Number(sp.page) : 1,
-    // Availability filter — exclude venues booked/blocked on this date.
-    availableDate: (sp.date as string) || undefined,
   };
 
   const result = await getVenues(filters);
@@ -40,7 +45,7 @@ export default async function VenuesPage({ searchParams }: Props) {
   const allCities = Array.from(new Set(result.items.map((v) => v.city).filter(Boolean) as string[])).sort();
 
   const jsonLdItems = result.items.slice(0, 20).map((v) => ({
-    name: v.nameRo,
+    name: locale === "ru" ? v.nameRu || v.nameRo : locale === "en" ? v.nameEn || v.nameRo : v.nameRo,
     url: `https://epetrecere.md/sali/${v.slug}`,
   }));
 
@@ -50,15 +55,15 @@ export default async function VenuesPage({ searchParams }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: safeJsonLd(breadcrumbJsonLd([
-            { name: "Acasă", url: "https://epetrecere.md" },
-            { name: "Săli", url: "https://epetrecere.md/sali" },
+            { name: locale === "ru" ? "Главная" : locale === "en" ? "Home" : "Acasă", url: "https://epetrecere.md" },
+            { name: locale === "ru" ? "Залы" : locale === "en" ? "Venues" : "Săli", url: "https://epetrecere.md/sali" },
           ])),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: safeJsonLd(itemListJsonLd(jsonLdItems, "Săli pentru Evenimente")),
+          __html: safeJsonLd(itemListJsonLd(jsonLdItems, locale === "ru" ? "Залы для событий" : locale === "en" ? "Event Venues" : "Săli pentru Evenimente")),
         }}
       />
       <VenuesListClient
@@ -70,7 +75,6 @@ export default async function VenuesPage({ searchParams }: Props) {
         cities={allCities}
         currentCity={(sp.city as string) || ""}
         currentCapacityMin={(sp.capacity_min as string) || ""}
-        currentDate={(sp.date as string) || ""}
       />
     </>
   );

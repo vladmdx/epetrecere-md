@@ -9,32 +9,30 @@ import {
   MessageSquare,
   Star,
   User,
-  ClipboardList,
   Calculator,
   Mail,
-  Wallet,
   CheckSquare,
-  Shield,
   Camera,
   Plus,
   PartyPopper,
   Archive,
   ChevronDown,
-  Settings,
   Menu,
   X,
   Heart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
+import { LanguageSwitcher } from "@/components/shared/language-switcher";
 
 // Static nav items rendered above the dynamic "Evenimente" section.
 const topNav = [
-  { href: "/cabinet", icon: LayoutDashboard, label: "Panoul Meu" },
-  { href: "/cabinet/rezervari", icon: BookOpen, label: "Rezervările Mele" },
-  { href: "/cabinet/favorite", icon: Heart, label: "Favorite" },
-  { href: "/cabinet/mesaje", icon: MessageSquare, label: "Mesaje" },
-  { href: "/cabinet/recenzii", icon: Star, label: "Recenziile Mele" },
-  { href: "/cabinet/profil", icon: User, label: "Contul Meu" },
+  { href: "/cabinet", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
+  { href: "/cabinet/rezervari", icon: BookOpen, labelKey: "dashboard.myBookings" },
+  { href: "/cabinet/favorite", icon: Heart, labelKey: "dashboard.favorites" },
+  { href: "/cabinet/mesaje", icon: MessageSquare, labelKey: "dashboard.messages" },
+  { href: "/cabinet/recenzii", icon: Star, labelKey: "dashboard.myReviews" },
+  { href: "/cabinet/profil", icon: User, labelKey: "dashboard.myAccount" },
 ] as const;
 
 // Tools section — actual instruments only. Confidențialitate + Setări are
@@ -43,21 +41,21 @@ const topNav = [
 // stripped the budget tab/wizard step. Per-category price filtering
 // inside Rezervări Artiști replaces it.
 const toolsNav = [
-  { href: "/cabinet/checklist", icon: CheckSquare, label: "Checklist" },
-  { href: "/cabinet/invitatii", icon: Mail, label: "Invitații Electronice" },
-  { href: "/cabinet/moments", icon: Camera, label: "Momente Eveniment" },
+  { href: "/cabinet/checklist", icon: CheckSquare, labelKey: "tools.checklist" },
+  { href: "/cabinet/invitatii", icon: Mail, labelKey: "tools.electronicInvites" },
+  { href: "/cabinet/moments", icon: Camera, labelKey: "tools.moments" },
 ] as const;
 
 // Calculatoare section — rendered as collapsible accordion under Instrumente.
 // Each entry is a public /calculatoare/* page; the user lands directly there
 // and the result is logged in their dashboard if they're signed in.
 const calculatorsNav = [
-  { href: "/calculatoare/buget", label: "Buget" },
-  { href: "/calculatoare/invitati", label: "Invitați & Mese" },
-  { href: "/calculatoare/dar-nunta", label: "Dar Nuntă" },
-  { href: "/calculatoare/nunta", label: "Cost Nuntă" },
-  { href: "/calculatoare/alcool", label: "Băuturi" },
-  { href: "/calculatoare/meniu", label: "Meniu" },
+  { href: "/calculatoare/buget", labelKey: "tools.budgetCalculator" },
+  { href: "/calculatoare/invitati", labelKey: "tools.guestCalculator" },
+  { href: "/calculatoare/dar-nunta", labelKey: "tools.giftCalculator" },
+  { href: "/calculatoare/nunta", labelKey: "tools.weddingCalculator" },
+  { href: "/calculatoare/alcool", labelKey: "tools.drinksCalculator" },
+  { href: "/calculatoare/meniu", labelKey: "tools.menuCalculator" },
 ] as const;
 
 interface PlanSummary {
@@ -78,6 +76,7 @@ function NavBody({
   archivedCount: number;
   onNavigate?: () => void;
 }) {
+  const { t } = useLocale();
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
       {topNav.map((item) => (
@@ -89,7 +88,7 @@ function NavBody({
         />
       ))}
 
-      <SectionHeader label="Evenimentele Mele" />
+      <SectionHeader label={t("dashboard.myEvents")} />
 
       {activePlans.length === 0 ? (
         <Link
@@ -103,7 +102,7 @@ function NavBody({
           )}
         >
           <Plus className="h-4 w-4 shrink-0" />
-          <span className="truncate">Creează eveniment</span>
+          <span className="truncate">{t("dashboard.createEvent")}</span>
         </Link>
       ) : (
         <>
@@ -142,7 +141,7 @@ function NavBody({
               )}
             >
               <Archive className="h-4 w-4 shrink-0" />
-              <span className="flex-1 truncate">Arhivă evenimente</span>
+              <span className="flex-1 truncate">{t("dashboard.eventArchive")}</span>
               <span className="text-[10px] tabular-nums text-muted-foreground/70">
                 {archivedCount}
               </span>
@@ -160,7 +159,7 @@ function NavBody({
             )}
           >
             <Plus className="h-4 w-4 shrink-0" />
-            <span className="truncate">Eveniment nou</span>
+            <span className="truncate">{t("dashboard.newEvent")}</span>
           </Link>
         </>
       )}
@@ -171,7 +170,7 @@ function NavBody({
           în eveniment" button on artist/venue profiles is the only entry
           point now. */}
 
-      <SectionHeader label="Instrumente" />
+      <SectionHeader label={t("dashboard.tools")} />
 
       {toolsNav.map((item) => (
         <NavLink
@@ -226,6 +225,9 @@ export function ClientSidebar() {
           activePlans={activePlans}
           archivedCount={archivedCount}
         />
+        <div className="border-t border-border/30 px-3 py-2">
+          <LanguageSwitcher />
+        </div>
       </aside>
 
       {/* Mobile hamburger */}
@@ -273,6 +275,9 @@ export function ClientSidebar() {
               archivedCount={archivedCount}
               onNavigate={() => setMobileOpen(false)}
             />
+            <div className="border-t border-border/30 px-3 py-2">
+              <LanguageSwitcher />
+            </div>
           </aside>
         </div>
       )}
@@ -297,6 +302,7 @@ function CalculatorsAccordion({
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const { t } = useLocale();
   // Default expanded if user is currently inside any /calculatoare/* page.
   const onCalcRoute = pathname.startsWith("/calculatoare");
   const [open, setOpen] = useState(onCalcRoute);
@@ -314,7 +320,7 @@ function CalculatorsAccordion({
         )}
       >
         <Calculator className="h-4 w-4 shrink-0" />
-        <span className="flex-1 text-left truncate">Calculatoare</span>
+        <span className="flex-1 text-left truncate">{t("tools.calculators")}</span>
         <ChevronDown
           className={cn(
             "h-3.5 w-3.5 shrink-0 transition-transform",
@@ -338,7 +344,7 @@ function CalculatorsAccordion({
                     : "text-muted-foreground/80 hover:bg-accent/50 hover:text-foreground",
                 )}
               >
-                {c.label}
+                {t(c.labelKey)}
               </Link>
             );
           })}
@@ -353,10 +359,11 @@ function NavLink({
   pathname,
   onClick,
 }: {
-  item: { href: string; icon: React.ComponentType<{ className?: string }>; label: string };
+  item: { href: string; icon: React.ComponentType<{ className?: string }>; labelKey: string };
   pathname: string;
   onClick?: () => void;
 }) {
+  const { t } = useLocale();
   const Icon = item.icon;
   const isActive =
     pathname === item.href ||
@@ -373,7 +380,7 @@ function NavLink({
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      <span className="truncate">{item.label}</span>
+      <span className="truncate">{t(item.labelKey)}</span>
     </Link>
   );
 }

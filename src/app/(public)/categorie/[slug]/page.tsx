@@ -6,6 +6,7 @@ import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized } from "@/i18n";
 import { CategoryPageClient } from "./client";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 
 // M11 Intern #2 — ISR: category landings refresh every hour.
 export const revalidate = 3600;
@@ -19,10 +20,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const category = await getCategoryBySlug(slug);
   if (!category) return {};
+  const locale = await getServerLocale();
+  const name = getLocalized(category, "name", locale);
+  const seoTitle = getLocalized(category, "seoTitle", locale);
+  const seoDescription = getLocalized(category, "seoDesc", locale);
 
   return generateMeta({
-    title: `${category.nameRo} — Evenimente Moldova`,
-    description: category.seoDescRo || `Descoperă ${category.nameRo?.toLowerCase()} pentru evenimente în Moldova`,
+    title: seoTitle || `${name}: evenimente în Moldova`,
+    description: seoDescription || `${name} pentru nunți și evenimente în Chișinău și Republica Moldova în 2026.`,
     entity: category,
     path: `/categorie/${slug}`,
   });
@@ -34,6 +39,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   const category = await getCategoryBySlug(slug);
   if (!category) notFound();
+  const locale = await getServerLocale();
+  const localizedName = getLocalized(category, "name", locale);
 
   const filters = {
     categoryId: category.id,
@@ -50,12 +57,14 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const result = await getArtists(filters);
 
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
+    { name: locale === "ru" ? "Главная" : locale === "en" ? "Home" : "Acasă", url: "/" },
     {
-      name: category.type === "service" ? "Servicii" : "Artiști",
+      name: category.type === "service"
+        ? locale === "ru" ? "Услуги" : locale === "en" ? "Services" : "Servicii"
+        : locale === "ru" ? "Артисты" : locale === "en" ? "Artists" : "Artiști",
       url: category.type === "service" ? "/servicii" : "/artisti",
     },
-    { name: getLocalized(category, "name", "ro"), url: `/categorie/${slug}` },
+    { name: localizedName, url: `/categorie/${slug}` },
   ];
 
   return (

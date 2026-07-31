@@ -4,19 +4,39 @@ import { ArrowRight, Calendar, Sparkles, Tag } from "lucide-react";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
+import { getLocalized } from "@/i18n";
+import { getServerLocale } from "@/lib/i18n/server-locale";
+import { findEditorialPost2026 } from "@/lib/blog/editorial-posts-2026";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 
 export async function generateMetadata() {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: {
+      title: "Blog nunți și evenimente 2026 în Moldova",
+      description:
+        "Ghiduri locale despre costul nunții, alegerea sălii și organizarea evenimentelor în Chișinău și Republica Moldova în 2026.",
+    },
+    ru: {
+      title: "Блог о свадьбах и событиях 2026 в Молдове",
+      description:
+        "Местные гиды о стоимости свадьбы, выборе зала и организации событий в Кишиневе и Молдове в 2026 году.",
+    },
+    en: {
+      title: "Moldova Wedding and Event Blog 2026",
+      description:
+        "Local guides to wedding costs, venue selection and event planning in Chișinău and Moldova in 2026.",
+    },
+  }[locale];
   return metaForPath("/blog", {
-    title: "Blog — Idei și sfaturi pentru evenimente",
-    description:
-      "Sfaturi, idei și inspirație pentru organizarea evenimentelor perfecte în Moldova.",
+    title: meta.title,
+    description: meta.description,
   });
 }
 
-function formatDate(value: Date) {
-  return value.toLocaleDateString("ro-RO", {
+function formatDate(value: Date, locale: "ro" | "ru" | "en") {
+  return value.toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-RO", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -24,6 +44,30 @@ function formatDate(value: Date) {
 }
 
 export default async function BlogListingPage() {
+  const locale = await getServerLocale();
+  const labels = {
+    ro: {
+      home: "Acasă", eyebrow: "Inspirație ePetrecere", title: "Idei care transformă planurile în momente memorabile",
+      description: "Ghiduri practice, tendințe și recomandări pentru nunți, cumetrii, aniversări și evenimente corporate în Republica Moldova.",
+      featured: "Articol recomandat", read: "Citește articolul", latest: "Cele mai noi", ideas: "Sfaturi și idei", articles: "articole",
+      emptyTitle: "Primele articole sunt în pregătire",
+      emptyDescription: "Revino în curând pentru ghiduri și idei noi de organizare.",
+    },
+    ru: {
+      home: "Главная", eyebrow: "Вдохновение ePetrecere", title: "Идеи, которые превращают планы в памятные события",
+      description: "Практические гиды, тенденции и рекомендации для свадеб, крестин, дней рождения и корпоративных событий в Молдове.",
+      featured: "Рекомендуем", read: "Читать статью", latest: "Новое", ideas: "Советы и идеи", articles: "статьи",
+      emptyTitle: "Первые статьи готовятся",
+      emptyDescription: "Скоро здесь появятся новые гиды и идеи для организации.",
+    },
+    en: {
+      home: "Home", eyebrow: "ePetrecere inspiration", title: "Ideas that turn plans into memorable moments",
+      description: "Practical guides, trends and recommendations for weddings, baptisms, birthdays and corporate events in Moldova.",
+      featured: "Featured article", read: "Read article", latest: "Latest", ideas: "Advice and ideas", articles: "articles",
+      emptyTitle: "The first articles are being prepared",
+      emptyDescription: "Come back soon for new planning guides and ideas.",
+    },
+  }[locale];
   const posts = await db
     .select()
     .from(blogPosts)
@@ -33,7 +77,7 @@ export default async function BlogListingPage() {
 
   const [featured, ...remaining] = posts;
   const crumbs = breadcrumbJsonLd([
-    { name: "Acasă", url: "/" },
+    { name: labels.home, url: "/" },
     { name: "Blog", url: "/blog" },
   ]);
 
@@ -54,14 +98,13 @@ export default async function BlogListingPage() {
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent to-[#05080d]" />
         <div className="mx-auto max-w-7xl px-4 lg:px-8">
           <p className="text-xs font-semibold uppercase tracking-[.28em] text-gold">
-            Inspirație ePetrecere
+            {labels.eyebrow}
           </p>
           <h1 className="mt-3 max-w-3xl font-heading text-4xl font-semibold tracking-tight sm:text-6xl">
-            Idei care transformă planurile în momente memorabile
+            {labels.title}
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62 sm:text-base">
-            Ghiduri practice, tendințe și recomandări pentru nunți, cumetrii,
-            aniversări și evenimente corporate în Republica Moldova.
+            {labels.description}
           </p>
         </div>
       </section>
@@ -71,10 +114,10 @@ export default async function BlogListingPage() {
           <div className="rounded-2xl border border-white/8 bg-white/[.025] px-6 py-24 text-center">
             <Sparkles className="mx-auto h-10 w-10 text-gold/55" />
             <h2 className="mt-5 font-heading text-2xl font-semibold">
-              Primele articole sunt în pregătire
+              {labels.emptyTitle}
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-white/50">
-              Revino în curând pentru ghiduri și idei noi de organizare.
+              {labels.emptyDescription}
             </p>
           </div>
         ) : (
@@ -88,7 +131,13 @@ export default async function BlogListingPage() {
                   {featured.coverImageUrl ? (
                     <Image
                       src={featured.coverImageUrl}
-                      alt={featured.titleRo}
+                      alt={findEditorialPost2026(featured.slug)
+                        ? locale === "ru"
+                          ? findEditorialPost2026(featured.slug)!.coverAltRu
+                          : locale === "en"
+                            ? findEditorialPost2026(featured.slug)!.coverAltEn
+                            : findEditorialPost2026(featured.slug)!.coverAltRo
+                        : getLocalized(featured, "title", locale)}
                       fill
                       priority
                       sizes="(max-width: 1024px) 100vw, 55vw"
@@ -102,7 +151,7 @@ export default async function BlogListingPage() {
                 <div className="flex flex-col justify-center p-7 sm:p-10">
                   <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/44">
                     <span className="rounded-full border border-gold/25 bg-gold/8 px-3 py-1 font-semibold uppercase tracking-wider text-gold">
-                      Articol recomandat
+                      {labels.featured}
                     </span>
                     {featured.category && (
                       <span className="flex items-center gap-1.5">
@@ -112,20 +161,20 @@ export default async function BlogListingPage() {
                     )}
                   </div>
                   <h2 className="mt-5 font-heading text-3xl font-semibold leading-tight text-white group-hover:text-[#efd078]">
-                    {featured.titleRo}
+                    {getLocalized(featured, "title", locale)}
                   </h2>
-                  {featured.excerptRo && (
+                  {getLocalized(featured, "excerpt", locale) && (
                     <p className="mt-4 line-clamp-3 text-sm leading-7 text-white/57">
-                      {featured.excerptRo}
+                      {getLocalized(featured, "excerpt", locale)}
                     </p>
                   )}
                   <div className="mt-7 flex items-center justify-between border-t border-white/8 pt-5 text-xs">
                     <span className="flex items-center gap-2 text-white/42">
                       <Calendar className="h-3.5 w-3.5" />
-                      {formatDate(featured.publishedAt || featured.createdAt)}
+                      {formatDate(featured.publishedAt || featured.createdAt, locale)}
                     </span>
                     <span className="flex items-center gap-2 font-semibold text-gold">
-                      Citește articolul
+                      {labels.read}
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </span>
                   </div>
@@ -138,14 +187,14 @@ export default async function BlogListingPage() {
                 <div className="mb-6 flex items-end justify-between">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-gold">
-                      Cele mai noi
+                      {labels.latest}
                     </p>
                     <h2 className="mt-2 font-heading text-3xl font-semibold">
-                      Sfaturi și idei
+                      {labels.ideas}
                     </h2>
                   </div>
                   <p className="text-xs text-white/38">
-                    {remaining.length} articole
+                    {remaining.length} {labels.articles}
                   </p>
                 </div>
 
@@ -160,7 +209,13 @@ export default async function BlogListingPage() {
                         {post.coverImageUrl ? (
                           <Image
                             src={post.coverImageUrl}
-                            alt={post.titleRo}
+                            alt={findEditorialPost2026(post.slug)
+                              ? locale === "ru"
+                                ? findEditorialPost2026(post.slug)!.coverAltRu
+                                : locale === "en"
+                                  ? findEditorialPost2026(post.slug)!.coverAltEn
+                                  : findEditorialPost2026(post.slug)!.coverAltRo
+                              : getLocalized(post, "title", locale)}
                             fill
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                             className="object-cover transition duration-500 group-hover:scale-105"
@@ -176,17 +231,17 @@ export default async function BlogListingPage() {
                       </div>
                       <div className="flex flex-1 flex-col p-5">
                         <h3 className="line-clamp-2 font-heading text-xl font-semibold leading-snug text-white group-hover:text-[#edc86b]">
-                          {post.titleRo}
+                          {getLocalized(post, "title", locale)}
                         </h3>
-                        {post.excerptRo && (
+                        {getLocalized(post, "excerpt", locale) && (
                           <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/50">
-                            {post.excerptRo}
+                            {getLocalized(post, "excerpt", locale)}
                           </p>
                         )}
                         <div className="mt-auto flex items-center justify-between border-t border-white/7 pt-4 text-[11px]">
                           <span className="flex items-center gap-1.5 text-white/37">
                             <Calendar className="h-3 w-3" />
-                            {formatDate(post.publishedAt || post.createdAt)}
+                            {formatDate(post.publishedAt || post.createdAt, locale)}
                           </span>
                           <ArrowRight className="h-4 w-4 text-gold transition-transform group-hover:translate-x-1" />
                         </div>

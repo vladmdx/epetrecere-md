@@ -6,6 +6,8 @@ import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { ToolCta } from "@/components/public/tool-cta";
 import { ToolHeroImage } from "@/components/public/tool-hero-image";
 import { TOOLS_BY_SLUG, TOOL_DEFS } from "@/lib/utilitati/tools";
+import { localizeTool } from "@/lib/utilitati/tools-i18n";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Check, ArrowRight } from "lucide-react";
 
@@ -21,24 +23,33 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
-  const tool = TOOLS_BY_SLUG[slug];
-  if (!tool) return {};
+  const sourceTool = TOOLS_BY_SLUG[slug];
+  if (!sourceTool) return {};
+  const locale = await getServerLocale();
+  const tool = localizeTool(sourceTool, locale);
   const override = await getPageMeta(`/utilitati/${slug}`);
   return generateMeta({
-    title: override?.title ?? tool.metaTitle,
-    description: override?.description ?? tool.metaDescription,
+    title: locale === "ro" ? override?.title ?? tool.metaTitle : tool.metaTitle,
+    description: locale === "ro" ? override?.description ?? tool.metaDescription : tool.metaDescription,
     path: `/utilitati/${slug}`,
   });
 }
 
 export default async function ToolLandingPage({ params }: Props) {
   const { slug } = await params;
-  const tool = TOOLS_BY_SLUG[slug];
-  if (!tool) notFound();
+  const sourceTool = TOOLS_BY_SLUG[slug];
+  if (!sourceTool) notFound();
+  const locale = await getServerLocale();
+  const tool = localizeTool(sourceTool, locale);
+  const labels = {
+    ro: { home: "Acasă", tools: "Utilități", free: "Instrument gratuit", other: "Vezi alte instrumente", note: "Gratuit · Nu necesită eveniment activ · Cont nou în 1 minut", start: "Începe acum, gratuit", cta: `Creează-ți contul în 1 minut și folosește ${tool.title.toLowerCase()} fără limită. Instrumentul rulează independent, chiar dacă nu ai încă un eveniment activ.` },
+    ru: { home: "Главная", tools: "Инструменты", free: "Бесплатный инструмент", other: "Другие инструменты", note: "Бесплатно · Не требует активного события · Новый аккаунт за 1 минуту", start: "Начните бесплатно", cta: `Создайте аккаунт за 1 минуту и используйте ${tool.title.toLowerCase()} без ограничений. Инструмент работает даже без активного события.` },
+    en: { home: "Home", tools: "Tools", free: "Free tool", other: "View other tools", note: "Free · No active event required · New account in 1 minute", start: "Start for free", cta: `Create an account in 1 minute and use ${tool.title.toLowerCase()} without limits. The tool works even without an active event.` },
+  }[locale];
 
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Utilități", url: "/utilitati" },
+    { name: labels.home, url: "/" },
+    { name: labels.tools, url: "/utilitati" },
     { name: tool.title, url: `/utilitati/${slug}` },
   ];
 
@@ -61,9 +72,9 @@ export default async function ToolLandingPage({ params }: Props) {
         <div className="relative z-10 mx-auto max-w-6xl px-4 lg:px-8">
           {/* Breadcrumbs */}
           <nav className="mb-6 text-xs text-muted-foreground">
-            <Link href="/" className="hover:text-gold">Acasă</Link>
+            <Link href="/" className="hover:text-gold">{labels.home}</Link>
             <span className="mx-2">/</span>
-            <Link href="/utilitati" className="hover:text-gold">Utilități</Link>
+            <Link href="/utilitati" className="hover:text-gold">{labels.tools}</Link>
             <span className="mx-2">/</span>
             <span className="text-foreground">{tool.title}</span>
           </nav>
@@ -75,7 +86,7 @@ export default async function ToolLandingPage({ params }: Props) {
                 <div className="inline-flex items-center gap-2 mb-4">
                   <span className="text-3xl">{tool.emoji}</span>
                   <p className="text-xs font-medium uppercase tracking-[3px] text-gold">
-                    Instrument Gratuit
+                    {labels.free}
                   </p>
                 </div>
                 <h1 className="font-heading text-4xl font-bold md:text-5xl text-[#FAF8F2] mb-4">
@@ -103,12 +114,12 @@ export default async function ToolLandingPage({ params }: Props) {
                     href="/utilitati"
                     className="text-sm text-muted-foreground hover:text-gold inline-flex items-center gap-1"
                   >
-                    Vezi alte instrumente
+                    {labels.other}
                     <ArrowRight className="h-3 w-3" />
                   </Link>
                 </div>
                 <p className="mt-3 text-[11px] text-muted-foreground">
-                  ✓ Gratuit · ✓ Nu necesită eveniment activat · ✓ Cont nou în 1 minut
+                  ✓ {labels.note}
                 </p>
               </div>
 
@@ -156,14 +167,14 @@ export default async function ToolLandingPage({ params }: Props) {
                       return (
                         <ul key={idx} className="mb-3 ml-4 list-disc space-y-1 text-muted-foreground">
                           {trimmed.split("\n").map((line, j) => (
-                            <li key={j}>{line.trimStart().slice(2)}</li>
+                            <li key={j}>{renderInline(line.trimStart().slice(2))}</li>
                           ))}
                         </ul>
                       );
                     }
                     return (
                       <p key={idx} className="mb-3 text-muted-foreground leading-relaxed">
-                        {trimmed}
+                        {renderInline(trimmed)}
                       </p>
                     );
                   })}
@@ -176,11 +187,10 @@ export default async function ToolLandingPage({ params }: Props) {
           <ScrollReveal delay={0.2}>
             <section className="mt-16 rounded-2xl border border-gold/30 bg-gold/5 p-8 md:p-12 text-center">
               <h2 className="font-heading text-2xl md:text-3xl font-bold mb-3">
-                Începe acum — gratuit
+                {labels.start}
               </h2>
               <p className="text-muted-foreground mb-6 max-w-xl mx-auto">
-                Creează-ți contul în 1 minut și folosește {tool.title.toLowerCase()} fără
-                limită. Nu trebuie să ai un eveniment activ — instrumentul rulează independent.
+                {labels.cta}
               </p>
               <ToolCta cabinetPath={tool.cabinetPath} />
             </section>
@@ -191,3 +201,14 @@ export default async function ToolLandingPage({ params }: Props) {
   );
 }
 
+function renderInline(value: string) {
+  return value.split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={index} className="font-semibold text-foreground">
+        {part.slice(2, -2)}
+      </strong>
+    ) : (
+      part
+    ),
+  );
+}
