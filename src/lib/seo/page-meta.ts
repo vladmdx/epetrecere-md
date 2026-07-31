@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { pageMeta } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateMeta } from "./generate-meta";
+import type { Locale } from "@/types";
 
 export interface PageMetaOverride {
   title: string | null;
@@ -46,12 +47,17 @@ interface MetaDefaults {
 export async function metaForPath(
   path: string,
   defaults: MetaDefaults,
+  locale: Locale = "ro",
 ): Promise<Metadata> {
-  const override = await getPageMeta(path);
+  // The current page_meta table stores Romanian values only. Applying the
+  // same override to RU/EN would replace correctly translated metadata with
+  // Romanian copy, so localized pages use their translated defaults.
+  const override = locale === "ro" ? await getPageMeta(path) : null;
   return generateMeta({
     title: override?.title ?? defaults.title,
     description: override?.description ?? defaults.description,
     path,
+    locale,
     noindex: defaults.noindex,
   });
 }

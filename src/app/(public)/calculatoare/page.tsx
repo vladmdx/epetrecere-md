@@ -25,7 +25,7 @@ export async function generateMetadata() {
   return metaForPath("/calculatoare", {
     title: meta.title,
     description: meta.description,
-  });
+  }, locale);
 }
 
 const CALCULATORS = [

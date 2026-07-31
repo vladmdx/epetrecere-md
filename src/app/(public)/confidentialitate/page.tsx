@@ -172,6 +172,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: labels.metaTitle,
     description: labels.metaDescription,
     path: "/confidentialitate",
+    locale,
   });
 }
 

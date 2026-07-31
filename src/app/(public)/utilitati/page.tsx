@@ -26,7 +26,7 @@ export async function generateMetadata() {
   return metaForPath("/utilitati", {
     title: meta[0],
     description: meta[1],
-  });
+  }, locale);
 }
 
 const CALCULATORS = [

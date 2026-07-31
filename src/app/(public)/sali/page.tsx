@@ -15,7 +15,7 @@ export async function generateMetadata() {
   return metaForPath("/sali", {
     title: meta[0],
     description: meta[1],
-  });
+  }, locale);
 }
 
 interface Props {

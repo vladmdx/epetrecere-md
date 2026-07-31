@@ -32,7 +32,7 @@ export async function generateMetadata() {
   return metaForPath("/blog", {
     title: meta.title,
     description: meta.description,
-  });
+  }, locale);
 }
 
 function formatDate(value: Date, locale: "ro" | "ru" | "en") {

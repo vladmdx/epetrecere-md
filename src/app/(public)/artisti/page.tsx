@@ -16,7 +16,7 @@ export async function generateMetadata() {
   return metaForPath("/artisti", {
     title: meta[0],
     description: meta[1],
-  });
+  }, locale);
 }
 
 interface Props {

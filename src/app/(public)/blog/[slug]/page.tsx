@@ -40,6 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     path: `/blog/${slug}`,
     type: "article",
     image: post.coverImageUrl || undefined,
+    locale,
   });
 }
 

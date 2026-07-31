@@ -30,6 +30,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: seoDescription || `${name} pentru nunți și evenimente în Chișinău și Republica Moldova în 2026.`,
     entity: category,
     path: `/categorie/${slug}`,
+    locale,
   });
 }
 

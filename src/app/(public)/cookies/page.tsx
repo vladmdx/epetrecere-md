@@ -68,7 +68,7 @@ export async function generateMetadata(): Promise<Metadata> {
         "Learn how cookies and local storage are used, what is strictly necessary and how to change your consent choices.",
     },
   }[locale];
-  return generateMeta({ ...meta, path: "/cookies" });
+  return generateMeta({ ...meta, path: "/cookies", locale });
 }
 
 export default async function CookiesPage() {

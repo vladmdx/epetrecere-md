@@ -2,13 +2,19 @@ import Link from "next/link";
 import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { ServiceIcon } from "@/components/public/service-icon";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 
 export async function generateMetadata() {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: ["Servicii pentru Evenimente în Chișinău și Moldova", "Compară artiști, foto-video, decor, echipament și alte servicii pentru evenimente în Moldova în 2026."],
+    ru: ["Услуги для событий в Кишиневе и Молдове", "Сравните артистов, фото, видео, декор, оборудование и другие услуги для событий в Молдове в 2026 году."],
+    en: ["Event Services in Chișinău and Moldova", "Compare artists, photo, video, decor, equipment and other event services in Moldova in 2026."],
+  }[locale];
   return metaForPath("/servicii", {
-    title: "Servicii pentru Evenimente",
-    description:
-      "Toate serviciile disponibile pentru evenimentul tău: artiști, fotografi, videografi, decor, echipament și multe altele.",
-  });
+    title: meta[0],
+    description: meta[1],
+  }, locale);
 }
 
 const serviceGroups = [
