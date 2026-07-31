@@ -8,10 +8,10 @@ export default function SignInPage() {
           variables: {
             colorPrimary: "#C9A84C",
             colorBackground: "#1A1A2E",
-            colorText: "#FAF8F2",
-            colorTextSecondary: "#B0B0C0",
-            colorInputBackground: "#141428",
-            colorInputText: "#FAF8F2",
+            colorForeground: "#FAF8F2",
+            colorMutedForeground: "#B0B0C0",
+            colorInput: "#141428",
+            colorInputForeground: "#FAF8F2",
           },
           elements: {
             formButtonPrimary:

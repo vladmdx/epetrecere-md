@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Save, Palette, Globe, BarChart3, Mail, Loader2, CheckCircle } from "lucide-react";
+import { Save, Palette, Globe, BarChart3, Mail, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
 

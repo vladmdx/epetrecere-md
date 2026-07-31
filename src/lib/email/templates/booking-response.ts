@@ -1,3 +1,5 @@
+import { escapeHtml } from "@/lib/email/escape";
+
 interface BookingResponseProps {
   clientName: string;
   artistName: string;
@@ -10,6 +12,10 @@ export function bookingResponseEmail({ clientName, artistName, eventDate, status
   const isAccepted = status === "accepted";
   const statusText = isAccepted ? "ACCEPTATĂ" : "REFUZATĂ";
   const statusColor = isAccepted ? "#4CAF50" : "#E74C3C";
+  const safeClientName = escapeHtml(clientName);
+  const safeArtistName = escapeHtml(artistName);
+  const safeEventDate = escapeHtml(eventDate);
+  const safeReply = escapeHtml(reply);
 
   return `
 <!DOCTYPE html>
@@ -21,15 +27,16 @@ export function bookingResponseEmail({ clientName, artistName, eventDate, status
       <span style="color:#C9A84C;font-size:24px;font-weight:bold;">ePetrecere.md</span>
     </div>
     <div style="background:#1A1A2E;border-radius:12px;padding:32px;border:1px solid rgba(201,168,76,0.15);">
+      <p style="color:#A0A0B0;font-size:14px;margin:0 0 8px;">Salut ${safeClientName},</p>
       <h1 style="color:#FAF8F2;font-size:20px;margin:0 0 8px;">Rezervarea ta a fost ${statusText}</h1>
       <p style="color:${statusColor};font-size:14px;margin:0 0 24px;font-weight:bold;">${statusText}</p>
       <table style="width:100%;border-collapse:collapse;">
-        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;">Artist</td><td style="color:#C9A84C;padding:8px 0;font-size:14px;text-align:right;font-weight:bold;">${artistName}</td></tr>
-        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;">Data</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;text-align:right;">${eventDate}</td></tr>
+        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;">Artist</td><td style="color:#C9A84C;padding:8px 0;font-size:14px;text-align:right;font-weight:bold;">${safeArtistName}</td></tr>
+        <tr><td style="color:#A0A0B0;padding:8px 0;font-size:14px;">Data</td><td style="color:#FAF8F2;padding:8px 0;font-size:14px;text-align:right;">${safeEventDate}</td></tr>
       </table>
       <div style="margin-top:20px;padding:16px;background:rgba(255,255,255,0.05);border-radius:8px;">
         <p style="color:#A0A0B0;font-size:12px;margin:0 0 4px;">Mesajul artistului:</p>
-        <p style="color:#FAF8F2;font-size:14px;margin:0;">${reply}</p>
+        <p style="color:#FAF8F2;font-size:14px;margin:0;">${safeReply}</p>
       </div>
       ${isAccepted ? `
       <div style="text-align:center;margin-top:24px;">

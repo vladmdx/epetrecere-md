@@ -141,9 +141,7 @@ export function BudgetTrackerClient() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const saved = JSON.parse(raw);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (saved.categories) setCategories(saved.categories);
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (saved.totalBudget) setTotalBudget(saved.totalBudget);
       }
     } catch {

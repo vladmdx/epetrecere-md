@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
@@ -24,14 +24,6 @@ import { Progress } from "@/components/ui/progress";
 import { INVITATION_DESIGN_LIST, type InvitationDesignId } from "@/lib/invitations/templates";
 import { TimePicker } from "@/components/ui/time-picker";
 import { Calendar as CalendarIcon, Phone as PhoneIcon, MessageCircle, Mail } from "lucide-react";
-
-interface Template {
-  id: number;
-  slug: string;
-  nameRo: string;
-  category: string | null;
-  designTokens: Record<string, string> | null;
-}
 
 interface Guest {
   name: string;
@@ -87,7 +79,6 @@ export function InvitationWizard() {
   const router = useRouter();
   const { isLoaded, isSignedIn } = useUser();
   const [step, setStep] = useState(0);
-  const [templates, setTemplates] = useState<Template[]>([]);
   const [saving, setSaving] = useState(false);
 
   const [data, setData] = useState({
@@ -108,17 +99,6 @@ export function InvitationWizard() {
     guests: [] as Guest[],
   });
   const [newGuest, setNewGuest] = useState<Guest>({ name: "", email: "" });
-
-  useEffect(() => {
-    fetch("/api/invitation-templates")
-      .then((r) => (r.ok ? r.json() : []))
-      .then(setTemplates);
-  }, []);
-
-  // Filter templates by event type when picking
-  const filteredTemplates = templates.filter(
-    (t) => !t.category || t.category === data.eventType,
-  );
 
   function update<K extends keyof typeof data>(
     key: K,

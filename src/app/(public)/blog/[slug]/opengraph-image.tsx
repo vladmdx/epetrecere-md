@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 import { ImageResponse } from "next/og";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";

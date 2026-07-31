@@ -87,7 +87,7 @@ export function CategoriesSection() {
                   href={tile.href}
                   className="group relative flex h-full w-full items-end overflow-hidden rounded-2xl"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  { }
                   <img
                     src={tile.image}
                     alt={name}

@@ -4,9 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Search, Music, Building2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { useLocale } from "@/hooks/use-locale";
-import { cn } from "@/lib/utils";
 
 interface SearchResult {
   id: number;

@@ -10,8 +10,7 @@
 //   6. 3 bottom shortcuts (Calendar / Tarife / Financiar)
 //   7. Footer flourish
 
-import { useMemo } from "react";
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from "react-native";
+import { View, Text, Pressable, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-expo";

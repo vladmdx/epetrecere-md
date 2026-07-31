@@ -214,7 +214,7 @@ function HeroCard({ profile }: { profile: ArtistProfileSnapshot }) {
         {/* Logo / initials chip */}
         <div className="relative flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-2 border-gold/40 bg-background ring-2 ring-gold/20 transition-transform duration-300 hover:scale-105">
           {profile.photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+
             <img
               src={profile.photoUrl}
               alt={profile.nameRo}
@@ -348,7 +348,7 @@ function NextEventCard({ event }: { event: NextEvent }) {
       <div className="flex flex-col gap-5 p-5 sm:flex-row sm:p-6">
         {/* Cover image */}
         <div className="relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-xl border border-border/40 transition-all duration-300 hover:border-gold/40 sm:aspect-square sm:w-48">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             src={image}
             alt={event.venueName ?? eventLabel}

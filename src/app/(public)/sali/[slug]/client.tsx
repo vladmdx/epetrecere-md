@@ -499,7 +499,7 @@ export function VenueDetailClient({
                             rel="noopener noreferrer"
                             className="block h-20 w-20 overflow-hidden rounded-lg border border-border/40 transition-transform hover:scale-105"
                           >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            { }
                             <img
                               src={url}
                               alt={`Fotografie recenzie ${i + 1}`}

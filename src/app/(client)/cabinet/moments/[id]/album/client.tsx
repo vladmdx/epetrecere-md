@@ -39,7 +39,7 @@ export function AlbumClient({ planId }: { planId: number }) {
   const [favoritesOnly, setFavoritesOnly] = useState(false);
 
   useEffect(() => {
-    let alive = true;
+    const alive = true;
     (async () => {
       try {
         const [planRes, photosRes] = await Promise.all([
@@ -217,7 +217,7 @@ export function AlbumClient({ planId }: { planId: number }) {
           <div className="grid grid-cols-3 gap-2">
             {page.map((photo) => (
               <figure key={photo.id} className="flex flex-col">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 <img
                   src={photo.url}
                   alt={photo.guestName ?? ""}

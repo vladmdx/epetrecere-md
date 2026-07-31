@@ -55,7 +55,7 @@ interface Credits {
 
 export default function LeadMatchesPage() {
   const [matches, setMatches] = useState<LeadMatch[]>([]);
-  const [credits, setCredits] = useState<Credits | null>(null);
+  const [_credits, setCredits] = useState<Credits | null>(null);
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "new" | "unlocked" | "won">("all");

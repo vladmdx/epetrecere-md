@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { searchAll } from "@/lib/search/meilisearch";
 import { db } from "@/lib/db";
 import { artists, venues } from "@/lib/db/schema";
-import { eq, sql, or } from "drizzle-orm";
+import {  sql } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {

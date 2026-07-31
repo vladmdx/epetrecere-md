@@ -111,7 +111,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
               href={`/artisti/${hero.slug}`}
               className="group relative flex h-full min-h-[320px] flex-col justify-end overflow-hidden rounded-2xl"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img
                 src={hero.image}
                 alt={hero.name}
@@ -153,7 +153,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
                   className="group flex h-full gap-4 overflow-hidden rounded-2xl border border-gold/15 bg-[#1A1A2E] p-3 transition-all hover:-translate-y-0.5 hover:border-gold/40"
                 >
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    { }
                     <img
                       src={a.image}
                       alt={a.name}

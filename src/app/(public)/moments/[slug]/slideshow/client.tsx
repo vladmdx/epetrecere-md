@@ -247,7 +247,7 @@ export function SlideshowClient({
       {/* ────────────── REVEALED: carousel ────────────── */}
       {state.revealed && current ? (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             key={current.id}
             src={current.url}
@@ -291,7 +291,7 @@ export function SlideshowClient({
           accepting submissions. */}
       {qrUrl && (
         <div className="absolute right-8 top-8 flex flex-col items-center gap-2 rounded-2xl bg-white/95 p-3 shadow-2xl backdrop-blur">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img src={qrUrl} alt="Scan pentru upload poze" className="h-32 w-32" />
           <p className="text-center text-[11px] font-semibold text-black">
             📸 Scanează

@@ -8,7 +8,7 @@ import {
   artists,
   vendorCredits,
 } from "@/lib/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import {  desc, eq } from "drizzle-orm";
 
 // M3 — GET /api/lead-matches
 //

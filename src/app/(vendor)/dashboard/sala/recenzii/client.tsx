@@ -250,7 +250,6 @@ export function VenueReviewsClient({
   }
 
   // Trend chart: find max count for y-axis scaling
-  const maxDist = Math.max(1, ...stats.dist.map((d) => d.count));
 
   return (
     <div className="space-y-6">

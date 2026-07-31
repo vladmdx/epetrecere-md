@@ -40,7 +40,7 @@ export function RecentlyViewed({ type, title, className }: Props) {
           >
             <div className="relative aspect-[4/5] overflow-hidden rounded-xl border border-border/40 bg-muted transition-all group-hover:border-gold/40">
               {it.imageUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
+
                 <img
                   src={it.imageUrl}
                   alt={it.name}

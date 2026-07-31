@@ -1,18 +1,24 @@
-// Sentry edge runtime config (middleware, edge API routes).
-
 import * as Sentry from "@sentry/nextjs";
 
-const dsn = process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN;
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
 
 if (dsn) {
   Sentry.init({
     dsn,
     environment:
-      process.env.SENTRY_ENVIRONMENT ||
+      process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT ||
       process.env.NODE_ENV ||
       "development",
     sendDefaultPii: false,
-    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1,
+    replaysSessionSampleRate: 0,
+    replaysOnErrorSampleRate: 0,
+    ignoreErrors: [
+      "top.GLOBALS",
+      "ResizeObserver loop limit exceeded",
+      "Non-Error promise rejection captured",
+      "ClerkNetworkError",
+    ],
     beforeSend(event) {
       if (event.request?.url) {
         try {
@@ -22,16 +28,19 @@ if (dsn) {
           );
           event.request.url = url.toString();
         } catch {
-          // Ignore malformed URLs and preserve the error event.
+          // Keep reporting even when a browser supplies a relative URL.
         }
       }
+
       if (event.request?.headers) {
         delete event.request.headers.authorization;
         delete event.request.headers.cookie;
         delete event.request.headers["set-cookie"];
       }
-      delete event.request?.data;
+
       return event;
     },
   });
 }
+
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

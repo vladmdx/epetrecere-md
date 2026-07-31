@@ -50,7 +50,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
           <Link href="/sali" className="text-gold hover:underline">
             Săli
           </Link>{" "}
-          cu butonul „Compară" pentru a le vedea side-by-side aici.
+          cu butonul „Compară” pentru a le vedea side-by-side aici.
         </p>
       </div>
     );

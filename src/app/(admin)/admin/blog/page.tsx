@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Eye, Calendar, Loader2, Trash2 } from "lucide-react";
+import { Plus, Edit, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface BlogPost {

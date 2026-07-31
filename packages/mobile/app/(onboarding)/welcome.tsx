@@ -10,14 +10,12 @@
 // progress indicator and a tap-to-jump control.
 
 import { useState, useRef, useEffect } from "react";
-import { View, Text, Pressable, Dimensions } from "react-native";
+import { View, Text, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  interpolate,
-  Extrapolation,
 } from "react-native-reanimated";
 import { useTranslation } from "react-i18next";
 import {

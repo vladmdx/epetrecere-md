@@ -94,7 +94,7 @@ export function ReviewPhotoUploader({
             key={url}
             className="relative h-20 w-20 overflow-hidden rounded-lg border border-border/40"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img
               src={url}
               alt={`Fotografie ${i + 1}`}

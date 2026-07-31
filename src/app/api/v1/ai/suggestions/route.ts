@@ -184,9 +184,6 @@ async function partnerSuggestions(userId: string): Promise<Suggestion[]> {
 
   // Signal 1: pending booking count
   const todayIso = new Date().toISOString().slice(0, 10);
-  const sevenDaysAhead = new Date(Date.now() + 7 * 86_400_000)
-    .toISOString()
-    .slice(0, 10);
   const [pendingRow] = await db
     .select({ value: count() })
     .from(bookingRequests)

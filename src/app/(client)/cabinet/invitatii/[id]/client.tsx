@@ -13,7 +13,6 @@ import {
   Copy,
   ExternalLink,
   Loader2,
-  Trash2,
   Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";

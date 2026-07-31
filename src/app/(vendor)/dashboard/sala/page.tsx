@@ -6,7 +6,6 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { and, eq, gte, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues, calendarEvents } from "@/lib/db/schema";

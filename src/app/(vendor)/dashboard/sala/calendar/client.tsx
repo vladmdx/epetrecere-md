@@ -176,7 +176,7 @@ export function VenueCalendarClient({
   }
   while (cells.length % 7 !== 0) cells.push({ day: null });
 
-  const today = new Date();
+  const today = useMemo(() => new Date(), []);
   const todayStr = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
 
   // Compute currently-highlighted drag range

@@ -219,7 +219,7 @@ export default function PartnerBookingDetailScreen() {
               Mesaj client
             </Text>
             <Text className="text-[14px] italic leading-5 text-foreground/85">
-              "{b.message}"
+              „{b.message}”
             </Text>
           </Card>
         )}

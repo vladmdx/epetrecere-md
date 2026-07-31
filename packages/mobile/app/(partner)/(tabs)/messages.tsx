@@ -13,13 +13,13 @@ import { useCallback } from "react";
 import { View, Text, Pressable, FlatList, RefreshControl } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useAuth } from "@clerk/clerk-expo";
 import { MessageCircle } from "lucide-react-native";
 import { SafeScreen, Avatar } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { useApi } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
-import { relativeTimeRO, initials as toInitials } from "@epetrecere/shared/utils";
+import { relativeTimeRO } from "@epetrecere/shared/utils";
 
 interface PartnerConversation {
   id: number;

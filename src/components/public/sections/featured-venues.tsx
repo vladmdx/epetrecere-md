@@ -77,7 +77,7 @@ export function FeaturedVenuesSection({ venues }: Props) {
               <ScrollReveal key={v.id} delay={i * 0.1}>
                 <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#E4DECF] bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)]">
                   <div className="relative aspect-[16/10] overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    { }
                     <img
                       src={v.coverImageUrl || `/images/venues/hall-${(v.id % 6) + 1}.jpg`}
                       alt={name}

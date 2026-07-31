@@ -1116,7 +1116,7 @@ function OgImageSelector({
               aria-label="Folosește coperta galeriei"
             >
               {coverUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
+
                 <img
                   src={coverUrl}
                   alt="Cover (default)"
@@ -1139,7 +1139,7 @@ function OgImageSelector({
                 }
                 aria-label={`Selectează imaginea ${g.id}`}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 <img
                   src={g.url}
                   alt={g.altRo ?? ""}
@@ -1156,7 +1156,7 @@ function OgImageSelector({
           {effectiveUrl && (
             <div className="overflow-hidden rounded-lg border border-border/40 bg-background">
               <div className="relative aspect-[1200/630] w-full bg-muted">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 <img
                   src={effectiveUrl}
                   alt="OG preview"

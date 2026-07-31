@@ -5,7 +5,7 @@
 // Module-level cache + listener pattern so widgets on the same page
 // stay in sync without React Context.
 
-import { useCallback, useEffect, useState } from "react";
+import {  useEffect, useState } from "react";
 
 export type RecentEntity = "artist" | "venue";
 const MAX = 10;

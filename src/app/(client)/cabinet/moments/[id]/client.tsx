@@ -518,7 +518,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 <QrCode className="h-4 w-4 text-gold" /> QR code pentru invitați
               </div>
               {qrUrl && (
-                /* eslint-disable-next-line @next/next/no-img-element */
+
                 <img
                   src={qrUrl}
                   alt="QR code"
@@ -777,7 +777,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 </span>
                 <span className="mt-0.5 block text-[11px] text-muted-foreground">
                   Pozele invitaților rămân ascunse până le aprobi din tab-ul
-                  „În așteptare" — util pentru evenimente corporate sau
+                  „În așteptare” — util pentru evenimente corporate sau
                   familii cu copii mici. Implicit dezactivat (publicare
                   imediată).
                 </span>
@@ -814,8 +814,8 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 Provocări foto (opțional)
               </div>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                O „misiune" pe linie. Invitații văd una pe rând cu progres
-                — „Provocare 3/10". Lasă gol pentru încărcare liberă.
+                O „misiune” pe linie. Invitații văd una pe rând cu progres
+                — „Provocare 3/10”. Lasă gol pentru încărcare liberă.
               </p>
               <textarea
                 value={promptsInput}
@@ -836,7 +836,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 Mese / locații (opțional)
               </label>
               <p className="mt-0.5 text-[11px] text-muted-foreground">
-                Câte un nume pe linie. Pagina „Carduri QR per masă" îți
+                Câte un nume pe linie. Pagina „Carduri QR per masă” îți
                 generează un cod separat pentru fiecare — pe dashboard
                 vezi cine a încărcat de la fiecare masă.
               </p>
@@ -1069,7 +1069,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                             : "border-border/40"
                         }`}
                       >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        { }
                         <img
                           src={p.url}
                           alt={p.guestName ?? ""}

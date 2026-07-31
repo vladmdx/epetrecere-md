@@ -658,7 +658,7 @@ export function MomentsUploadClient({
                   key={p.id}
                   className="overflow-hidden rounded-lg border border-border/40 bg-card/40"
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  { }
                   <img
                     src={p.url}
                     alt={p.guestName ?? "Event photo"}

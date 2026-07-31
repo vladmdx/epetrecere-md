@@ -49,7 +49,7 @@ import {
   ChevronRight,
   ExternalLink,
   Save,
-  Image,
+  Image as ImageIcon,
   Star,
   Send,
   Check,
@@ -578,7 +578,7 @@ export default function PlanDetailPage({
                   </div>
                   <div className="grid grid-cols-2 gap-1">
                     <div className="h-8 w-8 rounded bg-accent/50 flex items-center justify-center">
-                      <Image className="h-4 w-4 text-muted-foreground" />
+                      <ImageIcon className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="h-8 w-8 rounded bg-accent/50 flex items-center justify-center">
                       <Camera className="h-4 w-4 text-muted-foreground" />
@@ -718,14 +718,14 @@ function OverviewTab({
   checklist,
   guests,
   tables,
-  seats,
+  seats: _seats,
   bookings,
-  photoCount,
+  photoCount: _photoCount,
   guestTotal,
   guestAccepted,
   checklistDone,
   checklistTotal,
-  seatedGuests,
+  seatedGuests: _seatedGuests,
   onCheckItem,
   onSwitchTab,
 }: {
@@ -951,6 +951,8 @@ function LiveCountdown({ targetDate }: { targetDate: string }) {
 
 // ─── Budget Progress Widget ─────────────────────────────────────────
 
+// Kept for re-enabling the budget tab without rebuilding its calculations.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function BudgetProgress({
   plan,
   bookings,
@@ -1037,6 +1039,8 @@ const BUDGET_CATEGORIES = [
   "Altele",
 ];
 
+// Kept for re-enabling the budget tab without rebuilding its editor.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function BudgetTab({
   plan,
   bookings,
@@ -1496,7 +1500,7 @@ interface DiscoveryArtist {
   _fetchedForCategoryId?: number;
 }
 
-const MAX_PER_CATEGORY = 5;
+const _MAX_PER_CATEGORY = 5;
 
 function BookingsTab({
   plan,
@@ -1838,7 +1842,7 @@ function DiscoverySection({
   byCategory,
   loading,
   bookingByArtistId,
-  bookingsPerCategory,
+  bookingsPerCategory: _bookingsPerCategory,
   blockedArtistIds,
   categoryBlocker,
   clientName,
@@ -3438,7 +3442,7 @@ function PlanArtistCard({
           )}
         >
           {cover ? (
-            // eslint-disable-next-line @next/next/no-img-element
+
             <img
               src={cover}
               alt={artist.nameRo}
@@ -4870,7 +4874,7 @@ function VenueDiscoveryCard({
         className="flex items-start gap-3"
       >
         {v.coverUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
+
           <img
             src={v.coverUrl}
             alt=""

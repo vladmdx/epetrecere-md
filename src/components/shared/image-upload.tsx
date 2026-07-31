@@ -2,7 +2,7 @@
 
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload, X, GripVertical, Star } from "lucide-react";
+import { Upload, X, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -20,7 +20,7 @@ interface ImageUploadProps {
   folder?: string;
 }
 
-export function ImageUpload({ images, onChange, maxFiles = 20, folder = "artists" }: ImageUploadProps) {
+export function ImageUpload({ images, onChange, maxFiles = 20, folder: _folder = "artists" }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 

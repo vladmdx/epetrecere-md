@@ -136,12 +136,12 @@ export default function SEOPage() {
           <p>
             <strong className="text-foreground">Titlu SEO</strong> — max 60
             caractere. Include cuvânt cheie la început + brand la final. Ex:
-            „Moderatori Nuntă Chișinău | ePetrecere.md".
+            „Moderatori Nuntă Chișinău | ePetrecere.md”.
           </p>
           <p>
             <strong className="text-foreground">Meta description</strong> — max
             160 caractere. Descriere atractivă + CTA implicit. Ex: „Cei mai
-            buni moderatori din Moldova pentru nuntă. Rezervă online".
+            buni moderatori din Moldova pentru nuntă. Rezervă online”.
           </p>
           <p>
             <strong className="text-foreground">Schema.org JSON-LD</strong> —

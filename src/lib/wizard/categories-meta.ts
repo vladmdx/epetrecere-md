@@ -37,8 +37,6 @@ interface CategoryMeta {
   allowedEventTypes: EventTypeKey[];
 }
 
-// FAMILY = small kids + grandparents in attendance — keep it tasteful.
-const FAMILY = ["wedding", "baptism", "cumatrie", "birthday", "other"] as const;
 // ADULT = no minors, broader entertainment options OK.
 const ADULT = ["wedding", "corporate", "birthday", "other"] as const;
 // VENUE_NEUTRAL = anything except concerts (which have specific staging needs)

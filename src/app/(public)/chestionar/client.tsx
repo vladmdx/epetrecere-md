@@ -186,7 +186,7 @@ export function MatchingQuizClient() {
               >
                 <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
                   {m.coverImage ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
+
                     <img
                       src={m.coverImage}
                       alt={m.name}

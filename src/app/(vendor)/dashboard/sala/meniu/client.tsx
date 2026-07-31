@@ -13,7 +13,6 @@ import {
   Beef,
   Loader2,
   Star,
-  X,
   Check,
   FileText,
 } from "lucide-react";
@@ -100,7 +99,7 @@ function iconComponent(icon: string | null) {
 export function VenueMenuClient({
   venueId,
   venueName,
-  existingMenuUrl,
+  existingMenuUrl: _existingMenuUrl,
   existingMenuPdfUrl,
   initialCategories,
   initialItems,
@@ -547,7 +546,7 @@ export function VenueMenuClient({
                 <div>
                   <p className="font-medium">Meniu PDF încărcat</p>
                   <p className="text-xs text-muted-foreground">
-                    Apare ca buton „Descarcă meniu PDF" pe profilul public.
+                    Apare ca buton „Descarcă meniu PDF” pe profilul public.
                   </p>
                 </div>
               </div>

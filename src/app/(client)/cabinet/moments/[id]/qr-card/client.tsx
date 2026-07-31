@@ -217,7 +217,7 @@ export function QrCardClient({ planId }: { planId: number }) {
           {/* QR */}
           {qrDataUrl && (
             <div className="z-10 my-2 rounded-lg bg-white p-2 shadow-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img
                 src={qrDataUrl}
                 alt="QR pentru upload poze"

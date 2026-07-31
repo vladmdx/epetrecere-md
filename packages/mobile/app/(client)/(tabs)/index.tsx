@@ -14,7 +14,7 @@
 // /api/v1/artists?featured=1, /api/v1/venues?featured=1.
 
 import { View, Text, ScrollView, Pressable } from "react-native";
-import { Link, useRouter } from "expo-router";
+import {  useRouter } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 import { useQuery } from "@tanstack/react-query";
 import { Search, Sparkles, ArrowRight } from "lucide-react-native";

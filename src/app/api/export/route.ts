@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { artists, leads, bookings, bookingRequests, offerRequests } from "@/lib/db/schema";
+import { artists, leads, bookingRequests, offerRequests } from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 

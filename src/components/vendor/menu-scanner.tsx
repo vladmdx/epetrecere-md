@@ -577,7 +577,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
               : "Durează 15-30 secunde pentru o poză, 30-60s pentru PDF multi-pagină"}
           </p>
           {previewUrl && previewMime?.startsWith("image/") && (
-            // eslint-disable-next-line @next/next/no-img-element
+
             <img
               src={previewUrl}
               alt="Preview"
@@ -633,7 +633,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
           </summary>
           <div className="p-3">
             {previewMime?.startsWith("image/") ? (
-              // eslint-disable-next-line @next/next/no-img-element
+
               <img
                 src={previewUrl}
                 alt="Menu source"

@@ -16,7 +16,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   Printer,
-  LayoutGrid,
   ImageIcon,
   Loader2,
   Sparkles,
@@ -196,7 +195,7 @@ export function ColajClient({ planId }: { planId: number }) {
           {layout === "grid" && (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-4 print:grid-cols-4 print:gap-1">
               {photos.map((p) => (
-                /* eslint-disable-next-line @next/next/no-img-element */
+
                 <img
                   key={p.id}
                   src={p.url}
@@ -221,7 +220,7 @@ export function ColajClient({ planId }: { planId: number }) {
                       width: "min(180px, 24%)",
                     }}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    { }
                     <img
                       src={p.url}
                       alt={p.guestName ?? ""}
@@ -249,7 +248,7 @@ export function ColajClient({ planId }: { planId: number }) {
                 const square = i % 3 === 0 && !tall;
                 return (
                   <div key={p.id} className="mb-2 break-inside-avoid print:mb-1">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    { }
                     <img
                       src={p.url}
                       alt={p.guestName ?? ""}

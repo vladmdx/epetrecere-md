@@ -255,7 +255,7 @@ export default function EditArtistPage() {
             <CardHeader>
               <CardTitle>Pachete</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Ofertele artistului — apar pe profilul public sub tab-ul „Pachete".
+                Ofertele artistului — apar pe profilul public sub tab-ul „Pachete”.
               </p>
             </CardHeader>
             <CardContent>

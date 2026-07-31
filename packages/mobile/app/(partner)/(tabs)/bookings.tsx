@@ -25,7 +25,7 @@ import {
   ScrollView,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-expo";
 import {
   CheckCircle,
@@ -83,7 +83,6 @@ export default function PartnerBookingsScreen() {
   const { isSignedIn } = useAuth();
   const router = useRouter();
   const api = useApi();
-  const qc = useQueryClient();
   const params = useLocalSearchParams<{ status?: string }>();
   const initialTab: Tab =
     params.status === "confirmed" ? "accepted" : "active";
@@ -510,4 +509,3 @@ function statusPill(status: string): { label: string; tone: BadgeTone } {
       return { label: status, tone: "default" };
   }
 }
-

@@ -22,9 +22,7 @@ import {
   Save,
   Loader2,
   X,
-  Copy,
   Calendar as CalendarIcon,
-  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -163,7 +161,7 @@ export default function VendorCalendarPage() {
   const [selectedEventType, setSelectedEventType] = useState<string>("nunta");
   const [selectedNote, setSelectedNote] = useState("");
   const [selectedStartTime, setSelectedStartTime] = useState("10:00");
-  const [selectedEndTime, setSelectedEndTime] = useState("22:00");
+  const [_selectedEndTime, setSelectedEndTime] = useState("22:00");
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState<WorkDay[]>(
     DAYS.map((_, i) => ({
@@ -287,7 +285,6 @@ export default function VendorCalendarPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity]);
 
   // Load work schedule from server when entity is resolved
@@ -378,7 +375,6 @@ export default function VendorCalendarPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity, currentMonth, dayBookings]);
 
   const { year, month } = currentMonth;
@@ -416,7 +412,6 @@ export default function VendorCalendarPage() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity, selectedDate]);
 
   function handleDayClick(dateStr: string) {
@@ -1264,7 +1259,7 @@ export default function VendorCalendarPage() {
                             .filter((d) => !d.isWorking)
                             .map((d) => DAYS[d.dayOfWeek])
                             .join(", ")}{" "}
-                          ca „blocate" pe următoarele 3 luni
+                          ca „blocate” pe următoarele 3 luni
                         </p>
                       </div>
                       <Button

@@ -24,7 +24,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     // to useSyncExternalStore is a larger change tracked for follow-up.
     const stored = localStorage.getItem("epetrecere-theme") as Theme | null;
     const initial = stored || "dark";
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThemeState(initial);
     document.documentElement.classList.toggle("dark", initial === "dark");
     setMounted(true);

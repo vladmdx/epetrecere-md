@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Edit, Eye, MapPin, Users, Star, Loader2 } from "lucide-react";
+import {  Edit, Eye, MapPin, Users, Star, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { BulkActionsBar } from "@/components/admin/bulk-actions-bar";

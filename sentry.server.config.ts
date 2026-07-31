@@ -15,6 +15,7 @@ if (dsn) {
       process.env.NODE_ENV ||
       "development",
 
+    sendDefaultPii: false,
     tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
 
     beforeSend(event) {
@@ -22,7 +23,7 @@ if (dsn) {
       if (event.request?.url) {
         try {
           const u = new URL(event.request.url);
-          ["token", "api_key", "password"].forEach((k) =>
+          ["token", "email", "phone", "api_key", "password"].forEach((k) =>
             u.searchParams.delete(k),
           );
           event.request.url = u.toString();
@@ -30,6 +31,15 @@ if (dsn) {
           /* ignore */
         }
       }
+
+      if (event.request?.headers) {
+        delete event.request.headers.authorization;
+        delete event.request.headers.cookie;
+        delete event.request.headers["set-cookie"];
+      }
+
+      // Request bodies can contain booking contact details and private chat.
+      delete event.request?.data;
       return event;
     },
   });

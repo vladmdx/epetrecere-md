@@ -426,7 +426,7 @@ export default function VendorSettingsPage() {
               <div className="flex-1">
                 <Label>Nu indica prețul public</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Clientul va vedea „Preț la cerere" și va trebui să-ți scrie
+                  Clientul va vedea „Preț la cerere” și va trebui să-ți scrie
                   pentru ofertă personalizată. Util când tariful depinde de
                   durata, locația sau tipul evenimentului.
                 </p>

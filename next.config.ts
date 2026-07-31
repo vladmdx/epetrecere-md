@@ -113,7 +113,11 @@ const nextConfig: NextConfig = {
 // fall back gracefully if missing so local dev works without Sentry.
 import { withSentryConfig } from "@sentry/nextjs";
 
-export default withSentryConfig(nextConfig, {
+const sentryEnabled = Boolean(
+  process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN,
+);
+
+const config = sentryEnabled ? withSentryConfig(nextConfig, {
   // Suppresses source-map upload logs during build
   silent: true,
   // These can also be set via env; hardcoding for a single-project setup.
@@ -122,6 +126,12 @@ export default withSentryConfig(nextConfig, {
   authToken: process.env.SENTRY_AUTH_TOKEN,
   // Only upload source maps in production builds to save time + quota
   widenClientFileUpload: true,
-  disableLogger: true,
-  automaticVercelMonitors: false,
-});
+  webpack: {
+    automaticVercelMonitors: false,
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
+}) : nextConfig;
+
+export default config;

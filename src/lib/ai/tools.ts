@@ -1,6 +1,6 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
-import { artists, leads, bookings, categories, venues, calendarEvents } from "@/lib/db/schema";
+import { artists, leads, bookings, venues, calendarEvents } from "@/lib/db/schema";
 import { eq, and, sql, desc, gte, count } from "drizzle-orm";
 
 // Tool definitions for Claude

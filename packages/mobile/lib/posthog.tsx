@@ -13,7 +13,8 @@ import {
   PostHogProvider as RawPostHogProvider,
   usePostHog,
 } from "posthog-react-native";
-import { useRouter, usePathname } from "expo-router";
+import type PostHog from "posthog-react-native";
+import { usePathname } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 
 const POSTHOG_KEY = process.env.EXPO_PUBLIC_POSTHOG_KEY;
@@ -81,7 +82,8 @@ function Identifier() {
 // context by <InstanceCapture /> below. posthog-react-native exposes the
 // instance ONLY through `usePostHog()` and never assigns any global, so
 // non-component callers of track() read it from here.
-let _posthog: { capture: (e: string, p?: object) => void } | null = null;
+let _posthog: PostHog | null = null;
+type EventProperties = Parameters<PostHog["capture"]>[1];
 
 /** Capture the context instance into the module-level handle for track(). */
 function InstanceCapture() {
@@ -109,7 +111,7 @@ function ScreenTracker() {
 /** Imperative `track` for non-component callers (mutations, push tap
  *  handlers, etc.). Safe to call without an active PostHog instance —
  *  returns a no-op when the key is missing. */
-export function track(event: string, props?: Record<string, unknown>) {
+export function track(event: string, props?: EventProperties) {
   if (!POSTHOG_KEY) return;
   // posthog-react-native does NOT attach the instance to any global — it
   // lives only in React context. <InstanceCapture /> mirrors it into the

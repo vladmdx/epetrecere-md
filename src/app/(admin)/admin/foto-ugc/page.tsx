@@ -158,7 +158,7 @@ export default function AdminUgcPhotosPage() {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {rows.map((row) => (
             <Card key={row.photo.id} className="overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img
                 src={row.photo.url}
                 alt={row.photo.caption || "Event photo"}

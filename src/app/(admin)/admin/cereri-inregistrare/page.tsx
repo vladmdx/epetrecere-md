@@ -137,7 +137,7 @@ export default function RegistrationRequestsPage() {
                   {/* Info */}
                   <div className="flex gap-4">
                     {req.photoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
+
                       <img
                         src={req.photoUrl}
                         alt={req.name}

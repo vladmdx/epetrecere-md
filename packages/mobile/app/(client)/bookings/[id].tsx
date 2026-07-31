@@ -24,7 +24,6 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
-  MapPin,
   Users,
   Euro,
   MessageCircle,

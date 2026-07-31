@@ -42,7 +42,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
           <Link href="/artisti" className="text-gold hover:underline">
             Artiști
           </Link>{" "}
-          cu butonul „Compară" pentru a-i vedea side-by-side aici.
+          cu butonul „Compară” pentru a-i vedea side-by-side aici.
         </p>
       </div>
     );

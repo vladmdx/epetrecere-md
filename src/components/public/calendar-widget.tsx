@@ -39,9 +39,9 @@ const EVENT_TYPES = [
   { value: "other", label: "📋 Altele" },
 ];
 
-export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: CalendarWidgetProps) {
+export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDateSelect }: CalendarWidgetProps) {
   const { t } = useLocale();
-  const { user, isSignedIn } = useUser();
+  const { user, isSignedIn: _isSignedIn } = useUser();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -353,7 +353,7 @@ export function CalendarWidget({ entityType, entityId, enabled, onDateSelect }: 
         {Array.from({ length: daysInMonth }).map((_, i) => {
           const day = i + 1;
           const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const { status, hasTimeSlots } = getDayStatus(dateStr);
+          const { status, hasTimeSlots: _hasTimeSlots } = getDayStatus(dateStr);
           const dateObj = new Date(year, month, day);
           const isPast = dateObj < today;
           const isToday = dateObj.toDateString() === today.toDateString();

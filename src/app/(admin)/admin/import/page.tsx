@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 type ImportStep = "upload" | "mapping" | "importing" | "done";
 

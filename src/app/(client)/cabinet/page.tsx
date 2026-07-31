@@ -545,7 +545,7 @@ function HeroCard({
             className="group relative aspect-[4/3] w-full max-w-[280px] shrink-0 overflow-hidden rounded-xl border border-border/40 transition-all duration-300 hover:border-gold/40 hover:shadow-[0_8px_25px_rgba(201,168,76,0.15)] active:scale-[0.98] sm:aspect-[16/10] sm:w-56"
             aria-label="Deschide planul evenimentului"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img
               src={venueImage}
               alt={venueName ?? plan.title}

@@ -8,7 +8,7 @@
 //   2. "QR codes" — printable page with each guest's QR code (rendered
 //       client-side via `qrcode` lib), ready for card/placecard printing.
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import QRCode from "qrcode";
 import {
@@ -382,7 +382,7 @@ function QrPrintView({
             key={g.id}
             className="flex flex-col items-center rounded-xl border border-border/40 bg-card p-3 text-center print:break-inside-avoid print:border-black"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img
               src={qrData.get(g.id)!}
               alt={`QR ${g.name}`}

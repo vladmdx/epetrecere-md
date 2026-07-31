@@ -133,8 +133,8 @@ export async function GET(
   // render "❤️ 5  🔥 3" badges without a second round trip. Only
   // computed when photos are revealed (otherwise nothing to react to
   // from the public perspective) AND when there are photos to look up.
-  let reactionsByPhoto: Record<number, Record<string, number>> = {};
-  let myReactions: Record<number, string[]> = {};
+  const reactionsByPhoto: Record<number, Record<string, number>> = {};
+  const myReactions: Record<number, string[]> = {};
   if (revealed && photos.length > 0) {
     const ids = photos.map((p) => p.id);
     const rows = await db

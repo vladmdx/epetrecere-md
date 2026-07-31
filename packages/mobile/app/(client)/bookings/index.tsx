@@ -8,7 +8,7 @@ import { useMemo, useCallback } from "react";
 import { View, Text, FlatList, RefreshControl, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth, useUser } from "@clerk/clerk-expo";
+import {  useUser } from "@clerk/clerk-expo";
 import {
   ArrowLeft,
   ChevronRight,

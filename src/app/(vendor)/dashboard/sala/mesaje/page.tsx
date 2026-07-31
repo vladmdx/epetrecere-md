@@ -239,7 +239,6 @@ export default function VenueMessagesPage() {
 
   useEffect(() => {
     if (selectedId != null) void openConversation(selectedId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId]);
 
   useEffect(() => {
@@ -516,7 +515,6 @@ function MessageBubble({ msg, mine }: { msg: ChatMessage; mine: boolean }) {
         {msg.attachmentUrl && (
           <div className="mb-2">
             {isImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <a
                 href={msg.attachmentUrl}
                 target="_blank"

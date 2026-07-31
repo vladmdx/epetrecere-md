@@ -52,7 +52,7 @@ export function ReelClient({ planId }: { planId: number }) {
   const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   useEffect(() => {
-    let alive = true;
+    const alive = true;
     (async () => {
       try {
         const [planRes, photosRes, momentsRes] = await Promise.all([
@@ -219,7 +219,7 @@ export function ReelClient({ planId }: { planId: number }) {
           so each new photo restarts from scale 1. */}
       {current && (
         <div className="absolute inset-0 overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             key={current.id}
             src={current.url}

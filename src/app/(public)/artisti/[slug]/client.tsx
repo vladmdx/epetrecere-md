@@ -471,7 +471,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                       key={p.id}
                       className="overflow-hidden rounded-lg border border-border/40 bg-card"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      { }
                       <img
                         src={p.url}
                         alt={p.caption || "Moment real de la eveniment"}
@@ -519,7 +519,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                               rel="noopener noreferrer"
                               className="block h-20 w-20 overflow-hidden rounded-lg border border-border/40 transition-transform hover:scale-105"
                             >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              { }
                               <img
                                 src={url}
                                 alt={`Fotografie recenzie ${i + 1}`}

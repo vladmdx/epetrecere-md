@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Calendar, RotateCcw, Download } from "lucide-react";
+import { Check, Calendar, RotateCcw } from "lucide-react";
 import { WEDDING_CHECKLIST } from "@/lib/wedding-checklist";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -20,7 +20,6 @@ export function ChecklistClient() {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const arr = JSON.parse(raw) as string[];
-        // eslint-disable-next-line react-hooks/set-state-in-effect
         setChecked(new Set(arr));
       }
     } catch {

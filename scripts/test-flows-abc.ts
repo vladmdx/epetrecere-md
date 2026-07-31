@@ -136,7 +136,7 @@ async function testB_partner() {
   `;
 
   // Round 1: Partner offers 350
-  let offers = [{ from: "artist", amount: 350, message: "Tariful meu", at: new Date().toISOString() }];
+  const offers = [{ from: "artist", amount: 350, message: "Tariful meu", at: new Date().toISOString() }];
   await sql`UPDATE booking_requests SET price_offers = ${JSON.stringify(offers)}::jsonb WHERE id = ${b.id}`;
   check("Round 1 — partner offers 350 stored", true, "priceOffers.length=1");
 
@@ -209,7 +209,7 @@ async function testB_partner() {
     RETURNING id
   `;
   // Find or create conversation
-  const [art11] = await sql`SELECT user_id FROM artists WHERE id = 11`;
+  await sql`SELECT user_id FROM artists WHERE id = 11`;
   let convId: number;
   const [existing] = await sql`SELECT id FROM conversations WHERE client_user_id = ${client.id} AND artist_id = 11 AND venue_id IS NULL LIMIT 1`;
   if (existing) {

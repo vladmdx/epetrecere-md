@@ -43,7 +43,7 @@ export default function ProfilePage() {
   const [newEmail, setNewEmail] = useState("");
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailOtp, setEmailOtp] = useState("");
-  const [emailResource, setEmailResource] = useState<ReturnType<
+  const [_emailResource, setEmailResource] = useState<ReturnType<
     NonNullable<typeof user>["createEmailAddress"]
   > | null>(null);
   const [savingEmail, setSavingEmail] = useState(false);

@@ -663,7 +663,7 @@ export default function OnboardingPage() {
               <div className="flex-1">
                 <p className="text-sm font-medium">Nu indica prețul public</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Clientul va vedea „Preț la cerere" și va trebui să-ți scrie
+                  Clientul va vedea „Preț la cerere” și va trebui să-ți scrie
                   pentru ofertă personalizată. Util pentru tarife negociabile
                   (în funcție de eveniment, durată, zonă etc.).
                 </p>

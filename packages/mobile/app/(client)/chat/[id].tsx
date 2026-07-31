@@ -9,7 +9,7 @@
 // "sending" pill; if the server returns OK we silently swap the
 // temp row with the real one; on failure we surface a retry icon.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {  useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   Text,

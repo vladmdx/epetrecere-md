@@ -332,7 +332,7 @@ function PricingSection({
             Ascunde prețul
           </Text>
           <Text className="text-[12px] text-muted-foreground">
-            Clienții văd "La cerere" în loc de suma — pentru negociere de la zero.
+            Clienții văd „La cerere” în loc de suma — pentru negociere de la zero.
           </Text>
         </View>
         <Switch

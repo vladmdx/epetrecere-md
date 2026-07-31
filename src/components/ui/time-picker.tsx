@@ -260,7 +260,7 @@ export function TimePicker({
     onChange(`${pad2(h)}:${pad2(m)}`);
   }
 
-  function commitTyping() {
+  function _commitTyping() {
     const p = parseTime(typing);
     if (!p) {
       setTyping(value); // revert

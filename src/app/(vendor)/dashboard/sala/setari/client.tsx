@@ -10,7 +10,6 @@ import {
   CalendarDays,
   Mail,
   Shield,
-  ExternalLink,
   Copy,
   Check,
   Globe,

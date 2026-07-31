@@ -5,6 +5,16 @@
   "workspaces": [
     "packages/shared"
   ],
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.28.1"
+    },
+    "gaxios": {
+      "rimraf": "^6.1.3"
+    },
+    "postcss": "^8.5.25",
+    "sharp": "^0.35.3"
+  },
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
@@ -19,14 +29,14 @@
     "test:e2e:prod": "E2E_BASE_URL=https://epetrecere.md playwright test",
     "test:e2e:local": "E2E_BASE_URL=http://localhost:3000 playwright test",
     "test:e2e:ui": "playwright test --ui",
-    "mobile": "npm --workspace @epetrecere/mobile run start",
-    "mobile:ios": "npm --workspace @epetrecere/mobile run ios",
-    "mobile:android": "npm --workspace @epetrecere/mobile run android",
-    "mobile:typecheck": "npm --workspace @epetrecere/mobile run typecheck",
+    "mobile": "npm --prefix packages/mobile run start",
+    "mobile:ios": "npm --prefix packages/mobile run ios",
+    "mobile:android": "npm --prefix packages/mobile run android",
+    "mobile:typecheck": "npm --prefix packages/mobile run typecheck",
     "shared:build": "npm --workspace @epetrecere/shared run build"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.82.0",
+    "@anthropic-ai/sdk": "^0.115.0",
     "@aws-sdk/client-s3": "^3.1025.0",
     "@base-ui/react": "^1.3.0",
     "@clerk/localizations": "^4.4.0",
@@ -66,7 +76,7 @@
     "react": "^19.0.0",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.0.0",
-    "react-email": "^5.2.10",
+    "react-email": "^6.9.1",
     "react-leaflet": "^5.0.0",
     "resend": "^6.10.0",
     "shadcn": "^4.1.2",
@@ -75,7 +85,7 @@
     "tailwind-merge": "^3.5.0",
     "tw-animate-css": "^1.4.0",
     "web-push": "^3.6.7",
-    "xlsx": "^0.18.5",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -89,8 +99,9 @@
     "@types/web-push": "^3.6.4",
     "dotenv": "^17.4.1",
     "drizzle-kit": "^0.31.10",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.2",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.12",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

@@ -117,7 +117,7 @@ export function QrTablesClient({ planId }: { planId: number }) {
       <div className="mx-auto max-w-xl px-4 py-20 text-center">
         <p className="text-sm text-muted-foreground">
           Adaugă mai întâi lista meselor în pagina galeriei (textarea
-          „Mese / locații" din setări).
+          „Mese / locații” din setări).
         </p>
         <Link
           href={`/cabinet/moments/${planId}`}
@@ -182,7 +182,7 @@ export function QrTablesClient({ planId }: { planId: number }) {
                   {label}
                 </p>
                 {qr ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
+
                   <img
                     src={qr}
                     alt={`QR ${label}`}

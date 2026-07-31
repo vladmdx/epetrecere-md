@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { calendarEvents } from "@/lib/db/schema";
-import { eq, and, gte, lte, sql, not, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, inArray } from "drizzle-orm";
 import type { EntityType, CalendarStatus } from "@/types";
 
 export async function getCalendarEvents(

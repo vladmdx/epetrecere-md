@@ -6,7 +6,7 @@
 // add-guest sheet.
 
 import { useState } from "react";
-import { View, Text, Pressable, FlatList, Modal, TextInput } from "react-native";
+import { View, Text, Pressable, FlatList, Modal } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,

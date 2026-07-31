@@ -3,7 +3,6 @@ import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import * as XLSX from "xlsx";
 import * as schema from "../src/lib/db/schema";
-import { eq } from "drizzle-orm";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 if (!DATABASE_URL) {

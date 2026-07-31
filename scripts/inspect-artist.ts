@@ -6,7 +6,7 @@
 import "dotenv/config";
 import { db } from "@/lib/db";
 import { artists, categories } from "@/lib/db/schema";
-import { eq, ilike, sql } from "drizzle-orm";
+import {  ilike, sql } from "drizzle-orm";
 
 async function main() {
   const fragment = process.argv[2];

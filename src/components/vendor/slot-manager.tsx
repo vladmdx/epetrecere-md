@@ -318,7 +318,7 @@ export function SlotManager({
                 placeholder="Ex: 200"
               />
               <p className="text-[11px] text-muted-foreground">
-                Lasă gol pentru "preț la cerere".
+                Lasă gol pentru „preț la cerere”.
               </p>
             </div>
             <div className="space-y-1.5">

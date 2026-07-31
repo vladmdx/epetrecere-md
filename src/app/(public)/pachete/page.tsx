@@ -3,7 +3,6 @@ import Link from "next/link";
 import { Check, Star, Zap, Crown } from "lucide-react";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = generateMeta({
   title: "Pachete pentru furnizori",

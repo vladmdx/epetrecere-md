@@ -62,7 +62,7 @@ function ErrorScreen({ onRetry, error }: { onRetry: () => void; error: Error }) 
         Ceva nu a mers
       </Text>
       <Text className="mt-2 max-w-[280px] text-center text-[14px] leading-5 text-muted-foreground">
-        Am notificat echipa noastră. Apasă "Reia" să încerci din nou.
+        Am notificat echipa noastră. Apasă „Reia” să încerci din nou.
       </Text>
       {__DEV__ && (
         <Text className="mt-4 max-w-[300px] text-center text-[11px] text-rose-300">

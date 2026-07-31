@@ -127,7 +127,7 @@ export function PublicInvitationView({
       {/* Hero */}
       <section className="relative overflow-hidden">
         {invitation.coverImageUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
+
           <img
             src={invitation.coverImageUrl}
             alt={title}

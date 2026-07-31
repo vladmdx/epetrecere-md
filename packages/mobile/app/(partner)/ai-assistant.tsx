@@ -157,7 +157,7 @@ export default function AIAssistantScreen() {
             break;
           }
         }
-      } catch (err) {
+      } catch {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === aiMsg.id

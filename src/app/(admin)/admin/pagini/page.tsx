@@ -11,7 +11,7 @@ const RichEditor = dynamic(
   () => import("@/components/shared/rich-editor").then((m) => m.RichEditor),
   { ssr: false },
 );
-import { Save, FileText, Loader2, Sparkles } from "lucide-react";
+import { Save, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 interface Page {

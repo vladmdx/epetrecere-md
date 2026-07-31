@@ -400,8 +400,6 @@ export default function ReservationsPage() {
 
     const offers = b.priceOffers ?? [];
     const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
-    const lastOfferIsFromArtist = lastOffer?.from === "artist";
-    const canNegotiate = b.status === "pending";
     const canConfirmAccepted = b.status === "accepted";
 
     return (

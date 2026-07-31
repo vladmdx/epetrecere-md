@@ -31,50 +31,6 @@ export function useVoiceRecorder({
   const [isRecording, setIsRecording] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
 
-  const startRecording = useCallback(async () => {
-    try {
-      // Ask for mic permission lazily (only when user first tries to
-      // record). Skip permission prompt if already granted.
-      const perm = await Audio.requestPermissionsAsync();
-      if (!perm.granted) return;
-
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        // Stay quiet on background music — we're voice-noting, not
-        // a phone call.
-        shouldDuckAndroid: true,
-      });
-
-      // Mid-quality preset: 22kHz mono, m4a on iOS, 3gpp on Android.
-      // Smaller upload than HIGH_QUALITY (44kHz stereo) and Whisper
-      // can't tell the difference for human speech.
-      const { recording } = await Audio.Recording.createAsync({
-        ...Audio.RecordingOptionsPresets.LOW_QUALITY,
-        android: {
-          ...Audio.RecordingOptionsPresets.LOW_QUALITY.android,
-          numberOfChannels: 1,
-          sampleRate: 22_050,
-        },
-        ios: {
-          ...Audio.RecordingOptionsPresets.LOW_QUALITY.ios,
-          numberOfChannels: 1,
-          sampleRate: 22_050,
-        },
-      });
-      recordingRef.current = recording;
-      setIsRecording(true);
-
-      // Auto-stop guard
-      autoStopRef.current = setTimeout(() => {
-        void stopRecording();
-      }, maxSeconds * 1000);
-    } catch (err) {
-      console.error("[voice] start failed", err);
-      setIsRecording(false);
-    }
-  }, [maxSeconds]);
-
   const stopRecording = useCallback(async () => {
     if (autoStopRef.current) {
       clearTimeout(autoStopRef.current);
@@ -135,6 +91,50 @@ export function useVoiceRecorder({
       setTranscribing(false);
     }
   }, [apiUrl, getToken, onTranscript]);
+
+  const startRecording = useCallback(async () => {
+    try {
+      // Ask for mic permission lazily (only when user first tries to
+      // record). Skip permission prompt if already granted.
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) return;
+
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        // Stay quiet on background music — we're voice-noting, not
+        // a phone call.
+        shouldDuckAndroid: true,
+      });
+
+      // Mid-quality preset: 22kHz mono, m4a on iOS, 3gpp on Android.
+      // Smaller upload than HIGH_QUALITY (44kHz stereo) and Whisper
+      // can't tell the difference for human speech.
+      const { recording } = await Audio.Recording.createAsync({
+        ...Audio.RecordingOptionsPresets.LOW_QUALITY,
+        android: {
+          ...Audio.RecordingOptionsPresets.LOW_QUALITY.android,
+          numberOfChannels: 1,
+          sampleRate: 22_050,
+        },
+        ios: {
+          ...Audio.RecordingOptionsPresets.LOW_QUALITY.ios,
+          numberOfChannels: 1,
+          sampleRate: 22_050,
+        },
+      });
+      recordingRef.current = recording;
+      setIsRecording(true);
+
+      // Auto-stop guard
+      autoStopRef.current = setTimeout(() => {
+        void stopRecording();
+      }, maxSeconds * 1000);
+    } catch (err) {
+      console.error("[voice] start failed", err);
+      setIsRecording(false);
+    }
+  }, [maxSeconds, stopRecording]);
 
   return {
     isRecording,

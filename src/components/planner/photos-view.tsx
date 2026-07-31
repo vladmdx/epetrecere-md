@@ -193,7 +193,7 @@ export function PhotosView({ planId }: Props) {
               key={p.id}
               className="group relative overflow-hidden rounded-xl border border-border/40 bg-card"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img
                 src={p.url}
                 alt={p.caption || "Event photo"}
