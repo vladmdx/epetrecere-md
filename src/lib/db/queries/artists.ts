@@ -7,10 +7,10 @@ import {
   artistAvailabilitySlots,
   reviews,
   calendarEvents,
-  categories,
   eventPhotos,
 } from "@/lib/db/schema";
-import { eq, and, desc, asc, sql, ilike, gte, lte, arrayContains, notInArray, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, ilike, gte, lte, arrayContains, or } from "drizzle-orm";
+import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
 
 export interface ArtistFilters {
   categoryId?: number;
@@ -242,7 +242,11 @@ export async function getArtists(filters: ArtistFilters = {}) {
     const pricing = pricingByArtist.get(a.id);
     return {
       ...a,
-      coverImageUrl: a.photoUrl || coverMap.get(a.id) || null,
+      coverImageUrl: resolveArtistCoverImage(
+        a.slug,
+        a.photoUrl,
+        coverMap.get(a.id),
+      ),
       availabilitySlots: slotsByArtist.get(a.id) ?? [],
       packageCount: pricing?.tierCount ?? 0,
       packageMinPrice: pricing?.minPrice ?? null,
@@ -296,7 +300,18 @@ export async function getArtistBySlug(slug: string) {
       .limit(20),
   ]);
 
-  return { ...artist, images, videos, packages, reviews: artistReviews };
+  return {
+    ...artist,
+    photoUrl: resolveArtistCoverImage(
+      artist.slug,
+      artist.photoUrl,
+      images.find((image) => image.isCover)?.url,
+    ),
+    images: images.filter((image) => !image.url.toLowerCase().includes("placeholder")),
+    videos,
+    packages,
+    reviews: artistReviews,
+  };
 }
 
 export async function getFeaturedArtists(limit = 8) {
@@ -329,7 +344,14 @@ export async function getFeaturedArtists(limit = 8) {
       ));
   }
   const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
-  return items.map((a) => ({ ...a, coverImageUrl: a.photoUrl || coverMap.get(a.id) || null }));
+  return items.map((a) => ({
+    ...a,
+    coverImageUrl: resolveArtistCoverImage(
+      a.slug,
+      a.photoUrl,
+      coverMap.get(a.id),
+    ),
+  }));
 }
 
 /**
@@ -386,5 +408,12 @@ export async function getSimilarArtists(artistId: number, categoryIds: number[],
       ));
   }
   const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
-  return items.map((a) => ({ ...a, coverImageUrl: a.photoUrl || coverMap.get(a.id) || null }));
+  return items.map((a) => ({
+    ...a,
+    coverImageUrl: resolveArtistCoverImage(
+      a.slug,
+      a.photoUrl,
+      coverMap.get(a.id),
+    ),
+  }));
 }

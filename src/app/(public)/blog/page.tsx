@@ -1,17 +1,25 @@
-import { db } from "@/lib/db";
-import { blogPosts } from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import Image from "next/image";
-import { Calendar, Tag } from "lucide-react";
+import { ArrowRight, Calendar, Sparkles, Tag } from "lucide-react";
+import { desc, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { blogPosts } from "@/lib/db/schema";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 
 export async function generateMetadata() {
   return metaForPath("/blog", {
-    title: "Blog",
+    title: "Blog — Idei și sfaturi pentru evenimente",
     description:
       "Sfaturi, idei și inspirație pentru organizarea evenimentelor perfecte în Moldova.",
+  });
+}
+
+function formatDate(value: Date) {
+  return value.toLocaleDateString("ro-RO", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
   });
 }
 
@@ -23,92 +31,174 @@ export default async function BlogListingPage() {
     .orderBy(desc(blogPosts.publishedAt), desc(blogPosts.createdAt))
     .limit(50);
 
+  const [featured, ...remaining] = posts;
   const crumbs = breadcrumbJsonLd([
     { name: "Acasă", url: "/" },
     { name: "Blog", url: "/blog" },
   ]);
 
   return (
-    <div className="min-h-screen">
+    <div className="-mt-16 min-h-screen bg-[#05080d] pt-16 text-[#f6f0e5]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: safeJsonLd(crumbs) }}
       />
 
-      {/* Hero */}
-      <section className="border-b border-border/40 bg-gradient-to-b from-card to-background py-12">
-        <div className="container mx-auto max-w-4xl px-4 text-center">
-          <h1 className="font-heading text-3xl font-bold md:text-4xl">Blog</h1>
-          <p className="mt-2 text-muted-foreground">
-            Sfaturi, idei și inspirație pentru evenimentele tale
+      <section className="relative isolate overflow-hidden border-b border-gold/10 py-20">
+        <img
+          src="/images/backgrounds/party-dance.jpg"
+          alt=""
+          className="absolute inset-0 -z-20 h-full w-full object-cover opacity-30"
+        />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,8,13,.99),rgba(5,8,13,.9)_55%,rgba(5,8,13,.66))]" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent to-[#05080d]" />
+        <div className="mx-auto max-w-7xl px-4 lg:px-8">
+          <p className="text-xs font-semibold uppercase tracking-[.28em] text-gold">
+            Inspirație ePetrecere
+          </p>
+          <h1 className="mt-3 max-w-3xl font-heading text-4xl font-semibold tracking-tight sm:text-6xl">
+            Idei care transformă planurile în momente memorabile
+          </h1>
+          <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62 sm:text-base">
+            Ghiduri practice, tendințe și recomandări pentru nunți, cumetrii,
+            aniversări și evenimente corporate în Republica Moldova.
           </p>
         </div>
       </section>
 
-      {/* Posts Grid */}
-      <section className="container mx-auto max-w-6xl px-4 py-12">
+      <main className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
         {posts.length === 0 ? (
-          <p className="text-center text-muted-foreground py-20">
-            Nu există articole publicate momentan.
-          </p>
+          <div className="rounded-2xl border border-white/8 bg-white/[.025] px-6 py-24 text-center">
+            <Sparkles className="mx-auto h-10 w-10 text-gold/55" />
+            <h2 className="mt-5 font-heading text-2xl font-semibold">
+              Primele articole sunt în pregătire
+            </h2>
+            <p className="mx-auto mt-2 max-w-lg text-sm text-white/50">
+              Revino în curând pentru ghiduri și idei noi de organizare.
+            </p>
+          </div>
         ) : (
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {posts.map((post) => (
+          <>
+            {featured && (
               <Link
-                key={post.id}
-                href={`/blog/${post.slug}`}
-                className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all hover:border-gold/30 hover:shadow-lg"
+                href={`/blog/${featured.slug}`}
+                className="group grid overflow-hidden rounded-2xl border border-gold/18 bg-[linear-gradient(135deg,#101622,#0b0e14)] shadow-[0_24px_70px_rgba(0,0,0,.24)] transition hover:border-gold/42 lg:grid-cols-[1.08fr_.92fr]"
               >
-                {post.coverImageUrl ? (
-                  <div className="relative aspect-[16/9] overflow-hidden bg-muted">
+                <div className="relative min-h-[310px] overflow-hidden bg-[#111724]">
+                  {featured.coverImageUrl ? (
                     <Image
-                      src={post.coverImageUrl}
-                      alt={post.titleRo}
+                      src={featured.coverImageUrl}
+                      alt={featured.titleRo}
                       fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      priority
+                      sizes="(max-width: 1024px) 100vw, 55vw"
+                      className="object-cover transition duration-700 group-hover:scale-105"
                     />
+                  ) : (
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_35%_30%,rgba(230,184,77,.28),transparent_28%),linear-gradient(145deg,#1b2130,#090c12)]" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0a0d13]/65 to-transparent lg:bg-gradient-to-r lg:from-transparent lg:to-[#0d111a]/25" />
+                </div>
+                <div className="flex flex-col justify-center p-7 sm:p-10">
+                  <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/44">
+                    <span className="rounded-full border border-gold/25 bg-gold/8 px-3 py-1 font-semibold uppercase tracking-wider text-gold">
+                      Articol recomandat
+                    </span>
+                    {featured.category && (
+                      <span className="flex items-center gap-1.5">
+                        <Tag className="h-3 w-3" />
+                        {featured.category}
+                      </span>
+                    )}
                   </div>
-                ) : (
-                  <div className="flex aspect-[16/9] items-center justify-center bg-muted text-4xl">
-                    📝
-                  </div>
-                )}
-                <div className="flex flex-1 flex-col p-5">
-                  <h2 className="font-heading text-lg font-bold line-clamp-2 group-hover:text-gold transition-colors">
-                    {post.titleRo}
+                  <h2 className="mt-5 font-heading text-3xl font-semibold leading-tight text-white group-hover:text-[#efd078]">
+                    {featured.titleRo}
                   </h2>
-                  {post.excerptRo && (
-                    <p className="mt-2 text-sm text-muted-foreground line-clamp-3">
-                      {post.excerptRo}
+                  {featured.excerptRo && (
+                    <p className="mt-4 line-clamp-3 text-sm leading-7 text-white/57">
+                      {featured.excerptRo}
                     </p>
                   )}
-                  <div className="mt-auto flex items-center gap-4 pt-4 text-xs text-muted-foreground">
-                    {(post.publishedAt || post.createdAt) && (
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {new Date(
-                          post.publishedAt || post.createdAt,
-                        ).toLocaleDateString("ro-RO", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
-                    )}
-                    {post.category && (
-                      <span className="flex items-center gap-1">
-                        <Tag className="h-3 w-3" />
-                        {post.category}
-                      </span>
-                    )}
+                  <div className="mt-7 flex items-center justify-between border-t border-white/8 pt-5 text-xs">
+                    <span className="flex items-center gap-2 text-white/42">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {formatDate(featured.publishedAt || featured.createdAt)}
+                    </span>
+                    <span className="flex items-center gap-2 font-semibold text-gold">
+                      Citește articolul
+                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    </span>
                   </div>
                 </div>
               </Link>
-            ))}
-          </div>
+            )}
+
+            {remaining.length > 0 && (
+              <section className="mt-14">
+                <div className="mb-6 flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-gold">
+                      Cele mai noi
+                    </p>
+                    <h2 className="mt-2 font-heading text-3xl font-semibold">
+                      Sfaturi și idei
+                    </h2>
+                  </div>
+                  <p className="text-xs text-white/38">
+                    {remaining.length} articole
+                  </p>
+                </div>
+
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {remaining.map((post) => (
+                    <Link
+                      key={post.id}
+                      href={`/blog/${post.slug}`}
+                      className="group flex min-h-full flex-col overflow-hidden rounded-xl border border-white/8 bg-[#0d111a] transition duration-300 hover:-translate-y-1 hover:border-gold/35 hover:shadow-[0_20px_45px_rgba(0,0,0,.28)]"
+                    >
+                      <div className="relative aspect-[16/10] overflow-hidden bg-[#121824]">
+                        {post.coverImageUrl ? (
+                          <Image
+                            src={post.coverImageUrl}
+                            alt={post.titleRo}
+                            fill
+                            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                            className="object-cover transition duration-500 group-hover:scale-105"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_25%,rgba(230,184,77,.2),transparent_26%),linear-gradient(150deg,#171d2b,#090c12)]" />
+                        )}
+                        {post.category && (
+                          <span className="absolute left-3 top-3 rounded-full border border-white/10 bg-black/55 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider text-[#edc86b] backdrop-blur">
+                            {post.category}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-1 flex-col p-5">
+                        <h3 className="line-clamp-2 font-heading text-xl font-semibold leading-snug text-white group-hover:text-[#edc86b]">
+                          {post.titleRo}
+                        </h3>
+                        {post.excerptRo && (
+                          <p className="mt-3 line-clamp-3 text-sm leading-6 text-white/50">
+                            {post.excerptRo}
+                          </p>
+                        )}
+                        <div className="mt-auto flex items-center justify-between border-t border-white/7 pt-4 text-[11px]">
+                          <span className="flex items-center gap-1.5 text-white/37">
+                            <Calendar className="h-3 w-3" />
+                            {formatDate(post.publishedAt || post.createdAt)}
+                          </span>
+                          <ArrowRight className="h-4 w-4 text-gold transition-transform group-hover:translate-x-1" />
+                        </div>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
         )}
-      </section>
+      </main>
     </div>
   );
 }

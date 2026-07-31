@@ -3,7 +3,19 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CalendarPlus, Menu, X, User, LogIn, LayoutDashboard, Shield, UserCircle, LogOut } from "lucide-react";
+import {
+  ArrowRight,
+  CalendarPlus,
+  ChevronDown,
+  LayoutDashboard,
+  LogIn,
+  LogOut,
+  Menu,
+  Shield,
+  User,
+  UserCircle,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { SearchAutocomplete } from "@/components/public/search-autocomplete";
@@ -14,78 +26,6 @@ import { useUserRole, isClientOrGuest } from "@/hooks/use-user-role";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { BrandMark } from "@/components/public/brand-mark";
 
-// Fallback list rendered on first paint before /api/categories resolves —
-// covers the most-clicked items so the menu is never empty. The full list is
-// fetched on mount and replaces this.
-const FALLBACK_ARTIST_CATEGORIES = [
-  { slug: "moderatori", label: "Moderatori" },
-  { slug: "dj", label: "DJ" },
-  { slug: "cantareti", label: "Cântăreți" },
-  { slug: "cantareti-de-estrada", label: "Cântăreți de Estradă" },
-  { slug: "interpreti-muzica-populara", label: "Interpreți Muzică Populară" },
-  { slug: "cover-band", label: "Cover Band" },
-  { slug: "formatii", label: "Formații" },
-  { slug: "instrumentalisti", label: "Instrumentaliști" },
-  { slug: "cvartet", label: "Cvartet" },
-  { slug: "dansatori", label: "Dansatori" },
-  { slug: "dansuri-populare", label: "Dansuri Populare" },
-  { slug: "ansamblu-tiganesc", label: "Ansamblu Țigănesc" },
-  { slug: "dans-oriental", label: "Dans Oriental" },
-  { slug: "striptiz", label: "Striptiz" },
-  { slug: "show-program", label: "Show Program" },
-  { slug: "iluzionisti-magicieni", label: "Iluzioniști / Magicieni" },
-  { slug: "animatori", label: "Animatori" },
-  { slug: "show-ul-focului", label: "Show-ul Focului" },
-  { slug: "clovni", label: "Clovni" },
-  { slug: "interesant-la-sarbatoare", label: "Interesant la Sărbătoare" },
-  { slug: "show-circus", label: "Show Circus" },
-  { slug: "stand-up", label: "Stand Up" },
-  { slug: "mos-craciun", label: "Moș Crăciun" },
-];
-
-const FALLBACK_SERVICE_CATEGORIES = [
-  { slug: "fotografi", label: "Fotografi" },
-  { slug: "videografi", label: "Videografi" },
-  { slug: "decor", label: "Decor & Floristică" },
-  { slug: "echipament-tehnic", label: "Echipament Tehnic" },
-  { slug: "foto-video", label: "Foto & Video" },
-  { slug: "foto-zona-selfie", label: "Foto Zonă / Selfie" },
-];
-
-function useCategories() {
-  const [artist, setArtist] = useState(FALLBACK_ARTIST_CATEGORIES);
-  const [service, setService] = useState(FALLBACK_SERVICE_CATEGORIES);
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/categories")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows: unknown) => {
-        if (!alive) return;
-        const list = Array.isArray(rows)
-          ? (rows as Array<{ slug: string; nameRo: string; type: string; sortOrder?: number | null }>)
-          : [];
-        const sortFn = (a: { sortOrder?: number | null }, b: { sortOrder?: number | null }) =>
-          (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
-        const artists = list
-          .filter((c) => c.type === "artist")
-          .sort(sortFn)
-          .map((c) => ({ slug: c.slug, label: c.nameRo }));
-        const services = list
-          .filter((c) => c.type === "service")
-          .sort(sortFn)
-          .map((c) => ({ slug: c.slug, label: c.nameRo }));
-        if (artists.length > 0) setArtist(artists);
-        if (services.length > 0) setService(services);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
-  return { artist, service };
-}
-
-// "Utilități" tools — still surfaced in the mobile menu (the desktop nav was
-// simplified to plain links in the redesign). Each links to a public landing
-// page (/utilitati/[slug]) optimized for SEO.
 const UTILITATI_TOOLS = [
   { slug: "checklist", label: "Checklist Eveniment", emoji: "✅" },
   { slug: "budget", label: "Budget & Cheltuieli", emoji: "💰" },
@@ -93,6 +33,116 @@ const UTILITATI_TOOLS = [
   { slug: "lista-invitati", label: "Listă Invitați & Așezare Mese", emoji: "👥" },
   { slug: "momente-eveniment", label: "Momente Eveniment", emoji: "📸" },
 ];
+
+const CALCULATOR_TOOLS = [
+  { slug: "dar-nunta", label: "Calculator Dar Nuntă" },
+  { slug: "nunta", label: "Calculator Cost Nuntă" },
+  { slug: "buget", label: "Calculator Buget" },
+  { slug: "invitati", label: "Invitați & Mese" },
+  { slug: "alcool", label: "Băuturi" },
+  { slug: "meniu", label: "Meniu" },
+];
+
+function UtilitiesMenu({ label }: { label: string }) {
+  const [open, setOpen] = useState(false);
+
+  function closeMenu() {
+    setOpen(false);
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex items-center gap-1 text-sm font-medium text-white/85 transition-colors hover:text-gold"
+      >
+        {label}
+        <ChevronDown
+          className={`h-3.5 w-3.5 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
+            className="absolute left-1/2 top-full z-50 w-[680px] -translate-x-1/2 pt-4"
+          >
+            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-[#0b0e14]/98 p-4 shadow-[0_24px_70px_rgba(0,0,0,.55)] backdrop-blur-xl">
+              <div className="rounded-xl bg-white/[.025] p-2">
+                <div className="mb-2 flex items-center justify-between px-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-gold">
+                    Organizare
+                  </p>
+                  <Link
+                    href="/utilitati"
+                    onClick={closeMenu}
+                    className="text-[10px] text-white/45 hover:text-gold"
+                  >
+                    Toate
+                  </Link>
+                </div>
+                {UTILITATI_TOOLS.map((tool) => (
+                  <Link
+                    key={tool.slug}
+                    href={`/utilitati/${tool.slug}`}
+                    onClick={closeMenu}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 text-xs text-white/72 transition hover:bg-white/[.055] hover:text-gold"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/9 text-base">
+                      {tool.emoji}
+                    </span>
+                    {tool.label}
+                  </Link>
+                ))}
+              </div>
+
+              <div className="rounded-xl bg-white/[.025] p-2">
+                <div className="mb-2 flex items-center justify-between px-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-[.2em] text-gold">
+                    Calculatoare
+                  </p>
+                  <Link
+                    href="/calculatoare"
+                    onClick={closeMenu}
+                    className="text-[10px] text-white/45 hover:text-gold"
+                  >
+                    Toate
+                  </Link>
+                </div>
+                {CALCULATOR_TOOLS.map((tool) => (
+                  <Link
+                    key={tool.slug}
+                    href={`/calculatoare/${tool.slug}`}
+                    onClick={closeMenu}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 text-xs text-white/72 transition hover:bg-white/[.055] hover:text-gold"
+                  >
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/9 text-base">
+                      🧮
+                    </span>
+                    {tool.label}
+                  </Link>
+                ))}
+                <Link
+                  href="/utilitati"
+                  onClick={closeMenu}
+                  className="mt-2 flex items-center justify-between rounded-lg border border-gold/20 bg-gold/[.06] px-3 py-2.5 text-xs font-semibold text-gold hover:bg-gold/10"
+                >
+                  Vezi toate instrumentele
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 function UserMenu() {
   const { isSignedIn, user } = useUser();
@@ -181,10 +231,6 @@ export function Header() {
   // Hide the "Plan event" CTA for vendors and admins — it's a client-
   // facing action. Guests + clients still see it.
   const showPlannerCta = isClientOrGuest(userRole);
-  // Live category lists from /api/categories — falls back to a hardcoded
-  // list on first paint so the menu is never empty.
-  const { artist: artistCategories, service: serviceCategories } = useCategories();
-
   return (
     <header className={`fixed top-0 z-50 w-full transition-all duration-300 backdrop-blur-md ${scrolled ? "bg-[#0D0D0D]/90 border-b border-gold/10 shadow-lg" : "bg-[#0D0D0D]/40 border-b border-transparent"}`}>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 lg:px-8">
@@ -196,8 +242,8 @@ export function Header() {
           </span>
         </Link>
 
-        {/* Desktop Nav — plain links matching the redesign */}
-        <nav className="hidden items-center gap-7 xl:flex">
+        {/* Desktop navigation */}
+        <nav className="hidden items-center gap-5 xl:flex">
           <Link href="/sali" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
             {t("nav.locations")}
           </Link>
@@ -207,22 +253,17 @@ export function Header() {
           <Link href="/servicii" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
             {t("nav.services")}
           </Link>
-          <Link href="/planifica" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
-            {t("nav.event_types")}
+          <UtilitiesMenu label={t("nav.utilities")} />
+          <Link href="/blog" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
+            {t("nav.blog")}
           </Link>
-          <Link href="/#cum-functioneaza" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
+          <Link href="/cum-functioneaza" className="text-sm font-medium text-white/85 transition-colors hover:text-gold whitespace-nowrap">
             {t("nav.how_it_works")}
           </Link>
         </nav>
 
         {/* Right Actions — always on dark header bg, so force light icon/text in both themes */}
         <div className="flex items-center gap-2 text-white/90">
-          {/* Bells self-gate to signed-in users, so the signed-out marketing
-              header stays clean (matches the design). */}
-          <ChatBell />
-          <NotificationBell />
-          <LanguageSwitcher />
-          <UserMenu />
           {showPlannerCta && (
             <Link href="/planifica" aria-label={t("nav.planner")} title={t("nav.planner")}>
               <Button className="h-9 min-w-9 rounded-full bg-gold px-2 text-[#0D0D0D] shadow-[0_4px_18px_rgba(201,168,76,.22)] hover:bg-gold-dark sm:rounded-lg sm:px-4">
@@ -233,6 +274,12 @@ export function Header() {
               </Button>
             </Link>
           )}
+          {/* Bells self-gate to signed-in users, so the signed-out marketing
+              header stays clean (matches the design). */}
+          <ChatBell />
+          <NotificationBell />
+          <LanguageSwitcher />
+          <UserMenu />
           <Button
             variant="ghost"
             size="icon"
@@ -253,43 +300,33 @@ export function Header() {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="border-t border-border/40 bg-background xl:hidden"
+            className="max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-white/10 bg-[#090c12]/98 xl:hidden"
           >
             <nav className="flex flex-col gap-1 px-4 py-4">
               <div className="mb-3 lg:hidden"><SearchAutocomplete /></div>
-              <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gold">Artiști</p>
-              {artistCategories.map((cat) => (
-                <Link key={cat.slug} href={`/categorie/${cat.slug}`} onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">
-                  {cat.label}
-                </Link>
-              ))}
-              <Link href="/artisti" onClick={() => setMobileOpen(false)}
-                className="rounded-lg px-3 py-2 text-sm font-medium text-gold">
-                Vezi toți artiștii →
-              </Link>
-              <div className="my-2 border-t border-border/40" />
-              <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gold">Servicii</p>
-              {serviceCategories.map((cat) => (
-                <Link key={cat.slug} href={`/categorie/${cat.slug}`} onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">
-                  {cat.label}
-                </Link>
-              ))}
-              <div className="my-2 border-t border-border/40" />
-              <Link href="/sali" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.venues")}</Link>
-              <p className="px-3 py-1 mt-2 text-xs font-medium uppercase tracking-wider text-gold">Utilități</p>
+              <Link href="/sali" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-white/76 hover:bg-white/[.05] hover:text-gold">{t("nav.locations")}</Link>
+              <Link href="/artisti" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-white/76 hover:bg-white/[.05] hover:text-gold">{t("nav.artists")}</Link>
+              <Link href="/servicii" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-white/76 hover:bg-white/[.05] hover:text-gold">{t("nav.services")}</Link>
+              <Link href="/blog" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-white/76 hover:bg-white/[.05] hover:text-gold">{t("nav.blog")}</Link>
+              <Link href="/cum-functioneaza" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-white/76 hover:bg-white/[.05] hover:text-gold">{t("nav.how_it_works")}</Link>
+
+              <div className="my-2 border-t border-white/10" />
+              <p className="px-3 py-1 text-xs font-medium uppercase tracking-wider text-gold">{t("nav.utilities")}</p>
               {UTILITATI_TOOLS.map((tool) => (
                 <Link key={tool.slug} href={`/utilitati/${tool.slug}`} onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">
+                  className="rounded-lg px-3 py-2 text-sm text-white/66 hover:bg-white/[.05] hover:text-gold">
                   {tool.emoji} {tool.label}
                 </Link>
               ))}
-              <Link href="/calculatoare" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-gold hover:bg-gold/10">
-                🧮 Calculatoare (toate)
+              {CALCULATOR_TOOLS.map((tool) => (
+                <Link key={tool.slug} href={`/calculatoare/${tool.slug}`} onClick={() => setMobileOpen(false)}
+                  className="rounded-lg px-3 py-2 text-sm text-white/66 hover:bg-white/[.05] hover:text-gold">
+                  🧮 {tool.label}
+                </Link>
+              ))}
+              <Link href="/utilitati" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm font-medium text-gold hover:bg-gold/10">
+                Vezi toate instrumentele →
               </Link>
-              <Link href="/blog" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.blog")}</Link>
-              <Link href="/contact" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold">{t("nav.contact")}</Link>
               {showPlannerCta && (
                 <Link href="/planifica" onClick={() => setMobileOpen(false)}>
                   <Button className="mt-2 w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark">{t("nav.planner")}</Button>

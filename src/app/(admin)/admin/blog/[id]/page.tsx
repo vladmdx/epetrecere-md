@@ -12,7 +12,7 @@ const RichEditor = dynamic(
   () => import("@/components/shared/rich-editor").then((m) => m.RichEditor),
   { ssr: false },
 );
-import { ArrowLeft, Save, Eye, Trash2, Loader2, Sparkles } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -55,11 +55,16 @@ export default function BlogEditorPage() {
       const method = isNew ? "POST" : "PUT";
       const body = isNew ? post : { id: Number(id), ...post };
       const res = await fetch("/api/blog", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "Nu s-a putut salva articolul");
+      }
       const saved = await res.json();
       toast.success(isNew ? "Articol creat!" : "Articol salvat!");
       if (isNew && saved.id) router.push(`/admin/blog/${saved.id}`);
-    } catch { toast.error("Eroare"); }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Eroare la salvare");
+    }
     finally { setSaving(false); }
   }
 
@@ -86,18 +91,8 @@ export default function BlogEditorPage() {
         <select value={post.status} onChange={e => update({ status: e.target.value })} className="rounded-md border border-input bg-background px-3 py-2 text-sm">
           <option value="draft">Draft</option>
           <option value="published">Publicat</option>
-          <option value="scheduled">Programat</option>
           <option value="archived">Arhivat</option>
         </select>
-        {post.status === "scheduled" && (
-          <input
-            type="datetime-local"
-            value={post.publishedAt ? new Date(post.publishedAt).toISOString().slice(0, 16) : ""}
-            onChange={e => update({ publishedAt: e.target.value ? new Date(e.target.value).toISOString() : "" })}
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-            min={new Date().toISOString().slice(0, 16)}
-          />
-        )}
         <Button onClick={handleSave} disabled={saving} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvează
         </Button>

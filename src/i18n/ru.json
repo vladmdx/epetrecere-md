@@ -36,11 +36,12 @@
     "artists": "Артисты",
     "venues": "Залы и Рестораны",
     "services": "Услуги",
-    "planner": "Спланировать событие",
+    "planner": "Планировать",
     "blog": "Блог",
     "contact": "Контакты",
     "about": "О нас",
     "locations": "Локации",
+    "utilities": "Инструменты",
     "event_types": "Типы событий",
     "how_it_works": "Как это работает",
     "explore_vendors": "Смотреть поставщиков"

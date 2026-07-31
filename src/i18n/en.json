@@ -36,11 +36,12 @@
     "artists": "Artists",
     "venues": "Venues & Restaurants",
     "services": "Services",
-    "planner": "Plan an event",
+    "planner": "Plan",
     "blog": "Blog",
     "contact": "Contact",
     "about": "About Us",
     "locations": "Venues",
+    "utilities": "Utilities",
     "event_types": "Event types",
     "how_it_works": "How it works",
     "explore_vendors": "Explore vendors"

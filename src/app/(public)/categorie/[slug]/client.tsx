@@ -1,166 +1,206 @@
 "use client";
 
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ArrowRight,
+  MapPin,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { ArtistCard } from "@/components/public/artist-card";
 import { ArtistListCard } from "@/components/public/artist-list-card";
-import { SortBar } from "@/components/public/sort-bar";
 import { PaginationBar } from "@/components/public/pagination-bar";
-import { Button } from "@/components/ui/button";
+import { SortBar } from "@/components/public/sort-bar";
+import { ViewSwitcher, useViewMode } from "@/components/public/view-switcher";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
-import { Star, SlidersHorizontal, X } from "lucide-react";
-import {
-  ViewSwitcher,
-  useViewMode,
-  gridClassName,
-} from "@/components/public/view-switcher";
+import { cn } from "@/lib/utils";
+
+interface Artist {
+  id: number;
+  slug: string;
+  nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
+  descriptionRo: string | null;
+  descriptionRu: string | null;
+  descriptionEn: string | null;
+  priceFrom: number | null;
+  priceCurrency: string | null;
+  ratingAvg: number | null;
+  ratingCount: number | null;
+  isVerified: boolean;
+  isFeatured: boolean;
+  isPremium: boolean;
+  location: string | null;
+  coverImageUrl?: string | null;
+}
+
+interface Category {
+  id: number;
+  type: string;
+  nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
+  descriptionRo: string | null;
+  descriptionRu: string | null;
+  descriptionEn: string | null;
+  slug: string;
+  priceFrom: number | null;
+  seoBodyRo: string | null;
+}
 
 interface Props {
-  category: {
-    id: number;
-    nameRo: string;
-    nameRu: string | null;
-    nameEn: string | null;
-    descriptionRo: string | null;
-    descriptionRu: string | null;
-    descriptionEn: string | null;
-    slug: string;
-    priceFrom: number | null;
-    seoBodyRo: string | null;
-  };
-  artists: Array<{
-    id: number;
-    slug: string;
-    nameRo: string;
-    nameRu: string | null;
-    nameEn: string | null;
-    descriptionRo: string | null;
-    descriptionRu: string | null;
-    descriptionEn: string | null;
-    priceFrom: number | null;
-    priceCurrency: string | null;
-    ratingAvg: number | null;
-    ratingCount: number | null;
-    isVerified: boolean;
-    isFeatured: boolean;
-    isPremium: boolean;
-    location: string | null;
-    coverImageUrl?: string | null;
-  }>;
+  category: Category;
+  artists: Artist[];
   total: number;
   page: number;
   totalPages: number;
   currentSort: string;
+  searchQuery: string;
+  currentCity: string;
+  currentPriceMin: string;
+  currentPriceMax: string;
 }
 
 const sortOptions = [
-  { value: "popular", label: "Popular" },
-  { value: "price_asc", label: "Preț ↑" },
-  { value: "price_desc", label: "Preț ↓" },
+  { value: "popular", label: "Popularitate" },
+  { value: "price_asc", label: "Preț crescător" },
+  { value: "price_desc", label: "Preț descrescător" },
   { value: "rating", label: "Rating" },
-  { value: "newest", label: "Nou" },
+  { value: "newest", label: "Cei mai noi" },
 ];
 
-/* Reusable filter controls for desktop and mobile sheet */
-function FilterControls({
-  searchParams,
-  updateParams,
-  clearParam,
-  category,
-  router,
-}: {
-  searchParams: ReturnType<typeof useSearchParams>;
-  updateParams: (key: string, value: string) => void;
-  clearParam: (key: string) => void;
-  category: Props["category"];
-  router: ReturnType<typeof useRouter>;
-}) {
-  const activeRating = searchParams.get("rating_min");
+const locations = ["", "Chișinău", "Bălți", "Orhei", "Cahul", "Ungheni", "Soroca"];
 
-  return (
-    <>
-      {/* Price range filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground min-w-[36px]">Preț:</span>
-        {[100, 200, 500, 1000, 2000].map((price) => (
-          <Button
-            key={price}
-            variant="outline"
-            size="sm"
-            className={
-              searchParams.get("price_max") === String(price)
-                ? "bg-gold/10 border-gold/30 text-gold"
-                : ""
-            }
-            onClick={() => updateParams("price_max", String(price))}
-          >
-            pînă la {price}€
-          </Button>
-        ))}
-        {searchParams.get("price_max") && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive text-xs"
-            onClick={() => clearParam("price_max")}
-          >
-            ✕
-          </Button>
-        )}
-      </div>
-
-      {/* Rating filter */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs text-muted-foreground min-w-[36px]">
-          Rating:
-        </span>
-        {[3, 4, 4.5].map((rating) => (
-          <Button
-            key={rating}
-            variant="outline"
-            size="sm"
-            className={
-              activeRating === String(rating)
-                ? "bg-gold/10 border-gold/30 text-gold"
-                : ""
-            }
-            onClick={() => updateParams("rating_min", String(rating))}
-          >
-            <Star className="h-3.5 w-3.5 fill-gold text-gold mr-1" />
-            {rating}+
-          </Button>
-        ))}
-        {activeRating && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-destructive text-xs"
-            onClick={() => clearParam("rating_min")}
-          >
-            ✕
-          </Button>
-        )}
-      </div>
-
-      {/* Clear all filters */}
-      {(searchParams.get("price_max") || activeRating) && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-destructive text-xs"
-          onClick={() => {
-            router.push(`/categorie/${category.slug}`);
-          }}
-        >
-          Resetează toate filtrele
-        </Button>
-      )}
-    </>
-  );
+interface FilterPanelProps {
+  city: string;
+  priceMin: string;
+  priceMax: string;
+  rating: string;
+  hasFilters: boolean;
+  onCityChange: (value: string) => void;
+  onPriceMinChange: (value: string) => void;
+  onPriceMaxChange: (value: string) => void;
+  onRatingChange: (value: string) => void;
+  onApply: () => void;
+  onReset: () => void;
 }
 
+function FilterPanel({
+  city,
+  priceMin,
+  priceMax,
+  rating,
+  hasFilters,
+  onCityChange,
+  onPriceMinChange,
+  onPriceMaxChange,
+  onRatingChange,
+  onApply,
+  onReset,
+}: FilterPanelProps) {
+  return (
+    <div className="rounded-xl border border-white/8 bg-[linear-gradient(180deg,#0d1017,#090c12)] p-4 shadow-[0_24px_55px_rgba(0,0,0,.18)]">
+      <div className="flex items-center justify-between border-b border-white/8 pb-4">
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-[#e8c05f]">
+          <SlidersHorizontal className="h-4 w-4" />
+          Filtrează rezultate
+        </h2>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-[10px] text-white/45 hover:text-white"
+          >
+            Resetează
+          </button>
+        )}
+      </div>
+
+      <div className="border-b border-white/8 py-4">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">
+          Preț
+        </p>
+        <div className="grid grid-cols-2 gap-2">
+          <input
+            inputMode="numeric"
+            value={priceMin}
+            onChange={(event) =>
+              onPriceMinChange(event.target.value.replace(/\D/g, ""))
+            }
+            placeholder="Min €"
+            className="h-9 rounded-lg border border-white/10 bg-black/18 px-2.5 text-xs text-white outline-none placeholder:text-white/35 focus:border-[#e6b84d]/60"
+          />
+          <input
+            inputMode="numeric"
+            value={priceMax}
+            onChange={(event) =>
+              onPriceMaxChange(event.target.value.replace(/\D/g, ""))
+            }
+            placeholder="Max €"
+            className="h-9 rounded-lg border border-white/10 bg-black/18 px-2.5 text-xs text-white outline-none placeholder:text-white/35 focus:border-[#e6b84d]/60"
+          />
+        </div>
+      </div>
+
+      <div className="border-b border-white/8 py-4">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">
+          Locație
+        </p>
+        <select
+          value={city}
+          onChange={(event) => onCityChange(event.target.value)}
+          className="h-10 w-full rounded-lg border border-white/10 bg-[#090d14] px-3 text-xs text-white/76 outline-none"
+        >
+          <option value="">Toată Moldova</option>
+          {locations.slice(1).map((location) => (
+            <option key={location} value={location}>
+              {location}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="py-4">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">
+          Rating minim
+        </p>
+        <div className="flex gap-1">
+          {[3, 4, 5].map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() =>
+                onRatingChange(rating === String(value) ? "" : String(value))
+              }
+              className={cn(
+                "flex-1 rounded-lg border px-2 py-2 text-xs",
+                rating === String(value)
+                  ? "border-[#e6b84d] bg-[#e6b84d]/12 text-[#e6b84d]"
+                  : "border-white/10 text-white/58 hover:border-[#e6b84d]/35",
+              )}
+            >
+              {value}★+
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onApply}
+        className="h-11 w-full rounded-lg border border-[#e6b84d]/65 bg-[#e6b84d]/8 text-xs font-semibold text-[#edc666] hover:bg-[#e6b84d]/15"
+      >
+        Aplică filtrele
+      </button>
+    </div>
+  );
+}
 export function CategoryPageClient({
   category,
   artists,
@@ -168,184 +208,331 @@ export function CategoryPageClient({
   page,
   totalPages,
   currentSort,
+  searchQuery,
+  currentCity,
+  currentPriceMin,
+  currentPriceMax,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { locale, t } = useLocale();
-  const name = getLocalized(category, "name", locale);
-  const description = getLocalized(category, "description", locale);
+  const [query, setQuery] = useState(searchQuery);
+  const [city, setCity] = useState(currentCity);
+  const [priceMin, setPriceMin] = useState(currentPriceMin);
+  const [priceMax, setPriceMax] = useState(currentPriceMax);
+  const [rating, setRating] = useState(searchParams.get("rating_min") ?? "");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useViewMode();
 
-  function updateParams(key: string, value: string) {
+  const name = getLocalized(category, "name", locale);
+  const description = getLocalized(category, "description", locale);
+  const entityLabel = category.type === "service" ? "furnizori" : "artiști";
+  const parentHref = category.type === "service" ? "/servicii" : "/artisti";
+  const parentLabel = category.type === "service" ? "Servicii" : "Artiști";
+  const hasFilters = Boolean(
+    searchQuery ||
+      currentCity ||
+      currentPriceMin ||
+      currentPriceMax ||
+      searchParams.get("rating_min"),
+  );
+
+  function navigate(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
-    params.set(key, value);
-    if (key !== "page") params.delete("page");
-    router.push(`/categorie/${category.slug}?${params.toString()}`);
+    for (const [key, value] of Object.entries(updates)) {
+      if (value) params.set(key, value);
+      else params.delete(key);
+    }
+    if (!("page" in updates)) params.delete("page");
+    const suffix = params.toString();
+    router.push(
+      suffix
+        ? `/categorie/${category.slug}?${suffix}`
+        : `/categorie/${category.slug}`,
+    );
   }
 
-  function clearParam(key: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete(key);
-    params.delete("page");
-    router.push(`/categorie/${category.slug}?${params.toString()}`);
+  function handleSearch(event: FormEvent) {
+    event.preventDefault();
+    navigate({ q: query.trim() || undefined, city: city || undefined });
   }
+
+  function applyFilters() {
+    navigate({
+      city: city || undefined,
+      price_min: priceMin || undefined,
+      price_max: priceMax || undefined,
+      rating_min: rating || undefined,
+    });
+    setMobileFiltersOpen(false);
+  }
+
+  function resetFilters() {
+    setQuery("");
+    setCity("");
+    setPriceMin("");
+    setPriceMax("");
+    setRating("");
+    router.push(`/categorie/${category.slug}`);
+    setMobileFiltersOpen(false);
+  }
+
+  const filterProps: FilterPanelProps = {
+    city,
+    priceMin,
+    priceMax,
+    rating,
+    hasFilters,
+    onCityChange: setCity,
+    onPriceMinChange: setPriceMin,
+    onPriceMaxChange: setPriceMax,
+    onRatingChange: setRating,
+    onApply: applyFilters,
+    onReset: resetFilters,
+  };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
-      {/* Hero */}
-      <div className="mb-8">
-        <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">
-            Acasă
-          </Link>
-          <span className="mx-2">/</span>
-          <span className="text-foreground">{name}</span>
-        </nav>
-        <h1 className="font-heading text-3xl font-bold md:text-4xl">{name}</h1>
-        {description && (
-          <p className="mt-2 max-w-2xl text-muted-foreground">{description}</p>
-        )}
-        <p className="mt-1 text-sm text-muted-foreground">{total} rezultate</p>
-      </div>
+    <div className="-mt-16 min-h-screen bg-[#05080d] text-[#f6f0e5]">
+      <section className="relative isolate overflow-hidden border-b border-[#e4b747]/12 pt-16">
+        <img
+          src="/images/redesign/artists-hero.webp"
+          alt=""
+          className="absolute inset-0 -z-20 h-full w-full object-cover object-center"
+        />
+        <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,8,13,.98)_0%,rgba(5,8,13,.9)_50%,rgba(5,8,13,.48)_100%)]" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-transparent to-[#05080d]" />
 
-      {/* Filters + Sort bar */}
-      <div className="mb-6 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <SortBar
-            options={sortOptions}
-            current={currentSort}
-            onChange={(v) => updateParams("sort", v)}
-          />
-          <div className="flex items-center gap-2">
-            <ViewSwitcher mode={viewMode} onChange={setViewMode} />
-            {/* Mobile filter toggle */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="md:hidden border-gold/30 text-gold gap-1.5"
-              onClick={() => setMobileFiltersOpen(true)}
+        <div className="mx-auto max-w-[1480px] px-4 pb-9 pt-7 lg:px-8">
+          <nav className="text-xs text-white/48">
+            <Link href="/" className="hover:text-[#e6b84d]">
+              Acasă
+            </Link>
+            <span className="mx-2">›</span>
+            <Link href={parentHref} className="hover:text-[#e6b84d]">
+              {parentLabel}
+            </Link>
+            <span className="mx-2">›</span>
+            <span>{name}</span>
+          </nav>
+
+          <div className="mt-8 max-w-3xl">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.28em] text-[#e6b84d]">
+              Categorie premium
+            </p>
+            <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
+              {name}
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/68 sm:text-base">
+              {description ||
+                `Descoperă ${entityLabel} potriviți pentru evenimentul tău, într-o selecție modernă și ușor de filtrat.`}
+            </p>
+
+            <form
+              onSubmit={handleSearch}
+              className="mt-6 grid gap-2 rounded-xl border border-white/12 bg-[#090d14]/80 p-3 shadow-[0_20px_50px_rgba(0,0,0,.25)] backdrop-blur-xl sm:grid-cols-[1fr_210px_auto]"
             >
-              <SlidersHorizontal className="h-4 w-4" /> Filtre
-            </Button>
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
+                <Search className="h-4 w-4 text-[#e6b84d]" />
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder={`Caută în ${name.toLowerCase()}...`}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
+                />
+              </label>
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
+                <MapPin className="h-4 w-4 text-[#e6b84d]" />
+                <select
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
+                >
+                  <option value="" className="bg-[#0a1019]">
+                    Toată Moldova
+                  </option>
+                  {locations.slice(1).map((location) => (
+                    <option
+                      key={location}
+                      value={location}
+                      className="bg-[#0a1019]"
+                    >
+                      {location}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button className="min-h-11 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] hover:brightness-105">
+                Caută
+              </button>
+            </form>
           </div>
         </div>
+      </section>
 
-        {/* Desktop filters — hidden on mobile */}
-        <div className="hidden md:block space-y-3">
-          <FilterControls
-            searchParams={searchParams}
-            updateParams={updateParams}
-            clearParam={clearParam}
-            category={category}
-            router={router}
-          />
+      <main className="mx-auto max-w-[1480px] px-4 py-7 lg:px-8">
+        <div className="grid items-start gap-5 lg:grid-cols-[245px_minmax(0,1fr)]">
+          <aside className="hidden lg:sticky lg:top-20 lg:block">
+            <FilterPanel {...filterProps} />
+          </aside>
+
+          <section className="min-w-0">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-white/68">
+                  <span className="font-semibold text-white">{total}</span>{" "}
+                  {entityLabel} găsiți
+                </p>
+                {hasFilters && (
+                  <p className="mt-0.5 text-[10px] text-[#e6b84d]">
+                    Filtre active
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileFiltersOpen(true)}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#e6b84d]/30 px-3 text-xs text-[#e6b84d] lg:hidden"
+                >
+                  <SlidersHorizontal className="h-3.5 w-3.5" />
+                  Filtre
+                </button>
+                <SortBar
+                  options={sortOptions}
+                  current={currentSort}
+                  onChange={(value) => navigate({ sort: value })}
+                />
+                <ViewSwitcher mode={viewMode} onChange={setViewMode} />
+              </div>
+            </div>
+
+            {artists.length > 0 ? (
+              viewMode.kind === "grid" ? (
+                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                  {artists.map((artist) => (
+                    <ArtistCard key={artist.id} artist={artist} />
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {artists.map((artist) => (
+                    <ArtistListCard
+                      key={artist.id}
+                      artist={artist}
+                      density={viewMode.density}
+                    />
+                  ))}
+                </div>
+              )
+            ) : (
+              <div className="rounded-xl border border-white/8 bg-white/[.02] py-24 text-center">
+                <Sparkles className="mx-auto h-9 w-9 text-[#e6b84d]/60" />
+                <p className="mt-4 text-sm text-white/58">
+                  {t("common.noResults")}
+                </p>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="mt-4 text-xs text-[#e6b84d]"
+                >
+                  Resetează filtrele
+                </button>
+              </div>
+            )}
+
+            <PaginationBar
+              page={page}
+              totalPages={totalPages}
+              onPageChange={(value) => navigate({ page: String(value) })}
+            />
+
+            <div className="mt-7 flex flex-col items-center gap-5 rounded-xl border border-[#e6b84d]/25 bg-[radial-gradient(circle_at_15%_30%,rgba(230,184,77,.11),transparent_28%),linear-gradient(100deg,#0d1019,#151022,#0c101a)] px-6 py-7 text-center sm:flex-row sm:text-left">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-gold/25 bg-gold/8">
+                <Sparkles className="h-7 w-7 text-gold" />
+              </div>
+              <div className="flex-1">
+                <h2 className="font-heading text-2xl font-semibold text-[#edd08a]">
+                  Vrei recomandări potrivite evenimentului tău?
+                </h2>
+                <p className="mt-1 text-sm text-white/56">
+                  Spune-ne ce organizezi și planificatorul îți pregătește o
+                  selecție personalizată.
+                </p>
+              </div>
+              <Link
+                href="/planifica"
+                className="inline-flex h-11 items-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-6 text-xs font-semibold text-[#07101d]"
+              >
+                Planifică evenimentul
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            {category.seoBodyRo && (
+              <article className="mx-auto mt-12 max-w-3xl border-t border-white/8 pt-8">
+                {category.seoBodyRo.split(/\n\s*\n/).map((paragraph, index) => {
+                  const value = paragraph.trim();
+                  if (!value) return null;
+                  if (value.startsWith("## ")) {
+                    return (
+                      <h2
+                        key={index}
+                        className="mb-3 mt-7 font-heading text-2xl font-semibold text-[#edcf87]"
+                      >
+                        {value.slice(3)}
+                      </h2>
+                    );
+                  }
+                  if (value.startsWith("### ")) {
+                    return (
+                      <h3
+                        key={index}
+                        className="mb-2 mt-5 font-heading text-lg font-semibold text-white"
+                      >
+                        {value.slice(4)}
+                      </h3>
+                    );
+                  }
+                  return (
+                    <p
+                      key={index}
+                      className="mb-4 text-sm leading-7 text-white/58"
+                    >
+                      {value}
+                    </p>
+                  );
+                })}
+              </article>
+            )}
+          </section>
         </div>
-      </div>
+      </main>
 
-      {/* Mobile filter sheet */}
       {mobileFiltersOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div
-            className="absolute inset-0 bg-black/60"
+        <div className="fixed inset-0 z-[70] lg:hidden">
+          <button
+            type="button"
+            aria-label="Închide filtrele"
+            className="absolute inset-0 bg-black/70"
             onClick={() => setMobileFiltersOpen(false)}
           />
-          <div className="absolute bottom-0 left-0 right-0 max-h-[80vh] overflow-y-auto rounded-t-2xl bg-background border-t border-gold/20 p-6 space-y-4 animate-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-bold">Filtre</h3>
+          <div className="absolute inset-x-0 bottom-0 max-h-[86vh] overflow-y-auto rounded-t-2xl border-t border-gold/20 bg-[#070a10] p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="font-heading text-lg font-semibold text-white">
+                Filtre
+              </p>
               <button
+                type="button"
                 onClick={() => setMobileFiltersOpen(false)}
-                aria-label="Închide filtrele"
-                className="text-muted-foreground hover:text-foreground"
+                aria-label="Închide"
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-white/65"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-            <FilterControls
-              searchParams={searchParams}
-              updateParams={(k, v) => {
-                updateParams(k, v);
-                setMobileFiltersOpen(false);
-              }}
-              clearParam={clearParam}
-              category={category}
-              router={router}
-            />
+            <FilterPanel {...filterProps} />
           </div>
         </div>
-      )}
-
-      {/* Results */}
-      {artists.length > 0 ? (
-        viewMode.kind === "grid" ? (
-          <div className={gridClassName(viewMode.cols)}>
-            {artists.map((artist) => (
-              <ArtistCard key={artist.id} artist={artist} />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {artists.map((artist) => (
-              <ArtistListCard
-                key={artist.id}
-                artist={artist}
-                density={viewMode.density}
-              />
-            ))}
-          </div>
-        )
-      ) : (
-        <div className="py-20 text-center">
-          <p className="text-lg text-muted-foreground">
-            {t("common.noResults")}
-          </p>
-        </div>
-      )}
-
-      <PaginationBar
-        page={page}
-        totalPages={totalPages}
-        onPageChange={(p) => updateParams("page", String(p))}
-      />
-
-      {/* SEO long-form body — rendered below the listing. Romanian content
-          optimized for Moldova / Chișinău local search. Plain text with
-          paragraphs separated by blank lines. */}
-      {category.seoBodyRo && (
-        <section className="mt-16 border-t border-border/40 pt-10">
-          <div className="prose prose-sm dark:prose-invert max-w-3xl mx-auto">
-            {category.seoBodyRo.split(/\n\s*\n/).map((para, idx) => {
-              const trimmed = para.trim();
-              if (!trimmed) return null;
-              // Lines starting with "## " become subheadings.
-              if (trimmed.startsWith("## ")) {
-                return (
-                  <h2
-                    key={idx}
-                    className="font-heading text-xl font-bold mt-6 mb-2 text-foreground"
-                  >
-                    {trimmed.slice(3)}
-                  </h2>
-                );
-              }
-              if (trimmed.startsWith("### ")) {
-                return (
-                  <h3
-                    key={idx}
-                    className="font-heading text-lg font-semibold mt-4 mb-1.5 text-foreground"
-                  >
-                    {trimmed.slice(4)}
-                  </h3>
-                );
-              }
-              return (
-                <p key={idx} className="mb-3 text-muted-foreground leading-relaxed">
-                  {trimmed}
-                </p>
-              );
-            })}
-          </div>
-        </section>
       )}
     </div>
   );

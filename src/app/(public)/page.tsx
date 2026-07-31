@@ -3,7 +3,6 @@ import { FeatureHighlightsSection } from "@/components/public/sections/feature-h
 import { CategoriesSection } from "@/components/public/sections/categories";
 import { FeaturedArtistsSection } from "@/components/public/sections/featured-artists";
 import { FeaturedVenuesSection } from "@/components/public/sections/featured-venues";
-import { RecommendationsSection } from "@/components/public/sections/recommendations";
 import { ProcessSection } from "@/components/public/sections/process";
 import { CommunitySection } from "@/components/public/sections/community";
 import { CTASection } from "@/components/public/sections/cta";
@@ -21,13 +20,12 @@ export async function generateMetadata() {
   });
 }
 
-// Section type → wrapper style mapping. Light sections (features, venues,
-// recommendations) own their background inside the component, so they get no
+// Section type → wrapper style mapping. Light sections own their background,
+// so they get no
 // dark wrapper here.
 const sectionStyles: Record<string, string> = {
   categories: "section-dark relative",
   featured_artists: "section-navy relative",
-  process: "section-dark border-t border-b border-gold/10",
   community: "section-navy relative",
 };
 
@@ -37,7 +35,7 @@ const sectionStyles: Record<string, string> = {
 // are no longer part of the homepage layout.
 const defaultSectionOrder = [
   "hero", "features", "categories", "featured_venues", "featured_artists",
-  "recommendations", "process", "community", "cta",
+  "process", "community", "cta",
 ];
 
 export default async function HomePage() {
@@ -73,8 +71,6 @@ export default async function HomePage() {
         return <FeaturedVenuesSection key={type} venues={featuredVenues} />;
       case "featured_artists":
         return <FeaturedArtistsSection key={type} artists={featuredArtists} />;
-      case "recommendations":
-        return <RecommendationsSection key={type} />;
       case "process":
         return <ProcessSection key={type} />;
       case "community":

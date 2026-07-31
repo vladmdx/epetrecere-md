@@ -9,6 +9,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { WishlistButton } from "@/components/public/wishlist-button";
 import { CompareButton } from "@/components/public/compare-button";
+import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
 
 interface ArtistCardProps {
   artist: {
@@ -40,24 +41,7 @@ export function ArtistCard({ artist }: ArtistCardProps) {
   // Price is gated behind login (M0a #8). We only show the locked pill once
   // Clerk has hydrated so we don't flash a "Lock" state for authed users.
   const showPrice = isLoaded && isSignedIn;
-  const fallbackImages = [
-    "/images/artists/aleksei-atamanyuk.jpg",
-    "/images/artists/anna-danilchenko.jpeg",
-    "/images/artists/igor-nedoseikin.jpg",
-    "/images/artists/irina-grekova.jpg",
-    "/images/artists/liviu-gulca.jpg",
-    "/images/artists/roxana.jpg",
-    "/images/artists/serj-kuzenkov.jpg",
-    "/images/artists/stas-pindus.jpg",
-    "/images/artists/victoria-lungu.jpg",
-  ];
-  const hasRealCover =
-    artist.coverImageUrl &&
-    !artist.coverImageUrl.endsWith("/images/artists/placeholder.svg") &&
-    !artist.coverImageUrl.endsWith("placeholder.svg");
-  const image = hasRealCover
-    ? artist.coverImageUrl!
-    : fallbackImages[artist.id % fallbackImages.length];
+  const image = resolveArtistCoverImage(artist.slug, artist.coverImageUrl);
 
   return (
     <Link
@@ -65,14 +49,22 @@ export function ArtistCard({ artist }: ArtistCardProps) {
       className="group flex flex-col overflow-hidden rounded-xl border border-white/8 bg-[#111522] transition-all duration-300 hover:-translate-y-1 hover:border-[#e6b84d]/45 hover:shadow-[0_18px_38px_rgba(0,0,0,.28)]"
     >
       <div className="relative aspect-[4/5] overflow-hidden bg-[#0a0d14]">
-        <Image
-          src={image}
-          alt={name}
-          fill
-          sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
-          className="object-cover object-[center_20%] transition-transform duration-500 group-hover:scale-105"
-          unoptimized={image.includes("r2.cloudflarestorage.com")}
-        />
+        {image ? (
+          <Image
+            src={image}
+            alt={name}
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1280px) 33vw, 25vw"
+            className="object-cover object-[center_20%] transition-transform duration-500 group-hover:scale-105"
+            unoptimized={image.includes("r2.cloudflarestorage.com")}
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-[radial-gradient(circle_at_50%_30%,rgba(230,184,77,.16),transparent_35%),linear-gradient(145deg,#131927,#080b11)]">
+            <span className="font-heading text-5xl font-semibold text-gold/55">
+              {name.charAt(0).toUpperCase()}
+            </span>
+          </div>
+        )}
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#111522] to-transparent" />
         <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#06110d]/85 px-2 py-1 text-[9px] font-medium text-[#53df86] backdrop-blur">
           <span className="h-1.5 w-1.5 rounded-full bg-[#4fe47f]" />

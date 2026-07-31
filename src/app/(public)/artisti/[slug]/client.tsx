@@ -28,6 +28,7 @@ import { ArtistCard } from "@/components/public/artist-card";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm } from "@/components/public/request-form";
 import { WishlistButton } from "@/components/public/wishlist-button";
+import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
 import { AddToEventButton } from "@/components/public/add-to-event-button";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { ShareButtons } from "@/components/public/share-buttons";
@@ -112,18 +113,6 @@ interface Props {
   }>;
 }
 
-const ARTIST_FALLBACK_IMAGES = [
-  "/images/artists/aleksei-atamanyuk.jpg",
-  "/images/artists/anna-danilchenko.jpeg",
-  "/images/artists/igor-nedoseikin.jpg",
-  "/images/artists/irina-grekova.jpg",
-  "/images/artists/liviu-gulca.jpg",
-  "/images/artists/roxana.jpg",
-  "/images/artists/serj-kuzenkov.jpg",
-  "/images/artists/stas-pindus.jpg",
-  "/images/artists/victoria-lungu.jpg",
-];
-
 export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
@@ -131,19 +120,24 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
   const [avatarOpen, setAvatarOpen] = useState(false);
-  const rawProfilePhotoUrl = artist.photoUrl || artist.images?.[0]?.url || null;
-  const profilePhotoUrl =
-    rawProfilePhotoUrl && !rawProfilePhotoUrl.includes("placeholder.svg")
-      ? rawProfilePhotoUrl
-      : ARTIST_FALLBACK_IMAGES[artist.id % ARTIST_FALLBACK_IMAGES.length];
+  const profilePhotoUrl = resolveArtistCoverImage(
+    artist.slug,
+    artist.photoUrl,
+    artist.images?.[0]?.url,
+  );
+  const galleryImages = artist.images.filter(
+    (image) =>
+      !image.url.toLowerCase().includes("placeholder") &&
+      image.url !== profilePhotoUrl,
+  );
   const momentImages = Array.from(
     new Set([
-      ...artist.images.map((image) => image.url),
+      ...(profilePhotoUrl ? [profilePhotoUrl] : []),
+      ...galleryImages.map((image) => image.url),
       ...ugcPhotos.map((image) => image.url),
-      ...ARTIST_FALLBACK_IMAGES,
     ]),
   )
-    .filter((url) => url && url !== profilePhotoUrl)
+    .filter(Boolean)
     .slice(0, 6);
   const profilePackages = artist.packages.length
     ? artist.packages.map((pkg) => ({
@@ -337,7 +331,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
           <Tabs defaultValue="description" className="mt-6">
             <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-white/8 bg-[#0c111b] p-1">
               <TabsTrigger value="description">{t("artist.description")}</TabsTrigger>
-              <TabsTrigger value="gallery">{t("artist.gallery")} ({artist.images.length})</TabsTrigger>
+              <TabsTrigger value="gallery">{t("artist.gallery")} ({galleryImages.length})</TabsTrigger>
               {artist.videos.length > 0 && (
                 <TabsTrigger value="videos">{t("artist.videos")} ({artist.videos.length})</TabsTrigger>
               )}
@@ -381,12 +375,12 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               onClickCapture={() => trackClick("artist", artist.id, "gallery")}
             >
               <ImageGallery
-                images={artist.images.map((img) => ({
+                images={galleryImages.map((img) => ({
                   url: img.url,
                   alt: img.altRo,
                 }))}
               />
-              {artist.images.length === 0 && (
+              {galleryImages.length === 0 && (
                 <p className="text-muted-foreground">Nu există imagini momentan.</p>
               )}
             </TabsContent>

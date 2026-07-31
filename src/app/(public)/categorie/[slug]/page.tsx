@@ -37,6 +37,8 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   const filters = {
     categoryId: category.id,
+    search: typeof sp.q === "string" ? sp.q : undefined,
+    city: typeof sp.city === "string" ? sp.city : undefined,
     sort: (sp.sort as "popular" | "price_asc" | "price_desc" | "rating" | "newest") || "popular",
     page: sp.page ? Number(sp.page) : 1,
     priceMin: sp.price_min ? Number(sp.price_min) : undefined,
@@ -49,7 +51,10 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   const breadcrumbs = [
     { name: "Acasă", url: "/" },
-    { name: "Categorii", url: "/artisti" },
+    {
+      name: category.type === "service" ? "Servicii" : "Artiști",
+      url: category.type === "service" ? "/servicii" : "/artisti",
+    },
     { name: getLocalized(category, "name", "ro"), url: `/categorie/${slug}` },
   ];
 
@@ -66,6 +71,10 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         page={result.page}
         totalPages={result.totalPages}
         currentSort={filters.sort}
+        searchQuery={filters.search ?? ""}
+        currentCity={filters.city ?? ""}
+        currentPriceMin={sp.price_min ? String(sp.price_min) : ""}
+        currentPriceMax={sp.price_max ? String(sp.price_max) : ""}
       />
     </>
   );
