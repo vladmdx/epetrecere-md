@@ -9,20 +9,18 @@
 // the vendor reads the advice and edits manually).
 
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
+import { getAiClient } from "@/lib/ai/provider";
 
 const MODEL = "claude-sonnet-4-5";
 
 function getClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
-  return new Anthropic({ apiKey });
+  return getAiClient();
 }
 
 export async function POST(req: NextRequest) {

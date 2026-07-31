@@ -9,12 +9,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, eventPlans } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
+import { getAiClient } from "@/lib/ai/provider";
 
 const MODEL = "claude-sonnet-4-5";
 
@@ -23,9 +23,7 @@ const schema = z.object({
 });
 
 function getClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
-  return new Anthropic({ apiKey });
+  return getAiClient();
 }
 
 export async function POST(req: NextRequest) {

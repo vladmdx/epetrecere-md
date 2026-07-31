@@ -1,12 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { getAiClient } from "./provider";
 
 let client: Anthropic | null = null;
 
 function getClient(): Anthropic {
   if (!client) {
-    client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    client = getAiClient();
   }
   return client;
 }

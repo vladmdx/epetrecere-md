@@ -6,6 +6,7 @@ import { adminTools, vendorTools, executeTool } from "@/lib/ai/tools";
 import { db } from "@/lib/db";
 import { users, artists } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { getAiClient } from "@/lib/ai/provider";
 
 const chatSchema = z.object({
   messages: z.array(
@@ -90,12 +91,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 503 });
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY) {
+    return NextResponse.json({ error: "AI provider not configured" }, { status: 503 });
   }
 
-  const client = new Anthropic({ apiKey });
+  const client = getAiClient();
   const isAdmin = requestedContext === "admin";
   const systemPrompt = buildSystemPrompt(
     isAdmin ? ADMIN_SYSTEM_BASE : VENDOR_SYSTEM_BASE,

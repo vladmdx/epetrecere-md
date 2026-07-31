@@ -40,11 +40,10 @@ import {
   generateVenueDescription,
   generateSEOTexts,
 } from "@/lib/ai";
+import { getAiClient } from "@/lib/ai/provider";
 
 function getClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
-  return new Anthropic({ apiKey });
+  return getAiClient();
 }
 
 const MODEL = "claude-sonnet-4-5";

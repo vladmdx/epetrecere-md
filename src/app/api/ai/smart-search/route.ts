@@ -23,8 +23,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import Anthropic from "@anthropic-ai/sdk";
 import { rateLimit } from "@/lib/rate-limit";
+import { getAiClient } from "@/lib/ai/provider";
 
 const schema = z.object({
   q: z.string().min(3).max(200),
@@ -95,9 +95,7 @@ Rules:
 - explanation must be in Romanian and factual — describe only the filters you set.`;
 
 function getClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
-  return new Anthropic({ apiKey });
+  return getAiClient();
 }
 
 function buildUrl(parsed: ParsedQuery): string {

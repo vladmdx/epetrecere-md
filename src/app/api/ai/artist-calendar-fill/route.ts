@@ -19,14 +19,13 @@ import { db } from "@/lib/db";
 import { artistAvailabilitySlots, artists, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { getAiClient } from "@/lib/ai/provider";
 
 // Client is created per-request — the SDK is cheap to instantiate and
 // avoiding a module-level singleton keeps edge/serverless cold starts
 // predictable.
 function getClient() {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
-  return new Anthropic({ apiKey });
+  return getAiClient();
 }
 
 const MODEL = "claude-sonnet-4-5";

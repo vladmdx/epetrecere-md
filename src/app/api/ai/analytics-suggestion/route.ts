@@ -12,6 +12,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
+import { getAiClient } from "@/lib/ai/provider";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -37,7 +38,7 @@ const schema = z.object({
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
   if (!client) {
-    client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    client = getAiClient();
   }
   return client;
 }
