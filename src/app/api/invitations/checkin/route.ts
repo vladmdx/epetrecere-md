@@ -18,9 +18,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { invitationGuests, invitations } from "@/lib/db/schema";
+import { requireAppUser } from "@/lib/planner/ownership";
 
 const schema = z.object({
   token: z.string().min(8).max(200),
@@ -104,6 +105,27 @@ export async function GET(req: NextRequest) {
       { error: "invitation_id required" },
       { status: 400 },
     );
+  }
+
+  const appUser = await requireAppUser();
+  if (!appUser.ok) {
+    return NextResponse.json(
+      { error: appUser.error },
+      { status: appUser.status },
+    );
+  }
+  const [ownedInvitation] = await db
+    .select({ id: invitations.id })
+    .from(invitations)
+    .where(
+      and(
+        eq(invitations.id, invitationId),
+        eq(invitations.userId, appUser.userId),
+      ),
+    )
+    .limit(1);
+  if (!ownedInvitation) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   const guests = await db

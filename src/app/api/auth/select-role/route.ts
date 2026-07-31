@@ -14,7 +14,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users, venues } from "@/lib/db/schema";
+import { artists, users, venues } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 
 const schema = z.object({
@@ -36,7 +36,12 @@ export async function POST(req: Request) {
 
     // Look up or create the user
     let [appUser] = await db
-      .select({ id: users.id, email: users.email, name: users.name })
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name,
+        role: users.role,
+      })
       .from(users)
       .where(eq(users.clerkId, clerkId))
       .limit(1);
@@ -63,10 +68,20 @@ export async function POST(req: Request) {
           role: "user",
         })
         .onConflictDoNothing()
-        .returning({ id: users.id, email: users.email, name: users.name });
+        .returning({
+          id: users.id,
+          email: users.email,
+          name: users.name,
+          role: users.role,
+        });
       if (!created) {
         const [refound] = await db
-          .select({ id: users.id, email: users.email, name: users.name })
+          .select({
+            id: users.id,
+            email: users.email,
+            name: users.name,
+            role: users.role,
+          })
           .from(users)
           .where(eq(users.clerkId, clerkId))
           .limit(1);
@@ -80,6 +95,33 @@ export async function POST(req: Request) {
     }
 
     const role = parsed.data.role;
+    const [[artistProfile], [venueProfile]] = await Promise.all([
+      db
+        .select({ id: artists.id })
+        .from(artists)
+        .where(eq(artists.userId, appUser.id))
+        .limit(1),
+      db
+        .select({ id: venues.id })
+        .from(venues)
+        .where(eq(venues.userId, appUser.id))
+        .limit(1),
+    ]);
+
+    const roleConflict =
+      (role === "artist" && Boolean(venueProfile)) ||
+      (role === "venue" && (Boolean(artistProfile) || appUser.role === "artist")) ||
+      (role === "client" &&
+        (Boolean(artistProfile) || Boolean(venueProfile) || appUser.role === "artist"));
+    if (roleConflict) {
+      return NextResponse.json(
+        {
+          error:
+            "Rolul contului este deja stabilit. Folosește un cont separat pentru alt tip de profil.",
+        },
+        { status: 409 },
+      );
+    }
 
     if (role === "artist") {
       // Set role to artist immediately. Onboarding still required to

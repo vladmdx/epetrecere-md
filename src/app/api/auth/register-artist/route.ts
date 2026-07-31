@@ -7,6 +7,7 @@ import {
   artistPackages,
   users,
   notifications,
+  venues,
 } from "@/lib/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
@@ -130,6 +131,17 @@ export async function POST(req: Request) {
     if (existingArtist) {
       return NextResponse.json(
         { error: "Already registered as artist", artistId: existingArtist.id },
+        { status: 409 },
+      );
+    }
+    const [existingVenue] = await db
+      .select({ id: venues.id })
+      .from(venues)
+      .where(eq(venues.userId, appUser.id))
+      .limit(1);
+    if (existingVenue) {
+      return NextResponse.json(
+        { error: "Un cont de sală nu poate fi înregistrat și ca artist." },
         { status: 409 },
       );
     }

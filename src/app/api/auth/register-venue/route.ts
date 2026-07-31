@@ -8,7 +8,7 @@ import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
 import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { venues, users, notifications } from "@/lib/db/schema";
+import { artists, venues, users, notifications } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { validatePhone } from "@/lib/phone/validate";
 
@@ -138,6 +138,18 @@ export async function POST(req: Request) {
         }
         appUser = existing;
       }
+    }
+
+    const [existingArtist] = await db
+      .select({ id: artists.id })
+      .from(artists)
+      .where(eq(artists.userId, appUser.id))
+      .limit(1);
+    if (existingArtist) {
+      return NextResponse.json(
+        { error: "Un cont de artist nu poate fi înregistrat și ca sală." },
+        { status: 409 },
+      );
     }
 
     // A user may own only one APPROVED venue through this flow. If they
