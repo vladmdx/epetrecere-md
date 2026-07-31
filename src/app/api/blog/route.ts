@@ -24,7 +24,10 @@ const blogWriteSchema = z.object({
   category: optionalText(120),
   tags: z.array(z.string().trim().min(1).max(80)).max(30).optional().default([]),
   status: z.enum(["draft", "published", "archived"]).default("draft"),
-  publishedAt: z.string().datetime().nullish(),
+  publishedAt: z
+    .union([z.string().datetime(), z.literal("")])
+    .nullish()
+    .transform((value) => value || null),
   seoTitleRo: optionalText(120),
   seoTitleRu: optionalText(120),
   seoTitleEn: optionalText(120),
