@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "@/lib/env"; // Validate env vars at startup
-import { Playfair_Display, DM_Sans, Cormorant_Garamond } from "next/font/google";
+import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { LocaleProvider } from "@/hooks/use-locale";
 import { PreferencesProvider } from "@/hooks/use-preferences";
@@ -12,24 +12,17 @@ import { ReferralCapture } from "@/components/shared/referral-capture";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const playfair = Playfair_Display({
-  variable: "--font-playfair",
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "700"],
-  display: "swap",
-});
-
-const dmSans = DM_Sans({
-  variable: "--font-dm-sans",
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "700"],
+const manrope = Manrope({
+  variable: "--font-manrope",
+  subsets: ["latin", "latin-ext", "cyrillic"],
+  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
-  subsets: ["latin", "cyrillic"],
-  weight: ["600"],
+  subsets: ["latin", "latin-ext", "cyrillic"],
+  weight: ["600", "700"],
   display: "swap",
 });
 
@@ -56,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="ro"
-      className={`${playfair.variable} ${dmSans.variable} ${cormorant.variable} h-full antialiased`}
+      className={`${manrope.variable} ${cormorant.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col overflow-x-hidden">

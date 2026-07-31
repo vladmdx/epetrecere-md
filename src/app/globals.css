@@ -7,9 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-dm-sans);
+  --font-sans: var(--font-manrope);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-playfair);
+  --font-heading: var(--font-cormorant);
   --font-accent: var(--font-cormorant);
   --color-gold: var(--gold);
   --color-gold-soft: var(--gold-soft);
