@@ -6,6 +6,7 @@ import { useUser } from "@clerk/nextjs";
 import { MessageCircle, X, Send, Loader2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 // M0b #10 — Persistent pre-booking chat widget.
 // Uses a React Portal so the modal escapes any sticky/overflow parent.
@@ -89,10 +90,17 @@ export function ChatWidget({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: text }),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Mesajul nu a putut fi trimis.");
+      }
       const inserted = await res.json();
       setMessages((prev) => [...prev, inserted]);
       setDraft("");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Mesajul nu a putut fi trimis.",
+      );
     } finally {
       setSending(false);
     }

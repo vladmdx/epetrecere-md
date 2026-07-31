@@ -7,6 +7,7 @@ import { createClerkClient } from "@clerk/backend";
 // mints a one-shot sign-in token. Intended for /test-login demo access.
 const TEST_PERSONAS: Record<string, { email: string }> = {
   igor: { email: "igor.nedoseikin@epetrecere.md" },
+  venue: { email: "venue.test@epetrecere.md" },
   client: { email: "client.test@epetrecere.md" },
 };
 

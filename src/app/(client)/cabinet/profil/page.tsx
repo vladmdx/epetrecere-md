@@ -36,6 +36,7 @@ export default function ProfilePage() {
   const [editingPhone, setEditingPhone] = useState(false);
   const [phoneValue, setPhoneValue] = useState("");
   const [savingPhone, setSavingPhone] = useState(false);
+  const [dbPhone, setDbPhone] = useState<string | null>(null);
 
   // Email editing
   const [editingEmail, setEditingEmail] = useState(false);
@@ -60,6 +61,26 @@ export default function ProfilePage() {
         "";
       setPhoneValue(anyPhone);
     }
+  }, [user]);
+
+  // Google/email sign-ups store the onboarding phone in our app database,
+  // even when Clerk has no phone object. Load that canonical contact so the
+  // profile and booking flow do not incorrectly claim the number is missing.
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    void fetch("/api/me/phone", { cache: "no-store" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        const phone = typeof data.phone === "string" ? data.phone : null;
+        setDbPhone(phone);
+        if (phone && user.phoneNumbers.length === 0) setPhoneValue(phone);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   async function handleSave() {
@@ -186,7 +207,7 @@ export default function ProfilePage() {
       (p) => p.verification?.status === "verified",
     );
     if (verified) return verified.phoneNumber;
-    return user.phoneNumbers[0]?.phoneNumber;
+    return user.phoneNumbers[0]?.phoneNumber || dbPhone || undefined;
   })();
   const currentEmail = user?.primaryEmailAddress?.emailAddress;
 

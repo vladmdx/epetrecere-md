@@ -1,10 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { chatMessages, conversations, users, artists, venues } from "@/lib/db/schema";
-import { and, asc, eq, sql } from "drizzle-orm";
+import {
+  chatMessages,
+  conversations,
+  users,
+  artists,
+  venues,
+  bookingRequests,
+} from "@/lib/db/schema";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendPushToUser } from "@/lib/push/expo";
+import {
+  containsContact,
+  redactContact,
+} from "@/lib/privacy/contact-redaction";
 
 // M0b #10 — Messages for a persistent client↔artist conversation.
 // GET  lists messages (oldest → newest, capped at 200) and resets the caller's
@@ -50,6 +61,34 @@ async function loadContext(conversationId: number, clerkId: string) {
   return { appUser, conv, side } as const;
 }
 
+const CONTACT_SHARED_STATUSES = new Set([
+  "accepted",
+  "confirmed_by_client",
+  "completed",
+]);
+async function contactIsUnlocked(conv: typeof conversations.$inferSelect) {
+  const vendorCondition = conv.artistId
+    ? eq(bookingRequests.artistId, conv.artistId)
+    : conv.venueId
+      ? eq(bookingRequests.venueId, conv.venueId)
+      : null;
+  if (!vendorCondition) return false;
+
+  const [booking] = await db
+    .select({ status: bookingRequests.status })
+    .from(bookingRequests)
+    .where(
+      and(
+        eq(bookingRequests.clientUserId, conv.clientUserId),
+        vendorCondition,
+      ),
+    )
+    .orderBy(desc(bookingRequests.updatedAt))
+    .limit(1);
+
+  return booking ? CONTACT_SHARED_STATUSES.has(booking.status) : false;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -76,6 +115,7 @@ export async function GET(
     .where(eq(chatMessages.conversationId, conversationId))
     .orderBy(asc(chatMessages.createdAt))
     .limit(200);
+  const contactUnlocked = await contactIsUnlocked(ctx.conv);
 
   // Reset the viewer's unread counter.
   if (ctx.side === "client" && ctx.conv.clientUnread > 0) {
@@ -93,7 +133,19 @@ export async function GET(
       .where(eq(conversations.id, conversationId));
   }
 
-  return NextResponse.json(messages);
+  return NextResponse.json(
+    contactUnlocked
+      ? messages
+      : messages.map((message) => ({
+          ...message,
+          message: redactContact(message.message),
+          attachmentUrl: null,
+          attachmentName: message.attachmentUrl
+            ? "Atașament disponibil după confirmare"
+            : message.attachmentName,
+          attachmentMime: null,
+        })),
+  );
 }
 
 export async function POST(
@@ -141,6 +193,18 @@ export async function POST(
   const ctx = await loadContext(conversationId, clerkId);
   if (!ctx) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const contactUnlocked = await contactIsUnlocked(ctx.conv);
+  if (!contactUnlocked && (containsContact(message) || attachmentUrl)) {
+    return NextResponse.json(
+      {
+        error:
+          "Datele de contact și atașamentele devin disponibile după confirmarea rezervării.",
+        code: "CONTACT_LOCKED",
+      },
+      { status: 422 },
+    );
   }
 
   // Sender display name comes from the appUser record; fall back to the side.

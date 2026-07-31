@@ -24,6 +24,24 @@ function normalize(raw: string | null): string | null {
   return "+" + digits;
 }
 
+export async function GET() {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const [appUser] = await db
+    .select({ phone: users.phone })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  if (!appUser) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ phone: appUser.phone });
+}
+
 export async function PUT(req: Request) {
   const { userId: clerkId } = await auth();
   if (!clerkId) {

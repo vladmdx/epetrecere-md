@@ -9,6 +9,7 @@ import {
   bookingRequests,
 } from "@/lib/db/schema";
 import { and, eq, desc, isNull, inArray } from "drizzle-orm";
+import { redactContact } from "@/lib/privacy/contact-redaction";
 
 /** Shape we attach to each conversation so the UI can show "Re: Nuntă 20 sept". */
 type LinkedBooking = {
@@ -29,6 +30,7 @@ async function attachLinkedBookings<
     clientUserId: string;
     artistId: number | null;
     venueId: number | null;
+    lastMessagePreview: string | null;
   },
 >(rows: T[]): Promise<(T & { linkedBooking: LinkedBooking | null })[]> {
   if (rows.length === 0) return [];
@@ -128,13 +130,30 @@ async function attachLinkedBookings<
     });
   }
 
+  const contactSharedStatuses = new Set([
+    "accepted",
+    "confirmed_by_client",
+    "completed",
+  ]);
+
   return rows.map((r) => {
     const key = r.artistId
       ? `${r.clientUserId}|a${r.artistId}`
       : r.venueId
         ? `${r.clientUserId}|v${r.venueId}`
         : "";
-    return { ...r, linkedBooking: byKey.get(key) ?? null };
+    const linkedBooking = byKey.get(key) ?? null;
+    const contactUnlocked = linkedBooking
+      ? contactSharedStatuses.has(linkedBooking.status)
+      : false;
+    return {
+      ...r,
+      lastMessagePreview:
+        !contactUnlocked && r.lastMessagePreview
+          ? redactContact(r.lastMessagePreview)
+          : r.lastMessagePreview,
+      linkedBooking,
+    };
   });
 }
 

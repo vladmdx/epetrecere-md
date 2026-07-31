@@ -17,6 +17,7 @@ import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/disp
 import { sendPushToUser } from "@/lib/push/expo";
 import { sendEmail } from "@/lib/email/send";
 import { bookingRequestNewEmail } from "@/lib/email/templates/booking-request-new";
+import { redactContact } from "@/lib/privacy/contact-redaction";
 
 const bookingSchema = z.object({
   /** Either artistId or venueId must be set. */
@@ -342,6 +343,9 @@ export async function POST(req: NextRequest) {
       { error: "artistId or venueId required" },
       { status: 400 },
     );
+  }
+  if (parsed.data.message) {
+    parsed.data.message = redactContact(parsed.data.message);
   }
 
   // Resolve the authenticated user so we can link booking to their account.

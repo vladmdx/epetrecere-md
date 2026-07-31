@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { useClerk } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, User2, Music2 } from "lucide-react";
+import { Building2, Loader2, User2, Music2 } from "lucide-react";
 
-type WhoKey = "igor" | "client";
+type WhoKey = "igor" | "venue" | "client";
 
 const PERSONAS: Record<WhoKey, { label: string; email: string; role: string; dest: string; icon: React.ReactNode }> = {
   igor: {
@@ -16,6 +16,13 @@ const PERSONAS: Record<WhoKey, { label: string; email: string; role: string; des
     role: "Artist — vede panoul de rezervări",
     dest: "/dashboard/rezervari",
     icon: <Music2 className="h-5 w-5" />,
+  },
+  venue: {
+    label: "Sala Demo QA (Sală)",
+    email: "venue.test@epetrecere.md",
+    role: "Sală — vede rezervările locației",
+    dest: "/dashboard/sala/rezervari",
+    icon: <Building2 className="h-5 w-5" />,
   },
   client: {
     label: "Test Client (Client)",
