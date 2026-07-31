@@ -1,25 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { reviews, artists, venues } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { rateLimit } from "@/lib/rate-limit";
-import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
+import { reviews } from "@/lib/db/schema";
+import { and, desc, eq } from "drizzle-orm";
 
-// GET — list reviews for an artist or venue (public, only approved; or all if owner)
+// Public reads expose approved reviews only.
 export async function GET(req: NextRequest) {
   const artistId = req.nextUrl.searchParams.get("artist_id");
   const venueId = req.nextUrl.searchParams.get("venue_id");
 
   if (!artistId && !venueId) {
-    return NextResponse.json({ error: "artist_id or venue_id required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "artist_id or venue_id required" },
+      { status: 400 },
+    );
   }
 
   const conditions = [eq(reviews.isApproved, true)];
   if (artistId) conditions.push(eq(reviews.artistId, Number(artistId)));
   if (venueId) conditions.push(eq(reviews.venueId, Number(venueId)));
 
-  const { and, desc } = await import("drizzle-orm");
   const result = await db
     .select({
       id: reviews.id,
@@ -39,116 +38,15 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(result);
 }
 
-const reviewSchema = z.object({
-  artistId: z.number().optional(),
-  venueId: z.number().optional(),
-  authorName: z.string().min(2),
-  eventType: z.string().optional(),
-  rating: z.number().min(1).max(5),
-  text: z.string().min(10).max(1000),
-  /** Up to 5 photo URLs attached to the review. */
-  photos: z.array(z.string().url()).max(5).optional(),
-});
-
-export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for") || "anonymous";
-  const { success } = await rateLimit(`review:${ip}`, 5, 60_000);
-  if (!success) {
-    return NextResponse.json({ error: "Too many reviews" }, { status: 429 });
-  }
-
-  const body = await req.json();
-  const parsed = reviewSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
-  }
-
-  const [review] = await db
-    .insert(reviews)
-    .values({
-      ...parsed.data,
-      photos: parsed.data.photos ?? [],
-      isApproved: false, // Needs admin approval
-    })
-    .returning();
-
-  // M5 — dispatch in-app + email notifications (non-blocking)
-  void (async () => {
-    try {
-      const { notificationEmail } = await import("@/lib/email/templates/notification-email");
-      const { escapeHtml } = await import("@/lib/email/escape");
-      // User-supplied fields MUST be escaped before entering HTML templates.
-      const safeName = escapeHtml(parsed.data.authorName);
-      const rating = parsed.data.rating;
-      const adminEmailHtml = notificationEmail({
-        title: "Recenzie nouă de aprobat",
-        message: `<strong>${safeName}</strong> a lăsat o recenzie de ${rating}★`,
-        ctaUrl: "https://epetrecere.md/admin/recenzii",
-        ctaText: "Vezi recenzia →",
-        emoji: "⭐",
-      });
-      await dispatchToAdmins({
-        type: "admin_review_pending",
-        title: "Recenzie nouă de aprobat",
-        message: `${parsed.data.authorName} — ${rating}★`,
-        actionUrl: "/admin/recenzii",
-        emailSubject: `⭐ Recenzie nouă: ${rating}★ de la ${parsed.data.authorName}`,
-        emailHtml: adminEmailHtml,
-      });
-      if (parsed.data.artistId) {
-        const [artist] = await db
-          .select({ userId: artists.userId, email: artists.email, nameRo: artists.nameRo })
-          .from(artists)
-          .where(eq(artists.id, parsed.data.artistId))
-          .limit(1);
-        if (artist?.userId) {
-          await dispatchNotification({
-            userId: artist.userId,
-            type: "review_new",
-            title: "Ai o recenzie nouă",
-            message: `${rating}★ de la ${parsed.data.authorName}`,
-            actionUrl: "/dashboard/recenzii",
-            email: artist.email ?? undefined,
-            emailSubject: `⭐ Recenzie nouă: ${rating}★ de la ${parsed.data.authorName}`,
-            emailHtml: notificationEmail({
-              title: "Ai o recenzie nouă!",
-              message: `<strong>${safeName}</strong> ți-a lăsat o recenzie de <strong>${rating}★</strong>. Verifică-o în dashboard!`,
-              ctaUrl: "https://epetrecere.md/dashboard/recenzii",
-              ctaText: "Vezi recenzia →",
-              emoji: "⭐",
-            }),
-          });
-        }
-      }
-      if (parsed.data.venueId) {
-        const [venue] = await db
-          .select({ userId: venues.userId, email: venues.email })
-          .from(venues)
-          .where(eq(venues.id, parsed.data.venueId))
-          .limit(1);
-        if (venue?.userId) {
-          await dispatchNotification({
-            userId: venue.userId,
-            type: "review_new",
-            title: "Ai o recenzie nouă",
-            message: `${rating}★ de la ${parsed.data.authorName}`,
-            actionUrl: "/dashboard/recenzii",
-            email: venue.email ?? undefined,
-            emailSubject: `⭐ Recenzie nouă: ${rating}★ de la ${parsed.data.authorName}`,
-            emailHtml: notificationEmail({
-              title: "Ai o recenzie nouă!",
-              message: `<strong>${safeName}</strong> a lăsat o recenzie de <strong>${rating}★</strong> pentru sala ta.`,
-              ctaUrl: "https://epetrecere.md/dashboard/recenzii",
-              ctaText: "Vezi recenzia →",
-              emoji: "⭐",
-            }),
-          });
-        }
-      }
-    } catch (err) {
-      console.error("[notifications] review POST", err);
-    }
-  })();
-
-  return NextResponse.json(review, { status: 201 });
+// Unlinked public reviews are intentionally disabled. Reviews are created by
+// POST /api/reviews/from-booking, which verifies ownership, confirmation,
+// event date and duplicate submissions before storing anything.
+export async function POST() {
+  return NextResponse.json(
+    {
+      error:
+        "Recenziile se trimit din cabinet, după o rezervare confirmată și finalizată.",
+    },
+    { status: 410 },
+  );
 }

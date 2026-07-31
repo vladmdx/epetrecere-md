@@ -40,7 +40,6 @@ interface Conversation {
   venueId: number | null;
   clientUserId: string;
   clientName: string | null;
-  clientEmail: string | null;
   lastMessageAt: string;
   lastMessagePreview: string | null;
   clientUnread: number;
@@ -256,7 +255,6 @@ export default function VenueMessagesPage() {
     return conversations.filter((t) => {
       const haystack = [
         t.clientName,
-        t.clientEmail,
         t.lastMessagePreview,
         t.linkedBooking?.eventType,
       ]

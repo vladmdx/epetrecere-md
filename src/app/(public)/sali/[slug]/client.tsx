@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Building2,
@@ -19,12 +20,12 @@ import {
 import { formatWorkingHours } from "@/components/vendor/working-hours-editor";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
-import { RequestPriceForm, RequestBookingForm } from "@/components/public/request-form";
+import { RequestPriceForm } from "@/components/public/request-form";
+import { AddToEventButton } from "@/components/public/add-to-event-button";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { WishlistButton } from "@/components/public/wishlist-button";
 import { ShareButtons } from "@/components/public/share-buttons";
 import { VenueCard } from "@/components/public/venue-card";
-import { ReviewPhotoUploader } from "@/components/public/review-photo-uploader";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
@@ -130,11 +131,12 @@ export function VenueDetailClient({
 }) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
+  const searchParams = useSearchParams();
   const name = getLocalized(venue, "name", locale);
   const description = getLocalized(venue, "description", locale);
   // M0a #8 — price gated behind login
   const canSeePrice = isLoaded && isSignedIn;
-  const venueHeroImages = [
+  const venueFallbackImages = [
     "/images/redesign/venue-chateau-hero.webp",
     "/images/venues/hall-1.jpg",
     "/images/venues/hall-2.jpg",
@@ -143,17 +145,23 @@ export function VenueDetailClient({
     "/images/venues/hall-5.jpg",
     "/images/venues/hall-6.jpg",
   ];
-  const realImages = venue.images.map((image) => image.url).filter(Boolean);
+  const realImages = Array.from(
+    new Set(venue.images.map((image) => image.url).filter(Boolean)),
+  );
   const venueHeroImage =
     venue.slug === "chateau-vartely-events"
       ? "/images/redesign/venue-chateau-hero.webp"
-      : realImages[0] || venueHeroImages[venue.id % venueHeroImages.length];
-  const galleryImages = Array.from(
-    new Set([
-      ...realImages.filter((url) => url !== venueHeroImage),
-      ...venueHeroImages.filter((url) => url !== venueHeroImage),
-    ]),
-  ).slice(0, 4);
+      : realImages[0] ||
+        venueFallbackImages[venue.id % venueFallbackImages.length];
+  // A gallery must represent this venue, not silently borrow stock photos
+  // used by other listings. When the owner uploaded one photo, show one.
+  const galleryImages = realImages
+    .filter((url) => url !== venueHeroImage)
+    .slice(0, 4);
+  const planParam = Number(searchParams.get("plan"));
+  const eventPlanId = Number.isFinite(planParam) && planParam > 0
+    ? planParam
+    : null;
 
   useEffect(() => {
     import("@/hooks/use-recently-viewed").then(({ trackRecentView }) => {
@@ -513,7 +521,7 @@ export function VenueDetailClient({
 
           {/* Review form */}
           <div className="mt-5">
-            <VenueReviewForm venueId={venue.id} />
+            <VenueReviewForm />
           </div>
           </section>
         </div>
@@ -558,7 +566,11 @@ export function VenueDetailClient({
               )}
             </div>
             <RequestPriceForm venueId={venue.id} />
-            <RequestBookingForm venueId={venue.id} capacityMax={venue.capacityMax} />
+            <AddToEventButton
+              venueId={venue.id}
+              venueSlug={venue.slug}
+              presetEventPlanId={eventPlanId}
+            />
             <ChatWidget
               venueId={venue.id}
               artistName={getLocalized(venue, "name", locale) || venue.nameRo}
@@ -715,119 +727,20 @@ function CategoryAccordion({
   );
 }
 
-function VenueReviewForm({ venueId }: { venueId: number }) {
-  const [rating, setRating] = useState(5);
-  const [name, setName] = useState("");
-  const [text, setText] = useState("");
-  const [eventType, setEventType] = useState("");
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name || text.length < 10) return;
-    setSubmitting(true);
-    try {
-      const res = await fetch("/api/reviews", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          venueId,
-          authorName: name,
-          rating,
-          text,
-          eventType: eventType || undefined,
-          photos,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      setSubmitted(true);
-    } catch {
-      // silent
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  if (submitted) {
-    return (
-      <div className="rounded-xl border border-success/30 bg-success/10 p-6 text-center">
-        <p className="font-heading font-bold text-success">
-          Mulțumim pentru recenzie!
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Recenzia va fi publicată după verificare.
-        </p>
-      </div>
-    );
-  }
-
+function VenueReviewForm() {
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="rounded-xl border border-border/40 bg-card p-5"
-    >
-      <h3 className="mb-4 font-heading text-base font-bold">Lasă o recenzie</h3>
-      <div className="mb-4 flex gap-1">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <button key={i} type="button" onClick={() => setRating(i + 1)}>
-            <Star
-              className={cn(
-                "h-6 w-6 cursor-pointer transition-colors",
-                i < rating
-                  ? "fill-gold text-gold"
-                  : "text-muted hover:text-gold/50",
-              )}
-            />
-          </button>
-        ))}
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Numele tău *"
-          required
-          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-        />
-        <select
-          value={eventType}
-          onChange={(e) => setEventType(e.target.value)}
-          className="flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm"
-        >
-          <option value="">Tip eveniment</option>
-          <option value="Nuntă">Nuntă</option>
-          <option value="Botez">Botez</option>
-          <option value="Corporate">Corporate</option>
-          <option value="Aniversare">Aniversare</option>
-        </select>
-      </div>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Scrie recenzia ta (min 10 caractere) *"
-        required
-        minLength={10}
-        rows={3}
-        className="mt-3 flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-      />
-
-      {/* Photos */}
-      <div className="mt-3">
-        <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Fotografii (opțional)
-        </p>
-        <ReviewPhotoUploader value={photos} onChange={setPhotos} max={5} />
-      </div>
-
-      <button
-        type="submit"
-        disabled={submitting || !name || text.length < 10}
-        className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-6 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-50"
+    <div className="rounded-xl border border-border/40 bg-card p-5">
+      <h3 className="font-heading text-base font-bold">Recenzii verificate</h3>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        Recenzia poate fi trimisă după un eveniment confirmat, direct din
+        cabinetul clientului. Astfel, feedbackul public provine din rezervări reale.
+      </p>
+      <Link
+        href="/cabinet/recenzii"
+        className="mt-4 inline-flex items-center gap-2 rounded-md bg-gold px-5 py-2.5 text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark"
       >
-        {submitting ? "Se trimite..." : "Trimite recenzia"}
-      </button>
-    </form>
+        Vezi rezervările eligibile <ArrowRight className="h-4 w-4" />
+      </Link>
+    </div>
   );
 }

@@ -53,8 +53,10 @@ interface PlanConflictInfo {
 }
 
 interface Props {
-  artistId: number;
-  artistSlug: string;
+  artistId?: number;
+  artistSlug?: string;
+  venueId?: number;
+  venueSlug?: string;
   /** When the user came here via a /cabinet/planifica/[id] deep-link
    *  the parent already knows which plan to target. We honour that and
    *  skip the picker entirely. */
@@ -64,6 +66,8 @@ interface Props {
 export function AddToEventButton({
   artistId,
   artistSlug,
+  venueId,
+  venueSlug,
   presetEventPlanId,
 }: Props) {
   const router = useRouter();
@@ -114,6 +118,13 @@ export function AddToEventButton({
    *  treated as available (unknown). Failures default to available so
    *  we don't false-block the user from booking. */
   async function loadConflicts(list: PlanListItem[]) {
+    // Venue conflict validation is performed by the booking API against the
+    // exact date and time. The public picker currently has a dedicated
+    // availability endpoint only for artists, so venue plans stay selectable.
+    if (!artistId) {
+      setConflicts({});
+      return;
+    }
     const datedPlans = list.filter((p) => !!p.eventDate);
     if (datedPlans.length === 0) {
       setConflicts({});
@@ -175,22 +186,27 @@ export function AddToEventButton({
   async function onClick() {
     if (!isLoaded) return;
     if (!isSignedIn) {
+      const entityPath = artistId
+        ? `/artisti/${artistSlug ?? ""}`
+        : `/sali/${venueSlug ?? ""}`;
       // Stash where to come back to after sign-in.
       try {
         sessionStorage.setItem(
           "next-url",
-          `/cabinet/planifica?artistSlug=${encodeURIComponent(artistSlug)}`,
+          entityPath,
         );
       } catch {
         /* ignore */
       }
       router.push(
-        `/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artistSlug}`)}`,
+        `/sign-in?redirect_url=${encodeURIComponent(entityPath)}`,
       );
       return;
     }
     if (presetEventPlanId) {
-      router.push(`/cabinet/planifica/${presetEventPlanId}?tab=bookings`);
+      router.push(
+        `/cabinet/planifica/${presetEventPlanId}?tab=${artistId ? "bookings" : "venues"}`,
+      );
       return;
     }
     setLoading(true);
@@ -232,7 +248,9 @@ export function AddToEventButton({
 
   function selectPlan(planId: number) {
     setOpen(false);
-    router.push(`/cabinet/planifica/${planId}?tab=bookings`);
+    router.push(
+      `/cabinet/planifica/${planId}?tab=${artistId ? "bookings" : "venues"}`,
+    );
   }
 
   function newEvent() {
@@ -240,13 +258,15 @@ export function AddToEventButton({
     // Send the artist target along with the wizard so we can auto-create
     // a booking once the plan is ready. The /auth-redirect → from-wizard
     // flow already handles the session-storage hand-off.
-    try {
-      sessionStorage.setItem(
-        "auto-book-after-plan",
-        JSON.stringify({ artistId, artistSlug }),
-      );
-    } catch {
-      /* ignore */
+    if (artistId) {
+      try {
+        sessionStorage.setItem(
+          "auto-book-after-plan",
+          JSON.stringify({ artistId, artistSlug }),
+        );
+      } catch {
+        /* ignore */
+      }
     }
     router.push("/planifica");
   }
@@ -268,6 +288,7 @@ export function AddToEventButton({
   // Partner viewing a public profile — show nothing instead of a button
   // that the API would reject. The rest of the page (gallery, reviews)
   // still works for browsing competitors.
+  if (!artistId && !venueId) return null;
   if (isPartner) return null;
 
   return (
@@ -285,7 +306,9 @@ export function AddToEventButton({
         )}
         {presetEventPlanId
           ? "Rezervă pentru evenimentul tău"
-          : "Adaugă la un eveniment"}
+          : artistId
+            ? "Adaugă artistul la un eveniment"
+            : "Adaugă sala la un eveniment"}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>

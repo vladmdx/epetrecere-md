@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { bookingRequests, offerRequests, artists, venues } from "@/lib/db/schema";
+import {
+  bookingRequests,
+  offerRequests,
+  artists,
+  venues,
+  eventPlans,
+} from "@/lib/db/schema";
 import { users } from "@/lib/db/schema";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
@@ -95,6 +101,7 @@ export async function GET(req: NextRequest) {
   // Check if the caller is admin — admins can query any data
   const admin = await requireAdmin();
   const isAdmin = admin.ok;
+  let vendorViewer = false;
 
   if (!isAdmin) {
     // Regular user — verify ownership
@@ -119,6 +126,7 @@ export async function GET(req: NextRequest) {
       if (!artist || artist.userId !== appUser.id) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
+      vendorViewer = true;
     }
 
     // If querying by client_email, verify it matches the user's email
@@ -166,6 +174,7 @@ export async function GET(req: NextRequest) {
           .where(eq(artists.id, b.artistId))
           .limit(1);
         owns = a?.userId === appUser.id;
+        if (owns) vendorViewer = true;
       }
       if (!owns && b.venueId) {
         const [v] = await db
@@ -174,6 +183,7 @@ export async function GET(req: NextRequest) {
           .where(eq(venues.id, b.venueId))
           .limit(1);
         owns = v?.userId === appUser.id;
+        if (owns) vendorViewer = true;
       }
       if (!owns) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -258,7 +268,7 @@ export async function GET(req: NextRequest) {
     "confirmed_by_client",
     "completed",
   ]);
-  const redactByDefault = !isAdmin && !!artistId;
+  const redactByDefault = !isAdmin && vendorViewer;
 
   // Phase 6 — enrich artist bookings with the venue on the same event plan
   // (if any). Lets the artist see "Eveniment la Sala X" on their rezervări.
@@ -341,7 +351,13 @@ export async function POST(req: NextRequest) {
   let clientUserId: string | undefined;
   if (clerkId) {
     const [appUser] = await db
-      .select({ id: users.id, role: users.role })
+      .select({
+        id: users.id,
+        role: users.role,
+        name: users.name,
+        email: users.email,
+        phone: users.phone,
+      })
       .from(users)
       .where(eq(users.clerkId, clerkId))
       .limit(1);
@@ -373,6 +389,47 @@ export async function POST(req: NextRequest) {
         }
       }
       clientUserId = appUser.id;
+
+      // Signed-in bookings use the account's canonical identity. This avoids
+      // spoofed names/emails and prevents planner fallbacks such as "000000"
+      // from becoming the contact stored on a real reservation.
+      parsed.data.clientName = appUser.name?.trim() || parsed.data.clientName;
+      parsed.data.clientEmail = appUser.email?.trim() || parsed.data.clientEmail;
+      if (appUser.phone?.trim()) parsed.data.clientPhone = appUser.phone.trim();
+
+      const phoneDigits = parsed.data.clientPhone.replace(/\D/g, "");
+      if (phoneDigits.length < 8 || /^(\d)\1+$/.test(phoneDigits)) {
+        return NextResponse.json(
+          {
+            error:
+              "Adaugă un număr de telefon valid în profil înainte de a trimite rezervarea.",
+            code: "CLIENT_PHONE_REQUIRED",
+          },
+          { status: 400 },
+        );
+      }
+    }
+  }
+
+  // A booking linked to an event plan must come from the authenticated owner
+  // of that plan. Without this gate, a caller could attach a reservation to
+  // somebody else's plan by guessing its numeric id.
+  if (parsed.data.eventPlanId) {
+    if (!clientUserId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const [ownedPlan] = await db
+      .select({ id: eventPlans.id })
+      .from(eventPlans)
+      .where(
+        and(
+          eq(eventPlans.id, parsed.data.eventPlanId),
+          eq(eventPlans.userId, clientUserId),
+        ),
+      )
+      .limit(1);
+    if (!ownedPlan) {
+      return NextResponse.json({ error: "Event plan not found" }, { status: 404 });
     }
   }
 

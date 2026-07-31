@@ -52,7 +52,7 @@ interface Booking {
   eventPlanId: number | null;
   clientUserId: string | null;
   clientName: string;
-  clientPhone: string;
+  clientPhone: string | null;
   clientEmail: string | null;
   eventType: string | null;
   eventDate: string;

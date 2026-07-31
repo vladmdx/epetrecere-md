@@ -180,7 +180,6 @@ export async function GET(req: NextRequest) {
         artistUnread: conversations.artistUnread,
         createdAt: conversations.createdAt,
         clientName: users.name,
-        clientEmail: users.email,
       })
       .from(conversations)
       .leftJoin(users, eq(users.id, conversations.clientUserId))
@@ -210,7 +209,6 @@ export async function GET(req: NextRequest) {
         artistUnread: conversations.artistUnread,
         createdAt: conversations.createdAt,
         clientName: users.name,
-        clientEmail: users.email,
       })
       .from(conversations)
       .leftJoin(users, eq(users.id, conversations.clientUserId))
@@ -248,7 +246,6 @@ export async function GET(req: NextRequest) {
             artistUnread: conversations.artistUnread,
             createdAt: conversations.createdAt,
             clientName: users.name,
-            clientEmail: users.email,
           })
           .from(conversations)
           .leftJoin(users, eq(users.id, conversations.clientUserId))
@@ -268,7 +265,6 @@ export async function GET(req: NextRequest) {
             artistUnread: conversations.artistUnread,
             createdAt: conversations.createdAt,
             clientName: users.name,
-            clientEmail: users.email,
           })
           .from(conversations)
           .leftJoin(users, eq(users.id, conversations.clientUserId))

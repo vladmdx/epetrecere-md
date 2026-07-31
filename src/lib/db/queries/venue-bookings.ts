@@ -28,7 +28,7 @@ export type VenueBooking = {
   eventPlanId: number | null;
   clientUserId: string | null;
   clientName: string;
-  clientPhone: string;
+  clientPhone: string | null;
   clientEmail: string | null;
   eventType: string | null;
   eventDate: string;
@@ -157,11 +157,23 @@ export async function getVenueBookings(
     );
   }
 
-  return rows.map((r) => ({
-    ...r,
-    linkedArtists: r.eventPlanId ? linkedMap.get(r.eventPlanId) ?? [] : [],
-    sameDayBookingsCount: (sameDateCounts.get(r.eventDate) ?? 0),
-  }));
+  const contactSharedStatuses = new Set([
+    "accepted",
+    "confirmed_by_client",
+    "completed",
+  ]);
+
+  return rows.map((r) => {
+    const canSeeContact = contactSharedStatuses.has(r.status);
+    return {
+      ...r,
+      clientPhone: canSeeContact ? r.clientPhone : null,
+      clientEmail: canSeeContact ? r.clientEmail : null,
+      userEmail: canSeeContact ? r.userEmail : null,
+      linkedArtists: r.eventPlanId ? linkedMap.get(r.eventPlanId) ?? [] : [],
+      sameDayBookingsCount: sameDateCounts.get(r.eventDate) ?? 0,
+    };
+  });
 }
 
 /** Counts per tab so we can show badges. */

@@ -98,10 +98,16 @@ export async function POST(req: NextRequest) {
 
   // Only ask after the event has happened
   const today = new Date().toISOString().slice(0, 10);
-  if (booking.eventDate > today) {
+  if (booking.eventDate >= today) {
     return NextResponse.json(
       { error: "Poți cere recenzia doar după eveniment" },
       { status: 400 },
+    );
+  }
+  if (!["confirmed_by_client", "completed"].includes(booking.status)) {
+    return NextResponse.json(
+      { error: "Recenzia poate fi cerută doar pentru o rezervare confirmată" },
+      { status: 409 },
     );
   }
 
@@ -138,10 +144,7 @@ export async function POST(req: NextRequest) {
   const base = process.env.NEXT_PUBLIC_SITE_URL || "https://epetrecere.md";
   const entityName =
     kind === "sala" ? booking.venueName || "sala" : booking.artistName || "artistul";
-  const entitySlug =
-    kind === "sala" ? booking.venueSlug : booking.artistSlug;
-  const entityPath = kind === "sala" ? "sali" : "artisti";
-  const reviewUrl = `${base}/${entityPath}/${entitySlug}?review_booking=${booking.id}`;
+  const reviewUrl = `${base}/cabinet/recenzii?booking=${booking.id}`;
 
   const html = reviewRequestEmail({
     clientName: booking.clientName,

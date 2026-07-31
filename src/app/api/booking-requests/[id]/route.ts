@@ -113,6 +113,12 @@ export async function PUT(
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
+    if (booking.status !== "pending") {
+      return NextResponse.json(
+        { error: "Doar cererile în așteptare pot fi acceptate" },
+        { status: 409 },
+      );
+    }
     // Re-validate availability on accept — working hours + conflicts.
     // Same checks as on POST so an artist can't accept a booking that
     // violates their own schedule.
@@ -313,30 +319,18 @@ export async function PUT(
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
+    if (booking.status !== "pending") {
+      return NextResponse.json(
+        { error: "Doar cererile în așteptare pot fi refuzate" },
+        { status: 409 },
+      );
+    }
     await db.update(bookingRequests).set({
       status: "rejected",
       artistReply: reply || "Ne pare rău, nu suntem disponibili.",
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
-    // If the booking had already been accepted, remove the source="booking"
-    // block from whichever calendar it targeted.
-    if (booking.status === "accepted" && booking.eventDate) {
-      const entityType = booking.venueId ? "venue" : "artist";
-      const entityId = booking.venueId ?? booking.artistId;
-      if (entityId) {
-        await db
-          .delete(calendarEvents)
-          .where(
-            and(
-              eq(calendarEvents.entityType, entityType),
-              eq(calendarEvents.entityId, entityId),
-              eq(calendarEvents.date, booking.eventDate),
-              eq(calendarEvents.source, "booking"),
-            ),
-          );
-      }
-    }
   } else if (action === "client_confirm") {
     // Only the original client (matched via users.clerkId → clientUserId) may
     // promote an "accepted" booking to "confirmed_by_client".
@@ -376,31 +370,17 @@ export async function PUT(
     if (!appUser || appUser.id !== booking.clientUserId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    if (booking.status !== "pending") {
+      return NextResponse.json(
+        { error: "Doar cererile în așteptare pot fi retrase de client" },
+        { status: 409 },
+      );
+    }
     await db.update(bookingRequests).set({
       status: "cancelled",
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
-    // Same cleanup as reject: release the calendar block.
-    if (
-      (booking.status === "accepted" || booking.status === "confirmed_by_client") &&
-      booking.eventDate
-    ) {
-      const entityType = booking.venueId ? "venue" : "artist";
-      const entityId = booking.venueId ?? booking.artistId;
-      if (entityId) {
-        await db
-          .delete(calendarEvents)
-          .where(
-            and(
-              eq(calendarEvents.entityType, entityType),
-              eq(calendarEvents.entityId, entityId),
-              eq(calendarEvents.date, booking.eventDate),
-              eq(calendarEvents.source, "booking"),
-            ),
-          );
-      }
-    }
   } else if (action === "complete") {
     const owner = await requireBookingArtistOwner();
     if (!owner.ok) {
@@ -564,6 +544,15 @@ export async function PUT(
     if (!paidStatus || !["unpaid", "partial", "paid"].includes(paidStatus)) {
       return NextResponse.json({ error: "paidStatus required" }, { status: 400 });
     }
+    if (
+      booking.status !== "confirmed_by_client" &&
+      booking.status !== "completed"
+    ) {
+      return NextResponse.json(
+        { error: "Plata poate fi actualizată doar pentru rezervări confirmate" },
+        { status: 409 },
+      );
+    }
     await db.update(bookingRequests).set({
       paidStatus,
       updatedAt: new Date(),
@@ -608,6 +597,12 @@ export async function PUT(
     }
     if (!isClient && !isArtistOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (booking.status !== "pending") {
+      return NextResponse.json(
+        { error: "Negocierea este disponibilă doar cât cererea este în așteptare" },
+        { status: 409 },
+      );
     }
     const existingOffers = (booking.priceOffers ?? []) as Array<{
       from: "artist" | "client";

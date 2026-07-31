@@ -145,13 +145,12 @@ export async function POST(
 
   // Sender display name comes from the appUser record; fall back to the side.
   const [appUserFull] = await db
-    .select({ name: users.name, email: users.email })
+    .select({ name: users.name })
     .from(users)
     .where(eq(users.id, ctx.appUser.id))
     .limit(1);
   const senderName =
     appUserFull?.name ||
-    appUserFull?.email ||
     (ctx.side === "artist"
       ? "Artist"
       : ctx.side === "venue"

@@ -7,7 +7,7 @@ import {
   users,
   artists,
 } from "@/lib/db/schema";
-import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getLocalized } from "@/i18n";
 
 // M4 — GET /api/reviews/reviewable-bookings
@@ -49,7 +49,7 @@ export async function GET() {
     .leftJoin(reviews, eq(reviews.bookingRequestId, bookingRequests.id))
     .where(
       and(
-        eq(bookingRequests.status, "confirmed_by_client"),
+        inArray(bookingRequests.status, ["confirmed_by_client", "completed"]),
         lt(bookingRequests.eventDate, sql`${today}::date`),
         or(
           eq(bookingRequests.clientUserId, appUser.id),

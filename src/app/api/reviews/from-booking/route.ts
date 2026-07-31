@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Must be confirmed and past event date
-  if (booking.status !== "confirmed_by_client") {
+  if (!["confirmed_by_client", "completed"].includes(booking.status)) {
     return NextResponse.json(
       { error: "Doar rezervările confirmate pot fi recenzate" },
       { status: 400 },
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   }
   // eventDate is a date column ("YYYY-MM-DD"); compare against today
   const today = new Date().toISOString().slice(0, 10);
-  if (booking.eventDate > today) {
+  if (booking.eventDate >= today) {
     return NextResponse.json(
       { error: "Poți lăsa o recenzie doar după eveniment" },
       { status: 400 },
