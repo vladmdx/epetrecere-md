@@ -37,10 +37,14 @@ import {
   MOLDOVA_CITIES,
   TRAVEL_DISTANCE_OPTIONS,
 } from "@/lib/moldova-cities";
+import { getLocalized } from "@/i18n";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Category {
   id: number;
   nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
   slug: string;
   type: string;
 }
@@ -59,6 +63,7 @@ const MIN_AI_INPUT = 40;
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useUser();
+  const { locale } = useLocale();
   const [step, setStep] = useState(0);
   const [categories, setCategories] = useState<Category[]>([]);
   const [data, setData] = useState({
@@ -99,7 +104,12 @@ export default function OnboardingPage() {
         return r.json();
       })
       .then((cats) =>
-        setCategories(cats.filter((c: Category) => c.type === "artist")),
+        setCategories(
+          cats.filter(
+            (category: Category) =>
+              category.type === "artist" || category.type === "service",
+          ),
+        ),
       )
       .catch(() => toast.error("Nu s-au putut încărca categoriile"));
 
@@ -337,7 +347,7 @@ export default function OnboardingPage() {
                     : "border-border/40 hover:border-gold/30",
                 )}
               >
-                {cat.nameRo}
+                {getLocalized(cat, "name", locale)}
               </button>
             ))}
           </div>
@@ -691,7 +701,15 @@ export default function OnboardingPage() {
             </div>
           )}
           <div className="space-y-2 text-sm">
-            <SummaryRow label="Categorie" value={categories.find((c) => c.id === data.categoryId)?.nameRo ?? "—"} />
+            <SummaryRow
+              label="Categorie"
+              value={
+                (() => {
+                  const category = categories.find((c) => c.id === data.categoryId);
+                  return category ? getLocalized(category, "name", locale) : "—";
+                })()
+              }
+            />
             <SummaryRow label="Nume" value={data.name} />
             <SummaryRow label="Oraș de bază" value={data.baseCity} />
             <SummaryRow
