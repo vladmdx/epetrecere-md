@@ -26,6 +26,7 @@ const manualOverrides: Record<Exclude<Locale, "ro">, PhraseMap> = {
   },
   en: {
     Alege: "Choose",
+    "Confirmați": "Confirmed",
     "data și locația evenimentului": "the event date and location",
     Autentificare: "Sign in",
     Preferințe: "Preferences",
