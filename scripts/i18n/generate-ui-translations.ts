@@ -83,6 +83,20 @@ function literalValue(node: ts.Node): string | null {
   return null;
 }
 
+function literalValues(node: ts.Node): string[] {
+  const values: string[] = [];
+  const visit = (child: ts.Node) => {
+    const value = literalValue(child);
+    if (value) {
+      values.push(value);
+      return;
+    }
+    ts.forEachChild(child, visit);
+  };
+  visit(node);
+  return values;
+}
+
 function extractPhrases(): string[] {
   const phrases = new Set<string>();
   const add = (value: string | null) => {
@@ -107,12 +121,12 @@ function extractPhrases(): string[] {
       if (ts.isJsxAttribute(node) && VISIBLE_ATTRIBUTES.has(node.name.getText(tree))) {
         if (node.initializer && ts.isStringLiteral(node.initializer)) add(node.initializer.text);
         if (node.initializer && ts.isJsxExpression(node.initializer) && node.initializer.expression) {
-          add(literalValue(node.initializer.expression));
+          literalValues(node.initializer.expression).forEach(add);
         }
       }
 
       if (ts.isJsxExpression(node) && node.expression) {
-        add(literalValue(node.expression));
+        literalValues(node.expression).forEach(add);
       }
 
       if (ts.isPropertyAssignment(node)) {
