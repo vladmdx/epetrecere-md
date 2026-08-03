@@ -3,6 +3,8 @@
 // Order: Chișinău first, then top-5 cities by population, then the rest
 // alphabetically. Anything missing → falls back to free text.
 
+import type { Locale } from "@/types";
+
 const TOP_CITIES = [
   "Chișinău",
   "Bălți",
@@ -55,6 +57,55 @@ const ALPHABETIC = [
 export const MOLDOVA_CITIES: string[] = [...TOP_CITIES, ...ALPHABETIC];
 
 export const DEFAULT_CITY = "Chișinău";
+
+const CITY_NAMES_RU: Record<string, string> = {
+  "Chișinău": "Кишинёв",
+  "Bălți": "Бельцы",
+  Tiraspol: "Тирасполь",
+  "Tighina (Bender)": "Бендеры",
+  Cahul: "Кагул",
+  Ungheni: "Унгены",
+  "Anenii Noi": "Новые Анены",
+  Basarabeasca: "Бессарабка",
+  Briceni: "Бричаны",
+  "Călărași": "Калараш",
+  Cantemir: "Кантемир",
+  "Căușeni": "Каушаны",
+  "Cimișlia": "Чимишлия",
+  Comrat: "Комрат",
+  Criuleni: "Криуляны",
+  Dnestrovsc: "Днестровск",
+  "Dondușeni": "Дондюшаны",
+  Drochia: "Дрокия",
+  "Dubăsari": "Дубоссары",
+  "Edineț": "Единцы",
+  "Fălești": "Фалешты",
+  "Florești": "Флорешты",
+  Glodeni: "Глодяны",
+  "Hîncești": "Хынчешты",
+  Ialoveni: "Яловены",
+  Leova: "Леова",
+  Nisporeni: "Ниспорены",
+  "Ocnița": "Окница",
+  Orhei: "Оргеев",
+  Otaci: "Отачь",
+  Rezina: "Резина",
+  "Rîbnița": "Рыбница",
+  "Rîșcani": "Рышканы",
+  "Sîngerei": "Сынжерей",
+  Slobozia: "Слободзея",
+  Soroca: "Сороки",
+  "Strășeni": "Страшены",
+  "Șoldănești": "Шолданешты",
+  "Ștefan Vodă": "Штефан-Водэ",
+  Taraclia: "Тараклия",
+  "Telenești": "Теленешты",
+  "Vulcănești": "Вулканешты",
+};
+
+export function localizeMoldovaCity(city: string, locale: Locale): string {
+  return locale === "ru" ? CITY_NAMES_RU[city] ?? city : city;
+}
 
 /** Normalized lowercase set for membership checks (case-insensitive). */
 const CITY_SET = new Set(MOLDOVA_CITIES.map((c) => c.toLowerCase()));

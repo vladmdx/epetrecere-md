@@ -56,7 +56,11 @@ const sortOptions = [
   { value: "newest", label: "Cei mai noi" },
 ];
 
-const popularSearches = ["Formații", "DJ", "Prezentatori", "Muzică Populară", "Cover Band", "Instrumentaliști"];
+const popularSearches = {
+  ro: ["Formații", "DJ", "Prezentatori", "Muzică Populară", "Cover Band", "Instrumentaliști"],
+  ru: ["Группы", "DJ", "Ведущие", "Народная музыка", "Кавер-группа", "Инструменталисты"],
+  en: ["Bands", "DJ", "Hosts", "Folk Music", "Cover Band", "Instrumentalists"],
+} as const;
 
 const locations = ["", "Chișinău", "Bălți", "Orhei", "Cahul", "Ungheni", "Soroca"];
 
@@ -172,7 +176,7 @@ export function ArtistsListClient({
               </button>
               <div className="flex flex-wrap items-center gap-1.5 sm:col-span-3">
                 <span className="mr-1 text-[10px] text-white/43">{labels.popular}</span>
-                {popularSearches.map((item) => (
+                {popularSearches[locale].map((item) => (
                   <button
                     key={item}
                     type="button"

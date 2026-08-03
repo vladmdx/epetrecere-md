@@ -9,6 +9,7 @@ import { getServerLocale } from "@/lib/i18n/server-locale";
 import { findEditorialPost2026 } from "@/lib/blog/editorial-posts-2026";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
+import { localizeBlogCategory } from "@/i18n/blog-categories";
 
 export async function generateMetadata() {
   const locale = await getServerLocale();
@@ -156,7 +157,7 @@ export default async function BlogListingPage() {
                     {featured.category && (
                       <span className="flex items-center gap-1.5">
                         <Tag className="h-3 w-3" />
-                        {featured.category}
+                        {localizeBlogCategory(featured.category, locale)}
                       </span>
                     )}
                   </div>
@@ -225,7 +226,7 @@ export default async function BlogListingPage() {
                         )}
                         {post.category && (
                           <span className="absolute left-3 top-3 rounded-full border border-white/10 bg-black/55 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-wider text-[#edc86b] backdrop-blur">
-                            {post.category}
+                            {localizeBlogCategory(post.category, locale)}
                           </span>
                         )}
                       </div>

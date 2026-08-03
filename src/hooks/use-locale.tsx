@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 import type { Locale } from "@/types";
 import { defaultLocale, t as translate } from "@/i18n";
+import { useLegacyUiTranslation } from "@/i18n/legacy-dom-translator";
 
 interface LocaleContextValue {
   locale: Locale;
@@ -22,6 +23,7 @@ function getStoredLocale(): Locale {
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>(defaultLocale);
+  useLegacyUiTranslation(locale);
 
   useEffect(() => {
     // Intentional sync-in-effect: read the locale cookie on first mount

@@ -6,18 +6,24 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Calendar } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 import { useState, useEffect } from "react";
+import { getLocalized } from "@/i18n";
+import { localizeBlogCategory } from "@/i18n/blog-categories";
 
 interface BlogPost {
   slug: string;
-  coverImage: string | null;
+  coverImageUrl: string | null;
   titleRo: string;
+  titleRu: string | null;
+  titleEn: string | null;
   excerptRo: string | null;
+  excerptRu: string | null;
+  excerptEn: string | null;
   publishedAt: string | null;
-  categoryName: string | null;
+  category: string | null;
 }
 
 export function BlogPreviewSection() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [posts, setPosts] = useState<BlogPost[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -81,10 +87,10 @@ export function BlogPreviewSection() {
                 className="group flex flex-col overflow-hidden rounded-xl border border-border/40 bg-card transition-all hover:border-gold/30 hover:shadow-[0_4px_20px_rgba(201,168,76,0.1)]"
               >
                 <div className="relative aspect-[16/9] overflow-hidden bg-muted">
-                  {post.coverImage ? (
+                  {post.coverImageUrl ? (
                     <Image
-                      src={post.coverImage}
-                      alt={post.titleRo}
+                      src={post.coverImageUrl}
+                      alt={getLocalized(post, "title", locale)}
                       fill
                       sizes="(max-width: 768px) 100vw, 33vw"
                       className="object-cover transition-transform duration-500 group-hover:scale-105"
@@ -97,20 +103,20 @@ export function BlogPreviewSection() {
                 </div>
                 <div className="flex flex-1 flex-col p-5">
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    {post.categoryName && <span className="text-gold font-medium">{post.categoryName}</span>}
-                    {post.categoryName && post.publishedAt && <span>·</span>}
+                    {post.category && <span className="text-gold font-medium">{localizeBlogCategory(post.category, locale)}</span>}
+                    {post.category && post.publishedAt && <span>·</span>}
                     {post.publishedAt && (
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {new Date(post.publishedAt).toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" })}
+                        {new Date(post.publishedAt).toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-RO", { day: "numeric", month: "short", year: "numeric" })}
                       </span>
                     )}
                   </div>
                   <h3 className="mt-2 font-heading text-base font-bold group-hover:text-gold transition-colors">
-                    {post.titleRo}
+                    {getLocalized(post, "title", locale)}
                   </h3>
-                  {post.excerptRo && (
-                    <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{post.excerptRo}</p>
+                  {getLocalized(post, "excerpt", locale) && (
+                    <p className="mt-2 text-sm text-muted-foreground line-clamp-2">{getLocalized(post, "excerpt", locale)}</p>
                   )}
                   <span className="mt-auto pt-3 text-xs font-medium text-gold">
                     {t("common.readMore")} →

@@ -10,6 +10,7 @@ import { CustomCalendar } from "@/components/public/custom-calendar";
 import { TimePicker } from "@/components/ui/time-picker";
 import { ServiceIcon } from "@/components/public/service-icon";
 import { useLocale } from "@/hooks/use-locale";
+import { getLocalized } from "@/i18n";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import {
@@ -18,7 +19,7 @@ import {
   ClipboardList, UtensilsCrossed, Check, LogIn, Camera,
 } from "lucide-react";
 import { isCategoryAllowedForEvent } from "@/lib/wizard/categories-meta";
-import { MOLDOVA_CITIES } from "@/lib/moldova-cities";
+import { localizeMoldovaCity, MOLDOVA_CITIES } from "@/lib/moldova-cities";
 
 // ═══════════════════════════════════════════════
 // TYPES
@@ -662,7 +663,7 @@ function computeEndTime(startTime: string, durationHours: number): string {
 }
 
 function StepDate({ data, update }: StepProps) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const presets =
     DURATION_PRESETS[data.eventType] ?? DURATION_PRESETS.other;
   const endTime = computeEndTime(data.startTime, data.durationHours);
@@ -703,7 +704,7 @@ function StepDate({ data, update }: StepProps) {
                 className="mt-2 h-11 w-full rounded-lg border border-[#e6b84d]/28 bg-[#0b1019] px-3 text-sm text-white outline-none focus:border-[#e6b84d]/65"
               >
                 {MOLDOVA_CITIES.map((city) => (
-                  <option key={city} value={city}>{city}</option>
+                  <option key={city} value={city}>{localizeMoldovaCity(city, locale)}</option>
                 ))}
               </select>
               <p className="mt-1 text-[10px] text-white/42">
@@ -961,11 +962,14 @@ type CategoryRow = {
   id: number;
   slug: string;
   nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
   type: "artist" | "service" | "venue";
   sortOrder?: number | null;
 };
 
 function StepServices({ data, update }: StepProps) {
+  const { locale } = useLocale();
   const [categories, setCategories] = useState<CategoryRow[]>([]);
   const [loadingCats, setLoadingCats] = useState(true);
 
@@ -1054,7 +1058,9 @@ function StepServices({ data, update }: StepProps) {
                 )}
               >
                 <ServiceIcon slug={cat.slug} className="h-7 w-7 text-[#e6b84d]" />
-                <span className="text-xs font-medium leading-tight">{cat.nameRo}</span>
+                <span className="text-xs font-medium leading-tight">
+                  {getLocalized(cat, "name", locale)}
+                </span>
                 {checked && (
                   <span className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-[linear-gradient(135deg,#f2d278,#d9a63c)] text-[#07101d]">
                     <Check className="h-3.5 w-3.5" />
@@ -1235,7 +1241,7 @@ interface SummaryProps extends StepProps {
 }
 
 function StepSummary({ data, update, isSignedIn }: SummaryProps) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   // Pull category names so the summary shows real labels (e.g. "Iluzioniști /
   // Magicieni") instead of raw slugs.
   const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
@@ -1245,16 +1251,16 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: unknown) => {
         if (!alive) return;
-        const list: Array<{ slug: string; nameRo: string }> = Array.isArray(rows)
-          ? (rows as Array<{ slug: string; nameRo: string }>)
+        const list: CategoryRow[] = Array.isArray(rows)
+          ? (rows as CategoryRow[])
           : [];
         const map: Record<string, string> = {};
-        for (const c of list) map[c.slug] = c.nameRo;
+        for (const c of list) map[c.slug] = getLocalized(c, "name", locale);
         setCategoryNames(map);
       })
       .catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [locale]);
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_summary")}</h2>

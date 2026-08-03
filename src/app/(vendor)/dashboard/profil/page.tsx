@@ -367,7 +367,7 @@ export default function VendorProfilePage() {
       </div>
 
       <Tabs defaultValue="info">
-        <TabsList>
+        <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1">
           <TabsTrigger value="info">Informații</TabsTrigger>
           <TabsTrigger value="description">Descriere</TabsTrigger>
           <TabsTrigger value="gallery">Galerie</TabsTrigger>

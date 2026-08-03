@@ -4,8 +4,7 @@ import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { LocaleProvider } from "@/hooks/use-locale";
 import { PreferencesProvider } from "@/hooks/use-preferences";
-import { ClerkProvider } from "@clerk/nextjs";
-import { roRO } from "@clerk/localizations";
+import { LocalizedClerkProvider } from "@/components/shared/localized-clerk-provider";
 import { CookieConsent } from "@/components/shared/cookie-consent";
 import { PwaManager } from "@/components/shared/pwa-manager";
 import { ReferralCapture } from "@/components/shared/referral-capture";
@@ -53,26 +52,13 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col overflow-x-hidden">
-        <ClerkProvider
-          signInUrl="/sign-in"
-          signUpUrl="/sign-up"
-          // Force every successful auth (sign-in or sign-up, OAuth or
-          // password) through /auth-redirect — that's where the role
-          // picker lives. Setting it on the provider (not just on the
-          // SignIn/SignUp components) covers OAuth callbacks that come
-          // back without a mounted React component.
-          signInForceRedirectUrl="/auth-redirect"
-          signUpForceRedirectUrl="/auth-redirect"
-          signInFallbackRedirectUrl="/auth-redirect"
-          signUpFallbackRedirectUrl="/auth-redirect"
-          localization={roRO}
-        ><ThemeProvider><LocaleProvider><PreferencesProvider>
+        <ThemeProvider><LocaleProvider><LocalizedClerkProvider><PreferencesProvider>
           {children}
           <CookieConsent />
           <PwaManager />
           <ReferralCapture />
           <Toaster />
-        </PreferencesProvider></LocaleProvider></ThemeProvider></ClerkProvider>
+        </PreferencesProvider></LocalizedClerkProvider></LocaleProvider></ThemeProvider>
       </body>
     </html>
   );

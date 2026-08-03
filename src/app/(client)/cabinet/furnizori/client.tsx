@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useUser } from "@clerk/nextjs";
 import {
   ArrowLeft,
@@ -16,15 +17,22 @@ import {
   Building2,
   Calendar,
   Plus,
+  PlayCircle,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useLocale } from "@/hooks/use-locale";
+import { getLocalized } from "@/i18n";
 
 interface Vendor {
   kind: "artist" | "venue";
   id: number;
-  name: string;
+  nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
   slug: string | null;
+  imageUrl: string;
+  videoUrl: string | null;
   status: string;
   eventDate: string | null;
   eventType: string | null;
@@ -47,6 +55,7 @@ const statusLabels: Record<string, { label: string; cls: string }> = {
 };
 
 export function FurnizoriClient() {
+  const { locale } = useLocale();
   const { isLoaded, isSignedIn } = useUser();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -144,11 +153,41 @@ export function FurnizoriClient() {
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           {vendors.map((v) => {
             const status = statusLabels[v.status] ?? statusLabels.new;
+            const name = getLocalized(v, "name", locale);
             const publicPath =
               v.slug &&
               (v.kind === "artist" ? `/artisti/${v.slug}` : `/sali/${v.slug}`);
             return (
-              <Card key={`${v.kind}-${v.id}`}>
+              <Card key={`${v.kind}-${v.id}`} className="overflow-hidden">
+                <div className="relative aspect-[16/7] bg-muted">
+                  <Image
+                    src={v.imageUrl}
+                    alt={name}
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover"
+                    unoptimized
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+                  <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full border border-white/20 bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+                    {v.kind === "artist" ? (
+                      <Music className="h-3 w-3" />
+                    ) : (
+                      <Building2 className="h-3 w-3" />
+                    )}
+                    {v.kind === "artist" ? "Artist" : "Sală"}
+                  </span>
+                  {v.videoUrl && (
+                    <a
+                      href={v.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-gold px-3 py-1.5 text-xs font-semibold text-[#0D0D0D] shadow-lg hover:bg-gold-dark"
+                    >
+                      <PlayCircle className="h-4 w-4" /> Video
+                    </a>
+                  )}
+                </div>
                 <CardContent className="p-5">
                   <div className="flex items-start gap-3">
                     <div className="rounded-lg bg-gold/10 p-2 text-gold">
@@ -161,7 +200,7 @@ export function FurnizoriClient() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="truncate font-heading font-bold">
-                          {v.name}
+                          {name}
                         </h3>
                         <Badge className={`text-xs ${status.cls}`}>
                           {status.label}

@@ -11,6 +11,7 @@ import { getServerLocale } from "@/lib/i18n/server-locale";
 import { findEditorialPost2026 } from "@/lib/blog/editorial-posts-2026";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
+import { localizeBlogCategory } from "@/i18n/blog-categories";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -137,7 +138,7 @@ export default async function BlogPostPage({ params }: Props) {
             {post.category && (
               <span className="inline-flex items-center gap-1.5 rounded-full border border-gold/25 bg-black/30 px-3 py-1 font-semibold uppercase tracking-wider text-gold backdrop-blur">
                 <Tag className="h-3 w-3" />
-                {post.category}
+                {localizeBlogCategory(post.category, locale)}
               </span>
             )}
             <span className="inline-flex items-center gap-1.5 text-white/48">

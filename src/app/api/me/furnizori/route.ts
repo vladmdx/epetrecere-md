@@ -5,21 +5,28 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { desc, eq, inArray } from "drizzle-orm";
+import { asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   artists,
+  artistImages,
+  artistVideos,
   bookingRequests,
   offerRequests,
   users,
   venues,
+  venueImages,
 } from "@/lib/db/schema";
 
 interface VendorEntry {
   kind: "artist" | "venue";
   id: number;
-  name: string;
+  nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
   slug: string | null;
+  imageUrl: string;
+  videoUrl: string | null;
   status: string;
   eventDate: string | null;
   eventType: string | null;
@@ -90,6 +97,9 @@ export async function GET() {
             id: artists.id,
             slug: artists.slug,
             nameRo: artists.nameRo,
+            nameRu: artists.nameRu,
+            nameEn: artists.nameEn,
+            photoUrl: artists.photoUrl,
           })
           .from(artists)
           .where(inArray(artists.id, artistIds))
@@ -100,14 +110,93 @@ export async function GET() {
             id: venues.id,
             slug: venues.slug,
             nameRo: venues.nameRo,
+            nameRu: venues.nameRu,
+            nameEn: venues.nameEn,
+            videoTestimonials: venues.videoTestimonials,
           })
           .from(venues)
           .where(inArray(venues.id, venueIds))
       : Promise.resolve([]),
   ]);
 
+  const [artistImageRows, artistVideoRows, venueImageRows] = await Promise.all([
+    artistIds.length
+      ? db
+          .select({
+            artistId: artistImages.artistId,
+            url: artistImages.url,
+            isCover: artistImages.isCover,
+            sortOrder: artistImages.sortOrder,
+          })
+          .from(artistImages)
+          .where(inArray(artistImages.artistId, artistIds))
+          .orderBy(desc(artistImages.isCover), asc(artistImages.sortOrder))
+      : Promise.resolve([]),
+    artistIds.length
+      ? db
+          .select({
+            artistId: artistVideos.artistId,
+            platform: artistVideos.platform,
+            videoId: artistVideos.videoId,
+            sortOrder: artistVideos.sortOrder,
+          })
+          .from(artistVideos)
+          .where(inArray(artistVideos.artistId, artistIds))
+          .orderBy(asc(artistVideos.sortOrder))
+      : Promise.resolve([]),
+    venueIds.length
+      ? db
+          .select({
+            venueId: venueImages.venueId,
+            url: venueImages.url,
+            isCover: venueImages.isCover,
+            sortOrder: venueImages.sortOrder,
+          })
+          .from(venueImages)
+          .where(inArray(venueImages.venueId, venueIds))
+          .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder))
+      : Promise.resolve([]),
+  ]);
+
   const artistById = new Map(artistRows.map((a) => [a.id, a]));
   const venueById = new Map(venueRows.map((v) => [v.id, v]));
+  const artistImageById = new Map<number, string>();
+  const artistVideoById = new Map<number, string>();
+  const venueImageById = new Map<number, string>();
+  for (const image of artistImageRows) {
+    if (!artistImageById.has(image.artistId)) artistImageById.set(image.artistId, image.url);
+  }
+  for (const video of artistVideoRows) {
+    if (artistVideoById.has(video.artistId)) continue;
+    artistVideoById.set(
+      video.artistId,
+      video.platform === "youtube"
+        ? `https://www.youtube.com/watch?v=${video.videoId}`
+        : `https://vimeo.com/${video.videoId}`,
+    );
+  }
+  for (const image of venueImageRows) {
+    if (!venueImageById.has(image.venueId)) venueImageById.set(image.venueId, image.url);
+  }
+
+  function artistMedia(artist: (typeof artistRows)[number]) {
+    return {
+      imageUrl:
+        artistImageById.get(artist.id) ||
+        artist.photoUrl ||
+        "/images/artists/placeholder.svg",
+      videoUrl: artistVideoById.get(artist.id) || null,
+    };
+  }
+
+  function venueMedia(venue: (typeof venueRows)[number]) {
+    return {
+      imageUrl:
+        venueImageById.get(venue.id) ||
+        `/images/venues/hall-${(venue.id % 6) + 1}.jpg`,
+      videoUrl: venue.videoTestimonials?.[0]?.url || null,
+    };
+  }
 
   const vendors: VendorEntry[] = [];
 
@@ -118,8 +207,11 @@ export async function GET() {
     vendors.push({
       kind: "artist",
       id: a.id,
-      name: a.nameRo,
+      nameRo: a.nameRo,
+      nameRu: a.nameRu,
+      nameEn: a.nameEn,
       slug: a.slug,
+      ...artistMedia(a),
       status: b.status,
       eventDate: b.eventDate,
       eventType: b.eventType,
@@ -135,8 +227,11 @@ export async function GET() {
         vendors.push({
           kind: "artist",
           id: a.id,
-          name: a.nameRo,
+          nameRo: a.nameRo,
+          nameRu: a.nameRu,
+          nameEn: a.nameEn,
           slug: a.slug,
+          ...artistMedia(a),
           status: o.status ?? "new",
           eventDate: o.eventDate,
           eventType: o.eventType,
@@ -151,8 +246,11 @@ export async function GET() {
         vendors.push({
           kind: "venue",
           id: v.id,
-          name: v.nameRo,
+          nameRo: v.nameRo,
+          nameRu: v.nameRu,
+          nameEn: v.nameEn,
           slug: v.slug,
+          ...venueMedia(v),
           status: o.status ?? "new",
           eventDate: o.eventDate,
           eventType: o.eventType,
