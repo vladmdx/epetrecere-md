@@ -21,17 +21,25 @@ function getStoredLocale(): Locale {
   return (cookie?.split("=")[1] as Locale) || defaultLocale;
 }
 
-export function LocaleProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(defaultLocale);
+export function LocaleProvider({
+  children,
+  initialLocale,
+}: {
+  children: ReactNode;
+  /** Resolved on the server from the URL prefix. */
+  initialLocale?: Locale;
+}) {
+  const [locale, setLocaleState] = useState<Locale>(initialLocale ?? defaultLocale);
   useLegacyUiTranslation(locale);
 
   useEffect(() => {
-    // Intentional sync-in-effect: read the locale cookie on first mount
-    // to swap from SSR default to the user's preference. The cookie is
-    // the source of truth; refactor to useSyncExternalStore is tracked
-    // for follow-up.
+    // The URL is the source of truth now, so when the server already resolved
+    // a locale we keep it — reading the cookie here would fight the URL and
+    // reintroduce the flash of the wrong language. The cookie is only a
+    // fallback for routes rendered without the header.
+    if (initialLocale) return;
     setLocaleState(getStoredLocale());
-  }, []);
+  }, [initialLocale]);
 
   const setLocale = useCallback((newLocale: Locale) => {
     setLocaleState(newLocale);

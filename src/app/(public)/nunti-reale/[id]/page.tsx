@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, artists, venues } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";

@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import Link from "@/components/shared/locale-link";
+import { generateMetaAsync } from "@/lib/seo/generate-meta";
 
-export const metadata: Metadata = generateMeta({
+export async function generateMetadata(): Promise<Metadata> {
+  return generateMetaAsync({
   title: "Termeni și Condiții",
   description:
     "Termenii și condițiile de utilizare a platformei ePetrecere.md.",
   path: "/termeni",
 });
+}
 
 export default function TermsPage() {
   return (

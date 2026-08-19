@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { Search, Music, Building2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import Image from "next/image";
 import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, artists, venues } from "@/lib/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Camera, Calendar, MapPin, ArrowRight } from "lucide-react";
 
@@ -13,12 +13,14 @@ import { Camera, Calendar, MapPin, ArrowRight } from "lucide-react";
 // grid of "real wedding stories" with the first cover photo per event.
 // Each card links to /nunti-reale/[planId] for a full lightbox.
 
-export const metadata: Metadata = generateMeta({
+export async function generateMetadata(): Promise<Metadata> {
+  return generateMetaAsync({
   title: "Nunți reale din Moldova — galerie cu povești adevărate",
   description:
     "Descoperă povești reale de nuntă din Moldova. Fotografii aprobate de cuplurile care au folosit ePetrecere.md — inspirație și idei pentru nunta ta.",
   path: "/nunti-reale",
 });
+}
 
 export const revalidate = 3600; // ISR: refresh every hour
 

@@ -2,7 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,

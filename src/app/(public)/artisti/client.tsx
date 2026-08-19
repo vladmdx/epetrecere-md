@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowRight, MapPin, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { ArtistCard } from "@/components/public/artist-card";

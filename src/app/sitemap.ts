@@ -3,6 +3,11 @@ import { db } from "@/lib/db";
 import { artists, venues, categories, blogPosts, eventPhotos, eventPlans } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { CITIES } from "@/lib/seo/cities";
+import {
+  LOCALES,
+  localeAlternates,
+  localizePath,
+} from "@/lib/i18n/routing";
 
 // M2 — Dynamic sitemap. Next.js calls this on demand (revalidated hourly)
 // and emits an XML sitemap at /sitemap.xml. Includes every indexable URL:
@@ -139,7 +144,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [
+  const all = [
     ...staticRoutes,
     ...artistRoutes,
     ...venueRoutes,
@@ -150,4 +155,29 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...blogRoutes,
     ...realWeddingRoutes,
   ];
+
+  // Every page exists in three languages at three distinct URLs, so the
+  // sitemap lists all of them and declares the alternates. Without this the
+  // RU/EN versions would be crawled only if something happened to link to
+  // them.
+  return withLocaleAlternates(all);
+}
+
+/** Expand each entry into its ro/ru/en URLs, each carrying `alternates`. */
+function withLocaleAlternates(
+  entries: MetadataRoute.Sitemap,
+): MetadataRoute.Sitemap {
+  const out: MetadataRoute.Sitemap = [];
+  for (const e of entries) {
+    const path = e.url.startsWith(BASE_URL) ? e.url.slice(BASE_URL.length) : e.url;
+    const languages = localeAlternates(path || "/", BASE_URL);
+    for (const locale of LOCALES) {
+      out.push({
+        ...e,
+        url: `${BASE_URL}${localizePath(path || "/", locale)}`,
+        alternates: { languages },
+      });
+    }
+  }
+  return out;
 }

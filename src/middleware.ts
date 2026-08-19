@@ -1,6 +1,12 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
+import {
+  DEFAULT_LOCALE,
+  LOCALE_HEADER,
+  isLocale,
+  splitLocale,
+} from "@/lib/i18n/routing";
 
 const isProtectedRoute = createRouteMatcher(["/admin(.*)", "/dashboard(.*)"]);
 
@@ -199,7 +205,26 @@ function resolveLegacySeoSlug(pathname: string): string | null {
 }
 
 export default clerkMiddleware(async (auth, req) => {
-  const pathname = req.nextUrl.pathname;
+  const rawPathname = req.nextUrl.pathname;
+
+  // ── i18n routing ───────────────────────────────────────────────────────
+  // Each language now has its own URL (/sali, /ru/sali, /en/sali) so search
+  // engines can index all three. The prefix is stripped here and handed to
+  // server components through a request header, which keeps the existing
+  // route tree (and Clerk's matchers) working unchanged.
+  const { locale, pathname } = splitLocale(rawPathname);
+  const hasPrefix = locale !== DEFAULT_LOCALE;
+
+  // "/ro/..." is not a real URL — RO is served unprefixed. Redirect so we
+  // never serve the same page under two addresses.
+  const firstSegment = rawPathname.split("/")[1];
+  if (firstSegment === DEFAULT_LOCALE) {
+    const url = req.nextUrl.clone();
+    const rest = "/" + rawPathname.split("/").slice(2).join("/");
+    url.pathname = rest === "//" ? "/" : rest;
+    return NextResponse.redirect(url, 308);
+  }
+  void isLocale;
 
   // Legacy SEO redirects must run BEFORE auth logic so public crawlers
   // hitting `/moderatori-nunta-chisinau` get a clean 301 to the canonical URL.
@@ -229,6 +254,18 @@ export default clerkMiddleware(async (auth, req) => {
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
+
+  // Hand the resolved locale to server components. For prefixed URLs we also
+  // rewrite onto the real (unprefixed) route.
+  const headers = new Headers(req.headers);
+  headers.set(LOCALE_HEADER, locale);
+
+  if (hasPrefix) {
+    const url = req.nextUrl.clone();
+    url.pathname = pathname;
+    return NextResponse.rewrite(url, { request: { headers } });
+  }
+  return NextResponse.next({ request: { headers } });
 });
 
 export const config = {

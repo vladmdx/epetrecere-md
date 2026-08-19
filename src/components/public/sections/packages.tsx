@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { Check, Star, Zap, Crown, ArrowRight } from "lucide-react";
 
 // M7 Intern #4 — Homepage packages teaser.

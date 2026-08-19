@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { FileText } from "lucide-react";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { LEGAL_DOCUMENTS, LEGAL_PACK_VERSION } from "@/lib/legal";
 
-export const metadata: Metadata = generateMeta({
+export async function generateMetadata(): Promise<Metadata> {
+  return generateMetaAsync({
   title: "Documente legale",
   description:
     "Acordurile, politicile și tarifele care guvernează platforma ePetrecere.md.",
   path: "/legal",
 });
+}
 
 export default function LegalIndexPage() {
   return (

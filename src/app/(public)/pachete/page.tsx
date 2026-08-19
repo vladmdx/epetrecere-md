@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { Check, Percent, Gift, Building2, ShieldCheck } from "lucide-react";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { generateMetaAsync } from "@/lib/seo/generate-meta";
 
 /**
  * Vendor pricing.
@@ -15,12 +15,14 @@ import { generateMeta } from "@/lib/seo/generate-meta";
  * The page now states the model we actually operate and bill.
  */
 
-export const metadata: Metadata = generateMeta({
+export async function generateMetadata(): Promise<Metadata> {
+  return generateMetaAsync({
   title: "Tarife pentru furnizori",
   description:
     "Înregistrarea și listarea pe ePetrecere.md sunt gratuite. Plătești doar 5% din comenzile confirmate obținute prin platformă.",
   path: "/pachete",
 });
+}
 
 const INCLUDED = [
   "Profil public complet — foto, video, descriere, contact",

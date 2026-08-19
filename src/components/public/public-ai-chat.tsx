@@ -7,7 +7,7 @@
 // don't need accounts / cookies.
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { Bot, X, Send, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

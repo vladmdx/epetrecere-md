@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { Star, MapPin, Users, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";

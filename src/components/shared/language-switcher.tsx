@@ -1,7 +1,8 @@
 "use client";
 
 import { useLocale } from "@/hooks/use-locale";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { localizePath, splitLocale, type AppLocale } from "@/lib/i18n/routing";
 import { locales, localeNames } from "@/i18n";
 import {
   DropdownMenu,
@@ -19,10 +20,20 @@ const localeFlags = {
 export function LanguageSwitcher() {
   const { locale, setLocale } = useLocale();
   const router = useRouter();
+  const pathname = usePathname() || "/";
+  const searchParams = useSearchParams();
 
   function changeLocale(nextLocale: typeof locale) {
+    // The URL carries the language now, so switching means NAVIGATING to the
+    // sibling URL (/sali → /ru/sali). Only setting a cookie would leave the
+    // address bar lying about the language and give search engines — and
+    // anyone the visitor shares the link with — the wrong page.
     setLocale(nextLocale);
-    router.refresh();
+    const { pathname: bare } = splitLocale(pathname);
+    const qs = searchParams?.toString();
+    router.push(
+      localizePath(bare, nextLocale as AppLocale) + (qs ? `?${qs}` : ""),
+    );
   }
 
   return (

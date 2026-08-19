@@ -47,8 +47,12 @@ interface MetaDefaults {
 export async function metaForPath(
   path: string,
   defaults: MetaDefaults,
-  locale: Locale = "ro",
+  localeArg?: Locale,
 ): Promise<Metadata> {
+  // Default to the locale the middleware resolved from the URL prefix, so a
+  // page under /ru gets Russian metadata and its own canonical instead of
+  // inheriting the Romanian one.
+  const locale: Locale = localeArg ?? (await resolveRequestLocale());
   // The current page_meta table stores Romanian values only. Applying the
   // same override to RU/EN would replace correctly translated metadata with
   // Romanian copy, so localized pages use their translated defaults.
@@ -60,4 +64,18 @@ export async function metaForPath(
     locale,
     noindex: defaults.noindex,
   });
+}
+
+/** Locale for the current request, from the URL prefix (see middleware). */
+async function resolveRequestLocale(): Promise<Locale> {
+  try {
+    const { headers } = await import("next/headers");
+    const { LOCALE_HEADER, DEFAULT_LOCALE, isLocale } = await import(
+      "@/lib/i18n/routing"
+    );
+    const raw = (await headers()).get(LOCALE_HEADER);
+    return (isLocale(raw) ? raw : DEFAULT_LOCALE) as Locale;
+  } catch {
+    return "ro";
+  }
 }

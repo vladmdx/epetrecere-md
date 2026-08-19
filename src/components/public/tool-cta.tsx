@@ -9,7 +9,7 @@
 // forceRedirectUrl is configured to /auth-redirect and we don't want to
 // fork the auth flow for every tool.
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, LogIn } from "lucide-react";

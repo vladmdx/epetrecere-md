@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { getAllCategories } from "@/lib/db/queries/categories";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";

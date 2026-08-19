@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { notFound } from "next/navigation";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { getPageMeta } from "@/lib/seo/page-meta";

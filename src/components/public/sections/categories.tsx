@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
 import { plural, NOUNS } from "@/lib/i18n/plural";

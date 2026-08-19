@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { Search, SlidersHorizontal, CalendarCheck, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";

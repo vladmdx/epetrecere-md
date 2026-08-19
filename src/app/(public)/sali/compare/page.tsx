@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venues } from "@/lib/db/schema";
 import { Star, MapPin, Users, ArrowLeft, X, Check } from "lucide-react";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { ClearCompareButton } from "./clear-button";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = generateMeta({
+export async function generateMetadata(): Promise<Metadata> {
+  return generateMetaAsync({
   title: "Compară săli de evenimente",
   description:
     "Compară până la 3 săli side-by-side — capacitate, preț, facilități — pentru a o alege pe cea potrivită evenimentului tău.",
   path: "/sali/compare",
 });
+}
 
 interface Props {
   searchParams: Promise<{ ids?: string }>;

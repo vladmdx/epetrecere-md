@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { ArrowRight, CheckCircle2, Sparkles } from "lucide-react";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { ServiceIcon } from "@/components/public/service-icon";

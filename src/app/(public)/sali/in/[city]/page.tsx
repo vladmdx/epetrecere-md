@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getVenues } from "@/lib/db/queries/venues";

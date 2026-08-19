@@ -7,7 +7,7 @@
 // relationship multiplier and a city-cost factor.
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import {
   Gift,
   Users,
