@@ -55,6 +55,8 @@ export async function POST(req: NextRequest) {
   const body = (await req.json().catch(() => ({}))) as {
     subjectType?: "artist" | "venue";
     signatureName?: string;
+    /** Handwritten signature as a PNG data URL. */
+    signatureImage?: string;
     representativeRole?: string;
     locale?: string;
     documents?: string[];
@@ -62,6 +64,15 @@ export async function POST(req: NextRequest) {
 
   const subjectType = body.subjectType === "venue" ? "venue" : "artist";
   const signatureName = (body.signatureName ?? "").trim();
+  // Only accept a real PNG data URL, and cap it: a signature is a few KB, so
+  // anything large is either a mistake or an attempt to stuff the row.
+  const rawImage = body.signatureImage ?? null;
+  const signatureImage =
+    typeof rawImage === "string" &&
+    rawImage.startsWith("data:image/png;base64,") &&
+    rawImage.length <= 400_000
+      ? rawImage
+      : null;
   if (signatureName.length < 3) {
     return NextResponse.json(
       { error: "signature_name_required" },
@@ -115,6 +126,7 @@ export async function POST(req: NextRequest) {
         packVersion: LEGAL_PACK_VERSION,
         locale,
         signatureName,
+        signatureImage,
         representativeRole: body.representativeRole ?? null,
         ipAddress: ip,
         userAgent: ua,
@@ -126,6 +138,48 @@ export async function POST(req: NextRequest) {
       // original signature (and its timestamp) is what counts.
       .onConflictDoNothing();
     recorded.push(doc.slug);
+  }
+
+  // Send the signer their own copy of what they just accepted (Anexa 2 asks
+  // that the accepted version be available to them). Non-blocking: an email
+  // failure must not undo a recorded signature.
+  if (recorded.length > 0 && u.email) {
+    void (async () => {
+      try {
+        const { sendEmail, dataUrlToAttachment } = await import("@/lib/email/send");
+        const { signedContractEmail } = await import(
+          "@/lib/email/templates/signed-contract"
+        );
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
+        const docs = recorded
+          .map((slug) => getLegalDocument(slug))
+          .filter((d): d is NonNullable<typeof d> => Boolean(d))
+          .map((d) => ({
+            title: d.title.ro,
+            version: d.version,
+            url: `/legal/${d.slug}`,
+          }));
+        const { subject, html } = signedContractEmail({
+          signerName: signatureName,
+          subjectLabel: subjectType === "venue" ? "locația ta" : "profilul tău de artist",
+          documents: docs,
+          acceptedAt: new Date(),
+          ipAddress: ip,
+          packVersion: LEGAL_PACK_VERSION,
+          baseUrl,
+          hasSignatureImage: Boolean(signatureImage),
+        });
+        const attachment = dataUrlToAttachment(signatureImage, "semnatura.png");
+        await sendEmail({
+          to: u.email,
+          subject,
+          html,
+          attachments: attachment ? [attachment] : undefined,
+        });
+      } catch (err) {
+        console.error("[legal] signed-contract email failed", err);
+      }
+    })();
   }
 
   return NextResponse.json({ success: true, recorded, packVersion: LEGAL_PACK_VERSION });

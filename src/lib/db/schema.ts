@@ -984,6 +984,8 @@ export const legalAcceptances = pgTable(
 
     /** Typed full name of the signing representative. */
     signatureName: text("signature_name").notNull(),
+    /** Handwritten signature drawn with mouse/finger, as a PNG data URL. */
+    signatureImage: text("signature_image"),
     representativeRole: text("representative_role"),
 
     acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),

@@ -410,7 +410,11 @@
     "nameHint": "Introdu numele complet (nume și prenume).",
     "fixationNote": "La acceptare se înregistrează versiunea documentelor, data și ora, adresa IP și dispozitivul, conform Anexei 2 din Acord.",
     "readyToSign": "Gata de semnare",
-    "docsTitle": "Documente legale"
+    "docsTitle": "Documente legale",
+    "drawSignature": "Semnează aici",
+    "clearSignature": "Șterge",
+    "drawHint": "Desenează semnătura cu mouse-ul sau cu degetul",
+    "signatureTooSmall": "Semnătura e prea scurtă — desenează-o complet."
   },
   "pricing": {
     "metaTitle": "Tarife pentru furnizori",

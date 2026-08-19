@@ -410,7 +410,11 @@
     "nameHint": "Enter your full name (first and last).",
     "fixationNote": "On acceptance we record the document version, date and time, IP address and device, per Annex 2 of the Agreement.",
     "readyToSign": "Ready to sign",
-    "docsTitle": "Legal documents"
+    "docsTitle": "Legal documents",
+    "drawSignature": "Sign here",
+    "clearSignature": "Clear",
+    "drawHint": "Draw your signature with the mouse or your finger",
+    "signatureTooSmall": "The signature is too short — please draw it fully."
   },
   "pricing": {
     "metaTitle": "Vendor pricing",

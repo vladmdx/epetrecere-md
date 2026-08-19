@@ -15,6 +15,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Check, FileText, ShieldCheck } from "lucide-react";
+import { SignaturePad, type SignatureValue } from "./signature-pad";
 import { useLocale } from "@/hooks/use-locale";
 import {
   LEGAL_DOCUMENTS,
@@ -26,6 +27,8 @@ import {
 
 export interface ESignatureValue {
   signatureName: string;
+  /** Handwritten signature (PNG data URL). */
+  signatureImage: string | null;
   accepted: boolean;
   documents: string[];
 }
@@ -52,18 +55,31 @@ export function ESignature({
 
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [name, setName] = useState(defaultName);
+  const [signature, setSignature] = useState<SignatureValue>({
+    dataUrl: null,
+    isValid: false,
+  });
 
   const allTicked = docs.length > 0 && docs.every((d) => ticked.has(d.slug));
   const nameOk = name.trim().length >= 3 && name.trim().includes(" ");
-  const valid = allTicked && nameOk;
+  // All three are required: the tick is what the Partner Agreement §4.2 asks
+  // for, the typed name identifies the signer, and the drawing is the
+  // handwritten signature itself.
+  const valid = allTicked && nameOk && signature.isValid;
 
-  function emit(nextTicked: Set<string>, nextName: string) {
+  function emit(
+    nextTicked: Set<string>,
+    nextName: string,
+    nextSig: SignatureValue = signature,
+  ) {
     onChange?.({
       signatureName: nextName.trim(),
+      signatureImage: nextSig.dataUrl,
       accepted:
         docs.every((d) => nextTicked.has(d.slug)) &&
         nextName.trim().length >= 3 &&
-        nextName.trim().includes(" "),
+        nextName.trim().includes(" ") &&
+        nextSig.isValid,
       documents: docs.map((d) => d.slug),
     });
   }
@@ -181,6 +197,15 @@ export function ESignature({
               : "Introdu numele complet (nume și prenume)."}
           </p>
         )}
+      </div>
+
+      <div className="mt-4">
+        <SignaturePad
+          onChange={(v) => {
+            setSignature(v);
+            emit(ticked, name, v);
+          }}
+        />
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">

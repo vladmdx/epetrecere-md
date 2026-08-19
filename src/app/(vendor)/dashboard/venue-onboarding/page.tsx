@@ -33,6 +33,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { MOLDOVA_CITIES, DEFAULT_CITY } from "@/lib/moldova-cities";
 import { MapsAutofill } from "@/components/vendor/maps-autofill";
+import { ESignature, type ESignatureValue } from "@/components/legal/e-signature";
 
 const STEP_LABELS = [
   "Date de bază",
@@ -46,6 +47,8 @@ export default function VenueOnboardingPage() {
   const router = useRouter();
   const { user } = useUser();
   const [step, setStep] = useState(0);
+  // Vendors must sign the Legal Pack before their profile is submitted.
+  const [signature, setSignature] = useState<ESignatureValue | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
@@ -226,6 +229,22 @@ export default function VenueOnboardingPage() {
   async function handleSubmit() {
     setSubmitting(true);
     try {
+      // Record the electronic acceptance first: if the profile were created
+      // and this failed, we'd have a live vendor with no signed contract.
+      if (signature?.accepted) {
+        await fetch("/api/legal/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subjectType: "venue",
+            signatureName: signature.signatureName,
+            signatureImage: signature.signatureImage,
+            documents: signature.documents,
+            locale: document.documentElement.lang || "ro",
+          }),
+        });
+      }
+
       const res = await fetch("/api/auth/register-venue", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -671,9 +690,16 @@ export default function VenueOnboardingPage() {
             Continuă <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
+          <>
+          <div className="mb-4">
+            <ESignature
+              subjectType="venue"
+              onChange={setSignature}
+            />
+          </div>
           <Button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !signature?.accepted}
             className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             {submitting ? (
@@ -684,6 +710,7 @@ export default function VenueOnboardingPage() {
               </>
             )}
           </Button>
+          </>
         )}
       </div>
     </div>

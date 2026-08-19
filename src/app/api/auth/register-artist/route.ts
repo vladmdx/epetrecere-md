@@ -307,6 +307,31 @@ export async function POST(req: Request) {
     })();
 
     // Notify admins (in-app + email)
+    // Attach the vendor's signed contract (drawn signature) to the admin
+    // notification, so whoever approves the request sees what was signed
+    // without digging through the admin panel.
+    const { legalAcceptances } = await import("@/lib/db/schema");
+    const { desc: descOrder } = await import("drizzle-orm");
+    const signedRows = await db
+      .select({
+        image: legalAcceptances.signatureImage,
+        name: legalAcceptances.signatureName,
+        acceptedAt: legalAcceptances.acceptedAt,
+      })
+      .from(legalAcceptances)
+      .where(eq(legalAcceptances.userId, appUser.id))
+      .orderBy(descOrder(legalAcceptances.acceptedAt))
+      .limit(1);
+    const signed = signedRows[0] ?? null;
+    const { dataUrlToAttachment } = await import("@/lib/email/send");
+    const signatureAttachment = dataUrlToAttachment(
+      signed?.image ?? null,
+      "semnatura-furnizor.png",
+    );
+    const signedBlock = signed
+      ? `<p style="margin:12px 0 0;">Contract semnat de <strong>${signed.name}</strong> la ${new Date(signed.acceptedAt).toLocaleString("ro-RO")}.${signatureAttachment ? " Semnătura este atașată." : ""}</p>`
+      : `<p style="margin:12px 0 0;color:#E8B84B;">⚠ Nu există un contract semnat pentru acest cont.</p>`;
+
     const admins = await db
       .select({ id: users.id, email: users.email })
       .from(users)
@@ -340,7 +365,8 @@ export async function POST(req: Request) {
             <div style="margin-top:20px;text-align:center;">
               <a href="https://epetrecere.md/admin/cereri-inregistrare" style="display:inline-block;background:#C9A84C;color:#0D0D0D;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Vezi cererea →</a>
             </div>
-          </div>`,
+          </div>${signedBlock}`,
+          attachments: signatureAttachment ? [signatureAttachment] : undefined,
         }).catch((err) => console.error("[register-artist] Email failed:", err));
       }
     }

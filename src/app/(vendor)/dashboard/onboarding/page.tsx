@@ -39,6 +39,7 @@ import {
 } from "@/lib/moldova-cities";
 import { getLocalized } from "@/i18n";
 import { useLocale } from "@/hooks/use-locale";
+import { ESignature, type ESignatureValue } from "@/components/legal/e-signature";
 
 interface Category {
   id: number;
@@ -65,6 +66,8 @@ export default function OnboardingPage() {
   const { user } = useUser();
   const { locale } = useLocale();
   const [step, setStep] = useState(0);
+  // Vendors must sign the Legal Pack before their profile is submitted.
+  const [signature, setSignature] = useState<ESignatureValue | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [data, setData] = useState({
     name: "",
@@ -225,6 +228,22 @@ export default function OnboardingPage() {
       );
 
       // 1. Create the artist row (same endpoint as before).
+      // Record the electronic acceptance first: if the profile were created
+      // and this failed, we'd have a live vendor with no signed contract.
+      if (signature?.accepted) {
+        await fetch("/api/legal/accept", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subjectType: "artist",
+            signatureName: signature.signatureName,
+            signatureImage: signature.signatureImage,
+            documents: signature.documents,
+            locale: document.documentElement.lang || "ro",
+          }),
+        });
+      }
+
       const res = await fetch("/api/auth/register-artist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -775,9 +794,16 @@ export default function OnboardingPage() {
             Continuă <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
+          <>
+          <div className="mb-4">
+            <ESignature
+              subjectType="artist"
+              onChange={setSignature}
+            />
+          </div>
           <Button
             onClick={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || !signature?.accepted}
             className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
           >
             {submitting ? (
@@ -788,6 +814,7 @@ export default function OnboardingPage() {
               </>
             )}
           </Button>
+          </>
         )}
       </div>
     </div>
