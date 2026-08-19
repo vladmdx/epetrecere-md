@@ -1,236 +1,193 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Check, Star, Zap, Crown } from "lucide-react";
+import { Check, Percent, Gift, Building2, ShieldCheck } from "lucide-react";
 import { generateMeta } from "@/lib/seo/generate-meta";
-import { Badge } from "@/components/ui/badge";
+
+/**
+ * Vendor pricing.
+ *
+ * This page used to advertise Basic/Pro/Premium subscriptions at 49€/129€ and
+ * claim "no commissions". Both statements contradicted the Legal Pack v1.0:
+ *   - Tariffs §1: registration and standard publication are FREE, and "at
+ *     launch EPETRECERE does not use Basic/Plus/Pro/Premium/Elite packages".
+ *   - Tariffs §2 / Partner Agreement §11.1: partners pay a 5% service fee on
+ *     confirmed orders — so "fără comisioane" was simply false.
+ * The page now states the model we actually operate and bill.
+ */
 
 export const metadata: Metadata = generateMeta({
-  title: "Pachete pentru furnizori",
+  title: "Tarife pentru furnizori",
   description:
-    "Alege pachetul potrivit pentru profilul tău pe ePetrecere.md — Basic, Pro sau Premium. Listează-ți serviciile, primești cereri directe și crești vânzările.",
+    "Înregistrarea și listarea pe ePetrecere.md sunt gratuite. Plătești doar 5% din comenzile confirmate obținute prin platformă.",
   path: "/pachete",
 });
 
-interface Tier {
-  id: "basic" | "pro" | "premium";
-  name: string;
-  tagline: string;
-  priceLabel: string;
-  priceNote: string;
-  highlight?: boolean;
-  icon: typeof Star;
-  features: string[];
-  cta: string;
-}
+const INCLUDED = [
+  "Profil public complet — foto, video, descriere, contact",
+  "Apariție în catalog, căutare și pagini de categorie",
+  "Cereri de rezervare directe de la clienți",
+  "Chat cu clienții și gestionarea cererilor",
+  "Calendar de disponibilitate și pachete de servicii",
+  "Recenzii verificate de la clienți reali",
+];
 
-const tiers: Tier[] = [
+const FAQ = [
   {
-    id: "basic",
-    name: "Basic",
-    tagline: "Începe gratuit, vizibilitate de bază",
-    priceLabel: "Gratuit",
-    priceNote: "pentru totdeauna",
-    icon: Star,
-    features: [
-      "Profil public complet (foto, descriere, contact)",
-      "Listare în catalogul public",
-      "Până la 5 fotografii în galerie",
-      "1 pachet de servicii",
-      "Primești cereri de ofertă",
-      "Notificări email",
-    ],
-    cta: "Începe gratuit",
+    q: "Cât costă înregistrarea?",
+    a: "Nimic. Înregistrarea și publicarea standard a profilului sunt gratuite (Tarife §1). Nu există pachete Basic/Pro/Premium la această etapă.",
   },
   {
-    id: "pro",
-    name: "Pro",
-    tagline: "Cel mai popular pentru profesioniști",
-    priceLabel: "49€",
-    priceNote: "pe lună",
-    highlight: true,
-    icon: Zap,
-    features: [
-      "Tot din Basic",
-      "Galerie nelimitată (foto + video)",
-      "Pachete nelimitate cu prețuri",
-      "Calendar de disponibilitate sincronizat",
-      "Badge „Verificat” pe profil",
-      "Răspuns automat la cereri",
-      "Prioritate în rezultate de căutare",
-      "Statistici detaliate (vizualizări, conversii)",
-      "Chat direct cu clienții",
-    ],
-    cta: "Aplică pentru Pro",
+    q: "Cum se calculează comisionul?",
+    a: "Pentru artiști și prestatori de servicii: 5% din valoarea comenzii confirmate obținute prin platformă, inclusiv serviciile suplimentare care fac parte din comandă (Tarife §2–§3).",
   },
   {
-    id: "premium",
-    name: "Premium",
-    tagline: "Maximum expunere și suport dedicat",
-    priceLabel: "129€",
-    priceNote: "pe lună",
-    icon: Crown,
-    features: [
-      "Tot din Pro",
-      "Badge „Premium” auriu pe profil",
-      "Poziție featured pe homepage",
-      "Listare prioritară în categoria ta",
-      "AI Assistant pentru descrieri & răspunsuri",
-      "Rapoarte lunare personalizate",
-      "Suport dedicat (manager de cont)",
-      "Campanii de promovare pe social media",
-      "Integrare calendar Google/Apple",
-    ],
-    cta: "Vreau Premium",
+    q: "Când apare obligația de plată?",
+    a: "În momentul în care rezervarea primește statutul „Comandă confirmată” (Tarife §5). Plata se face în 10 zile calendaristice de la factură sau notificare (§7).",
+  },
+  {
+    q: "Cât plătesc sălile și restaurantele?",
+    a: "Remunerația pentru locații se stabilește separat, în funcție de tipul evenimentului, și este comunicată înainte de nașterea obligației (Tarife §4, Acord Locații §13.2). Nu se aplică comisioane ascunse.",
+  },
+  {
+    q: "Ce se întâmplă dacă evenimentul se anulează?",
+    a: "Anularea nu anulează automat remunerația, dar poate fi recalculată în funcție de inițiator, motiv și etapa executării. Dacă evenimentul nu a avut loc și menținerea remunerației ar fi nejustificată, suma se corectează (Tarife §10).",
+  },
+  {
+    q: "Există costuri ascunse?",
+    a: "Nu. În viitor pot apărea servicii opționale cu plată — publicitate, promovare, analiză — dar activarea lor nu este automată (Tarife §12).",
   },
 ];
 
-const faqs = [
-  {
-    q: "Pot schimba pachetul oricând?",
-    a: "Da, poți face upgrade sau downgrade oricând din panoul vendor. Schimbarea intră în vigoare imediat, iar diferența se prorată pentru luna curentă.",
-  },
-  {
-    q: "Ce se întâmplă dacă anulez?",
-    a: "Profilul tău rămâne activ pe planul Basic. Nu pierzi datele, galeria sau cererile primite — doar funcționalitățile Pro/Premium se dezactivează.",
-  },
-  {
-    q: "Există comisioane pentru rezervări?",
-    a: "Nu. Pe ePetrecere.md plătești doar abonamentul lunar. Toate cererile și rezervările ajung direct la tine, fără comision pentru platformă.",
-  },
-  {
-    q: "Ce include „poziție featured” din Premium?",
-    a: "Profilul tău apare pe homepage în secțiunea „Artiști recomandați” timp de minim 7 zile pe lună, rotativ cu alți Premium din categoria ta.",
-  },
-];
-
-export default function PacketsPage() {
+export default function PricingPage() {
   return (
-    <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
-      {/* Hero */}
-      <div className="mx-auto max-w-3xl text-center">
-        <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">
-          Pentru furnizori
+    <div className="mx-auto max-w-5xl px-4 py-12 lg:px-8">
+      <div className="text-center">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[3px] text-gold">
+          Tarife
         </p>
         <h1 className="font-heading text-3xl font-bold md:text-4xl">
-          Alege pachetul potrivit pentru afacerea ta
+          Listezi gratuit. Plătești doar când câștigi.
         </h1>
-        <p className="mt-4 text-lg text-muted-foreground">
-          Crește vizibilitatea, primește cereri calificate și gestionează-ți
-          rezervările dintr-un singur loc. Fără comisioane — doar abonament lunar transparent.
+        <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
+          Fără abonament și fără taxă de înregistrare. Platforma reține un comision
+          doar din comenzile confirmate pe care ți le aduce.
         </p>
       </div>
 
-      {/* Tiers */}
-      <div className="mt-12 grid gap-6 lg:grid-cols-3">
-        {tiers.map((tier) => {
-          const Icon = tier.icon;
-          return (
-            <div
-              key={tier.id}
-              className={`relative flex flex-col rounded-2xl border p-6 ${
-                tier.highlight
-                  ? "border-gold bg-gradient-to-b from-gold/10 to-transparent shadow-lg"
-                  : "border-border/40 bg-card"
-              }`}
-            >
-              {tier.highlight && (
-                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gold text-[#0D0D0D]">
-                  Cel mai popular
-                </Badge>
-              )}
-              <div className="flex items-center gap-2">
-                <Icon
-                  className={`h-5 w-5 ${
-                    tier.highlight ? "text-gold" : "text-muted-foreground"
-                  }`}
-                />
-                <h3 className="font-heading text-xl font-bold">{tier.name}</h3>
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">{tier.tagline}</p>
-              <div className="mt-6">
-                <span className="font-accent text-4xl font-semibold">
-                  {tier.priceLabel}
-                </span>
-                <span className="ml-2 text-sm text-muted-foreground">
-                  {tier.priceNote}
-                </span>
-              </div>
-              <ul className="mt-6 flex-1 space-y-2.5 text-sm">
-                {tier.features.map((f) => (
-                  <li key={f} className="flex items-start gap-2">
-                    <Check
-                      className={`mt-0.5 h-4 w-4 shrink-0 ${
-                        tier.highlight ? "text-gold" : "text-success"
-                      }`}
-                    />
-                    <span>{f}</span>
-                  </li>
-                ))}
-              </ul>
-              <Link
-                href={`/contact?subject=${tier.id}`}
-                className={`mt-6 inline-flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-medium ${
-                  tier.highlight
-                    ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark"
-                    : "border border-border bg-background hover:bg-muted"
-                }`}
-              >
-                {tier.cta}
-              </Link>
+      {/* The two things a vendor actually pays */}
+      <div className="mt-12 grid gap-6 md:grid-cols-2">
+        <div className="rounded-2xl border border-border/60 p-6">
+          <Gift className="h-7 w-7 text-gold" />
+          <h2 className="mt-4 font-heading text-xl font-bold">Înregistrare și listare</h2>
+          <p className="mt-1 text-3xl font-bold text-gold">Gratuit</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Profil complet, apariție în catalog și cereri directe de la clienți — fără
+            niciun cost recurent.
+          </p>
+          <ul className="mt-5 space-y-2">
+            {INCLUDED.map((f) => (
+              <li key={f} className="flex items-start gap-2 text-sm">
+                <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+                <span className="text-muted-foreground">{f}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="rounded-2xl border border-gold/40 bg-gold/[0.04] p-6">
+          <Percent className="h-7 w-7 text-gold" />
+          <h2 className="mt-4 font-heading text-xl font-bold">
+            Comision din comenzi confirmate
+          </h2>
+          <p className="mt-1 text-3xl font-bold text-gold">5%</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Pentru artiști și prestatori de servicii — 5% din valoarea comenzii
+            confirmate obținute prin ePetrecere.md. Se aplică doar dacă rezervarea
+            ajunge la statutul „confirmată”.
+          </p>
+
+          <div className="mt-5 space-y-3 text-sm">
+            <div className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+              <span className="text-muted-foreground">
+                Baza de calcul: valoarea totală a comenzii, inclusiv serviciile
+                suplimentare incluse.
+              </span>
             </div>
-          );
-        })}
+            <div className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+              <span className="text-muted-foreground">
+                Termen de plată: 10 zile calendaristice de la factură sau notificare.
+              </span>
+            </div>
+            <div className="flex items-start gap-2">
+              <Check className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+              <span className="text-muted-foreground">
+                Totul e vizibil în contul tău: rezervarea, valoarea, rata, suma și
+                statusul plății.
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-5 flex items-start gap-2 rounded-xl border border-border/60 bg-background/50 p-3 text-sm">
+            <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
+            <span className="text-muted-foreground">
+              <strong className="text-foreground">Săli și restaurante:</strong>{" "}
+              remunerația se stabilește separat, în funcție de tipul evenimentului, și
+              îți este comunicată înainte de a deveni obligatorie.
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Comparison note */}
-      <div className="mt-10 rounded-xl border border-gold/20 bg-gold/5 p-6 text-center">
-        <p className="text-sm text-muted-foreground">
-          <strong className="text-foreground">Toate pachetele includ:</strong>{" "}
-          SSL & backup automat · GDPR compliant · support în română & rusă ·
-          actualizări lunare · garanție 14 zile money-back pe Pro și Premium
-        </p>
+      <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+        <Link
+          href="/sign-up"
+          className="inline-flex h-12 items-center justify-center rounded-xl bg-gold px-8 text-sm font-semibold text-[#0D0D0D] transition hover:brightness-105"
+        >
+          Înregistrează-te gratuit
+        </Link>
+        <Link
+          href="/legal/tarife"
+          className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-gold/40 px-8 text-sm font-semibold text-gold transition hover:bg-gold/10"
+        >
+          <ShieldCheck className="h-4 w-4" />
+          Citește tarifele complete
+        </Link>
       </div>
 
-      {/* FAQ */}
       <div className="mt-16">
-        <h2 className="text-center font-heading text-2xl font-bold">
+        <h2 className="mb-6 text-center font-heading text-2xl font-bold">
           Întrebări frecvente
         </h2>
-        <div className="mx-auto mt-8 grid max-w-4xl gap-4 md:grid-cols-2">
-          {faqs.map((faq) => (
-            <div
-              key={faq.q}
-              className="rounded-xl border border-border/40 bg-card p-5"
+        <div className="space-y-3">
+          {FAQ.map((item) => (
+            <details
+              key={item.q}
+              className="rounded-xl border border-border/60 p-4 [&_summary]:cursor-pointer"
             >
-              <h3 className="font-medium">{faq.q}</h3>
-              <p className="mt-2 text-sm text-muted-foreground">{faq.a}</p>
-            </div>
+              <summary className="font-medium">{item.q}</summary>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {item.a}
+              </p>
+            </details>
           ))}
         </div>
-      </div>
-
-      {/* CTA */}
-      <div className="mt-16 rounded-2xl bg-gradient-to-br from-gold/20 via-gold/5 to-transparent p-8 text-center md:p-12">
-        <h2 className="font-heading text-2xl font-bold md:text-3xl">
-          Gata să începi?
-        </h2>
-        <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-          Creează-ți profilul în 5 minute și începi să primești cereri în aceeași zi.
+        <p className="mt-6 text-center text-xs text-muted-foreground">
+          Condițiile complete sunt în{" "}
+          <Link href="/legal/tarife" className="text-gold hover:underline">
+            Tarife
+          </Link>
+          ,{" "}
+          <Link href="/legal/acord-parteneri" className="text-gold hover:underline">
+            Acordul pentru Parteneri
+          </Link>{" "}
+          și{" "}
+          <Link href="/legal/acord-locatii" className="text-gold hover:underline">
+            Acordul cu Locațiile
+          </Link>
+          .
         </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link
-            href="/sign-up?role=vendor"
-            className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
-          >
-            Creează profil gratuit
-          </Link>
-          <Link
-            href="/contact"
-            className="inline-flex items-center justify-center rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
-          >
-            Vorbește cu noi
-          </Link>
-        </div>
       </div>
     </div>
   );
