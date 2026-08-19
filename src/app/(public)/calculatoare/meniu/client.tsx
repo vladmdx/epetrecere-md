@@ -18,8 +18,11 @@ import {
   type EventType,
 } from "@/lib/calculators";
 import { Utensils } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
+import { calcLabel } from "@/lib/calculators/labels";
 
 export function MenuCalculatorClient() {
+  const { locale } = useLocale();
   const [eventType, setEventType] = useState<EventType>("wedding");
   const [guestCount, setGuestCount] = useState(100);
   const [includeSoup, setIncludeSoup] = useState(true);
@@ -97,7 +100,7 @@ export function MenuCalculatorClient() {
               <tbody>
                 {result.lines.map((line) => (
                   <tr key={line.key} className="border-b border-border/20">
-                    <td className="py-2">{line.label}</td>
+                    <td className="py-2">{calcLabel(line.label, locale)}</td>
                     <td className="py-2 text-right text-muted-foreground">
                       {line.gramsPerGuest}
                     </td>
@@ -133,7 +136,7 @@ export function MenuCalculatorClient() {
             {result.lines.map((l) => (
               <div key={l.key} className="flex items-center justify-between gap-3 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{l.label}</p>
+                  <p className="truncate text-sm font-medium">{calcLabel(l.label, locale)}</p>
                   <p className="text-xs text-muted-foreground">
                     {l.totalKg.toFixed(1)} kg × {formatEUR(l.pricePerKg)}/kg
                   </p>

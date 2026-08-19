@@ -267,7 +267,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                     flow. Heart toggle on the right of the title row;
                     persists per signed-in user via /api/wishlist. */}
                 <div className="ml-auto">
-                  <WishlistButton entityType="artist" entityId={artist.id} />
+                  <WishlistButton entityName={name} entityType="artist" entityId={artist.id} />
                 </div>
               </div>
 

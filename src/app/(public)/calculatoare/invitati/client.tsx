@@ -6,8 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { calculateGuests } from "@/lib/calculators";
 import { Users, Utensils, Baby, Car, Droplet } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
+import { calcLabel } from "@/lib/calculators/labels";
 
 export function GuestCalculatorClient() {
+  const { locale } = useLocale();
   const [guestCount, setGuestCount] = useState(120);
   const [seatsPerTable, setSeatsPerTable] = useState(10);
   const [noShowRate, setNoShowRate] = useState(10);
@@ -123,11 +126,11 @@ export function GuestCalculatorClient() {
             {stats.map((s) => {
               const Icon = s.icon;
               return (
-                <div key={s.label} className="flex items-center gap-3 p-4">
+                <div key={calcLabel(s.label, locale)} className="flex items-center gap-3 p-4">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
                     <Icon className="h-5 w-5 text-gold" />
                   </div>
-                  <div className="flex-1 text-sm">{s.label}</div>
+                  <div className="flex-1 text-sm">{calcLabel(s.label, locale)}</div>
                   <div className="font-heading text-xl font-semibold">{s.value}</div>
                 </div>
               );

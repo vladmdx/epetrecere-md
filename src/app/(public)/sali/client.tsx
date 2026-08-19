@@ -391,7 +391,7 @@ function VenueListCard({ venue, detailed, imageIndex }: { venue: Venue; detailed
             </div>
             {detailed && venue.address && <p className="mt-3 text-xs text-white/46">{venue.address}</p>}
           </div>
-          <WishlistButton entityType="venue" entityId={venue.id} />
+          <WishlistButton entityName={name} entityType="venue" entityId={venue.id} />
         </div>
       </div>
     </div>

@@ -21,8 +21,11 @@ import {
 } from "@/lib/calculators";
 import { cn } from "@/lib/utils";
 import { ArrowRight, Wallet } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
+import { calcLabel } from "@/lib/calculators/labels";
 
 export function BudgetCalculatorClient() {
+  const { locale } = useLocale();
   const [eventType, setEventType] = useState<EventType>("wedding");
   const [guestCount, setGuestCount] = useState(100);
   const [pricePerPerson, setPricePerPerson] = useState(30);
@@ -127,7 +130,7 @@ export function BudgetCalculatorClient() {
                       : "border-border/40 hover:border-gold/30",
                   )}
                 >
-                  <div>{rate.label}</div>
+                  <div>{calcLabel(rate.label, locale)}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {rate.kind === "flat"
                       ? `~${rate.price}€`
@@ -162,7 +165,7 @@ export function BudgetCalculatorClient() {
               result.items.map((item) => (
                 <div key={item.key} className="flex items-center justify-between gap-3 p-4">
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{item.label}</p>
+                    <p className="truncate text-sm font-medium">{calcLabel(item.label, locale)}</p>
                     <div className="mt-1 h-1 overflow-hidden rounded bg-muted">
                       <div
                         className="h-full bg-gold"

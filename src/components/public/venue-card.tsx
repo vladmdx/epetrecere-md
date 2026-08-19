@@ -62,13 +62,13 @@ export function VenueCard({ venue, imageIndex }: VenueCardProps) {
           </span>
         )}
         <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
-          <WishlistButton
+          <WishlistButton entityName={name}
             entityType="venue"
             entityId={venue.id}
             size="sm"
             className="bg-background/80 backdrop-blur-sm"
           />
-          <CompareButton entityType="venue" entityId={venue.id} />
+          <CompareButton entityName={name} entityType="venue" entityId={venue.id} />
         </div>
       </div>
 

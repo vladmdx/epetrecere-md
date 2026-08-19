@@ -14,10 +14,17 @@ import { useUser } from "@clerk/nextjs";
 import { Heart } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   entityType: "artist" | "venue";
   entityId: number;
+  /**
+   * Name of the thing being saved. Every card renders this button, so without
+   * it a screen reader announces "Adaugă la favorite" a dozen identical times
+   * with no way to tell which item is which (flagged in the QA audit).
+   */
+  entityName?: string;
   /** Optional label next to the heart (e.g. "Salvează"). */
   label?: string;
   /** Size variant for the button. */
@@ -63,10 +70,12 @@ function notify() {
 export function WishlistButton({
   entityType,
   entityId,
+  entityName,
   label,
   size = "md",
   className,
 }: Props) {
+  const { t } = useLocale();
   const router = useRouter();
   const pathname = usePathname();
   const { isSignedIn, isLoaded } = useUser();
@@ -149,7 +158,7 @@ export function WishlistButton({
       onClick={toggle}
       disabled={busy}
       aria-pressed={saved}
-      aria-label={saved ? "Scoate din favorite" : "Adaugă la favorite"}
+      aria-label={`${t(saved ? "a11y.removeFavorite" : "a11y.addFavorite")}${entityName ? `: ${entityName}` : ""}`}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-full border text-xs font-medium transition-colors disabled:opacity-60",
         saved

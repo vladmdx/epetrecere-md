@@ -85,13 +85,13 @@ export function ArtistCard({ artist }: ArtistCardProps) {
         </div>
         {/* Wishlist heart + Compare — positioned top-right, stacked */}
         <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
-          <WishlistButton
+          <WishlistButton entityName={name}
             entityType="artist"
             entityId={artist.id}
             size="sm"
             className="bg-background/80 backdrop-blur-sm"
           />
-          <CompareButton entityType="artist" entityId={artist.id} />
+          <CompareButton entityName={name} entityType="artist" entityId={artist.id} />
         </div>
       </div>
 

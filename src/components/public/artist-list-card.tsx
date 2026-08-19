@@ -127,9 +127,9 @@ export function ArtistListCard({ artist, density }: Props) {
           </div>
 
           <div className="flex shrink-0 items-center gap-1">
-            <WishlistButton entityType="artist" entityId={artist.id} />
+            <WishlistButton entityName={name} entityType="artist" entityId={artist.id} />
             {density === "detailed" && (
-              <CompareButton entityType="artist" entityId={artist.id} />
+              <CompareButton entityName={name} entityType="artist" entityId={artist.id} />
             )}
           </div>
         </div>

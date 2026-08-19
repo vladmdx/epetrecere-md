@@ -11,8 +11,11 @@ import {
   type EventType,
 } from "@/lib/calculators";
 import { Wine } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
+import { calcLabel } from "@/lib/calculators/labels";
 
 export function DrinksCalculatorClient() {
+  const { locale } = useLocale();
   const [eventType, setEventType] = useState<EventType>("wedding");
   const [guestCount, setGuestCount] = useState(100);
   const [drinkersRatio, setDrinkersRatio] = useState(80);
@@ -96,7 +99,7 @@ export function DrinksCalculatorClient() {
               <tbody>
                 {result.lines.map((line) => (
                   <tr key={line.key} className="border-b border-border/20">
-                    <td className="py-2">{line.label}</td>
+                    <td className="py-2">{calcLabel(line.label, locale)}</td>
                     <td className="py-2 text-right text-muted-foreground">
                       {(line.totalMl / 1000).toFixed(1)} L
                     </td>
@@ -128,7 +131,7 @@ export function DrinksCalculatorClient() {
             {result.lines.map((l) => (
               <div key={l.key} className="flex items-center justify-between gap-3 p-4">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{l.label}</p>
+                  <p className="truncate text-sm font-medium">{calcLabel(l.label, locale)}</p>
                   <p className="text-xs text-muted-foreground">
                     {l.bottles} × {(l.bottleMl / 1000).toFixed(2)}L
                   </p>

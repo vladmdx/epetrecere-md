@@ -195,7 +195,7 @@ export function VenueDetailClient({
               <h1 className="font-heading text-3xl font-semibold tracking-tight text-[#fbf7ee] md:text-5xl">{name}</h1>
             </div>
             <div className="ml-auto">
-              <WishlistButton entityType="venue" entityId={venue.id} />
+              <WishlistButton entityName={name} entityType="venue" entityId={venue.id} />
             </div>
           </div>
 
