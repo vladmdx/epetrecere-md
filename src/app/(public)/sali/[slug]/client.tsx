@@ -30,6 +30,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { trackClick } from "@/lib/analytics/track-click";
+import { plural, NOUNS } from "@/lib/i18n/plural";
 
 interface VenueData {
   id: number;
@@ -211,7 +212,7 @@ export function VenueDetailClient({
             <span className="flex items-center gap-1">
               <Star className="h-3.5 w-3.5 fill-gold text-gold" />
               {venue.ratingAvg && venue.ratingAvg > 0 ? venue.ratingAvg.toFixed(1) : "Nou"}
-              {venue.ratingCount ? <span className="text-white/36">({venue.ratingCount} recenzii)</span> : null}
+              {venue.ratingCount ? <span className="text-white/36">({plural(venue.ratingCount, locale, NOUNS.reviews)})</span> : null}
             </span>
             {venue.workingHours && (
               <span className="flex items-center gap-1" title="Program funcționare">

@@ -22,6 +22,8 @@ import {
   SERVICE_TO_CATEGORY_SLUG,
   SERVICE_LABELS,
 } from "@/lib/wizard/service-mapping";
+import { plural, NOUNS } from "@/lib/i18n/plural";
+import { useLocale } from "@/hooks/use-locale";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -463,6 +465,7 @@ function SectionHeader({
   subtitle?: string;
   count?: number;
 }) {
+  const { locale } = useLocale();
   return (
     <div className="mb-4 flex items-end justify-between gap-3">
       <div>
@@ -472,7 +475,7 @@ function SectionHeader({
         )}
       </div>
       {typeof count === "number" && (
-        <span className="text-xs text-muted-foreground">{count} rezultate</span>
+        <span className="text-xs text-muted-foreground">{plural(count, locale, NOUNS.results)}</span>
       )}
     </div>
   );

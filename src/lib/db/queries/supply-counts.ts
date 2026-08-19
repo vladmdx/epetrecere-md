@@ -10,7 +10,7 @@
 
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { artists, venues, categories, bookingRequests } from "@/lib/db/schema";
+import { artists, venues, categories, bookingRequests, users } from "@/lib/db/schema";
 
 export interface SupplyCounts {
   /** Per homepage tile key. */
@@ -52,11 +52,16 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
         .from(venues)
         .where(eq(venues.isActive, true)),
       db.select({ n: sql<number>`count(*)::int` }).from(categories),
+      // Exclude bookings made by QA/E2E accounts — they are real rows, but
+      // counting them would overstate the marketplace's activity on a public
+      // trust badge. The data stays; only the public tally ignores it.
       db
         .select({ n: sql<number>`count(*)::int` })
         .from(bookingRequests)
+        .leftJoin(users, eq(users.id, bookingRequests.clientUserId))
         .where(
-          sql`${bookingRequests.status} in ('completed','confirmed_by_client')`,
+          sql`${bookingRequests.status} in ('completed','confirmed_by_client')
+              and (${users.email} is null or ${users.email} !~* '(test|qa|demo|e2e)')`,
         ),
     ]);
 

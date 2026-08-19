@@ -100,6 +100,16 @@ export const NOUNS = {
     ru: { one: "фотография", few: "фотографии", many: "фотографий" },
     en: { one: "photo", other: "photos" },
   },
+  results: {
+    ro: { one: "rezultat", few: "rezultate", many: "rezultate" },
+    ru: { one: "результат", few: "результата", many: "результатов" },
+    en: { one: "result", other: "results" },
+  },
+  columns: {
+    ro: { one: "coloană", few: "coloane", many: "coloane" },
+    ru: { one: "колонка", few: "колонки", many: "колонок" },
+    en: { one: "column", other: "columns" },
+  },
   guests: {
     ro: { one: "invitat", few: "invitați", many: "invitați" },
     ru: { one: "гость", few: "гостя", many: "гостей" },

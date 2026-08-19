@@ -8,6 +8,7 @@ import { artists } from "@/lib/db/schema";
 import { Star, MapPin, ArrowLeft, X, Check } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { ClearCompareButton } from "./clear-button";
+import { NotSpecified } from "@/components/public/not-specified";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
       render: (a) =>
         a.priceFrom
           ? `${a.priceFrom} ${a.priceCurrency ?? "EUR"}`
-          : "—",
+          : <NotSpecified />,
     },
     {
       label: "Rating",
@@ -101,7 +102,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
             </span>
           </span>
         ) : (
-          "—"
+          <NotSpecified />
         ),
     },
     {
@@ -113,7 +114,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
             {a.location}
           </span>
         ) : (
-          "—"
+          <NotSpecified />
         ),
     },
     {
@@ -142,7 +143,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
             {a.descriptionRo.replace(/<[^>]+>/g, "").slice(0, 400)}
           </p>
         ) : (
-          "—"
+          <NotSpecified />
         ),
     },
   ];

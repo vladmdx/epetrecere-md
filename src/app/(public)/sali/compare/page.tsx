@@ -7,6 +7,7 @@ import { venues } from "@/lib/db/schema";
 import { Star, MapPin, Users, ArrowLeft, X, Check } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { ClearCompareButton } from "./clear-button";
+import { NotSpecified } from "@/components/public/not-specified";
 
 export const dynamic = "force-dynamic";
 
@@ -100,7 +101,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
             {v.city}
           </span>
         ) : (
-          "—"
+          <NotSpecified />
         ),
     },
     {
@@ -113,12 +114,12 @@ export default async function VenueComparePage({ searchParams }: Props) {
             {v.capacityMax} persoane
           </span>
         ) : (
-          "—"
+          <NotSpecified />
         ),
     },
     {
       label: "Preț / persoană",
-      render: (v) => (v.pricePerPerson ? `${v.pricePerPerson}€` : "—"),
+      render: (v) => (v.pricePerPerson ? `${v.pricePerPerson}€` : <NotSpecified />),
     },
     {
       label: "Rating",
@@ -132,7 +133,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
             </span>
           </span>
         ) : (
-          "—"
+          <NotSpecified />
         ),
     },
     {
@@ -172,7 +173,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
             {v.descriptionRo.replace(/<[^>]+>/g, "").slice(0, 400)}
           </p>
         ) : (
-          "—"
+          <NotSpecified />
         ),
     },
   ];
