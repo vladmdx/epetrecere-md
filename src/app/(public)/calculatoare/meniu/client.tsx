@@ -111,7 +111,7 @@ export function MenuCalculatorClient() {
             </table>
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
-            Prețurile sunt indicative, pentru achiziție en-gros (Moldova 2025).
+            Prețurile sunt indicative, pentru achiziție en-gros (Moldova 2026).
             Dacă lucrezi cu o sală care asigură tot meniul, verifică prețul pe persoană al acesteia.
           </p>
         </div>

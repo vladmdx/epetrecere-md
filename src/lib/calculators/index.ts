@@ -179,6 +179,21 @@ export function calculateGuests(input: GuestInput): GuestResult {
 
   const expectedAttendance = Math.round(guestCount * (1 - noShowRate));
 
+  // No guests means no venue at all. The Math.max floors below express
+  // "a real event needs at least 2 waiters", not "an empty room does" — so
+  // short-circuit before them, otherwise 0 guests reported 1 table,
+  // 2 bathrooms and 2 waiters.
+  if (expectedAttendance <= 0) {
+    return {
+      expectedAttendance: 0,
+      tablesNeeded: 0,
+      emptySeatsLastTable: 0,
+      bathroomsNeeded: 0,
+      waitersNeeded: 0,
+      parkingNeeded: 0,
+    };
+  }
+
   // Subtract head table from regular seating pool
   const seatsToPlace = Math.max(0, expectedAttendance - headTableSeats);
   const regularTables = Math.ceil(seatsToPlace / seatsPerTable);

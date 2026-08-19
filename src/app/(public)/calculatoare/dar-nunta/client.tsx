@@ -41,11 +41,13 @@ const RELATIONSHIPS: { id: Relationship; label: string; description: string; mul
   { id: "nas", label: "Naș / cumătru", description: "Rol ceremonial — suma este mult mai mare", multiplier: 2.5 },
 ];
 
-const VENUE_TIERS: { id: VenueTier; label: string; plate: number; description: string }[] = [
-  { id: "modest", label: "Cantină / sală modestă", plate: 25, description: "≈25€ / persoană" },
-  { id: "standard", label: "Restaurant standard", plate: 45, description: "≈45€ / persoană" },
-  { id: "premium", label: "Restaurant premium", plate: 70, description: "≈70€ / persoană" },
-  { id: "luxury", label: "Sală luxury / hotel 5★", plate: 110, description: "≈110€ / persoană" },
+// No static "≈X€/persoană" here: the calculator multiplies the plate by the
+// city factor, so the effective figure is derived at render time instead.
+const VENUE_TIERS: { id: VenueTier; label: string; plate: number }[] = [
+  { id: "modest", label: "Cantină / sală modestă", plate: 25 },
+  { id: "standard", label: "Restaurant standard", plate: 45 },
+  { id: "premium", label: "Restaurant premium", plate: 70 },
+  { id: "luxury", label: "Sală luxury / hotel 5★", plate: 110 },
 ];
 
 const CITY_TIERS: { id: CityTier; label: string; factor: number }[] = [
@@ -177,7 +179,9 @@ export function DarNuntaClient() {
                   }`}
                 >
                   <p className="text-sm font-medium">{v.label}</p>
-                  <p className="text-xs text-muted-foreground">{v.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    ≈{Math.round(v.plate * (CITY_TIERS.find((c) => c.id === city)?.factor ?? 1))}€ / persoană
+                  </p>
                 </button>
               ))}
             </CardContent>

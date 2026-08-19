@@ -10,7 +10,7 @@ export async function generateMetadata() {
   return metaForPath("/calculatoare/meniu", {
     title: "Calculator meniu & mâncare nuntă, botez, cumătrie",
     description:
-      "Calculează cantitățile de aperitive, fel principal, zeamă, fructe și tort pentru evenimentul tău. Norme pe porții, prețuri bulk Moldova 2025.",
+      "Calculează cantitățile de aperitive, fel principal, zeamă, fructe și tort pentru evenimentul tău. Norme pe porții, prețuri bulk Moldova 2026.",
   });
 }
 
