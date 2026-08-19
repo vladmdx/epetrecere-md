@@ -14,10 +14,23 @@ import {
   bookingRequests,
 } from "@/lib/db/schema";
 import { VenueFinanciarClient } from "./client";
+import { CommissionPanel } from "@/components/vendor/commission-panel";
 
 export const dynamic = "force-dynamic";
 
-const COMMISSION_PCT = 0.1;
+// The venue fee is NOT a fixed 10% — the legal pack leaves venue tariffs to be
+// agreed separately (Tariffs §4), and the real rates are configured by an admin
+// under site_settings.commission_rules. We read them here so this page can
+// never show a number the platform doesn't actually charge.
+async function getVenueCommissionPct(guestHint: number | null): Promise<number> {
+  const { getCommissionRules } = await import("@/lib/commissions/service");
+  const rules = await getCommissionRules();
+  const tier =
+    (guestHint ?? 0) >= rules.venue.guestThreshold
+      ? rules.venue.atOrAbove
+      : rules.venue.below;
+  return tier.rateBps != null ? tier.rateBps / 10_000 : 0;
+}
 
 export default async function VenueFinanciarPage() {
   const { userId: clerkId } = await auth();
@@ -118,6 +131,7 @@ export default async function VenueFinanciarPage() {
     0,
   );
   const revenueTotal = Number(totalRow[0]?.total ?? 0);
+  const COMMISSION_PCT = await getVenueCommissionPct(null);
   const commissionThisMonth = Math.round(revenueThisMonth * COMMISSION_PCT);
 
   const paid = confirmedBookings.filter((b) => b.paidStatus === "paid").length;
@@ -140,6 +154,7 @@ export default async function VenueFinanciarPage() {
   }
 
   return (
+    <>
     <VenueFinanciarClient
       venueName={venue.nameRo}
       stats={{
@@ -159,5 +174,7 @@ export default async function VenueFinanciarPage() {
       chartData={chartData}
       commissionPct={COMMISSION_PCT}
     />
+    <div className="px-6 pb-6"><CommissionPanel /></div>
+    </>
   );
 }

@@ -199,6 +199,21 @@ export async function PUT(
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
+    // Tariffs §5 — the platform fee obligation is born the moment the order
+    // reaches "confirmed". Raise the commission row now so it shows up in the
+    // vendor's and admin's finance views. Idempotent (unique index on the
+    // booking id) and non-blocking: a fee failure must never break an accept.
+    void (async () => {
+      try {
+        const { ensureCommissionForBooking } = await import(
+          "@/lib/commissions/service"
+        );
+        await ensureCommissionForBooking(Number(id));
+      } catch (err) {
+        console.error("[commissions] ensure failed for booking", id, err);
+      }
+    })();
+
     // Referral milestone — if the accepted booking is for a referred
     // client and it's their first, credit the referrer. Non-blocking.
     if (booking.clientUserId) {

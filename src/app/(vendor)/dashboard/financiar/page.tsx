@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { db } from "@/lib/db";
 import { artists, bookingRequests, users } from "@/lib/db/schema";
+import { CommissionPanel } from "@/components/vendor/commission-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -313,6 +314,7 @@ function TransactionRow({ row, amount, currency }: TransactionRowProps) {
           {isConfirmed ? "Confirmat" : "În așteptare"}
         </Badge>
       </div>
+          <CommissionPanel />
     </div>
   );
 }

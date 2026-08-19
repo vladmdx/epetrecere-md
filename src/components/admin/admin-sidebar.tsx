@@ -26,7 +26,7 @@ import {
   Menu,
   X,
   GitMerge,
-} from "lucide-react";
+  Wallet,} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/hooks/use-locale";
@@ -38,6 +38,7 @@ const navItems = [
   { href: "/admin/cereri-inregistrare", icon: UserCheck, label: "Cereri Înregistrare" },
   { href: "/admin/cereri-oferte", icon: Star, label: "Cereri Oferte" },
   { href: "/admin/crm", icon: MessageSquare, label: "CRM" },
+  { href: "/admin/finante", icon: Wallet, label: "Finanțe" },
   { href: "/admin/artisti", icon: Users, label: "Artiști" },
   { href: "/admin/categorii", icon: Grid3X3, label: "Categorii" },
   { href: "/admin/sali", icon: Building2, label: "Săli" },

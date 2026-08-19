@@ -945,6 +945,76 @@ export const bookingRequestStatusEnum = pgEnum("booking_request_status", [
   "expired",
 ]);
 
+/**
+ * Platform service fee ("remunerație de serviciu") owed by a vendor for a
+ * confirmed booking. Per the Legal Pack v1.0:
+ *   - Partners (artists): flat 5% of the confirmed order value
+ *     (Partner Agreement §11.1, Tariffs §2).
+ *   - Venues: agreed separately, tiered by guest count. The actual rates are
+ *     NOT fixed in the legal pack (Tariffs §4 — "aprobată separat"), so they
+ *     live in site_settings under `commission_rules` and are editable by an
+ *     admin instead of being hardcoded here.
+ * Settlement is manual: an admin marks a row paid once the money arrives.
+ */
+export const commissionStatusEnum = pgEnum("commission_status", [
+  /** Owed, not yet settled. */
+  "pending",
+  /** Invoice issued, awaiting payment. */
+  "invoiced",
+  /** Settled — admin confirmed receipt. */
+  "paid",
+  /** Dropped (event did not happen, recalculation per Tariffs §10). */
+  "cancelled",
+  /** Deliberately not charged (promo, individual terms — Tariffs §13). */
+  "waived",
+]);
+
+export const commissions = pgTable(
+  "commissions",
+  {
+    id: serial("id").primaryKey(),
+    /** One commission per booking. */
+    bookingRequestId: integer("booking_request_id")
+      .notNull()
+      .references(() => bookingRequests.id, { onDelete: "cascade" }),
+    /** Which side of the marketplace owes it. */
+    vendorType: text("vendor_type").notNull(), // "artist" | "venue"
+    artistId: integer("artist_id").references(() => artists.id, { onDelete: "cascade" }),
+    venueId: integer("venue_id").references(() => venues.id, { onDelete: "cascade" }),
+
+    /** Order value the fee was computed from, in minor-unit-free integers. */
+    baseAmount: integer("base_amount").notNull(),
+    currency: varchar("currency", { length: 3 }).default("EUR").notNull(),
+    /** Rate in basis points (500 = 5%). Null when a flat fee was applied. */
+    rateBps: integer("rate_bps"),
+    /** The fee itself, same currency as baseAmount. */
+    amount: integer("amount").notNull(),
+    /** Snapshot for audit — venue tiers depend on it and it can change later. */
+    guestCount: integer("guest_count"),
+    /** Which rule produced this row: artist_flat | venue_below | venue_above. */
+    tier: text("tier"),
+
+    status: commissionStatusEnum("status").default("pending").notNull(),
+    /** Tariffs §7 — 10 calendar days from notice unless agreed otherwise. */
+    dueDate: date("due_date"),
+
+    paidAt: timestamp("paid_at"),
+    /** Admin who recorded the manual settlement. */
+    paidBy: uuid("paid_by").references(() => users.id, { onDelete: "set null" }),
+    paymentMethod: text("payment_method"),
+    paymentNote: text("payment_note"),
+
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("commissions_booking_unique").on(t.bookingRequestId),
+    index("commissions_status_idx").on(t.status),
+    index("commissions_artist_idx").on(t.artistId),
+    index("commissions_venue_idx").on(t.venueId),
+  ],
+);
+
 export const bookingPaidStatusEnum = pgEnum("booking_paid_status", [
   "unpaid",
   "partial",
