@@ -10,6 +10,7 @@ import { FloatingCTA } from "@/components/shared/floating-cta";
 import { websiteJsonLd, organizationJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getFeaturedArtists } from "@/lib/db/queries/artists";
 import { getFeaturedVenues } from "@/lib/db/queries/venues";
+import { getSupplyCounts } from "@/lib/db/queries/supply-counts";
 import { metaForPath } from "@/lib/seo/page-meta";
 
 export async function generateMetadata() {
@@ -41,6 +42,7 @@ const defaultSectionOrder = [
 export default async function HomePage() {
   let featuredArtists: Awaited<ReturnType<typeof getFeaturedArtists>> = [];
   let featuredVenues: Awaited<ReturnType<typeof getFeaturedVenues>> = [];
+  let supply: Awaited<ReturnType<typeof getSupplyCounts>> | null = null;
   // The redesigned homepage renders a FIXED section order. The legacy
   // DB-driven `homepageSections` config predates the new section types
   // (features / recommendations / community), so using it for ordering here
@@ -48,12 +50,14 @@ export default async function HomePage() {
   const visibleSections: string[] = defaultSectionOrder;
 
   try {
-    const [artists, venues] = await Promise.all([
+    const [artists, venues, counts] = await Promise.all([
       getFeaturedArtists(8),
       getFeaturedVenues(6),
+      getSupplyCounts(),
     ]);
     featuredArtists = artists;
     featuredVenues = venues;
+    supply = counts;
   } catch {
     // DB not connected — sections still render; featured lists stay empty.
   }
@@ -66,7 +70,7 @@ export default async function HomePage() {
       case "features":
         return <FeatureHighlightsSection key={type} />;
       case "categories":
-        return <CategoriesSection key={type} />;
+        return <CategoriesSection key={type} counts={supply?.categories} />;
       case "featured_venues":
         return <FeaturedVenuesSection key={type} venues={featuredVenues} />;
       case "featured_artists":
@@ -74,7 +78,21 @@ export default async function HomePage() {
       case "process":
         return <ProcessSection key={type} />;
       case "community":
-        return <CommunitySection key={type} />;
+        return (
+          <CommunitySection
+            key={type}
+            stats={
+              supply
+                ? {
+                    activeArtists: supply.activeArtists,
+                    activeVenues: supply.activeVenues,
+                    serviceCategories: supply.serviceCategories,
+                    completedRequests: supply.completedRequests,
+                  }
+                : undefined
+            }
+          />
+        );
       case "cta":
         return <CTASection key={type} />;
       default:

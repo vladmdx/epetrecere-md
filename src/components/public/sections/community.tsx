@@ -6,12 +6,20 @@ import { cn } from "@/lib/utils";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
 
-const STATS = [
-  { value: "500+", key: "statVendors" },
-  { value: "200+", key: "statVenues" },
-  { value: "12+", key: "statCategories" },
-  { value: "1.000+", key: "statRequests" },
-] as const;
+export interface CommunityStats {
+  activeArtists: number;
+  activeVenues: number;
+  serviceCategories: number;
+  completedRequests: number;
+}
+
+/** "500+" style rounding, but only once a number is big enough to round. */
+function display(n: number): string {
+  if (n >= 1000) return `${Math.floor(n / 1000)}.000+`;
+  if (n >= 100) return `${Math.floor(n / 100) * 100}+`;
+  if (n >= 10) return `${Math.floor(n / 10) * 10}+`;
+  return String(n);
+}
 
 interface Testimonial {
   id: number;
@@ -22,8 +30,19 @@ interface Testimonial {
   rating: number;
 }
 
-export function CommunitySection() {
+export function CommunitySection({ stats }: { stats?: CommunityStats }) {
   const { t } = useLocale();
+
+  // Real catalog numbers. The previous "500+ / 200+ / 12+ / 1.000+" were
+  // placeholders unrelated to the database — flagged by the QA audit.
+  const STATS = stats
+    ? [
+        { value: display(stats.activeArtists), key: "statVendors" },
+        { value: display(stats.activeVenues), key: "statVenues" },
+        { value: display(stats.serviceCategories), key: "statCategories" },
+        { value: display(stats.completedRequests), key: "statRequests" },
+      ]
+    : [];
 
   // Fallback testimonials so the section always renders. The
   // /api/reviews/featured endpoint overrides these when it returns approved

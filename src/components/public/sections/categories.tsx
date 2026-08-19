@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
+import { plural, NOUNS } from "@/lib/i18n/plural";
 
 // "Explorează cele mai căutate servicii" — a curated bento of the top service
 // groups with marketing supply counts. Static by design (fixed groupings for
@@ -10,7 +11,6 @@ import { useLocale } from "@/hooks/use-locale";
 // (home.categories.<key>), counts are interpolated into home.categories.suppliers.
 interface Tile {
   key: string;
-  count: number;
   image: string;
   href: string;
   className: string; // grid placement
@@ -19,50 +19,49 @@ interface Tile {
 const TILES: Tile[] = [
   {
     key: "venues",
-    count: 120,
     image: "/images/redesign/home/home-category-venues.webp",
     href: "/sali",
     className: "md:col-span-1 md:row-span-2",
   },
   {
     key: "bands",
-    count: 150,
     image: "/images/redesign/home/home-category-bands.webp",
     href: "/categorie/formatii",
     className: "md:col-span-2",
   },
   {
     key: "dj",
-    count: 80,
     image: "/images/redesign/home/home-category-dj.webp",
     href: "/categorie/dj",
     className: "md:col-span-1",
   },
   {
     key: "photo",
-    count: 110,
     image: "/images/redesign/home/home-category-photo-video.webp",
     href: "/categorie/fotografi",
     className: "md:col-span-1",
   },
   {
     key: "hosts",
-    count: 60,
     image: "/images/redesign/home/home-category-host.webp",
     href: "/categorie/moderatori",
     className: "md:col-span-1",
   },
   {
     key: "decor",
-    count: 90,
     image: "/images/redesign/home/home-category-decor.webp",
     href: "/categorie/decor",
     className: "md:col-span-1",
   },
 ];
 
-export function CategoriesSection() {
-  const { t } = useLocale();
+export function CategoriesSection({
+  counts,
+}: {
+  /** Real per-category supply from the DB. Omitted → no counter is shown. */
+  counts?: Record<string, number>;
+}) {
+  const { t, locale } = useLocale();
 
   return (
     <section className="py-20">
@@ -99,9 +98,11 @@ export function CategoriesSection() {
                     <h3 className="font-heading text-lg font-bold text-white md:text-xl">
                       {name}
                     </h3>
-                    <p className="mt-0.5 text-sm text-gold">
-                      {t("home.categories.suppliers", { n: tile.count })}
-                    </p>
+                    {typeof counts?.[tile.key] === "number" && counts[tile.key]! > 0 && (
+                      <p className="mt-0.5 text-sm text-gold">
+                        {plural(counts[tile.key]!, locale, NOUNS.suppliers)}
+                      </p>
+                    )}
                   </div>
                   <span className="pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset ring-white/10 transition-all group-hover:ring-gold/40" />
                 </Link>
