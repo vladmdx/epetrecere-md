@@ -355,7 +355,8 @@
     "activeFilters": "Фильтры активны",
     "reset": "Сбросить",
     "foundArtists": "артистов найдено",
-    "foundVenues": "локаций найдено"
+    "foundVenues": "локаций найдено",
+    "map": "Карта"
   },
   "tools": {
     "organization": "Организация",

@@ -355,7 +355,8 @@
     "activeFilters": "Active filters",
     "reset": "Reset",
     "foundArtists": "artists found",
-    "foundVenues": "venues found"
+    "foundVenues": "venues found",
+    "map": "Map"
   },
   "tools": {
     "organization": "Organization",

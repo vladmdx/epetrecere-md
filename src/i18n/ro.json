@@ -355,7 +355,8 @@
     "activeFilters": "Filtre active",
     "reset": "Resetează",
     "foundArtists": "artiști găsiți",
-    "foundVenues": "locații găsite"
+    "foundVenues": "locații găsite",
+    "map": "Hartă"
   },
   "tools": {
     "organization": "Organizare",

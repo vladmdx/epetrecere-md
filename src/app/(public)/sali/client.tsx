@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -12,6 +12,7 @@ import {
   Sparkles,
   Star,
   Users,
+  Map as MapIcon,
 } from "lucide-react";
 import { VenueCard } from "@/components/public/venue-card";
 import { SortBar } from "@/components/public/sort-bar";
@@ -19,6 +20,7 @@ import { PaginationBar } from "@/components/public/pagination-bar";
 import { CompareBar } from "@/components/public/compare-bar";
 import { RecentlyViewed } from "@/components/public/recently-viewed";
 import { ViewSwitcher, gridClassName, useViewMode } from "@/components/public/view-switcher";
+import { VenuesMap } from "@/components/public/venues-map";
 import { WishlistButton } from "@/components/public/wishlist-button";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
@@ -93,6 +95,24 @@ export function VenuesListClient({
   const [city, setCity] = useState(currentCity);
   const [capacity, setCapacity] = useState(currentCapacityMin);
   const [viewMode, setViewMode] = useViewMode();
+  // Map mode is venue-specific, so it's a local toggle rather than a third
+  // ViewSwitcher kind — /artisti shares that component and has no map.
+  const [showMap, setShowMap] = useState(false);
+  const mapVenues = useMemo(
+    () =>
+      venues.map((v) => ({
+        id: v.id,
+        slug: v.slug,
+        name: getLocalized(v, "name", locale),
+        city: v.city ?? null,
+        lat: (v as { lat?: number | null }).lat ?? null,
+        lng: (v as { lng?: number | null }).lng ?? null,
+        capacityMax: v.capacityMax ?? null,
+        pricePerPerson: v.pricePerPerson ?? null,
+        ratingAvg: v.ratingAvg ?? null,
+      })),
+    [venues, locale],
+  );
   const locations = Array.from(new Set([...knownCities, ...cities].filter(Boolean)));
 
   function navigate(updates: Record<string, string | undefined>) {
@@ -265,9 +285,28 @@ export function VenuesListClient({
                   current={currentSort}
                   onChange={(value) => navigate({ sort: value })}
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowMap((v) => !v)}
+                  aria-pressed={showMap}
+                  className={`flex h-9 items-center gap-1.5 rounded-lg border px-3 text-xs font-medium transition-colors ${
+                    showMap
+                      ? "border-[#e6b84d] bg-[#e6b84d]/15 text-[#e6b84d]"
+                      : "border-white/12 text-white/70 hover:border-[#e6b84d]/50"
+                  }`}
+                >
+                  <MapIcon className="h-3.5 w-3.5" />
+                  {t("catalog.map") !== "catalog.map" ? t("catalog.map") : "Hartă"}
+                </button>
                 <ViewSwitcher mode={viewMode} onChange={setViewMode} />
               </div>
             </div>
+
+            {showMap && venues.length > 0 && (
+              <div className="mb-4">
+                <VenuesMap venues={mapVenues} />
+              </div>
+            )}
 
             {venues.length > 0 ? (
               viewMode.kind === "grid" ? (
