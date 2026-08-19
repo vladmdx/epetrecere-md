@@ -179,7 +179,8 @@
     "about": "About us",
     "faq": "FAQ",
     "newsletterDesc": "Get inspiration and exclusive offers for your event.",
-    "emailPlaceholder": "Your email"
+    "emailPlaceholder": "Your email",
+    "legalDocs": "Legal documents"
   },
   "admin": {
     "dashboard": "Dashboard",
@@ -396,5 +397,17 @@
     "settings": "Settings",
     "viewProfile": "View profile",
     "viewSite": "View site"
+  },
+  "legal": {
+    "signTitle": "Contract acceptance",
+    "signIntro": "Read and accept the documents. The full name you type below serves as your electronic signature.",
+    "iAccept": "I have read and accept",
+    "tickAll": "Tick all",
+    "untickAll": "Untick all",
+    "fullName": "Full name (electronic signature)",
+    "nameHint": "Enter your full name (first and last).",
+    "fixationNote": "On acceptance we record the document version, date and time, IP address and device, per Annex 2 of the Agreement.",
+    "readyToSign": "Ready to sign",
+    "docsTitle": "Legal documents"
   }
 }

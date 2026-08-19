@@ -179,7 +179,8 @@
     "about": "Despre noi",
     "faq": "Întrebări frecvente",
     "newsletterDesc": "Primește inspirație și oferte exclusive pentru evenimentul tău.",
-    "emailPlaceholder": "Email-ul tău"
+    "emailPlaceholder": "Email-ul tău",
+    "legalDocs": "Documente legale"
   },
   "admin": {
     "dashboard": "Panou de Control",
@@ -396,5 +397,17 @@
     "settings": "Setări",
     "viewProfile": "Vezi profil",
     "viewSite": "Vezi site"
+  },
+  "legal": {
+    "signTitle": "Acceptarea contractului",
+    "signIntro": "Citește și acceptă documentele. Numele complet introdus mai jos are valoare de semnătură electronică.",
+    "iAccept": "Am citit și accept",
+    "tickAll": "Bifează tot",
+    "untickAll": "Deselectează tot",
+    "fullName": "Nume și prenume (semnătură electronică)",
+    "nameHint": "Introdu numele complet (nume și prenume).",
+    "fixationNote": "La acceptare se înregistrează versiunea documentelor, data și ora, adresa IP și dispozitivul, conform Anexei 2 din Acord.",
+    "readyToSign": "Gata de semnare",
+    "docsTitle": "Documente legale"
   }
 }

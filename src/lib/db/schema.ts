@@ -956,6 +956,55 @@ export const bookingRequestStatusEnum = pgEnum("booking_request_status", [
  *     admin instead of being hardcoded here.
  * Settlement is manual: an admin marks a row paid once the money arrives.
  */
+/**
+ * Electronic acceptance of a legal document ("semnătură electronică").
+ *
+ * Venue Agreement, Anexa 2 requires the system to fix: the entity and
+ * representative identity, the document version, date/time, email/phone
+ * confirmation, IP and user-agent, plus an UNMODIFIABLE audit record. The last
+ * requirement is enforced in the database itself by an append-only trigger, so
+ * no application path — not even an admin route — can rewrite a signature.
+ */
+export const legalAcceptances = pgTable(
+  "legal_acceptances",
+  {
+    id: serial("id").primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** "artist" | "venue" — who the representative signed for. */
+    subjectType: text("subject_type").notNull(),
+    artistId: integer("artist_id").references(() => artists.id, { onDelete: "set null" }),
+    venueId: integer("venue_id").references(() => venues.id, { onDelete: "set null" }),
+
+    documentSlug: text("document_slug").notNull(),
+    documentVersion: text("document_version").notNull(),
+    packVersion: text("pack_version").notNull(),
+    locale: text("locale").notNull(),
+
+    /** Typed full name of the signing representative. */
+    signatureName: text("signature_name").notNull(),
+    representativeRole: text("representative_role"),
+
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    email: text("email"),
+    phone: text("phone"),
+    /** Fingerprint of the exact text accepted, so drift is detectable. */
+    contentHash: text("content_hash"),
+  },
+  (t) => [
+    uniqueIndex("legal_acceptances_unique").on(
+      t.userId,
+      t.subjectType,
+      t.documentSlug,
+      t.documentVersion,
+    ),
+    index("legal_acceptances_user_idx").on(t.userId),
+  ],
+);
+
 export const commissionStatusEnum = pgEnum("commission_status", [
   /** Owed, not yet settled. */
   "pending",

@@ -36,6 +36,7 @@ const COLUMNS: { title: string; links: { key: string; href: string }[] }[] = [
       { key: "footer.terms", href: "/termeni" },
       { key: "footer.privacy", href: "/confidentialitate" },
       { key: "footer.faq", href: "/contact" },
+      { key: "footer.legalDocs", href: "/legal" },
     ],
   },
 ];

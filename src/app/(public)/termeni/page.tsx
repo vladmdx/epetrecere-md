@@ -87,6 +87,15 @@ export default function TermsPage() {
           </p>
         </section>
       </div>
+    
+      <div className="mt-8 rounded-xl border border-gold/30 bg-gold/5 p-4 text-sm">
+        <p className="font-semibold">Pachetul legal complet</p>
+        <p className="mt-1 text-muted-foreground">
+          Acordurile pentru parteneri și locații, regulile marketplace, tarifele și
+          politicile de recenzii, anti-fraudă și calitate sunt disponibile în română și
+          rusă la <Link href="/legal" className="text-gold hover:underline">Documente legale</Link>.
+        </p>
+      </div>
     </div>
   );
 }
