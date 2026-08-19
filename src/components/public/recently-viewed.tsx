@@ -4,7 +4,7 @@
 // opened recently. Safe to render on any page; renders nothing if the
 // list is empty so it doesn't take up space.
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { useRecentlyViewed, type RecentEntity } from "@/hooks/use-recently-viewed";
 import { History, Music, Building2 } from "lucide-react";
 

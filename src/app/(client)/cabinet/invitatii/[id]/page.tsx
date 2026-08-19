@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { InvitationDetailClient } from "./client";
 
-export const metadata: Metadata = generateMeta({
+export async function generateMetadata(): Promise<Metadata> {
+  return generateMetaAsync({
   title: "Invitație",
   description: "Editează, gestionează invitații și vezi RSVP-uri",
   path: "/cabinet/invitatii",
 });
+}
 
 export default async function Page({
   params,

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import Image from "next/image";
 import { Star, BadgeCheck, Crown, Lock, MapPin } from "lucide-react";
 import { useUser } from "@clerk/nextjs";

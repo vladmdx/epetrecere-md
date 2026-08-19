@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { getCategoryEmoji } from "@/lib/wizard/categories-meta";
 
 // Same card style as the homepage CategoriesSection (image + gradient overlay

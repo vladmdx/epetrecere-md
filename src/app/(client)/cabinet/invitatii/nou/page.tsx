@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { InvitationWizard } from "./wizard";
 
-export const metadata: Metadata = generateMeta({
+export async function generateMetadata(): Promise<Metadata> {
+  return generateMetaAsync({
   title: "Creează invitație digitală",
   description:
     "Creează o invitație digitală frumoasă în 4 pași. Alege un template, completează detaliile și invită-ți oaspeții.",
   path: "/cabinet/invitatii/nou",
 });
+}
 
 export default function NewInvitationPage() {
   return <InvitationWizard />;

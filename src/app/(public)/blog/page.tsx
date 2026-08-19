@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import Image from "next/image";
 import { ArrowRight, Calendar, Sparkles, Tag } from "lucide-react";
 import { desc, eq } from "drizzle-orm";

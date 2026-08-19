@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { getServerLocale } from "@/lib/i18n/server-locale";
 

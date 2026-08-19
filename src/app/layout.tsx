@@ -3,6 +3,8 @@ import "@/lib/env"; // Validate env vars at startup
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { LocaleProvider } from "@/hooks/use-locale";
+import { headers } from "next/headers";
+import { DEFAULT_LOCALE, LOCALE_HEADER, isLocale } from "@/lib/i18n/routing";
 import { PreferencesProvider } from "@/hooks/use-preferences";
 import { LocalizedClerkProvider } from "@/components/shared/localized-clerk-provider";
 import { CookieConsent } from "@/components/shared/cookie-consent";
@@ -40,19 +42,27 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // The locale comes from the URL prefix (resolved in middleware), so the
+  // server renders the right language on the FIRST paint instead of shipping
+  // Romanian and swapping it client-side — which is what made RU/EN invisible
+  // to crawlers and caused the flash of Romanian text.
+  const h = await headers();
+  const headerLocale = h.get(LOCALE_HEADER);
+  const locale = isLocale(headerLocale) ? headerLocale : DEFAULT_LOCALE;
+
   return (
     <html
-      lang="ro"
+      lang={locale}
       className={`${manrope.variable} ${cormorant.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col overflow-x-hidden">
-        <ThemeProvider><LocaleProvider><LocalizedClerkProvider><PreferencesProvider>
+        <ThemeProvider><LocaleProvider initialLocale={locale}><LocalizedClerkProvider><PreferencesProvider>
           {children}
           <CookieConsent />
           <PwaManager />

@@ -16,7 +16,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { MapPin, Users, Star, X } from "lucide-react";
 import { resolveVenuePosition, type LatLng } from "@/lib/geo/city-coords";
 

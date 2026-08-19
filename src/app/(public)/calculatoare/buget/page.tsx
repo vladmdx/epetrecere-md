@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { BudgetCalculatorClient } from "./client";

@@ -3,7 +3,7 @@
 // List-view variant of ArtistCard — compact (thumbnail + name + price)
 // and detailed (adds description, rating, badges, action buttons).
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import Image from "next/image";
 import { Star, BadgeCheck, Crown, MapPin, Music, Lock } from "lucide-react";
 import { useUser } from "@clerk/nextjs";

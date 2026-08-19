@@ -1,22 +1,24 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import Image from "next/image";
 import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { artists } from "@/lib/db/schema";
 import { Star, MapPin, ArrowLeft, X, Check } from "lucide-react";
-import { generateMeta } from "@/lib/seo/generate-meta";
+import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { ClearCompareButton } from "./clear-button";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = generateMeta({
+export async function generateMetadata(): Promise<Metadata> {
+  return generateMetaAsync({
   title: "Compară artiști",
   description:
     "Compară până la 3 artiști side-by-side — preț, rating, locație, facilități — pentru a alege cel mai bun pentru evenimentul tău.",
   path: "/artisti/compare",
 });
+}
 
 interface Props {
   searchParams: Promise<{ ids?: string }>;

@@ -13,7 +13,7 @@
 // via the user's "notificationSoundEnabled" localStorage flag).
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Check, Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
