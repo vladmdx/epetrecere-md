@@ -98,11 +98,27 @@ function NoData({ text }: { text: string }) {
   );
 }
 
-function niceMax(v: number): number {
-  if (v <= 0) return 1;
+/**
+ * A round ceiling for the axis that is also divisible by `divisions`, so
+ * every gridline gets an exact label. Without the divisibility rule a max of
+ * 6 printed ticks at 2.5 and 7.5 — rounded to "3" and "8" — which are not
+ * values the axis actually marks.
+ */
+function niceMax(v: number, divisions = 4): number {
+  if (!Number.isFinite(v) || v <= 0) return divisions;
   const mag = 10 ** Math.floor(Math.log10(v));
-  const step = [1, 2, 2.5, 5, 10].find((s) => v <= s * mag) ?? 10;
-  return step * mag;
+  const steps = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+  for (const s of steps) {
+    const candidate = s * mag;
+    if (v <= candidate && Number.isInteger(candidate / divisions)) return candidate;
+  }
+  // Fall back to the next multiple of `divisions` above v.
+  return Math.ceil(v / divisions) * divisions;
+}
+
+/** Evenly spaced, exact tick values from 0 to max. */
+function ticksFor(max: number, divisions: number): number[] {
+  return Array.from({ length: divisions + 1 }, (_, i) => (max / divisions) * i);
 }
 
 /* ── time series (2 series, line + crosshair) ───────────────────── */
@@ -131,12 +147,18 @@ export function TimeSeriesChart({
   const H = 220;
   const P = { top: 12, right: 12, bottom: 26, left: 44 };
 
+  const DIVISIONS = 4;
   const max = useMemo(
-    () => niceMax(Math.max(0, ...points.flatMap((p) => p.values))),
+    () => niceMax(Math.max(0, ...points.flatMap((p) => p.values)), DIVISIONS),
     [points],
   );
 
-  if (points.length === 0) return <NoData text={emptyText} />;
+  // Gaps are filled with explicit zeros, so "no data" arrives as a full set
+  // of zero buckets rather than an empty array. Without this the reader sees
+  // a flat line on the axis and cannot tell it from a broken chart.
+  if (points.length === 0 || points.every((p) => p.values.every((v) => !v))) {
+    return <NoData text={emptyText} />;
+  }
 
   const innerW = W - P.left - P.right;
   const innerH = H - P.top - P.bottom;
@@ -144,15 +166,17 @@ export function TimeSeriesChart({
     P.left + (points.length === 1 ? innerW / 2 : (i / (points.length - 1)) * innerW);
   const y = (v: number) => P.top + innerH - (v / max) * innerH;
 
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(max * f));
+  const ticks = ticksFor(max, DIVISIONS);
   // Enough x labels to orient without collisions.
   const labelEvery = Math.max(1, Math.ceil(points.length / 7));
 
   return (
     <figure className="m-0">
+      {/* No fixed pixel height: the viewBox aspect ratio drives the size, so
+          the drawing fills the card instead of being letterboxed inside it. */}
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="h-[220px] w-full touch-none"
+        className="w-full touch-none"
         role="img"
         aria-label={`${seriesLabels.join(" și ")} pe perioadă`}
         onMouseLeave={() => setHover(null)}
@@ -294,10 +318,14 @@ export function BarSeriesChart({
   const P = { top: 12, right: 12, bottom: 26, left: 52 };
 
   const max = useMemo(
-    () => niceMax(Math.max(0, ...points.map((p) => p.value))),
+    () => niceMax(Math.max(0, ...points.map((p) => p.value)), 2),
     [points],
   );
-  if (points.length === 0) return <NoData text={emptyText} />;
+  // Same as above: a zero-height rect paints nothing, so an all-zero window
+  // rendered as an empty grid with no explanation.
+  if (points.length === 0 || points.every((p) => !p.value)) {
+    return <NoData text={emptyText} />;
+  }
 
   const innerW = W - P.left - P.right;
   const innerH = H - P.top - P.bottom;
@@ -310,16 +338,16 @@ export function BarSeriesChart({
     <figure className="m-0">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="h-[200px] w-full"
+        className="w-full"
         role="img"
         aria-label="Valoare pe perioadă"
         onMouseLeave={() => setHover(null)}
       >
-        {[0, 0.5, 1].map((f) => {
-          const v = Math.round(max * f);
+        {ticksFor(max, 2).map((v) => {
+          const f = max > 0 ? v / max : 0;
           const yy = P.top + innerH - f * innerH;
           return (
-            <g key={f}>
+            <g key={v}>
               <line x1={P.left} x2={W - P.right} y1={yy} y2={yy} stroke="var(--viz-grid)" strokeWidth={1} />
               <text x={P.left - 8} y={yy + 4} textAnchor="end" fontSize={10} fill="var(--viz-axis)">
                 {formatValue(v)}

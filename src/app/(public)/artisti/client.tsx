@@ -343,7 +343,7 @@ export function ArtistsListClient({
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-2 lg:order-3">
+              <div className="flex items-center justify-end gap-2 overflow-x-auto lg:order-3 lg:overflow-visible">
                 <ViewSwitcher mode={viewMode} onChange={setViewMode} />
               </div>
             </div>

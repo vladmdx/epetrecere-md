@@ -119,6 +119,16 @@ export async function PUT(
   const updates: Record<string, unknown> = { ...parsed.data };
   if (updates.durationMinutes === null) updates.durationMinutes = 0;
 
+  // Every field is optional, so an empty body parses fine and would reach
+  // drizzle's .set() with nothing to set — which throws, and the caller sees
+  // a 500 for what is really a no-op request.
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json(
+      { error: "No known fields to update — check the field names" },
+      { status: 400 },
+    );
+  }
+
   await db
     .update(artistPackages)
     .set(updates)

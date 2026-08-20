@@ -199,10 +199,14 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
       }
       scopeFromTime = d.scopeFromTime;
     }
+    // "1,5" hours plus 45 minutes is 2h15, not 1h75 — the API caps minutes at
+    // 59 and used to reject the whole save with a bare 400.
+    const totalMinutes =
+      Math.round(hours * 60) + minutes;
     return {
       price: Math.round(price),
-      durationHours: Math.floor(hours),
-      durationMinutes: minutes + Math.round((hours - Math.floor(hours)) * 60),
+      durationHours: Math.floor(totalMinutes / 60),
+      durationMinutes: totalMinutes % 60,
       scope: d.scope,
       scopeDayOfWeek,
       scopeFromTime,

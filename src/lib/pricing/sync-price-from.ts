@@ -10,6 +10,11 @@
  *
  * The floor is the cheapest visible priced tier of either kind: an hourly
  * tier and a fixed per-event price are both things a client can actually pay.
+ *
+ * This is a read-then-write with no transaction — neon-http has none — so two
+ * simultaneous tier edits can leave the cache one edit behind. The next
+ * mutation corrects it, and the value is a display floor rather than
+ * anything money moves on, so the window is acceptable.
  */
 
 import { and, eq, sql } from "drizzle-orm";
@@ -28,10 +33,14 @@ export async function syncArtistPriceFrom(artistId: number): Promise<void> {
       ),
     );
 
-  // No priced tier left → clear the cache rather than leave a stale figure
-  // the artist can no longer honour.
+  // No priced tier left → leave whatever is there. price_from is also
+  // editable by hand from /dashboard/profil, and an artist who deletes their
+  // last tier has not asked for their advertised price to vanish from the
+  // catalogue as a side effect.
+  if (row?.min == null) return;
+
   await db
     .update(artists)
-    .set({ priceFrom: row?.min ?? null })
+    .set({ priceFrom: row.min })
     .where(eq(artists.id, artistId));
 }

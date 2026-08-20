@@ -68,7 +68,16 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+/**
+ * A real calendar date, not just the right shape. "2026-13-45" matches a
+ * naive regex, then becomes an Invalid Date and takes the whole page down
+ * with it — the filter comes from the URL, so that is one paste away.
+ */
+function validDate(v: string | undefined): v is string {
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(`${v}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v;
+}
 
 function parseFilter(sp: Record<string, string | string[] | undefined>): StatsFilter {
   const one = (k: string) => {
@@ -82,10 +91,15 @@ function parseFilter(sp: Record<string, string | string[] | undefined>): StatsFi
   const basis = one("dupa");
 
   return {
-    from: from && DATE_RE.test(from) ? from : isoDaysAgo(365),
-    to: to && DATE_RE.test(to) ? to : new Date().toISOString().slice(0, 10),
+    from: validDate(from) ? from : isoDaysAgo(365),
+    to: validDate(to) ? to : new Date().toISOString().slice(0, 10),
     vendor: vendor === "artist" || vendor === "venue" ? (vendor as VendorFilter) : "all",
-    categoryId: Number.isInteger(categoryId) && categoryId > 0 ? categoryId : null,
+    // int4 — a larger number is not a category id, it is an error waiting to
+    // happen inside Postgres.
+    categoryId:
+      Number.isInteger(categoryId) && categoryId > 0 && categoryId <= 2_147_483_647
+        ? categoryId
+        : null,
     basis: basis === "event" ? ("event" as DateBasis) : ("created" as DateBasis),
   };
 }
@@ -329,14 +343,13 @@ export default async function StatisticiPage({
         <div className="xl:col-span-2">
           <ChartCard
             title="Pe categorie"
-            subtitle="doar artiști — un artist poate fi în mai multe categorii, deci totalul depășește numărul de solicitări"
+            subtitle="doar artiști; un artist poate fi în mai multe categorii, deci o solicitare se numără la fiecare dintre ele"
           >
             <RankedBars
               rows={stats.byCategory.map((c) => ({
                 key: c.key,
                 label: c.label,
                 value: c.count,
-                note: c.gmv > 0 ? formatAmount(c.gmv) : undefined,
               }))}
               emptyText="Nicio solicitare către un artist cu categorie setată."
             />
@@ -349,7 +362,7 @@ export default async function StatisticiPage({
       <p className="text-[11px] leading-relaxed text-muted-foreground">
         <b>Cum se numără.</b> O <i>solicitare</i> este orice cerere de rezervare
         primită de un furnizor. O <i>comandă</i> este o rezervare ajunsă la
-        „confirmată de client" sau „finalizată" — exact stările care generează
+        „confirmată de client” sau „finalizată” — exact stările care generează
         comision. <i>Venitul furnizorului</i> este suma prețurilor agreate pe
         comenzi; rezervările fără preț agreat contribuie cu 0, nu cu prețul de
         listă. <i>Venitul platformei</i> vine din registrul de comisioane: 5% de

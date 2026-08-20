@@ -132,6 +132,25 @@ function emptyTotals() {
   return { pending: 0, paid: 0, overdue: 0, count: 0 };
 }
 
+/**
+ * POST /api/commissions — admin-only reconciliation.
+ *
+ * Fees are raised by a fire-and-forget hook when a booking is confirmed, so a
+ * transient DB blip can drop one with nothing but a console line to show for
+ * it. This is the recovery path: it walks every confirmed order and creates
+ * the rows that are missing. Idempotent — the unique index on
+ * booking_request_id means running it twice changes nothing.
+ */
+export async function POST() {
+  const admin = await requireAdmin();
+  if (!admin.ok) {
+    return NextResponse.json({ error: admin.error }, { status: admin.status });
+  }
+  const { backfillCommissions } = await import("@/lib/commissions/service");
+  const result = await backfillCommissions();
+  return NextResponse.json(result);
+}
+
 export async function PATCH(req: NextRequest) {
   const admin = await requireAdmin();
   if (!admin.ok) {

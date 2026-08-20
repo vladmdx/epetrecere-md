@@ -18,6 +18,19 @@ import { sendPushToUser, type PushKind } from "@/lib/push/expo";
  * client confirmed, or one taken straight from accepted to completed, never
  * produced a commission row and simply went missing from the ledger.
  */
+function dropCommission(bookingId: number, note: string): void {
+  void (async () => {
+    try {
+      const { cancelCommissionForBooking } = await import(
+        "@/lib/commissions/service"
+      );
+      await cancelCommissionForBooking(bookingId, note);
+    } catch (err) {
+      console.error("[commissions] cancel failed for booking", bookingId, err);
+    }
+  })();
+}
+
 function raiseCommission(bookingId: number): void {
   void (async () => {
     try {
@@ -445,6 +458,8 @@ export async function PUT(
       artistReply: reply || "Rezervarea a fost anulată de organizator.",
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
+    // Tariffs §10 — the fee dies with the event.
+    dropCommission(Number(id), "Anulată de furnizor");
 
     // Release the auto-blocked calendar slot.
     if (booking.eventDate) {

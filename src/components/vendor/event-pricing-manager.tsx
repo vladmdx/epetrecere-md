@@ -118,10 +118,12 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
       toast.error("Completează durata medie a evenimentului");
       return null;
     }
+    // Normalise into whole hours + 0–59 minutes; the API caps minutes at 59.
+    const totalMinutes = Math.round(hours * 60) + minutes;
     return {
       price: Math.round(price),
-      durationHours: Math.floor(hours),
-      durationMinutes: minutes + Math.round((hours - Math.floor(hours)) * 60),
+      durationHours: Math.floor(totalMinutes / 60),
+      durationMinutes: totalMinutes % 60,
       eventType: d.eventType === "" ? null : d.eventType,
     };
   }

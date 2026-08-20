@@ -8,6 +8,7 @@
  * Cloud, restricted to the site's domains) to switch to Google.
  */
 
+import { useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/use-locale";
 import { plural, NOUNS } from "@/lib/i18n/plural";
@@ -38,15 +39,21 @@ export type { MapVenue };
 export function VenuesMap({ venues }: { venues: MapVenue[] }) {
   const { t, locale } = useLocale();
 
-  const labels = {
-    one: `1 ${plural(1, locale, NOUNS.venues)}`,
-    many: (n: number) => `${n} ${plural(n, locale, NOUNS.venues)}`,
-    close: t("common.close"),
-    approx: t("map.approx"),
-    empty: t("map.empty"),
-    loading: t("map.loading"),
-    failed: t("map.failed"),
-  };
+  // Memoised on locale: the renderers keep this object in effect dependency
+  // lists, and a fresh identity per render would rebuild every pin on the map
+  // each time the parent paints.
+  const labels = useMemo(
+    () => ({
+      one: `1 ${plural(1, locale, NOUNS.venues)}`,
+      many: (n: number) => `${n} ${plural(n, locale, NOUNS.venues)}`,
+      close: t("common.close"),
+      approx: t("map.approx"),
+      empty: t("map.empty"),
+      loading: t("map.loading"),
+      failed: t("map.failed"),
+    }),
+    [locale, t],
+  );
 
   return GOOGLE_KEY ? (
     <GoogleMap venues={venues} apiKey={GOOGLE_KEY} labels={labels} />

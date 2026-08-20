@@ -311,7 +311,7 @@ export function VenuesListClient({
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-end gap-2 lg:order-3">
+              <div className="flex items-center justify-end gap-2 overflow-x-auto lg:order-3 lg:overflow-visible">
                 <button
                   type="button"
                   onClick={() => setShowMap((v) => !v)}

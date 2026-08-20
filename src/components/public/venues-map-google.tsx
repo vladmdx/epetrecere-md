@@ -93,8 +93,14 @@ export default function VenuesMapGoogle({
   const placed = useMemo(() => placeVenues(venues), [venues]);
   const clusters = useMemo(() => clusterize(placed, zoom), [placed, zoom]);
 
-  // Create the map once.
+  // Create the map once the host div is in the DOM. `placed.length` is in
+  // the dependency list because the component renders a text placeholder
+  // instead of the host while there is nothing to show: without it, a page
+  // that starts with no results and then gets some kept a null hostRef and
+  // the map never appeared at all.
+  const hasPlaces = placed.length > 0;
   useEffect(() => {
+    if (!hasPlaces) return;
     let cancelled = false;
     loadGoogleMaps(apiKey, locale)
       .then((maps) => {
@@ -120,7 +126,7 @@ export default function VenuesMapGoogle({
     return () => {
       cancelled = true;
     };
-  }, [apiKey, locale]);
+  }, [apiKey, locale, hasPlaces]);
 
   // Redraw the pins whenever the clusters change.
   useEffect(() => {
@@ -155,7 +161,11 @@ export default function VenuesMapGoogle({
         map.fitBounds(bounds, 48);
       }
     }
-  }, [clusters, placed, status, labels]);
+    // `labels` is deliberately not a dependency: the parent rebuilds it on
+    // every render, and it is read here only for a marker tooltip. Listing it
+    // would tear down and rebuild every pin on every parent paint.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clusters, placed, status]);
 
   // Drop the markers when the component goes away.
   useEffect(

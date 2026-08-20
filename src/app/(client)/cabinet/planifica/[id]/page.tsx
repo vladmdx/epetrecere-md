@@ -2840,6 +2840,7 @@ function PlanArtistCard({
     setStartTime(slot.startTime);
     setEndTime(slot.endTime);
     setSelectedDurationMinutes(null);
+    setSelectedEventTierId(null);
   }
 
   function timesValid() {
@@ -2894,20 +2895,41 @@ function PlanArtistCard({
           )
         : null;
 
+  // An offer can stop applying after it was picked — the client moves the
+  // event to a weekday an evening price does not cover, or the artist edits
+  // their prices while the modal is open. Without this the stale id kept
+  // canSubmit true while resolvedForSelection went null, and the request went
+  // out with no price at all.
+  useEffect(() => {
+    if (selectedEventTierId == null) return;
+    if (!eventOffers.some((o) => o.tier.id === selectedEventTierId)) {
+      setSelectedEventTierId(null);
+    }
+  }, [eventOffers, selectedEventTierId]);
+
   const slotForSelection = slots.find((s) => s.id === selectedSlotId);
   const computedPrice =
     resolvedForSelection?.price ?? slotForSelection?.price ?? null;
 
+  // The manual start/end fallback is for artists with no priced offer of any
+  // kind. Keying it on packages.length locked out an artist who prices ONLY
+  // per event: their rows are packages, but they produce no duration options.
+  const hasPricedOffer = durationOptions.length > 0 || eventOffers.length > 0;
+
   const canSubmit =
     (selectedDurationMinutes != null && !!startTime) ||
     (selectedEventTierId != null && !!startTime) ||
-    (timesValid() && packages.length === 0);
+    (timesValid() && !hasPricedOffer);
 
   async function submit() {
     if (submitting) return;
     if (!canSubmit) {
-      if (packages.length > 0 && selectedDurationMinutes == null) {
-        toast.error("Alege durata de participare a artistului.");
+      if (hasPricedOffer && selectedDurationMinutes == null && selectedEventTierId == null) {
+        toast.error(
+          eventOffers.length > 0 && durationOptions.length === 0
+            ? "Alege prețul per eveniment."
+            : "Alege durata de participare a artistului.",
+        );
       } else {
         toast.error("Alege ora de început și durata.");
       }
@@ -2944,13 +2966,16 @@ function PlanArtistCard({
       }
       const summary =
         selectedDurationMinutes != null && computedPrice != null
-          ? `${formatDuration(selectedDurationMinutes)} · ${computedPrice}€`
-          : `${startTime}–${endTime}`;
+          ? `${formatDuration(selectedDurationMinutes)} · ${formatPrice(computedPrice)}`
+          : selectedEventTierId != null && computedPrice != null
+            ? `${resolvedForSelection?.tier.nameRo ?? "Preț per eveniment"} · ${formatPrice(computedPrice)}`
+            : `${startTime}–${endTime}`;
       toast.success(`Cerere trimisă către ${artist.nameRo} (${summary})`);
       setModalOpen(false);
       setMessage("");
       setSelectedSlotId(null);
       setSelectedDurationMinutes(null);
+      setSelectedEventTierId(null);
       setStartTime("");
       setEndTime("");
       onRefresh();
@@ -3246,6 +3271,7 @@ function PlanArtistCard({
                           {
                             eventDate: plan.eventDate,
                             startTime: startTime || null,
+                            eventType: planEventType,
                           },
                         );
                         // Surface whether a weekend/evening/specific-day

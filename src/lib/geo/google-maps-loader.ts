@@ -6,6 +6,11 @@
  * so every map on the page shares one download.
  */
 
+/**
+ * Note: Google fixes the UI language at script-load time. A visitor who
+ * switches language after the map has loaded keeps the first language until
+ * the next full page load — reloading the API in place is not supported.
+ */
 let pending: Promise<typeof google.maps> | null = null;
 
 export function loadGoogleMaps(

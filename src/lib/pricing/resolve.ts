@@ -156,6 +156,7 @@ export function resolvePriceForDuration(
   const candidates = tiers.filter(
     (t) =>
       t.price != null &&
+      t.isVisible !== false &&
       tierMode(t) === "per_hour" &&
       tierDurationMinutes(t) === durationMinutes &&
       scopeMatches(t, ctx) &&
@@ -215,10 +216,14 @@ export function minApplicablePrice(
     if (min == null || offer.price < min) min = offer.price;
   }
 
-  // Group the hourly tiers by duration, then resolve each group.
+  // Group the hourly tiers by duration, then resolve each group. Hidden
+  // tiers are excluded here for the same reason they are excluded from
+  // resolution: a price the artist has taken down must not become the "de la"
+  // figure on their card.
   const byDuration = new Map<number, PricingTier[]>();
   for (const t of tiers) {
     if (tierMode(t) !== "per_hour") continue;
+    if (t.isVisible === false) continue;
     const d = tierDurationMinutes(t);
     if (d == null || t.price == null) continue;
     const arr = byDuration.get(d) ?? [];
@@ -230,8 +235,12 @@ export function minApplicablePrice(
       const resolved = resolvePriceForDuration(group, tierDurationMinutes(group[0])!, ctx);
       if (resolved && (min == null || resolved.price < min)) min = resolved.price;
     } else {
-      // No context — take the group's minimum directly
+      // No context — take the group's minimum directly. Event-type-restricted
+      // tiers are skipped: without knowing the event we cannot promise that
+      // price, and advertising a wedding-only rate as the floor for every
+      // enquiry would understate what most clients actually pay.
       for (const t of group) {
+        if (t.eventType) continue;
         if (t.price != null && (min == null || t.price < min)) min = t.price;
       }
     }

@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatRate, type CommissionRules } from "@/lib/commissions/rules";
-import { Check, RefreshCw, Settings2, AlertTriangle } from "lucide-react";
+import { Check, RefreshCw, Settings2, AlertTriangle, ListChecks } from "lucide-react";
 import { formatAmount } from "@/lib/format/price";
+import { toast } from "sonner";
 
 interface Row {
   id: number;
@@ -57,6 +58,32 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
   const [rules, setRules] = useState<CommissionRules>(initialRules);
+  const [reconciling, setReconciling] = useState(false);
+
+  /**
+   * Fees are raised by a non-blocking hook when a booking is confirmed, so a
+   * transient failure can leave a confirmed order with no ledger row and only
+   * a server log to show for it. This walks every confirmed order and creates
+   * what is missing. Idempotent — safe to press at any time.
+   */
+  async function reconcile() {
+    setReconciling(true);
+    try {
+      const res = await fetch("/api/commissions", { method: "POST" });
+      if (!res.ok) throw new Error();
+      const { created } = (await res.json()) as { created: number };
+      toast.success(
+        created > 0
+          ? `${created} comisioane create`
+          : "Toate comenzile confirmate au deja comision",
+      );
+      await load();
+    } catch {
+      toast.error("Sincronizarea a eșuat");
+    } finally {
+      setReconciling(false);
+    }
+  }
   const [showRules, setShowRules] = useState(false);
   const [savingRules, setSavingRules] = useState(false);
 
@@ -126,6 +153,15 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
           </Button>
           <Button variant="outline" onClick={() => void load()} className="gap-2">
             <RefreshCw className="h-4 w-4" /> Reîmprospătează
+          </Button>
+          <Button
+            variant="outline"
+            disabled={reconciling}
+            onClick={() => void reconcile()}
+            className="gap-2"
+            title="Creează rândurile lipsă pentru comenzile confirmate. Sigur de rulat oricând."
+          >
+            <ListChecks className="h-4 w-4" /> Sincronizează
           </Button>
         </div>
       </div>

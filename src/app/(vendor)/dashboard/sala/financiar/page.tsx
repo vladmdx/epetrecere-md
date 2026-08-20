@@ -132,7 +132,14 @@ export default async function VenueFinanciarPage() {
       amount: commissions.amount,
     })
     .from(commissions)
-    .where(eq(commissions.venueId, venue.id));
+    .where(
+      and(
+        eq(commissions.venueId, venue.id),
+        // A cancelled or waived fee is not owed and must not be shown as if
+        // it were.
+        sql`${commissions.status} <> 'cancelled' and ${commissions.status} <> 'waived'`,
+      ),
+    );
   const commissionByBooking: Record<number, number> = {};
   for (const r of feeRows) commissionByBooking[r.bookingId] = r.amount;
   const commissionThisMonth = thisMonthBookings.reduce(

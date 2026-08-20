@@ -34,7 +34,7 @@ import {
   users,
   venues,
 } from "@/lib/db/schema";
-import { normalizeEventType, type EventTypeKey } from "@/lib/events/normalize";
+import { normalizeEventType } from "@/lib/events/normalize";
 
 /** Statuses that mean the deal is real. Mirrors FEE_TRIGGER_STATUSES. */
 export const ORDER_STATUSES = ["confirmed_by_client", "completed"] as const;
@@ -178,7 +178,33 @@ function granularityFor(from: string, to: string): "day" | "month" {
 
 /* ── the report ─────────────────────────────────────────────────── */
 
-export async function getAdminStats(f: StatsFilter): Promise<AdminStats> {
+/** Longest range the page will render. Two years of months is already 24
+ *  buckets; beyond that the chart says nothing the table does not. */
+const MAX_RANGE_DAYS = 1096;
+
+/**
+ * Put the window in a state the SQL and the bucket loop can both trust:
+ * ordered, real dates, and no longer than MAX_RANGE_DAYS. A hand-edited URL
+ * used to reach fillGaps' 800-iteration guard and silently truncate the
+ * series instead of saying the range was too wide.
+ */
+function sanitize(f: StatsFilter): StatsFilter {
+  let { from, to } = f;
+  if (Date.parse(`${from}T00:00:00Z`) > Date.parse(`${to}T00:00:00Z`)) {
+    [from, to] = [to, from];
+  }
+  const span =
+    (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000;
+  if (span > MAX_RANGE_DAYS) {
+    const start = new Date(`${to}T00:00:00Z`);
+    start.setUTCDate(start.getUTCDate() - MAX_RANGE_DAYS);
+    from = start.toISOString().slice(0, 10);
+  }
+  return { ...f, from, to };
+}
+
+export async function getAdminStats(input: StatsFilter): Promise<AdminStats> {
+  const f = sanitize(input);
   const where = bookingWhere(f);
   const granularity = granularityFor(f.from, f.to);
   const basisCol =
@@ -284,7 +310,6 @@ export async function getAdminStats(f: StatsFilter): Promise<AdminStats> {
         id: sql<number>`c.id`,
         label: sql<string>`c.name_ro`,
         count: sql<number>`count(*)::int`,
-        gmv: sql<number>`coalesce(sum(${bookingRequests.agreedPrice}) filter (where ${isOrder}), 0)::int`,
       })
       .from(bookingRequests)
       .innerJoin(artists, eq(bookingRequests.artistId, artists.id))
@@ -331,7 +356,10 @@ export async function getAdminStats(f: StatsFilter): Promise<AdminStats> {
     // late still belongs to the booking that earned it.
     db
       .select({
-        billed: sql<number>`coalesce(sum(${commissions.amount}), 0)::int`,
+        // Cancelled (the event did not happen) and waived (deliberately not
+        // charged) fees are not revenue. Counting them made "Venit platformă"
+        // larger than anything that could ever be collected.
+        billed: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} <> 'cancelled' and ${commissions.status} <> 'waived'), 0)::int`,
         collected: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} = 'paid'), 0)::int`,
         outstanding: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} in ('pending','invoiced')), 0)::int`,
         overdue: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} in ('pending','invoiced') and ${commissions.dueDate} < current_date), 0)::int`,
@@ -349,7 +377,7 @@ export async function getAdminStats(f: StatsFilter): Promise<AdminStats> {
         vendorType: sql<string>`${commissions.vendorType}`,
         artistId: commissions.artistId,
         venueId: commissions.venueId,
-        billed: sql<number>`coalesce(sum(${commissions.amount}), 0)::int`,
+        billed: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} <> 'cancelled' and ${commissions.status} <> 'waived'), 0)::int`,
         paid: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} = 'paid'), 0)::int`,
       })
       .from(commissions)
@@ -438,7 +466,11 @@ export async function getAdminStats(f: StatsFilter): Promise<AdminStats> {
       key: String(r.id),
       label: r.label,
       count: r.count,
-      gmv: r.gmv,
+      // No GMV here on purpose: an artist can be tagged with several
+      // categories, so the unnest repeats each booking once per category.
+      // Counting bookings that way is a defensible "touches this category";
+      // summing money that way would invent revenue.
+      gmv: 0,
     })),
     vendors,
   };

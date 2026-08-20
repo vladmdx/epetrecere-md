@@ -72,6 +72,7 @@ export async function ensureCommissionForBooking(
       status: bookingRequests.status,
       agreedPrice: bookingRequests.agreedPrice,
       guestCount: bookingRequests.guestCount,
+      source: bookingRequests.source,
     })
     .from(bookingRequests)
     .where(eq(bookingRequests.id, bookingRequestId))
@@ -81,6 +82,10 @@ export async function ensureCommissionForBooking(
   if (!FEE_TRIGGER_STATUSES.includes(b.status as (typeof FEE_TRIGGER_STATUSES)[number])) {
     return null;
   }
+  // A vendor blocking their own calendar is not a marketplace transaction —
+  // the client name on those rows is literally "Rezervare manuală". Charging
+  // a fee on one would bill an artist for their own bookkeeping.
+  if (b.source === "manual") return null;
 
   const [existing] = await db
     .select({ id: commissions.id })
@@ -89,6 +94,17 @@ export async function ensureCommissionForBooking(
     .limit(1);
   if (existing) return existing.id;
 
+  // Exactly one vendor per booking is the data-model invariant. If both ids
+  // are somehow set the fee is ambiguous — which side owes what, at which
+  // rate — so refuse rather than silently bill the artist rate to a venue.
+  if (b.artistId && b.venueId) {
+    console.error(
+      "[commissions] booking",
+      bookingRequestId,
+      "names both an artist and a venue; no fee raised",
+    );
+    return null;
+  }
   const vendorType: "artist" | "venue" | null = b.artistId
     ? "artist"
     : b.venueId
@@ -164,6 +180,35 @@ export async function setCommissionStatus(
     .where(eq(commissions.id, commissionId));
 }
 
+/**
+ * Cancel the fee attached to a booking, if one was raised.
+ *
+ * Tariffs §10: the obligation dies with the event. Without this a venue kept
+ * owing 100 € for a wedding that was called off — the status change moved the
+ * booking but left the ledger row sitting at `pending`.
+ *
+ * A fee already marked `paid` is left alone: money that changed hands is a
+ * refund conversation, not a status flip.
+ */
+export async function cancelCommissionForBooking(
+  bookingRequestId: number,
+  note: string,
+): Promise<void> {
+  await db
+    .update(commissions)
+    .set({
+      status: "cancelled",
+      paymentNote: note,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(commissions.bookingRequestId, bookingRequestId),
+        sql`${commissions.status} in ('pending','invoiced')`,
+      ),
+    );
+}
+
 export interface CommissionTotals {
   pending: number;
   paid: number;
@@ -204,7 +249,10 @@ export async function backfillCommissions(): Promise<{ created: number; skipped:
       // No agreed-price filter: a venue's flat fee is owed on a confirmed
       // event whatever the price was, and computeCommission decides whether a
       // row is due. Filtering here used to hide those bookings entirely.
-      sql`${bookingRequests.status} in ('confirmed_by_client','completed')`,
+      and(
+        sql`${bookingRequests.status} in ('confirmed_by_client','completed')`,
+        sql`${bookingRequests.source} <> 'manual'`,
+      ),
     );
   let created = 0;
   let skipped = 0;

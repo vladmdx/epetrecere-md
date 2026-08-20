@@ -140,7 +140,6 @@ export function ClusterPanel({
               className="flex gap-3 rounded-lg border border-border/50 p-2 transition-colors hover:border-gold/40 hover:bg-gold/5"
             >
               {v.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={v.imageUrl}
                   alt={v.name}
