@@ -64,6 +64,8 @@ import { createPortal } from "react-dom";
 import { TimePicker } from "@/components/ui/time-picker";
 import {
   resolvePriceForDuration,
+  perEventOffers,
+  tierMode,
   tierDurationMinutes,
   formatDuration,
   type PricingTier,
@@ -83,6 +85,8 @@ import {
 } from "@/components/planner/price-negotiation-panel";
 import { AIArtistPickerChat } from "@/components/planner/ai-artist-picker-chat";
 import { cn } from "@/lib/utils";
+import { normalizeEventType } from "@/lib/events/normalize";
+import { formatPrice } from "@/lib/format/price";
 
 interface Plan {
   id: number;
@@ -2653,6 +2657,11 @@ function PlanArtistCard({
   // (base / weekend / evening / specific-day override).
   const [packages, setPackages] = useState<PricingTier[]>([]);
   const [packagesLoading, setPackagesLoading] = useState(false);
+  // A fixed per-event price the artist quoted for this kind of event. It is
+  // an alternative to picking an hourly duration, not another duration.
+  const [selectedEventTierId, setSelectedEventTierId] = useState<number | null>(
+    null,
+  );
   const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<
     number | null
   >(null);
@@ -2740,18 +2749,28 @@ function PlanArtistCard({
   }, [modalOpen, artist.id]);
 
   // When a duration is selected, recompute endTime from startTime + duration.
+  // A per-event price has no billable duration, but the booking still needs
+  // an end time for the calendar — the artist's stated average is the honest
+  // estimate, and both sides can adjust it while negotiating.
   useEffect(() => {
-    if (selectedDurationMinutes == null) return;
+    const chosenEventTier =
+      selectedEventTierId != null
+        ? packages.find((p) => p.id === selectedEventTierId)
+        : undefined;
+    const minutes =
+      selectedDurationMinutes ??
+      (chosenEventTier ? tierDurationMinutes(chosenEventTier) : null);
+    if (minutes == null) return;
     if (!startTime) return;
     const [h, m] = startTime.split(":").map(Number);
     if (Number.isNaN(h)) return;
-    const totalMinutes = h * 60 + (m || 0) + selectedDurationMinutes;
+    const totalMinutes = h * 60 + (m || 0) + minutes;
     const endH = Math.floor(totalMinutes / 60) % 24;
     const endM = Math.round(totalMinutes % 60);
     setEndTime(
       `${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`,
     );
-  }, [selectedDurationMinutes, startTime]);
+  }, [selectedDurationMinutes, selectedEventTierId, packages, startTime]);
 
   // Chat modal state
   const [chatOpen, setChatOpen] = useState(false);
@@ -2835,6 +2854,10 @@ function PlanArtistCard({
   const durationOptions = (() => {
     const map = new Map<number, PricingTier[]>();
     for (const p of packages) {
+      // A per-event price is a whole-event figure whose duration is only an
+      // average. Bucketing it by duration would make "wedding, ~6h, 800 €"
+      // collide with a genuine 6-hour hourly tier.
+      if (tierMode(p) === "per_event") continue;
       const d = tierDurationMinutes(p);
       if (d == null) continue;
       const arr = map.get(d) ?? [];
@@ -2846,17 +2869,30 @@ function PlanArtistCard({
       .map(([durationMinutes, tiers]) => ({ durationMinutes, tiers }));
   })();
 
+  const planEventType = normalizeEventType(plan.eventType);
+
+  const eventOffers = perEventOffers(packages, {
+    eventDate: plan.eventDate,
+    startTime: startTime || null,
+    eventType: planEventType,
+  });
+  const selectedEventOffer =
+    eventOffers.find((o) => o.tier.id === selectedEventTierId) ?? null;
+
   const resolvedForSelection =
-    selectedDurationMinutes != null
-      ? resolvePriceForDuration(
-          packages,
-          selectedDurationMinutes,
-          {
-            eventDate: plan.eventDate,
-            startTime: startTime || null,
-          },
-        )
-      : null;
+    selectedEventTierId != null
+      ? selectedEventOffer
+      : selectedDurationMinutes != null
+        ? resolvePriceForDuration(
+            packages,
+            selectedDurationMinutes,
+            {
+              eventDate: plan.eventDate,
+              startTime: startTime || null,
+              eventType: planEventType,
+            },
+          )
+        : null;
 
   const slotForSelection = slots.find((s) => s.id === selectedSlotId);
   const computedPrice =
@@ -2864,6 +2900,7 @@ function PlanArtistCard({
 
   const canSubmit =
     (selectedDurationMinutes != null && !!startTime) ||
+    (selectedEventTierId != null && !!startTime) ||
     (timesValid() && packages.length === 0);
 
   async function submit() {
@@ -3100,9 +3137,77 @@ function PlanArtistCard({
                   )}
                 </div>
 
+                {/* Fixed per-event prices, when the artist quoted one for
+                    this kind of event. Choosing one replaces the hourly
+                    duration choice rather than adding to it. */}
+                {eventOffers.length > 0 && (
+                  <div>
+                    <Label>Preț per eveniment</Label>
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      Artistul are un preț fix pentru acest tip de eveniment.
+                    </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {eventOffers.map((offer) => {
+                        const selected = selectedEventTierId === offer.tier.id;
+                        const minutes = tierDurationMinutes(offer.tier);
+                        return (
+                          <button
+                            key={offer.tier.id}
+                            type="button"
+                            disabled={submitting}
+                            onClick={() => {
+                              const next = selected ? null : offer.tier.id;
+                              setSelectedEventTierId(next);
+                              if (next != null) {
+                                setSelectedDurationMinutes(null);
+                                setSelectedSlotId(null);
+                              }
+                            }}
+                            className={cn(
+                              "flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all",
+                              selected
+                                ? "border-gold bg-gold/10 shadow-[0_0_0_1px_rgba(201,168,76,0.4)]"
+                                : "border-border/40 hover:border-gold/40",
+                            )}
+                          >
+                            <div className="flex items-baseline justify-between gap-2">
+                              <span
+                                className={cn(
+                                  "font-heading text-sm font-bold",
+                                  selected ? "text-gold" : "text-foreground",
+                                )}
+                              >
+                                {offer.tier.nameRo || "Preț per eveniment"}
+                              </span>
+                              <span
+                                className={cn(
+                                  "text-sm font-bold",
+                                  selected ? "text-gold" : "text-foreground",
+                                )}
+                              >
+                                {formatPrice(offer.price)}
+                              </span>
+                            </div>
+                            {minutes != null && (
+                              <span className="text-[11px] text-muted-foreground">
+                                ~{formatDuration(minutes)} în medie
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Duration picker — the resolver picks the right price */}
                 <div>
-                  <Label>Durata de participare *</Label>
+                  <Label>
+                    Durata de participare{" "}
+                    {eventOffers.length > 0 && selectedEventTierId != null
+                      ? "(înlocuită de prețul per eveniment)"
+                      : "*"}
+                  </Label>
                   <p className="mb-2 text-xs text-muted-foreground">
                     {durationOptions.length > 0
                       ? "Alege durata. Prețul se calculează în funcție de dată și oră."
@@ -3173,6 +3278,8 @@ function PlanArtistCard({
                               setSelectedDurationMinutes(
                                 selected ? null : durationMinutes,
                               );
+                              // The two pricing models are alternatives.
+                              if (!selected) setSelectedEventTierId(null);
                               setSelectedSlotId(null);
                             }}
                             className={cn(

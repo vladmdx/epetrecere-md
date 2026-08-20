@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { artistPackages, artists, users } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
+import { syncArtistPriceFrom } from "@/lib/pricing/sync-price-from";
 
 // M1 #1 — Artist packages list + create.
 // Public GET (listing for a single artist) so the profile page stays fast.
@@ -17,6 +18,21 @@ const scopeEnum = z.enum([
   "specific_day",
 ]);
 
+
+// Kept in step with lib/events/normalize.ts. A null event type means "any
+// event", which is what every row created before per-event pricing means.
+const eventTypeEnum = z.enum([
+  "wedding",
+  "baptism",
+  "cumatrie",
+  "corporate",
+  "birthday",
+  "concert",
+  "other",
+]);
+
+const pricingModeEnum = z.enum(["per_hour", "per_event"]);
+
 const packageSchema = z.object({
   artistId: z.number().int().positive(),
   nameRo: z.string().min(2).max(200),
@@ -28,6 +44,8 @@ const packageSchema = z.object({
   price: z.number().int().min(0).optional().nullable(),
   durationHours: z.number().min(0).max(240).optional().nullable(),
   durationMinutes: z.number().int().min(0).max(59).optional().nullable(),
+  pricingMode: pricingModeEnum.optional().default("per_hour"),
+  eventType: eventTypeEnum.nullable().optional(),
   scope: scopeEnum.optional().default("base"),
   scopeDayOfWeek: z.number().int().min(0).max(6).optional().nullable(),
   scopeFromTime: z
@@ -144,12 +162,16 @@ export async function POST(req: Request) {
       price: parsed.data.price ?? null,
       durationHours: parsed.data.durationHours ?? null,
       durationMinutes: parsed.data.durationMinutes ?? 0,
+      pricingMode: parsed.data.pricingMode ?? "per_hour",
+      eventType: parsed.data.eventType ?? null,
       scope: parsed.data.scope ?? "base",
       scopeDayOfWeek: parsed.data.scopeDayOfWeek ?? null,
       scopeFromTime: parsed.data.scopeFromTime ?? null,
       isVisible: parsed.data.isVisible,
     })
     .returning();
+
+  await syncArtistPriceFrom(parsed.data.artistId);
 
   return NextResponse.json(created, { status: 201 });
 }

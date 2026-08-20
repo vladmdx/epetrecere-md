@@ -197,6 +197,7 @@ export async function getArtists(filters: ArtistFilters = {}) {
         price: artistPackages.price,
         durationHours: artistPackages.durationHours,
         durationMinutes: artistPackages.durationMinutes,
+        pricingMode: artistPackages.pricingMode,
       })
       .from(artistPackages)
       .where(
@@ -206,18 +207,22 @@ export async function getArtists(filters: ArtistFilters = {}) {
         ),
       );
 
-    // Track unique durations per artist to compute tierCount correctly.
-    const uniqueDurations = new Map<number, Set<number>>();
+    // Track unique tiers per artist to compute tierCount correctly. A
+    // per-event price counts as its own tier keyed by row id: its duration is
+    // an average, so folding it into a duration bucket would either hide it
+    // or merge it with a genuine hourly tier of the same length.
+    const uniqueTiers = new Map<number, Set<string>>();
 
     for (const r of pkgRows) {
       if (r.price == null) continue;
+      const perEvent = r.pricingMode === "per_event";
       const totalMin =
         Math.round((r.durationHours ?? 0) * 60) + (r.durationMinutes ?? 0);
-      if (totalMin <= 0) continue;
+      if (!perEvent && totalMin <= 0) continue;
 
-      const durations = uniqueDurations.get(r.artistId) ?? new Set<number>();
-      durations.add(totalMin);
-      uniqueDurations.set(r.artistId, durations);
+      const tiers = uniqueTiers.get(r.artistId) ?? new Set<string>();
+      tiers.add(perEvent ? `e${r.artistId}:${r.price}:${totalMin}` : `h${totalMin}`);
+      uniqueTiers.set(r.artistId, tiers);
 
       const entry = pricingByArtist.get(r.artistId) ?? {
         tierCount: 0,
@@ -231,10 +236,10 @@ export async function getArtists(filters: ArtistFilters = {}) {
       pricingByArtist.set(r.artistId, entry);
     }
 
-    // Fill in tierCount from the unique-durations tracker.
-    for (const [artistId, durations] of uniqueDurations) {
+    // Fill in tierCount from the unique-tier tracker.
+    for (const [artistId, tiers] of uniqueTiers) {
       const entry = pricingByArtist.get(artistId);
-      if (entry) entry.tierCount = durations.size;
+      if (entry) entry.tierCount = tiers.size;
     }
   }
 

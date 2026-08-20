@@ -18,6 +18,13 @@ export type PricingScope =
   | "evening"
   | "specific_day";
 
+/**
+ * How a row prices the work. `per_hour` is the classic duration tier;
+ * `per_event` is a fixed price for a whole event, where the duration
+ * describes the average length rather than a billable unit.
+ */
+export type PricingMode = "per_hour" | "per_event";
+
 export interface PricingTier {
   id: number;
   durationHours: number | null;
@@ -28,6 +35,14 @@ export interface PricingTier {
   scopeFromTime: string | null;
   nameRo?: string | null;
   isVisible?: boolean;
+  /** Missing on legacy rows — they are all per-hour. */
+  pricingMode?: PricingMode | string | null;
+  /** Canonical event-type key, or null/undefined for "any event type". */
+  eventType?: string | null;
+}
+
+export function tierMode(tier: PricingTier): PricingMode {
+  return tier.pricingMode === "per_event" ? "per_event" : "per_hour";
 }
 
 /** Convert a tier row to a normalized duration in minutes. Returns null when
@@ -52,6 +67,25 @@ interface Context {
   eventDate: string | null | undefined;
   /** Start time as HH:MM. */
   startTime: string | null | undefined;
+  /**
+   * Canonical event-type key of the booking, when known. A tier restricted to
+   * one event type only applies when it matches; a tier with no event type
+   * applies to everything, which is what every legacy row does.
+   */
+  eventType?: string | null;
+}
+
+/**
+ * Whether a tier's event type fits the context.
+ *
+ * A tier with no event type is generic and always fits. A restricted tier
+ * fits only its own type — and when the caller does not know the event type,
+ * a restricted tier is NOT offered, because charging a wedding price for an
+ * unknown event would be wrong in the customer's disfavour.
+ */
+export function eventTypeMatches(tier: PricingTier, ctx: Context): boolean {
+  if (!tier.eventType) return true;
+  return Boolean(ctx.eventType) && tier.eventType === ctx.eventType;
 }
 
 /** Higher number = wins. */
@@ -122,16 +156,46 @@ export function resolvePriceForDuration(
   const candidates = tiers.filter(
     (t) =>
       t.price != null &&
+      tierMode(t) === "per_hour" &&
       tierDurationMinutes(t) === durationMinutes &&
-      scopeMatches(t, ctx),
+      scopeMatches(t, ctx) &&
+      eventTypeMatches(t, ctx),
   );
   if (candidates.length === 0) return null;
-  candidates.sort(
-    (a, b) =>
-      scopePriority(b.scope || "base") - scopePriority(a.scope || "base"),
-  );
+  candidates.sort((a, b) => {
+    // A price written for this exact event type beats a generic one, then
+    // the usual weekend/evening override priority decides.
+    const byEvent = Number(Boolean(b.eventType)) - Number(Boolean(a.eventType));
+    if (byEvent !== 0) return byEvent;
+    return scopePriority(b.scope || "base") - scopePriority(a.scope || "base");
+  });
   const winner = candidates[0];
   return { price: winner.price!, tier: winner };
+}
+
+/**
+ * The fixed per-event prices that apply to this context, cheapest first.
+ *
+ * These are separate from the duration tiers on purpose: matching them by
+ * duration would make a "wedding, 6h average, 800 €" row compete with a
+ * genuine 6-hour hourly tier, and the client would see one row where there
+ * are two different products.
+ */
+export function perEventOffers(
+  tiers: PricingTier[],
+  ctx: Context,
+): { price: number; tier: PricingTier }[] {
+  return tiers
+    .filter(
+      (t) =>
+        t.price != null &&
+        tierMode(t) === "per_event" &&
+        t.isVisible !== false &&
+        scopeMatches(t, ctx) &&
+        eventTypeMatches(t, ctx),
+    )
+    .sort((a, b) => (a.price ?? 0) - (b.price ?? 0))
+    .map((t) => ({ price: t.price!, tier: t }));
 }
 
 /**
@@ -144,9 +208,17 @@ export function minApplicablePrice(
   ctx: Context = { eventDate: null, startTime: null },
 ): number | null {
   let min: number | null = null;
-  // Group tiers by duration then resolve each group.
+
+  // Per-event prices are whole-event figures, so they enter the floor
+  // directly rather than through a duration bucket.
+  for (const offer of perEventOffers(tiers, ctx)) {
+    if (min == null || offer.price < min) min = offer.price;
+  }
+
+  // Group the hourly tiers by duration, then resolve each group.
   const byDuration = new Map<number, PricingTier[]>();
   for (const t of tiers) {
+    if (tierMode(t) !== "per_hour") continue;
     const d = tierDurationMinutes(t);
     if (d == null || t.price == null) continue;
     const arr = byDuration.get(d) ?? [];

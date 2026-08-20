@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { artistPackages, artists, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { syncArtistPriceFrom } from "@/lib/pricing/sync-price-from";
 
 // M1 #2 — Update / delete a single artist package. Owner-only.
 
@@ -15,6 +16,21 @@ const scopeEnum = z.enum([
   "specific_day",
 ]);
 
+
+// Kept in step with lib/events/normalize.ts. A null event type means "any
+// event", which is what every row created before per-event pricing means.
+const eventTypeEnum = z.enum([
+  "wedding",
+  "baptism",
+  "cumatrie",
+  "corporate",
+  "birthday",
+  "concert",
+  "other",
+]);
+
+const pricingModeEnum = z.enum(["per_hour", "per_event"]);
+
 const updateSchema = z.object({
   nameRo: z.string().min(2).max(200).optional(),
   nameRu: z.string().max(200).nullable().optional(),
@@ -25,6 +41,8 @@ const updateSchema = z.object({
   price: z.number().int().min(0).nullable().optional(),
   durationHours: z.number().min(0).max(240).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(59).nullable().optional(),
+  pricingMode: pricingModeEnum.optional(),
+  eventType: eventTypeEnum.nullable().optional(),
   scope: scopeEnum.optional(),
   scopeDayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
   scopeFromTime: z
@@ -106,6 +124,8 @@ export async function PUT(
     .set(updates)
     .where(eq(artistPackages.id, pkgId));
 
+  await syncArtistPriceFrom(owner.artistId);
+
   const [updated] = await db
     .select()
     .from(artistPackages)
@@ -131,5 +151,6 @@ export async function DELETE(
   }
 
   await db.delete(artistPackages).where(eq(artistPackages.id, pkgId));
+  await syncArtistPriceFrom(owner.artistId);
   return NextResponse.json({ success: true });
 }

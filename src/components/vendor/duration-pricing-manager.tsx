@@ -26,12 +26,14 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/pricing/resolve";
+import { EventPricingManager } from "@/components/vendor/event-pricing-manager";
 
 type Scope = "base" | "weekend" | "weekday" | "evening" | "specific_day";
 
 interface Package {
   id: number;
   artistId: number;
+  pricingMode?: string | null;
   nameRo: string | null;
   price: number | null;
   durationHours: number | null;
@@ -127,7 +129,12 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
     try {
       const res = await fetch(`/api/artist-packages?artist_id=${artistId}`);
       if (!res.ok) throw new Error();
-      const data = (await res.json()) as Package[];
+      // Per-event rows live in the same table but are edited by
+      // EventPricingManager; showing them here as another duration tier is
+      // exactly the confusion this split exists to avoid.
+      const data = ((await res.json()) as Package[]).filter(
+        (p) => p.pricingMode !== "per_event",
+      );
       data.sort((a, b) => {
         const aMin = (a.durationHours ?? 0) * 60 + (a.durationMinutes ?? 0);
         const bMin = (b.durationHours ?? 0) * 60 + (b.durationMinutes ?? 0);
@@ -595,9 +602,12 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
         <p className="mt-2 text-xs text-muted-foreground">
           💡 Dacă un event al clientului e într-o sâmbătă și ai setat tarif
           weekend, clientul va vedea prețul de weekend. Altfel, se folosește
-          tariful de bază.
+          tariful de bază. Dacă lucrezi cu preț fix pe eveniment (altul la
+          nuntă, altul la botez), folosește secțiunea de mai jos.
         </p>
       </div>
+
+      <EventPricingManager artistId={artistId} />
 
       {renderGroup("base")}
       {renderGroup("weekend")}

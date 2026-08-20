@@ -376,6 +376,23 @@ export const artistPackages = pgTable("artist_packages", {
   price: integer("price"),
   durationHours: real("duration_hours"),
   durationMinutes: integer("duration_minutes").default(0).notNull(),
+  /**
+   * How this row prices the work.
+   *   per_hour  — the classic duration tier: N minutes for `price`.
+   *   per_event — a fixed price for a whole event; `duration_hours`/
+   *               `duration_minutes` then describe the AVERAGE length, not a
+   *               billable unit.
+   * Artists said their real pricing is per event and per event type, not per
+   * hour, so both models coexist.
+   */
+  pricingMode: text("pricing_mode").default("per_hour").notNull(),
+  /**
+   * Canonical event-type key (see lib/events/normalize.ts) this price applies
+   * to, or NULL for "any event type" — which is what every pre-existing row
+   * means. A photographer charges one figure for a wedding and another for a
+   * christening; this is that.
+   */
+  eventType: text("event_type"),
   /** base | weekend | weekday | evening | specific_day */
   scope: text("scope").default("base").notNull(),
   /** 0 (Sunday) – 6 (Saturday); used when scope="specific_day" */

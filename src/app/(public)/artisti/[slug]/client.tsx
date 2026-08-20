@@ -36,6 +36,8 @@ import { trackClick } from "@/lib/analytics/track-click";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { formatPrice } from "@/lib/format/price";
+import { eventTypeLabel, type EventTypeKey } from "@/lib/events/normalize";
+import { formatDuration } from "@/lib/pricing/resolve";
 
 interface ArtistData {
   id: number;
@@ -72,6 +74,11 @@ interface ArtistData {
     descriptionEn: string | null;
     price: number | null;
     durationHours: number | null;
+    durationMinutes: number | null;
+    /** "per_hour" (default) or "per_event". */
+    pricingMode: string | null;
+    /** Canonical event-type key, or null for "any event". */
+    eventType: string | null;
   }>;
   reviews: Array<{
     id: number;
@@ -140,8 +147,28 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   )
     .filter(Boolean)
     .slice(0, 6);
-  const profilePackages = artist.packages.length
-    ? artist.packages.map((pkg) => ({
+  // Fixed per-event prices are a different product from the hourly tiers —
+  // "800 € for a wedding" is not "a 6-hour package" — so they get their own
+  // block rather than being mixed into the packages grid.
+  const eventPrices = artist.packages
+    .filter((pkg) => pkg.pricingMode === "per_event" && pkg.price)
+    .map((pkg) => ({
+      id: pkg.id,
+      name: getLocalized(pkg, "name", locale),
+      description: getLocalized(pkg, "description", locale),
+      price: pkg.price,
+      eventType: pkg.eventType,
+      minutes:
+        (pkg.durationHours ?? 0) * 60 + (pkg.durationMinutes ?? 0),
+    }))
+    .sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
+
+  const hourlyPackages = artist.packages.filter(
+    (pkg) => pkg.pricingMode !== "per_event",
+  );
+
+  const profilePackages = hourlyPackages.length
+    ? hourlyPackages.map((pkg) => ({
         id: pkg.id,
         name: getLocalized(pkg, "name", locale),
         description: getLocalized(pkg, "description", locale),
@@ -336,7 +363,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               {artist.videos.length > 0 && (
                 <TabsTrigger value="videos">{t("artist.videos")} ({artist.videos.length})</TabsTrigger>
               )}
-              {artist.packages.length > 0 && (
+              {hourlyPackages.length > 0 && (
                 <TabsTrigger value="packages">{t("artist.packages")}</TabsTrigger>
               )}
               <TabsTrigger value="reviews">{t("artist.reviews")} ({artist.reviews.length})</TabsTrigger>
@@ -415,10 +442,10 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               </TabsContent>
             )}
 
-            {artist.packages.length > 0 && (
+            {hourlyPackages.length > 0 && (
               <TabsContent value="packages" className="mt-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {artist.packages.map((pkg) => {
+                  {hourlyPackages.map((pkg) => {
                     const pkgName = getLocalized(pkg, "name", locale);
                     const pkgDesc = getLocalized(pkg, "description", locale);
                     return (
@@ -602,6 +629,54 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                       </div>
                     )}
                   </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {eventPrices.length > 0 && (
+            <section id="preturi-eveniment" className="mt-10 scroll-mt-24">
+              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">
+                Preț fix
+              </p>
+              <h2 className="mt-2 font-heading text-2xl font-semibold">
+                Prețuri per eveniment
+              </h2>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {eventPrices.map((ep) => (
+                  <article
+                    key={ep.id}
+                    className="flex flex-col rounded-xl border border-white/10 bg-[linear-gradient(180deg,#111722,#0b1018)] p-5"
+                  >
+                    <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-white/45">
+                      {ep.eventType
+                        ? eventTypeLabel(ep.eventType as EventTypeKey, locale)
+                        : "Orice eveniment"}
+                    </p>
+                    <h3 className="mt-1.5 font-heading text-lg font-semibold">{ep.name}</h3>
+                    {ep.description && (
+                      <p className="mt-2 text-xs leading-5 text-white/48">{ep.description}</p>
+                    )}
+                    {ep.minutes > 0 && (
+                      <p className="mt-3 flex items-center gap-2 text-[11px] text-white/58">
+                        <Clock3 className="h-3.5 w-3.5 text-[#e6b84d]" />
+                        ~{formatDuration(ep.minutes)} în medie
+                      </p>
+                    )}
+                    <p className="mt-4 font-heading text-xl font-semibold text-[#e6b84d]">
+                      {formatPrice(ep.price, artist.priceCurrency, locale)}
+                    </p>
+                    <Link
+                      href={
+                        eventPlanId
+                          ? `/cabinet/planifica/${eventPlanId}?tab=bookings&package=${ep.id}`
+                          : "/planifica"
+                      }
+                      className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e6b84d]/45 bg-[#e6b84d]/8 text-xs font-semibold text-[#e6b84d] hover:bg-[#e6b84d]/15"
+                    >
+                      Solicită <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </article>
                 ))}
               </div>
             </section>
