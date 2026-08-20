@@ -35,6 +35,7 @@ import { ShareButtons } from "@/components/public/share-buttons";
 import { trackClick } from "@/lib/analytics/track-click";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
+import { formatPrice } from "@/lib/format/price";
 
 interface ArtistData {
   id: number;
@@ -299,7 +300,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 ) : artist.priceFrom ? (
                   canSeeContact ? (
                     <span className="font-accent font-semibold text-gold">
-                      {t("common.from")} {artist.priceFrom}€
+                      {t("common.from")} {formatPrice(artist.priceFrom, artist.priceCurrency, locale)}
                     </span>
                   ) : (
                     <a
@@ -319,7 +320,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               )}
 
               <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-xl border border-white/8 bg-[#0d1119]">
-                <ArtistFact icon={CalendarDays} label="Evenimente" value="Private & corporate" />
+                <ArtistFact icon={CalendarDays} label="Evenimente" value="Private și corporate" />
                 <ArtistFact icon={Clock3} label="Program" value="Personalizat" />
                 <ArtistFact icon={Languages} label="Limbi" value="RO / RU" />
                 <ArtistFact icon={Mic2} label="Format" value="Live & interactiv" />
@@ -703,7 +704,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               </div>
               {artist.priceFrom && canSeeContact && !artist.priceHidden && (
                 <p className="mt-4 font-heading text-2xl font-semibold text-[#e6b84d]">
-                  de la {artist.priceFrom}€
+                  {t("common.from")} {formatPrice(artist.priceFrom, artist.priceCurrency, locale)}
                 </p>
               )}
             </div>

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { formatPrice } from "@/lib/format/price";
 
 interface QuizAnswers {
   eventType: string;
@@ -217,7 +218,7 @@ export function MatchingQuizClient() {
                     ) : null}
                     {m.priceFrom && (
                       <span className="text-foreground">
-                        de la {m.priceFrom}€
+                        de la {formatPrice(m.priceFrom)}
                       </span>
                     )}
                   </div>

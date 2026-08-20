@@ -1144,7 +1144,7 @@ function BudgetTab({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="font-heading text-xl font-bold">Budget & Cheltuieli</h2>
+          <h2 className="font-heading text-xl font-bold">Buget și cheltuieli</h2>
           <p className="text-sm text-muted-foreground">
             Buget total: {budget > 0 ? `${budget}€` : "Nesetat"}
           </p>

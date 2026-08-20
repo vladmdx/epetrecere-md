@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState, useTransition } from "react";
 import Image from "next/image";
 import Link from "@/components/shared/locale-link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -13,6 +13,7 @@ import {
   Star,
   Users,
   Map as MapIcon,
+  Loader2,
 } from "lucide-react";
 import { VenueCard } from "@/components/public/venue-card";
 import { SortBar } from "@/components/public/sort-bar";
@@ -115,6 +116,13 @@ export function VenuesListClient({
   );
   const locations = Array.from(new Set([...knownCities, ...cities].filter(Boolean)));
 
+  const [pending, startTransition] = useTransition();
+
+  // Clicking "Caută" used to feel slower and less reliable than pressing Enter:
+  // both run the same handler, but router.push does an RSC round-trip and the
+  // button gave no sign it had registered the click, so people clicked again.
+  // The transition marks the navigation pending, so the button reacts on the
+  // first press exactly like Enter does.
   function navigate(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(updates)) {
@@ -123,7 +131,9 @@ export function VenuesListClient({
     }
     if (!("page" in updates)) params.delete("page");
     const suffix = params.toString();
-    router.push(suffix ? `/sali?${suffix}` : "/sali");
+    startTransition(() => {
+      router.push(suffix ? `/sali?${suffix}` : "/sali");
+    });
   }
 
   function handleSearch(event: FormEvent) {
@@ -198,8 +208,14 @@ export function VenuesListClient({
                   ))}
                 </select>
               </label>
-              <button className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] hover:brightness-105">
-                <Search className="h-4 w-4" /> {labels.search}
+              <button
+                type="submit"
+                disabled={pending}
+                aria-busy={pending}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] transition hover:brightness-105 disabled:cursor-progress disabled:opacity-75"
+              >
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                {labels.search}
               </button>
             </form>
           </div>

@@ -10,6 +10,7 @@ import { getLocalized } from "@/i18n";
 import { WishlistButton } from "@/components/public/wishlist-button";
 import { CompareButton } from "@/components/public/compare-button";
 import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
+import { formatPrice } from "@/lib/format/price";
 
 interface ArtistCardProps {
   artist: {
@@ -124,7 +125,7 @@ export function ArtistCard({ artist }: ArtistCardProps) {
           {artist.priceFrom ? (
             showPrice ? (
               <p className="text-[10px] font-semibold text-white/76">
-                {t("common.from")} {artist.priceFrom}€
+                {t("common.from")} {formatPrice(artist.priceFrom, artist.priceCurrency, locale)}
               </p>
             ) : (
               <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">

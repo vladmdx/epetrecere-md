@@ -283,7 +283,7 @@
       "viewAll": "Explore all artists"
     },
     "common": {
-      "from": "from {price} MDL"
+      "from": "from {price}"
     },
     "reco": {
       "eyebrow": "Smart recommendations",
@@ -498,5 +498,17 @@
     "removeFavorite": "Remove from favourites",
     "addCompare": "Add to comparison",
     "removeCompare": "Remove from comparison"
+  },
+  "aiChat": {
+    "greeting": "Hi! I'm the ePetrecere.md assistant. I can help you find artists and venues, work out your wedding budget, or answer questions about planning your event. What can I help with?",
+    "q1": "What does an average wedding cost in Moldova?",
+    "q2": "How do I find a good DJ?",
+    "q3": "How does the platform fee work?",
+    "q4": "How many guests fit in a mid-size venue?"
+  },
+  "ui": {
+    "aiPowered": "AI powered",
+    "budgetExpenses": "Budget & expenses",
+    "privateCorporate": "Private & corporate"
   }
 }

@@ -4,6 +4,7 @@ import Link from "@/components/shared/locale-link";
 import { Star, MapPin, Users, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
+import { formatPrice } from "@/lib/format/price";
 
 interface VenueRow {
   id: number;
@@ -34,12 +35,8 @@ const SAMPLE_VENUES: VenueRow[] = [
   { id: 3, slug: "nobil-luxury-events", nameRo: "Nobil Luxury Events", nameRu: null, nameEn: null, address: null, city: "Chișinău", capacityMin: null, capacityMax: 350, pricePerPerson: 11500, ratingAvg: 4.9, ratingCount: 87, isFeatured: true },
 ];
 
-function fmt(n: number) {
-  return n.toLocaleString("ro-RO");
-}
-
 export function FeaturedVenuesSection({ venues }: Props) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const list = venues.length
     ? venues
     : process.env.NODE_ENV === "development"
@@ -103,7 +100,7 @@ export function FeaturedVenuesSection({ venues }: Props) {
                         </p>
                       )}
                       {v.pricePerPerson ? (
-                        <p className="font-semibold text-[#2C2C3A]">{t("home.common.from", { price: fmt(v.pricePerPerson) })}</p>
+                        <p className="font-semibold text-[#2C2C3A]">{t("home.common.from", { price: formatPrice(v.pricePerPerson, null, locale) ?? "" })}</p>
                       ) : null}
                     </div>
 

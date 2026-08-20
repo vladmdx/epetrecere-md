@@ -5,6 +5,7 @@ import Link from "@/components/shared/locale-link";
 import { Search, Music, Building2, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
+import { formatPrice } from "@/lib/format/price";
 
 interface SearchResult {
   id: number;
@@ -20,7 +21,7 @@ interface SearchResult {
 }
 
 export function SearchAutocomplete() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [results, setResults] = useState<{ artists: SearchResult[]; venues: SearchResult[] }>({
@@ -155,7 +156,7 @@ export function SearchAutocomplete() {
                   </div>
                   {item.price_from && (
                     <span className="shrink-0 font-accent text-xs text-gold">
-                      {item.price_from}€
+                      {formatPrice(item.price_from, null, locale)}
                     </span>
                   )}
                 </Link>
@@ -184,7 +185,7 @@ export function SearchAutocomplete() {
                   </div>
                   {item.price_per_person && (
                     <span className="shrink-0 font-accent text-xs text-gold">
-                      {item.price_per_person}€/pers
+                      {formatPrice(item.price_per_person, null, locale)}/pers
                     </span>
                   )}
                 </Link>

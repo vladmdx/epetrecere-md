@@ -1,5 +1,6 @@
 import Link from "@/components/shared/locale-link";
 import { getCategoryEmoji } from "@/lib/wizard/categories-meta";
+import { formatPrice } from "@/lib/format/price";
 
 // Same card style as the homepage CategoriesSection (image + gradient overlay
 // + name + "from X€"). Falls back to a gold-gradient + emoji tile when there's
@@ -51,7 +52,7 @@ export function CategoryCard({ slug, name, image, imageAlt, priceFrom, badge }: 
       <div className="absolute bottom-0 left-0 right-0 p-4">
         <h3 className="font-heading text-base font-bold text-white">{name}</h3>
         {priceFrom && priceFrom > 0 && (
-          <p className="font-accent text-sm text-gold mt-1">de la {priceFrom}€</p>
+          <p className="font-accent text-sm text-gold mt-1">de la {formatPrice(priceFrom)}</p>
         )}
       </div>
     </Link>

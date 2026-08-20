@@ -11,23 +11,17 @@ import Link from "@/components/shared/locale-link";
 import { Bot, X, Send, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const STORAGE_KEY = "epetrecere-public-ai-chat";
 
-const GREETING: Msg = {
-  role: "assistant",
-  content:
-    "Salut! Sunt asistentul ePetrecere.md. Te pot ajuta să găsești artiști, săli, să calculezi bugetul nunții sau să răspund la întrebări despre planificarea evenimentului. Cu ce te pot ajuta?",
-};
-
-const QUICK_PROMPTS = [
-  "Cât costă o nuntă medie în Moldova?",
-  "Cum găsesc un DJ bun?",
-  "Ce include pachetul Pro?",
-  "Câți invitați încap într-o sală mijlocie?",
-];
+// The greeting and the suggested prompts used to be hardcoded Romanian, so
+// the assistant opened in Romanian even for a Russian or English visitor
+// (flagged in the QA audit). They follow the active locale now.
+// Note: the "Ce include pachetul Pro?" prompt was dropped — those packages no
+// longer exist (Tariffs §1).
 
 /** Replace `/path` or `/path/sub` tokens in AI replies with Next <Link>. */
 function renderWithLinks(text: string) {
@@ -49,6 +43,14 @@ function renderWithLinks(text: string) {
 }
 
 export function PublicAiChat() {
+  const { t } = useLocale();
+  const GREETING: Msg = { role: "assistant", content: t("aiChat.greeting") };
+  const QUICK_PROMPTS = [
+    t("aiChat.q1"),
+    t("aiChat.q2"),
+    t("aiChat.q3"),
+    t("aiChat.q4"),
+  ];
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Msg[]>([GREETING]);
   const [draft, setDraft] = useState("");

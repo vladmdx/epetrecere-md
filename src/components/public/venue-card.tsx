@@ -8,6 +8,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { WishlistButton } from "@/components/public/wishlist-button";
 import { CompareButton } from "@/components/public/compare-button";
+import { formatPrice } from "@/lib/format/price";
 
 interface VenueCardProps {
   venue: {
@@ -101,7 +102,7 @@ export function VenueCard({ venue, imageIndex }: VenueCardProps) {
           {venue.pricePerPerson ? (
             showPrice ? (
               <p className="text-[10px] font-semibold text-white/76">
-                {venue.pricePerPerson}€ {t("common.perPerson")}
+                {formatPrice(venue.pricePerPerson, null, locale)} {t("common.perPerson")}
               </p>
             ) : (
               <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">

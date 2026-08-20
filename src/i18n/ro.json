@@ -283,7 +283,7 @@
       "viewAll": "Explorează toți artiștii"
     },
     "common": {
-      "from": "de la {price} MDL"
+      "from": "de la {price}"
     },
     "reco": {
       "eyebrow": "Recomandări inteligente",
@@ -498,5 +498,17 @@
     "removeFavorite": "Scoate din favorite",
     "addCompare": "Adaugă la comparare",
     "removeCompare": "Scoate din comparare"
+  },
+  "aiChat": {
+    "greeting": "Salut! Sunt asistentul ePetrecere.md. Te pot ajuta să găsești artiști, săli, să calculezi bugetul nunții sau să răspund la întrebări despre planificarea evenimentului. Cu ce te pot ajuta?",
+    "q1": "Cât costă o nuntă medie în Moldova?",
+    "q2": "Cum găsesc un DJ bun?",
+    "q3": "Cum funcționează comisionul platformei?",
+    "q4": "Câți invitați încap într-o sală mijlocie?"
+  },
+  "ui": {
+    "aiPowered": "Cu inteligență artificială",
+    "budgetExpenses": "Buget și cheltuieli",
+    "privateCorporate": "Private și corporate"
   }
 }

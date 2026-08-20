@@ -4,6 +4,7 @@ import Link from "@/components/shared/locale-link";
 import { Star, MapPin, Play, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
+import { formatPrice } from "@/lib/format/price";
 
 interface ArtistRow {
   id: number;
@@ -59,12 +60,8 @@ const CARD_IMAGES = [
   "/images/artists/irina-grekova.jpg",
 ];
 
-function fmt(n: number) {
-  return n.toLocaleString("ro-RO");
-}
-
 export function FeaturedArtistsSection({ artists }: Props) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const display: DisplayArtist[] = artists.length
     ? artists.slice(0, 5).map((a, i) => ({
         id: a.id,
@@ -132,7 +129,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
                       <MapPin className="h-4 w-4 text-gold" /> {hero.city}
                     </span>
                   )}
-                  {hero.price ? <span>{t("home.common.from", { price: fmt(hero.price) })}</span> : null}
+                  {hero.price ? <span>{t("home.common.from", { price: formatPrice(hero.price, null, locale) ?? "" })}</span> : null}
                   {hero.rating ? (
                     <span className="flex items-center gap-1">
                       <Star className="h-4 w-4 fill-gold text-gold" /> {hero.rating.toFixed(1)}
@@ -170,7 +167,7 @@ export function FeaturedArtistsSection({ artists }: Props) {
                       </p>
                     )}
                     <div className="mt-1.5 flex items-center justify-between text-xs">
-                      {a.price ? <span className="text-white/80">{t("home.common.from", { price: fmt(a.price) })}</span> : <span />}
+                      {a.price ? <span className="text-white/80">{t("home.common.from", { price: formatPrice(a.price, null, locale) ?? "" })}</span> : <span />}
                       {a.rating ? (
                         <span className="flex items-center gap-1 text-white/80">
                           <Star className="h-3 w-3 fill-gold text-gold" /> {a.rating.toFixed(1)}

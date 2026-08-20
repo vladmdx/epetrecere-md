@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
+import { formatPrice } from "@/lib/format/price";
 
 interface BookingArtistCardProps {
   artist: {
@@ -263,7 +264,7 @@ export function BookingArtistCard({
             {artist.priceFrom ? (
               showPrice ? (
                 <p className="font-accent text-sm font-semibold text-gold">
-                  {t("common.from")} {artist.priceFrom}€
+                  {t("common.from")} {formatPrice(artist.priceFrom, null, locale)}
                 </p>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">

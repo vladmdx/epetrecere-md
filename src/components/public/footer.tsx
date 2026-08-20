@@ -41,12 +41,22 @@ const COLUMNS: { title: string; links: { key: string; href: string }[] }[] = [
   },
 ];
 
+/**
+ * Social profiles, read from public env vars.
+ *
+ * These used to be four icons all pointing at "#": a visitor who clicked one
+ * went nowhere, which is worse than not showing it. An icon now appears only
+ * when its URL is actually configured, so the row is honest whatever is set.
+ * Fill NEXT_PUBLIC_SOCIAL_* in the deployment environment to light them up.
+ */
 const SOCIALS = [
-  { icon: Globe, href: "#", label: "Facebook" },
-  { icon: Camera, href: "#", label: "Instagram" },
-  { icon: Music2, href: "#", label: "TikTok" },
-  { icon: Send, href: "#", label: "Telegram" },
-];
+  { icon: Globe, href: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK, label: "Facebook" },
+  { icon: Camera, href: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM, label: "Instagram" },
+  { icon: Music2, href: process.env.NEXT_PUBLIC_SOCIAL_TIKTOK, label: "TikTok" },
+  { icon: Send, href: process.env.NEXT_PUBLIC_SOCIAL_TELEGRAM, label: "Telegram" },
+].filter((s): s is { icon: typeof Globe; href: string; label: string } =>
+  Boolean(s.href),
+);
 
 export function Footer() {
   const { t } = useLocale();
@@ -72,6 +82,8 @@ export function Footer() {
                 <a
                   key={s.label}
                   href={s.href}
+                  target="_blank"
+                  rel="noreferrer noopener"
                   aria-label={s.label}
                   className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-[#9A9AAB] transition-colors hover:border-gold/40 hover:text-gold"
                 >

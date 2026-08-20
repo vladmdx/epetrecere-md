@@ -31,6 +31,7 @@ import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { trackClick } from "@/lib/analytics/track-click";
 import { plural, NOUNS } from "@/lib/i18n/plural";
+import { formatPrice } from "@/lib/format/price";
 
 interface VenueData {
   id: number;
@@ -544,7 +545,7 @@ export function VenueDetailClient({
               {venue.pricePerPerson ? (
                 canSeePrice ? (
                   <>
-                    <p className="font-accent text-3xl font-semibold text-gold">{venue.pricePerPerson}€</p>
+                    <p className="font-accent text-3xl font-semibold text-gold">{formatPrice(venue.pricePerPerson, null, locale)}</p>
                     <p className="text-sm text-muted-foreground">{t("venue.price_per_person")}</p>
                   </>
                 ) : (

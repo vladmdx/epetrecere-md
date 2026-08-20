@@ -64,3 +64,17 @@ npm run db:studio        # Drizzle Studio (web DB)
   Next.js builds.
 - **Mobile** → EAS Build + EAS Submit. See `packages/mobile/README.md`
   for the full guide.
+
+## Optional public env vars
+
+`.env*` is gitignored, so these are documented here rather than in an
+example file. All are optional — the UI simply hides the feature when a
+value is missing, which is why the footer no longer shows social icons
+that lead nowhere.
+
+| Variable | Effect when set |
+| --- | --- |
+| `NEXT_PUBLIC_SOCIAL_FACEBOOK` | Shows the Facebook icon in the footer |
+| `NEXT_PUBLIC_SOCIAL_INSTAGRAM` | Shows the Instagram icon in the footer |
+| `NEXT_PUBLIC_SOCIAL_TIKTOK` | Shows the TikTok icon in the footer |
+| `NEXT_PUBLIC_SOCIAL_TELEGRAM` | Shows the Telegram icon in the footer |

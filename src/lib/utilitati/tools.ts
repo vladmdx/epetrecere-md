@@ -69,7 +69,7 @@ Creează-ți contul în mai puțin de 1 minut și deschide checklist-ul potrivit
     slug: "budget",
     cabinetPath: "/cabinet/buget",
     emoji: "💰",
-    title: "Budget & Cheltuieli",
+    title: "Buget și cheltuieli",
     metaTitle: "Buget Nuntă Online : Calculator Cheltuieli Moldova",
     metaDescription:
       "Urmărește bugetul nunții sau evenimentului tău în Moldova. Adaugă cheltuieli, vezi categoriile depășite, exportă raportul. Gratuit pe ePetrecere.md.",
@@ -84,7 +84,7 @@ Creează-ți contul în mai puțin de 1 minut și deschide checklist-ul potrivit
     ],
     seoBody: `## Bugetul nunții : sub control de la prima plată până la ultima
 
-Cea mai mare sursă de stres la organizarea unei nunți în Moldova este urmărirea cheltuielilor. Avansuri pe ici, plăți pe colo, schimbări de meniu, costuri ascunse : la final te trezești că ai depășit bugetul cu 30%. Cu instrumentul Budget & Cheltuieli de pe ePetrecere.md vezi clar fiecare leu unde a plecat.
+Cea mai mare sursă de stres la organizarea unei nunți în Moldova este urmărirea cheltuielilor. Avansuri pe ici, plăți pe colo, schimbări de meniu, costuri ascunse : la final te trezești că ai depășit bugetul cu 30%. Cu instrumentul Buget și cheltuieli de pe ePetrecere.md vezi clar fiecare leu unde a plecat.
 
 ## Cum funcționează?
 

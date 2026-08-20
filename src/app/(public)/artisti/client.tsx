@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useState, useTransition } from "react";
 import Link from "@/components/shared/locale-link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowRight, MapPin, Search, SlidersHorizontal, Sparkles } from "lucide-react";
+import { ArrowRight, MapPin, Search, SlidersHorizontal, Sparkles, Loader2 } from "lucide-react";
 import { ArtistCard } from "@/components/public/artist-card";
 import { ArtistListCard } from "@/components/public/artist-list-card";
 import { SortBar } from "@/components/public/sort-bar";
@@ -90,6 +90,13 @@ export function ArtistsListClient({
   const [priceMax, setPriceMax] = useState(currentPriceMax);
   const [viewMode, setViewMode] = useViewMode();
 
+  const [pending, startTransition] = useTransition();
+
+  // Clicking "Caută" used to feel slower and less reliable than pressing Enter:
+  // both run the same handler, but router.push does an RSC round-trip and the
+  // button gave no sign it had registered the click, so people clicked again.
+  // The transition marks the navigation pending, so the button reacts on the
+  // first press exactly like Enter does.
   function navigate(updates: Record<string, string | undefined>) {
     const params = new URLSearchParams(searchParams.toString());
     for (const [key, value] of Object.entries(updates)) {
@@ -98,7 +105,9 @@ export function ArtistsListClient({
     }
     if (!("page" in updates)) params.delete("page");
     const suffix = params.toString();
-    router.push(suffix ? `/artisti?${suffix}` : "/artisti");
+    startTransition(() => {
+      router.push(suffix ? `/artisti?${suffix}` : "/artisti");
+    });
   }
 
   function handleSearch(event: FormEvent) {
@@ -171,7 +180,13 @@ export function ArtistsListClient({
                   ))}
                 </select>
               </label>
-              <button className="min-h-11 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] hover:brightness-105">
+              <button
+                type="submit"
+                disabled={pending}
+                aria-busy={pending}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] transition hover:brightness-105 disabled:cursor-progress disabled:opacity-75"
+              >
+                {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {labels.search}
               </button>
               <div className="flex flex-wrap items-center gap-1.5 sm:col-span-3">

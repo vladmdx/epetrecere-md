@@ -14,7 +14,7 @@ const features = [
   { icon: Users, title: "500+ Artiști", desc: "Cea mai mare bază de artiști și furnizori de servicii pentru evenimente din Moldova." },
   { icon: Calendar, title: "Calendar Live", desc: "Verifică disponibilitatea artiștilor și sălilor în timp real." },
   { icon: Shield, title: "Verificați", desc: "Toți artiștii sunt verificați și evaluați de clienți reali." },
-  { icon: Sparkles, title: "AI Powered", desc: "Asistent AI pentru planificarea evenimentului perfect." },
+  { icon: Sparkles, title: "Cu inteligență artificială", desc: "Asistent AI pentru planificarea evenimentului perfect." },
 ];
 
 export default function AboutPage() {

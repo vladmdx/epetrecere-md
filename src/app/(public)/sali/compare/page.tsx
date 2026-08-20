@@ -8,6 +8,7 @@ import { Star, MapPin, Users, ArrowLeft, X, Check } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { ClearCompareButton } from "./clear-button";
 import { NotSpecified } from "@/components/public/not-specified";
+import { formatPrice } from "@/lib/format/price";
 
 export const dynamic = "force-dynamic";
 
@@ -119,7 +120,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
     },
     {
       label: "Preț / persoană",
-      render: (v) => (v.pricePerPerson ? `${v.pricePerPerson}€` : <NotSpecified />),
+      render: (v) => (v.pricePerPerson ? `${formatPrice(v.pricePerPerson, null, "ro")}` : <NotSpecified />),
     },
     {
       label: "Rating",
