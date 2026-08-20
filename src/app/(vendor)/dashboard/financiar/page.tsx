@@ -20,6 +20,7 @@ import {
 import { db } from "@/lib/db";
 import { artists, bookingRequests, users } from "@/lib/db/schema";
 import { CommissionPanel } from "@/components/vendor/commission-panel";
+import { formatAmount } from "@/lib/format/price";
 
 export const dynamic = "force-dynamic";
 
@@ -74,7 +75,6 @@ export default async function VendorFinancialPage() {
   }
 
   const priceFrom = artist.priceFrom ?? 0;
-  const currency = artist.priceCurrency ?? "€";
 
   // Pull every booking for this artist that is in an "earning" state
   const rows = await db
@@ -133,25 +133,25 @@ export default async function VendorFinancialPage() {
   const stats = [
     {
       label: "Venituri luna asta",
-      value: `${monthRevenue}${currency}`,
+      value: formatAmount(monthRevenue),
       icon: DollarSign,
       color: "text-gold",
     },
     {
       label: `Total ${year}`,
-      value: `${totalYear}${currency}`,
+      value: formatAmount(totalYear),
       icon: TrendingUp,
       color: "text-success",
     },
     {
       label: "Plăți în așteptare",
-      value: `${pendingRevenue}${currency}`,
+      value: formatAmount(pendingRevenue),
       icon: Clock,
       color: "text-warning",
     },
     {
       label: "Plăți confirmate",
-      value: `${confirmedRevenue}${currency}`,
+      value: formatAmount(confirmedRevenue),
       icon: CheckCircle,
       color: "text-success",
     },
@@ -165,8 +165,7 @@ export default async function VendorFinancialPage() {
         <div>
           <h1 className="font-heading text-2xl font-bold">Financiar</h1>
           <p className="text-xs text-muted-foreground">
-            Estimat pe baza prețului tău public ({priceFrom}
-            {currency} / eveniment).
+            Estimat pe baza prețului tău public ({formatAmount(priceFrom)} / eveniment).
           </p>
         </div>
       </div>
@@ -245,7 +244,6 @@ export default async function VendorFinancialPage() {
                           key={t.id}
                           row={t}
                           amount={priceFrom}
-                          currency={currency}
                         />
                       ))}
                     </div>
@@ -262,7 +260,6 @@ export default async function VendorFinancialPage() {
                           key={t.id}
                           row={t}
                           amount={priceFrom}
-                          currency={currency}
                         />
                       ))}
                     </div>
@@ -285,10 +282,9 @@ interface TransactionRowProps {
     status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled" | "completed" | "expired";
   };
   amount: number;
-  currency: string;
 }
 
-function TransactionRow({ row, amount, currency }: TransactionRowProps) {
+function TransactionRow({ row, amount }: TransactionRowProps) {
   const isConfirmed = row.status === "confirmed_by_client";
   return (
     <div className="flex items-center justify-between gap-3">
@@ -300,8 +296,7 @@ function TransactionRow({ row, amount, currency }: TransactionRowProps) {
       </div>
       <div className="text-right">
         <p className="font-accent font-semibold text-gold">
-          {amount}
-          {currency}
+          {formatAmount(amount)}
         </p>
         <Badge
           variant="outline"

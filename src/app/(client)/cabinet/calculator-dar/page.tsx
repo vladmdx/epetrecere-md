@@ -38,10 +38,10 @@ const PEOPLE_COUNTS = [
 ];
 
 const INCOMES = [
-  { value: "low", label: "Sub 5.000 MDL", weight: 0.7 },
-  { value: "medium", label: "5.000 – 10.000 MDL", weight: 1.0 },
-  { value: "high", label: "10.000 – 20.000 MDL", weight: 1.3 },
-  { value: "very_high", label: "Peste 20.000 MDL", weight: 1.6 },
+  { value: "low", label: "Sub 250 €", weight: 0.7 },
+  { value: "medium", label: "250 – 500 €", weight: 1.0 },
+  { value: "high", label: "500 – 1.000 €", weight: 1.3 },
+  { value: "very_high", label: "Peste 1.000 €", weight: 1.6 },
 ];
 
 const CITIES = [

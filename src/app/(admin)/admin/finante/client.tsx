@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { formatRate, type CommissionRules } from "@/lib/commissions/rules";
 import { Check, RefreshCw, Settings2, AlertTriangle } from "lucide-react";
+import { formatAmount } from "@/lib/format/price";
 
 interface Row {
   id: number;
@@ -328,11 +329,11 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
                         <td className="p-3">{r.clientName ?? "—"}</td>
                         <td className="p-3">{r.eventDate ?? "—"}</td>
                         <td className="p-3 text-right">
-                          {r.baseAmount} {r.currency}
+                          {formatAmount(r.baseAmount, r.currency)}
                         </td>
                         <td className="p-3 text-right">{formatRate(r.rateBps)}</td>
                         <td className="p-3 text-right font-semibold">
-                          {r.amount} {r.currency}
+                          {formatAmount(r.amount, r.currency)}
                         </td>
                         <td className={`p-3 ${overdue ? "text-red-500" : ""}`}>
                           {r.dueDate ?? "—"}

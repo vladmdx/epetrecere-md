@@ -33,10 +33,10 @@ const EVENT_TYPES = [
 ] as const;
 
 const BUDGETS = [
-  { value: "0-30000", key: "budgetUnder30" },
-  { value: "30000-50000", key: "budget30_50" },
-  { value: "50000-100000", key: "budget50_100" },
-  { value: "100000+", key: "budgetOver100" },
+  { value: "0-1500", key: "budgetUnder30" },
+  { value: "1500-2500", key: "budget30_50" },
+  { value: "2500-5000", key: "budget50_100" },
+  { value: "5000+", key: "budgetOver100" },
 ] as const;
 
 const RECOS = [
@@ -51,7 +51,7 @@ export function RecommendationsSection() {
   const [eventType, setEventType] = useState("wedding");
   const [date, setDate] = useState<Date | null>(getTomorrow());
   const [guests, setGuests] = useState("120");
-  const [budget, setBudget] = useState("30000-50000");
+  const [budget, setBudget] = useState("1500-2500");
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

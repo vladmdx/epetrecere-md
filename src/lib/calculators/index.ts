@@ -438,5 +438,5 @@ export const EVENT_TYPE_LABELS: Record<EventType, string> = {
 };
 
 export function formatEUR(amount: number): string {
-  return `${amount.toLocaleString("ro-MD")} €`;
+  return `${amount.toLocaleString("ro-RO")} €`;
 }

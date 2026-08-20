@@ -75,7 +75,7 @@ export function ViewSwitcher({ mode, onChange }: Props) {
   const mobileCols = mode.kind === "grid" && mode.cols === 1 ? 1 : 2;
   const desktopCols = mode.kind === "grid" && mode.cols >= 3 ? mode.cols : 4;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex shrink-0 flex-nowrap items-center gap-1.5">
       {/* Grid mode + column count */}
       <div
         className={cn(

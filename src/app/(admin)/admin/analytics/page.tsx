@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { formatAmount } from "@/lib/format/price";
 import {
   profileViews,
   bookingRequests,
@@ -155,7 +156,6 @@ export default async function AnalyticsPage() {
     nameRo: string;
     bookings: number;
     revenue: number;
-    currency: string;
   }> = [];
   if (topBookingRows.length > 0) {
     const topIds = topBookingRows
@@ -167,7 +167,6 @@ export default async function AnalyticsPage() {
             id: artists.id,
             nameRo: artists.nameRo,
             priceFrom: artists.priceFrom,
-            priceCurrency: artists.priceCurrency,
           })
           .from(artists)
           .where(inArray(artists.id, topIds))
@@ -183,7 +182,6 @@ export default async function AnalyticsPage() {
           nameRo: a.nameRo,
           bookings: r.bookings,
           revenue: (a.priceFrom ?? 0) * r.bookings,
-          currency: a.priceCurrency ?? "€",
         };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
@@ -246,7 +244,7 @@ export default async function AnalyticsPage() {
     },
     {
       label: `Revenue estimat ${year}`,
-      value: `${revenueYear.toLocaleString("ro-MD")}€`,
+      value: formatAmount(revenueYear),
       change: "",
       icon: DollarSign,
       color: "text-gold",
@@ -326,8 +324,7 @@ export default async function AnalyticsPage() {
                       {a.bookings} rez.
                     </span>
                     <span className="font-accent text-sm font-semibold text-gold">
-                      {a.revenue}
-                      {a.currency}
+                      {formatAmount(a.revenue)}
                     </span>
                   </div>
                 ))}

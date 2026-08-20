@@ -109,10 +109,12 @@ export function computeCommission(
   input: CommissionInput,
   rules: CommissionRules,
 ): CommissionResult | null {
-  const base = Math.round(input.baseAmount);
-  if (!Number.isFinite(base) || base <= 0) return null;
+  const raw = Math.round(input.baseAmount);
+  const base = Number.isFinite(raw) && raw > 0 ? raw : 0;
 
   if (input.vendorType === "artist") {
+    // A percentage of nothing is nothing — skip rather than book a 0 fee.
+    if (base <= 0) return null;
     const rateBps = rules.artist.rateBps;
     return {
       amount: bps(base, rateBps),
@@ -128,6 +130,9 @@ export function computeCommission(
   const atOrAbove = guests >= rules.venue.guestThreshold;
   const tierCfg = atOrAbove ? rules.venue.atOrAbove : rules.venue.below;
 
+  // A flat venue fee is owed per confirmed event, decided by the guest count
+  // alone — it does not depend on what the venue charged, so it applies even
+  // when no price was recorded on the booking.
   if (tierCfg.fixedAmount != null && tierCfg.fixedAmount > 0) {
     return {
       amount: Math.round(tierCfg.fixedAmount),
@@ -136,6 +141,8 @@ export function computeCommission(
       currency: rules.currency,
     };
   }
+  // A percentage tier still needs an order value to apply to.
+  if (base <= 0) return null;
   if (tierCfg.rateBps != null && tierCfg.rateBps > 0) {
     return {
       amount: bps(base, tierCfg.rateBps),

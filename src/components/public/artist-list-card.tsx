@@ -12,6 +12,7 @@ import { getLocalized } from "@/i18n";
 import { WishlistButton } from "@/components/public/wishlist-button";
 import { CompareButton } from "@/components/public/compare-button";
 import { cn } from "@/lib/utils";
+import { formatPrice } from "@/lib/format/price";
 
 interface Artist {
   id: number;
@@ -109,7 +110,7 @@ export function ArtistListCard({ artist, density }: Props) {
               )}
               {showPrice && artist.priceFrom ? (
                 <span className="font-medium text-gold">
-                  de la {artist.priceFrom} {artist.priceCurrency ?? "EUR"}
+                  de la {formatPrice(artist.priceFrom, artist.priceCurrency, locale)}
                 </span>
               ) : !showPrice ? (
                 <span className="flex items-center gap-1 text-gold/70">

@@ -1,8 +1,13 @@
 // Venue financial dashboard — spec section 8.
 //
 // Stats cards (month revenue, total, commission, paid/unpaid), table of
-// bookings with amounts, and per-month revenue chart. Commission is a
-// flat 10% of gross.
+// bookings with amounts, and per-month revenue chart.
+//
+// The commission shown here is READ FROM THE LEDGER, not recomputed. It used
+// to be `revenue × rate`, which silently printed 0 € under the configured
+// tariff: venue fees are a flat amount per event decided by the guest count
+// (50 € under 80 guests, 100 € from 80), so there is no rate to multiply by.
+// The venue now sees exactly the rows the admin sees in Finanțe.
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
@@ -12,25 +17,13 @@ import {
   users,
   venues,
   bookingRequests,
+  commissions,
 } from "@/lib/db/schema";
 import { VenueFinanciarClient } from "./client";
 import { CommissionPanel } from "@/components/vendor/commission-panel";
 
 export const dynamic = "force-dynamic";
 
-// The venue fee is NOT a fixed 10% — the legal pack leaves venue tariffs to be
-// agreed separately (Tariffs §4), and the real rates are configured by an admin
-// under site_settings.commission_rules. We read them here so this page can
-// never show a number the platform doesn't actually charge.
-async function getVenueCommissionPct(guestHint: number | null): Promise<number> {
-  const { getCommissionRules } = await import("@/lib/commissions/service");
-  const rules = await getCommissionRules();
-  const tier =
-    (guestHint ?? 0) >= rules.venue.guestThreshold
-      ? rules.venue.atOrAbove
-      : rules.venue.below;
-  return tier.rateBps != null ? tier.rateBps / 10_000 : 0;
-}
 
 export default async function VenueFinanciarPage() {
   const { userId: clerkId } = await auth();
@@ -131,8 +124,21 @@ export default async function VenueFinanciarPage() {
     0,
   );
   const revenueTotal = Number(totalRow[0]?.total ?? 0);
-  const COMMISSION_PCT = await getVenueCommissionPct(null);
-  const commissionThisMonth = Math.round(revenueThisMonth * COMMISSION_PCT);
+
+  // Real fees, per booking, straight from the commissions ledger.
+  const feeRows = await db
+    .select({
+      bookingId: commissions.bookingRequestId,
+      amount: commissions.amount,
+    })
+    .from(commissions)
+    .where(eq(commissions.venueId, venue.id));
+  const commissionByBooking: Record<number, number> = {};
+  for (const r of feeRows) commissionByBooking[r.bookingId] = r.amount;
+  const commissionThisMonth = thisMonthBookings.reduce(
+    (sum, b) => sum + (commissionByBooking[b.id] ?? 0),
+    0,
+  );
 
   const paid = confirmedBookings.filter((b) => b.paidStatus === "paid").length;
   const unpaid = confirmedBookings.filter(
@@ -172,7 +178,7 @@ export default async function VenueFinanciarPage() {
         createdAt: b.createdAt.toISOString(),
       }))}
       chartData={chartData}
-      commissionPct={COMMISSION_PCT}
+      commissionByBooking={commissionByBooking}
     />
     <div className="px-6 pb-6"><CommissionPanel /></div>
     </>

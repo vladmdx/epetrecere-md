@@ -305,10 +305,10 @@
       "typeBirthday": "Zi de naștere",
       "typeCorporate": "Eveniment corporate",
       "typeOther": "Altă petrecere",
-      "budgetUnder30": "sub 30.000 MDL",
-      "budget30_50": "30.000 - 50.000 MDL",
-      "budget50_100": "50.000 - 100.000 MDL",
-      "budgetOver100": "peste 100.000 MDL"
+      "budgetUnder30": "sub 1.500 €",
+      "budget30_50": "1.500 - 2.500 €",
+      "budget50_100": "2.500 - 5.000 €",
+      "budgetOver100": "peste 5.000 €"
     },
     "community": {
       "title": "O comunitate de încredere",
@@ -510,5 +510,11 @@
     "aiPowered": "Cu inteligență artificială",
     "budgetExpenses": "Buget și cheltuieli",
     "privateCorporate": "Private și corporate"
+  },
+  "map": {
+    "approx": "aprox.",
+    "empty": "Nicio locație cu adresă cunoscută încă.",
+    "loading": "Se încarcă harta…",
+    "failed": "Harta nu s-a putut încărca."
   }
 }

@@ -31,7 +31,7 @@ import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { trackClick } from "@/lib/analytics/track-click";
 import { plural, NOUNS } from "@/lib/i18n/plural";
-import { formatPrice } from "@/lib/format/price";
+import { formatPrice, currencySymbol } from "@/lib/format/price";
 
 interface VenueData {
   id: number;
@@ -369,7 +369,7 @@ export function VenueDetailClient({
                           {p.pricePerPerson}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {p.currency || "EUR"} / persoană
+                          {currencySymbol(p.currency)} / persoană
                         </span>
                       </div>
                       {p.minGuests && (

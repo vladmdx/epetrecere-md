@@ -84,7 +84,7 @@ Creează-ți contul în mai puțin de 1 minut și deschide checklist-ul potrivit
     ],
     seoBody: `## Bugetul nunții : sub control de la prima plată până la ultima
 
-Cea mai mare sursă de stres la organizarea unei nunți în Moldova este urmărirea cheltuielilor. Avansuri pe ici, plăți pe colo, schimbări de meniu, costuri ascunse : la final te trezești că ai depășit bugetul cu 30%. Cu instrumentul Buget și cheltuieli de pe ePetrecere.md vezi clar fiecare leu unde a plecat.
+Cea mai mare sursă de stres la organizarea unei nunți în Moldova este urmărirea cheltuielilor. Avansuri pe ici, plăți pe colo, schimbări de meniu, costuri ascunse : la final te trezești că ai depășit bugetul cu 30%. Cu instrumentul Buget și cheltuieli de pe ePetrecere.md vezi clar fiecare euro unde a plecat.
 
 ## Cum funcționează?
 
@@ -137,11 +137,11 @@ Creează-ți contul și începe să urmărești bugetul în 2 minute. Toate cate
     ],
     seoBody: `## Invitații electronice : economice, elegante, eco
 
-Invitațiile pe hârtie sunt scumpe (3-10 lei pe bucată în Moldova), durează 2-3 săptămâni să le imprimi, le pierzi pe drum, iar invitații care le primesc pe WhatsApp oricum nu le păstrează. Invitațiile electronice rezolvă toate aceste probleme.
+Invitațiile pe hârtie sunt scumpe (0,15-0,50 € pe bucată în Moldova), durează 2-3 săptămâni să le imprimi, le pierzi pe drum, iar invitații care le primesc pe WhatsApp oricum nu le păstrează. Invitațiile electronice rezolvă toate aceste probleme.
 
 ## De ce invitații electronice pentru evenimentul tău?
 
-- **Cost redus** : pentru o nuntă de 200 invitați, economisești 600-2000 lei față de invitațiile tipărite
+- **Cost redus** : pentru o nuntă de 200 invitați, economisești 30-100 € față de invitațiile tipărite
 - **Trimitere instant** : generează link unic pentru fiecare invitat și-l trimiți pe WhatsApp
 - **RSVP automat** : invitații dau click pe "Confirm prezența" și apare instant la tine
 - **Update-uri ușoare** : schimbi locația în 2 click-uri, toți invitații văd noul detaliu

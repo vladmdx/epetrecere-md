@@ -113,7 +113,16 @@ export default async function VenuePage({ params }: Props) {
   const menuItems =
     catIds.length > 0
       ? await db
-          .select()
+          .select({
+            id: venueMenuItems.id,
+            categoryId: venueMenuItems.categoryId,
+            nameRo: venueMenuItems.nameRo,
+            nameRu: venueMenuItems.nameRu,
+            nameEn: venueMenuItems.nameEn,
+            descriptionRo: venueMenuItems.descriptionRo,
+            priceEur: venueMenuItems.priceEur,
+            sortOrder: venueMenuItems.sortOrder,
+          })
           .from(venueMenuItems)
           .where(inArray(venueMenuItems.categoryId, catIds))
           .orderBy(asc(venueMenuItems.sortOrder), asc(venueMenuItems.id))

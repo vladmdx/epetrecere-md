@@ -64,17 +64,17 @@ export const EDITORIAL_POSTS_2026: EditorialPost2026[] = [
     seoDescEn:
       "See the realistic cost of a wedding in Moldova in 2026, including venue, menu, photo and video, DJ, decor and contingency.",
     contentRo: `
-      <p>Întrebarea <strong>cât costă o nuntă în Moldova în 2026</strong> nu are un singur răspuns. Numărul de invitați, sezonul, localitatea și nivelul serviciilor schimbă radical totalul. Pentru o nuntă cu aproximativ 100 de invitați, un buget orientativ poate porni de la 150.000 MDL pentru o variantă atent controlată și poate depăși 350.000 MDL pentru un eveniment premium în Chișinău.</p>
+      <p>Întrebarea <strong>cât costă o nuntă în Moldova în 2026</strong> nu are un singur răspuns. Numărul de invitați, sezonul, localitatea și nivelul serviciilor schimbă radical totalul. Pentru o nuntă cu aproximativ 100 de invitați, un buget orientativ poate porni de la 7.500 € pentru o variantă atent controlată și poate depăși 18.000 € pentru un eveniment premium în Chișinău.</p>
       <p>Intervalele de mai jos sunt repere editoriale, nu oferte comerciale. Cere mereu o ofertă scrisă și verifică exact ce include fiecare pachet.</p>
 
       <h2>Buget orientativ pentru 100 de invitați</h2>
       <ul>
-        <li><strong>Sală și meniu:</strong> aproximativ 65.000 - 120.000 MDL, în funcție de meniu, băuturi, taxă de locație și servicii incluse.</li>
-        <li><strong>Foto și video:</strong> aproximativ 31.000 - 45.000 MDL pentru echipe și pachete complete publicate pentru sezonul 2026.</li>
-        <li><strong>DJ sau formație:</strong> aproximativ 9.000 - 12.000 MDL pentru DJ, iar o formație live poate ridica semnificativ bugetul.</li>
-        <li><strong>Decor și floristică:</strong> aproximativ 15.000 - 50.000 MDL, în funcție de flori, structură, lumini și reutilizarea elementelor.</li>
-        <li><strong>Ținute, verighete și beauty:</strong> aproximativ 20.000 - 60.000 MDL.</li>
-        <li><strong>Tort, invitații, transport și detalii:</strong> aproximativ 12.000 - 35.000 MDL.</li>
+        <li><strong>Sală și meniu:</strong> aproximativ 3.300 - 6.000 €, în funcție de meniu, băuturi, taxă de locație și servicii incluse.</li>
+        <li><strong>Foto și video:</strong> aproximativ 1.600 - 2.300 € pentru echipe și pachete complete publicate pentru sezonul 2026.</li>
+        <li><strong>DJ sau formație:</strong> aproximativ 450 - 600 € pentru DJ, iar o formație live poate ridica semnificativ bugetul.</li>
+        <li><strong>Decor și floristică:</strong> aproximativ 750 - 2.500 €, în funcție de flori, structură, lumini și reutilizarea elementelor.</li>
+        <li><strong>Ținute, verighete și beauty:</strong> aproximativ 1.000 - 3.000 €.</li>
+        <li><strong>Tort, invitații, transport și detalii:</strong> aproximativ 600 - 1.800 €.</li>
       </ul>
 
       <h2>Ce influențează cel mai mult costul nunții</h2>
@@ -98,16 +98,16 @@ export const EDITORIAL_POSTS_2026: EditorialPost2026[] = [
       <p>Intervalele au fost comparate cu oferte publice pentru sezonul 2026 ale furnizorilor din Moldova și cu listări locale de săli. Tarifele se pot schimba, iar o ofertă personalizată rămâne sursa finală pentru decizia ta.</p>
     `,
     contentRu: `
-      <p>Вопрос <strong>сколько стоит свадьба в Молдове в 2026 году</strong> не имеет одного ответа. Количество гостей, сезон, город и уровень услуг сильно меняют итог. Для свадьбы примерно на 100 гостей ориентир может начинаться от 150 000 MDL при строгом контроле бюджета и превышать 350 000 MDL для премиального события в Кишиневе.</p>
+      <p>Вопрос <strong>сколько стоит свадьба в Молдове в 2026 году</strong> не имеет одного ответа. Количество гостей, сезон, город и уровень услуг сильно меняют итог. Для свадьбы примерно на 100 гостей ориентир может начинаться от 7 500 € при строгом контроле бюджета и превышать 18 000 € для премиального события в Кишиневе.</p>
       <p>Диапазоны ниже являются редакционными ориентирами, а не коммерческими предложениями. Всегда запрашивайте письменную смету и уточняйте состав пакета.</p>
       <h2>Ориентировочный бюджет на 100 гостей</h2>
       <ul>
-        <li><strong>Зал и меню:</strong> около 65 000 - 120 000 MDL.</li>
-        <li><strong>Фото и видео:</strong> около 31 000 - 45 000 MDL для полных пакетов сезона 2026.</li>
-        <li><strong>DJ или живая музыка:</strong> около 9 000 - 12 000 MDL за DJ, живая группа обычно стоит дороже.</li>
-        <li><strong>Декор и флористика:</strong> около 15 000 - 50 000 MDL.</li>
-        <li><strong>Наряды, кольца и beauty:</strong> около 20 000 - 60 000 MDL.</li>
-        <li><strong>Торт, приглашения, транспорт и детали:</strong> около 12 000 - 35 000 MDL.</li>
+        <li><strong>Зал и меню:</strong> около 3 300 - 6 000 €.</li>
+        <li><strong>Фото и видео:</strong> около 1 600 - 2 300 € для полных пакетов сезона 2026.</li>
+        <li><strong>DJ или живая музыка:</strong> около 450 - 600 € за DJ, живая группа обычно стоит дороже.</li>
+        <li><strong>Декор и флористика:</strong> около 750 - 2 500 €.</li>
+        <li><strong>Наряды, кольца и beauty:</strong> около 1 000 - 3 000 €.</li>
+        <li><strong>Торт, приглашения, транспорт и детали:</strong> около 600 - 1 800 €.</li>
       </ul>
       <h2>Что сильнее всего влияет на стоимость</h2>
       <p><strong>Количество гостей</strong> является главным множителем. Каждые дополнительные 10 человек увеличивают расходы на меню, напитки, торт и логистику. Второй фактор это дата. Субботы с мая по сентябрь наиболее востребованы. Пятница, воскресенье или холодный сезон часто дают больше возможностей для выбора.</p>
@@ -124,16 +124,16 @@ export const EDITORIAL_POSTS_2026: EditorialPost2026[] = [
       <p>Проверьте сценарии в <a href="/calculatoare/nunta">калькуляторе стоимости свадьбы</a> и <a href="/calculatoare/buget">калькуляторе бюджета</a>.</p>
     `,
     contentEn: `
-      <p>There is no single answer to <strong>how much a wedding costs in Moldova in 2026</strong>. Guest count, season, location and service level can change the total substantially. For roughly 100 guests, an indicative budget may start around MDL 150,000 for a carefully controlled event and exceed MDL 350,000 for a premium wedding in Chișinău.</p>
+      <p>There is no single answer to <strong>how much a wedding costs in Moldova in 2026</strong>. Guest count, season, location and service level can change the total substantially. For roughly 100 guests, an indicative budget may start around €7,500 for a carefully controlled event and exceed €18,000 for a premium wedding in Chișinău.</p>
       <p>The ranges below are editorial benchmarks, not commercial offers. Always request a written quote and confirm exactly what each package includes.</p>
       <h2>Indicative budget for 100 guests</h2>
       <ul>
-        <li><strong>Venue and menu:</strong> approximately MDL 65,000 - 120,000.</li>
-        <li><strong>Photo and video:</strong> approximately MDL 31,000 - 45,000 for complete 2026 packages.</li>
-        <li><strong>DJ or live band:</strong> approximately MDL 9,000 - 12,000 for a DJ, with live music usually costing more.</li>
-        <li><strong>Decor and flowers:</strong> approximately MDL 15,000 - 50,000.</li>
-        <li><strong>Attire, rings and beauty:</strong> approximately MDL 20,000 - 60,000.</li>
-        <li><strong>Cake, invitations, transport and details:</strong> approximately MDL 12,000 - 35,000.</li>
+        <li><strong>Venue and menu:</strong> approximately €3,300 - €6,000.</li>
+        <li><strong>Photo and video:</strong> approximately €1,600 - €2,300 for complete 2026 packages.</li>
+        <li><strong>DJ or live band:</strong> approximately €450 - €600 for a DJ, with live music usually costing more.</li>
+        <li><strong>Decor and flowers:</strong> approximately €750 - €2,500.</li>
+        <li><strong>Attire, rings and beauty:</strong> approximately €1,000 - €3,000.</li>
+        <li><strong>Cake, invitations, transport and details:</strong> approximately €600 - €1,800.</li>
       </ul>
       <h2>What changes the total most</h2>
       <p><strong>Guest count</strong> is the main multiplier. Every additional ten people affect the menu, drinks, cake and logistics. Date is the second major factor. Saturdays from May through September are in demand, while Friday, Sunday and off-season dates can offer more flexibility.</p>
@@ -151,17 +151,17 @@ export const EDITORIAL_POSTS_2026: EditorialPost2026[] = [
     `,
     faq: {
       ro: [
-        { question: "Care este un buget realist pentru 100 de invitați?", answer: "Un interval orientativ pentru 2026 este 150.000 - 350.000 MDL, în funcție de locație, meniu și nivelul serviciilor." },
+        { question: "Care este un buget realist pentru 100 de invitați?", answer: "Un interval orientativ pentru 2026 este 7.500 - 18.000 €, în funcție de locație, meniu și nivelul serviciilor." },
         { question: "Ce procent din buget ar trebui rezervat pentru sală și meniu?", answer: "Pentru multe nunți, sala, meniul și băuturile reprezintă aproximativ 50% - 55% din buget." },
         { question: "Este necesară o rezervă pentru cheltuieli neprevăzute?", answer: "Da. O rezervă de 10% - 15% reduce riscul ca schimbările din ultima perioadă să depășească bugetul." },
       ],
       ru: [
-        { question: "Какой бюджет реалистичен для 100 гостей?", answer: "Ориентир на 2026 год составляет 150 000 - 350 000 MDL в зависимости от зала, меню и уровня услуг." },
+        { question: "Какой бюджет реалистичен для 100 гостей?", answer: "Ориентир на 2026 год составляет 7 500 - 18 000 € в зависимости от зала, меню и уровня услуг." },
         { question: "Сколько бюджета оставить на зал и меню?", answer: "Для многих свадеб зал, меню и напитки составляют около 50% - 55% бюджета." },
         { question: "Нужен ли резерв?", answer: "Да. Резерв 10% - 15% защищает бюджет от изменений в последние недели." },
       ],
       en: [
-        { question: "What is a realistic budget for 100 guests?", answer: "An indicative 2026 range is MDL 150,000 - 350,000, depending on the venue, menu and service level." },
+        { question: "What is a realistic budget for 100 guests?", answer: "An indicative 2026 range is €7,500 - €18,000, depending on the venue, menu and service level." },
         { question: "How much should be reserved for the venue and menu?", answer: "For many weddings, the venue, menu and drinks represent about 50% - 55% of the budget." },
         { question: "Is a contingency necessary?", answer: "Yes. A 10% - 15% contingency helps absorb last-minute changes." },
       ],

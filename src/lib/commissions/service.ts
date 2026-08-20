@@ -201,10 +201,10 @@ export async function backfillCommissions(): Promise<{ created: number; skipped:
     .select({ id: bookingRequests.id })
     .from(bookingRequests)
     .where(
-      and(
-        sql`${bookingRequests.status} in ('confirmed_by_client','completed')`,
-        sql`${bookingRequests.agreedPrice} is not null`,
-      ),
+      // No agreed-price filter: a venue's flat fee is owed on a confirmed
+      // event whatever the price was, and computeCommission decides whether a
+      // row is due. Filtering here used to hide those bookings entirely.
+      sql`${bookingRequests.status} in ('confirmed_by_client','completed')`,
     );
   let created = 0;
   let skipped = 0;

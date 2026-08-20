@@ -53,7 +53,8 @@ interface Props {
   };
   bookings: Booking[];
   chartData: ChartPoint[];
-  commissionPct: number;
+  /** bookingId → fee actually raised. Absent means no fee is due yet. */
+  commissionByBooking: Record<number, number>;
 }
 
 const EVENT_LABELS: Record<string, string> = {
@@ -85,7 +86,7 @@ export function VenueFinanciarClient({
   stats,
   bookings: initialBookings,
   chartData,
-  commissionPct,
+  commissionByBooking,
 }: Props) {
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [filter, setFilter] = useState<"all" | "paid" | "unpaid">("all");
@@ -251,7 +252,7 @@ export function VenueFinanciarClient({
   function exportPDF() {
     const rows = bookings.map((b) => {
       const gross = b.agreedPrice ?? 0;
-      const commission = Math.round(gross * commissionPct);
+      const commission = commissionByBooking[b.id] ?? 0;
       const net = gross - commission;
       return `<tr>
         <td>#${b.id}</td>
@@ -281,7 +282,7 @@ export function VenueFinanciarClient({
         <div class="summary">
           <div class="stat"><div class="stat-label">Venituri Total</div><div class="stat-value">${stats.revenueTotal}€</div></div>
           <div class="stat"><div class="stat-label">Luna Curentă</div><div class="stat-value">${stats.revenueThisMonth}€</div></div>
-          <div class="stat"><div class="stat-label">Comision (${Math.round(commissionPct * 100)}%)</div><div class="stat-value">${stats.commissionThisMonth}€</div></div>
+          <div class="stat"><div class="stat-label">Comision platformă</div><div class="stat-value">${stats.commissionThisMonth}€</div></div>
           <div class="stat"><div class="stat-label">Rezervări Luna</div><div class="stat-value">${stats.bookingsThisMonth}</div></div>
         </div>
         <table>
@@ -309,8 +310,8 @@ export function VenueFinanciarClient({
       EVENT_LABELS[(b.eventType || "").toLowerCase()] || b.eventType || "",
       b.eventDate || "",
       b.agreedPrice ?? 0,
-      Math.round((b.agreedPrice ?? 0) * commissionPct),
-      (b.agreedPrice ?? 0) - Math.round((b.agreedPrice ?? 0) * commissionPct),
+      commissionByBooking[b.id] ?? 0,
+      (b.agreedPrice ?? 0) - (commissionByBooking[b.id] ?? 0),
       b.paidStatus || "unpaid",
     ]);
     const csv = [header, ...rows]
@@ -376,7 +377,7 @@ export function VenueFinanciarClient({
         />
         <StatCard
           icon={Percent}
-          label={`Comision platformă (${Math.round(commissionPct * 100)}%)`}
+          label="Comision platformă"
           value={`${stats.commissionThisMonth.toLocaleString("ro-RO")}€`}
           subLabel="Luna curentă"
           accent="text-amber-400"
@@ -596,7 +597,7 @@ export function VenueFinanciarClient({
                 <tbody>
                   {filtered.map((b) => {
                     const gross = b.agreedPrice ?? 0;
-                    const commission = Math.round(gross * commissionPct);
+                    const commission = commissionByBooking[b.id] ?? 0;
                     const net = gross - commission;
                     return (
                       <tr

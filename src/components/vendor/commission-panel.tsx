@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatRate } from "@/lib/commissions/rules";
+import { formatAmount } from "@/lib/format/price";
 
 interface Row {
   id: number;
@@ -103,11 +104,11 @@ export function CommissionPanel() {
                     <td className="py-2">{r.clientName ?? "—"}</td>
                     <td className="py-2">{r.eventDate ?? "—"}</td>
                     <td className="py-2 text-right">
-                      {r.baseAmount} {r.currency}
+                      {formatAmount(r.baseAmount, r.currency)}
                     </td>
                     <td className="py-2 text-right">{formatRate(r.rateBps)}</td>
                     <td className="py-2 text-right font-semibold">
-                      {r.amount} {r.currency}
+                      {formatAmount(r.amount, r.currency)}
                     </td>
                     <td className={`py-2 ${overdue ? "text-red-500" : ""}`}>
                       {r.dueDate ?? "—"}

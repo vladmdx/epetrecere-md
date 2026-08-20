@@ -61,7 +61,16 @@ export async function GET(req: NextRequest) {
   const items =
     catIds.length > 0
       ? await db
-          .select()
+          .select({
+            id: venueMenuItems.id,
+            categoryId: venueMenuItems.categoryId,
+            nameRo: venueMenuItems.nameRo,
+            nameRu: venueMenuItems.nameRu,
+            nameEn: venueMenuItems.nameEn,
+            descriptionRo: venueMenuItems.descriptionRo,
+            priceEur: venueMenuItems.priceEur,
+            sortOrder: venueMenuItems.sortOrder,
+          })
           .from(venueMenuItems)
           .where(inArray(venueMenuItems.categoryId, catIds))
           .orderBy(asc(venueMenuItems.sortOrder), asc(venueMenuItems.id))
@@ -97,7 +106,6 @@ const actionSchema = z.discriminatedUnion("action", [
     categoryId: z.number(),
     nameRo: z.string().min(1),
     descriptionRo: z.string().optional(),
-    priceMdl: z.number().int().nullable().optional(),
     priceEur: z.number().int().nullable().optional(),
   }),
   z.object({
@@ -106,7 +114,6 @@ const actionSchema = z.discriminatedUnion("action", [
     id: z.number(),
     nameRo: z.string().optional(),
     descriptionRo: z.string().nullable().optional(),
-    priceMdl: z.number().int().nullable().optional(),
     priceEur: z.number().int().nullable().optional(),
     sortOrder: z.number().int().optional(),
   }),
@@ -216,7 +223,6 @@ export async function POST(req: NextRequest) {
           categoryId: data.categoryId,
           nameRo: data.nameRo,
           descriptionRo: data.descriptionRo ?? null,
-          priceMdl: data.priceMdl ?? null,
           priceEur: data.priceEur ?? null,
         })
         .returning();

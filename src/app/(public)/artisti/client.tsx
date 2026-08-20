@@ -321,19 +321,29 @@ export function ArtistsListClient({
           </aside>
 
           <section className="min-w-0">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm text-white/68">
-                  <span className="font-semibold text-white">{total}</span> {labels.found}
-                </p>
-                {hasFilters && <p className="mt-0.5 text-[10px] text-[#e6b84d]">{labels.active}</p>}
+            {/* On a phone the sort control, the map toggle and the view
+                switcher together are wider than the column, so the row broke
+                mid-control and the display mode ended up split across two
+                lines. Sorting now sits on the first line with the result
+                count and the display mode gets a line of its own; from `lg`
+                up it collapses back to the single row it always was. */}
+            <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-3">
+              <div className="flex items-center justify-between gap-3 lg:contents">
+                <div className="lg:mr-auto">
+                  <p className="text-sm text-white/68">
+                    <span className="font-semibold text-white">{total}</span> {labels.found}
+                  </p>
+                  {hasFilters && <p className="mt-0.5 text-[10px] text-[#e6b84d]">{labels.active}</p>}
+                </div>
+                <div className="lg:order-2">
+                  <SortBar
+                    options={sortOptions}
+                    current={currentSort}
+                    onChange={(value) => navigate({ sort: value })}
+                  />
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <SortBar
-                  options={sortOptions}
-                  current={currentSort}
-                  onChange={(value) => navigate({ sort: value })}
-                />
+              <div className="flex items-center justify-end gap-2 lg:order-3">
                 <ViewSwitcher mode={viewMode} onChange={setViewMode} />
               </div>
             </div>

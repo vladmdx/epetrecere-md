@@ -305,10 +305,10 @@
       "typeBirthday": "Birthday",
       "typeCorporate": "Corporate event",
       "typeOther": "Other party",
-      "budgetUnder30": "under 30,000 MDL",
-      "budget30_50": "30,000 - 50,000 MDL",
-      "budget50_100": "50,000 - 100,000 MDL",
-      "budgetOver100": "over 100,000 MDL"
+      "budgetUnder30": "under €1,500",
+      "budget30_50": "€1,500 - €2,500",
+      "budget50_100": "€2,500 - €5,000",
+      "budgetOver100": "over €5,000"
     },
     "community": {
       "title": "A community you can trust",
@@ -510,5 +510,11 @@
     "aiPowered": "AI powered",
     "budgetExpenses": "Budget & expenses",
     "privateCorporate": "Private & corporate"
+  },
+  "map": {
+    "approx": "approx.",
+    "empty": "No venue has a known address yet.",
+    "loading": "Loading the map…",
+    "failed": "The map could not load."
   }
 }

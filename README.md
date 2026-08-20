@@ -78,3 +78,16 @@ that lead nowhere.
 | `NEXT_PUBLIC_SOCIAL_INSTAGRAM` | Shows the Instagram icon in the footer |
 | `NEXT_PUBLIC_SOCIAL_TIKTOK` | Shows the TikTok icon in the footer |
 | `NEXT_PUBLIC_SOCIAL_TELEGRAM` | Shows the Telegram icon in the footer |
+
+## Maps
+
+The public venue map renders with **Google Maps** when
+`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is set, and falls back to Leaflet +
+OpenStreetMap otherwise, so the map never goes blank while a key is being
+set up. The key must be a **Maps JavaScript API** key from a Google Cloud
+project with billing enabled, restricted by HTTP referrer to
+`epetrecere.md/*` — it ships to the browser, so a referrer restriction is
+the only thing protecting the quota.
+
+`MDL_PER_EUR` (default 19.5) is the single leu→euro rate used by the AI menu
+scanner, which has to read menus printed in lei. Nothing else converts.

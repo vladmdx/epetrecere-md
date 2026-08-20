@@ -22,7 +22,6 @@ import {
 const itemSchema = z.object({
   nameRo: z.string().min(1).max(200),
   descriptionRo: z.string().max(500).nullable().optional(),
-  priceMdl: z.number().int().nonnegative().nullable().optional(),
   priceEur: z.number().int().nonnegative().nullable().optional(),
 });
 
@@ -145,7 +144,6 @@ export async function POST(req: NextRequest) {
           categoryId: catRow.id,
           nameRo: it.nameRo,
           descriptionRo: it.descriptionRo ?? null,
-          priceMdl: it.priceMdl ?? null,
           priceEur: it.priceEur ?? null,
           sortOrder: idx,
         })),

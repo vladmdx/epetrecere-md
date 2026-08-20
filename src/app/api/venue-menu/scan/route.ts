@@ -22,6 +22,7 @@ import { createHash } from "crypto";
 import { db } from "@/lib/db";
 import { users, venues, menuScanCache } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
+import { mdlPerEur } from "@/lib/format/fx";
 
 export const runtime = "nodejs";
 // The vision call can take 20-40s on a 5-page PDF. Keep the serverless
@@ -52,8 +53,7 @@ const MENU_JSON_SHAPE = `{
         {
           "nameRo": "string",
           "descriptionRo": "string or null",
-          "priceMdl": "integer or null (Moldovan leu)",
-          "priceEur": "integer or null"
+          "priceEur": "integer or null (euro, whole numbers)"
         }
       ]
     }
@@ -61,7 +61,7 @@ const MENU_JSON_SHAPE = `{
   "packages": [
     {
       "nameRo": "string",
-      "pricePerPerson": "integer (EUR preferred; if only MDL available, convert using 19.5 MDL/EUR)",
+      "pricePerPerson": "integer (euro per person, whole numbers)",
       "includes": "plain text bullet list separated by \\n",
       "excludes": "plain text or null",
       "minGuests": "integer or null"
@@ -69,7 +69,13 @@ const MENU_JSON_SHAPE = `{
   ]
 }`;
 
-const SYSTEM_PROMPT = `You extract structured menu data from Moldovan venue menus (images or PDFs).
+/**
+ * Built per request so the leu→euro rate is the one server-side constant
+ * rather than something the model estimates. See lib/format/fx.ts.
+ */
+function systemPrompt(): string {
+  const RATE = mdlPerEur();
+  return `You extract structured menu data from Moldovan venue menus (images or PDFs).
 
 Output ONLY a JSON object matching this exact shape — no prose, no markdown fences:
 ${MENU_JSON_SHAPE}
@@ -83,10 +89,12 @@ Rules:
   wine = alcoholic drinks / wine / cocktails
   coffee = non-alcoholic / juice / soda / coffee
   utensils = anything else / uncategorized
-- Prices: parse integers. If the menu shows "150 lei" use priceMdl=150. If "15€" use priceEur=15. If both columns exist, fill both.
-- "Packages" are per-person offers like "Pachet Standard 600 MDL/persoană". Extract these separately from single items.
+- Prices: the platform is EUR-only. Every price you emit must be an integer number of euro in "priceEur"/"pricePerPerson". Never output any other currency field.
+- Most Moldovan menus are priced in Moldovan leu ("lei", "MDL", "L"). Recognise those prices and convert them with EXACTLY this rate: ${RATE} lei = 1 euro. Divide by ${RATE} and round to the nearest whole euro — do not use any other rate, and do not reason about current exchange rates. If a price is already in euro ("€", "EUR"), keep it as is. If a menu lists both currencies, use the euro figure.
+- "Packages" are per-person offers like "Pachet Standard 600 lei/persoană" — convert the per-person price with the same rate. Extract these separately from single items.
 - If you cannot read the menu reliably, return { "categories": [], "packages": [], "error": "short reason" }.
 - Never invent items. Only emit what you can read.`;
+}
 
 async function fetchFile(
   url: string,
@@ -302,7 +310,7 @@ export async function POST(req: NextRequest) {
     contentBlocks = [
       {
         type: "text",
-        text: `The following is the extracted text of a website menu page (${parsed.data.fileUrl}). Parse it and return the JSON described in the system prompt.\n\nIMPORTANT: be aggressive in extraction. E-commerce menus often mix item names with "Adaugă în coș" / "Add to cart" labels and prices in MDL or EUR. Ignore the cart UI and pull every distinct food item with its price. Map similar categories (e.g. "Plăcinte" → utensils icon, "Salate" → salad).\n\n---\n\n${text}`,
+        text: `The following is the extracted text of a website menu page (${parsed.data.fileUrl}). Parse it and return the JSON described in the system prompt.\n\nIMPORTANT: be aggressive in extraction. E-commerce menus often mix item names with "Adaugă în coș" / "Add to cart" labels and prices in lei (MDL) or euro. Ignore the cart UI and pull every distinct food item with its price. Map similar categories (e.g. "Plăcinte" → utensils icon, "Salate" → salad).\n\n---\n\n${text}`,
       },
     ];
   } else {
@@ -330,7 +338,7 @@ export async function POST(req: NextRequest) {
     const message = await getClient().messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 8000,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt(),
       messages: [{ role: "user", content: contentBlocks }],
     });
     const block = message.content[0];

@@ -9,6 +9,7 @@ import { Star, MapPin, ArrowLeft, X, Check } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { ClearCompareButton } from "./clear-button";
 import { NotSpecified } from "@/components/public/not-specified";
+import { formatPrice } from "@/lib/format/price";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
       label: "Preț de la",
       render: (a) =>
         a.priceFrom
-          ? `${a.priceFrom} ${a.priceCurrency ?? "EUR"}`
+          ? formatPrice(a.priceFrom, a.priceCurrency)
           : <NotSpecified />,
     },
     {

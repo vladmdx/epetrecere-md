@@ -8,6 +8,30 @@ import { reviewRequestEmail } from "@/lib/email/templates/review-request";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendPushToUser, type PushKind } from "@/lib/push/expo";
 
+/**
+ * Raise the platform fee for a booking that has just reached a fee-bearing
+ * status. Idempotent (unique index on booking_request_id) and non-blocking:
+ * a fee failure must never break the status change the user asked for.
+ *
+ * Every path into 'confirmed_by_client' or 'completed' must call this. It
+ * used to be wired only to the vendor's accept action, so a booking the
+ * client confirmed, or one taken straight from accepted to completed, never
+ * produced a commission row and simply went missing from the ledger.
+ */
+function raiseCommission(bookingId: number): void {
+  void (async () => {
+    try {
+      const { ensureCommissionForBooking } = await import(
+        "@/lib/commissions/service"
+      );
+      await ensureCommissionForBooking(bookingId);
+    } catch (err) {
+      console.error("[commissions] ensure failed for booking", bookingId, err);
+    }
+  })();
+}
+
+
 // UPDATE booking request — drives the bilateral confirmation flow (M0b #9):
 //   action=accept          → artist accepts, status becomes "accepted"
 //   action=reject          → artist rejects, status becomes "rejected"
@@ -199,20 +223,9 @@ export async function PUT(
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
 
-    // Tariffs §5 — the platform fee obligation is born the moment the order
-    // reaches "confirmed". Raise the commission row now so it shows up in the
-    // vendor's and admin's finance views. Idempotent (unique index on the
-    // booking id) and non-blocking: a fee failure must never break an accept.
-    void (async () => {
-      try {
-        const { ensureCommissionForBooking } = await import(
-          "@/lib/commissions/service"
-        );
-        await ensureCommissionForBooking(Number(id));
-      } catch (err) {
-        console.error("[commissions] ensure failed for booking", id, err);
-      }
-    })();
+    // Tariffs §5 — the fee obligation is born the moment the order reaches
+    // "confirmed".
+    raiseCommission(Number(id));
 
     // Referral milestone — if the accepted booking is for a referred
     // client and it's their first, credit the referrer. Non-blocking.
@@ -371,6 +384,7 @@ export async function PUT(
       status: "confirmed_by_client",
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
+    raiseCommission(Number(id));
   } else if (action === "cancel") {
     // The client may cancel while the request is still pending.
     const { userId: clerkId } = await auth();
@@ -411,6 +425,7 @@ export async function PUT(
       status: "completed",
       updatedAt: new Date(),
     }).where(eq(bookingRequests.id, Number(id)));
+    raiseCommission(Number(id));
   } else if (action === "vendor_cancel") {
     // Vendor-initiated cancellation of an accepted/confirmed booking. Frees
     // the calendar slot (like reject-after-accept) and notifies the client by

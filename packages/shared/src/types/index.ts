@@ -8,8 +8,8 @@
 // Convention:
 //   - All ISO dates are typed `string` (YYYY-MM-DD or full ISO 8601).
 //   - All money amounts are `number` in whole EUR (no cents), so a
-//     1200 means €1200. Currency conversion to MDL happens in the
-//     formatter helpers, never in the type layer.
+//     1200 means €1200. The platform prices in EUR only — there is no
+//     currency conversion anywhere in the product.
 //   - Nullable fields use `T | null`, not `T?`. Explicit null beats
 //     implicit undefined when serialising across HTTP.
 

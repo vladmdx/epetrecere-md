@@ -40,6 +40,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { MenuScanner } from "@/components/vendor/menu-scanner";
 import { Sparkles } from "lucide-react";
+import { formatPrice, currencySymbol } from "@/lib/format/price";
 
 interface Category {
   id: number;
@@ -54,7 +55,6 @@ interface Item {
   categoryId: number;
   nameRo: string;
   descriptionRo: string | null;
-  priceMdl: number | null;
   priceEur: number | null;
   sortOrder: number | null;
 }
@@ -694,7 +694,7 @@ export function VenueMenuClient({
                       {p.pricePerPerson}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      {p.currency || "EUR"} / persoană
+                      {currencySymbol(p.currency)} / persoană
                     </span>
                   </div>
                   {p.minGuests && (

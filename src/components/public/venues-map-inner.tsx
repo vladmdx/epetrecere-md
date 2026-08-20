@@ -1,97 +1,54 @@
 "use client";
 
 /**
- * Leaflet map of venues with grouping.
+ * Leaflet + OpenStreetMap renderer — the fallback used when no Google Maps
+ * API key is configured.
  *
- * Venues that sit close together collapse into one numbered cluster pin;
- * clicking it opens a list of exactly those venues in a side panel (the
- * behaviour asked for: "when they're next to each other, group them, and on
- * click show them as a list").
- *
- * Clustering is done here rather than via leaflet.markercluster: the extra
- * dependency isn't worth it for this dataset, and a hand-rolled grid pass
- * keeps the cluster→list mapping explicit and easy to reason about.
+ * `leaflet/dist/leaflet.css` is the load-bearing import here. Next scopes CSS
+ * to the chunk that imports it, and the only other import in the repo lives in
+ * the vendor map picker, so without this line /sali got Leaflet's DOM with
+ * none of its stylesheet: tiles lost `position:absolute` and fell into normal
+ * flow, Tailwind's preflight `img{max-width:100%}` rescaled them into
+ * misaligned rectangles, the pins were pushed outside the (unclipped)
+ * container, and touch drags scrolled the page instead of panning.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
-import Link from "@/components/shared/locale-link";
-import { MapPin, Users, Star, X } from "lucide-react";
-import { resolveVenuePosition, type LatLng } from "@/lib/geo/city-coords";
+import "leaflet/dist/leaflet.css";
+import {
+  ClusterPanel,
+  clusterize,
+  pinHtml,
+  pinSize,
+  placeVenues,
+  type Cluster,
+  type MapVenue,
+} from "./venues-map-shared";
+import type { LatLng } from "@/lib/geo/city-coords";
 
-export interface MapVenue {
-  id: number;
-  slug: string;
-  name: string;
-  city: string | null;
-  lat?: number | null;
-  lng?: number | null;
-  capacityMax?: number | null;
-  pricePerPerson?: number | null;
-  ratingAvg?: number | null;
-  imageUrl?: string | null;
-}
+export type { MapVenue };
 
-interface Placed extends MapVenue {
-  pos: LatLng;
-  approximate: boolean;
-}
-
-interface Cluster {
-  key: string;
-  pos: LatLng;
-  items: Placed[];
-}
-
-/** Zoom → grouping radius in degrees. Tighter as you zoom in. */
-function gridSize(zoom: number): number {
-  if (zoom >= 15) return 0.0015;
-  if (zoom >= 13) return 0.006;
-  if (zoom >= 11) return 0.02;
-  if (zoom >= 9) return 0.06;
-  return 0.2;
-}
-
-function clusterize(items: Placed[], zoom: number): Cluster[] {
-  const size = gridSize(zoom);
-  const buckets = new Map<string, Placed[]>();
-  for (const it of items) {
-    const key = `${Math.round(it.pos.lat / size)}:${Math.round(it.pos.lng / size)}`;
-    const arr = buckets.get(key);
-    if (arr) arr.push(it);
-    else buckets.set(key, [it]);
-  }
-  return [...buckets.entries()].map(([key, group]) => ({
-    key,
-    // Centre the pin on the group so it visually covers its members.
-    pos: {
-      lat: group.reduce((s, g) => s + g.pos.lat, 0) / group.length,
-      lng: group.reduce((s, g) => s + g.pos.lng, 0) / group.length,
-    },
-    items: group,
-  }));
-}
-
+/**
+ * Icons are cached by (count, approximate). react-leaflet compares `icon` by
+ * identity, so building one inline per render tore down and rebuilt every
+ * marker's DOM node on each zoom.
+ */
+const iconCache = new Map<string, L.DivIcon>();
 function pinIcon(count: number, approximate: boolean): L.DivIcon {
-  const size = count > 1 ? 42 : 34;
-  const label = count > 1 ? String(count) : "";
-  return L.divIcon({
+  const key = `${count}:${approximate}`;
+  const hit = iconCache.get(key);
+  if (hit) return hit;
+  const size = pinSize(count);
+  const icon = L.divIcon({
     className: "",
-    html: `<div style="
-        width:${size}px;height:${size}px;border-radius:9999px;
-        display:flex;align-items:center;justify-content:center;
-        background:${count > 1 ? "#C9A84C" : "#1A1A2E"};
-        color:${count > 1 ? "#0D0D0D" : "#C9A84C"};
-        border:2px solid ${count > 1 ? "#0D0D0D" : "#C9A84C"};
-        ${approximate && count === 1 ? "border-style:dashed;" : ""}
-        font-weight:700;font-size:${count > 1 ? 14 : 16}px;
-        box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer;">
-        ${label || "&#9679;"}
-      </div>`,
+    html: pinHtml(count, approximate),
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
+  iconCache.set(key, icon);
+  return icon;
 }
 
 /** Keeps the parent informed of the current zoom so clusters re-form. */
@@ -105,6 +62,26 @@ function ZoomWatcher({ onZoom }: { onZoom: (z: number) => void }) {
       map.off("zoomend", fn);
     };
   }, [map, onZoom]);
+  return null;
+}
+
+/**
+ * Re-measures the map when its box changes. The map mounts visible today, but
+ * a rotation or a future animated container would otherwise leave Leaflet
+ * holding a stale size and drawing a grey half-map.
+ */
+function ResizeGuard() {
+  const map = useMap();
+  useEffect(() => {
+    const el = map.getContainer();
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    ro.observe(el);
+    const t = window.setTimeout(() => map.invalidateSize(), 200);
+    return () => {
+      ro.disconnect();
+      window.clearTimeout(t);
+    };
+  }, [map]);
   return null;
 }
 
@@ -126,45 +103,48 @@ function FitBounds({ points }: { points: LatLng[] }) {
   return null;
 }
 
-export default function VenuesMapInner({ venues }: { venues: MapVenue[] }) {
+export default function VenuesMapInner({
+  venues,
+  labels,
+}: {
+  venues: MapVenue[];
+  labels: {
+    one: string;
+    many: (n: number) => string;
+    close: string;
+    approx: string;
+    empty: string;
+  };
+}) {
   const [zoom, setZoom] = useState(8);
   const [selected, setSelected] = useState<Cluster | null>(null);
 
-  const placed = useMemo<Placed[]>(
-    () =>
-      venues
-        .map((v) => {
-          const r = resolveVenuePosition(v);
-          return r ? { ...v, pos: r.pos, approximate: r.approximate } : null;
-        })
-        .filter((v): v is Placed => v !== null),
-    [venues],
-  );
-
+  const placed = useMemo(() => placeVenues(venues), [venues]);
   const clusters = useMemo(() => clusterize(placed, zoom), [placed, zoom]);
   const points = useMemo(() => placed.map((p) => p.pos), [placed]);
 
   if (placed.length === 0) {
     return (
-      <div className="flex h-[520px] items-center justify-center rounded-2xl border border-border/60 text-sm text-muted-foreground">
-        Nicio locație cu adresă cunoscută încă.
+      <div className="flex h-[420px] items-center justify-center rounded-2xl border border-border/60 text-sm text-muted-foreground sm:h-[520px]">
+        {labels.empty}
       </div>
     );
   }
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-border/60">
+    <div className="relative h-[420px] overflow-hidden rounded-2xl border border-border/60 sm:h-[520px]">
       <MapContainer
         center={[47.0105, 28.8638]}
         zoom={8}
         scrollWheelZoom
-        style={{ height: 520, width: "100%" }}
+        style={{ height: "100%", width: "100%" }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ZoomWatcher onZoom={setZoom} />
+        <ResizeGuard />
         <FitBounds points={points} />
         {clusters.map((c) => (
           <Marker
@@ -177,66 +157,11 @@ export default function VenuesMapInner({ venues }: { venues: MapVenue[] }) {
       </MapContainer>
 
       {selected && (
-        <div className="absolute right-3 top-3 z-[1000] max-h-[460px] w-[300px] overflow-y-auto rounded-xl border border-border bg-background/95 p-3 shadow-2xl backdrop-blur">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-sm font-semibold">
-              {selected.items.length === 1
-                ? "1 locație"
-                : `${selected.items.length} locații aici`}
-            </p>
-            <button
-              onClick={() => setSelected(null)}
-              aria-label="Închide"
-              className="rounded p-1 hover:bg-accent"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-          <ul className="space-y-2">
-            {selected.items.map((v) => (
-              <li key={v.id}>
-                <Link
-                  href={`/sali/${v.slug}`}
-                  className="flex gap-3 rounded-lg border border-border/50 p-2 transition-colors hover:border-gold/40 hover:bg-gold/5"
-                >
-                  {v.imageUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={v.imageUrl}
-                      alt={v.name}
-                      className="h-14 w-14 shrink-0 rounded-md object-cover"
-                      loading="lazy"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{v.name}</p>
-                    {v.city && (
-                      <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        {v.city}
-                        {v.approximate && " · aprox."}
-                      </p>
-                    )}
-                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                      {v.capacityMax != null && (
-                        <span className="flex items-center gap-1">
-                          <Users className="h-3 w-3" />
-                          {v.capacityMax}
-                        </span>
-                      )}
-                      {v.ratingAvg ? (
-                        <span className="flex items-center gap-1">
-                          <Star className="h-3 w-3 fill-gold text-gold" />
-                          {v.ratingAvg.toFixed(1)}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ClusterPanel
+          cluster={selected}
+          onClose={() => setSelected(null)}
+          labels={labels}
+        />
       )}
     </div>
   );

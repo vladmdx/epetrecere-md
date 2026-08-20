@@ -47,7 +47,6 @@ import { cn } from "@/lib/utils";
 interface ScannedItem {
   nameRo: string;
   descriptionRo?: string | null;
-  priceMdl?: number | null;
   priceEur?: number | null;
 }
 interface ScannedCategory {
@@ -315,7 +314,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
     updateCategory(catIdx, {
       items: [
         ...cat.items,
-        { nameRo: "", descriptionRo: null, priceMdl: null, priceEur: null },
+        { nameRo: "", descriptionRo: null, priceEur: null },
       ],
     });
   }
@@ -731,19 +730,6 @@ export function MenuScanner({ venueId, onImported }: Props) {
                             />
                             <Input
                               type="number"
-                              value={it.priceMdl ?? ""}
-                              onChange={(e) =>
-                                updateItem(ci, ii, {
-                                  priceMdl: e.target.value
-                                    ? Number(e.target.value)
-                                    : null,
-                                })
-                              }
-                              placeholder="MDL"
-                              className="h-8 w-20 text-xs"
-                            />
-                            <Input
-                              type="number"
                               value={it.priceEur ?? ""}
                               onChange={(e) =>
                                 updateItem(ci, ii, {
@@ -753,7 +739,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                                 })
                               }
                               placeholder="EUR"
-                              className="h-8 w-20 text-xs"
+                              className="h-8 w-24 text-xs"
                             />
                             <Button
                               size="icon"
