@@ -8,7 +8,7 @@
  * Cloud, restricted to the site's domains) to switch to Google.
  */
 
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { useLocale } from "@/hooks/use-locale";
 import { plural, NOUNS } from "@/lib/i18n/plural";
@@ -39,6 +39,13 @@ export type { MapVenue };
 export function VenuesMap({ venues }: { venues: MapVenue[] }) {
   const { t, locale } = useLocale();
 
+  // Google can fail for reasons a visitor cannot act on — a blocked script, a
+  // key restricted to another domain, an exhausted quota. Rather than show
+  // them an error where a map should be, fall back to OpenStreetMap, which
+  // needs no key and always works.
+  const [googleFailed, setGoogleFailed] = useState(false);
+  const handleUnavailable = useCallback(() => setGoogleFailed(true), []);
+
   // Memoised on locale: the renderers keep this object in effect dependency
   // lists, and a fresh identity per render would rebuild every pin on the map
   // each time the parent paints.
@@ -55,8 +62,13 @@ export function VenuesMap({ venues }: { venues: MapVenue[] }) {
     [locale, t],
   );
 
-  return GOOGLE_KEY ? (
-    <GoogleMap venues={venues} apiKey={GOOGLE_KEY} labels={labels} />
+  return GOOGLE_KEY && !googleFailed ? (
+    <GoogleMap
+      venues={venues}
+      apiKey={GOOGLE_KEY}
+      labels={labels}
+      onUnavailable={handleUnavailable}
+    />
   ) : (
     <LeafletMap venues={venues} labels={labels} />
   );

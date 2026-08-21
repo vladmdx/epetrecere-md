@@ -67,9 +67,17 @@ export default function VenuesMapGoogle({
   venues,
   apiKey,
   labels,
+  onUnavailable,
 }: {
   venues: MapVenue[];
   apiKey: string;
+  /**
+   * Called when Google Maps cannot be used at all — a blocked script, a key
+   * restricted to another domain, an exhausted quota. The parent swaps in the
+   * OpenStreetMap renderer: a visitor looking for a wedding venue wants a
+   * map, not an explanation of our billing setup.
+   */
+  onUnavailable?: () => void;
   labels: {
     one: string;
     many: (n: number) => string;
@@ -121,11 +129,16 @@ export default function VenuesMapGoogle({
         setStatus("ready");
       })
       .catch(() => {
-        if (!cancelled) setStatus("error");
+        if (cancelled) return;
+        setStatus("error");
+        onUnavailable?.();
       });
     return () => {
       cancelled = true;
     };
+    // onUnavailable is a stable callback from the parent; listing it would
+    // re-run the loader on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, locale, hasPlaces]);
 
   // Redraw the pins whenever the clusters change.

@@ -81,16 +81,23 @@ const nextConfig: NextConfig = {
             //   - YouTube/Vimeo for artist video embeds
             //   - Vercel Blob for image uploads
             //   - Upstash for rate limiting (connect-src)
+            //   - Google Maps for the venue map. The loader injects a script
+            //     tag, and the Maps SDK then fetches tiles and metadata over
+            //     XHR, so it needs BOTH script-src and connect-src. Without
+            //     them the browser blocks the injection before any request
+            //     leaves, the script's onerror fires, and the map reports
+            //     "could not load" with nothing in the network log to explain
+            //     it. gstatic.com serves the SDK's own sub-resources.
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' https://clerk.epetrecere.md https://*.clerk.accounts.dev https://challenges.cloudflare.com",
+              "script-src 'self' 'unsafe-inline' https://clerk.epetrecere.md https://*.clerk.accounts.dev https://challenges.cloudflare.com https://maps.googleapis.com https://maps.gstatic.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' data: blob: https: http:",
               "media-src 'self' https:",
               "frame-src https://www.youtube.com https://player.vimeo.com https://clerk.epetrecere.md https://*.clerk.accounts.dev https://challenges.cloudflare.com",
-              "connect-src 'self' https://clerk.epetrecere.md https://*.clerk.accounts.dev https://*.upstash.io https://*.r2.cloudflarestorage.com https://cdn.epetrecere.md https://*.vercel-storage.com wss:",
+              "connect-src 'self' https://clerk.epetrecere.md https://*.clerk.accounts.dev https://*.upstash.io https://*.r2.cloudflarestorage.com https://cdn.epetrecere.md https://*.vercel-storage.com https://maps.googleapis.com https://maps.gstatic.com wss:",
               "worker-src 'self' blob:",
               "object-src 'none'",
               "base-uri 'self'",

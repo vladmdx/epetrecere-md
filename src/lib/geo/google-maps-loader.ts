@@ -41,6 +41,14 @@ export function loadGoogleMaps(
     script.onerror = () => {
       // Let the next attempt retry rather than caching a dead promise.
       pending = null;
+      // A blocked script tag looks identical to a network failure and leaves
+      // nothing in the network log, so name the usual suspect out loud.
+      console.error(
+        "[maps] the Google Maps script did not load. Most often the site's " +
+          "Content-Security-Policy is missing https://maps.googleapis.com in " +
+          "script-src/connect-src, or the API key is restricted to another " +
+          "domain.",
+      );
       reject(new Error("Google Maps failed to load"));
     };
     document.head.appendChild(script);
