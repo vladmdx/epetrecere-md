@@ -51,8 +51,9 @@ export function VenuesMap({ venues }: { venues: MapVenue[] }) {
   // each time the parent paints.
   const labels = useMemo(
     () => ({
-      one: `1 ${plural(1, locale, NOUNS.venues)}`,
-      many: (n: number) => `${n} ${plural(n, locale, NOUNS.venues)}`,
+      // plural() renders the count itself — prefixing it printed "1 1 locație".
+      one: plural(1, locale, NOUNS.venues),
+      many: (n: number) => plural(n, locale, NOUNS.venues),
       close: t("common.close"),
       approx: t("map.approx"),
       empty: t("map.empty"),

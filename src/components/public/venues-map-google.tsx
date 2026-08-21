@@ -58,6 +58,9 @@ const DARK_STYLE: google.maps.MapTypeStyle[] = [
   { featureType: "road", elementType: "geometry", stylers: [{ color: "#232833" }] },
   { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9aa0ab" }] },
   { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#3a3323" }] },
+  // Google's route shields render in their own bright red/green/blue and
+  // fight the dark theme. The roads stay; only the badges go.
+  { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
   { featureType: "transit", stylers: [{ visibility: "off" }] },
   { featureType: "water", elementType: "geometry", stylers: [{ color: "#0d1b26" }] },
   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#3f5c6b" }] },
