@@ -6,6 +6,7 @@ import { MapPin, Music, Sparkles, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { CustomCalendar } from "@/components/public/custom-calendar";
 import { useLocale } from "@/hooks/use-locale";
+import { ALL_EVENT_TYPES, eventTypeLabel } from "@/lib/events/normalize";
 
 function getTomorrow() {
   const d = new Date();
@@ -23,14 +24,10 @@ function toYMD(d: Date) {
 // "Nu știi de unde să începi?" — a lightweight lead-in to the /planifica wizard.
 // The reco counts are indicative (marketing) figures; the real matching happens
 // once the user lands in the planner.
-const EVENT_TYPES = [
-  { value: "wedding", key: "typeWedding" },
-  { value: "baptism", key: "typeBaptism" },
-  { value: "cumatrie", key: "typeCumatrie" },
-  { value: "birthday", key: "typeBirthday" },
-  { value: "corporate", key: "typeCorporate" },
-  { value: "other", key: "typeOther" },
-] as const;
+// The i18n keys this used (home.reco.type*) only covered six types and would
+// need a new key per event type forever; eventTypeLabel already translates
+// all of them in all three languages.
+const EVENT_TYPES = ALL_EVENT_TYPES;
 
 const BUDGETS = [
   { value: "0-1500", key: "budgetUnder30" },
@@ -46,7 +43,7 @@ const RECOS = [
 ] as const;
 
 export function RecommendationsSection() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [eventType, setEventType] = useState("wedding");
   const [date, setDate] = useState<Date | null>(getTomorrow());
@@ -101,8 +98,10 @@ export function RecommendationsSection() {
                     onChange={(e) => setEventType(e.target.value)}
                     className="h-11 w-full rounded-xl border border-[#D4CFC4] bg-[#FAF8F2] px-3 text-sm outline-none focus:border-gold"
                   >
-                    {EVENT_TYPES.map((o) => (
-                      <option key={o.value} value={o.value}>{t(`home.reco.${o.key}`)}</option>
+                    {EVENT_TYPES.map((k) => (
+                      <option key={k} value={k}>
+                        {eventTypeLabel(k, locale)}
+                      </option>
                     ))}
                   </select>
                 </label>

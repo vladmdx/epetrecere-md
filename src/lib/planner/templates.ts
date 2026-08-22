@@ -6,9 +6,11 @@
 
 export type TemplateEventType =
   | "wedding"
+  | "cununie"
   | "baptism"
   | "cumatrie"
   | "birthday"
+  | "kids_birthday"
   | "corporate"
   | "other";
 
@@ -131,11 +133,43 @@ const OTHER_TEMPLATE: TemplateItem[] = [
   { title: "Confirmă invitații", category: "guests", priority: "high", dueDaysBefore: 7 },
 ];
 
+// The ceremony is its own project: paperwork and the registry office slot
+// drive the dates, and there is no menu to plan.
+const CUNUNIE_TEMPLATE: TemplateItem[] = [
+  { title: "Stabilește bugetul ceremoniei", category: "budget", priority: "high", dueDaysBefore: 60 },
+  { title: "Depune actele la starea civilă / parohie", category: "ceremony", priority: "high", dueDaysBefore: 45 },
+  { title: "Confirmă data și ora ceremoniei", category: "date", priority: "high", dueDaysBefore: 40 },
+  { title: "Alege nașii și confirmă prezența", category: "guests", priority: "high", dueDaysBefore: 35 },
+  { title: "Rezervă fotograf și videograf", category: "media", priority: "high", dueDaysBefore: 30 },
+  { title: "Comandă buchetul și decorul", category: "decor", priority: "medium", dueDaysBefore: 21 },
+  { title: "Probează ținutele", category: "outfits", priority: "medium", dueDaysBefore: 14 },
+  { title: "Verifică muzica pentru ceremonie", category: "artists", priority: "medium", dueDaysBefore: 14 },
+  { title: "Confirmă transportul", category: "logistics", priority: "medium", dueDaysBefore: 7 },
+  { title: "Pregătește verighetele și actele", category: "ceremony", priority: "high", dueDaysBefore: 2 },
+];
+
+// A children's party: shorter horizon, entertainment matters more than menu,
+// and the guest list is really a parents' list.
+const KIDS_BIRTHDAY_TEMPLATE: TemplateItem[] = [
+  { title: "Stabilește bugetul", category: "budget", priority: "high", dueDaysBefore: 30 },
+  { title: "Alege tema petrecerii", category: "decor", priority: "high", dueDaysBefore: 25 },
+  { title: "Rezervă locația sau pregătește spațiul", category: "venue", priority: "high", dueDaysBefore: 21 },
+  { title: "Rezervă animator / clovn / magician", category: "artists", priority: "high", dueDaysBefore: 21 },
+  { title: "Trimite invitațiile părinților", category: "guests", priority: "high", dueDaysBefore: 14 },
+  { title: "Comandă tortul", category: "menu", priority: "high", dueDaysBefore: 10 },
+  { title: "Pregătește meniul pentru copii și părinți", category: "menu", priority: "medium", dueDaysBefore: 7 },
+  { title: "Comandă baloane și decor", category: "decor", priority: "medium", dueDaysBefore: 7 },
+  { title: "Pregătește cadourile pentru invitați", category: "decor", priority: "low", dueDaysBefore: 5 },
+  { title: "Confirmă prezența copiilor", category: "guests", priority: "medium", dueDaysBefore: 3 },
+];
+
 const TEMPLATES: Record<TemplateEventType, TemplateItem[]> = {
   wedding: WEDDING_TEMPLATE,
+  cununie: CUNUNIE_TEMPLATE,
   baptism: BAPTISM_TEMPLATE,
   cumatrie: CUMATRIE_TEMPLATE,
   birthday: BIRTHDAY_TEMPLATE,
+  kids_birthday: KIDS_BIRTHDAY_TEMPLATE,
   corporate: CORPORATE_TEMPLATE,
   other: OTHER_TEMPLATE,
 };

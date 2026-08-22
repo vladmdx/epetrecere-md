@@ -4,14 +4,12 @@
 // server components, client components, API routes, and tests alike.
 // All currency values are in EUR.
 
-export type EventType =
-  | "wedding"
-  | "baptism"
-  | "cumatrie"
-  | "birthday"
-  | "corporate"
-  | "concert"
-  | "other";
+// Re-exported from the one canonical list rather than restated here. The two
+// copies had already drifted, and every table below is a Record over this
+// union — so the compiler now refuses to build until a new event type gets a
+// multiplier, a drink profile and a label, instead of silently falling back.
+import type { EventTypeKey } from "@/lib/wizard/categories-meta";
+export type EventType = EventTypeKey;
 
 // ══════════════════════════════════════════════════════════════
 // BUDGET CALCULATOR
@@ -83,9 +81,13 @@ export const BUDGET_SERVICE_RATES: Record<string, ServiceRate> = {
 // ceremony, etc.
 const EVENT_TYPE_MULTIPLIER: Record<EventType, number> = {
   wedding: 1.15,
+  // The ceremony alone: fewer guests, shorter, no full dinner service.
+  cununie: 0.7,
   baptism: 0.9,
   cumatrie: 0.85,
   birthday: 0.8,
+  // A children's party is the cheapest of the lot — daytime, no bar.
+  kids_birthday: 0.55,
   corporate: 1.0,
   concert: 1.05,
   other: 1.0,
@@ -274,9 +276,13 @@ const DRINK_DEFAULTS = [
 // drinks mostly beer, etc.
 const EVENT_DRINK_WEIGHT: Record<EventType, Partial<Record<string, number>>> = {
   wedding:   { wine_red: 1.0, wine_white: 1.0, vodka: 1.0, cognac: 1.0, champagne: 1.0, beer: 0.5, water: 1.0, juice: 1.0 },
+  // A ceremony is a toast, not a night of drinking.
+  cununie:   { wine_red: 0.4, wine_white: 0.5, vodka: 0.2, cognac: 0.2, champagne: 1.2, beer: 0.2, water: 1.2, juice: 1.2 },
   baptism:   { wine_red: 0.9, wine_white: 0.9, vodka: 0.7, cognac: 0.7, champagne: 1.0, beer: 0.4, water: 1.0, juice: 1.2 },
   cumatrie:  { wine_red: 1.0, wine_white: 0.9, vodka: 0.8, cognac: 0.7, champagne: 0.8, beer: 0.5, water: 1.0, juice: 1.0 },
   birthday:  { wine_red: 0.6, wine_white: 0.7, vodka: 0.6, cognac: 0.4, champagne: 0.5, beer: 1.0, water: 1.0, juice: 1.2 },
+  // Mostly children; the small alcohol figures are for the parents present.
+  kids_birthday: { wine_red: 0.15, wine_white: 0.2, vodka: 0.05, cognac: 0.05, champagne: 0.2, beer: 0.2, water: 1.5, juice: 2.5 },
   corporate: { wine_red: 0.7, wine_white: 0.8, vodka: 0.4, cognac: 0.3, champagne: 0.8, beer: 0.8, water: 1.0, juice: 1.5 },
   concert:   { wine_red: 0.3, wine_white: 0.3, vodka: 0.4, cognac: 0.2, champagne: 0.2, beer: 1.5, water: 1.0, juice: 1.0 },
   other:     { wine_red: 0.8, wine_white: 0.8, vodka: 0.6, cognac: 0.5, champagne: 0.6, beer: 0.8, water: 1.0, juice: 1.0 },
@@ -365,9 +371,13 @@ const MENU_DEFAULTS = [
 
 const MENU_EVENT_SCALE: Record<EventType, number> = {
   wedding: 1.0,
+  // A ceremony is a toast and a few canapés, not a seated dinner.
+  cununie: 0.35,
   baptism: 0.9,
   cumatrie: 0.95,
   birthday: 0.85,
+  // Children eat far less than adults, and half the table is cake.
+  kids_birthday: 0.5,
   corporate: 0.8,
   concert: 0.6,
   other: 0.9,
@@ -429,9 +439,11 @@ export function calculateMenu(input: MenuInput): MenuResult {
 
 export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   wedding: "Nuntă",
+  cununie: "Cununie",
   baptism: "Botez",
   cumatrie: "Cumătrie",
   birthday: "Aniversare",
+  kids_birthday: "Aniversare copii",
   corporate: "Corporate",
   concert: "Concert / Petrecere",
   other: "Alt tip",

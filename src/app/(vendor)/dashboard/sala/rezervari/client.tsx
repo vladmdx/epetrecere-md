@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import type { VenueBookingTab } from "@/lib/db/queries/venue-bookings";
 
 interface Booking {
@@ -92,27 +93,17 @@ const TABS: Array<{ key: VenueBookingTab; label: string }> = [
   { key: "anulate", label: "Anulate" },
 ];
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  nunta: "Nuntă",
-  baptism: "Botez",
-  botez: "Botez",
-  cumatrie: "Cumătrie",
-  corporate: "Corporate",
-  birthday: "Aniversare",
-  aniversare: "Aniversare",
-  other: "Altele",
-};
-
 const EVENT_TYPE_BORDER: Record<string, string> = {
   wedding: "border-l-red-500",
   nunta: "border-l-red-500",
+  cununie: "border-l-rose-500",
   baptism: "border-l-blue-500",
   botez: "border-l-blue-500",
   cumatrie: "border-l-cyan-500",
   corporate: "border-l-purple-500",
   birthday: "border-l-orange-500",
   aniversare: "border-l-orange-500",
+  kids_birthday: "border-l-amber-500",
 };
 
 const DECLINE_REASONS = [
@@ -498,7 +489,7 @@ export function VenueBookingsClient({
                 <option value="all">Toate</option>
                 {availableEventTypes.map((t) => (
                   <option key={t} value={t}>
-                    {EVENT_TYPE_LABELS[t] ?? t}
+                    {eventTypeLabel(normalizeEventType(t))}
                   </option>
                 ))}
               </select>
@@ -582,7 +573,8 @@ export function VenueBookingsClient({
           )}
           {visibleBookings.map((b) => {
             const eventKey = (b.eventType || "other").toLowerCase();
-            const eventLabel = EVENT_TYPE_LABELS[eventKey] || b.eventType || "Eveniment";
+            const eventTypeKey = normalizeEventType(b.eventType);
+            const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment";
             const borderColor = EVENT_TYPE_BORDER[eventKey] || "border-l-muted-foreground";
             const overCapacity =
               venueCapacityMax !== null &&
@@ -867,9 +859,9 @@ export function VenueBookingsClient({
                 <>
                   Confirmi rezervarea pentru{" "}
                   <strong>
-                    {EVENT_TYPE_LABELS[(acceptDialog.eventType || "other").toLowerCase()] ||
-                      acceptDialog.eventType ||
-                      "eveniment"}
+                    {acceptDialog.eventType
+                      ? eventTypeLabel(normalizeEventType(acceptDialog.eventType))
+                      : "eveniment"}
                   </strong>{" "}
                   pe{" "}
                   <strong>

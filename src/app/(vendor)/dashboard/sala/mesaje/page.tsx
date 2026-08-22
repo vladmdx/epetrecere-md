@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 
 interface LinkedBooking {
   id: number;
@@ -59,17 +60,6 @@ interface ChatMessage {
   createdAt: string;
 }
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  nunta: "Nuntă",
-  baptism: "Botez",
-  botez: "Botez",
-  cumatrie: "Cumătrie",
-  corporate: "Corporate",
-  birthday: "Aniversare",
-  aniversare: "Aniversare",
-};
-
 function formatTime(iso: string) {
   const d = new Date(iso);
   const now = new Date();
@@ -84,10 +74,8 @@ function formatTime(iso: string) {
 }
 
 function formatBookingBadge(b: LinkedBooking): string {
-  const label =
-    b.eventType && EVENT_TYPE_LABELS[b.eventType.toLowerCase()]
-      ? EVENT_TYPE_LABELS[b.eventType.toLowerCase()]
-      : b.eventType || "Eveniment";
+  const eventTypeKey = normalizeEventType(b.eventType);
+  const label = eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment";
   if (!b.eventDate) return `Re: ${label}`;
   const d = new Date(b.eventDate + "T00:00:00");
   return `Re: ${label} ${d.toLocaleDateString("ro-RO", {

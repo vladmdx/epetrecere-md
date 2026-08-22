@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
+import { ALL_EVENT_TYPES, EVENT_TYPE_EMOJI, eventTypeLabel } from "@/lib/events/normalize";
 
 interface CalendarWidgetProps {
   entityType: "artist" | "venue";
@@ -30,14 +31,13 @@ const MONTHS_RO = [
   "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie",
 ];
 
-const EVENT_TYPES = [
-  { value: "wedding", label: "🎊 Nuntă" },
-  { value: "baptism", label: "👶 Botez" },
-  { value: "cumetrie", label: "🤝 Cumetrie" },
-  { value: "corporate", label: "💼 Corporate" },
-  { value: "birthday", label: "🎂 Aniversare" },
-  { value: "other", label: "📋 Altele" },
-];
+// Derived from the canonical list so a new event type appears here on its
+// own; the previous hand-written six also spelled cumătrie differently from
+// the rest of the product.
+const EVENT_TYPES = ALL_EVENT_TYPES.map((k) => ({
+  value: k,
+  label: `${EVENT_TYPE_EMOJI[k]} ${eventTypeLabel(k)}`,
+}));
 
 export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDateSelect }: CalendarWidgetProps) {
   const { t } = useLocale();

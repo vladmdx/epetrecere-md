@@ -81,10 +81,12 @@
   },
   "event_types": {
     "wedding": "Nuntă",
+    "cununie": "Cununie",
     "baptism": "Botez",
     "cumatrie": "Cumătrie",
-    "corporate": "Corporate",
     "birthday": "Aniversare",
+    "kids_birthday": "Aniversare copii",
+    "corporate": "Corporate",
     "concert": "Concert",
     "other": "Alte evenimente"
   },

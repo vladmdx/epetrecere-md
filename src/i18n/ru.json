@@ -81,10 +81,12 @@
   },
   "event_types": {
     "wedding": "Свадьба",
+    "cununie": "Венчание",
     "baptism": "Крестины",
     "cumatrie": "Кумэтрия",
-    "corporate": "Корпоратив",
     "birthday": "День Рождения",
+    "kids_birthday": "Детский день рождения",
+    "corporate": "Корпоратив",
     "concert": "Концерт",
     "other": "Другое"
   },

@@ -16,6 +16,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, DollarSign, Loader2, User, Music, Ticket } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import Link from "next/link";
 import { toast } from "sonner";
 
@@ -48,11 +49,6 @@ const columns = [
   { id: "accepted", label: "Acceptați", color: "bg-success" },
   { id: "confirmed", label: "Confirmați", color: "bg-success" },
 ];
-
-const eventLabels: Record<string, string> = {
-  wedding: "Nuntă", baptism: "Botez", cumatrie: "Cumătrie",
-  corporate: "Corporate", birthday: "Aniversare", other: "Altele",
-};
 
 const typeIconMap = {
   lead: User,
@@ -98,7 +94,7 @@ function ItemCard({ item }: { item: CrmItem }) {
           {(item.eventType || item.eventDate) && (
             <div className="flex items-center gap-1.5">
               <Calendar className="h-3 w-3" />
-              {item.eventType ? (eventLabels[item.eventType] || item.eventType) : ""}
+              {item.eventType ? eventTypeLabel(normalizeEventType(item.eventType)) : ""}
               {item.eventType && item.eventDate ? " · " : ""}
               {item.eventDate || ""}
             </div>

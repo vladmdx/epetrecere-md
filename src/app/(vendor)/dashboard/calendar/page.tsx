@@ -25,6 +25,12 @@ import {
   Calendar as CalendarIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  ALL_EVENT_TYPES,
+  eventTypeLabel,
+  normalizeEventType,
+  type EventTypeKey,
+} from "@/lib/events/normalize";
 import { toast } from "sonner";
 
 const DAYS = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"];
@@ -43,51 +49,55 @@ const MONTHS = [
   "Decembrie",
 ];
 
-/** F-S6 — Event type catalog with color classes. Keep colors distinct from
- *  status colors so owners can see both at a glance (status = background,
- *  event type = left border accent). */
-const EVENT_TYPES: Record<
-  string,
-  { label: string; dot: string; border: string; text: string }
+/** F-S6 — Event type colors, keyed by the canonical event type. Keep colors
+ *  distinct from status colors so owners can see both at a glance (status =
+ *  background, event type = left border accent). The labels come from
+ *  lib/events/normalize so this screen can't drift from the canonical list. */
+const EVENT_TYPE_STYLES: Record<
+  EventTypeKey,
+  { dot: string; border: string; text: string }
 > = {
-  nunta: {
-    label: "Nuntă",
+  wedding: {
     dot: "bg-rose-500",
     border: "border-l-rose-500",
     text: "text-rose-500",
   },
-  cumetrie: {
-    label: "Cumătrie",
-    dot: "bg-sky-500",
-    border: "border-l-sky-500",
-    text: "text-sky-500",
+  cununie: {
+    dot: "bg-pink-500",
+    border: "border-l-pink-500",
+    text: "text-pink-500",
   },
-  botez: {
-    label: "Botez",
+  baptism: {
     dot: "bg-cyan-500",
     border: "border-l-cyan-500",
     text: "text-cyan-500",
   },
-  zi_nastere: {
-    label: "Zi de naștere",
+  cumatrie: {
+    dot: "bg-sky-500",
+    border: "border-l-sky-500",
+    text: "text-sky-500",
+  },
+  birthday: {
     dot: "bg-amber-500",
     border: "border-l-amber-500",
     text: "text-amber-500",
   },
+  kids_birthday: {
+    dot: "bg-orange-500",
+    border: "border-l-orange-500",
+    text: "text-orange-500",
+  },
   corporate: {
-    label: "Corporate",
     dot: "bg-indigo-500",
     border: "border-l-indigo-500",
     text: "text-indigo-500",
   },
-  revelion: {
-    label: "Revelion",
+  concert: {
     dot: "bg-violet-500",
     border: "border-l-violet-500",
     text: "text-violet-500",
   },
-  altele: {
-    label: "Altele",
+  other: {
     dot: "bg-slate-400",
     border: "border-l-slate-400",
     text: "text-slate-400",
@@ -158,7 +168,7 @@ export default function VendorCalendarPage() {
   const [events, setEvents] = useState<Record<string, CalendarEntry>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedStatus, setSelectedStatus] = useState("booked");
-  const [selectedEventType, setSelectedEventType] = useState<string>("nunta");
+  const [selectedEventType, setSelectedEventType] = useState<string>("wedding");
   const [selectedNote, setSelectedNote] = useState("");
   const [selectedStartTime, setSelectedStartTime] = useState("10:00");
   const [_selectedEndTime, setSelectedEndTime] = useState("22:00");
@@ -216,7 +226,7 @@ export default function VendorCalendarPage() {
   const [manualPackageId, setManualPackageId] = useState<number | null>(null);
   const [manualPrice, setManualPrice] = useState<string>("");
   const [manualNote, setManualNote] = useState("");
-  const [manualEventType, setManualEventType] = useState<string>("altele");
+  const [manualEventType, setManualEventType] = useState<string>("other");
   const [manualSaving, setManualSaving] = useState(false);
 
   // Resolve entity on mount — venue first, fallback to artist.
@@ -420,13 +430,13 @@ export default function VendorCalendarPage() {
     const existing = events[dateStr];
     if (existing) {
       setSelectedStatus(existing.status);
-      setSelectedEventType(existing.eventType || "nunta");
+      setSelectedEventType(existing.eventType || "wedding");
       setSelectedNote(existing.note || "");
       setSelectedStartTime(existing.startTime || "10:00");
       setSelectedEndTime(existing.endTime || "22:00");
     } else {
       setSelectedStatus("booked");
-      setSelectedEventType("nunta");
+      setSelectedEventType("wedding");
       setSelectedNote("");
       setSelectedStartTime("10:00");
       setSelectedEndTime("22:00");
@@ -808,10 +818,15 @@ export default function VendorCalendarPage() {
             <span className="text-xs font-medium text-muted-foreground">
               Tip eveniment:
             </span>
-            {Object.entries(EVENT_TYPES).map(([key, cfg]) => (
+            {ALL_EVENT_TYPES.map((key) => (
               <span key={key} className="flex items-center gap-1.5 text-xs">
-                <span className={cn("h-3 w-3 rounded-sm", cfg.dot)} />
-                {cfg.label}
+                <span
+                  className={cn(
+                    "h-3 w-3 rounded-sm",
+                    EVENT_TYPE_STYLES[key].dot,
+                  )}
+                />
+                {eventTypeLabel(key)}
               </span>
             ))}
           </div>
@@ -882,14 +897,12 @@ export default function VendorCalendarPage() {
 
                     // Build the list of dots — one per booking, colored by
                     // event type. Cap at 4; render a "+N" bubble for the rest.
-                    const dots = bookingsForDay
-                      .map((b) => {
-                        const key = b.eventType && EVENT_TYPES[b.eventType]
-                          ? b.eventType
-                          : "altele";
-                        return EVENT_TYPES[key];
-                      })
-                      .filter(Boolean);
+                    const dots = bookingsForDay.map(
+                      (b) =>
+                        EVENT_TYPE_STYLES[
+                          normalizeEventType(b.eventType) ?? "other"
+                        ],
+                    );
                     const visibleDots = dots.slice(0, 4);
                     const extraDots = dots.length - visibleDots.length;
 
@@ -1103,7 +1116,14 @@ export default function VendorCalendarPage() {
                                         🕐 {b.startTime}–{b.endTime}
                                       </span>
                                     )}
-                                    {b.eventType && <span>📋 {b.eventType}</span>}
+                                    {b.eventType && (
+                                      <span>
+                                        📋{" "}
+                                        {eventTypeLabel(
+                                          normalizeEventType(b.eventType),
+                                        )}
+                                      </span>
+                                    )}
                                     {b.guestCount != null && (
                                       <span>👥 {b.guestCount} invitați</span>
                                     )}
@@ -1512,7 +1532,7 @@ export default function VendorCalendarPage() {
               <div>
                 <Label className="text-xs">Tip eveniment</Label>
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {Object.entries(EVENT_TYPES).map(([key, cfg]) => {
+                  {ALL_EVENT_TYPES.map((key) => {
                     const selected = manualEventType === key;
                     return (
                       <button
@@ -1527,9 +1547,12 @@ export default function VendorCalendarPage() {
                         )}
                       >
                         <span
-                          className={cn("h-2 w-2 rounded-full", cfg.dot)}
+                          className={cn(
+                            "h-2 w-2 rounded-full",
+                            EVENT_TYPE_STYLES[key].dot,
+                          )}
                         />
-                        {cfg.label}
+                        {eventTypeLabel(key)}
                       </button>
                     );
                   })}

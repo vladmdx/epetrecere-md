@@ -13,19 +13,32 @@
 
 export type EventTypeKey =
   | "wedding"
+  | "cununie"
   | "baptism"
   | "cumatrie"
-  | "corporate"
   | "birthday"
+  | "kids_birthday"
+  | "corporate"
   | "concert"
   | "other";
 
+/**
+ * Ordered as a visitor thinks about them, not alphabetically: the wedding
+ * pair first, then the family celebrations, then birthdays, then the rest.
+ * This order drives the wizard tiles and every picker built from the list.
+ *
+ * `cununie` is the ceremony itself, which people in Moldova often organise
+ * separately from the party, and `kids_birthday` is a different job from an
+ * adult one — different performers, different venue, no bar.
+ */
 export const ALL_EVENT_TYPES: EventTypeKey[] = [
   "wedding",
+  "cununie",
   "baptism",
   "cumatrie",
-  "corporate",
   "birthday",
+  "kids_birthday",
+  "corporate",
   "concert",
   "other",
 ];
@@ -37,15 +50,30 @@ interface CategoryMeta {
   allowedEventTypes: EventTypeKey[];
 }
 
-// ADULT = no minors, broader entertainment options OK.
+// ADULT = no minors, broader entertainment options OK. Deliberately excludes
+// kids_birthday and cununie — one has children in the room, the other is a
+// ceremony.
 const ADULT = ["wedding", "corporate", "birthday", "other"] as const;
 // VENUE_NEUTRAL = anything except concerts (which have specific staging needs)
-const VENUE_NEUTRAL = ["wedding", "baptism", "cumatrie", "corporate", "birthday", "other"] as const;
+const VENUE_NEUTRAL = [
+  "wedding",
+  "cununie",
+  "baptism",
+  "cumatrie",
+  "corporate",
+  "birthday",
+  "other",
+] as const;
+// KIDS = safe and wanted at a children's party. Kept separate rather than
+// folded into VENUE_NEUTRAL because most of what suits a wedding reception —
+// a live band, a gypsy ensemble, a fire show — is wrong for a room full of
+// eight-year-olds.
+const KIDS = ["kids_birthday"] as const;
 
 export const CATEGORY_META: Record<string, CategoryMeta> = {
   // ── Music ─────────────────────────────────────────
-  moderatori: { emoji: "🎤", allowedEventTypes: [...VENUE_NEUTRAL, "concert"] },
-  dj: { emoji: "🎧", allowedEventTypes: ["wedding", "corporate", "birthday", "other"] },
+  moderatori: { emoji: "🎤", allowedEventTypes: [...VENUE_NEUTRAL, "concert", ...KIDS] },
+  dj: { emoji: "🎧", allowedEventTypes: ["wedding", "corporate", "birthday", "other", ...KIDS] },
   cantareti: {
     emoji: "🎙️",
     // Excluded from baptism — religious ceremony, no secular performers.
@@ -59,28 +87,28 @@ export const CATEGORY_META: Record<string, CategoryMeta> = {
   cvartet: { emoji: "🎻", allowedEventTypes: [...VENUE_NEUTRAL, "concert"] },
 
   // ── Dance ─────────────────────────────────────────
-  dansatori: { emoji: "💃", allowedEventTypes: [...ADULT, "baptism", "cumatrie"] },
+  dansatori: { emoji: "💃", allowedEventTypes: [...ADULT, "baptism", "cumatrie", ...KIDS] },
   "dansuri-populare": { emoji: "🩰", allowedEventTypes: [...VENUE_NEUTRAL] },
   "ansamblu-tiganesc": { emoji: "🎺", allowedEventTypes: [...VENUE_NEUTRAL] },
   "dans-oriental": { emoji: "🪩", allowedEventTypes: [...ADULT] },
   striptiz: { emoji: "🔥", allowedEventTypes: ["birthday", "other"] }, // private parties only
 
   // ── Show ──────────────────────────────────────────
-  "show-program": { emoji: "🎭", allowedEventTypes: [...VENUE_NEUTRAL] },
-  "iluzionisti-magicieni": { emoji: "🎩", allowedEventTypes: [...VENUE_NEUTRAL] },
-  animatori: { emoji: "🎈", allowedEventTypes: ["baptism", "cumatrie", "birthday", "other"] }, // kids
+  "show-program": { emoji: "🎭", allowedEventTypes: [...VENUE_NEUTRAL, ...KIDS] },
+  "iluzionisti-magicieni": { emoji: "🎩", allowedEventTypes: [...VENUE_NEUTRAL, ...KIDS] },
+  animatori: { emoji: "🎈", allowedEventTypes: ["baptism", "cumatrie", "birthday", "other", ...KIDS] }, // kids
   "show-ul-focului": { emoji: "🔥", allowedEventTypes: ["wedding", "corporate", "birthday", "other"] },
-  clovni: { emoji: "🤡", allowedEventTypes: ["birthday", "other"] }, // kids birthdays only
+  clovni: { emoji: "🤡", allowedEventTypes: ["birthday", "other", ...KIDS] }, // kids birthdays only
   "interesant-la-sarbatoare": { emoji: "✨", allowedEventTypes: [...ALL_EVENT_TYPES] },
-  "show-circus": { emoji: "🎪", allowedEventTypes: [...VENUE_NEUTRAL] },
+  "show-circus": { emoji: "🎪", allowedEventTypes: [...VENUE_NEUTRAL, ...KIDS] },
   "stand-up": { emoji: "🎙️", allowedEventTypes: ["corporate", "birthday", "other"] },
-  "mos-craciun": { emoji: "🎅", allowedEventTypes: ["corporate", "birthday", "other"] }, // winter only
+  "mos-craciun": { emoji: "🎅", allowedEventTypes: ["corporate", "birthday", "other", ...KIDS] }, // winter only
 
   // ── Services (foto/video/decor/tech) ──────────────
   fotografi: { emoji: "📸", allowedEventTypes: [...ALL_EVENT_TYPES] },
   videografi: { emoji: "🎥", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "foto-video": { emoji: "🎬", allowedEventTypes: [...ALL_EVENT_TYPES] },
-  "foto-zona-selfie": { emoji: "🤳", allowedEventTypes: [...VENUE_NEUTRAL] },
+  "foto-zona-selfie": { emoji: "🤳", allowedEventTypes: [...VENUE_NEUTRAL, ...KIDS] },
   decor: { emoji: "🌸", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "echipament-tehnic": { emoji: "🔊", allowedEventTypes: [...ALL_EVENT_TYPES] },
 };

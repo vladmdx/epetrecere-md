@@ -151,11 +151,13 @@ const LEGACY_CITY_SLUGS = new Set([
 
 const LEGACY_EVENT_KEYWORDS = new Set([
   "nunta",
+  "cununie",
   "botez",
   "cumetrie",
   "corporate",
   "zi-nastere",
   "aniversare",
+  "aniversare-copii",
 ]);
 
 /**

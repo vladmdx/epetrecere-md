@@ -32,6 +32,12 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import {
+  ALL_EVENT_TYPES,
+  eventTypeLabel,
+  normalizeEventType,
+  type EventTypeKey,
+} from "@/lib/events/normalize";
 
 interface CalendarEvent {
   date: string;
@@ -75,16 +81,29 @@ const MONTHS_RO = [
 
 const WEEKDAYS_RO = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
 
-const EVENT_TYPE_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  wedding: { label: "Nuntă", bg: "bg-red-500/25 border-red-500/60", text: "text-red-400" },
-  nunta: { label: "Nuntă", bg: "bg-red-500/25 border-red-500/60", text: "text-red-400" },
-  baptism: { label: "Botez", bg: "bg-blue-500/25 border-blue-500/60", text: "text-blue-400" },
-  botez: { label: "Botez", bg: "bg-blue-500/25 border-blue-500/60", text: "text-blue-400" },
-  cumatrie: { label: "Cumătrie", bg: "bg-cyan-500/25 border-cyan-500/60", text: "text-cyan-400" },
-  corporate: { label: "Corporate", bg: "bg-purple-500/25 border-purple-500/60", text: "text-purple-400" },
-  birthday: { label: "Aniversare", bg: "bg-orange-500/25 border-orange-500/60", text: "text-orange-400" },
-  aniversare: { label: "Aniversare", bg: "bg-orange-500/25 border-orange-500/60", text: "text-orange-400" },
+/** Colour per event type, keyed by the canonical key — the labels themselves
+ *  come from lib/events/normalize. A type with no entry here keeps the old
+ *  generic "Rezervat" red so nothing regresses when the list grows. */
+const EVENT_TYPE_STYLE: Partial<
+  Record<EventTypeKey, { bg: string; text: string; chip: string }>
+> = {
+  wedding: { bg: "bg-red-500/25 border-red-500/60", text: "text-red-400", chip: "bg-red-500/40" },
+  cununie: { bg: "bg-pink-500/25 border-pink-500/60", text: "text-pink-400", chip: "bg-pink-500/40" },
+  baptism: { bg: "bg-blue-500/25 border-blue-500/60", text: "text-blue-400", chip: "bg-blue-500/40" },
+  cumatrie: { bg: "bg-cyan-500/25 border-cyan-500/60", text: "text-cyan-400", chip: "bg-cyan-500/40" },
+  birthday: { bg: "bg-orange-500/25 border-orange-500/60", text: "text-orange-400", chip: "bg-orange-500/40" },
+  kids_birthday: { bg: "bg-amber-500/25 border-amber-500/60", text: "text-amber-400", chip: "bg-amber-500/40" },
+  corporate: { bg: "bg-purple-500/25 border-purple-500/60", text: "text-purple-400", chip: "bg-purple-500/40" },
 };
+
+/** Colour + label for a raw event_type value, whatever spelling it was stored
+ *  in (English key, Romanian slug or a hand-typed label). Undefined for a type
+ *  we don't colour, which the callers already render as a generic booking. */
+function eventTypeVisual(raw: string | null | undefined) {
+  const key = normalizeEventType(raw);
+  const style = key ? EVENT_TYPE_STYLE[key] : undefined;
+  return style ? { ...style, label: eventTypeLabel(key) } : undefined;
+}
 
 const TENTATIVE_STYLE = { label: "Tentativ", bg: "bg-yellow-500/25 border-yellow-500/60", text: "text-yellow-400" };
 
@@ -495,11 +514,12 @@ export function VenueCalendarClient({
       <Card>
         <CardContent className="flex flex-wrap gap-4 p-4 text-xs">
           <LegendChip color="bg-emerald-500/40" label="Disponibil" />
-          <LegendChip color="bg-red-500/40" label="Nuntă" />
-          <LegendChip color="bg-blue-500/40" label="Botez" />
-          <LegendChip color="bg-cyan-500/40" label="Cumătrie" />
-          <LegendChip color="bg-purple-500/40" label="Corporate" />
-          <LegendChip color="bg-orange-500/40" label="Aniversare" />
+          {ALL_EVENT_TYPES.map((k) => {
+            const style = EVENT_TYPE_STYLE[k];
+            return style ? (
+              <LegendChip key={k} color={style.chip} label={eventTypeLabel(k)} />
+            ) : null;
+          })}
           <LegendChip color="bg-yellow-500/40" label="Tentativ (pending)" />
           <LegendChip color="bg-slate-500/50" label="Blocat" />
         </CardContent>
@@ -538,8 +558,7 @@ export function VenueCalendarClient({
               let labelText = "";
 
               if (confirmed) {
-                const cfg =
-                  EVENT_TYPE_CONFIG[(confirmed.eventType || "").toLowerCase()];
+                const cfg = eventTypeVisual(confirmed.eventType);
                 if (cfg) {
                   cellClass = cfg.bg;
                   labelText = cfg.label;
@@ -555,7 +574,7 @@ export function VenueCalendarClient({
                 const cfg = STATUS_CONFIG[event.status];
                 if (cfg) cellClass = cfg.bg;
                 if (event.eventType) {
-                  const ec = EVENT_TYPE_CONFIG[event.eventType.toLowerCase()];
+                  const ec = eventTypeVisual(event.eventType);
                   if (ec) {
                     cellClass = ec.bg;
                     labelText = ec.label;
@@ -711,9 +730,10 @@ export function VenueCalendarClient({
             <div className="space-y-2">
               {dayBookings.map((b) => {
                 const isPending = b.status === "pending";
+                const typeKey = normalizeEventType(b.eventType);
                 const cfg = isPending
                   ? TENTATIVE_STYLE
-                  : EVENT_TYPE_CONFIG[(b.eventType || "").toLowerCase()];
+                  : eventTypeVisual(b.eventType);
                 return (
                   <div
                     key={b.id}
@@ -728,8 +748,8 @@ export function VenueCalendarClient({
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                           {cfg && (
                             <span className={cn("font-medium", cfg.text)}>
-                              {isPending && b.eventType
-                                ? `Tentativ · ${EVENT_TYPE_CONFIG[b.eventType.toLowerCase()]?.label ?? b.eventType}`
+                              {isPending && typeKey
+                                ? `Tentativ · ${eventTypeLabel(typeKey)}`
                                 : cfg.label}
                             </span>
                           )}
@@ -1018,7 +1038,7 @@ function ListView({
     const event = eventsByDate.get(dateStr);
 
     if (confirmed) {
-      const cfg = EVENT_TYPE_CONFIG[(confirmed.eventType || "").toLowerCase()];
+      const cfg = eventTypeVisual(confirmed.eventType);
       days.push({
         dateStr,
         statusLabel: cfg?.label || "Rezervat",
@@ -1031,9 +1051,10 @@ function ListView({
         kind: "booking",
       });
     } else if (pending) {
+      const pendingKey = normalizeEventType(pending.eventType);
       days.push({
         dateStr,
-        statusLabel: `Tentativ${pending.eventType ? ` · ${pending.eventType}` : ""}`,
+        statusLabel: `Tentativ${pendingKey ? ` · ${eventTypeLabel(pendingKey)}` : ""}`,
         statusClass: "text-yellow-400",
         eventType: pending.eventType,
         client: pending.clientName,

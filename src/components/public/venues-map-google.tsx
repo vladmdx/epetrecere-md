@@ -41,7 +41,11 @@ function pinIconUrl(count: number, approximate: boolean): string {
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="2"${approximate && !isGroup ? ' stroke-dasharray="4 3"' : ""}/>
     ${
       isGroup
-        ? `<text x="${size / 2}" y="${size / 2}" fill="#0D0D0D" font-family="system-ui,sans-serif" font-size="14" font-weight="700" text-anchor="middle" dominant-baseline="central">${text}</text>`
+        // An SVG loaded through <img> is its own document: it cannot see the
+        // page's fonts, so `system-ui` may not resolve, and
+        // dominant-baseline is unevenly supported. A concrete stack plus a
+        // dy offset centres the digit everywhere.
+        ? `<text x="${size / 2}" y="${size / 2}" dy=".36em" fill="#0D0D0D" font-family="Arial,Helvetica,sans-serif" font-size="15" font-weight="700" text-anchor="middle">${text}</text>`
         : `<circle cx="${size / 2}" cy="${size / 2}" r="4" fill="${PIN_GOLD}"/>`
     }
   </svg>`;

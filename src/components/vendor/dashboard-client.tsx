@@ -28,6 +28,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import type { ArtistStats } from "@/lib/db/queries/artist-stats";
 import type {
   ArtistProfileSnapshot,
@@ -67,16 +68,6 @@ const MONTHS_RO = [
   "noiembrie",
   "decembrie",
 ] as const;
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  baptism: "Botez",
-  cumatrie: "Cumătrie",
-  corporate: "Corporate",
-  birthday: "Aniversare",
-  concert: "Concert",
-  other: "Eveniment",
-};
 
 export function DashboardClient({
   profile,
@@ -323,9 +314,7 @@ function NextEventCard({ event }: { event: NextEvent }) {
   const weekday = WEEKDAYS_RO[date.getDay()];
   const dateLabel = `${date.getDate()} ${MONTHS_RO[date.getMonth()]} ${date.getFullYear()}`;
   const headerDate = `${weekday}, ${dateLabel}`;
-  const eventLabel = event.eventType
-    ? EVENT_TYPE_LABELS[event.eventType] ?? "Eveniment"
-    : "Eveniment";
+  const eventLabel = eventCaption(event.eventType);
   // Thematic fallback so the artist always gets a banner image — the
   // wedding shot is the safest default for the most common event type.
   const image = event.venueImage || "/images/backgrounds/party-dance.jpg";
@@ -463,9 +452,7 @@ function RecentRequests({ items }: { items: RecentRequest[] }) {
 function RecentRequestRow({ req }: { req: RecentRequest }) {
   const date = new Date(req.eventDate + "T00:00:00");
   const dateLabel = `${date.getDate()} ${MONTHS_RO[date.getMonth()].slice(0, 3)}. ${date.getFullYear()}`;
-  const eventLabel = req.eventType
-    ? EVENT_TYPE_LABELS[req.eventType] ?? "Eveniment"
-    : "Eveniment";
+  const eventLabel = eventCaption(req.eventType);
   const pill = statusPill(req.status);
 
   return (
@@ -540,6 +527,15 @@ function ShortcutCard({
 }
 
 // ─── Helpers ──────────────────────────────────────────────
+
+/** Event-type caption for the cards. Labels come from the shared
+ *  vocabulary; a missing or unrecognised type keeps the neutral
+ *  "Eveniment" this dashboard has always shown rather than the
+ *  helper's "Nespecificat", which reads badly next to a client name. */
+function eventCaption(raw: string | null): string {
+  const key = normalizeEventType(raw);
+  return key ? eventTypeLabel(key) : "Eveniment";
+}
 
 /** Formats the stat-tile delta caption like "+2 față de ieri" or
  *  "−1 față de săpt. trecută". Hides the sign for zero. */

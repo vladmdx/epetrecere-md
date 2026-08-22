@@ -29,6 +29,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
 import type { BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
 
@@ -52,15 +53,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "În așteptare", color: "bg-warning/10 text-warning border-warning/30" },
   accepted: { label: "Așteaptă confirmare client", color: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
   confirmed_by_client: { label: "Confirmat", color: "bg-success/10 text-success border-success/30" },
-};
-
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  baptism: "Botez",
-  cumatrie: "Cumătrie",
-  corporate: "Corporate",
-  birthday: "Aniversare",
-  other: "Eveniment",
 };
 
 const PREVIEW_LIMIT = 5;
@@ -189,7 +181,9 @@ export function DashboardBookingsPreview({ artistId }: Props) {
 
   function renderRow(b: BookingRequest) {
     const cfg = statusConfig[b.status];
-    const eventLabel = b.eventType ? EVENT_TYPE_LABELS[b.eventType] || b.eventType : "Eveniment";
+    // A missing or unrecognised type keeps the neutral "Eveniment" caption.
+    const eventTypeKey = normalizeEventType(b.eventType);
+    const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment";
     const isPending = b.status === "pending";
     const lastOffer = b.priceOffers && b.priceOffers.length > 0 ? b.priceOffers[b.priceOffers.length - 1] : null;
     const lastOfferIsFromClient = lastOffer?.from === "client";

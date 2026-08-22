@@ -19,6 +19,7 @@ const KanbanBoard = dynamic(
 );
 import type { CrmItem } from "./kanban";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
 
 const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
@@ -38,12 +39,6 @@ const typeConfig = {
   booking: { label: "Rezervare", color: "bg-purple-500/10 text-purple-400 border-purple-500/30", icon: Ticket },
   offer: { label: "Ofertă", color: "bg-gold/10 text-gold border-gold/30", icon: Music },
 } as const;
-
-const eventTypeLabels: Record<string, string> = {
-  wedding: "Nuntă", baptism: "Botez", cumatrie: "Cumătrie",
-  corporate: "Corporate", birthday: "Aniversare", concert: "Concert",
-  other: "Altele",
-};
 
 export default function CRMPage() {
   const [items, setItems] = useState<CrmItem[]>([]);
@@ -86,7 +81,7 @@ export default function CRMPage() {
           <Button variant="outline" size="sm" className="gap-1.5 border-gold/30 text-gold hover:bg-gold/10" onClick={() => {
             const header = "Tip,Nume,Telefon,Email,Eveniment,Data,Locatie,Invitati,Buget,Status,Sursa,Artist,Creat\n";
             const rows = items.map((l) =>
-              [l.type, l.name, l.phone, l.email || "", l.eventType || "", l.eventDate || "", l.location || "", l.guestCount || "", l.budget || "", l.status, l.source || "", l.artistName || "", l.createdAt]
+              [l.type, l.name, l.phone, l.email || "", l.eventType ? eventTypeLabel(normalizeEventType(l.eventType)) : "", l.eventDate || "", l.location || "", l.guestCount || "", l.budget || "", l.status, l.source || "", l.artistName || "", l.createdAt]
                 .map(v => `"${String(v).replace(/"/g, '""')}"`)
                 .join(",")
             ).join("\n");
@@ -227,7 +222,7 @@ export default function CRMPage() {
                           </Badge>
                           {item.eventType && (
                             <Badge variant="secondary" className="text-xs">
-                              {eventTypeLabels[item.eventType] || item.eventType}
+                              {eventTypeLabel(normalizeEventType(item.eventType))}
                             </Badge>
                           )}
                           {item.artistName && (

@@ -15,10 +15,12 @@
 
 export type EventType =
   | "wedding"
+  | "cununie"
   | "baptism"
   | "cumatrie"
-  | "corporate"
   | "birthday"
+  | "kids_birthday"
+  | "corporate"
   | "concert"
   | "other";
 

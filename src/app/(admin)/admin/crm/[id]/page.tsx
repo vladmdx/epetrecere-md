@@ -13,6 +13,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
 
 interface Lead {
@@ -54,12 +55,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   completed: { label: "Finalizat", color: "bg-success/10 text-success border-success/30" },
   lost: { label: "Pierdut", color: "bg-destructive/10 text-destructive border-destructive/30" },
   follow_up: { label: "Follow-up", color: "bg-warning/10 text-warning border-warning/30" },
-};
-
-const eventTypeLabels: Record<string, string> = {
-  wedding: "Nuntă", baptism: "Botez", cumatrie: "Cumătrie",
-  corporate: "Corporate", birthday: "Aniversare", concert: "Concert",
-  other: "Altele",
 };
 
 const activityIcons: Record<string, typeof Clock> = {
@@ -296,7 +291,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             <CardHeader><CardTitle>Detalii Eveniment</CardTitle></CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
-                {lead.eventType && <InfoRow icon={Calendar} label="Tip eveniment" value={eventTypeLabels[lead.eventType] || lead.eventType} />}
+                {lead.eventType && <InfoRow icon={Calendar} label="Tip eveniment" value={eventTypeLabel(normalizeEventType(lead.eventType))} />}
                 {lead.eventDate && <InfoRow icon={Calendar} label="Data" value={lead.eventDate} />}
                 {lead.location && <InfoRow icon={MapPin} label="Locație" value={lead.location} />}
                 {lead.guestCount && <InfoRow icon={Users} label="Invitați" value={`${lead.guestCount}`} />}

@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
 
 import { type BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
@@ -55,6 +56,7 @@ type ChatMessage = {
 const EVENT_TYPE_BORDER: Record<string, string> = {
   wedding: "border-l-red-500",
   nunta: "border-l-red-500",
+  cununie: "border-l-rose-500",
   baptism: "border-l-blue-500",
   botez: "border-l-blue-500",
   cumatrie: "border-l-cyan-500",
@@ -62,6 +64,7 @@ const EVENT_TYPE_BORDER: Record<string, string> = {
   corporate: "border-l-purple-500",
   birthday: "border-l-orange-500",
   aniversare: "border-l-orange-500",
+  kids_birthday: "border-l-amber-500",
 };
 
 /**
@@ -662,6 +665,7 @@ export default function VendorBookingsPage() {
             const chatMessages = chats[booking.id] || [];
             const eventKey = (booking.eventType || "other").toLowerCase();
             const borderColor = EVENT_TYPE_BORDER[eventKey] || "border-l-muted-foreground";
+            const eventTypeKey = normalizeEventType(booking.eventType);
             const leadScore = computeLeadScore(booking);
             const showLeadScore =
               booking.status === "pending" ||
@@ -696,7 +700,9 @@ export default function VendorBookingsPage() {
                             {leadScore.label}
                           </span>
                         )}
-                        <span className="font-heading font-bold">{booking.eventType || "Eveniment"}</span>
+                        <span className="font-heading font-bold">
+                          {eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment"}
+                        </span>
                         {(() => {
                           const offers = booking.priceOffers ?? [];
                           const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
@@ -1019,7 +1025,11 @@ export default function VendorBookingsPage() {
                   <span className="font-medium">{acceptDialog.clientName}</span>
 
                   <span className="text-muted-foreground">Eveniment:</span>
-                  <span>{acceptDialog.eventType || "—"}</span>
+                  <span>
+                    {acceptDialog.eventType
+                      ? eventTypeLabel(normalizeEventType(acceptDialog.eventType))
+                      : "—"}
+                  </span>
 
                   <span className="text-muted-foreground">Data:</span>
                   <span>{formatDate(acceptDialog.eventDate)}</span>

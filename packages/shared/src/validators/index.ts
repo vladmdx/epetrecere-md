@@ -13,10 +13,12 @@ import { z } from "zod";
 
 export const EventTypeSchema = z.enum([
   "wedding",
+  "cununie",
   "baptism",
   "cumatrie",
-  "corporate",
   "birthday",
+  "kids_birthday",
+  "corporate",
   "concert",
   "other",
 ]);

@@ -10,6 +10,7 @@ import {
   Loader2, ArrowRight, Trash2, RotateCcw, Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
 
 interface OfferRequest {
@@ -32,12 +33,6 @@ interface OfferRequest {
 }
 
 type FilterTab = "new" | "accepted" | "rejected" | "all";
-
-const eventTypeLabels: Record<string, string> = {
-  wedding: "Nuntă", baptism: "Botez", cumatrie: "Cumătrie",
-  corporate: "Corporate", birthday: "Aniversare", concert: "Concert",
-  other: "Altele",
-};
 
 export default function AdminOfferRequestsPage() {
   const [requests, setRequests] = useState<OfferRequest[]>([]);
@@ -235,7 +230,7 @@ function OfferCard({
               </Badge>
               {request.eventType && (
                 <Badge variant="outline" className="text-xs">
-                  {eventTypeLabels[request.eventType] || request.eventType}
+                  {eventTypeLabel(normalizeEventType(request.eventType))}
                 </Badge>
               )}
             </div>

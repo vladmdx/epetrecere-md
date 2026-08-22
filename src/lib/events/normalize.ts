@@ -28,11 +28,18 @@ function key(raw: string): string {
 }
 
 const ALIASES: Record<string, EventTypeKey> = {
-  // wedding
+  // wedding — the party
   wedding: "wedding",
   nunta: "wedding",
   nunti: "wedding",
   svadba: "wedding",
+  // cununie — the ceremony, often organised as its own event here
+  cununie: "cununie",
+  cununia: "cununie",
+  cununie_civila: "cununie",
+  cununie_religioasa: "cununie",
+  ceremony: "cununie",
+  venchanie: "cununie",
   // baptism
   baptism: "baptism",
   botez: "baptism",
@@ -50,6 +57,12 @@ const ALIASES: Record<string, EventTypeKey> = {
   zi_de_nastere: "birthday",
   aniversare: "birthday",
   anniversary: "birthday",
+  // a children's party is a different job from an adult one
+  kids_birthday: "kids_birthday",
+  aniversare_copii: "kids_birthday",
+  zi_nastere_copii: "kids_birthday",
+  petrecere_copii: "kids_birthday",
+  kids: "kids_birthday",
   // concert
   concert: "concert",
   // everything else
@@ -70,12 +83,36 @@ export function normalizeEventType(
 
 const LABELS: Record<EventTypeKey, { ro: string; ru: string; en: string }> = {
   wedding: { ro: "Nuntă", ru: "Свадьба", en: "Wedding" },
+  cununie: { ro: "Cununie", ru: "Венчание", en: "Wedding ceremony" },
   baptism: { ro: "Botez", ru: "Крестины", en: "Baptism" },
   cumatrie: { ro: "Cumătrie", ru: "Кумэтрия", en: "Cumătrie" },
   corporate: { ro: "Corporate", ru: "Корпоратив", en: "Corporate" },
   birthday: { ro: "Zi de naștere", ru: "День рождения", en: "Birthday" },
+  kids_birthday: {
+    ro: "Aniversare copii",
+    ru: "Детский день рождения",
+    en: "Kids birthday",
+  },
   concert: { ro: "Concert", ru: "Концерт", en: "Concert" },
   other: { ro: "Altele", ru: "Другое", en: "Other" },
+};
+
+/**
+ * One emoji per event type, so the pickers that use emoji rather than icons
+ * (the quiz tiles, the booking form, the calendar widget) all show the same
+ * mark for the same event. They each used to keep their own list, which is
+ * how the quiz ended up offering "Cumătrie" under the value `baptism`.
+ */
+export const EVENT_TYPE_EMOJI: Record<EventTypeKey, string> = {
+  wedding: "💍",
+  cununie: "⛪",
+  baptism: "👶",
+  cumatrie: "🤝",
+  birthday: "🎂",
+  kids_birthday: "🎈",
+  corporate: "💼",
+  concert: "🎵",
+  other: "🎉",
 };
 
 export function eventTypeLabel(k: EventTypeKey | null, locale = "ro"): string {

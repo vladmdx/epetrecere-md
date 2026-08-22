@@ -28,6 +28,11 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  ALL_EVENT_TYPES,
+  eventTypeLabel,
+  normalizeEventType,
+} from "@/lib/events/normalize";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { VenueStats } from "@/lib/db/queries/venue-stats";
@@ -79,12 +84,16 @@ const WEEKDAYS_RO = ["L", "Ma", "Mi", "J", "V", "S", "D"];
 const EVENT_TYPE_COLORS: Record<string, string> = {
   wedding: "bg-red-500/80",
   nunta: "bg-red-500/80",
+  cununie: "bg-rose-500/80",
   baptism: "bg-blue-500/80",
   botez: "bg-blue-500/80",
   cumatrie: "bg-cyan-500/80",
   corporate: "bg-purple-500/80",
   birthday: "bg-orange-500/80",
   aniversare: "bg-orange-500/80",
+  kids_birthday: "bg-amber-500/80",
+  concert: "bg-violet-500/80",
+  other: "bg-slate-500/80",
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -355,11 +364,17 @@ export function VenueHomeDashboard({
                 <LegendDot color="bg-yellow-500/50" label="Tentativ" />
                 <LegendDot color="bg-slate-500/50" label="Blocat" />
               </div>
+              {/* Built from the same colour map the calendar dots use, so the
+                  legend cannot fall out of step with what is drawn — it used
+                  to list four hand-written entries with their own colours. */}
               <div className="flex flex-wrap gap-3 text-[9px]">
-                <LegendDot color="bg-red-500" label="Nuntă" />
-                <LegendDot color="bg-blue-500" label="Botez" />
-                <LegendDot color="bg-purple-500" label="Corporate" />
-                <LegendDot color="bg-orange-500" label="Alt eveniment" />
+                {ALL_EVENT_TYPES.map((k) => (
+                  <LegendDot
+                    key={k}
+                    color={EVENT_TYPE_COLORS[k] ?? "bg-slate-500/80"}
+                    label={eventTypeLabel(k)}
+                  />
+                ))}
               </div>
             </div>
           </CardContent>
@@ -482,7 +497,9 @@ export function VenueHomeDashboard({
                       >
                         <td className="py-3 pr-3 font-medium">{b.clientName}</td>
                         <td className="py-3 pr-3 text-muted-foreground">
-                          {b.eventType || "—"}
+                          {b.eventType
+                            ? eventTypeLabel(normalizeEventType(b.eventType))
+                            : "—"}
                         </td>
                         <td className="py-3 pr-3 text-muted-foreground">
                           {b.eventDate

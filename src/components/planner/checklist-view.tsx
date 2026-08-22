@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Plus, Trash2, Clock, Loader2, RefreshCw, Sparkles } from "lucide-react";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { CATEGORY_LABELS } from "@/lib/planner/templates";
 import { cn } from "@/lib/utils";
 
@@ -38,15 +39,6 @@ interface Props {
   onChange: (items: ChecklistItem[]) => void;
 }
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  baptism: "Cumătrie / Botez",
-  cumatrie: "Cumătrie",
-  birthday: "Aniversare",
-  corporate: "Eveniment Corporativ",
-  other: "Eveniment",
-};
-
 const PRIORITY_COLOR: Record<ChecklistItem["priority"], string> = {
   high: "border-red-500/40 bg-red-500/5 text-red-500",
   medium: "border-amber-500/40 bg-amber-500/5 text-amber-500",
@@ -66,12 +58,12 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
   const [adding, setAdding] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
 
-  const eventTypeLabel = eventType
-    ? EVENT_TYPE_LABELS[eventType.toLowerCase()] || eventType
-    : "Eveniment";
+  // A missing or unrecognised type keeps the neutral "Eveniment" caption.
+  const eventTypeKey = normalizeEventType(eventType);
+  const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment";
 
   async function regenerateFromTemplate() {
-    if (!confirm(`Vrei să regenerezi checklist-ul cu template pentru ${eventTypeLabel}? Aceasta va șterge elementele existente și le va înlocui cu template-ul standard.`)) {
+    if (!confirm(`Vrei să regenerezi checklist-ul cu template pentru ${eventLabel}? Aceasta va șterge elementele existente și le va înlocui cu template-ul standard.`)) {
       return;
     }
     setRegenerating(true);
@@ -82,7 +74,7 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
       if (!res.ok) throw new Error();
       const data = await res.json();
       onChange(data.items || []);
-      toast.success(`Checklist pentru ${eventTypeLabel} a fost regenerat!`);
+      toast.success(`Checklist pentru ${eventLabel} a fost regenerat!`);
     } catch {
       toast.error("Nu s-a putut regenera checklist-ul");
     } finally {
@@ -183,7 +175,7 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               Checklist personalizat pentru
             </p>
-            <p className="font-heading font-bold">{eventTypeLabel}</p>
+            <p className="font-heading font-bold">{eventLabel}</p>
           </div>
         </div>
         <Button

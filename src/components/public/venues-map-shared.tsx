@@ -52,33 +52,104 @@ export function placeVenues(venues: MapVenue[]): Placed[] {
     .filter((v): v is Placed => v !== null);
 }
 
-/** Zoom → grouping radius in degrees. Tighter as you zoom in. */
-export function gridSize(zoom: number): number {
-  if (zoom >= 15) return 0.0015;
-  if (zoom >= 13) return 0.006;
-  if (zoom >= 11) return 0.02;
-  if (zoom >= 9) return 0.06;
-  return 0.2;
+/**
+ * Web Mercator projection — the one both Leaflet and Google use, so a pixel
+ * distance computed here matches what the visitor actually sees.
+ */
+function project(pos: LatLng, zoom: number): { x: number; y: number } {
+  const scale = 256 * 2 ** zoom;
+  const siny = Math.min(
+    Math.max(Math.sin((pos.lat * Math.PI) / 180), -0.9999),
+    0.9999,
+  );
+  return {
+    x: ((pos.lng + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI)) * scale,
+  };
 }
 
+/**
+ * Two pins must never sit close enough to hide each other. The group pin is
+ * 42px across, so anything within this distance is merged — which is the
+ * whole point: a count that another pin is covering is worse than no count.
+ */
+const MERGE_DISTANCE_PX = 52;
+
+/**
+ * Group venues that would overlap on screen.
+ *
+ * This used to bucket by a fixed lat/lng grid, which is not the same question:
+ * three venues scattered around one city centre could land in three different
+ * cells that are four pixels apart, so the map drew a "2" pin with a single
+ * pin sitting on top of it and the number vanished. Distance in projected
+ * pixels is what decides whether two marks collide, so that is what decides
+ * whether they merge.
+ *
+ * Greedy, then a settling pass: assign each venue to the first cluster whose
+ * centre is near enough, then re-merge clusters that drifted together as
+ * their centres moved.
+ */
 export function clusterize(items: Placed[], zoom: number): Cluster[] {
-  const size = gridSize(zoom);
-  const buckets = new Map<string, Placed[]>();
-  for (const it of items) {
-    const key = `${Math.round(it.pos.lat / size)}:${Math.round(it.pos.lng / size)}`;
-    const arr = buckets.get(key);
-    if (arr) arr.push(it);
-    else buckets.set(key, [it]);
+  if (items.length === 0) return [];
+
+  interface Working {
+    items: Placed[];
+    px: { x: number; y: number };
   }
-  return [...buckets.entries()].map(([key, group]) => ({
-    key,
-    // Centre the pin on the group so it visually covers its members.
+
+  const clusters: Working[] = [];
+  // Sorted by id so the same input always produces the same grouping —
+  // otherwise pins would reshuffle between renders.
+  for (const item of [...items].sort((a, b) => a.id - b.id)) {
+    const px = project(item.pos, zoom);
+    const near = clusters.find(
+      (c) => Math.hypot(c.px.x - px.x, c.px.y - px.y) < MERGE_DISTANCE_PX,
+    );
+    if (near) {
+      near.items.push(item);
+      near.px = centroidPx(near.items, zoom);
+    } else {
+      clusters.push({ items: [item], px });
+    }
+  }
+
+  // Moving a centre can bring two clusters within range of each other.
+  for (let pass = 0; pass < 3; pass++) {
+    let merged = false;
+    outer: for (let i = 0; i < clusters.length; i++) {
+      for (let j = i + 1; j < clusters.length; j++) {
+        const a = clusters[i]!;
+        const b = clusters[j]!;
+        if (Math.hypot(a.px.x - b.px.x, a.px.y - b.px.y) < MERGE_DISTANCE_PX) {
+          a.items.push(...b.items);
+          a.px = centroidPx(a.items, zoom);
+          clusters.splice(j, 1);
+          merged = true;
+          break outer;
+        }
+      }
+    }
+    if (!merged) break;
+  }
+
+  return clusters.map((c) => ({
+    // Keyed by member ids: stable across zoom changes, and never collides
+    // with another cluster the way a rounded coordinate could.
+    key: c.items.map((i) => i.id).join("-"),
     pos: {
-      lat: group.reduce((s, g) => s + g.pos.lat, 0) / group.length,
-      lng: group.reduce((s, g) => s + g.pos.lng, 0) / group.length,
+      lat: c.items.reduce((s, g) => s + g.pos.lat, 0) / c.items.length,
+      lng: c.items.reduce((s, g) => s + g.pos.lng, 0) / c.items.length,
     },
-    items: group,
+    items: c.items,
   }));
+}
+
+function centroidPx(items: Placed[], zoom: number): { x: number; y: number } {
+  const pts = items.map((i) => project(i.pos, zoom));
+  return {
+    x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
+    y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
+  };
 }
 
 /** The pin markup, as a string — Leaflet needs HTML, Google needs a DOM node. */

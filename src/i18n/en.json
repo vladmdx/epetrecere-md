@@ -81,10 +81,12 @@
   },
   "event_types": {
     "wedding": "Wedding",
+    "cununie": "Wedding ceremony",
     "baptism": "Baptism",
-    "cumatrie": "Cumpatrie",
-    "corporate": "Corporate",
+    "cumatrie": "Cumătrie",
     "birthday": "Birthday",
+    "kids_birthday": "Kids birthday",
+    "corporate": "Corporate",
     "concert": "Concert",
     "other": "Other"
   },

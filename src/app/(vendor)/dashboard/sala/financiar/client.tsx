@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 
 interface Booking {
   id: number;
@@ -57,27 +58,18 @@ interface Props {
   commissionByBooking: Record<number, number>;
 }
 
-const EVENT_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  nunta: "Nuntă",
-  baptism: "Botez",
-  botez: "Botez",
-  cumatrie: "Cumătrie",
-  corporate: "Corporate",
-  birthday: "Aniversare",
-  aniversare: "Aniversare",
-};
-
 /** Color palette for the pie chart — one tone per event type. */
 const EVENT_COLORS: Record<string, string> = {
   wedding: "#E74C3C",
   nunta: "#E74C3C",
+  cununie: "#EC7063",
   baptism: "#3498DB",
   botez: "#3498DB",
   cumatrie: "#06B6D4",
   corporate: "#9B59B6",
   birthday: "#F39C12",
   aniversare: "#F39C12",
+  kids_birthday: "#F1C40F",
   other: "#64748B",
 };
 
@@ -194,7 +186,7 @@ export function VenueFinanciarClient({
       .filter(([, v]) => v > 0)
       .map(([key, value]) => ({
         key,
-        label: EVENT_LABELS[key] || key,
+        label: eventTypeLabel(normalizeEventType(key)),
         value,
         pct: total > 0 ? (value / total) * 100 : 0,
         color: EVENT_COLORS[key] || "#64748B",
@@ -257,7 +249,7 @@ export function VenueFinanciarClient({
       return `<tr>
         <td>#${b.id}</td>
         <td>${b.clientName}</td>
-        <td>${EVENT_LABELS[(b.eventType || "").toLowerCase()] || b.eventType || "—"}</td>
+        <td>${b.eventType ? eventTypeLabel(normalizeEventType(b.eventType)) : "—"}</td>
         <td>${b.eventDate ? new Date(b.eventDate).toLocaleDateString("ro-RO") : "—"}</td>
         <td style="text-align:right">${gross}€</td>
         <td style="text-align:right;color:#888">${commission}€</td>
@@ -307,7 +299,7 @@ export function VenueFinanciarClient({
     const rows = bookings.map((b) => [
       b.id,
       b.clientName,
-      EVENT_LABELS[(b.eventType || "").toLowerCase()] || b.eventType || "",
+      b.eventType ? eventTypeLabel(normalizeEventType(b.eventType)) : "",
       b.eventDate || "",
       b.agreedPrice ?? 0,
       commissionByBooking[b.id] ?? 0,
@@ -505,7 +497,7 @@ export function VenueFinanciarClient({
                 <option value="all">Toate</option>
                 {availableEventTypes.map((t) => (
                   <option key={t} value={t}>
-                    {EVENT_LABELS[t] ?? t}
+                    {eventTypeLabel(normalizeEventType(t))}
                   </option>
                 ))}
               </select>
@@ -609,9 +601,9 @@ export function VenueFinanciarClient({
                         </td>
                         <td className="py-3 font-medium">{b.clientName}</td>
                         <td className="py-3 text-muted-foreground">
-                          {EVENT_LABELS[(b.eventType || "").toLowerCase()] ||
-                            b.eventType ||
-                            "—"}
+                          {b.eventType
+                            ? eventTypeLabel(normalizeEventType(b.eventType))
+                            : "—"}
                         </td>
                         <td className="py-3 text-muted-foreground">
                           {b.eventDate ? (

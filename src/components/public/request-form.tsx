@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ALL_EVENT_TYPES, EVENT_TYPE_EMOJI, eventTypeLabel } from "@/lib/events/normalize";
 
 // ─── Shared props ────────────────────────────────────────
 interface FormBaseProps {
@@ -255,14 +256,13 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
     }
   }
 
-  const eventTypes = [
-    { value: "wedding", label: "🎊 Nuntă" },
-    { value: "baptism", label: "👶 Botez" },
-    { value: "cumetrie", label: "🤝 Cumetrie" },
-    { value: "corporate", label: "💼 Corporate" },
-    { value: "birthday", label: "🎂 Aniversare" },
-    { value: "other", label: "📋 Altele" },
-  ];
+  // Built from the canonical list: this used to be a hand-written six that
+  // was missing concert entirely and wrote "cumetrie" where the rest of the
+  // product writes "cumatrie".
+  const eventTypes = ALL_EVENT_TYPES.map((k) => ({
+    value: k,
+    label: `${EVENT_TYPE_EMOJI[k]} ${eventTypeLabel(k)}`,
+  }));
 
   return (
     <>

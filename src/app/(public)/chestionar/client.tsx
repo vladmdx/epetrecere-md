@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/format/price";
+import { ALL_EVENT_TYPES, EVENT_TYPE_EMOJI, eventTypeLabel } from "@/lib/events/normalize";
 
 interface QuizAnswers {
   eventType: string;
@@ -38,14 +39,15 @@ interface MatchResult {
   categories: string[];
 }
 
-const EVENT_TYPES = [
-  { value: "wedding", label: "Nuntă", emoji: "💍" },
-  { value: "birthday", label: "Zi de naștere", emoji: "🎂" },
-  { value: "corporate", label: "Corporate", emoji: "💼" },
-  { value: "baptism", label: "Cumătrie", emoji: "👶" },
-  { value: "anniversary", label: "Aniversare", emoji: "🎉" },
-  { value: "graduation", label: "Absolvire", emoji: "🎓" },
-];
+// Derived from the canonical list. The hand-written version had two real
+// faults: it offered the label "Cumătrie" under the value `baptism`, and it
+// emitted `anniversary` and `graduation`, which no other part of the product
+// recognises as event types.
+const EVENT_TYPES = ALL_EVENT_TYPES.map((k) => ({
+  value: k,
+  label: eventTypeLabel(k),
+  emoji: EVENT_TYPE_EMOJI[k],
+}));
 
 const STYLES = [
   { value: "elegant", label: "Elegant & clasic", desc: "Rafinament și simplitate" },

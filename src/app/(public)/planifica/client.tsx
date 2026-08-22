@@ -75,9 +75,11 @@ interface WizardData {
  *  so the "rezervare artist" modal auto-fills sensible start/end times. */
 const DEFAULT_DURATION_HOURS: Record<string, number> = {
   wedding: 10,
+  cununie: 2,
   baptism: 6,
   cumatrie: 6,
   birthday: 5,
+  kids_birthday: 3,
   corporate: 4,
   concert: 3,
   other: 5,
@@ -86,9 +88,11 @@ const DEFAULT_DURATION_HOURS: Record<string, number> = {
 /** Reasonable default start hour per event type. */
 const DEFAULT_START_TIME: Record<string, string> = {
   wedding: "14:00",
+  cununie: "11:00",
   baptism: "12:00",
   cumatrie: "17:00",
   birthday: "18:00",
+  kids_birthday: "12:00",
   corporate: "18:00",
   concert: "19:00",
   other: "18:00",
@@ -102,9 +106,11 @@ const DEFAULT_START_TIME: Record<string, string> = {
  */
 const DEFAULT_GUEST_COUNT: Record<string, number> = {
   wedding: 150,
+  cununie: 30,
   baptism: 40,
   cumatrie: 50,
   birthday: 30,
+  kids_birthday: 20,
   corporate: 50,
   concert: 60,
   other: 40,
@@ -557,12 +563,18 @@ function WizardStepHeading({
 // real background photo + dark gradient overlay + label. Files in
 // /public/images/event-types/[slug].jpg — admin can replace any without
 // touching this code.
+// Order and membership follow ALL_EVENT_TYPES; only the photo lives here.
+// event-cununie.webp and event-kids-birthday.webp currently reuse the wedding
+// and birthday photographs — replace those two files with their own pictures
+// and nothing here needs to change.
 const eventTypes = [
   { value: "wedding", image: "/images/redesign/event-wedding.webp" },
+  { value: "cununie", image: "/images/redesign/event-cununie.webp" },
   { value: "baptism", image: "/images/redesign/event-baptism.webp" },
   { value: "cumatrie", image: "/images/redesign/event-cumatrie.webp" },
-  { value: "corporate", image: "/images/redesign/event-corporate.webp" },
   { value: "birthday", image: "/images/redesign/event-birthday.webp" },
+  { value: "kids_birthday", image: "/images/redesign/event-kids-birthday.webp" },
+  { value: "corporate", image: "/images/redesign/event-corporate.webp" },
   { value: "concert", image: "/images/redesign/event-concert.webp" },
   { value: "other", image: "/images/redesign/event-other.webp" },
 ];
@@ -1330,6 +1342,8 @@ function eventNamePlaceholder(eventType: string): string {
   switch (eventType) {
     case "wedding":
       return "Ex: Nunta Ana & Ion";
+    case "cununie":
+      return "Ex: Cununia Ana & Ion";
     case "baptism":
       return "Ex: Botezul lui Gabi";
     case "cumatrie":
@@ -1338,6 +1352,8 @@ function eventNamePlaceholder(eventType: string): string {
       return "Ex: Petrecerea companiei";
     case "birthday":
       return "Ex: Ziua de naștere a Mariei";
+    case "kids_birthday":
+      return "Ex: Aniversarea Sofiei — 5 ani";
     case "concert":
       return "Ex: Concert Live";
     default:

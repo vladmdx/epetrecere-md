@@ -120,10 +120,12 @@ export function relativeTimeRO(iso: string): string {
 
 export const EVENT_TYPE_LABELS_RO: Record<EventType, string> = {
   wedding: "Nuntă",
+  cununie: "Cununie",
   baptism: "Botez",
   cumatrie: "Cumătrie",
-  corporate: "Corporate",
   birthday: "Aniversare",
+  kids_birthday: "Aniversare copii",
+  corporate: "Corporate",
   concert: "Concert",
   other: "Eveniment",
 };

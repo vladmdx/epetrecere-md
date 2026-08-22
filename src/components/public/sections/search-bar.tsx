@@ -6,18 +6,10 @@ import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { CustomCalendar } from "@/components/public/custom-calendar";
 import { useLocale } from "@/hooks/use-locale";
-import {
-  Search, ChevronDown, MapPin,
-  Sparkles,
-  Heart,
-  Baby,
-  Users,
-  Briefcase,
-  Cake,
-  Music,
-} from "lucide-react";
+import { Baby, Briefcase, Cake, ChevronDown, Church, Heart, MapPin, Music, PartyPopper, Search, Sparkles, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MOLDOVA_CITIES, DEFAULT_CITY } from "@/lib/moldova-cities";
+import { ALL_EVENT_TYPES, eventTypeLabel, type EventTypeKey } from "@/lib/events/normalize";
 
 function getTomorrow() {
   const d = new Date();
@@ -52,15 +44,26 @@ interface CategoryItem {
  * artist matching). Keeping the city + date inputs gives the wizard
  * usable context on step 1.
  */
+/** One lucide icon per event type; the label comes from the shared table. */
+const EVENT_TYPE_ICONS: Record<EventTypeKey, CategoryItem["icon"]> = {
+  wedding: Heart,
+  cununie: Church,
+  baptism: Baby,
+  cumatrie: Users,
+  birthday: Cake,
+  kids_birthday: PartyPopper,
+  corporate: Briefcase,
+  concert: Music,
+  other: Sparkles,
+};
+
 const EVENT_TYPE_ITEMS: CategoryItem[] = [
   { value: "", label: "Alege evenimentul", icon: Sparkles },
-  { value: "wedding", label: "Nuntă", icon: Heart },
-  { value: "baptism", label: "Botez", icon: Baby },
-  { value: "cumatrie", label: "Cumătrie", icon: Users },
-  { value: "birthday", label: "Zi de naștere", icon: Cake },
-  { value: "corporate", label: "Eveniment corporate", icon: Briefcase },
-  { value: "concert", label: "Concert / Petrecere", icon: Music },
-  { value: "other", label: "Altă petrecere", icon: Sparkles },
+  ...ALL_EVENT_TYPES.map((k) => ({
+    value: k,
+    label: eventTypeLabel(k),
+    icon: EVENT_TYPE_ICONS[k],
+  })),
 ];
 
 // Custom Dropdown
