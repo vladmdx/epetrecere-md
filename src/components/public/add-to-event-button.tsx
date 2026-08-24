@@ -23,7 +23,6 @@
 // has its own per-category booking grid; this component just routes.
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { CalendarDays, Loader2, Plus, AlertTriangle } from "lucide-react";
 import {
@@ -34,6 +33,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 
 interface PlanListItem {
   id: number;
@@ -70,7 +70,7 @@ export function AddToEventButton({
   venueSlug,
   presetEventPlanId,
 }: Props) {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const { isSignedIn, isLoaded } = useUser();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -198,8 +198,10 @@ export function AddToEventButton({
       } catch {
         /* ignore */
       }
+      // The payload needs the prefix too — a localized /ru/sign-in that
+      // comes back to the bare /artisti/... loses the language anyway.
       router.push(
-        `/sign-in?redirect_url=${encodeURIComponent(entityPath)}`,
+        `/sign-in?redirect_url=${encodeURIComponent(router.localize(entityPath))}`,
       );
       return;
     }

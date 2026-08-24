@@ -5,6 +5,7 @@ import {
   DEFAULT_LOCALE,
   LOCALE_HEADER,
   isLocale,
+  localizePath,
   splitLocale,
 } from "@/lib/i18n/routing";
 
@@ -149,6 +150,19 @@ const LEGACY_CITY_SLUGS = new Set([
   "ialoveni",
 ]);
 
+/**
+ * Paths where an unprefixed URL should follow the `locale` cookie rather than
+ * fall back to Romanian. Public catalogue pages are excluded on purpose —
+ * they are the indexed canonicals.
+ */
+const LOCALE_COOKIE_ROUTES = [
+  "/sign-in",
+  "/sign-up",
+  "/auth-redirect",
+  "/cabinet",
+  "/dashboard",
+];
+
 const LEGACY_EVENT_KEYWORDS = new Set([
   "nunta",
   "cununie",
@@ -227,6 +241,28 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(url, 308);
   }
   void isLocale;
+
+  // Safety net for the account area. Every link inside /cabinet and
+  // /dashboard is a plain next/link, and Clerk's own footer links and OAuth
+  // returns are built from configured URLs — so a Russian visitor who signs
+  // in has any number of ways to land on an unprefixed path and get served
+  // Romanian for the rest of the session. When that happens, honour the
+  // language they actually picked, which the switcher already stores.
+  //
+  // Deliberately limited to the signed-in surfaces: the public pages are the
+  // SEO canonicals and must never redirect on a cookie, or a crawler that
+  // happens to carry one would be sent away from the URL it asked for.
+  if (!hasPrefix && req.method === "GET") {
+    const cookieLocale = req.cookies.get("locale")?.value;
+    const isAppRoute = LOCALE_COOKIE_ROUTES.some(
+      (r) => pathname === r || pathname.startsWith(r + "/"),
+    );
+    if (isAppRoute && isLocale(cookieLocale) && cookieLocale !== DEFAULT_LOCALE) {
+      const url = req.nextUrl.clone();
+      url.pathname = localizePath(pathname, cookieLocale);
+      return NextResponse.redirect(url, 307);
+    }
+  }
 
   // Legacy SEO redirects must run BEFORE auth logic so public crawlers
   // hitting `/moderatori-nunta-chisinau` get a clean 301 to the canonical URL.

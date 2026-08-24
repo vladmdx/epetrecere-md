@@ -2,18 +2,18 @@
  * Missing translations for the Clerk widgets.
  *
  * @clerk/localizations ships incomplete bundles. Measured against enUS on
- * 4.4.0: roRO is missing 27 keys outright and leaves ~106 more either
- * undefined or byte-identical to English; ruRU is worse. Most sit in features
- * this site doesn't use (SAML, organizations, API keys, billing), but one is
- * right in the sign-up form: sign-up reads
+ * 4.13.10, which defines 1396 strings: roRO leaves 477 of them undefined and
+ * ruRU 696, and Clerk renders English wherever a value is missing. Most sit in
+ * features this site doesn't use (SAML, organizations, API keys, billing), but
+ * some are right in the auth card: sign-up reads
  * formFieldInputPlaceholder__signUpPassword — a different key from sign-in's
  * formFieldInputPlaceholder__password — and neither roRO nor ruRU defines it,
  * so Clerk fell back to English and the field read "Create a password" under
  * a Romanian label. That is the first thing a visitor sees.
  *
  * Only the keys reachable in this app's flows are filled in: email + password
- * sign-up/sign-in, Google, password reset, and the user button. The rest stay
- * as upstream ships them.
+ * sign-up/sign-in, Google, the bot check that fronts both, password reset, and
+ * the user button. The rest stay as upstream ships them.
  *
  * To find what is still English after a Clerk upgrade:
  *   node -e "const l=require('@clerk/localizations'); …" — diff roRO/ruRU
@@ -30,6 +30,21 @@ import { roRO } from "@clerk/localizations";
  */
 type Localization = typeof roRO;
 
+/** Clerk shows the same bot check ahead of sign-in and ahead of sign-up. */
+const PROTECT_CHECK_RO = {
+  title: "Verificăm cererea",
+  subtitle: "Te rugăm să aștepți cât verificăm cererea.",
+  loading: "Se încarcă…",
+  retryButton: "Încearcă din nou",
+};
+
+const PROTECT_CHECK_RU = {
+  title: "Проверяем ваш запрос",
+  subtitle: "Подождите, пока мы проверяем запрос.",
+  loading: "Загрузка…",
+  retryButton: "Попробовать снова",
+};
+
 export const CLERK_RO_OVERRIDES: Localization = {
   formFieldInputPlaceholder__signUpPassword: "Creează o parolă",
   formFieldInputPlaceholder__username: "Introdu numele de utilizator",
@@ -38,12 +53,19 @@ export const CLERK_RO_OVERRIDES: Localization = {
   signIn: {
     passwordCompromised: { title: "Parolă compromisă" },
     passwordUntrusted: { title: "Parolă nesigură" },
+    protectCheck: PROTECT_CHECK_RO,
+  },
+  signUp: {
+    protectCheck: PROTECT_CHECK_RO,
   },
   userButton: {
     action__openUserMenu: "Deschide meniul contului",
     action__closeUserMenu: "Închide meniul contului",
   },
   unstable__errors: {
+    action_blocked:
+      "Acțiunea nu a putut fi finalizată. Încearcă din nou mai târziu sau contactează suportul dacă problema persistă.",
+    oauth_access_denied: "Nu ai acordat accesul la contul tău.",
     form_new_password_matches_current:
       "Parola nouă nu poate fi aceeași cu cea actuală.",
     form_password_untrusted__sign_in:
@@ -55,11 +77,21 @@ export const CLERK_RU_OVERRIDES: Localization = {
   formFieldInputPlaceholder__signUpPassword: "Придумайте пароль",
   formFieldInput__emailAddress_format: "Формат: имя@пример.com",
   badge__banned: "Заблокирован",
+  // Upstream ruRU says "Продолжить с помощью Google"; the shorter wording is
+  // what the client signed off on.
+  socialButtonsBlockButton: "Продолжить с {{provider|titleize}}",
   signIn: {
     passwordCompromised: { title: "Пароль скомпрометирован" },
     passwordUntrusted: { title: "Ненадёжный пароль" },
+    protectCheck: PROTECT_CHECK_RU,
+  },
+  signUp: {
+    protectCheck: PROTECT_CHECK_RU,
   },
   unstable__errors: {
+    action_blocked:
+      "Действие не удалось выполнить. Повторите попытку позже или обратитесь в поддержку, если это повторится.",
+    oauth_access_denied: "Вы не предоставили доступ к своему аккаунту.",
     form_new_password_matches_current:
       "Новый пароль не может совпадать с текущим.",
     form_password_length_too_short:

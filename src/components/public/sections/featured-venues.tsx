@@ -5,6 +5,7 @@ import { Star, MapPin, Users, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
 import { formatPrice } from "@/lib/format/price";
+import Image from "next/image";
 
 interface VenueRow {
   id: number;
@@ -74,12 +75,12 @@ export function FeaturedVenuesSection({ venues }: Props) {
               <ScrollReveal key={v.id} delay={i * 0.1}>
                 <div className="group flex h-full flex-col overflow-hidden rounded-2xl border border-[#E4DECF] bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)]">
                   <div className="relative aspect-[16/10] overflow-hidden">
-                    { }
-                    <img
+                    <Image
                       src={v.coverImageUrl || `/images/venues/hall-${(v.id % 6) + 1}.jpg`}
                       alt={name}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
+                      fill
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <span className="absolute left-3 top-3 rounded-full bg-gold px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-[#0D0D0D] shadow">
                       {badge}

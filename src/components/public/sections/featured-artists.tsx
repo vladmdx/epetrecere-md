@@ -5,6 +5,7 @@ import { Star, MapPin, Play, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
 import { formatPrice } from "@/lib/format/price";
+import Image from "next/image";
 
 interface ArtistRow {
   id: number;
@@ -108,12 +109,12 @@ export function FeaturedArtistsSection({ artists }: Props) {
               href={`/artisti/${hero.slug}`}
               className="group relative flex h-full min-h-[320px] flex-col justify-end overflow-hidden rounded-2xl"
             >
-              { }
-              <img
+              <Image
                 src={hero.image}
                 alt={hero.name}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                loading="lazy"
+                fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover transition-transform duration-500 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
               {/* Play button */}
@@ -150,12 +151,12 @@ export function FeaturedArtistsSection({ artists }: Props) {
                   className="group flex h-full gap-4 overflow-hidden rounded-2xl border border-gold/15 bg-[#1A1A2E] p-3 transition-all hover:-translate-y-0.5 hover:border-gold/40"
                 >
                   <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl">
-                    { }
-                    <img
+                    <Image
                       src={a.image}
                       alt={a.name}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
+                      fill
+                      sizes="96px"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                   </div>
                   <div className="flex min-w-0 flex-1 flex-col justify-center">

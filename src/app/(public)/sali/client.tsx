@@ -6,6 +6,7 @@ import Link from "@/components/shared/locale-link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
+  CalendarDays,
   MapPin,
   Search,
   SlidersHorizontal,
@@ -25,6 +26,7 @@ import { VenuesMap } from "@/components/public/venues-map";
 import { WishlistButton } from "@/components/public/wishlist-button";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
+import { localizePath } from "@/lib/i18n/routing";
 import { cn } from "@/lib/utils";
 import { CatalogSeoContent } from "@/components/public/catalog-seo-content";
 
@@ -54,6 +56,7 @@ interface Props {
   cities: string[];
   currentCity: string;
   currentCapacityMin: string;
+  currentDate: string;
 }
 
 const sortOptions = [
@@ -84,17 +87,19 @@ export function VenuesListClient({
   cities,
   currentCity,
   currentCapacityMin,
+  currentDate,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useLocale();
   const labels = {
-    ro: { home: "Acasă", venues: "Săli", title: "Săli pentru evenimentul tău", description: "Descoperă restaurante, săli de nuntă și locații premium pentru orice eveniment din Republica Moldova.", allMoldova: "Toată Moldova", anyCapacity: "Orice capacitate", guests: "invitați", search: "Caută", filter: "Filtrează rezultate", reset: "Resetează", locality: "Localitate", allLocations: "Toate localitățile", capacity: "Capacitate", apply: "Aplică filtrele", found: "locații găsite", active: "Filtre active", unsure: "Nu știi ce locație să alegi?", ctaDesc: "Spune-ne numărul de invitați și stilul evenimentului, iar noi îți recomandăm săli potrivite.", recommendations: "Primește recomandări", heroAlt: "Sală elegantă pentru evenimente în Republica Moldova", newLabel: "Nou", upTo: "până la" },
-    ru: { home: "Главная", venues: "Залы", title: "Залы для вашего события", description: "Найдите рестораны, свадебные залы и премиальные площадки по всей Молдове.", allMoldova: "Вся Молдова", anyCapacity: "Любая вместимость", guests: "гостей", search: "Найти", filter: "Фильтры", reset: "Сбросить", locality: "Город", allLocations: "Все города", capacity: "Вместимость", apply: "Применить фильтры", found: "локаций найдено", active: "Фильтры активны", unsure: "Не знаете, какой зал выбрать?", ctaDesc: "Укажите число гостей и стиль события, и мы предложим подходящие залы.", recommendations: "Получить рекомендации", heroAlt: "Элегантный зал для событий в Республике Молдова", newLabel: "Новый", upTo: "до" },
-    en: { home: "Home", venues: "Venues", title: "Venues for your event", description: "Discover restaurants, wedding halls and premium venues across Moldova.", allMoldova: "All Moldova", anyCapacity: "Any capacity", guests: "guests", search: "Search", filter: "Filter results", reset: "Reset", locality: "Location", allLocations: "All locations", capacity: "Capacity", apply: "Apply filters", found: "venues found", active: "Active filters", unsure: "Not sure which venue to choose?", ctaDesc: "Tell us your guest count and event style, and we will suggest suitable venues.", recommendations: "Get recommendations", heroAlt: "Elegant event venue in the Republic of Moldova", newLabel: "New", upTo: "up to" },
+    ro: { home: "Acasă", venues: "Săli", title: "Săli pentru evenimentul tău", description: "Descoperă restaurante, săli de nuntă și locații premium pentru orice eveniment din Republica Moldova.", allMoldova: "Toată Moldova", anyCapacity: "Orice capacitate", eventDate: "Data evenimentului", guests: "invitați", search: "Caută", filter: "Filtrează rezultate", reset: "Resetează", locality: "Localitate", allLocations: "Toate localitățile", capacity: "Capacitate", apply: "Aplică filtrele", found: "locații găsite", active: "Filtre active", unsure: "Nu știi ce locație să alegi?", ctaDesc: "Spune-ne numărul de invitați și stilul evenimentului, iar noi îți recomandăm săli potrivite.", recommendations: "Primește recomandări", heroAlt: "Sală elegantă pentru evenimente în Republica Moldova", newLabel: "Nou", upTo: "până la" },
+    ru: { home: "Главная", venues: "Залы", title: "Залы для вашего события", description: "Найдите рестораны, свадебные залы и премиальные площадки по всей Молдове.", allMoldova: "Вся Молдова", anyCapacity: "Любая вместимость", eventDate: "Дата события", guests: "гостей", search: "Найти", filter: "Фильтры", reset: "Сбросить", locality: "Город", allLocations: "Все города", capacity: "Вместимость", apply: "Применить фильтры", found: "локаций найдено", active: "Фильтры активны", unsure: "Не знаете, какой зал выбрать?", ctaDesc: "Укажите число гостей и стиль события, и мы предложим подходящие залы.", recommendations: "Получить рекомендации", heroAlt: "Элегантный зал для событий в Республике Молдова", newLabel: "Новый", upTo: "до" },
+    en: { home: "Home", venues: "Venues", title: "Venues for your event", description: "Discover restaurants, wedding halls and premium venues across Moldova.", allMoldova: "All Moldova", anyCapacity: "Any capacity", eventDate: "Event date", guests: "guests", search: "Search", filter: "Filter results", reset: "Reset", locality: "Location", allLocations: "All locations", capacity: "Capacity", apply: "Apply filters", found: "venues found", active: "Active filters", unsure: "Not sure which venue to choose?", ctaDesc: "Tell us your guest count and event style, and we will suggest suitable venues.", recommendations: "Get recommendations", heroAlt: "Elegant event venue in the Republic of Moldova", newLabel: "New", upTo: "up to" },
   }[locale];
   const [city, setCity] = useState(currentCity);
   const [capacity, setCapacity] = useState(currentCapacityMin);
+  const [date, setDate] = useState(currentDate);
   const [viewMode, setViewMode] = useViewMode();
   // Map mode is venue-specific, so it's a local toggle rather than a third
   // ViewSwitcher kind — /artisti shares that component and has no map.
@@ -132,8 +137,11 @@ export function VenuesListClient({
     }
     if (!("page" in updates)) params.delete("page");
     const suffix = params.toString();
+    // Locale lives in the path (/ru/sali), so an unprefixed push would drop a
+    // Russian or English visitor onto the Romanian listing mid-filtering.
+    const base = localizePath("/sali", locale);
     startTransition(() => {
-      router.push(suffix ? `/sali?${suffix}` : "/sali");
+      router.push(suffix ? `${base}?${suffix}` : base);
     });
   }
 
@@ -142,10 +150,23 @@ export function VenuesListClient({
     navigate({
       city: city || undefined,
       capacity_min: capacity || undefined,
+      date: date || undefined,
     });
   }
 
-  const hasFilters = Boolean(currentCity || currentCapacityMin);
+  // The bare path drops sort/page from the URL, but the inputs are controlled
+  // and the route does not change, so without clearing state too the next
+  // "Aplică filtrele" would silently re-submit the filters just reset.
+  function resetFilters() {
+    setCity("");
+    setCapacity("");
+    setDate("");
+    startTransition(() => {
+      router.push(localizePath("/sali", locale));
+    });
+  }
+
+  const hasFilters = Boolean(currentCity || currentCapacityMin || currentDate);
 
   return (
     <div className="-mt-16 min-h-screen bg-[#05080d] text-[#f6f0e5]">
@@ -180,7 +201,7 @@ export function VenuesListClient({
 
             <form
               onSubmit={handleSearch}
-              className="mt-6 grid gap-2 rounded-xl border border-white/12 bg-[#090d14]/82 p-3 shadow-[0_20px_50px_rgba(0,0,0,.25)] backdrop-blur-xl sm:grid-cols-2 lg:grid-cols-[1fr_240px_auto]"
+              className="mt-6 grid gap-2 rounded-xl border border-white/12 bg-[#090d14]/82 p-3 shadow-[0_20px_50px_rgba(0,0,0,.25)] backdrop-blur-xl sm:grid-cols-2 lg:grid-cols-[1fr_210px_190px_auto]"
             >
               <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
                 <MapPin className="h-4 w-4 text-[#e6b84d]" />
@@ -209,6 +230,20 @@ export function VenuesListClient({
                   ))}
                 </select>
               </label>
+              {/* Availability is the one filter the cards make a claim about:
+                  only with a date does getVenues drop the venues already
+                  booked, so only then does VenueCard show its badge. */}
+              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
+                <CalendarDays className="h-4 w-4 shrink-0 text-[#e6b84d]" />
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(event) => setDate(event.target.value)}
+                  aria-label={labels.eventDate}
+                  title={labels.eventDate}
+                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none [color-scheme:dark]"
+                />
+              </label>
               <button
                 type="submit"
                 disabled={pending}
@@ -232,7 +267,7 @@ export function VenuesListClient({
                 {labels.filter}
               </h2>
               {hasFilters && (
-                <button onClick={() => router.push("/sali")} className="text-[10px] text-white/45 hover:text-white">
+                <button onClick={resetFilters} className="text-[10px] text-white/45 hover:text-white">
                   {labels.reset}
                 </button>
               )}
@@ -281,7 +316,7 @@ export function VenuesListClient({
             </div>
 
             <button
-              onClick={() => navigate({ city: city || undefined, capacity_min: capacity || undefined })}
+              onClick={() => navigate({ city: city || undefined, capacity_min: capacity || undefined, date: date || undefined })}
               className="h-11 w-full rounded-lg border border-[#e6b84d]/65 bg-[#e6b84d]/8 text-xs font-semibold text-[#edc666] hover:bg-[#e6b84d]/15"
             >
               {labels.apply}
@@ -338,7 +373,9 @@ export function VenuesListClient({
             {venues.length > 0 ? (
               viewMode.kind === "grid" ? (
                 <div className={gridClassName(viewMode.cols)}>
-                  {venues.map((venue, index) => <VenueCard key={venue.id} venue={venue} imageIndex={index} />)}
+                  {venues.map((venue, index) => (
+                    <VenueCard key={venue.id} venue={venue} imageIndex={index} availableOn={currentDate || null} />
+                  ))}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -351,7 +388,7 @@ export function VenuesListClient({
               <div className="rounded-xl border border-white/8 bg-white/[.02] py-24 text-center">
                 <Sparkles className="mx-auto h-9 w-9 text-[#e6b84d]/60" />
                 <p className="mt-4 text-sm text-white/58">{t("common.noResults")}</p>
-                <button onClick={() => router.push("/sali")} className="mt-4 text-xs text-[#e6b84d]">
+                <button onClick={resetFilters} className="mt-4 text-xs text-[#e6b84d]">
                   {labels.reset}
                 </button>
               </div>

@@ -9,10 +9,24 @@ import { WeddingCostCalculatorClient } from "./client";
 // Moldovan traditions (cumătri, nași) that don't apply to corporate/birthday.
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix.
   return metaForPath("/calculatoare/nunta", {
-    title: "Calculator cost nuntă Moldova 2025 — estimează total pe categorii",
-    description:
-      "Cât costă o nuntă în Moldova? Calculator complet: sală, meniu, rochie, foto-video, decor, inele, lună de miere. Estimări pe intervale reale 2025.",
+    ro: {
+      title: "Calculator cost nuntă Moldova 2025 — estimează total pe categorii",
+      description:
+        "Cât costă o nuntă în Moldova? Calculator complet: sală, meniu, rochie, foto-video, decor, inele, lună de miere. Estimări pe intervale reale 2025.",
+    },
+    ru: {
+      title: "Калькулятор стоимости свадьбы в Молдове 2025",
+      description:
+        "Сколько стоит свадьба в Молдове? Полный расчёт: зал, меню, платье, фото и видео, декор, кольца, медовый месяц. Реальные диапазоны цен 2025 года.",
+    },
+    en: {
+      title: "Moldova Wedding Cost Calculator 2025",
+      description:
+        "How much does a wedding in Moldova cost? Full calculator: venue, menu, dress, photo and video, decor, rings, honeymoon. Real 2025 price ranges.",
+    },
   });
 }
 

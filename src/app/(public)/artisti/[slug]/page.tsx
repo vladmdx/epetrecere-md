@@ -12,6 +12,7 @@ import {
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { artistJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized } from "@/i18n";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 import { ArtistDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
 
@@ -45,11 +46,41 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const artist = await getArtistBySlug(slug);
   if (!artist) return {};
 
+  const locale = await getServerLocale();
+  // The artist's name is data — only the words around it are translated.
+  const name = getLocalized(artist, "name", locale);
+
+  // The profile's own description is the better snippet when it exists in
+  // this language; the sentence below is what a profile without one gets,
+  // instead of the Romanian excerpt every locale used to receive. Admin
+  // seo_desc_* still wins — generateMeta applies it for this locale only.
+  const excerpt = {
+    ro: artist.descriptionRo,
+    ru: artist.descriptionRu,
+    en: artist.descriptionEn,
+  }[locale]?.substring(0, 155);
+
+  const fallback = {
+    ro: {
+      title: `${name} — Artist pentru Evenimente`,
+      description: `${name} — profil, prețuri, video și recenzii. Verifică datele libere și rezervă online pe ePetrecere.md.`,
+    },
+    ru: {
+      title: `${name} — артист на праздник`,
+      description: `${name} — анкета, цены, видео и отзывы. Проверьте свободные даты и забронируйте онлайн на ePetrecere.md.`,
+    },
+    en: {
+      title: `${name} — Event Artist`,
+      description: `${name} — profile, prices, videos and reviews. Check available dates and book online on ePetrecere.md.`,
+    },
+  }[locale];
+
   return generateMeta({
-    title: `${artist.nameRo} — Artist pentru Evenimente`,
-    description: artist.seoDescRo || artist.descriptionRo?.substring(0, 155) || "",
+    title: fallback.title,
+    description: excerpt || fallback.description,
     entity: artist,
     path: `/artisti/${slug}`,
+    locale,
   });
 }
 

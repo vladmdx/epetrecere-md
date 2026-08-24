@@ -3,10 +3,24 @@ import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { ContactPageClient } from "./client";
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix.
   return metaForPath("/contact", {
-    title: "Contact",
-    description:
-      "Contactează echipa ePetrecere.md pentru servicii evenimente în Republica Moldova.",
+    ro: {
+      title: "Contact",
+      description:
+        "Contactează echipa ePetrecere.md pentru servicii evenimente în Republica Moldova.",
+    },
+    ru: {
+      title: "Контакты",
+      description:
+        "Свяжитесь с командой ePetrecere.md по вопросам услуг для мероприятий в Республике Молдова.",
+    },
+    en: {
+      title: "Contact",
+      description:
+        "Get in touch with the ePetrecere.md team about event services in the Republic of Moldova.",
+    },
   });
 }
 
@@ -27,13 +41,19 @@ export default function ContactPage() {
               name: "Contact ePetrecere.md",
               url: "https://epetrecere.md/contact",
               mainEntity: {
+                // Registry details for EPETRECERE S.R.L. (IDNO 1026023123354).
+                // No telephone: the number that used to sit here was a
+                // placeholder, and publishing a fake one as structured data is
+                // worse than publishing none.
                 "@type": "Organization",
-                name: "ePetrecere.md",
-                telephone: "+373 60 123 456",
+                name: "EPETRECERE S.R.L.",
+                alternateName: "ePetrecere.md",
                 email: "info@epetrecere.md",
                 address: {
                   "@type": "PostalAddress",
-                  addressLocality: "Chișinău",
+                  streetAddress: "str. Mihai Eminescu 64, of. 6",
+                  addressLocality: "Strășeni",
+                  postalCode: "MD-3701",
                   addressCountry: "MD",
                 },
               },

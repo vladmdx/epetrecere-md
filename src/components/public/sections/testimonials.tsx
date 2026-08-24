@@ -3,7 +3,10 @@
 import { useState, useEffect } from "react";
 import { Star, ChevronLeft, ChevronRight, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useBackgroundVideo } from "@/hooks/use-background-video";
 import { cn } from "@/lib/utils";
+
+const POSTER = "/images/backgrounds/club-blue.jpg";
 
 interface Testimonial {
   id: number;
@@ -17,6 +20,7 @@ export function TestimonialsSection() {
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [current, setCurrent] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const { ref: bgRef, showVideo } = useBackgroundVideo();
 
   // Fetch real approved reviews (high-rated)
   useEffect(() => {
@@ -52,11 +56,16 @@ export function TestimonialsSection() {
 
   return (
     <section className="py-20 relative">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <video autoPlay muted loop playsInline className="w-full h-full object-cover opacity-[0.12] blur-[2px] hidden md:block parallax-bg">
-          <source src="/videos/testimonials-bg.mp4" type="video/mp4" />
-        </video>
-        <img src="/images/backgrounds/club-blue.jpg" alt="" className="w-full h-full object-cover opacity-[0.10] blur-[2px] md:hidden" loading="lazy" />
+      <div ref={bgRef} className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Swapped rather than layered: both are near-transparent, so stacking
+            them would add up to a brighter wash than the design calls for. */}
+        {showVideo ? (
+          <video autoPlay muted loop playsInline preload="none" poster={POSTER} className="w-full h-full object-cover opacity-[0.12] blur-[2px] parallax-bg">
+            <source src="/videos/testimonials-bg.mp4" type="video/mp4" />
+          </video>
+        ) : (
+          <img src={POSTER} alt="" className="w-full h-full object-cover opacity-[0.10] blur-[2px]" loading="lazy" />
+        )}
       </div>
       <div className="relative z-10 mx-auto max-w-4xl px-4 lg:px-8">
         <div className="mb-12 text-center">

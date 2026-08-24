@@ -7,6 +7,10 @@ import { getCategoryBySlug, getAllCategories } from "@/lib/db/queries/categories
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getCityBySlug, CITIES } from "@/lib/seo/cities";
+import { cityNameAfterIn } from "@/lib/seo/city-grammar";
+import { getServerLocale } from "@/lib/i18n/server-locale";
+import { plural } from "@/lib/i18n/plural";
+import { getLocalized } from "@/i18n";
 import { ArtistCard } from "@/components/public/artist-card";
 
 // M2 — City × Category SEO landing page.
@@ -14,6 +18,13 @@ import { ArtistCard } from "@/components/public/artist-card";
 //   e.g. /artisti/in/chisinau/fotografi
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
+
+/** The count in the title has to agree with its noun in each language. */
+const PROFESSIONALS = {
+  ro: { one: "profesionist", few: "profesioniști", many: "profesioniști" },
+  ru: { one: "специалист", few: "специалиста", many: "специалистов" },
+  en: { one: "professional", other: "professionals" },
+};
 
 interface Props {
   params: Promise<{ city: string; category: string }>;
@@ -32,11 +43,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     limit: 1,
   });
 
-  const catName = category.nameRo;
+  // Category and city are data (both carry ru/en columns); the sentence that
+  // frames them is what gets translated.
+  const locale = await getServerLocale();
+  const catName = getLocalized(category, "name", locale);
+  const cityName = cityNameAfterIn(city, locale);
+  const pros = plural(total, locale, PROFESSIONALS);
+  const copy = {
+    ro: {
+      title: `${catName} în ${cityName} — ${pros}`,
+      description: `Top ${catName.toLowerCase()} în ${cityName} pentru nuntă, botez și evenimente corporate. Compară prețuri și recenzii, apoi rezervă online.`,
+    },
+    ru: {
+      title: `${catName} в ${cityName} — ${pros}`,
+      description: `${catName} в ${cityName} для свадьбы, крестин и корпоратива. Сравните цены и отзывы, забронируйте онлайн на ePetrecere.md.`,
+    },
+    en: {
+      title: `${catName} in ${cityName} — ${pros}`,
+      description: `${catName} in ${cityName} for weddings, christenings and corporate events. Compare prices and reviews, then book online.`,
+    },
+  }[locale];
+
   return generateMeta({
-    title: `${catName} în ${city.nameRo} — ${total} disponibili`,
-    description: `Top ${catName.toLowerCase()} în ${city.nameRo} pentru nuntă, botez și evenimente. Compară prețuri, recenzii și rezervă online. ${total} profesioniști disponibili acum.`,
+    title: copy.title,
+    description: copy.description,
     path: `/artisti/in/${citySlug}/${categorySlug}`,
+    locale,
   });
 }
 

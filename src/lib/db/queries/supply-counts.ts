@@ -15,6 +15,10 @@ import { artists, venues, categories, bookingRequests, users } from "@/lib/db/sc
 export interface SupplyCounts {
   /** Per homepage tile key. */
   categories: Record<string, number>;
+  /** Active artists per category slug — the grouped query already produces
+   *  the whole map, so any page that lists categories can show a real
+   *  number instead of a hardcoded one. */
+  bySlug: Record<string, number>;
   activeArtists: number;
   activeVenues: number;
   serviceCategories: number;
@@ -34,6 +38,7 @@ const TILE_CATEGORY_SLUG: Record<string, string | null> = {
 export async function getSupplyCounts(): Promise<SupplyCounts> {
   const empty: SupplyCounts = {
     categories: {},
+    bySlug: {},
     activeArtists: 0,
     activeVenues: 0,
     serviceCategories: 0,
@@ -41,8 +46,7 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
   };
 
   try {
-    const [cats, [artistRow], [venueRow], [catRow], [reqRow]] = await Promise.all([
-      db.select({ id: categories.id, slug: categories.slug }).from(categories),
+    const [[artistRow], [venueRow], [catRow], [reqRow]] = await Promise.all([
       db
         .select({ n: sql<number>`count(*)::int` })
         .from(artists)
@@ -65,33 +69,36 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
         ),
     ]);
 
-    const bySlug = new Map(cats.map((c) => [c.slug, c.id]));
+    // One grouped statement for every tile. This used to be a loop that
+    // awaited a separate count per tile — five more strictly serial
+    // round-trips to Frankfurt on every homepage render, which was the
+    // single longest stretch of the critical path.
+    const perCategory = await db
+      .select({
+        slug: categories.slug,
+        n: sql<number>`count(${artists.id})::int`,
+      })
+      .from(categories)
+      .leftJoin(
+        artists,
+        and(
+          eq(artists.isActive, true),
+          sql`${categories.id} = ANY(${artists.categoryIds})`,
+        ),
+      )
+      .groupBy(categories.slug);
+
+    const countBySlug = new Map(perCategory.map((r) => [r.slug, r.n]));
     const result: Record<string, number> = {};
 
     for (const [tile, slug] of Object.entries(TILE_CATEGORY_SLUG)) {
-      if (slug === null) {
-        result[tile] = venueRow?.n ?? 0;
-        continue;
-      }
-      const catId = bySlug.get(slug);
-      if (!catId) {
-        result[tile] = 0;
-        continue;
-      }
-      const [row] = await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(artists)
-        .where(
-          and(
-            eq(artists.isActive, true),
-            sql`${catId} = ANY(${artists.categoryIds})`,
-          ),
-        );
-      result[tile] = row?.n ?? 0;
+      // A null slug means the tile counts venues, not artists.
+      result[tile] = slug === null ? (venueRow?.n ?? 0) : (countBySlug.get(slug) ?? 0);
     }
 
     return {
       categories: result,
+      bySlug: Object.fromEntries(countBySlug),
       activeArtists: artistRow?.n ?? 0,
       activeVenues: venueRow?.n ?? 0,
       serviceCategories: catRow?.n ?? 0,

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Search, MapPin, Users } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 import { CustomCalendar } from "@/components/public/custom-calendar";
+import { localizePath } from "@/lib/i18n/routing";
 import { cn } from "@/lib/utils";
 
 type Tab = "venues" | "artists" | "services";
@@ -35,7 +36,7 @@ const TAB_ROUTES: Record<Tab, string> = {
  * bottom of the hero, overlapping the video background.
  */
 export function HeroSearch() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const router = useRouter();
   const [tab, setTab] = useState<Tab>("venues");
   const [q, setQ] = useState("");
@@ -49,15 +50,43 @@ export function HeroSearch() {
     { key: "services", label: t("search.tab_services") ?? "Servicii" },
   ];
 
+  /**
+   * Each tab lands on a different page, and those pages read different query
+   * params — a name the destination never looks at drops what the visitor
+   * typed without a trace. That is how `?guests=` was lost: /sali filters on
+   * `capacity_min` and has never read `guests`. So spell the params out per
+   * destination instead of sending one set to all three.
+   */
+  function buildParams() {
+    const params = new URLSearchParams();
+    const cityValue = city.trim();
+    const dateValue = date ? toYMD(date) : "";
+
+    if (tab === "venues") {
+      if (cityValue) params.set("city", cityValue);
+      if (dateValue) params.set("date", dateValue);
+      // Guest count is the venue capacity filter. /sali has no free-text
+      // search (getVenues takes no `search`), so `q` is deliberately dropped.
+      if (guests.trim()) params.set("capacity_min", guests.trim());
+    } else if (tab === "artists") {
+      if (q.trim()) params.set("q", q.trim());
+      if (cityValue) params.set("city", cityValue);
+      if (dateValue) params.set("date", dateValue);
+      // No guest-count filter exists for artists.
+    }
+    // The services tab lands on the static /servicii landing, which reads no
+    // search params at all — anything appended there is pure decoration.
+
+    return params;
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const params = new URLSearchParams();
-    if (q.trim()) params.set("q", q.trim());
-    if (city.trim()) params.set("city", city.trim());
-    if (date) params.set("date", toYMD(date));
-    if (guests.trim()) params.set("guests", guests.trim());
-    const qs = params.toString();
-    router.push(`${TAB_ROUTES[tab]}${qs ? `?${qs}` : ""}`);
+    const qs = buildParams().toString();
+    // Locale lives in the path (/ru/sali), so an unprefixed push would flip a
+    // Russian or English visitor to the Romanian listing.
+    const base = localizePath(TAB_ROUTES[tab], locale);
+    router.push(`${base}${qs ? `?${qs}` : ""}`);
   }
 
   return (

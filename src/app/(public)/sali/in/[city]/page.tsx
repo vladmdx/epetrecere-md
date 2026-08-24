@@ -6,12 +6,22 @@ import { getVenues } from "@/lib/db/queries/venues";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getCityBySlug, CITIES } from "@/lib/seo/cities";
+import { cityNameAfterIn } from "@/lib/seo/city-grammar";
+import { getServerLocale } from "@/lib/i18n/server-locale";
+import { plural } from "@/lib/i18n/plural";
 import { VenueCard } from "@/components/public/venue-card";
 
 // M2 — SEO landing page for venues in a specific Moldovan city.
 // URL: /sali/in/[city]   e.g. /sali/in/chisinau
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
+
+/** The count in the title has to agree with its noun in each language. */
+const LOCATIONS = {
+  ro: { one: "locație", few: "locații", many: "locații" },
+  ru: { one: "площадка", few: "площадки", many: "площадок" },
+  en: { one: "location", other: "locations" },
+};
 
 interface Props {
   params: Promise<{ city: string }>;
@@ -25,10 +35,31 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const { total } = await getVenues({ cityKeywords: city.keywords, limit: 1 });
 
+  // The city comes from the whitelist in the visitor's language (Russian
+  // declines it after "в"); everything around it is translated copy.
+  const locale = await getServerLocale();
+  const cityName = cityNameAfterIn(city, locale);
+  const count = plural(total, locale, LOCATIONS);
+  const copy = {
+    ro: {
+      title: `Săli și restaurante pentru nuntă în ${cityName} — ${count}`,
+      description: `Săli și restaurante pentru nuntă, cumătrie și evenimente corporate în ${cityName}. Capacitate, preț pe persoană, galerie foto și rezervare online.`,
+    },
+    ru: {
+      title: `Залы и рестораны для свадьбы в ${cityName} — ${count}`,
+      description: `Залы и рестораны для свадьбы, крестин и корпоратива в ${cityName}. Вместимость, цена на человека, фотогалерея и бронирование онлайн.`,
+    },
+    en: {
+      title: `Wedding Venues and Restaurants in ${cityName} — ${count}`,
+      description: `Wedding venues, restaurants and event halls in ${cityName}. Capacity, price per guest, photo galleries and online booking.`,
+    },
+  }[locale];
+
   return generateMeta({
-    title: `Săli și restaurante pentru nuntă în ${city.nameRo} — ${total} locații`,
-    description: `Descoperă ${total} săli și restaurante pentru nuntă, botez, cumătrie și evenimente corporate în ${city.nameRo}. Capacitate, preț pe persoană, galerie foto, rezervare online.`,
+    title: copy.title,
+    description: copy.description,
     path: `/sali/in/${citySlug}`,
+    locale,
   });
 }
 

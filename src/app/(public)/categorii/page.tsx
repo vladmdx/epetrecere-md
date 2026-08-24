@@ -9,10 +9,25 @@ import { CategoryCard } from "./category-card";
 export const revalidate = 3600;
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix. The RO title no longer spells
+  // out the brand, which the root layout template appended a second time.
   return metaForPath("/categorii", {
-    title: "Toate Categoriile — ePetrecere.md",
-    description:
-      "Descoperă toate categoriile de artiști și servicii pentru evenimente în Moldova: DJ, cântăreți, formații, fotografi, decor, animatori și multe altele.",
+    ro: {
+      title: "Toate categoriile de artiști și servicii",
+      description:
+        "Descoperă toate categoriile de artiști și servicii pentru evenimente în Moldova: DJ, cântăreți, formații, fotografi, decor, animatori și multe altele.",
+    },
+    ru: {
+      title: "Все категории артистов и услуг",
+      description:
+        "Все категории артистов и услуг для мероприятий в Молдове: диджеи, певцы, группы, фотографы, декор, аниматоры и многое другое.",
+    },
+    en: {
+      title: "All Artist and Service Categories",
+      description:
+        "Every category of artists and event services in Moldova: DJs, singers, bands, photographers, decor, entertainers and much more.",
+    },
   });
 }
 

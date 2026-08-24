@@ -116,7 +116,7 @@ export default function SettingsPage() {
             <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
-                <div><Label>Telefon</Label><Input value={get("contact_phone", "+373 60 123 456")} onChange={(e) => set("contact_phone", e.target.value)} /></div>
+                <div><Label>Telefon</Label><Input value={get("contact_phone", "")} onChange={(e) => set("contact_phone", e.target.value)} /></div>
                 <div><Label>Email</Label><Input value={get("contact_email", "info@epetrecere.md")} onChange={(e) => set("contact_email", e.target.value)} /></div>
                 <div><Label>Adresă</Label><Input value={get("contact_address", "Chișinău, Moldova")} onChange={(e) => set("contact_address", e.target.value)} /></div>
               </div>

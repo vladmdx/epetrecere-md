@@ -26,9 +26,18 @@ export default async function VenuesPage({ searchParams }: Props) {
   const locale = await getServerLocale();
   const sp = await searchParams;
 
+  // The homepage hero search already sends `?date=` here (hero-search.tsx),
+  // and getVenues excludes venues booked or blocked that day — the page just
+  // never read it, so the filter silently did nothing and the cards claimed
+  // availability nobody had checked. Anything that is not a calendar date is
+  // dropped rather than handed to the calendar_events subquery.
+  const rawDate = typeof sp.date === "string" ? sp.date : "";
+  const availableDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : undefined;
+
   const filters = {
     city: (sp.city as string) || undefined,
     capacityMin: sp.capacity_min ? Number(sp.capacity_min) : undefined,
+    availableDate,
     sort: (sp.sort as "popular" | "price_asc" | "price_desc" | "rating" | "capacity") || "popular",
     page: sp.page ? Number(sp.page) : 1,
   };
@@ -75,6 +84,7 @@ export default async function VenuesPage({ searchParams }: Props) {
         cities={allCities}
         currentCity={(sp.city as string) || ""}
         currentCapacityMin={(sp.capacity_min as string) || ""}
+        currentDate={availableDate ?? ""}
       />
     </>
   );

@@ -4,6 +4,7 @@ import Link from "@/components/shared/locale-link";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
 import { plural, NOUNS } from "@/lib/i18n/plural";
+import Image from "next/image";
 
 // "Explorează cele mai căutate servicii" — a curated bento of the top service
 // groups with marketing supply counts. Static by design (fixed groupings for
@@ -86,12 +87,12 @@ export function CategoriesSection({
                   href={tile.href}
                   className="group relative flex h-full w-full items-end overflow-hidden rounded-2xl"
                 >
-                  { }
-                  <img
+                  <Image
                     src={tile.image}
                     alt={name}
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    loading="lazy"
+                    fill
+                    sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent transition-opacity group-hover:from-black/90" />
                   <div className="relative z-10 p-5">

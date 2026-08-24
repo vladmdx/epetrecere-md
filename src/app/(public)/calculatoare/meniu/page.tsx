@@ -7,10 +7,24 @@ import { MenuCalculatorClient } from "./client";
 // URL: /calculatoare/meniu
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix.
   return metaForPath("/calculatoare/meniu", {
-    title: "Calculator meniu & mâncare nuntă, botez, cumătrie",
-    description:
-      "Calculează cantitățile de aperitive, fel principal, zeamă, fructe și tort pentru evenimentul tău. Norme pe porții, prețuri bulk Moldova 2026.",
+    ro: {
+      title: "Calculator meniu & mâncare nuntă, botez, cumătrie",
+      description:
+        "Calculează cantitățile de aperitive, fel principal, zeamă, fructe și tort pentru evenimentul tău. Norme pe porții, prețuri bulk Moldova 2026.",
+    },
+    ru: {
+      title: "Калькулятор меню и еды на свадьбу и крестины",
+      description:
+        "Рассчитайте количество закусок, горячего, супа, фруктов и торта для вашего события. Нормы на порцию и оптовые цены по Молдове, 2026.",
+    },
+    en: {
+      title: "Wedding Menu and Food Calculator",
+      description:
+        "Calculate how much you need of starters, main course, soup, fruit and cake for your event. Per-portion norms and bulk Moldova prices, 2026.",
+    },
   });
 }
 

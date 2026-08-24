@@ -4,7 +4,14 @@ import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
 import { LocaleProvider } from "@/hooks/use-locale";
 import { headers } from "next/headers";
-import { DEFAULT_LOCALE, LOCALE_HEADER, isLocale } from "@/lib/i18n/routing";
+import {
+  DEFAULT_LOCALE,
+  LOCALE_HEADER,
+  isLocale,
+  ogLocaleFor,
+  type AppLocale,
+} from "@/lib/i18n/routing";
+import { SITE_URL } from "@/lib/seo/generate-meta";
 import { PreferencesProvider } from "@/hooks/use-preferences";
 import { LocalizedClerkProvider } from "@/components/shared/localized-clerk-provider";
 import { CookieConsent } from "@/components/shared/cookie-consent";
@@ -27,20 +34,59 @@ const cormorant = Cormorant_Garamond({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: {
-    default: "ePetrecere.md — Marketplace pentru Evenimente",
-    template: "%s | ePetrecere.md",
+/** Site-wide title and description, one entry per language. */
+const SITE_COPY: Record<AppLocale, { title: string; description: string }> = {
+  ro: {
+    title: "ePetrecere.md — Marketplace pentru Evenimente",
+    description:
+      "Platformă de servicii pentru evenimente din Republica Moldova. Artiști, săli, fotografi, DJ și multe altele pentru nunta, botezul sau evenimentul tău.",
   },
-  description:
-    "Platformă de servicii pentru evenimente din Republica Moldova. Artiști, săli, fotografi, DJ și multe altele pentru nunta, botezul sau evenimentul tău.",
-  metadataBase: new URL("https://epetrecere.md"),
-  openGraph: {
-    type: "website",
-    locale: "ro_MD",
-    siteName: "ePetrecere.md",
+  ru: {
+    title: "ePetrecere.md — маркетплейс для мероприятий",
+    description:
+      "Платформа услуг для мероприятий в Республике Молдова. Артисты, залы, фотографы, диджеи и многое другое для вашей свадьбы, крестин или праздника.",
+  },
+  en: {
+    title: "ePetrecere.md — Event Services Marketplace",
+    description:
+      "Event services platform for the Republic of Moldova. Artists, venues, photographers, DJs and more for your wedding, christening or celebration.",
   },
 };
+
+/**
+ * Site-wide defaults, in the language of the current request.
+ *
+ * This used to be a static `export const metadata`, and a static export cannot
+ * read headers — so every route that did not set its own title/description
+ * inherited the Romanian ones, including the /ru and /en renders. It is now a
+ * `generateMetadata`, which costs nothing extra: the layout below already
+ * awaits `headers()`, so this tree was never statically rendered anyway.
+ *
+ * Deliberately no `alternates` here. Metadata is merged per segment, so a
+ * canonical or hreflang set defined at the root would be inherited verbatim by
+ * every page that does not define its own — declaring each of them a duplicate
+ * of the homepage. Canonicals belong to the page, via generateMeta().
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  const h = await headers();
+  const headerLocale = h.get(LOCALE_HEADER);
+  const locale = isLocale(headerLocale) ? headerLocale : DEFAULT_LOCALE;
+  const copy = SITE_COPY[locale];
+
+  return {
+    title: {
+      default: copy.title,
+      template: "%s | ePetrecere.md",
+    },
+    description: copy.description,
+    metadataBase: new URL(SITE_URL),
+    openGraph: {
+      type: "website",
+      locale: ogLocaleFor(locale),
+      siteName: "ePetrecere.md",
+    },
+  };
+}
 
 export default async function RootLayout({
   children,

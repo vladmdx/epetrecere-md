@@ -3,19 +3,27 @@
 import Link from "@/components/shared/locale-link";
 import { Button } from "@/components/ui/button";
 import { ArrowRight } from "lucide-react";
+import { useBackgroundVideo } from "@/hooks/use-background-video";
 import { useLocale } from "@/hooks/use-locale";
+
+const POSTER = "/images/backgrounds/birthday-party.jpg";
 
 export function CTASection() {
   const { t } = useLocale();
+  // Far below the fold: the video must not compete with the hero for bandwidth,
+  // so it is only mounted once this section approaches the viewport.
+  const { ref: bgRef, showVideo } = useBackgroundVideo();
 
   return (
     <section className="relative overflow-hidden py-32 md:py-40">
       {/* Video background */}
-      <div className="absolute inset-0">
-        <video autoPlay muted loop playsInline className="w-full h-full object-cover hidden md:block">
-          <source src="/videos/cta-bg.mp4" type="video/mp4" />
-        </video>
-        <img src="/images/backgrounds/birthday-party.jpg" alt="" className="w-full h-full object-cover md:hidden" loading="lazy" />
+      <div ref={bgRef} className="absolute inset-0">
+        <img src={POSTER} alt="" className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+        {showVideo && (
+          <video autoPlay muted loop playsInline preload="none" poster={POSTER} className="absolute inset-0 w-full h-full object-cover">
+            <source src="/videos/cta-bg.mp4" type="video/mp4" />
+          </video>
+        )}
         <div className="absolute inset-0 bg-black/60 md:bg-black/55" />
         <div className="absolute inset-0 bg-gradient-to-r from-gold/5 via-gold/10 to-gold/5" />
       </div>

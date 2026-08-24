@@ -73,8 +73,9 @@ export const env = {
   /** Analytics salt for hashing */
   ANALYTICS_SALT: optional("ANALYTICS_SALT"),
 
-  /** Contact phone shown on site */
-  NEXT_PUBLIC_CONTACT_PHONE: optional("NEXT_PUBLIC_CONTACT_PHONE", "+373 60 123 456"),
+  /** Contact phone shown on site. No default: an unset value hides the
+   *  phone block rather than printing a number nobody answers. */
+  NEXT_PUBLIC_CONTACT_PHONE: optional("NEXT_PUBLIC_CONTACT_PHONE"),
 
   /** Enable test login page (development only) */
   ENABLE_TEST_LOGIN: optional("ENABLE_TEST_LOGIN"),

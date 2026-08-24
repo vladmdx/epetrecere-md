@@ -83,7 +83,7 @@ export default async function ArtistsPage({ searchParams }: Props) {
       totalPages={result.totalPages}
       currentSort={filters.sort}
       searchQuery={(sp.q as string) || ""}
-      categories={cats.map((c) => ({ id: c.id, nameRo: c.nameRo, nameRu: c.nameRu, nameEn: c.nameEn }))}
+      categories={cats.map((c) => ({ id: c.id, slug: c.slug, nameRo: c.nameRo, nameRu: c.nameRu, nameEn: c.nameEn }))}
       currentCategory={(sp.category as string) || ""}
       currentPriceMin={(sp.price_min as string) || ""}
       currentPriceMax={(sp.price_max as string) || ""}

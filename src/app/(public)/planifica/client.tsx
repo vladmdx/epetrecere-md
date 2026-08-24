@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import {
-  ArrowLeft, ArrowRight, Loader2, Send, Sparkles,
-  PartyPopper, Calendar, Users, Wrench, Building2, ClipboardCheck,
-  ClipboardList, UtensilsCrossed, Check, LogIn, Camera,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, ArrowRight, Building2, Calendar, Camera, Check, ClipboardCheck, ClipboardList, Loader2, LogIn, PartyPopper, Send, Sparkles, Users, UtensilsCrossed, Wrench } from "lucide-react";
 import { isCategoryAllowedForEvent } from "@/lib/wizard/categories-meta";
 import { localizeMoldovaCity, MOLDOVA_CITIES } from "@/lib/moldova-cities";
 
@@ -41,8 +37,10 @@ interface WizardData {
   venueNeeded: "" | "yes" | "no"; // do they need a venue
   /** When venueNeeded === "yes", the maximum radius (km) from the
    *  event city the user is willing to travel for the venue. 0 = only
-   *  the selected city, 999 = no limit. */
-  venueRadiusKm: number;
+   *  the selected city, 999 = no limit. `null` means the user has not
+   *  chosen yet — it cannot be 0, because 0 is a legitimate answer
+   *  ("Doar în oraș") and would make an unanswered step look answered. */
+  venueRadiusKm: number | null;
   services: string[]; // selected category ids
   /** Free-text venue name/address the client typed when they answered
    *  "Nu, am deja locație" on the venue step. Optional — empty string
@@ -134,7 +132,7 @@ const initialData: WizardData = {
   timeSlot: "",
   guestCount: 100,
   venueNeeded: "",
-  venueRadiusKm: 25,
+  venueRadiusKm: null,
   services: [],
   existingVenue: "",
   name: "",
@@ -169,13 +167,28 @@ const SUMMARY_INDEX = TOTAL_STEPS - 1; // 6
 // WIZARD COMPONENT
 // ═══════════════════════════════════════════════
 
+export type CategoryRow = {
+  id: number;
+  slug: string;
+  nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
+  type: "artist" | "service" | "venue";
+  sortOrder?: number | null;
+};
+
 interface WizardClientProps {
   /** When true, this is the admin-side wizard: skips auth gate and
    *  redirects to /admin/eveniment-nou/rezultate on completion. */
   adminMode?: boolean;
+  /** Categories rendered by the services step and named in the summary.
+   *  Supplied by the server component so the step is instant — it used to
+   *  fetch /api/categories only once the user had already arrived on it,
+   *  which is why the list took seconds to appear. */
+  categories?: CategoryRow[];
 }
 
-export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
+export function WizardClient({ adminMode = false, categories: initialCategories = [] }: WizardClientProps = {}) {
   const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -183,6 +196,9 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
   const [step, setStep] = useState(0);
   const [data, setData] = useState<WizardData>(initialData);
   const [submitting, setSubmitting] = useState(false);
+  /** Why "Continuă" refused, shown next to the button. */
+  const [stepError, setStepError] = useState<string | null>(null);
+  const stepErrorRef = useRef<HTMLDivElement | null>(null);
 
   // Use a separate storage key for admin so both wizards can coexist
   const storageKey = adminMode ? "admin-wizard-data" : "wizard-data";
@@ -283,29 +299,63 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
     });
   }
 
-  // All fields mandatory per M0a #4
-  function canAdvance(): boolean {
+  // All fields mandatory per M0a #4.
+  //
+  // This returns the REASON the step is incomplete rather than a bare
+  // boolean, because a disabled "Continuă" with no explanation is how the
+  // radius step came to look optional: users answered "Da, am nevoie de
+  // sală", never scrolled to the radius picker below the fold, and were
+  // left staring at a dead button. Every step now says what is missing.
+  function blockReason(): string | null {
     switch (step) {
-      case 0: return !!data.eventType;
+      case 0:
+        return data.eventType ? null : t("wizard.required_event_type");
       case 1:
-        return (
-          !!data.eventDate &&
-          !!data.location &&
-          !!data.startTime &&
-          data.durationHours > 0
-        );
-      case 2: return data.guestCount > 0;
-      case 3: return data.venueNeeded === "yes" || data.venueNeeded === "no";
-      case 4: return data.services.length > 0;
-      case 5: return true; // extras step — every choice is valid (including all "no")
+        if (!data.eventDate) return t("wizard.required_date");
+        if (!data.location) return t("wizard.required_city");
+        if (!data.startTime) return t("wizard.required_start_time");
+        if (!(data.durationHours > 0)) return t("wizard.required_duration");
+        return null;
+      case 2:
+        return data.guestCount > 0 ? null : t("wizard.required_guests");
+      case 3:
+        if (data.venueNeeded !== "yes" && data.venueNeeded !== "no") {
+          return t("wizard.required_venue");
+        }
+        // The radius only exists once they said they need a venue.
+        if (data.venueNeeded === "yes" && data.venueRadiusKm == null) {
+          return t("wizard.required_radius");
+        }
+        return null;
+      case 4:
+        return data.services.length > 0 ? null : t("wizard.required_services");
+      case 5:
+        return null; // extras step — every choice is valid (including all "no")
       case 6:
         // The summary step now only asks for the event title — phone /
         // email / GDPR were collected at sign-up. Unauthenticated users
         // get bounced through the sign-in gate inside handleSubmit.
-        return !!data.name.trim();
-      default: return false;
+        return data.name.trim() ? null : t("wizard.required_name");
+      default:
+        return t("wizard.required_generic");
     }
   }
+
+  function canAdvance(): boolean {
+    return blockReason() === null;
+  }
+
+  // Clear the "you must pick X" message as soon as the user changes
+  // anything or moves step — a stale error is worse than none.
+  useEffect(() => {
+    setStepError(null);
+  }, [step, data]);
+
+  useEffect(() => {
+    if (stepError) {
+      stepErrorRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }
+  }, [stepError]);
 
   // Reset scroll on step change so the user always sees the wizard header,
   // not whichever halfway-down position the previous step left them at —
@@ -387,6 +437,12 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
           wizardData: {
             services: data.services,
             venueNeeded: data.venueNeeded,
+            // The exact interval, not just the coarse bucket. venueRadiusKm
+            // was collected on step 3 and previously discarded here.
+            startTime: data.startTime,
+            durationHours: data.durationHours,
+            endTime: computeEndTime(data.startTime, data.durationHours),
+            venueRadiusKm: data.venueRadiusKm,
             timeSlot: data.timeSlot,
           },
         }),
@@ -467,9 +523,24 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
         {step === 1 && <StepDate data={data} update={update} autoNext={autoNext} />}
         {step === 2 && <StepGuests data={data} update={update} autoNext={autoNext} />}
         {step === 3 && <StepVenue data={data} update={update} autoNext={autoNext} />}
-        {step === 4 && <StepServices data={data} update={update} />}
+        {step === 4 && <StepServices data={data} update={update} allCategories={initialCategories} />}
         {step === 5 && <StepExtras data={data} update={update} />}
-        {step === 6 && <StepSummary data={data} update={update} isSignedIn={!!isSignedIn} />}
+        {step === 6 && <StepSummary data={data} update={update} isSignedIn={!!isSignedIn} allCategories={initialCategories} />}
+
+        {/* Why the step will not advance. Rendered above the buttons and
+            scrolled into view, so the answer is next to the control the
+            user just pressed rather than somewhere off-screen. */}
+        {stepError ? (
+          <div
+            ref={stepErrorRef}
+            role="alert"
+            aria-live="polite"
+            className="mt-6 flex items-start gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+          >
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{stepError}</span>
+          </div>
+        ) : null}
 
         {/* Navigation. On mobile the page used to end flush with the
             viewport bottom — Safari/Chrome's UI bar covered the
@@ -490,8 +561,15 @@ export function WizardClient({ adminMode = false }: WizardClientProps = {}) {
 
           {step < SUMMARY_INDEX ? (
             <Button
-              onClick={nextStep}
-              disabled={!canAdvance()}
+              onClick={() => {
+                const reason = blockReason();
+                if (reason) {
+                  setStepError(reason);
+                  return;
+                }
+                setStepError(null);
+                nextStep();
+              }}
               className="min-w-36 gap-2 bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] text-[#07101d] hover:brightness-105"
             >
               {t("common.next")} <ArrowRight className="h-4 w-4" />
@@ -970,22 +1048,17 @@ function StepVenue({ data, update }: StepProps) {
 //   1. Fetch all live categories from /api/categories (= what artist.md has)
 //   2. Use the slug as the wizard service id (no aliasing layer needed)
 //   3. Filter by event type via CATEGORY_META.allowedEventTypes
-type CategoryRow = {
-  id: number;
-  slug: string;
-  nameRo: string;
-  nameRu: string | null;
-  nameEn: string | null;
-  type: "artist" | "service" | "venue";
-  sortOrder?: number | null;
-};
-
-function StepServices({ data, update }: StepProps) {
+function StepServices({ data, update, allCategories }: StepProps & { allCategories: CategoryRow[] }) {
   const { locale } = useLocale();
-  const [categories, setCategories] = useState<CategoryRow[]>([]);
-  const [loadingCats, setLoadingCats] = useState(true);
+  const [categories, setCategories] = useState<CategoryRow[]>(() =>
+    allCategories.filter((c) => c.type === "artist" || c.type === "service"),
+  );
+  const [loadingCats, setLoadingCats] = useState(allCategories.length === 0);
 
   useEffect(() => {
+    // Server-rendered list already covers the normal path; this only runs
+    // for the admin wizard, which mounts without one.
+    if (allCategories.length > 0) return;
     let alive = true;
     fetch("/api/categories")
       .then((r) => (r.ok ? r.json() : []))
@@ -1009,7 +1082,7 @@ function StepServices({ data, update }: StepProps) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [allCategories.length]);
 
   // Filter categories by the picked event type so e.g. Stand Up doesn't show
   // for Cumătrie/Botez (audience: family with kids).
@@ -1047,8 +1120,15 @@ function StepServices({ data, update }: StepProps) {
       </div>
 
       {loadingCats ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-gold" />
+        // Skeleton tiles in the real grid shape, so the step does not jump
+        // when the list arrives.
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-24 animate-pulse rounded-xl border border-border/40 bg-muted/40"
+            />
+          ))}
         </div>
       ) : visible.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
@@ -1252,27 +1332,16 @@ interface SummaryProps extends StepProps {
   isSignedIn: boolean;
 }
 
-function StepSummary({ data, update, isSignedIn }: SummaryProps) {
+function StepSummary({ data, update, isSignedIn, allCategories }: SummaryProps & { allCategories: CategoryRow[] }) {
   const { locale, t } = useLocale();
-  // Pull category names so the summary shows real labels (e.g. "Iluzioniști /
-  // Magicieni") instead of raw slugs.
-  const [categoryNames, setCategoryNames] = useState<Record<string, string>>({});
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/categories")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((rows: unknown) => {
-        if (!alive) return;
-        const list: CategoryRow[] = Array.isArray(rows)
-          ? (rows as CategoryRow[])
-          : [];
-        const map: Record<string, string> = {};
-        for (const c of list) map[c.slug] = getLocalized(c, "name", locale);
-        setCategoryNames(map);
-      })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, [locale]);
+  // Real labels ("Iluzioniști / Magicieni") rather than raw slugs. This was a
+  // second copy of the same /api/categories request the services step had
+  // already made.
+  const categoryNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const c of allCategories) map[c.slug] = getLocalized(c, "name", locale);
+    return map;
+  }, [allCategories, locale]);
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_summary")}</h2>
@@ -1285,9 +1354,39 @@ function StepSummary({ data, update, isSignedIn }: SummaryProps) {
         <SummaryRow label="Tip eveniment" value={t(`event_types.${data.eventType}`)} />
         <SummaryRow label="Data" value={data.eventDate} />
         <SummaryRow label="Locație" value={data.location} />
-        {data.timeSlot && <SummaryRow label="Interval" value={data.timeSlot} />}
+        {/* The exact interval the user picked. This row used to print
+            data.timeSlot, a three-bucket approximation of the start hour,
+            so a 14:00–00:00 event came back as "după-amiază". */}
+        {data.startTime && (
+          <SummaryRow
+            label="Interval"
+            value={
+              computeEndTime(data.startTime, data.durationHours)
+                ? `${data.startTime} – ${computeEndTime(data.startTime, data.durationHours)} (${data.durationHours}h)`
+                : data.startTime
+            }
+          />
+        )}
         <SummaryRow label="Invitați" value={String(data.guestCount)} />
-        <SummaryRow label="Sală" value={data.venueNeeded === "yes" ? "Am nevoie de sală" : "Am deja locație"} />
+        {data.venueNeeded && (
+          <SummaryRow
+            label="Sală"
+            value={data.venueNeeded === "yes" ? "Am nevoie de sală" : "Am deja locație"}
+          />
+        )}
+        {/* The radius was asked for on step 3 and then never shown again. */}
+        {data.venueNeeded === "yes" && data.venueRadiusKm != null && (
+          <SummaryRow
+            label="Rază de căutare"
+            value={
+              data.venueRadiusKm === 0
+                ? `${data.location} (doar în oraș)`
+                : data.venueRadiusKm >= 999
+                  ? `${data.location} — toată Moldova`
+                  : `${data.location}, ${data.venueRadiusKm} km`
+            }
+          />
+        )}
         {data.services.length > 0 && (
           <SummaryRow
             label="Categorii"

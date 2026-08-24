@@ -4,6 +4,7 @@ import Link from "@/components/shared/locale-link";
 import { MapPin, Music, ClipboardList, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { useLocale } from "@/hooks/use-locale";
+import Image from "next/image";
 
 // "Tot ce ai nevoie pentru un eveniment reușit" — three top-level entry points
 // (venues / artists / planner) on a light section. Copy lives in i18n under
@@ -37,12 +38,12 @@ export function FeatureHighlightsSection() {
                 <div className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-[#E4DECF] bg-white shadow-[0_2px_16px_rgba(0,0,0,0.04)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_16px_40px_rgba(0,0,0,0.10)]">
                   {/* Image */}
                   <div className="relative h-44 overflow-hidden">
-                    { }
-                    <img
+                    <Image
                       src={card.image}
                       alt={title}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
+                      fill
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      className="object-cover transition-transform duration-500 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
                   </div>

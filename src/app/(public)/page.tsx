@@ -14,10 +14,25 @@ import { getSupplyCounts } from "@/lib/db/queries/supply-counts";
 import { metaForPath } from "@/lib/seo/page-meta";
 
 export async function generateMetadata() {
+  // All three languages up front: metaForPath picks the one the middleware
+  // resolved from the URL prefix, so /ru and /en get their own title,
+  // description, og:locale and canonical instead of the Romanian ones.
   return metaForPath("/", {
-    title: "Marketplace pentru Evenimente din Moldova",
-    description:
-      "Găsește artiști, săli de evenimente și servicii pentru nuntă, botez, cumetrie și corporate. Cea mai mare platformă de evenimente din Republica Moldova.",
+    ro: {
+      title: "Marketplace pentru Evenimente din Moldova",
+      description:
+        "Găsește artiști, săli de evenimente și servicii pentru nuntă, botez, cumetrie și corporate. Cea mai mare platformă de evenimente din Republica Moldova.",
+    },
+    ru: {
+      title: "Маркетплейс мероприятий в Молдове",
+      description:
+        "Найдите артистов, залы и услуги для свадьбы, крестин, кумэтрии и корпоратива. Крупнейшая платформа мероприятий в Республике Молдова.",
+    },
+    en: {
+      title: "Moldova's Event Marketplace",
+      description:
+        "Find artists, venues and services for weddings, christenings, cumetrie and corporate events. The largest event platform in the Republic of Moldova.",
+    },
   });
 }
 
@@ -51,8 +66,8 @@ export default async function HomePage() {
 
   try {
     const [artists, venues, counts] = await Promise.all([
-      getFeaturedArtists(8),
-      getFeaturedVenues(6),
+      getFeaturedArtists(5),
+      getFeaturedVenues(3),
       getSupplyCounts(),
     ]);
     featuredArtists = artists;

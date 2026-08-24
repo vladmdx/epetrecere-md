@@ -7,10 +7,24 @@ import { GuestCalculatorClient } from "./client";
 // URL: /calculatoare/invitati
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix.
   return metaForPath("/calculatoare/invitati", {
-    title: "Calculator invitați, mese și logistică eveniment",
-    description:
-      "Calculează câte mese, băi, ospătari și locuri de parcare îți trebuie pentru numărul tău de invitați. Formule verificate pentru nunți și evenimente în Moldova.",
+    ro: {
+      title: "Calculator invitați, mese și logistică eveniment",
+      description:
+        "Calculează câte mese, băi, ospătari și locuri de parcare îți trebuie pentru numărul tău de invitați. Formule verificate pentru nunți și evenimente în Moldova.",
+    },
+    ru: {
+      title: "Калькулятор гостей, столов и логистики мероприятия",
+      description:
+        "Рассчитайте, сколько столов, официантов, туалетов и парковочных мест нужно на ваше количество гостей. Проверенные нормы для событий в Молдове.",
+    },
+    en: {
+      title: "Guest, Table and Event Logistics Calculator",
+      description:
+        "Work out how many tables, restrooms, waiters and parking spaces your guest count needs. Proven formulas for weddings and events in Moldova.",
+    },
   });
 }
 

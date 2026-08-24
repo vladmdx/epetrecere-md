@@ -8,10 +8,24 @@ import { DarNuntaClient } from "./client";
 // suggested minimum / typical / generous gift amount in €.
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix.
   return metaForPath("/calculatoare/dar-nunta", {
-    title: "Cât să dau dar la nuntă? — Calculator Moldova",
-    description:
-      "Calculează suma potrivită pentru darul de nuntă în funcție de relația cu mirii, oraș, tipul sălii și câte persoane mergi. Sugestii reale pentru Moldova 2025.",
+    ro: {
+      title: "Cât să dau dar la nuntă? — Calculator Moldova",
+      description:
+        "Calculează suma potrivită pentru darul de nuntă în funcție de relația cu mirii, oraș, tipul sălii și câte persoane mergi. Sugestii reale pentru Moldova 2025.",
+    },
+    ru: {
+      title: "Сколько дарить на свадьбу? — калькулятор для Молдовы",
+      description:
+        "Рассчитайте подходящую сумму подарка: степень родства с молодожёнами, город, уровень зала и сколько человек идёт с вами. Ориентиры для Молдовы, 2025.",
+    },
+    en: {
+      title: "How Much to Give at a Wedding? — Moldova Calculator",
+      description:
+        "Work out the right wedding gift from your relationship to the couple, the city, the venue tier and how many of you attend. Real Moldova figures, 2025.",
+    },
   });
 }
 

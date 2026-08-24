@@ -7,10 +7,24 @@ import { DrinksCalculatorClient } from "./client";
 // URL: /calculatoare/alcool
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix.
   return metaForPath("/calculatoare/alcool", {
-    title: "Calculator băuturi nuntă — vin, vodcă, coniac, șampanie, apă",
-    description:
-      "Calculează câte sticle de vin, vodcă, coniac, șampanie, bere și apă îți trebuie pentru nuntă, botez sau cumătrie. Norme Moldova, 2025.",
+    ro: {
+      title: "Calculator băuturi nuntă — vin, vodcă, coniac, șampanie, apă",
+      description:
+        "Calculează câte sticle de vin, vodcă, coniac, șampanie, bere și apă îți trebuie pentru nuntă, botez sau cumătrie. Norme Moldova, 2025.",
+    },
+    ru: {
+      title: "Калькулятор напитков на свадьбу — вино, водка, шампанское",
+      description:
+        "Рассчитайте, сколько вина, водки, коньяка, шампанского, пива и воды нужно на свадьбу, крестины или корпоратив. Нормы на гостя, Молдова, 2025.",
+    },
+    en: {
+      title: "Wedding Drinks Calculator — Wine, Vodka, Champagne",
+      description:
+        "Work out how many bottles of wine, vodka, cognac, champagne, beer and water you need per guest for a wedding or christening in Moldova, 2025.",
+    },
   });
 }
 

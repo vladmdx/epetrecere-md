@@ -31,6 +31,7 @@ async function resolveLegacySlug(slug: string): Promise<string | null> {
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { venueJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized } from "@/i18n";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 import { VenueDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
 
@@ -54,13 +55,43 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const coverImage = venue.images?.find((i) => i.isCover) ?? venue.images?.[0];
   const image = venue.ogImageUrl ?? coverImage?.url ?? undefined;
 
+  const locale = await getServerLocale();
+  // The venue's name is data — only the words around it are translated.
+  const name = getLocalized(venue, "name", locale);
+
+  // The venue's own description is the better snippet when it exists in this
+  // language; the sentence below is what a venue without one gets, instead of
+  // the Romanian excerpt every locale used to receive. Admin seo_desc_* still
+  // wins — generateMeta applies it for this locale only.
+  const excerpt = {
+    ro: venue.descriptionRo,
+    ru: venue.descriptionRu,
+    en: venue.descriptionEn,
+  }[locale]?.substring(0, 155);
+
+  const fallback = {
+    ro: {
+      title: `${name} — Sală Evenimente`,
+      description: `${name} — capacitate, preț pe persoană, meniu și galerie foto. Verifică datele libere și rezervă online pe ePetrecere.md.`,
+    },
+    ru: {
+      title: `${name} — зал для торжеств`,
+      description: `${name} — вместимость, цена на человека, меню и фотогалерея. Узнайте свободные даты и забронируйте онлайн на ePetrecere.md.`,
+    },
+    en: {
+      title: `${name} — Event Venue`,
+      description: `${name} — capacity, price per guest, menu and photo gallery. Check free dates and book online on ePetrecere.md.`,
+    },
+  }[locale];
+
   return generateMeta({
-    title: `${venue.nameRo} — Sală Evenimente`,
-    description: venue.seoDescRo || venue.descriptionRo?.substring(0, 155) || "",
+    title: fallback.title,
+    description: excerpt || fallback.description,
     entity: venue,
     path: `/sali/${slug}`,
     image,
     type: "profile",
+    locale,
   });
 }
 

@@ -2,15 +2,34 @@ import type { Metadata } from "next";
 import Link from "@/components/shared/locale-link";
 import { FileText } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 import { LEGAL_DOCUMENTS, LEGAL_PACK_VERSION } from "@/lib/legal";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: {
+      title: "Documente legale",
+      description:
+        "Acordurile, politicile și tarifele care guvernează platforma ePetrecere.md.",
+    },
+    ru: {
+      title: "Юридические документы",
+      description:
+        "Договоры, политики и тарифы, которые регулируют работу платформы ePetrecere.md.",
+    },
+    en: {
+      title: "Legal Documents",
+      description:
+        "The agreements, policies and tariffs that govern the ePetrecere.md platform.",
+    },
+  }[locale];
   return generateMetaAsync({
-  title: "Documente legale",
-  description:
-    "Acordurile, politicile și tarifele care guvernează platforma ePetrecere.md.",
-  path: "/legal",
-});
+    title: meta.title,
+    description: meta.description,
+    path: "/legal",
+    locale,
+  });
 }
 
 export default function LegalIndexPage() {

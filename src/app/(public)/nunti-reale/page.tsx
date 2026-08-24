@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, artists, venues } from "@/lib/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Camera, Calendar, MapPin, ArrowRight } from "lucide-react";
 
@@ -14,12 +15,30 @@ import { Camera, Calendar, MapPin, ArrowRight } from "lucide-react";
 // Each card links to /nunti-reale/[planId] for a full lightbox.
 
 export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: {
+      title: "Nunți reale din Moldova — galerie cu povești adevărate",
+      description:
+        "Descoperă povești reale de nuntă din Moldova. Fotografii aprobate de cuplurile care au folosit ePetrecere.md — inspirație și idei pentru nunta ta.",
+    },
+    ru: {
+      title: "Реальные свадьбы в Молдове — истории и фото",
+      description:
+        "Настоящие свадебные истории из Молдовы. Фотографии, одобренные парами, которые планировали праздник на ePetrecere.md — идеи для вашей свадьбы.",
+    },
+    en: {
+      title: "Real Weddings in Moldova — Stories and Photos",
+      description:
+        "Real wedding stories from Moldova. Photos approved by the couples who planned with ePetrecere.md — inspiration and ideas for your own day.",
+    },
+  }[locale];
   return generateMetaAsync({
-  title: "Nunți reale din Moldova — galerie cu povești adevărate",
-  description:
-    "Descoperă povești reale de nuntă din Moldova. Fotografii aprobate de cuplurile care au folosit ePetrecere.md — inspirație și idei pentru nunta ta.",
-  path: "/nunti-reale",
-});
+    title: meta.title,
+    description: meta.description,
+    path: "/nunti-reale",
+    locale,
+  });
 }
 
 export const revalidate = 3600; // ISR: refresh every hour

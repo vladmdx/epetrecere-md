@@ -1,9 +1,10 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Loader2, Music, Building2, PartyPopper, Phone } from "lucide-react";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
+import { useLocale } from "@/hooks/use-locale";
 
 /**
  * If the user just came through the public /planifica wizard, their answers
@@ -49,7 +50,11 @@ type RoleChoice = "client" | "artist" | "venue" | null;
 
 export default function AuthRedirectPage() {
   const { isLoaded, isSignedIn, user } = useUser();
-  const router = useRouter();
+  // Every exit from this page is a router.replace, and this is the first
+  // screen after registration — an unprefixed one strands a RU/EN visitor
+  // inside the Romanian account area for good.
+  const router = useLocalizedRouter();
+  const { t } = useLocale();
   const [checking, setChecking] = useState(true);
   const [showPhoneStep, setShowPhoneStep] = useState(false);
   const [showRoleSelect, setShowRoleSelect] = useState(false);
@@ -213,7 +218,7 @@ export default function AuthRedirectPage() {
   async function handlePhoneSubmit() {
     const trimmed = phoneInput.trim();
     if (trimmed.length < 6) {
-      setPhoneError("Numărul de telefon e prea scurt");
+      setPhoneError(t("auth.phoneTooShort"));
       return;
     }
     setPhoneError(null);
@@ -231,7 +236,7 @@ export default function AuthRedirectPage() {
         // the body isn't JSON.
         const body = await res.json().catch(() => null);
         setPhoneError(
-          body?.error || "Nu s-a putut salva numărul. Încearcă din nou.",
+          body?.error || t("auth.phoneSaveFailed"),
         );
         return;
       }
@@ -285,10 +290,13 @@ export default function AuthRedirectPage() {
 
   if (checking && !showRoleSelect && !showPhoneStep) {
     return (
-      <div className="fixed inset-0 z-[9999] flex min-h-screen items-center justify-center bg-[#0D0D0D]">
+      <div
+        data-no-auto-translate
+        className="fixed inset-0 z-[9999] flex min-h-screen items-center justify-center bg-[#0D0D0D]"
+      >
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-[#C9A84C]" />
-          <p className="text-sm text-[#B0B0C0]">Se verifică contul...</p>
+          <p className="text-sm text-[#B0B0C0]">{t("auth.checking")}</p>
         </div>
       </div>
     );
@@ -296,23 +304,24 @@ export default function AuthRedirectPage() {
 
   if (showPhoneStep) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] px-4">
+      <div
+        data-no-auto-translate
+        className="flex min-h-screen items-center justify-center bg-[#0D0D0D] px-4"
+      >
         <div className="w-full max-w-md">
           <div className="mb-8 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#C9A84C]/10">
               <Phone className="h-7 w-7 text-[#C9A84C]" />
             </div>
             <h1 className="text-2xl font-bold text-[#FAF8F2] font-heading md:text-3xl">
-              Bine ai venit pe ePetrecere!
+              {t("auth.welcome")}
             </h1>
-            <p className="mt-2 text-[#B0B0C0]">
-              Adaugă numărul tău de telefon pentru a finaliza înregistrarea.
-            </p>
+            <p className="mt-2 text-[#B0B0C0]">{t("auth.phoneIntro")}</p>
           </div>
 
           <div className="rounded-xl border border-[#2A2A3E] bg-[#1A1A2E] p-5">
             <label className="text-sm font-medium text-[#FAF8F2]">
-              Număr de telefon *
+              {t("auth.phoneLabel")}
             </label>
             <input
               type="tel"
@@ -331,10 +340,7 @@ export default function AuthRedirectPage() {
             {phoneError && (
               <p className="mt-2 text-xs text-red-400">{phoneError}</p>
             )}
-            <p className="mt-2 text-xs text-[#B0B0C0]">
-              Folosit pentru a primi confirmări de rezervare. Nu este vizibil
-              public — doar tu și administratorii îl pot vedea.
-            </p>
+            <p className="mt-2 text-xs text-[#B0B0C0]">{t("auth.phoneHint")}</p>
           </div>
 
           <button
@@ -347,7 +353,7 @@ export default function AuthRedirectPage() {
             }`}
           >
             {savingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Continuă
+            {t("auth.continue")}
           </button>
         </div>
       </div>
@@ -356,15 +362,16 @@ export default function AuthRedirectPage() {
 
   if (showRoleSelect) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D] px-4">
+      <div
+        data-no-auto-translate
+        className="flex min-h-screen items-center justify-center bg-[#0D0D0D] px-4"
+      >
         <div className="w-full max-w-lg">
           <div className="mb-8 text-center">
             <h1 className="text-2xl font-bold text-[#FAF8F2] font-heading md:text-3xl">
-              Bine ai venit pe ePetrecere!
+              {t("auth.welcome")}
             </h1>
-            <p className="mt-2 text-[#B0B0C0]">
-              Cum dorești să folosești platforma?
-            </p>
+            <p className="mt-2 text-[#B0B0C0]">{t("auth.roleQuestion")}</p>
           </div>
 
           <div className="space-y-3">
@@ -383,9 +390,9 @@ export default function AuthRedirectPage() {
                 <PartyPopper className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-bold text-[#FAF8F2]">Client</p>
+                <p className="font-bold text-[#FAF8F2]">{t("auth.roleClient")}</p>
                 <p className="text-sm text-[#B0B0C0]">
-                  Caut artiști și săli pentru evenimentul meu
+                  {t("auth.roleClientDesc")}
                 </p>
               </div>
             </button>
@@ -405,9 +412,9 @@ export default function AuthRedirectPage() {
                 <Music className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-bold text-[#FAF8F2]">Partener (Artist / Formație)</p>
+                <p className="font-bold text-[#FAF8F2]">{t("auth.roleArtist")}</p>
                 <p className="text-sm text-[#B0B0C0]">
-                  Vreau să-mi promovez serviciile și să primesc rezervări
+                  {t("auth.roleArtistDesc")}
                 </p>
               </div>
             </button>
@@ -427,9 +434,9 @@ export default function AuthRedirectPage() {
                 <Building2 className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-bold text-[#FAF8F2]">Sală de evenimente</p>
+                <p className="font-bold text-[#FAF8F2]">{t("auth.roleVenue")}</p>
                 <p className="text-sm text-[#B0B0C0]">
-                  Vreau să-mi listez sala și să primesc rezervări
+                  {t("auth.roleVenueDesc")}
                 </p>
               </div>
             </button>
@@ -447,7 +454,7 @@ export default function AuthRedirectPage() {
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : null}
-            Continuă
+            {t("auth.continue")}
           </button>
         </div>
       </div>

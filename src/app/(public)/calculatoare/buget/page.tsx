@@ -9,10 +9,24 @@ import { BudgetCalculatorClient } from "./client";
 // in ./client.tsx since it needs React state.
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix.
   return metaForPath("/calculatoare/buget", {
-    title: "Calculator buget nuntă, botez, cumătrie — estimare online gratuită",
-    description:
-      "Calculează bugetul exact pentru nuntă, botez sau cumătrie în Moldova. Meniu, artiști, decor, foto-video, transport — prețuri reale 2025 pe ePetrecere.md.",
+    ro: {
+      title: "Calculator buget nuntă, botez, cumătrie — estimare online gratuită",
+      description:
+        "Calculează bugetul exact pentru nuntă, botez sau cumătrie în Moldova. Meniu, artiști, decor, foto-video, transport — prețuri reale 2025 pe ePetrecere.md.",
+    },
+    ru: {
+      title: "Калькулятор бюджета свадьбы и крестин — бесплатно онлайн",
+      description:
+        "Рассчитайте точный бюджет свадьбы или крестин в Молдове. Меню, артисты, декор, фото и видео, транспорт — реальные цены 2025 на ePetrecere.md.",
+    },
+    en: {
+      title: "Wedding and Party Budget Calculator — Free Online",
+      description:
+        "Work out the exact budget for a wedding or christening in Moldova. Menu, artists, decor, photo and video, transport — real 2025 prices on ePetrecere.md.",
+    },
   });
 }
 

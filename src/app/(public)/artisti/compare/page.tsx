@@ -5,8 +5,11 @@ import Image from "next/image";
 import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { artists } from "@/lib/db/schema";
+import { fetchArtistCovers } from "@/lib/db/queries/artists";
+import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
 import { Star, MapPin, ArrowLeft, X, Check } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 import { ClearCompareButton } from "./clear-button";
 import { NotSpecified } from "@/components/public/not-specified";
 import { formatPrice } from "@/lib/format/price";
@@ -14,12 +17,30 @@ import { formatPrice } from "@/lib/format/price";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: {
+      title: "Compară artiști",
+      description:
+        "Compară până la 3 artiști side-by-side — preț, rating, locație, facilități — pentru a alege cel mai bun pentru evenimentul tău.",
+    },
+    ru: {
+      title: "Сравнение артистов",
+      description:
+        "Сравните до трёх артистов рядом — цена, рейтинг, город, что входит в услугу — и выберите лучшего для вашего события.",
+    },
+    en: {
+      title: "Compare Artists",
+      description:
+        "Compare up to three artists side by side — price, rating, location, what is included — and pick the best one for your event.",
+    },
+  }[locale];
   return generateMetaAsync({
-  title: "Compară artiști",
-  description:
-    "Compară până la 3 artiști side-by-side — preț, rating, locație, facilități — pentru a alege cel mai bun pentru evenimentul tău.",
-  path: "/artisti/compare",
-});
+    title: meta.title,
+    description: meta.description,
+    path: "/artisti/compare",
+    locale,
+  });
 }
 
 interface Props {
@@ -75,9 +96,16 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
   if (rows.length === 0) notFound();
 
   // Preserve the user's chosen order
+  const covers = await fetchArtistCovers(rows.map((r) => r.id));
   const ordered = ids
     .map((id) => rows.find((r) => r.id === id))
-    .filter((r): r is (typeof rows)[number] => !!r);
+    .filter((r): r is (typeof rows)[number] => !!r)
+    // artists.photo_url alone is not the cover — most artists only ever fill in
+    // artist_images, and those compared as a bare 🎵 tile next to a real photo.
+    .map((r) => ({
+      ...r,
+      photoUrl: resolveArtistCoverImage(r.slug, r.photoUrl, ...(covers.get(r.id) ?? [])),
+    }));
 
   // Rows of the comparison table
   const rowDefs: Array<{
@@ -166,26 +194,42 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
         <ClearCompareButton />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse">
+      {/* Automatic table layout sized every column from its own content, so the
+          artist with a 400-character description swallowed the table and the
+          others collapsed — and since the header cells fall back to baseline
+          alignment, their cards were pushed hundreds of pixels down to match.
+          table-fixed + a colgroup make the columns equal, which also makes the
+          card images equal height. The min width grows with the number of
+          artists instead of being a constant 640px. */}
+      <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+        <table
+          className="w-full table-fixed border-separate border-spacing-0"
+          style={{ minWidth: `calc(10rem + ${ordered.length} * 15rem)` }}
+        >
+          <colgroup>
+            <col className="w-40" />
+            {ordered.map((a) => (
+              <col key={a.id} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
-              <th className="w-32 border-b border-border/40 p-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <th className="sticky left-0 z-20 w-40 border-b border-border/40 bg-background p-3 text-left align-top text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-[1px_0_0_0_var(--border)]">
                 &nbsp;
               </th>
               {ordered.map((a) => (
                 <th
                   key={a.id}
-                  className="border-b border-border/40 p-3 text-left"
+                  className="border-b border-border/40 p-3 text-left align-top"
                 >
                   <Link href={`/artisti/${a.slug}`} className="block group">
-                    <div className="relative aspect-[4/5] w-full overflow-hidden rounded-xl bg-muted">
+                    <div className="relative h-56 w-full overflow-hidden rounded-xl bg-muted">
                       {a.photoUrl ? (
                         <Image
                           src={a.photoUrl}
                           alt={a.nameRo}
                           fill
-                          sizes="(max-width: 640px) 100vw, 33vw"
+                          sizes="240px"
                           className="object-cover transition-transform group-hover:scale-105"
                           unoptimized={
                             a.photoUrl.includes("r2.cloudflarestorage.com") ??
@@ -208,12 +252,12 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
           </thead>
           <tbody>
             {rowDefs.map((r) => (
-              <tr key={r.label} className="border-b border-border/20">
-                <td className="p-3 align-top text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <tr key={r.label}>
+                <td className="sticky left-0 z-10 w-40 border-b border-border/20 bg-background p-3 align-top text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-[1px_0_0_0_var(--border)]">
                   {r.label}
                 </td>
                 {ordered.map((a) => (
-                  <td key={a.id} className="p-3 align-top text-sm">
+                  <td key={a.id} className="border-b border-border/20 p-3 align-top text-sm">
                     {r.render(a)}
                   </td>
                 ))}

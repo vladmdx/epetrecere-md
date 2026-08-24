@@ -32,6 +32,38 @@ export interface ArtistFilters {
   limit?: number;
 }
 
+/**
+ * Ordered photo candidates per artist — the flagged cover first, then the
+ * portfolio order. Listings used to look up `is_cover = true` alone while the
+ * detail page fell back to the first image, so an artist whose only photo was
+ * inserted without the flag (admin insert, seed script, anything predating the
+ * auto-cover logic) showed a letter placeholder in the catalogue and a real
+ * photo on their own page. Both paths now pick the same row.
+ */
+export async function fetchArtistCovers(artistIds: number[]) {
+  const byArtist = new Map<number, string[]>();
+  if (!artistIds.length) return byArtist;
+
+  const rows = await db
+    .select({ artistId: artistImages.artistId, url: artistImages.url })
+    .from(artistImages)
+    .where(
+      sql`${artistImages.artistId} IN (${sql.join(artistIds.map((id) => sql`${id}`), sql`, `)})`,
+    )
+    .orderBy(
+      desc(artistImages.isCover),
+      asc(artistImages.sortOrder),
+      asc(artistImages.id),
+    );
+
+  for (const row of rows) {
+    const candidates = byArtist.get(row.artistId) ?? [];
+    candidates.push(row.url);
+    byArtist.set(row.artistId, candidates);
+  }
+  return byArtist;
+}
+
 export async function getArtists(filters: ArtistFilters = {}) {
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 12;
@@ -126,20 +158,7 @@ export async function getArtists(filters: ArtistFilters = {}) {
 
   // Fetch cover images for all artists in one query
   const artistIds = items.map((a) => a.id);
-  let coverImages: { artistId: number; url: string }[] = [];
-  if (artistIds.length) {
-    coverImages = await db
-      .select({ artistId: artistImages.artistId, url: artistImages.url })
-      .from(artistImages)
-      .where(
-        and(
-          sql`${artistImages.artistId} IN (${sql.join(artistIds.map(id => sql`${id}`), sql`, `)})`,
-          eq(artistImages.isCover, true),
-        ),
-      );
-  }
-
-  const coverMap = new Map(coverImages.map((c) => [c.artistId, c.url]));
+  const coverMap = await fetchArtistCovers(artistIds);
 
   // When an availableDate filter is set, fetch the artist's declared time
   // slots for that exact day. Empty array means "declared no slots" (we
@@ -250,7 +269,7 @@ export async function getArtists(filters: ArtistFilters = {}) {
       coverImageUrl: resolveArtistCoverImage(
         a.slug,
         a.photoUrl,
-        coverMap.get(a.id),
+        ...(coverMap.get(a.id) ?? []),
       ),
       availabilitySlots: slotsByArtist.get(a.id) ?? [],
       packageCount: pricing?.tierCount ?? 0,
@@ -282,7 +301,15 @@ export async function getArtistBySlug(slug: string) {
       .select()
       .from(artistImages)
       .where(eq(artistImages.artistId, artist.id))
-      .orderBy(asc(artistImages.sortOrder)),
+      // /api/artist-images never writes sortOrder, so every row sits at 0 and
+      // Postgres was free to return them in a different order on each render —
+      // which silently changed WHICH photo became the hero. isCover first, then
+      // id, pins it.
+      .orderBy(
+        desc(artistImages.isCover),
+        asc(artistImages.sortOrder),
+        asc(artistImages.id),
+      ),
     db
       .select()
       .from(artistVideos)
@@ -305,14 +332,27 @@ export async function getArtistBySlug(slug: string) {
       .limit(20),
   ]);
 
+  // The portfolio is resolved once, here. Callers used to re-derive the cover
+  // and then subtract it from `images`, so an artist with a single photo was
+  // advertised as "Galerie (0)" — a cover photo IS a portfolio work.
+  const seen = new Set<string>();
+  const portfolio = images.filter((image) => {
+    if (image.url.toLowerCase().includes("placeholder")) return false;
+    if (seen.has(image.url)) return false;
+    seen.add(image.url);
+    return true;
+  });
+  const coverUrl = resolveArtistCoverImage(
+    artist.slug,
+    artist.photoUrl,
+    ...portfolio.map((image) => image.url),
+  );
+
   return {
     ...artist,
-    photoUrl: resolveArtistCoverImage(
-      artist.slug,
-      artist.photoUrl,
-      images.find((image) => image.isCover)?.url,
-    ),
-    images: images.filter((image) => !image.url.toLowerCase().includes("placeholder")),
+    photoUrl: coverUrl,
+    coverUrl,
+    images: portfolio,
     videos,
     packages,
     reviews: artistReviews,
@@ -337,24 +377,13 @@ export async function getFeaturedArtists(limit = 8) {
     .limit(limit);
 
   // Add cover images
-  const ids = items.map((a) => a.id);
-  let covers: { artistId: number; url: string }[] = [];
-  if (ids.length) {
-    covers = await db
-      .select({ artistId: artistImages.artistId, url: artistImages.url })
-      .from(artistImages)
-      .where(and(
-        sql`${artistImages.artistId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
-        eq(artistImages.isCover, true),
-      ));
-  }
-  const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
+  const coverMap = await fetchArtistCovers(items.map((a) => a.id));
   return items.map((a) => ({
     ...a,
     coverImageUrl: resolveArtistCoverImage(
       a.slug,
       a.photoUrl,
-      coverMap.get(a.id),
+      ...(coverMap.get(a.id) ?? []),
     ),
   }));
 }
@@ -401,24 +430,13 @@ export async function getSimilarArtists(artistId: number, categoryIds: number[],
     .limit(limit);
 
   // Add cover images
-  const ids = items.map((a) => a.id);
-  let covers: { artistId: number; url: string }[] = [];
-  if (ids.length) {
-    covers = await db
-      .select({ artistId: artistImages.artistId, url: artistImages.url })
-      .from(artistImages)
-      .where(and(
-        sql`${artistImages.artistId} IN (${sql.join(ids.map(id => sql`${id}`), sql`, `)})`,
-        eq(artistImages.isCover, true),
-      ));
-  }
-  const coverMap = new Map(covers.map((c) => [c.artistId, c.url]));
+  const coverMap = await fetchArtistCovers(items.map((a) => a.id));
   return items.map((a) => ({
     ...a,
     coverImageUrl: resolveArtistCoverImage(
       a.slug,
       a.photoUrl,
-      coverMap.get(a.id),
+      ...(coverMap.get(a.id) ?? []),
     ),
   }));
 }

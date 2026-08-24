@@ -36,15 +36,19 @@ export function ContactPageClient() {
             </div>
           </div>
 
-          <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
-              <Phone className="h-5 w-5" />
+          {/* Shown only when a real number is configured. It used to fall
+              back to a made-up one, which reads as a working line. */}
+          {process.env.NEXT_PUBLIC_CONTACT_PHONE ? (
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">
+                <Phone className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-heading font-bold">{t("form.phone")}</h3>
+                <p className="text-sm text-muted-foreground">{process.env.NEXT_PUBLIC_CONTACT_PHONE}</p>
+              </div>
             </div>
-            <div>
-              <h3 className="font-heading font-bold">{t("form.phone")}</h3>
-              <p className="text-sm text-muted-foreground">{process.env.NEXT_PUBLIC_CONTACT_PHONE || "+373 60 123 456"}</p>
-            </div>
-          </div>
+          ) : null}
 
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gold/10 text-gold">

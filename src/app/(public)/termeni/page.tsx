@@ -1,14 +1,33 @@
 import type { Metadata } from "next";
 import Link from "@/components/shared/locale-link";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: {
+      title: "Termeni și Condiții",
+      description:
+        "Termenii și condițiile de utilizare a platformei ePetrecere.md, pentru clienți și pentru furnizori.",
+    },
+    ru: {
+      title: "Условия использования",
+      description:
+        "Условия использования платформы ePetrecere.md — для клиентов и для поставщиков услуг.",
+    },
+    en: {
+      title: "Terms and Conditions",
+      description:
+        "The terms and conditions for using the ePetrecere.md platform, for clients and service providers alike.",
+    },
+  }[locale];
   return generateMetaAsync({
-  title: "Termeni și Condiții",
-  description:
-    "Termenii și condițiile de utilizare a platformei ePetrecere.md.",
-  path: "/termeni",
-});
+    title: meta.title,
+    description: meta.description,
+    path: "/termeni",
+    locale,
+  });
 }
 
 export default function TermsPage() {

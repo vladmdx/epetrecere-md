@@ -28,9 +28,16 @@ interface VenueCardProps {
     coverImageUrl?: string | null;
   };
   imageIndex?: number;
+  /**
+   * The date the list was filtered on (YYYY-MM-DD). Only then may the card
+   * claim availability: getVenues({ availableDate }) drops every venue booked
+   * or blocked on it, so "in this result set" means "free on that day".
+   * Without a date nothing is known, so the badge stays hidden.
+   */
+  availableOn?: string | null;
 }
 
-export function VenueCard({ venue, imageIndex }: VenueCardProps) {
+export function VenueCard({ venue, imageIndex, availableOn }: VenueCardProps) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(venue, "name", locale);
@@ -53,10 +60,12 @@ export function VenueCard({ venue, imageIndex }: VenueCardProps) {
           unoptimized={image.includes("r2.cloudflarestorage.com")}
         />
         <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#111522] to-transparent" />
-        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#06110d]/85 px-2 py-1 text-[9px] font-medium text-[#53df86] backdrop-blur">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#4fe47f]" />
-          Disponibilă
-        </span>
+        {availableOn && (
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#06110d]/85 px-2 py-1 text-[9px] font-medium text-[#53df86] backdrop-blur">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#4fe47f]" />
+            Disponibilă
+          </span>
+        )}
         {venue.isFeatured && (
           <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#e6b84d]/92 px-2 py-1 text-[9px] font-semibold text-[#07101d]">
             <BadgeCheck className="h-3 w-3" /> Recomandată

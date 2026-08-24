@@ -6,12 +6,22 @@ import { getArtists } from "@/lib/db/queries/artists";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getCityBySlug } from "@/lib/seo/cities";
+import { cityNameAfterIn } from "@/lib/seo/city-grammar";
+import { getServerLocale } from "@/lib/i18n/server-locale";
+import { NOUNS, plural } from "@/lib/i18n/plural";
 import { ArtistCard } from "@/components/public/artist-card";
 
 // M2 — SEO landing page for all artists in a given Moldovan city.
 // URL: /artisti/in/[city]   e.g. /artisti/in/chisinau
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
+
+/** The count in the title has to agree with its noun in each language. */
+const PROFESSIONALS = {
+  ro: { one: "profesionist", few: "profesioniști", many: "profesioniști" },
+  ru: { one: "специалист", few: "специалиста", many: "специалистов" },
+  en: { one: "professional", other: "professionals" },
+};
 
 interface Props {
   params: Promise<{ city: string }>;
@@ -30,10 +40,32 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     limit: 1,
   });
 
+  // Only the sentence is translated — the city is data, taken from the
+  // whitelist in the visitor's language (declined for Russian, which does not
+  // leave a city name alone after "в").
+  const locale = await getServerLocale();
+  const cityName = cityNameAfterIn(city, locale);
+  const pros = plural(total, locale, PROFESSIONALS);
+  const copy = {
+    ro: {
+      title: `Artiști pentru evenimente în ${cityName} — ${pros}`,
+      description: `Descoperă ${plural(total, locale, NOUNS.artists)} și trupe pentru nuntă, botez, cumătrie și evenimente corporate în ${cityName}. Rezervă online pe ePetrecere.md.`,
+    },
+    ru: {
+      title: `Артисты на мероприятия в ${cityName} — ${pros}`,
+      description: `Артисты, ведущие и живая музыка на свадьбу, крестины или корпоратив в ${cityName}. Цены, отзывы и бронирование онлайн на ePetrecere.md.`,
+    },
+    en: {
+      title: `Event Artists in ${cityName} — ${pros}`,
+      description: `Find artists, hosts and live bands for weddings, christenings and corporate events in ${cityName}. Prices, reviews and online booking.`,
+    },
+  }[locale];
+
   return generateMeta({
-    title: `Artiști pentru evenimente în ${city.nameRo} — ${total} profesioniști`,
-    description: `Descoperă ${total} artiști și trupe pentru nuntă, botez, cumătrie și evenimente corporate în ${city.nameRo}. Rezervă online pe ePetrecere.md.`,
+    title: copy.title,
+    description: copy.description,
     path: `/artisti/in/${citySlug}`,
+    locale,
   });
 }
 

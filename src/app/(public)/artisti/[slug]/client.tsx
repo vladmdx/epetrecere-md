@@ -28,7 +28,6 @@ import { ArtistCard } from "@/components/public/artist-card";
 import { ImageGallery } from "@/components/public/image-gallery";
 import { RequestPriceForm } from "@/components/public/request-form";
 import { WishlistButton } from "@/components/public/wishlist-button";
-import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
 import { AddToEventButton } from "@/components/public/add-to-event-button";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { ShareButtons } from "@/components/public/share-buttons";
@@ -62,6 +61,8 @@ interface ArtistData {
   isPremium: boolean;
   calendarEnabled: boolean;
   photoUrl: string | null;
+  /** Hero photo, resolved server-side — also present inside `images`. */
+  coverUrl: string | null;
   images: Array<{ id: number; url: string; altRo: string | null; isCover: boolean }>;
   videos: Array<{ id: number; platform: string; videoId: string; title: string | null }>;
   packages: Array<{
@@ -128,25 +129,21 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
   const [avatarOpen, setAvatarOpen] = useState(false);
-  const profilePhotoUrl = resolveArtistCoverImage(
-    artist.slug,
-    artist.photoUrl,
-    artist.images?.[0]?.url,
-  );
-  const galleryImages = artist.images.filter(
-    (image) =>
-      !image.url.toLowerCase().includes("placeholder") &&
-      image.url !== profilePhotoUrl,
-  );
-  const momentImages = Array.from(
+  // One portfolio, resolved by the query layer. The hero is part of it, not a
+  // separate thing to be subtracted — deriving the cover here a second time is
+  // what made "Galerie" count one photo short of what the page displays.
+  const portfolio = artist.images;
+  const profilePhotoUrl = artist.coverUrl;
+  const allMoments = Array.from(
     new Set([
       ...(profilePhotoUrl ? [profilePhotoUrl] : []),
-      ...galleryImages.map((image) => image.url),
+      ...portfolio.map((image) => image.url),
       ...ugcPhotos.map((image) => image.url),
     ]),
-  )
-    .filter(Boolean)
-    .slice(0, 6);
+  ).filter(Boolean);
+  // Counted in full, shown truncated — the label used to print the length of
+  // the already-sliced array, so 20 photos advertised as "6 fotografii".
+  const momentImages = allMoments.slice(0, 6);
   // Fixed per-event prices are a different product from the hourly tiers —
   // "800 € for a wedding" is not "a 6-hour package" — so they get their own
   // block rather than being mixed into the packages grid.
@@ -359,7 +356,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
           <Tabs defaultValue="description" className="mt-6">
             <TabsList className="h-auto w-full justify-start gap-1 overflow-x-auto rounded-xl border border-white/8 bg-[#0c111b] p-1">
               <TabsTrigger value="description">{t("artist.description")}</TabsTrigger>
-              <TabsTrigger value="gallery">{t("artist.gallery")} ({galleryImages.length})</TabsTrigger>
+              <TabsTrigger value="gallery">{t("artist.gallery")} ({portfolio.length})</TabsTrigger>
               {artist.videos.length > 0 && (
                 <TabsTrigger value="videos">{t("artist.videos")} ({artist.videos.length})</TabsTrigger>
               )}
@@ -403,12 +400,12 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               onClickCapture={() => trackClick("artist", artist.id, "gallery")}
             >
               <ImageGallery
-                images={galleryImages.map((img) => ({
+                images={portfolio.map((img) => ({
                   url: img.url,
                   alt: img.altRo,
                 }))}
               />
-              {galleryImages.length === 0 && (
+              {portfolio.length === 0 && (
                 <p className="text-muted-foreground">Nu există imagini momentan.</p>
               )}
             </TabsContent>
@@ -572,19 +569,22 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             </TabsContent>
           </Tabs>
 
+          {allMoments.length > 0 && (
           <section id="momente" className="mt-10 scroll-mt-24">
             <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">
               Portofoliu
             </p>
             <div className="mt-2 flex items-end justify-between gap-4">
               <h2 className="font-heading text-2xl font-semibold">Momente din evenimente</h2>
-              <span className="text-xs text-white/38">{momentImages.length} fotografii</span>
+              <span className="text-xs text-white/38">
+                {allMoments.length} {allMoments.length === 1 ? "fotografie" : "fotografii"}
+              </span>
             </div>
             <div
               className="mt-5 grid auto-rows-[190px] gap-3 sm:grid-cols-2 lg:grid-cols-3"
               onClickCapture={() => trackClick("artist", artist.id, "gallery")}
             >
-              {momentImages.slice(0, 6).map((url, index) => (
+              {momentImages.map((url, index) => (
                 <a
                   key={url}
                   href={url}
@@ -606,6 +606,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               ))}
             </div>
           </section>
+          )}
 
           {artist.videos.length > 0 && (
             <section className="mt-10">

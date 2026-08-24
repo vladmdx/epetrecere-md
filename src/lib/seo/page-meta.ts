@@ -7,7 +7,8 @@ import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { pageMeta } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { generateMeta } from "./generate-meta";
+import { generateMeta, resolveRequestLocale } from "./generate-meta";
+import type { AppLocale } from "@/lib/i18n/routing";
 import type { Locale } from "@/types";
 
 export interface PageMetaOverride {
@@ -34,48 +35,59 @@ export async function getPageMeta(path: string): Promise<PageMetaOverride | null
   }
 }
 
-interface MetaDefaults {
+export interface MetaCopy {
   title: string;
   description: string;
+}
+
+export interface MetaDefaults extends MetaCopy {
   noindex?: boolean;
 }
 
 /**
+ * Metadata written once per language. Preferred shape for public pages: the
+ * `Record<AppLocale, …>` forces all three languages to exist, so a page can no
+ * longer ship Romanian copy to /ru just because nobody wrote the translation.
+ */
+export type LocalizedMetaDefaults = Record<AppLocale, MetaCopy> & {
+  noindex?: boolean;
+};
+
+function isLocalized(
+  defaults: MetaDefaults | LocalizedMetaDefaults,
+): defaults is LocalizedMetaDefaults {
+  return "ro" in defaults;
+}
+
+/**
  * One-call helper for static pages — pulls admin override from page_meta and
- * falls back to the hardcoded defaults. Use inside `generateMetadata()`.
+ * falls back to the supplied defaults. Use inside `generateMetadata()`.
+ *
+ * `defaults` may be a single already-resolved {title, description} pair or the
+ * three-language record; in the latter case the page does not need to resolve
+ * the locale itself.
  */
 export async function metaForPath(
   path: string,
-  defaults: MetaDefaults,
+  defaults: MetaDefaults | LocalizedMetaDefaults,
   localeArg?: Locale,
 ): Promise<Metadata> {
   // Default to the locale the middleware resolved from the URL prefix, so a
   // page under /ru gets Russian metadata and its own canonical instead of
   // inheriting the Romanian one.
   const locale: Locale = localeArg ?? (await resolveRequestLocale());
+  const copy: MetaCopy = isLocalized(defaults)
+    ? defaults[locale as AppLocale]
+    : defaults;
   // The current page_meta table stores Romanian values only. Applying the
   // same override to RU/EN would replace correctly translated metadata with
   // Romanian copy, so localized pages use their translated defaults.
   const override = locale === "ro" ? await getPageMeta(path) : null;
   return generateMeta({
-    title: override?.title ?? defaults.title,
-    description: override?.description ?? defaults.description,
+    title: override?.title ?? copy.title,
+    description: override?.description ?? copy.description,
     path,
     locale,
     noindex: defaults.noindex,
   });
-}
-
-/** Locale for the current request, from the URL prefix (see middleware). */
-async function resolveRequestLocale(): Promise<Locale> {
-  try {
-    const { headers } = await import("next/headers");
-    const { LOCALE_HEADER, DEFAULT_LOCALE, isLocale } = await import(
-      "@/lib/i18n/routing"
-    );
-    const raw = (await headers()).get(LOCALE_HEADER);
-    return (isLocale(raw) ? raw : DEFAULT_LOCALE) as Locale;
-  } catch {
-    return "ro";
-  }
 }

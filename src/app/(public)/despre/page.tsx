@@ -3,10 +3,24 @@ import { breadcrumbJsonLd, organizationJsonLd, safeJsonLd } from "@/lib/seo/json
 import { Sparkles, Users, Calendar, Shield } from "lucide-react";
 
 export async function generateMetadata() {
+  // All three languages up front — metaForPath serves the one the
+  // middleware resolved from the URL prefix.
   return metaForPath("/despre", {
-    title: "Despre Noi",
-    description:
-      "Despre ePetrecere.md — platforma de servicii pentru evenimente din Republica Moldova.",
+    ro: {
+      title: "Despre Noi",
+      description:
+        "Despre ePetrecere.md — platforma de servicii pentru evenimente din Republica Moldova.",
+    },
+    ru: {
+      title: "О нас",
+      description:
+        "О платформе ePetrecere.md — маркетплейс артистов, залов и услуг для мероприятий в Республике Молдова.",
+    },
+    en: {
+      title: "About Us",
+      description:
+        "About ePetrecere.md — the marketplace for artists, venues and event services in the Republic of Moldova.",
+    },
   });
 }
 

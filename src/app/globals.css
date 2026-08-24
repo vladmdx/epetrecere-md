@@ -161,13 +161,13 @@
     font-size: calc(16px * var(--user-text-scale, 1));
     /* Mobile fix: even with overflow-x:hidden on the body, a deeply
        nested overflowing element could still produce a phantom scroll
-       on touch (iOS in particular). Pinning the html scroll axis to
-       vertical kills the horizontal swipe. */
+       on touch (iOS in particular). `clip` is the declaration that
+       actually settles it: unlike `hidden` it never turns the body into
+       a scroll container, so there is nothing left for a finger to pan. */
     overflow-x: hidden;
     overflow-x: clip;
     overscroll-behavior-x: none;
     max-width: 100%;
-    touch-action: pan-y;
   }
   html {
     @apply font-sans;
@@ -175,6 +175,21 @@
     overflow-x: clip;
     overscroll-behavior-x: none;
     max-width: 100%;
+  }
+
+  /* The guard above used to carry `touch-action: pan-y` on the body as well.
+     An element's effective touch-action is the intersection of every
+     ancestor's value, so nothing underneath could opt back in: every
+     `overflow-x-auto` container in the app (the comparison tables, the
+     category rails, the service pills) refused a horizontal swipe on a
+     phone, and pinch-to-zoom was disabled site-wide with it. It is only
+     needed where `overflow-x: clip` is unsupported (iOS <= 15), which is
+     the one case where the body really is still a pannable scroll
+     container -- and even there, zoom stays available. */
+  @supports not (overflow: clip) {
+    body {
+      touch-action: pan-y pinch-zoom;
+    }
   }
 
   /* Gold focus ring on interactive elements */

@@ -66,9 +66,23 @@ function templateValue(node: ts.TemplateExpression): string {
   return normalize(value);
 }
 
+/**
+ * Mirrors isSafePattern in src/i18n/legacy-dom-translator.ts — keep the two in
+ * step. `${hours}h` reduces to the "phrase" {{1}}h{{2}}, which the runtime
+ * translator compiles into `^(.+?)h(.+?)$` and applies to every string on the
+ * page. Such a phrase must never be handed to the translator in the first
+ * place. Duplicated rather than imported: the translator is a client module
+ * that pulls in the whole phrase maps.
+ */
+function isSafePattern(value: string): boolean {
+  if (value.replace(/\{\{\d+\}\}/g, "").length >= 6) return true;
+  return !/\S\{\{\d+\}\}|\{\{\d+\}\}\S/.test(value);
+}
+
 function isUseful(value: string): boolean {
   if (value.length < 2 || value.length > 700) return false;
   if (!/[A-Za-zĂÂÎȘȚăâîșțА-Яа-я]/.test(value)) return false;
+  if (/\{\{\d+\}\}/.test(value) && !isSafePattern(value)) return false;
   if (/^(?:https?:|\/|#|\.|[a-z-]+\/|[A-Z0-9_]+$)/.test(value)) return false;
   if (/^(?:flex|grid|block|hidden|relative|absolute|fixed|sticky)(?:\s|$)/.test(value)) return false;
   if (/\b(?:bg-|text-|border-|hover:|focus:|sm:|md:|lg:|xl:|px-|py-|mt-|mb-|gap-|rounded-)\S*/.test(value)) return false;

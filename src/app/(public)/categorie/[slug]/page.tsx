@@ -22,12 +22,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!category) return {};
   const locale = await getServerLocale();
   const name = getLocalized(category, "name", locale);
-  const seoTitle = getLocalized(category, "seoTitle", locale);
-  const seoDescription = getLocalized(category, "seoDesc", locale);
+  // Only the category name comes from the database; the sentence is translated.
+  // Admin seo_title_*/seo_desc_* override it, but generateMeta applies them
+  // for this locale only — a category with Romanian copy alone leaves /ru on
+  // the Russian sentence below rather than inheriting the Romanian one.
+  const fallback = {
+    ro: {
+      title: `${name}: evenimente în Moldova`,
+      description: `${name} pentru nunți și evenimente în Chișinău și Republica Moldova în 2026.`,
+    },
+    ru: {
+      title: `${name} для свадеб и мероприятий в Молдове`,
+      description: `${name} в Кишинёве и по всей Молдове: цены, отзывы, свободные даты и бронирование онлайн на ePetrecere.md.`,
+    },
+    en: {
+      title: `${name} for weddings and events in Moldova`,
+      description: `${name} in Chișinău and across Moldova: prices, reviews, free dates and online booking on ePetrecere.md.`,
+    },
+  }[locale];
 
   return generateMeta({
-    title: seoTitle || `${name}: evenimente în Moldova`,
-    description: seoDescription || `${name} pentru nunți și evenimente în Chișinău și Republica Moldova în 2026.`,
+    title: fallback.title,
+    description: fallback.description,
     entity: category,
     path: `/categorie/${slug}`,
     locale,

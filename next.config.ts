@@ -58,6 +58,17 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        // The hero and CTA background videos never change once deployed.
+        // Without this they were revalidated on every visit.
+        source: "/videos/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           // SAMEORIGIN (not DENY) so same-origin iframes work — e.g. the

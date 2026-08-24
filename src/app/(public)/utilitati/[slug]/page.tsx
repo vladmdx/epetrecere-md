@@ -32,6 +32,7 @@ export async function generateMetadata({ params }: Props) {
     title: locale === "ro" ? override?.title ?? tool.metaTitle : tool.metaTitle,
     description: locale === "ro" ? override?.description ?? tool.metaDescription : tool.metaDescription,
     path: `/utilitati/${slug}`,
+    locale,
   });
 }
 

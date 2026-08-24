@@ -3,15 +3,28 @@
 import { useEffect } from "react";
 import type { Locale } from "@/types";
 import { localizeMoldovaCity } from "@/lib/moldova-cities";
-import ruPhrases from "./ui-phrases.ru.json";
-import enPhrases from "./ui-phrases.en.json";
-
 type PhraseMap = Record<string, string>;
 
-const maps: Record<Exclude<Locale, "ro">, PhraseMap> = {
-  ru: ruPhrases,
-  en: enPhrases,
-};
+/**
+ * The two phrase maps are 406 KB and 296 KB of JSON. Imported statically they
+ * landed in a "use client" chunk that every visitor downloaded and parsed on
+ * every page — including Romanian visitors, for whom this module does nothing
+ * at all. They are now fetched only for the locale that needs one, after the
+ * page has painted.
+ */
+const maps: Partial<Record<Exclude<Locale, "ro">, PhraseMap>> = {};
+
+async function loadPhrases(locale: Exclude<Locale, "ro">): Promise<PhraseMap> {
+  const cached = maps[locale];
+  if (cached) return cached;
+  const mod =
+    locale === "ru"
+      ? await import("./ui-phrases.ru.json")
+      : await import("./ui-phrases.en.json");
+  const map = mod.default as PhraseMap;
+  maps[locale] = map;
+  return map;
+}
 
 const protectedPhrases = new Set(["Petrecere", "ePetrecere", "ePetrecere.md"]);
 
@@ -52,6 +65,8 @@ type PatternTranslation = {
 
 const patternCache = new Map<Exclude<Locale, "ro">, PatternTranslation[]>();
 
+const MIN_PATTERN_LITERAL = 6;
+
 function normalize(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -60,17 +75,44 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/**
+ * Whether a phrase carries enough text of its own to be matched by regex.
+ * The harvester reduces template literals to placeholders, so `${hours}h`
+ * arrived here as the "phrase" `{{1}}h{{2}}` — and `^(.+?)h(.+?)$` matches
+ * every Latin string on the page. Under Russian it rewrote the first h of
+ * each one into the ч of its translation: "Sign in with Google" came out as
+ * "Sign in witч Google". A thin phrase is only trusted when every placeholder
+ * stands as its own word ("Ora {{1}}") rather than being fused into one.
+ */
+function isSafePattern(source: string): boolean {
+  if (source.replace(/\{\{\d+\}\}/g, "").length >= MIN_PATTERN_LITERAL) return true;
+  return !/\S\{\{\d+\}\}|\{\{\d+\}\}\S/.test(source);
+}
+
 function patternsFor(locale: Exclude<Locale, "ro">): PatternTranslation[] {
   const cached = patternCache.get(locale);
   if (cached) return cached;
 
-  const patterns = Object.entries(maps[locale])
-    .filter(([source]) => /\{\{\d+\}\}/.test(source))
+  const map = maps[locale];
+  if (!map) return [];
+
+  const patterns = Object.entries(map)
+    .filter(([source]) => /\{\{\d+\}\}/.test(source) && isSafePattern(source))
     .map(([source, translated]) => {
       const tokens = source.match(/\{\{\d+\}\}/g) ?? [];
-      const segments = source.split(/\{\{\d+\}\}/g).map(escapeRegex);
+      const segments = source.split(/\{\{\d+\}\}/g);
+      let pattern = escapeRegex(segments[0]);
+      tokens.forEach((_, index) => {
+        // A placeholder fused into a word stands for a compact value — `3h`,
+        // `12px`, `msg-4` — never a phrase, so it must not swallow the spaces
+        // around it and turn the pattern into a whole-sentence match.
+        const fused =
+          /[\p{L}\p{N}]$/u.test(segments[index]) ||
+          /^[\p{L}\p{N}]/u.test(segments[index + 1]);
+        pattern += `${fused ? "(\\S+?)" : "(.+?)"}${escapeRegex(segments[index + 1])}`;
+      });
       return {
-        regex: new RegExp(`^${segments.join("(.+?)")}$`, "u"),
+        regex: new RegExp(`^${pattern}$`, "u"),
         tokens,
         translated,
       };
@@ -97,7 +139,11 @@ export function translateLegacyPhrase(value: string, locale: Locale): string | n
   const localizedCity = localizeMoldovaCity(source, locale);
   if (localizedCity !== source) return localizedCity;
 
-  const exact = maps[locale][source];
+  // Nothing to do until the map for this locale has arrived.
+  const map = maps[locale];
+  if (!map) return null;
+
+  const exact = map[source];
   if (exact && exact !== source) return exact;
 
   for (const pattern of patternsFor(locale)) {
@@ -203,36 +249,55 @@ export function useLegacyUiTranslation(locale: Locale) {
     const root = document.body;
     if (!root) return;
     document.documentElement.lang = locale;
-    applyElement(root, locale);
 
-    const titleSource = document.title;
-    const translatedTitle = translateLegacyPhrase(titleSource, locale);
-    if (translatedTitle) document.title = translatedTitle;
+    // Romanian is the source language: there is nothing to translate and no
+    // reason to download a phrase map.
+    if (locale === "ro") return;
 
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === "characterData") {
-          applyText(mutation.target as Text, locale);
-          continue;
-        }
-        if (mutation.type === "attributes") {
-          const attribute = mutation.attributeName;
-          if (attribute) applyAttribute(mutation.target as Element, attribute, locale);
-          continue;
-        }
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === Node.TEXT_NODE) applyText(node as Text, locale);
-          else if (node.nodeType === Node.ELEMENT_NODE) applyElement(node as Element, locale);
-        });
-      }
+    let cancelled = false;
+    let observer: MutationObserver | null = null;
+
+    void loadPhrases(locale).then(() => {
+      if (cancelled) return;
+      start();
     });
-    observer.observe(root, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-      attributes: true,
-      attributeFilter: [...translatedAttributes],
-    });
-    return () => observer.disconnect();
+
+    function start() {
+      applyElement(root, locale);
+
+      const titleSource = document.title;
+      const translatedTitle = translateLegacyPhrase(titleSource, locale);
+      if (translatedTitle) document.title = translatedTitle;
+
+      observer = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.type === "characterData") {
+            applyText(mutation.target as Text, locale);
+            continue;
+          }
+          if (mutation.type === "attributes") {
+            const attribute = mutation.attributeName;
+            if (attribute) applyAttribute(mutation.target as Element, attribute, locale);
+            continue;
+          }
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.TEXT_NODE) applyText(node as Text, locale);
+            else if (node.nodeType === Node.ELEMENT_NODE) applyElement(node as Element, locale);
+          });
+        }
+      });
+      observer.observe(root, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: [...translatedAttributes],
+      });
+    }
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+    };
   }, [locale]);
 }

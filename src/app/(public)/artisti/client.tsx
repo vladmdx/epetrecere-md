@@ -12,6 +12,7 @@ import { CompareBar } from "@/components/public/compare-bar";
 import { RecentlyViewed } from "@/components/public/recently-viewed";
 import { ViewSwitcher, gridClassName, useViewMode } from "@/components/public/view-switcher";
 import { useLocale } from "@/hooks/use-locale";
+import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { CatalogSeoContent } from "@/components/public/catalog-seo-content";
 
@@ -42,7 +43,7 @@ interface Props {
   totalPages: number;
   currentSort: string;
   searchQuery: string;
-  categories: Array<{ id: number; nameRo: string; nameRu: string | null; nameEn: string | null }>;
+  categories: Array<{ id: number; slug: string; nameRo: string; nameRu: string | null; nameEn: string | null }>;
   currentCategory: string;
   currentPriceMin: string;
   currentPriceMax: string;
@@ -56,11 +57,19 @@ const sortOptions = [
   { value: "newest", label: "Cei mai noi" },
 ];
 
-const popularSearches = {
-  ro: ["Formații", "DJ", "Prezentatori", "Muzică Populară", "Cover Band", "Instrumentaliști"],
-  ru: ["Группы", "DJ", "Ведущие", "Народная музыка", "Кавер-группа", "Инструменталисты"],
-  en: ["Bands", "DJ", "Hosts", "Folk Music", "Cover Band", "Instrumentalists"],
-} as const;
+// The chips used to be display strings pushed into ?q=, a free-text ILIKE over
+// name_ro/name_ru/description_ro — so a DJ whose description never spells out
+// "DJ" was missed, and the RU/EN chips matched nothing at all. They are real
+// categories now; anything that does not resolve against the DB simply does not
+// render, so a stale slug degrades to a missing chip instead of a 404.
+const popularCategorySlugs = [
+  "formatii",
+  "dj",
+  "moderatori",
+  "interpreti-muzica-populara",
+  "cover-band",
+  "instrumentalisti",
+];
 
 const locations = ["", "Chișinău", "Bălți", "Orhei", "Cahul", "Ungheni", "Soroca"];
 
@@ -92,6 +101,10 @@ export function ArtistsListClient({
 
   const [pending, startTransition] = useTransition();
 
+  const popularCategories = popularCategorySlugs
+    .map((slug) => categories.find((category) => category.slug === slug))
+    .filter((category): category is Props["categories"][number] => Boolean(category));
+
   // Clicking "Caută" used to feel slower and less reliable than pressing Enter:
   // both run the same handler, but router.push does an RSC round-trip and the
   // button gave no sign it had registered the click, so people clicked again.
@@ -113,6 +126,19 @@ export function ArtistsListClient({
   function handleSearch(event: FormEvent) {
     event.preventDefault();
     navigate({ q: query.trim() || undefined, city: city || undefined });
+  }
+
+  // Pushing the bare path clears the URL but not the inputs, and those inputs
+  // are exactly what "Aplică filtrele" submits next — so a reset followed by
+  // Apply silently re-applied the filters the user had just cleared.
+  function resetFilters() {
+    setQuery("");
+    setCity("");
+    setPriceMin("");
+    setPriceMax("");
+    startTransition(() => {
+      router.push("/artisti");
+    });
   }
 
   function applyPrice() {
@@ -189,22 +215,20 @@ export function ArtistsListClient({
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {labels.search}
               </button>
+              {popularCategories.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 sm:col-span-3">
                 <span className="mr-1 text-[10px] text-white/43">{labels.popular}</span>
-                {popularSearches[locale].map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => {
-                      setQuery(item);
-                      navigate({ q: item });
-                    }}
+                {popularCategories.map((category) => (
+                  <Link
+                    key={category.id}
+                    href={`/categorie/${category.slug}`}
                     className="rounded-full border border-white/9 bg-white/[.04] px-2.5 py-1 text-[10px] text-white/66 hover:border-[#e6b84d]/35 hover:text-[#e6b84d]"
                   >
-                    {item}
-                  </button>
+                    {getLocalized(category, "name", locale)}
+                  </Link>
                 ))}
               </div>
+              )}
             </form>
           </div>
         </div>
@@ -219,7 +243,7 @@ export function ArtistsListClient({
                 {labels.filter}
               </h2>
               {hasFilters && (
-                <button onClick={() => router.push("/artisti")} className="text-[10px] text-white/45 hover:text-white">
+                <button onClick={resetFilters} className="text-[10px] text-white/45 hover:text-white">
                   {labels.reset}
                 </button>
               )}
@@ -250,7 +274,7 @@ export function ArtistsListClient({
                       )}
                     >
                       <span className={cn("h-3.5 w-3.5 rounded border", selected ? "border-[#e6b84d] bg-[#e6b84d]" : "border-white/24")} />
-                      <span className="truncate">{locale === "ru" ? category.nameRu || category.nameRo : locale === "en" ? category.nameEn || category.nameRo : category.nameRo}</span>
+                      <span className="truncate">{getLocalized(category, "name", locale)}</span>
                     </button>
                   );
                 })}
@@ -364,7 +388,7 @@ export function ArtistsListClient({
               <div className="rounded-xl border border-white/8 bg-white/[.02] py-24 text-center">
                 <Sparkles className="mx-auto h-9 w-9 text-[#e6b84d]/60" />
                 <p className="mt-4 text-sm text-white/58">{t("common.noResults")}</p>
-                <button onClick={() => router.push("/artisti")} className="mt-4 text-xs text-[#e6b84d]">
+                <button onClick={resetFilters} className="mt-4 text-xs text-[#e6b84d]">
                   {labels.reset}
                 </button>
               </div>

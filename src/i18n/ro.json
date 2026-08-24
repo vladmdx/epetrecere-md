@@ -47,6 +47,23 @@
     "how_it_works": "Cum funcționează",
     "explore_vendors": "Explorează furnizorii"
   },
+  "auth": {
+    "checking": "Se verifică contul...",
+    "welcome": "Bine ai venit pe ePetrecere!",
+    "phoneIntro": "Adaugă numărul tău de telefon pentru a finaliza înregistrarea.",
+    "phoneLabel": "Număr de telefon *",
+    "phoneHint": "Folosit pentru a primi confirmări de rezervare. Nu este vizibil public — doar tu și administratorii îl pot vedea.",
+    "phoneTooShort": "Numărul de telefon e prea scurt",
+    "phoneSaveFailed": "Nu s-a putut salva numărul. Încearcă din nou.",
+    "roleQuestion": "Cum dorești să folosești platforma?",
+    "roleClient": "Client",
+    "roleClientDesc": "Caut artiști și săli pentru evenimentul meu",
+    "roleArtist": "Partener (Artist / Formație)",
+    "roleArtistDesc": "Vreau să-mi promovez serviciile și să primesc rezervări",
+    "roleVenue": "Sală de evenimente",
+    "roleVenueDesc": "Vreau să-mi listez sala și să primesc rezervări",
+    "continue": "Continuă"
+  },
   "hero": {
     "subtitle": "Platforma completă pentru evenimente",
     "title": "Evenimente memorabile, planificate fără compromisuri.",
@@ -137,7 +154,18 @@
     "let_us_choose": "Lasă la alegerea noastră",
     "have_venue": "Am deja sală",
     "budget_warning": "Bugetul este sub estimare",
-    "budget_info": "Bugetul este orientativ și ne ajută să vă oferim cele mai potrivite opțiuni."
+    "budget_info": "Bugetul este orientativ și ne ajută să vă oferim cele mai potrivite opțiuni.",
+    "required_event_type": "Alege tipul evenimentului ca să continui.",
+    "required_date": "Alege data evenimentului.",
+    "required_city": "Alege orașul evenimentului.",
+    "required_start_time": "Alege ora de început.",
+    "required_duration": "Alege durata evenimentului.",
+    "required_guests": "Indică numărul de invitați.",
+    "required_venue": "Spune-ne dacă ai nevoie de sală.",
+    "required_radius": "Alege raza de căutare a sălii — e obligatorie.",
+    "required_services": "Alege cel puțin o categorie de servicii.",
+    "required_name": "Introdu numele evenimentului (ex: Nunta Ana & Ion).",
+    "required_generic": "Completează câmpurile obligatorii ca să continui."
   },
   "process": {
     "title": "Cum Funcționează",

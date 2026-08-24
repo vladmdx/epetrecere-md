@@ -9,11 +9,12 @@
 // /sign-in with a redirect_url pointing back to the current page.
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Heart } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
@@ -76,7 +77,7 @@ export function WishlistButton({
   className,
 }: Props) {
   const { t } = useLocale();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const pathname = usePathname();
   const { isSignedIn, isLoaded } = useUser();
   const [saved, setSaved] = useState(false);

@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import Link from "@/components/shared/locale-link";
-import { inArray } from "drizzle-orm";
+import { asc, desc, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { venues } from "@/lib/db/schema";
+import { venues, venueImages } from "@/lib/db/schema";
 import { Star, MapPin, Users, ArrowLeft, X, Check } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
+import { getServerLocale } from "@/lib/i18n/server-locale";
 import { ClearCompareButton } from "./clear-button";
 import { NotSpecified } from "@/components/public/not-specified";
 import { formatPrice } from "@/lib/format/price";
@@ -13,12 +15,30 @@ import { formatPrice } from "@/lib/format/price";
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getServerLocale();
+  const meta = {
+    ro: {
+      title: "Compară săli de evenimente",
+      description:
+        "Compară până la 3 săli side-by-side — capacitate, preț, facilități — pentru a o alege pe cea potrivită evenimentului tău.",
+    },
+    ru: {
+      title: "Сравнение залов для мероприятий",
+      description:
+        "Сравните до трёх залов рядом — вместимость, цена, оснащение — и выберите тот, который подходит вашему событию.",
+    },
+    en: {
+      title: "Compare Event Venues",
+      description:
+        "Compare up to three venues side by side — capacity, price, facilities — and choose the right one for your event.",
+    },
+  }[locale];
   return generateMetaAsync({
-  title: "Compară săli de evenimente",
-  description:
-    "Compară până la 3 săli side-by-side — capacitate, preț, facilități — pentru a o alege pe cea potrivită evenimentului tău.",
-  path: "/sali/compare",
-});
+    title: meta.title,
+    description: meta.description,
+    path: "/sali/compare",
+    locale,
+  });
 }
 
 interface Props {
@@ -60,30 +80,47 @@ export default async function VenueComparePage({ searchParams }: Props) {
     );
   }
 
-  const rows = await db
-    .select({
-      id: venues.id,
-      slug: venues.slug,
-      nameRo: venues.nameRo,
-      descriptionRo: venues.descriptionRo,
-      city: venues.city,
-      address: venues.address,
-      capacityMin: venues.capacityMin,
-      capacityMax: venues.capacityMax,
-      pricePerPerson: venues.pricePerPerson,
-      ratingAvg: venues.ratingAvg,
-      ratingCount: venues.ratingCount,
-      facilities: venues.facilities,
-      phone: venues.phone,
-      email: venues.email,
-      virtualTourUrl: venues.virtualTourUrl,
-      menuUrl: venues.menuUrl,
-      menuPdfUrl: venues.menuPdfUrl,
-    })
-    .from(venues)
-    .where(inArray(venues.id, ids));
+  const [rows, images] = await Promise.all([
+    db
+      .select({
+        id: venues.id,
+        slug: venues.slug,
+        nameRo: venues.nameRo,
+        descriptionRo: venues.descriptionRo,
+        city: venues.city,
+        address: venues.address,
+        capacityMin: venues.capacityMin,
+        capacityMax: venues.capacityMax,
+        pricePerPerson: venues.pricePerPerson,
+        ratingAvg: venues.ratingAvg,
+        ratingCount: venues.ratingCount,
+        facilities: venues.facilities,
+        phone: venues.phone,
+        email: venues.email,
+        virtualTourUrl: venues.virtualTourUrl,
+        menuUrl: venues.menuUrl,
+        menuPdfUrl: venues.menuPdfUrl,
+      })
+      .from(venues)
+      .where(inArray(venues.id, ids)),
+    // Photos are the fastest way to tell three halls apart, and this page used
+    // to draw the same grey pin for all of them. Same ordering as the listing
+    // query, so a venue shows the same cover here as on its card.
+    db
+      .select({ venueId: venueImages.venueId, url: venueImages.url })
+      .from(venueImages)
+      .where(inArray(venueImages.venueId, ids))
+      .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder)),
+  ]);
 
   if (rows.length === 0) notFound();
+
+  const coverByVenue = new Map<number, string>();
+  for (const image of images) {
+    if (!coverByVenue.has(image.venueId)) coverByVenue.set(image.venueId, image.url);
+  }
+  const coverFor = (id: number) =>
+    coverByVenue.get(id) ?? `/images/venues/hall-${(id % 6) + 1}.jpg`;
 
   const ordered = ids
     .map((id) => rows.find((r) => r.id === id))
@@ -196,43 +233,78 @@ export default async function VenueComparePage({ searchParams }: Props) {
         <ClearCompareButton />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] border-collapse">
+      {/* Automatic table layout sized every column from its own content, so a
+          venue with a long description or a long address stole the width from
+          the others and their cards — whose height came from the column width —
+          ended up shorter and, on baseline-aligned header cells, pushed
+          hundreds of pixels down the page. Fixed layout + a colgroup gives
+          every venue exactly the same column, and the minimum grows with the
+          number of venues instead of being a constant 640px. */}
+      <div className="-mx-4 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+        <table
+          className="w-full table-fixed border-separate border-spacing-0"
+          style={{ minWidth: `calc(10rem + ${ordered.length} * 15rem)` }}
+        >
+          <colgroup>
+            <col className="w-40" />
+            {ordered.map((v) => (
+              <col key={v.id} />
+            ))}
+          </colgroup>
           <thead>
             <tr>
-              <th className="w-32 border-b border-border/40 p-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {/* Opaque background is load-bearing: a transparent sticky cell
+                  lets the scrolled columns show through it. */}
+              <th className="sticky left-0 z-20 border-b border-border/40 bg-background p-3 text-left align-top text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-[1px_0_0_0_var(--border)]">
                 &nbsp;
               </th>
-              {ordered.map((v) => (
-                <th
-                  key={v.id}
-                  className="border-b border-border/40 p-3 text-left"
-                >
-                  <Link href={`/sali/${v.slug}`} className="block group">
-                    <div className="relative aspect-[16/10] w-full overflow-hidden rounded-xl bg-muted flex items-center justify-center text-muted-foreground/40">
-                      <MapPin className="h-10 w-10" />
-                    </div>
-                    <p className="mt-3 font-heading text-lg font-bold group-hover:text-gold">
-                      {v.nameRo}
-                    </p>
-                    {v.address && (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {v.address}
+              {ordered.map((v) => {
+                const image = coverFor(v.id);
+                return (
+                  <th
+                    key={v.id}
+                    className="border-b border-border/40 p-3 text-left align-top"
+                  >
+                    <Link href={`/sali/${v.slug}`} className="block group">
+                      {/* Fixed height, not an aspect ratio: the card must not
+                          get its height from the column width again. Below lg
+                          the column is the 15rem the colgroup gives it, above
+                          it stretches to about a third of max-w-7xl. */}
+                      <div className="relative h-40 w-full overflow-hidden rounded-xl bg-muted">
+                        <Image
+                          src={image}
+                          alt={v.nameRo}
+                          fill
+                          sizes="(max-width: 1024px) 240px, 33vw"
+                          className="object-cover transition-transform group-hover:scale-105"
+                          unoptimized={image.includes("r2.cloudflarestorage.com")}
+                        />
+                      </div>
+                      <p className="mt-3 font-heading text-lg font-bold group-hover:text-gold">
+                        {v.nameRo}
                       </p>
-                    )}
-                  </Link>
-                </th>
-              ))}
+                      {v.address && (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {v.address}
+                        </p>
+                      )}
+                    </Link>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
+            {/* border-separate is what makes the sticky column work in Safari,
+                and it stops rendering borders declared on <tr>, so the row rule
+                lives on the cells. */}
             {rowDefs.map((r) => (
-              <tr key={r.label} className="border-b border-border/20">
-                <td className="p-3 align-top text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <tr key={r.label}>
+                <td className="sticky left-0 z-10 border-b border-border/20 bg-background p-3 align-top text-xs font-semibold uppercase tracking-wider text-muted-foreground shadow-[1px_0_0_0_var(--border)]">
                   {r.label}
                 </td>
                 {ordered.map((v) => (
-                  <td key={v.id} className="p-3 align-top text-sm">
+                  <td key={v.id} className="border-b border-border/20 p-3 align-top text-sm">
                     {r.render(v)}
                   </td>
                 ))}

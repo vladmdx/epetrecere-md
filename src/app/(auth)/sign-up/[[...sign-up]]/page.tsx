@@ -2,8 +2,14 @@ import { SignUp } from "@clerk/nextjs";
 
 export default function SignUpPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0D0D0D]">
-      <SignUp forceRedirectUrl="/auth-redirect"
+    // Clerk ships its own translations (LocalizedClerkProvider feeds it the
+    // active locale), so the legacy DOM translator must keep its hands off
+    // this subtree — rewriting Clerk's text phrase by phrase corrupts it.
+    <div
+      data-no-auto-translate
+      className="flex min-h-screen items-center justify-center bg-[#0D0D0D]"
+    >
+      <SignUp
         appearance={{
           variables: {
             colorPrimary: "#C9A84C",

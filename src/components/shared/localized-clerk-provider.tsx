@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { ClerkProvider } from "@clerk/nextjs";
 import { enUS, roRO, ruRU } from "@clerk/localizations";
 import { useLocale } from "@/hooks/use-locale";
+import { localizePath } from "@/lib/i18n/routing";
 import {
   CLERK_RO_OVERRIDES,
   CLERK_RU_OVERRIDES,
@@ -21,14 +22,20 @@ export function LocalizedClerkProvider({ children }: { children: React.ReactNode
     return mergeLocalization(roRO, CLERK_RO_OVERRIDES);
   }, [locale]);
 
+  // Clerk copies these paths verbatim into its own footer links and into
+  // every post-auth redirect. Left unprefixed, the "register" link on
+  // /ru/sign-in lands on the Romanian /sign-up and the language is gone —
+  // and so does the account that has just been created.
+  const p = (path: string) => localizePath(path, locale);
+
   return (
     <ClerkProvider
-      signInUrl="/sign-in"
-      signUpUrl="/sign-up"
-      signInForceRedirectUrl="/auth-redirect"
-      signUpForceRedirectUrl="/auth-redirect"
-      signInFallbackRedirectUrl="/auth-redirect"
-      signUpFallbackRedirectUrl="/auth-redirect"
+      signInUrl={p("/sign-in")}
+      signUpUrl={p("/sign-up")}
+      signInForceRedirectUrl={p("/auth-redirect")}
+      signUpForceRedirectUrl={p("/auth-redirect")}
+      signInFallbackRedirectUrl={p("/auth-redirect")}
+      signUpFallbackRedirectUrl={p("/auth-redirect")}
       localization={localization}
     >
       {children}

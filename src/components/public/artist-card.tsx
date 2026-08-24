@@ -32,9 +32,16 @@ interface ArtistCardProps {
     location: string | null;
     coverImageUrl?: string | null;
   };
+  /**
+   * The date the list was filtered on (YYYY-MM-DD). Only then may the card
+   * claim availability: getArtists({ availableDate }) drops every artist
+   * booked or blocked on it, so "in this result set" means "free that day".
+   * Without a date nothing is known, so the badge stays hidden.
+   */
+  availableOn?: string | null;
 }
 
-export function ArtistCard({ artist }: ArtistCardProps) {
+export function ArtistCard({ artist, availableOn }: ArtistCardProps) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(artist, "name", locale);
@@ -67,10 +74,12 @@ export function ArtistCard({ artist }: ArtistCardProps) {
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-[#111522] to-transparent" />
-        <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#06110d]/85 px-2 py-1 text-[9px] font-medium text-[#53df86] backdrop-blur">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#4fe47f]" />
-          Disponibil
-        </span>
+        {availableOn && (
+          <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#06110d]/85 px-2 py-1 text-[9px] font-medium text-[#53df86] backdrop-blur">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#4fe47f]" />
+            Disponibil
+          </span>
+        )}
         {/* Badges */}
         <div className="absolute left-2 top-2 flex gap-1">
           {artist.isVerified && (

@@ -8,6 +8,7 @@ import {
   localeAlternates,
   localizePath,
 } from "@/lib/i18n/routing";
+import { SITE_URL } from "@/lib/seo/generate-meta";
 
 // M2 — Dynamic sitemap. Next.js calls this on demand (revalidated hourly)
 // and emits an XML sitemap at /sitemap.xml. Includes every indexable URL:
@@ -18,13 +19,11 @@ import {
 //   - All published blog posts
 //   - SEO auto-pages: /artisti/in/[city], /artisti/in/[city]/[category], /sali/in/[city]
 
-// `.trim()` + trailing-slash strip defends against env values that carry
-// a trailing newline or stray slash — one such value is currently in
-// `.env.production.local` and was previously shipping broken `<loc>` URLs
-// (`https://epetrecere.md\n/artisti/...`) to Google via next-sitemap.
-const BASE_URL = (process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md")
-  .trim()
-  .replace(/\/+$/, "");
+// One shared origin with the canonical/hreflang helper and robots.txt. It is
+// sanitized there (`.trim()` + trailing-slash strip) because the value in
+// `.env.production.local` carries a trailing newline, which was shipping broken
+// `<loc>` URLs (`https://epetrecere.md\n/artisti/...`) to Google.
+const BASE_URL = SITE_URL;
 
 // Revalidate the sitemap at most once an hour so Google doesn't hammer the DB.
 export const revalidate = 3600;
@@ -45,8 +44,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE_URL}/despre`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE_URL}/contact`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${BASE_URL}/calculatoare`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/calculatoare/alcool`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/calculatoare/buget`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE_URL}/calculatoare/dar-nunta`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/calculatoare/invitati`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/calculatoare/meniu`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/calculatoare/nunta`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE_URL}/nunti-reale`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${BASE_URL}/categorii`, lastModified: now, changeFrequency: "weekly", priority: 0.7 },
+    { url: `${BASE_URL}/pachete`, lastModified: now, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE_URL}/chestionar`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    // Legal pages are thin but they are indexable and were reachable only via
+    // footer links, so crawlers rediscovered them slowly after every deploy.
+    { url: `${BASE_URL}/legal`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${BASE_URL}/termeni`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${BASE_URL}/confidentialitate`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${BASE_URL}/cookies`, lastModified: now, changeFrequency: "yearly", priority: 0.3 },
   ];
 
   // ─── Real weddings (public plans with approved photos) ────

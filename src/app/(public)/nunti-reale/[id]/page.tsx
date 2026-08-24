@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, artists, venues } from "@/lib/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { generateMeta } from "@/lib/seo/generate-meta";
+import { getServerLocale } from "@/lib/i18n/server-locale";
+import { NOUNS, plural } from "@/lib/i18n/plural";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Calendar, MapPin, ArrowLeft, Users } from "lucide-react";
 import { RealWeddingGallery } from "./gallery";
@@ -79,12 +81,34 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await getWedding(Number(id));
   if (!data) return {};
 
+  // The couple's own event title and location are data — they stay as typed;
+  // the sentence around them is translated. Russian gets the place after a
+  // comma rather than after "в", because a Romanian place name cannot be
+  // declined the way the preposition would require.
+  const locale = await getServerLocale();
+  const eventTitle = data.plan.title;
+  const place = data.plan.location;
+  const photoCount = plural(data.photos.length, locale, NOUNS.photos);
+  const copy = {
+    ro: {
+      title: `${eventTitle} — Nuntă reală`,
+      description: `Poveste reală de nuntă: ${eventTitle}${place ? ` în ${place}` : ""}. ${photoCount}, furnizori verificați.`,
+    },
+    ru: {
+      title: `${eventTitle} — реальная свадьба`,
+      description: `Настоящая свадебная история: ${eventTitle}${place ? `, ${place}` : ""}. ${photoCount}, проверенные поставщики.`,
+    },
+    en: {
+      title: `${eventTitle} — real wedding`,
+      description: `A real wedding story: ${eventTitle}${place ? ` in ${place}` : ""}. ${photoCount}, verified vendors.`,
+    },
+  }[locale];
+
   return generateMeta({
-    title: `${data.plan.title} — Nuntă reală`,
-    description: `Poveste reală de nuntă: ${data.plan.title}${
-      data.plan.location ? ` în ${data.plan.location}` : ""
-    }. ${data.photos.length} fotografii, furnizori verificați.`,
+    title: copy.title,
+    description: copy.description,
     path: `/nunti-reale/${id}`,
+    locale,
   });
 }
 

@@ -18,6 +18,7 @@ import { SortBar } from "@/components/public/sort-bar";
 import { ViewSwitcher, gridClassName, useViewMode } from "@/components/public/view-switcher";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
+import { localizePath } from "@/lib/i18n/routing";
 import { cn } from "@/lib/utils";
 
 interface Artist {
@@ -240,12 +241,21 @@ export function CategoryPageClient({
   const entityLabel = category.type === "service" ? labels.suppliers : labels.artistEntities;
   const parentHref = category.type === "service" ? "/servicii" : "/artisti";
   const parentLabel = category.type === "service" ? labels.services : labels.artists;
+  // The page hands `?date=` to getArtists as availableDate, which excludes
+  // artists booked or blocked that day — so only with a date on the URL has
+  // anyone actually checked, and only then may the cards say "Disponibil".
+  const rawDate = searchParams.get("date") ?? "";
+  const availableOn = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null;
+
   const hasFilters = Boolean(
     searchQuery ||
       currentCity ||
       currentPriceMin ||
       currentPriceMax ||
-      searchParams.get("rating_min"),
+      searchParams.get("rating_min") ||
+      // Arrives from the homepage hero search; it narrows the results just as
+      // much as the rest, so Reset has to be offered for it too.
+      availableOn,
   );
 
   function navigate(updates: Record<string, string | undefined>) {
@@ -256,11 +266,10 @@ export function CategoryPageClient({
     }
     if (!("page" in updates)) params.delete("page");
     const suffix = params.toString();
-    router.push(
-      suffix
-        ? `/categorie/${category.slug}?${suffix}`
-        : `/categorie/${category.slug}`,
-    );
+    // Locale lives in the path (/ru/categorie/dj), so an unprefixed push would
+    // drop a Russian or English visitor onto the Romanian page mid-filtering.
+    const base = localizePath(`/categorie/${category.slug}`, locale);
+    router.push(suffix ? `${base}?${suffix}` : base);
   }
 
   function handleSearch(event: FormEvent) {
@@ -284,7 +293,7 @@ export function CategoryPageClient({
     setPriceMin("");
     setPriceMax("");
     setRating("");
-    router.push(`/categorie/${category.slug}`);
+    router.push(localizePath(`/categorie/${category.slug}`, locale));
     setMobileFiltersOpen(false);
   }
 
@@ -420,7 +429,11 @@ export function CategoryPageClient({
               viewMode.kind === "grid" ? (
                 <div className={gridClassName(viewMode.cols)}>
                   {artists.map((artist) => (
-                    <ArtistCard key={artist.id} artist={artist} />
+                    <ArtistCard
+                      key={artist.id}
+                      artist={artist}
+                      availableOn={availableOn}
+                    />
                   ))}
                 </div>
               ) : (

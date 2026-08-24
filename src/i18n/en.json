@@ -47,6 +47,23 @@
     "how_it_works": "How it works",
     "explore_vendors": "Explore vendors"
   },
+  "auth": {
+    "checking": "Checking your account...",
+    "welcome": "Welcome to ePetrecere!",
+    "phoneIntro": "Add your phone number to finish signing up.",
+    "phoneLabel": "Phone number *",
+    "phoneHint": "Used to send you booking confirmations. Not shown publicly — only you and the administrators can see it.",
+    "phoneTooShort": "That phone number is too short",
+    "phoneSaveFailed": "We couldn't save your number. Please try again.",
+    "roleQuestion": "How would you like to use the platform?",
+    "roleClient": "Client",
+    "roleClientDesc": "I'm looking for artists and venues for my event",
+    "roleArtist": "Partner (Artist / Band)",
+    "roleArtistDesc": "I want to promote my services and receive bookings",
+    "roleVenue": "Event venue",
+    "roleVenueDesc": "I want to list my venue and receive bookings",
+    "continue": "Continue"
+  },
   "hero": {
     "subtitle": "The complete events platform",
     "title": "Memorable events, planned without compromise.",
@@ -137,7 +154,18 @@
     "let_us_choose": "Let us choose",
     "have_venue": "I already have a venue",
     "budget_warning": "Budget is below estimate",
-    "budget_info": "The budget is approximate and helps us offer the best options."
+    "budget_info": "The budget is approximate and helps us offer the best options.",
+    "required_event_type": "Choose an event type to continue.",
+    "required_date": "Choose the event date.",
+    "required_city": "Choose the event city.",
+    "required_start_time": "Choose a start time.",
+    "required_duration": "Choose how long the event lasts.",
+    "required_guests": "Enter the number of guests.",
+    "required_venue": "Tell us whether you need a venue.",
+    "required_radius": "Choose a venue search radius — this field is required.",
+    "required_services": "Choose at least one service category.",
+    "required_name": "Enter the event name (e.g. Ana & Ion’s Wedding).",
+    "required_generic": "Fill in the required fields to continue."
   },
   "process": {
     "title": "How It Works",
