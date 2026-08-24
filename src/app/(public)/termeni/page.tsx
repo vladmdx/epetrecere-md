@@ -99,7 +99,21 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">7. Contact</h2>
+          <h2 className="font-heading text-xl font-semibold text-foreground">7. Operatorul platformei</h2>
+          <p className="mt-2">
+            Operatorul platformei este Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.), IDNO 1026023123354, cu sediul în MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova.{" "}
+            Documentele contractuale complete — Termenii Generali, acordurile
+            cu partenerii și cu locațiile, politicile de confidențialitate,
+            cookie, recenzii și anti-fraudă — sunt publicate la{" "}
+            <a href="/legal" className="text-gold underline">
+              /legal
+            </a>
+            .
+          </p>
+        </section>
+
+        <section>
+          <h2 className="font-heading text-xl font-semibold text-foreground">8. Contact</h2>
           <p className="mt-2">
             Întrebări?{" "}
             <a href="mailto:legal@epetrecere.md" className="text-gold underline">

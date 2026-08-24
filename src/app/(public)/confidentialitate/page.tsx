@@ -14,7 +14,7 @@ const copy = {
     sections: [
       {
         title: "1. Operator și domeniu de aplicare",
-        body: "ePetrecere.md operează o platformă de servicii pentru evenimente în Republica Moldova. Politica se aplică vizitatorilor, clienților, artiștilor, partenerilor și reprezentanților sălilor. Pentru solicitări privind datele personale ne poți contacta la privacy@epetrecere.md.",
+        body: "Operatorul datelor este Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.), IDNO 1026023123354, cu sediul în MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova, care operează platforma ePetrecere.md. Politica se aplică vizitatorilor, clienților, artiștilor, partenerilor și reprezentanților sălilor. Pentru solicitări privind datele personale ne poți contacta la privacy@epetrecere.md.",
       },
       {
         title: "2. Cadrul legal aplicabil",
@@ -67,7 +67,7 @@ const copy = {
     sections: [
       {
         title: "1. Оператор и область применения",
-        body: "ePetrecere.md управляет платформой услуг для событий в Республике Молдова. Политика применяется к посетителям, клиентам, артистам, партнерам и представителям залов. По вопросам персональных данных пишите на privacy@epetrecere.md.",
+        body: "Оператором данных является Societatea cu Răspundere Limitată «EPETRECERE» (EPETRECERE S.R.L.), IDNO 1026023123354, юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова, которое управляет платформой ePetrecere.md. Политика применяется к посетителям, клиентам, артистам, партнерам и представителям залов. По вопросам персональных данных пишите на privacy@epetrecere.md.",
       },
       {
         title: "2. Применимое законодательство",
@@ -120,7 +120,7 @@ const copy = {
     sections: [
       {
         title: "1. Controller and scope",
-        body: "ePetrecere.md operates an event services platform in the Republic of Moldova. This policy applies to visitors, clients, artists, partners and venue representatives. Contact privacy@epetrecere.md for personal data requests.",
+        body: "The data controller is Societatea cu Răspundere Limitată “EPETRECERE” (EPETRECERE S.R.L.), IDNO 1026023123354, registered at MD-3701, Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova, which operates the ePetrecere.md platform. This policy applies to visitors, clients, artists, partners and venue representatives. Contact privacy@epetrecere.md for personal data requests.",
       },
       {
         title: "2. Applicable legal framework",

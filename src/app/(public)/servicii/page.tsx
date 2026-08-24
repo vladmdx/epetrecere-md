@@ -70,7 +70,10 @@ function supplyLabel(
   supply: Awaited<ReturnType<typeof getSupplyCounts>>,
 ): string | null {
   const n = slug === "sali" ? supply.activeVenues : supply.bySlug[slug];
-  if (n == null) return null;
+  // No count rather than a count of zero: omitting the line says nothing,
+  // while "0 profesioniști" on ten cards advertises the gap. The point of
+  // this helper is that whatever it prints is true — not that it prints.
+  if (!n) return null;
   if (slug === "sali") return n === 1 ? "1 locație" : `${n} locații`;
   return n === 1 ? "1 profesionist" : `${n} profesioniști`;
 }
