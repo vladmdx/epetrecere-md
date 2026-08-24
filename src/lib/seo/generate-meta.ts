@@ -57,6 +57,8 @@ interface GenerateMetaOptions {
  * sitemap.ts, robots.ts and the root layout's `metadataBase` all import this so
  * there is one origin instead of four that can drift apart.
  */
+export const SITE_NAME = "ePetrecere.md";
+
 export const SITE_URL = (
   process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md"
 )
@@ -138,14 +140,21 @@ export async function generateMeta(
   const bare = opts.path || "/";
   const url = `${SITE_URL}${localizePath(bare, locale)}`;
 
+  // The root layout appends "| ePetrecere.md" through title.template, but the
+  // seo_title columns were written with the brand already in them — so entity
+  // pages went out as "Marcel Rosca — Artist Evenimente | ePetrecere.md |
+  // ePetrecere.md". When the title already carries the brand, take it as
+  // absolute and let the template stand aside.
+  const titleField = title.includes(SITE_NAME) ? { absolute: title } : title;
+
   return {
-    title,
+    title: titleField,
     description,
     openGraph: {
       title,
       description,
       url,
-      siteName: "ePetrecere.md",
+      siteName: SITE_NAME,
       type: opts.type || "website",
       locale: ogLocaleFor(locale),
       ...(opts.image && {
