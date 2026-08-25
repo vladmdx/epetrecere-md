@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale } from "@/hooks/use-locale";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { localizePath, splitLocale, type AppLocale } from "@/lib/i18n/routing";
 import { locales, localeNames } from "@/i18n";
 import {
@@ -21,7 +21,6 @@ export function LanguageSwitcher() {
   const { locale, setLocale } = useLocale();
   const router = useRouter();
   const pathname = usePathname() || "/";
-  const searchParams = useSearchParams();
 
   function changeLocale(nextLocale: typeof locale) {
     // The URL carries the language now, so switching means NAVIGATING to the
@@ -30,7 +29,13 @@ export function LanguageSwitcher() {
     // anyone the visitor shares the link with — the wrong page.
     setLocale(nextLocale);
     const { pathname: bare } = splitLocale(pathname);
-    const qs = searchParams?.toString();
+    // Read the query string at click time rather than subscribing with
+    // useSearchParams(): this component sits in the header of every page, and
+    // that hook opts whatever renders it out of static rendering unless it is
+    // wrapped in Suspense. Nothing here needs to re-render when the query
+    // changes — it is only read to carry the filters across the switch.
+    const qs =
+      typeof window === "undefined" ? "" : window.location.search.replace(/^\?/, "");
     router.push(
       localizePath(bare, nextLocale as AppLocale) + (qs ? `?${qs}` : ""),
     );

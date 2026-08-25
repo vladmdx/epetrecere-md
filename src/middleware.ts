@@ -293,14 +293,21 @@ export default clerkMiddleware(async (auth, req) => {
     await auth.protect();
   }
 
-  // Hand the resolved locale to server components. For prefixed URLs we also
-  // rewrite onto the real (unprefixed) route.
+  // Every page lives under the `[locale]` segment, so the locale is a build
+  // parameter and the pages can be prerendered. Romanian is still served
+  // unprefixed on the wire — `/sali` is rewritten onto `/ro/sali` here, which
+  // is an internal rewrite, so the address bar and the indexed URLs are
+  // untouched. A prefixed request already matches the segment and passes
+  // through as it is.
+  //
+  // The header is still set: a handful of non-page surfaces (route handlers,
+  // sitemap, opengraph-image) have no route params to read.
   const headers = new Headers(req.headers);
   headers.set(LOCALE_HEADER, locale);
 
-  if (hasPrefix) {
+  if (!hasPrefix) {
     const url = req.nextUrl.clone();
-    url.pathname = pathname;
+    url.pathname = `/${DEFAULT_LOCALE}${pathname === "/" ? "" : pathname}`;
     return NextResponse.rewrite(url, { request: { headers } });
   }
   return NextResponse.next({ request: { headers } });
