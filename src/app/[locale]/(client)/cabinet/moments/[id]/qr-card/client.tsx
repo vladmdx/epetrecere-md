@@ -13,24 +13,27 @@ import Link from "next/link";
 import { ArrowLeft, Printer, Loader2 } from "lucide-react";
 import QRCode from "qrcode";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 type Template = "classic" | "romantic" | "modern";
 
-const TEMPLATES: Array<{ key: Template; label: string; description: string }> = [
+/** Translation keys, not copy — resolved at render time so the picker
+ *  and the caption below it follow the reader's language. */
+const TEMPLATES: Array<{ key: Template; labelKey: string; descriptionKey: string }> = [
   {
     key: "classic",
-    label: "Classic gold",
-    description: "Ramă aurie subțire pe fundal crem. Discret, elegant.",
+    labelKey: "moments.qrCard.classicLabel",
+    descriptionKey: "moments.qrCard.classicDesc",
   },
   {
     key: "romantic",
-    label: "Romantic floral",
-    description: "Motive florale gold + cursive — perfect pentru nuntă.",
+    labelKey: "moments.qrCard.romanticLabel",
+    descriptionKey: "moments.qrCard.romanticDesc",
   },
   {
     key: "modern",
-    label: "Modern geometric",
-    description: "Linii curate, contrast înalt. Pentru evenimente corporate.",
+    labelKey: "moments.qrCard.modernLabel",
+    descriptionKey: "moments.qrCard.modernDesc",
   },
 ];
 
@@ -42,6 +45,7 @@ interface Plan {
 }
 
 export function QrCardClient({ planId }: { planId: number }) {
+  const { t } = useLocale();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [template, setTemplate] = useState<Template>("classic");
@@ -117,14 +121,13 @@ export function QrCardClient({ planId }: { planId: number }) {
     return (
       <div className="mx-auto max-w-xl px-4 py-20 text-center">
         <p className="text-sm text-muted-foreground">
-          Activează mai întâi galeria Photo Moments ca să poți tipări
-          cardul cu QR.
+          {t("moments.qrCard.disabled")}
         </p>
         <Link
           href={`/cabinet/moments/${planId}`}
           className="mt-4 inline-block text-sm text-gold hover:underline"
         >
-          ← Înapoi la galerie
+          ← {t("moments.backToGallery")}
         </Link>
       </div>
     );
@@ -138,7 +141,7 @@ export function QrCardClient({ planId }: { planId: number }) {
           href={`/cabinet/moments/${planId}`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold"
         >
-          <ArrowLeft className="h-3 w-3" /> Înapoi la galerie
+          <ArrowLeft className="h-3 w-3" /> {t("moments.backToGallery")}
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <select
@@ -146,9 +149,9 @@ export function QrCardClient({ planId }: { planId: number }) {
             onChange={(e) => setTemplate(e.target.value as Template)}
             className="rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold focus:outline-none"
           >
-            {TEMPLATES.map((t) => (
-              <option key={t.key} value={t.key}>
-                {t.label}
+            {TEMPLATES.map((tpl) => (
+              <option key={tpl.key} value={tpl.key}>
+                {t(tpl.labelKey)}
               </option>
             ))}
           </select>
@@ -157,15 +160,18 @@ export function QrCardClient({ planId }: { planId: number }) {
             disabled={!qrDataUrl}
             className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-50"
           >
-            <Printer className="h-4 w-4" /> Tipărește / Salvează PDF
+            <Printer className="h-4 w-4" /> {t("moments.qrCard.print")}
           </button>
         </div>
       </div>
 
       <p className="print-hide mb-4 text-xs text-muted-foreground">
-        {TEMPLATES.find((t) => t.key === template)?.description}{" "}
+        {t(
+          TEMPLATES.find((tpl) => tpl.key === template)?.descriptionKey ??
+            "moments.qrCard.classicDesc",
+        )}{" "}
         <span className="ml-1 text-gold">
-          File → Print → Save as PDF, format A6 portrait.
+          {t("moments.qrCard.printHint")}
         </span>
       </p>
 
@@ -220,7 +226,7 @@ export function QrCardClient({ planId }: { planId: number }) {
               { }
               <img
                 src={qrDataUrl}
-                alt="QR pentru upload poze"
+                alt={t("moments.qrCard.qrAlt")}
                 style={{ width: "55mm", height: "55mm", display: "block" }}
               />
             </div>
@@ -231,9 +237,9 @@ export function QrCardClient({ planId }: { planId: number }) {
             className="z-10 mb-2 flex flex-col items-center"
             style={{ color: templateStyle(template).body }}
           >
-            <p className="text-sm font-semibold">Scanează codul</p>
+            <p className="text-sm font-semibold">{t("moments.qrCard.scanCode")}</p>
             <p className="mt-0.5 text-xs">
-              Împărtășește pozele tale instant — fără cont, fără aplicație.
+              {t("moments.qrCard.scanHint")}
             </p>
             <p
               className="mt-2 text-[10px] uppercase tracking-[3px]"

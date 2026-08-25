@@ -22,6 +22,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Booking {
   id: number;
@@ -80,6 +81,7 @@ export function VenueFinanciarClient({
   chartData,
   commissionByBooking,
 }: Props) {
+  const { t } = useLocale();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [filter, setFilter] = useState<"all" | "paid" | "unpaid">("all");
   const [search, setSearch] = useState("");
@@ -218,7 +220,7 @@ export function VenueFinanciarClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut actualiza");
+        toast.error(err.error || t("vendor.venueFinance.updateError"));
         // Rollback.
         setBookings((prev) =>
           prev.map((x) =>
@@ -229,10 +231,10 @@ export function VenueFinanciarClient({
       }
       toast.success(
         next === "paid"
-          ? "Marcat plătit"
+          ? t("vendor.venueFinance.markedPaid")
           : next === "partial"
-            ? "Marcat plată parțială"
-            : "Marcat neplătit",
+            ? t("vendor.venueFinance.markedPartial")
+            : t("vendor.venueFinance.markedUnpaid"),
       );
     } finally {
       setTogglingPaid(null);
@@ -254,10 +256,10 @@ export function VenueFinanciarClient({
         <td style="text-align:right">${gross}€</td>
         <td style="text-align:right;color:#888">${commission}€</td>
         <td style="text-align:right;color:#0a7">${net}€</td>
-        <td>${b.paidStatus === "paid" ? "✓ Plătit" : "În așteptare"}</td>
+        <td>${b.paidStatus === "paid" ? `✓ ${t("vendor.venueFinance.statusPaid")}` : t("vendor.venueFinance.statusPending")}</td>
       </tr>`;
     });
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Raport Financiar — ${venueName}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t("vendor.venueFinance.reportTitle")} — ${venueName}</title>
       <style>body{font-family:system-ui;padding:40px;color:#222}
       h1{color:#A08839;margin:0}
       h2{color:#666;font-size:14px;font-weight:normal;margin:4px 0 20px}
@@ -269,19 +271,19 @@ export function VenueFinanciarClient({
       .stat-value{font-size:22px;font-weight:bold;color:#A08839;margin-top:4px}
       @media print{@page{margin:15mm}}</style></head>
       <body>
-        <h1>Raport Financiar</h1>
-        <h2>${venueName} · Generat ${new Date().toLocaleDateString("ro-RO")}</h2>
+        <h1>${t("vendor.venueFinance.reportTitle")}</h1>
+        <h2>${venueName} · ${t("vendor.venueFinance.generated")} ${new Date().toLocaleDateString("ro-RO")}</h2>
         <div class="summary">
-          <div class="stat"><div class="stat-label">Venituri Total</div><div class="stat-value">${stats.revenueTotal}€</div></div>
-          <div class="stat"><div class="stat-label">Luna Curentă</div><div class="stat-value">${stats.revenueThisMonth}€</div></div>
-          <div class="stat"><div class="stat-label">Comision platformă</div><div class="stat-value">${stats.commissionThisMonth}€</div></div>
-          <div class="stat"><div class="stat-label">Rezervări Luna</div><div class="stat-value">${stats.bookingsThisMonth}</div></div>
+          <div class="stat"><div class="stat-label">${t("vendor.venueFinance.revenueTotal")}</div><div class="stat-value">${stats.revenueTotal}€</div></div>
+          <div class="stat"><div class="stat-label">${t("vendor.venueFinance.currentMonthCap")}</div><div class="stat-value">${stats.revenueThisMonth}€</div></div>
+          <div class="stat"><div class="stat-label">${t("vendor.venueFinance.platformCommission")}</div><div class="stat-value">${stats.commissionThisMonth}€</div></div>
+          <div class="stat"><div class="stat-label">${t("vendor.venueFinance.bookingsMonth")}</div><div class="stat-value">${stats.bookingsThisMonth}</div></div>
         </div>
         <table>
           <thead><tr>
-            <th>ID</th><th>Client</th><th>Eveniment</th><th>Data</th>
-            <th style="text-align:right">Sumă</th><th style="text-align:right">Comision</th>
-            <th style="text-align:right">Net</th><th>Status</th>
+            <th>ID</th><th>${t("auth.roleClient")}</th><th>${t("vendor.venueFinance.colEvent")}</th><th>${t("vendor.venueFinance.colDate")}</th>
+            <th style="text-align:right">${t("vendor.venueFinance.colAmount")}</th><th style="text-align:right">${t("vendor.venueFinance.colCommission")}</th>
+            <th style="text-align:right">${t("vendor.venueFinance.colNet")}</th><th>${t("vendor.venueFinance.colStatus")}</th>
           </tr></thead>
           <tbody>${rows.join("")}</tbody>
         </table>
@@ -295,7 +297,16 @@ export function VenueFinanciarClient({
   }
 
   function exportExcel() {
-    const header = ["ID", "Client", "Eveniment", "Data", "Suma €", "Comision €", "Net €", "Status plată"];
+    const header = [
+      "ID",
+      t("auth.roleClient"),
+      t("vendor.venueFinance.colEvent"),
+      t("vendor.venueFinance.colDate"),
+      t("vendor.venueFinance.csvAmount"),
+      t("vendor.venueFinance.csvCommission"),
+      t("vendor.venueFinance.csvNet"),
+      t("vendor.venueFinance.csvPaidStatus"),
+    ];
     const rows = bookings.map((b) => [
       b.id,
       b.clientName,
@@ -329,9 +340,9 @@ export function VenueFinanciarClient({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Financiar</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("dashboard.financial")}</h1>
           <p className="text-muted-foreground">
-            Venituri, comision platformă și tranzacții pentru <strong>{venueName}</strong>
+            {t("vendor.venueFinance.subtitle")} <strong>{venueName}</strong>
           </p>
         </div>
         <div className="flex gap-2">
@@ -355,30 +366,30 @@ export function VenueFinanciarClient({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={Wallet}
-          label="Venituri luna"
+          label={t("vendor.venueFinance.revenueMonth")}
           value={`${stats.revenueThisMonth.toLocaleString("ro-RO")}€`}
-          subLabel={`${stats.bookingsThisMonth} rezervări`}
+          subLabel={`${stats.bookingsThisMonth} ${t("vendor.venueFinance.bookingsUnit")}`}
           accent="text-emerald-400"
         />
         <StatCard
           icon={TrendingUp}
-          label="Venituri Total"
+          label={t("vendor.venueFinance.revenueTotal")}
           value={`${stats.revenueTotal.toLocaleString("ro-RO")}€`}
-          subLabel="All time"
+          subLabel={t("vendor.venueFinance.allTime")}
           accent="text-gold"
         />
         <StatCard
           icon={Percent}
-          label="Comision platformă"
+          label={t("vendor.venueFinance.platformCommission")}
           value={`${stats.commissionThisMonth.toLocaleString("ro-RO")}€`}
-          subLabel="Luna curentă"
+          subLabel={t("vendor.venueFinance.currentMonth")}
           accent="text-amber-400"
         />
         <StatCard
           icon={CheckCircle2}
-          label="Status plăți"
+          label={t("vendor.venueFinance.paymentsStatus")}
           value={`${stats.paid} / ${stats.paid + stats.unpaid}`}
-          subLabel={`${stats.unpaid} neplătite`}
+          subLabel={`${stats.unpaid} ${t("vendor.venueFinance.unpaidUnit")}`}
           accent="text-blue-400"
         />
       </div>
@@ -389,10 +400,11 @@ export function VenueFinanciarClient({
           <CardContent className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-heading text-base font-semibold">
-                Venituri pe luni (ultimele 12 luni)
+                {t("vendor.venueFinance.revenueByMonth")}
               </h2>
               <span className="text-xs text-muted-foreground">
-                {chartData.reduce((s, d) => s + d.total, 0).toLocaleString("ro-RO")}€ total
+                {chartData.reduce((s, d) => s + d.total, 0).toLocaleString("ro-RO")}€{" "}
+                {t("vendor.venueFinance.totalLower")}
               </span>
             </div>
             <div className="flex h-48 items-end gap-1">
@@ -430,7 +442,7 @@ export function VenueFinanciarClient({
         <Card>
           <CardContent className="p-5">
             <h2 className="mb-4 font-heading text-base font-semibold">
-              Distribuție tip eveniment
+              {t("vendor.venueFinance.pieTitle")}
             </h2>
             <EventTypePie data={pieData} />
           </CardContent>
@@ -441,11 +453,15 @@ export function VenueFinanciarClient({
       <Card>
         <CardContent className="p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-heading text-base font-semibold">Tranzacții</h2>
+            <h2 className="font-heading text-base font-semibold">{t("vendor.venueFinance.transactions")}</h2>
             <div className="flex gap-1">
               {(["all", "paid", "unpaid"] as const).map((f) => {
                 const label =
-                  f === "all" ? "Toate" : f === "paid" ? "Plătite" : "Neplătite";
+                  f === "all"
+                    ? t("common.all")
+                    : f === "paid"
+                      ? t("vendor.venueFinance.filterPaid")
+                      : t("vendor.venueFinance.filterUnpaid");
                 const count =
                   f === "all"
                     ? bookings.length
@@ -475,26 +491,26 @@ export function VenueFinanciarClient({
           <div className="mb-4 flex flex-wrap items-end gap-3 rounded-lg bg-muted/20 p-3">
             <div className="min-w-[180px] flex-1">
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <Search className="mr-1 inline h-3 w-3" /> Caută
+                <Search className="mr-1 inline h-3 w-3" /> {t("common.search")}
               </label>
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Nume client, #ID, eveniment..."
+                placeholder={t("vendor.venueFinance.searchPlaceholder")}
                 className="mt-1 h-8 w-full rounded-md border border-border/50 bg-background px-2 text-xs"
               />
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <Filter className="mr-1 inline h-3 w-3" /> Tip eveniment
+                <Filter className="mr-1 inline h-3 w-3" /> {t("wizard.steps.eventType")}
               </label>
               <select
                 value={filterEventType}
                 onChange={(e) => setFilterEventType(e.target.value)}
                 className="mt-1 h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
               >
-                <option value="all">Toate</option>
+                <option value="all">{t("common.all")}</option>
                 {availableEventTypes.map((t) => (
                   <option key={t} value={t}>
                     {eventTypeLabel(normalizeEventType(t))}
@@ -504,7 +520,7 @@ export function VenueFinanciarClient({
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                De la
+                {t("vendor.venueFinance.dateFrom")}
               </label>
               <input
                 type="date"
@@ -515,7 +531,7 @@ export function VenueFinanciarClient({
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                Până la
+                {t("vendor.venueFinance.dateTo")}
               </label>
               <input
                 type="date"
@@ -531,7 +547,7 @@ export function VenueFinanciarClient({
                 onClick={resetFilters}
                 className="h-8"
               >
-                Resetează
+                {t("catalog.reset")}
               </Button>
             )}
             <span className="ml-auto text-xs text-muted-foreground">
@@ -541,7 +557,11 @@ export function VenueFinanciarClient({
 
           {filtered.length === 0 ? (
             <div className="py-10 text-center text-sm text-muted-foreground">
-              Nicio tranzacție{filter !== "all" ? ` ${filter === "paid" ? "plătită" : "neplătită"}` : ""} încă.
+              {filter === "all"
+                ? t("vendor.venueFinance.emptyAll")
+                : filter === "paid"
+                  ? t("vendor.venueFinance.emptyPaid")
+                  : t("vendor.venueFinance.emptyUnpaid")}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -549,15 +569,15 @@ export function VenueFinanciarClient({
                 <thead>
                   <tr className="border-b border-border/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
                     <th className="pb-2">ID</th>
-                    <th className="pb-2">Client</th>
-                    <th className="pb-2">Eveniment</th>
+                    <th className="pb-2">{t("auth.roleClient")}</th>
+                    <th className="pb-2">{t("vendor.venueFinance.colEvent")}</th>
                     <th className="pb-2">
                       <button
                         type="button"
                         onClick={() => toggleSort("date")}
                         className="inline-flex items-center gap-1 hover:text-gold"
                       >
-                        Data
+                        {t("vendor.venueFinance.colDate")}
                         {sortKey === "date" &&
                           (sortDir === "asc" ? (
                             <ArrowUp className="h-3 w-3" />
@@ -572,7 +592,7 @@ export function VenueFinanciarClient({
                         onClick={() => toggleSort("amount")}
                         className="inline-flex items-center gap-1 hover:text-gold"
                       >
-                        Sumă
+                        {t("vendor.venueFinance.colAmount")}
                         {sortKey === "amount" &&
                           (sortDir === "asc" ? (
                             <ArrowUp className="h-3 w-3" />
@@ -581,9 +601,9 @@ export function VenueFinanciarClient({
                           ))}
                       </button>
                     </th>
-                    <th className="pb-2 text-right">Comision</th>
-                    <th className="pb-2 text-right">Net</th>
-                    <th className="pb-2">Status</th>
+                    <th className="pb-2 text-right">{t("vendor.venueFinance.colCommission")}</th>
+                    <th className="pb-2 text-right">{t("vendor.venueFinance.colNet")}</th>
+                    <th className="pb-2">{t("vendor.venueFinance.colStatus")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -633,7 +653,7 @@ export function VenueFinanciarClient({
                             type="button"
                             onClick={() => cyclePaidStatus(b)}
                             disabled={togglingPaid === b.id}
-                            title="Click pentru a cicla status: neplătit → parțial → plătit"
+                            title={t("vendor.venueFinance.cycleHint")}
                             className={cn(
                               "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs transition-colors",
                               b.paidStatus === "paid"
@@ -653,10 +673,10 @@ export function VenueFinanciarClient({
                               <Clock className="h-3 w-3" />
                             )}
                             {b.paidStatus === "paid"
-                              ? "Plătit"
+                              ? t("vendor.venueFinance.statusPaid")
                               : b.paidStatus === "partial"
-                                ? "Parțial"
-                                : "În așteptare"}
+                                ? t("calendar.legendPartial")
+                                : t("vendor.venueFinance.statusPending")}
                           </button>
                         </td>
                       </tr>
@@ -688,10 +708,11 @@ function EventTypePie({
     color: string;
   }>;
 }) {
+  const { t } = useLocale();
   if (data.length === 0) {
     return (
       <p className="py-8 text-center text-xs text-muted-foreground">
-        Nicio tranzacție încă.
+        {t("vendor.venueFinance.emptyAll")}
       </p>
     );
   }
@@ -734,7 +755,7 @@ function EventTypePie({
           width={size}
           height={size}
           viewBox={`0 0 ${size} ${size}`}
-          aria-label="Distribuție venituri pe tip eveniment"
+          aria-label={t("vendor.venueFinance.pieAria")}
         >
           {slices.length === 1 ? (
             <>
@@ -757,7 +778,9 @@ function EventTypePie({
         </svg>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <span className="font-heading text-lg font-bold">{total}€</span>
-          <span className="text-[10px] text-muted-foreground">Total</span>
+          <span className="text-[10px] text-muted-foreground">
+            {t("vendor.venueFinance.total")}
+          </span>
         </div>
       </div>
       <ul className="w-full space-y-1 text-xs">

@@ -19,6 +19,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 import {
   ViewSwitcher,
   useViewMode,
@@ -48,6 +49,7 @@ interface WishlistItem {
 type TypeFilter = "all" | "artist" | "venue";
 
 export default function WishlistPage() {
+  const { t } = useLocale();
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
@@ -59,9 +61,9 @@ export default function WishlistPage() {
     fetch("/api/wishlist", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { items: [] }))
       .then((data) => setItems(Array.isArray(data.items) ? data.items : []))
-      .catch(() => toast.error("Nu am putut încărca lista"))
+      .catch(() => toast.error(t("cabinet.favorites.loadError")))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   async function remove(item: WishlistItem) {
     const k = `${item.entityType}:${item.entityId}`;
@@ -80,9 +82,9 @@ export default function WishlistPage() {
             ),
         ),
       );
-      toast.success("Scos din favorite");
+      toast.success(t("cabinet.favorites.removed"));
     } catch {
-      toast.error("Eroare la ștergere");
+      toast.error(t("cabinet.favorites.removeError"));
     } finally {
       setRemoving(null);
     }
@@ -131,13 +133,18 @@ export default function WishlistPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Favoritele mele</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("cabinet.favorites.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {items.length > 0
-              ? `${filtered.length} din ${items.length} ${
-                  items.length === 1 ? "element" : "elemente"
-                }`
-              : "Artiștii și sălile salvate pentru mai târziu."}
+              ? t(
+                  items.length === 1
+                    ? "cabinet.favorites.itemsOne"
+                    : "cabinet.favorites.itemsMany",
+                  { shown: filtered.length, total: items.length },
+                )
+              : t("cabinet.favorites.subtitle")}
           </p>
         </div>
         {items.length > 0 && (
@@ -150,21 +157,20 @@ export default function WishlistPage() {
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center">
             <Heart className="h-10 w-10 text-gold/40" />
             <p className="text-sm font-medium">
-              Niciun artist sau sală salvat încă
+              {t("cabinet.favorites.emptyTitle")}
             </p>
             <p className="max-w-sm text-xs text-muted-foreground">
-              Apasă pe inimioara ❤ de pe orice card de artist sau sală pentru a
-              salva rapid pentru mai târziu.
+              {t("cabinet.favorites.emptyHint")}
             </p>
             <div className="mt-3 flex gap-2">
               <Link href="/artisti">
                 <Button className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
-                  <Music className="h-4 w-4" /> Explorează artiști
+                  <Music className="h-4 w-4" /> {t("home.features.artistsCta")}
                 </Button>
               </Link>
               <Link href="/sali">
                 <Button variant="outline" className="gap-2">
-                  <Building2 className="h-4 w-4" /> Săli
+                  <Building2 className="h-4 w-4" /> {t("venues.breadcrumb")}
                 </Button>
               </Link>
             </div>
@@ -176,16 +182,20 @@ export default function WishlistPage() {
           <div className="flex flex-wrap gap-2">
             {(
               [
-                { key: "all" as const, label: "Toate", count: counts.all },
+                {
+                  key: "all" as const,
+                  label: t("common.all"),
+                  count: counts.all,
+                },
                 {
                   key: "artist" as const,
-                  label: "Artiști",
+                  label: t("nav.artists"),
                   count: counts.artist,
                   icon: Music,
                 },
                 {
                   key: "venue" as const,
-                  label: "Săli",
+                  label: t("venues.breadcrumb"),
                   count: counts.venue,
                   icon: Building2,
                 },
@@ -237,7 +247,7 @@ export default function WishlistPage() {
                     : "border-border/30 text-muted-foreground hover:border-gold/30",
                 )}
               >
-                Toate categoriile
+                {t("catalogFilters.allCategories")}
               </button>
               {availableCategories.map((cat) => (
                 <button
@@ -264,7 +274,7 @@ export default function WishlistPage() {
               <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
                 <Heart className="h-8 w-8 text-gold/40" />
                 <p className="text-sm text-muted-foreground">
-                  Nu ai elemente salvate în această categorie
+                  {t("cabinet.favorites.emptyCategory")}
                 </p>
                 <Button
                   variant="outline"
@@ -274,7 +284,7 @@ export default function WishlistPage() {
                     setCategoryId(null);
                   }}
                 >
-                  Resetează filtrele
+                  {t("filterBar.resetAll")}
                 </Button>
               </CardContent>
             </Card>
@@ -311,6 +321,7 @@ function GridView({
   onRemove: (item: WishlistItem) => void;
   removing: string | null;
 }) {
+  const { t } = useLocale();
   return (
     <div className={gridClassName(cols)}>
       {items.map((item) => {
@@ -347,11 +358,11 @@ function GridView({
                   <span className="inline-flex items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 text-[10px] font-medium backdrop-blur-sm">
                     {item.entityType === "artist" ? (
                       <>
-                        <Music className="h-3 w-3" /> Artist
+                        <Music className="h-3 w-3" /> {t("cabinet.common.artist")}
                       </>
                     ) : (
                       <>
-                        <Building2 className="h-3 w-3" /> Sală
+                        <Building2 className="h-3 w-3" /> {t("cabinet.common.venue")}
                       </>
                     )}
                   </span>
@@ -380,7 +391,9 @@ function GridView({
                       </span>
                     )}
                     {item.priceFrom && (
-                      <span className="text-gold">de la {item.priceFrom}€</span>
+                      <span className="text-gold">
+                        {t("common.from")} {item.priceFrom}€
+                      </span>
                     )}
                   </div>
                 </div>
@@ -388,7 +401,7 @@ function GridView({
                   type="button"
                   onClick={() => onRemove(item)}
                   disabled={removing === k}
-                  aria-label="Șterge din favorite"
+                  aria-label={t("cabinet.favorites.removeAria")}
                   className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-400"
                 >
                   {removing === k ? (
@@ -418,6 +431,7 @@ function ListView({
   onRemove: (item: WishlistItem) => void;
   removing: string | null;
 }) {
+  const { t } = useLocale();
   const isCompact = density === "compact";
   const thumbClass = isCompact
     ? "relative h-16 w-16 overflow-hidden rounded-lg bg-muted"
@@ -474,11 +488,13 @@ function ListView({
                   <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-[10px] font-medium">
                     {item.entityType === "artist" ? (
                       <>
-                        <Music className="h-2.5 w-2.5" /> Artist
+                        <Music className="h-2.5 w-2.5" />{" "}
+                        {t("cabinet.common.artist")}
                       </>
                     ) : (
                       <>
-                        <Building2 className="h-2.5 w-2.5" /> Sală
+                        <Building2 className="h-2.5 w-2.5" />{" "}
+                        {t("cabinet.common.venue")}
                       </>
                     )}
                   </span>
@@ -496,15 +512,17 @@ function ListView({
                     </span>
                   )}
                   {item.priceFrom && (
-                    <span className="text-gold">de la {item.priceFrom}€</span>
+                    <span className="text-gold">
+                      {t("common.from")} {item.priceFrom}€
+                    </span>
                   )}
                   {!isCompact && (
                     <span className="hidden sm:inline">
-                      Salvat{" "}
-                      {new Date(item.addedAt).toLocaleDateString("ro-RO", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
+                      {t("cabinet.favorites.savedOn", {
+                        date: new Date(item.addedAt).toLocaleDateString(
+                          "ro-RO",
+                          { day: "numeric", month: "short", year: "numeric" },
+                        ),
                       })}
                     </span>
                   )}
@@ -514,7 +532,7 @@ function ListView({
                 {!isCompact && (
                   <Link href={href}>
                     <Button size="sm" variant="outline" className="text-xs">
-                      Vezi
+                      {t("cabinet.common.view")}
                     </Button>
                   </Link>
                 )}
@@ -522,7 +540,7 @@ function ListView({
                   type="button"
                   onClick={() => onRemove(item)}
                   disabled={removing === k}
-                  aria-label="Șterge din favorite"
+                  aria-label={t("cabinet.favorites.removeAria")}
                   className="shrink-0 rounded-lg p-2 text-muted-foreground hover:bg-red-500/10 hover:text-red-400"
                 >
                   {removing === k ? (

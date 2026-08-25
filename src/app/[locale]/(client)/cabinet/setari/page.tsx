@@ -8,10 +8,18 @@ import { WhatsAppPhoneInput } from "@/components/shared/whatsapp-phone-input";
 import { NotificationSoundToggle } from "@/components/shared/notification-sound-toggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Bell, MessageCircle } from "lucide-react";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 
 export const dynamic = "force-dynamic";
 
-export default async function ClientSettingsPage() {
+export default async function ClientSettingsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const { userId: clerkId } = await auth();
   let phone: string | null = null;
   if (clerkId) {
@@ -26,9 +34,11 @@ export default async function ClientSettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Setări</h1>
+        <h1 className="font-heading text-2xl font-bold">
+          {t("dashboard.settings", locale)}
+        </h1>
         <p className="text-muted-foreground">
-          Personalizează aspectul și notificările.
+          {t("cabinet.settings.subtitle", locale)}
         </p>
       </div>
 
@@ -36,14 +46,12 @@ export default async function ClientSettingsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Bell className="h-4 w-4 text-gold" />
-            Notificări instant pe dispozitiv
+            {t("cabinet.settings.pushTitle", locale)}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Activează notificările browser / PWA ca să primești un ping
-            imediat ce un artist sau o sală îți acceptă cererea, sau când
-            primești un mesaj.
+            {t("cabinet.settings.pushBody", locale)}
           </p>
           <PushSubscribeButton />
           <NotificationSoundToggle />

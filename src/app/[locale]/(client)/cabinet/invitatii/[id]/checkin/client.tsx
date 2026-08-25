@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface GuestRow {
   id: number;
@@ -50,6 +51,7 @@ export function CheckinClient({
   eventDate,
   guests: initialGuests,
 }: Props) {
+  const { t } = useLocale();
   const [guests, setGuests] = useState<GuestRow[]>(initialGuests);
   const [search, setSearch] = useState("");
   const [polling, setPolling] = useState(true);
@@ -115,7 +117,7 @@ export function CheckinClient({
 
   async function toggleCheckIn(g: GuestRow) {
     if (!g.checkInUrl) {
-      toast.error("Acest invitat nu are un QR valid — adaugă-l manual pe lista imprimată");
+      toast.error(t("cabinet.checkin.noQr"));
       return;
     }
     // Use the public check-in endpoint with the guest's token (extract from URL)
@@ -129,7 +131,7 @@ export function CheckinClient({
         body: JSON.stringify({ token }),
       });
       if (!res.ok) {
-        toast.error("Nu am putut face check-in");
+        toast.error(t("cabinet.checkin.failed"));
         return;
       }
       const data = await res.json();
@@ -139,12 +141,15 @@ export function CheckinClient({
         ),
       );
       toast.success(
-        data.alreadyCheckedIn
-          ? `${g.name} era deja prezent`
-          : `${g.name} marcat prezent`,
+        t(
+          data.alreadyCheckedIn
+            ? "cabinet.checkin.alreadyPresent"
+            : "cabinet.checkin.markedPresent",
+          { name: g.name },
+        ),
       );
     } catch {
-      toast.error("Eroare");
+      toast.error(t("moments.errGeneric"));
     }
   }
 
@@ -154,12 +159,14 @@ export function CheckinClient({
         href={`/cabinet/invitatii/${invitationId}`}
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
       >
-        <ArrowLeft className="h-3 w-3" /> Înapoi la invitație
+        <ArrowLeft className="h-3 w-3" /> {t("cabinet.checkin.back")}
       </Link>
 
       <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Check-in live</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("cabinet.checkin.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {invitationTitle} ·{" "}
             {new Date(eventDate).toLocaleDateString("ro-RO", {
@@ -172,25 +179,25 @@ export function CheckinClient({
         </div>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-400">
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-          Live — update la 5s
+          {t("cabinet.checkin.liveBadge")}
         </span>
       </div>
 
       {/* Stats row */}
       <div className="mt-6 grid gap-3 sm:grid-cols-4">
-        <StatCard label="Invitați total" value={stats.total} />
+        <StatCard label={t("cabinet.checkin.statTotal")} value={stats.total} />
         <StatCard
-          label="Confirmați (RSVP)"
+          label={t("cabinet.checkin.statConfirmed")}
           value={stats.confirmed}
-          subtitle="+1 incluși"
+          subtitle={t("cabinet.checkin.statConfirmedHint")}
         />
         <StatCard
-          label="Așteptați"
+          label={t("cabinet.checkin.statExpected")}
           value={stats.expected}
           subtitle="(conf + plusOne)"
         />
         <StatCard
-          label="Prezenți"
+          label={t("cabinet.checkin.statArrived")}
           value={stats.arrived}
           highlight
           subtitle={
@@ -203,8 +210,10 @@ export function CheckinClient({
 
       <Tabs defaultValue="live" className="mt-6">
         <TabsList>
-          <TabsTrigger value="live">Listă invitați</TabsTrigger>
-          <TabsTrigger value="qr">QR codes — imprimă</TabsTrigger>
+          <TabsTrigger value="live">
+            {t("wizard.extras.guestsTitle")}
+          </TabsTrigger>
+          <TabsTrigger value="qr">{t("cabinet.checkin.tabQr")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="live" className="mt-4 space-y-3">
@@ -213,7 +222,7 @@ export function CheckinClient({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Caută după nume…"
+              placeholder={t("cabinet.checkin.searchPlaceholder")}
               className="pl-10"
             />
           </div>
@@ -240,16 +249,16 @@ export function CheckinClient({
                     {g.name}
                     {g.plusOne && (
                       <span className="ml-1 text-xs text-muted-foreground">
-                        + {g.plusOneName || "acompaniator"}
+                        + {g.plusOneName || t("cabinet.checkin.companion")}
                       </span>
                     )}
                   </p>
                   <p className="text-[11px] text-muted-foreground">
                     {g.rsvpStatus === "yes"
-                      ? "Confirmat"
+                      ? t("cabinet.checkin.rsvpYes")
                       : g.rsvpStatus === "no"
-                        ? "Declinat"
-                        : "Neconfirmat"}
+                        ? t("cabinet.checkin.rsvpNo")
+                        : t("cabinet.checkin.rsvpPending")}
                   </p>
                 </div>
                 {g.checkedInAt && (
@@ -267,7 +276,7 @@ export function CheckinClient({
               <Card>
                 <CardContent className="py-8 text-center text-sm text-muted-foreground">
                   <Users className="mx-auto mb-2 h-6 w-6" />
-                  Niciun invitat.
+                  {t("cabinet.checkin.noGuests")}
                 </CardContent>
               </Card>
             )}
@@ -322,6 +331,7 @@ function QrPrintView({
   guests: GuestRow[];
   eventTitle: string;
 }) {
+  const { t } = useLocale();
   const [qrData, setQrData] = useState<Map<number, string>>(new Map());
   const [generating, setGenerating] = useState(true);
 
@@ -365,14 +375,14 @@ function QrPrintView({
     <div>
       <div className="mb-4 flex items-center justify-between print:hidden">
         <p className="text-sm text-muted-foreground">
-          {printable.length} QR codes generate. Fiecare invitat are unul unic.
+          {t("cabinet.checkin.qrGenerated", { count: printable.length })}
         </p>
         <button
           onClick={print}
           className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-xs font-semibold text-[#0D0D0D] hover:bg-gold-dark"
         >
           <Printer className="h-3.5 w-3.5" />
-          Imprimă
+          {t("cabinet.checkin.print")}
         </button>
       </div>
 
@@ -393,7 +403,7 @@ function QrPrintView({
             </p>
             {g.plusOne && (
               <p className="text-[10px] text-muted-foreground">
-                + {g.plusOneName || "acompaniator"}
+                + {g.plusOneName || t("cabinet.checkin.companion")}
               </p>
             )}
             <p className="mt-1 truncate text-[9px] text-muted-foreground/70">
@@ -404,8 +414,10 @@ function QrPrintView({
       </div>
       {guests.length > printable.length && (
         <p className="mt-4 text-xs text-amber-500 print:hidden">
-          ⚠ {guests.length - printable.length} invitați fără token RSVP — nu
-          pot avea QR auto-generat. Adaugă-i manual pe lista de check-in.
+          ⚠{" "}
+          {t("cabinet.checkin.missingTokens", {
+            count: guests.length - printable.length,
+          })}
         </p>
       )}
     </div>

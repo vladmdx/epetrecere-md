@@ -7,6 +7,7 @@
 import Link from "@/components/shared/locale-link";
 import { useRecentlyViewed, type RecentEntity } from "@/hooks/use-recently-viewed";
 import { History, Music, Building2 } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   type: RecentEntity;
@@ -16,10 +17,14 @@ interface Props {
 }
 
 export function RecentlyViewed({ type, title, className }: Props) {
+  const { t } = useLocale();
   const items = useRecentlyViewed(type);
   if (items.length === 0) return null;
 
-  const defaultTitle = type === "venue" ? "Săli vizualizate recent" : "Artiști vizualizați recent";
+  const defaultTitle =
+    type === "venue"
+      ? t("recentlyViewed.venuesTitle")
+      : t("recentlyViewed.artistsTitle");
   const base = type === "venue" ? "/sali" : "/artisti";
   const Icon = type === "venue" ? Building2 : Music;
 

@@ -19,6 +19,7 @@ import {
   Volume2,
   ScreenShare,
 } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Photo {
   id: number;
@@ -41,6 +42,7 @@ const MAX_PHOTOS = 20;
 const SLIDE_MS = 4000;
 
 export function ReelClient({ planId }: { planId: number }) {
+  const { t } = useLocale();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,14 +154,13 @@ export function ReelClient({ planId }: { planId: number }) {
     return (
       <div className="mx-auto max-w-xl px-4 py-20 text-center">
         <p className="text-sm text-muted-foreground">
-          Nu există încă poze pentru highlight reel. Marchează câteva ca
-          favorite sau așteaptă să vină mai multe încărcări.
+          {t("moments.reel.empty")}
         </p>
         <Link
           href={`/cabinet/moments/${planId}`}
           className="mt-4 inline-block text-sm text-gold hover:underline"
         >
-          ← Înapoi la galerie
+          ← {t("moments.backToGallery")}
         </Link>
       </div>
     );
@@ -174,10 +175,14 @@ export function ReelClient({ planId }: { planId: number }) {
           href={`/cabinet/moments/${planId}`}
           className="inline-flex items-center gap-1 rounded-full bg-black/50 px-3 py-1.5 text-xs text-white/80 backdrop-blur hover:bg-black/70"
         >
-          <ArrowLeft className="h-3 w-3" /> Înapoi
+          <ArrowLeft className="h-3 w-3" /> {t("common.back")}
         </Link>
         <p className="hidden sm:block text-xs text-white/60">
-          {plan?.title} · {photos.length} cadre · {SLIDE_MS / 1000}s / cadru
+          {plan?.title} ·{" "}
+          {t("moments.reel.meta", {
+            count: photos.length,
+            seconds: SLIDE_MS / 1000,
+          })}
         </p>
         <div className="flex items-center gap-2">
           <button
@@ -185,7 +190,7 @@ export function ReelClient({ planId }: { planId: number }) {
             className="inline-flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs text-white/80 backdrop-blur hover:bg-black/70"
           >
             {paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
-            {paused ? "Reia" : "Pauză"}
+            {paused ? t("moments.reel.resume") : t("moments.reel.pause")}
           </button>
           <button
             onClick={() => {
@@ -208,9 +213,9 @@ export function ReelClient({ planId }: { planId: number }) {
               }
             }}
             className="inline-flex items-center gap-1.5 rounded-full bg-gold px-3 py-1.5 text-xs font-medium text-[#0D0D0D] hover:bg-gold-dark"
-            title="Pornește înregistrarea ecranului ca să capturezi reel-ul ca video"
+            title={t("moments.reel.recordHint")}
           >
-            <ScreenShare className="h-3.5 w-3.5" /> Înregistrează
+            <ScreenShare className="h-3.5 w-3.5" /> {t("moments.reel.record")}
           </button>
         </div>
       </div>
@@ -256,7 +261,7 @@ export function ReelClient({ planId }: { planId: number }) {
               className="absolute bottom-6 left-6 flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-xs text-white/90 backdrop-blur hover:bg-black/80 print-hide"
             >
               {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              {muted ? "Fără sunet" : "Muzică"}
+              {muted ? t("moments.slideshow.noSound") : t("moments.slideshow.music")}
             </button>
           )}
           {autoplayBlocked && (
@@ -266,7 +271,7 @@ export function ReelClient({ planId }: { planId: number }) {
                 onClick={startMusic}
                 className="flex items-center gap-2 rounded-full bg-gold px-5 py-2.5 text-sm font-semibold text-[#0D0D0D] shadow-2xl hover:bg-gold-dark"
               >
-                <Play className="h-4 w-4 fill-current" /> Pornește muzica
+                <Play className="h-4 w-4 fill-current" /> {t("moments.slideshow.startMusic")}
               </button>
             </div>
           )}

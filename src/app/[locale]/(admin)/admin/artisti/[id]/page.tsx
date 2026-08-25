@@ -19,6 +19,7 @@ import { PackagesManager } from "@/components/vendor/packages-manager";
 import { ArrowLeft, Save, Sparkles, Eye, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { useLocale } from "@/hooks/use-locale";
 
 interface ArtistData {
   id: number;
@@ -39,6 +40,7 @@ interface ArtistData {
 }
 
 export default function EditArtistPage() {
+  const { t } = useLocale();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -61,10 +63,10 @@ export default function EditArtistPage() {
       fetch(`/api/artists/${id}`)
         .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
         .then((data) => { setArtist(data); })
-        .catch(() => { toast.error("Nu s-a putut încărca artistul"); })
+        .catch(() => { toast.error(t("admin.artistEdit.loadError")); })
         .finally(() => { setLoading(false); });
     }
-  }, [id, isNew]);
+  }, [id, isNew, t]);
 
   function update(partial: Partial<ArtistData>) {
     setArtist((prev) => ({ ...prev, ...partial }));
@@ -82,24 +84,24 @@ export default function EditArtistPage() {
       });
       if (!res.ok) throw new Error("Save failed");
       const saved = await res.json();
-      toast.success(isNew ? "Artist creat!" : "Artist salvat!");
+      toast.success(isNew ? t("admin.artistEdit.created") : t("admin.artistEdit.saved"));
       if (isNew) router.push(`/admin/artisti/${saved.id}`);
     } catch {
-      toast.error("Eroare la salvare");
+      toast.error(t("admin.artistEdit.saveError"));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete() {
-    if (!confirm("Sigur vrei să ștergi acest artist?")) return;
+    if (!confirm(t("admin.artistEdit.deleteConfirm"))) return;
     try {
       const res = await fetch(`/api/artists/crud?id=${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      toast.success("Artist șters");
+      toast.success(t("admin.artistEdit.deleted"));
       router.push("/admin/artisti");
     } catch {
-      toast.error("Nu s-a putut șterge artistul");
+      toast.error(t("admin.artistEdit.deleteError"));
     }
   }
 
@@ -123,9 +125,9 @@ export default function EditArtistPage() {
       } else {
         update({ descriptionRo: data.result });
       }
-      toast.success("Generat cu AI!");
+      toast.success(t("admin.artistEdit.aiGenerated"));
     } catch {
-      toast.error("AI indisponibil");
+      toast.error(t("admin.artistEdit.aiUnavailable"));
     }
   }
 
@@ -137,51 +139,51 @@ export default function EditArtistPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Link href="/admin/artisti">
-          <Button variant="ghost" size="icon" aria-label="Înapoi la listă artiști"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label={t("admin.artistEdit.backToArtists")}><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div className="flex-1">
-          <h1 className="font-heading text-2xl font-bold">{isNew ? "Artist Nou" : `Editare: ${artist.nameRo}`}</h1>
+          <h1 className="font-heading text-2xl font-bold">{isNew ? t("admin.artistEdit.newArtist") : t("admin.artistEdit.editing", { name: artist.nameRo ?? "" })}</h1>
         </div>
         {!isNew && (
           <>
             <Link href={`/artisti/${artist.slug}`} target="_blank">
-              <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> Preview</Button>
+              <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> {t("admin.artistEdit.preview")}</Button>
             </Link>
-            <Button variant="outline" className="text-destructive gap-2" onClick={handleDelete}><Trash2 className="h-4 w-4" /> Șterge</Button>
+            <Button variant="outline" className="text-destructive gap-2" onClick={handleDelete}><Trash2 className="h-4 w-4" /> {t("admin.artistEdit.delete")}</Button>
           </>
         )}
         <Button onClick={handleSave} disabled={saving} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Salvează
+          {t("admin.artistEdit.save")}
         </Button>
       </div>
 
       <Tabs defaultValue="general">
         <TabsList>
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="description">Descriere</TabsTrigger>
-          <TabsTrigger value="gallery">Galerie</TabsTrigger>
-          <TabsTrigger value="packages">Pachete</TabsTrigger>
-          <TabsTrigger value="seo">SEO</TabsTrigger>
+          <TabsTrigger value="general">{t("admin.artistEdit.tabGeneral")}</TabsTrigger>
+          <TabsTrigger value="description">{t("admin.artistEdit.tabDescription")}</TabsTrigger>
+          <TabsTrigger value="gallery">{t("admin.artistEdit.tabGallery")}</TabsTrigger>
+          <TabsTrigger value="packages">{t("admin.artistEdit.tabPackages")}</TabsTrigger>
+          <TabsTrigger value="seo">{t("admin.artistEdit.tabSeo")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-6">
           <Card>
-            <CardHeader><CardTitle>Informații de bază</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("admin.artistEdit.basicInfo")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
-                <div><Label>Nume (RO) *</Label><Input value={artist.nameRo || ""} onChange={(e) => update({ nameRo: e.target.value })} /></div>
-                <div><Label>Nume (RU)</Label><Input value={artist.nameRu || ""} onChange={(e) => update({ nameRu: e.target.value })} /></div>
-                <div><Label>Nume (EN)</Label><Input value={artist.nameEn || ""} onChange={(e) => update({ nameEn: e.target.value })} /></div>
+                <div><Label>{t("admin.artistEdit.nameRo")}</Label><Input value={artist.nameRo || ""} onChange={(e) => update({ nameRo: e.target.value })} /></div>
+                <div><Label>{t("admin.artistEdit.nameRu")}</Label><Input value={artist.nameRu || ""} onChange={(e) => update({ nameRu: e.target.value })} /></div>
+                <div><Label>{t("admin.artistEdit.nameEn")}</Label><Input value={artist.nameEn || ""} onChange={(e) => update({ nameEn: e.target.value })} /></div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div><Label>Slug</Label><Input value={artist.slug || ""} onChange={(e) => update({ slug: e.target.value })} /></div>
-                <div><Label>Locație</Label><Input value={artist.location || ""} onChange={(e) => update({ location: e.target.value })} /></div>
+                <div><Label>{t("admin.artistEdit.slug")}</Label><Input value={artist.slug || ""} onChange={(e) => update({ slug: e.target.value })} /></div>
+                <div><Label>{t("admin.artistEdit.location")}</Label><Input value={artist.location || ""} onChange={(e) => update({ location: e.target.value })} /></div>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                <div><Label>Preț de la (€)</Label><Input type="number" value={artist.priceFrom || 0} onChange={(e) => update({ priceFrom: Number(e.target.value) })} /></div>
-                <div><Label>Telefon</Label><Input value={artist.phone || ""} onChange={(e) => update({ phone: e.target.value })} /></div>
-                <div><Label>Email</Label><Input value={artist.email || ""} onChange={(e) => update({ email: e.target.value })} /></div>
+                <div><Label>{t("admin.artistEdit.priceFrom")}</Label><Input type="number" value={artist.priceFrom || 0} onChange={(e) => update({ priceFrom: Number(e.target.value) })} /></div>
+                <div><Label>{t("admin.artistEdit.phone")}</Label><Input value={artist.phone || ""} onChange={(e) => update({ phone: e.target.value })} /></div>
+                <div><Label>{t("admin.artistEdit.email")}</Label><Input value={artist.email || ""} onChange={(e) => update({ email: e.target.value })} /></div>
               </div>
               <div className="grid gap-4 sm:grid-cols-4">
                 <div><Label>Instagram</Label><Input value={artist.instagram || ""} onChange={(e) => update({ instagram: e.target.value })} /></div>
@@ -193,17 +195,17 @@ export default function EditArtistPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Setări</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("admin.artistEdit.settings")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {([
-                ["isActive", "Activ", "Vizibil pe site"],
-                ["isFeatured", "Featured", "Apare pe homepage"],
-                ["isVerified", "Verificat", "Badge verificat"],
-                ["isPremium", "Premium", "Badge premium"],
-                ["calendarEnabled", "Calendar activ", "Afișează calendarul pe profil"],
-              ] as const).map(([key, label, desc]) => (
+                ["isActive", "admin.artistEdit.flagActive", "admin.artistEdit.flagActiveHint"],
+                ["isFeatured", "admin.artistEdit.flagFeatured", "admin.artistEdit.flagFeaturedHint"],
+                ["isVerified", "admin.artistEdit.flagVerified", "admin.artistEdit.flagVerifiedHint"],
+                ["isPremium", "admin.artistEdit.flagPremium", "admin.artistEdit.flagPremiumHint"],
+                ["calendarEnabled", "admin.artistEdit.flagCalendar", "admin.artistEdit.flagCalendarHint"],
+              ] as const).map(([key, labelKey, descKey]) => (
                 <div key={key} className="flex items-center justify-between">
-                  <div><Label>{label}</Label><p className="text-xs text-muted-foreground">{desc}</p></div>
+                  <div><Label>{t(labelKey)}</Label><p className="text-xs text-muted-foreground">{t(descKey)}</p></div>
                   <Switch checked={!!artist[key]} onCheckedChange={(v) => update({ [key]: v } as Partial<ArtistData>)} />
                 </div>
               ))}
@@ -215,23 +217,23 @@ export default function EditArtistPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Descriere</CardTitle>
+                <CardTitle>{t("admin.artistEdit.descriptionTitle")}</CardTitle>
                 <Button variant="outline" size="sm" className="gap-1" onClick={() => handleAIGenerate("description")}>
-                  <Sparkles className="h-3.5 w-3.5 text-gold" /> Generează cu AI
+                  <Sparkles className="h-3.5 w-3.5 text-gold" /> {t("admin.artistEdit.generateAi")}
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>Descriere (RO)</Label><RichEditor content={artist.descriptionRo || ""} onChange={(html) => update({ descriptionRo: html })} /></div>
-              <div><Label>Descriere (RU)</Label><RichEditor content={artist.descriptionRu || ""} onChange={(html) => update({ descriptionRu: html })} /></div>
-              <div><Label>Descriere (EN)</Label><RichEditor content={artist.descriptionEn || ""} onChange={(html) => update({ descriptionEn: html })} /></div>
+              <div><Label>{t("admin.artistEdit.descriptionRo")}</Label><RichEditor content={artist.descriptionRo || ""} onChange={(html) => update({ descriptionRo: html })} /></div>
+              <div><Label>{t("admin.artistEdit.descriptionRu")}</Label><RichEditor content={artist.descriptionRu || ""} onChange={(html) => update({ descriptionRu: html })} /></div>
+              <div><Label>{t("admin.artistEdit.descriptionEn")}</Label><RichEditor content={artist.descriptionEn || ""} onChange={(html) => update({ descriptionEn: html })} /></div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="gallery" className="mt-6">
           <Card>
-            <CardHeader><CardTitle>Galerie Imagini</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("admin.artistEdit.gallery")}</CardTitle></CardHeader>
             <CardContent>
               <ImageUpload
                 images={(artist.images || []).map((img) => ({ id: String(img.id), url: img.url, alt: img.altRo || "", isCover: img.isCover }))}
@@ -253,9 +255,9 @@ export default function EditArtistPage() {
         <TabsContent value="packages" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Pachete</CardTitle>
+              <CardTitle>{t("admin.artistEdit.packages")}</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Ofertele artistului — apar pe profilul public sub tab-ul „Pachete”.
+                {t("admin.artistEdit.packagesHint")}
               </p>
             </CardHeader>
             <CardContent>
@@ -268,20 +270,20 @@ export default function EditArtistPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>SEO</CardTitle>
+                <CardTitle>{t("admin.artistEdit.seo")}</CardTitle>
                 <Button variant="outline" size="sm" className="gap-1" onClick={() => handleAIGenerate("seo")}>
-                  <Sparkles className="h-3.5 w-3.5 text-gold" /> Auto-generează SEO
+                  <Sparkles className="h-3.5 w-3.5 text-gold" /> {t("admin.artistEdit.autoGenerateSeo")}
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>Meta Title (RO)</Label><Input value={artist.seoTitleRo || ""} onChange={(e) => update({ seoTitleRo: e.target.value })} maxLength={60} /><p className="text-xs text-muted-foreground mt-1">{(artist.seoTitleRo || "").length}/60</p></div>
-              <div><Label>Meta Description (RO)</Label><Input value={artist.seoDescRo || ""} onChange={(e) => update({ seoDescRo: e.target.value })} maxLength={155} /><p className="text-xs text-muted-foreground mt-1">{(artist.seoDescRo || "").length}/155</p></div>
+              <div><Label>{t("admin.artistEdit.metaTitleRo")}</Label><Input value={artist.seoTitleRo || ""} onChange={(e) => update({ seoTitleRo: e.target.value })} maxLength={60} /><p className="text-xs text-muted-foreground mt-1">{(artist.seoTitleRo || "").length}/60</p></div>
+              <div><Label>{t("admin.artistEdit.metaDescRo")}</Label><Input value={artist.seoDescRo || ""} onChange={(e) => update({ seoDescRo: e.target.value })} maxLength={155} /><p className="text-xs text-muted-foreground mt-1">{(artist.seoDescRo || "").length}/155</p></div>
               <div className="rounded-lg border border-border/40 p-4">
-                <p className="text-xs text-muted-foreground mb-1">Preview Google:</p>
-                <p className="text-blue-600 text-sm">{artist.seoTitleRo || `${artist.nameRo} — Artist Evenimente | ePetrecere.md`}</p>
+                <p className="text-xs text-muted-foreground mb-1">{t("admin.artistEdit.googlePreview")}</p>
+                <p className="text-blue-600 text-sm">{artist.seoTitleRo || t("admin.artistEdit.serpTitleFallback", { name: artist.nameRo ?? "" })}</p>
                 <p className="text-green-700 text-xs">epetrecere.md/artisti/{artist.slug}</p>
-                <p className="text-xs text-muted-foreground">{artist.seoDescRo || "Descrierea meta va apărea aici..."}</p>
+                <p className="text-xs text-muted-foreground">{artist.seoDescRo || t("admin.artistEdit.serpDescFallback")}</p>
               </div>
             </CardContent>
           </Card>

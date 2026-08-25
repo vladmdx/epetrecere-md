@@ -138,7 +138,7 @@ export function ArtistCard({ artist, availableOn }: ArtistCardProps) {
               </p>
             ) : (
               <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">
-                <Lock className="h-3 w-3" /> Preț la autentificare
+                <Lock className="h-3 w-3" /> {t("common.priceOnLogin")}
               </span>
             )
           ) : null}

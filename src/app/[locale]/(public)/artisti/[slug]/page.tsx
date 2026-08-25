@@ -11,7 +11,7 @@ import {
 } from "@/lib/db/queries/artists";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { artistJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
-import { getLocalized } from "@/i18n";
+import { getLocalized, t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { ArtistDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
@@ -85,7 +85,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ArtistPage({ params }: Props) {
-  const { slug } = await params;
+  const { locale: rawLocale, slug } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
 
   // AD-29: check if this slug has been superseded by a newer one
   const redirectTarget = await resolveRedirect(slug);
@@ -123,8 +124,8 @@ export default async function ArtistPage({ params }: Props) {
   const desc = getLocalized(artist, "description", "ro");
 
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Artiști", url: "/artisti" },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("nav.artists", locale), url: "/artisti" },
     { name, url: `/artisti/${slug}` },
   ];
 

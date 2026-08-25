@@ -8,7 +8,7 @@ import { localizePath } from "@/lib/i18n/routing";
 
 export function ClearCompareButton() {
   const router = useRouter();
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const { clear } = useCompare("venue");
 
   return (
@@ -22,7 +22,7 @@ export function ClearCompareButton() {
       className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs text-muted-foreground hover:border-red-500/40 hover:text-red-400"
     >
       <Trash2 className="h-3.5 w-3.5" />
-      Curăță comparația
+      {t("compare.clear")}
     </button>
   );
 }

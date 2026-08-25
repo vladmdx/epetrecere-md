@@ -8,6 +8,7 @@ import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { playMessageChime } from "@/lib/notifications/sound";
+import { useLocale } from "@/hooks/use-locale";
 
 interface ConversationPreview {
   id: number;
@@ -22,19 +23,23 @@ interface ConversationPreview {
 // the user clearly opened the conversation).
 const POLL_INTERVAL_MS = 15_000;
 
-function timeAgo(iso: string): string {
+function timeAgo(
+  iso: string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "acum";
-  if (mins < 60) return `${mins}m`;
+  if (mins < 1) return t("notifications.justNow");
+  if (mins < 60) return t("notifications.minutesAgo", { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return t("notifications.hoursAgo", { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}z`;
+  if (days < 7) return t("notifications.daysAgo", { n: days });
   return new Date(iso).toLocaleDateString("ro-MD");
 }
 
 export function ChatBell() {
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const [open, setOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationPreview[]>([]);
@@ -67,7 +72,10 @@ export function ChatBell() {
       if (Array.isArray(data)) {
         const convos: ConversationPreview[] = data.map((c: Record<string, unknown>) => ({
           id: c.id as number,
-          artistName: (c.artistName as string) || (c.clientName as string) || "Conversație",
+          artistName:
+            (c.artistName as string) ||
+            (c.clientName as string) ||
+            t("chat.bell.fallbackName"),
           lastMessagePreview: c.lastMessagePreview as string | null,
           lastMessageAt: c.lastMessageAt as string | null,
           unread: userRole === "artist"
@@ -87,7 +95,7 @@ export function ChatBell() {
     } catch {
       // silent
     }
-  }, [isSignedIn, userRole]);
+  }, [isSignedIn, userRole, t]);
 
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
@@ -131,7 +139,7 @@ export function ChatBell() {
         variant="ghost"
         size="icon"
         className="relative h-9 w-9 rounded-full"
-        aria-label="Mesaje"
+        aria-label={t("chat.bell.title")}
         onClick={() => { setOpen((v) => !v); if (!open) load(); }}
       >
         <MessageCircle className="h-5 w-5" />
@@ -156,16 +164,18 @@ export function ChatBell() {
             className="fixed right-2 top-14 z-50 w-[calc(100vw-1rem)] max-w-sm overflow-hidden rounded-xl border border-border/40 bg-popover shadow-2xl sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:w-72"
           >
             <div className="flex items-center justify-between border-b border-border/40 px-4 py-2.5">
-              <h3 className="text-sm font-semibold">Mesaje</h3>
+              <h3 className="text-sm font-semibold">{t("chat.bell.title")}</h3>
               {totalUnread > 0 && (
-                <span className="text-[10px] text-gold">{totalUnread} necitite</span>
+                <span className="text-[10px] text-gold">
+                  {t("notifications.unreadCount", { count: totalUnread })}
+                </span>
               )}
             </div>
 
             <div className="max-h-64 overflow-y-auto">
               {conversations.length === 0 ? (
                 <div className="p-4 text-center text-xs text-muted-foreground">
-                  Nu aveți conversații încă.
+                  {t("chat.bell.empty")}
                 </div>
               ) : (
                 conversations
@@ -192,7 +202,7 @@ export function ChatBell() {
                           <p className="text-xs font-medium truncate">{conv.artistName}</p>
                           {conv.lastMessageAt && (
                             <span className="text-[10px] text-muted-foreground shrink-0">
-                              {timeAgo(conv.lastMessageAt)}
+                              {timeAgo(conv.lastMessageAt, t)}
                             </span>
                           )}
                         </div>

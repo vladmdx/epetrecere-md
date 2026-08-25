@@ -12,11 +12,19 @@ import { legalAcceptances, users, artists, venues } from "@/lib/db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getLegalDocument } from "@/lib/legal";
+import { t } from "@/i18n";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { ShieldCheck } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminContractsPage() {
+export default async function AdminContractsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const admin = await requireAdmin();
   if (!admin.ok) redirect("/");
 
@@ -60,18 +68,16 @@ export default async function AdminContractsPage() {
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Contracte semnate</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("adminUi.contracts.title", locale)}</h1>
         <p className="text-sm text-muted-foreground">
-          Acceptările electronice ale furnizorilor, cu fixarea tehnică cerută de
-          Anexa 2. Înregistrările nu pot fi modificate sau șterse.
+          {t("adminUi.contracts.subtitle", locale)}
         </p>
       </div>
 
       {groups.size === 0 ? (
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
-            Niciun contract semnat încă. Apar aici imediat ce un artist sau o sală
-            acceptă documentele la înregistrare.
+            {t("adminUi.contracts.empty", locale)}
           </CardContent>
         </Card>
       ) : (
@@ -88,17 +94,21 @@ export default async function AdminContractsPage() {
                         <ShieldCheck className="h-4 w-4 text-gold" />
                         <p className="font-semibold">{who}</p>
                         <Badge variant="outline">
-                          {g.subjectType === "venue" ? "Sală" : "Artist"}
+                          {g.subjectType === "venue"
+                            ? t("adminUi.contracts.subjectVenue", locale)
+                            : t("adminUi.contracts.subjectArtist", locale)}
                         </Badge>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Semnat de <strong>{g.signatureName}</strong> ·{" "}
+                        {t("adminUi.contracts.signedBy", locale)}{" "}
+                        <strong>{g.signatureName}</strong> ·{" "}
                         {new Date(g.acceptedAt).toLocaleString("ro-RO")}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {g.email ?? "—"}
-                        {g.phone ? ` · ${g.phone}` : ""} · Pachet v{g.packVersion} ·{" "}
-                        limba {g.locale.toUpperCase()}
+                        {g.phone ? ` · ${g.phone}` : ""} ·{" "}
+                        {t("adminUi.contracts.packVersion", locale, { v: g.packVersion })} ·{" "}
+                        {t("adminUi.contracts.language", locale, { lang: g.locale.toUpperCase() })}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         IP {g.ipAddress ?? "—"} ·{" "}
@@ -130,12 +140,12 @@ export default async function AdminContractsPage() {
                     {g.signatureImage ? (
                       <div className="shrink-0">
                         <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
-                          Semnătură
+                          {t("adminUi.contracts.signature", locale)}
                         </p>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={g.signatureImage}
-                          alt={`Semnătura lui ${g.signatureName}`}
+                          alt={t("adminUi.contracts.signatureAlt", locale, { name: g.signatureName })}
                           className="h-24 w-56 rounded-lg border border-border bg-white object-contain"
                         />
                         <a
@@ -143,12 +153,12 @@ export default async function AdminContractsPage() {
                           download={`semnatura-${g.signatureName.replace(/\s+/g, "-")}.png`}
                           className="mt-1 block text-center text-xs text-gold hover:underline"
                         >
-                          Descarcă
+                          {t("adminUi.contracts.download", locale)}
                         </a>
                       </div>
                     ) : (
                       <p className="shrink-0 text-xs italic text-muted-foreground">
-                        Fără semnătură olografă
+                        {t("adminUi.contracts.noSignature", locale)}
                       </p>
                     )}
                   </div>

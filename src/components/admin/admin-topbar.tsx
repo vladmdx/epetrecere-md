@@ -6,15 +6,17 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 import { NotificationBell } from "@/components/public/notification-bell";
 import { ChatBell } from "@/components/public/chat-bell";
+import { useLocale } from "@/hooks/use-locale";
 
 export function AdminTopbar() {
+  const { t } = useLocale();
   return (
     <header className="flex h-16 items-center justify-between border-b border-border/40 bg-background px-4 pl-16 lg:px-6">
       <div className="flex flex-1 items-center gap-4">
         <div className="relative hidden max-w-md flex-1 sm:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Caută artiști, leads, setări..."
+            placeholder={t("adminUi.topbar.searchPlaceholder")}
             className="pl-9"
           />
         </div>

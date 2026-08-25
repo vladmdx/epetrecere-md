@@ -32,23 +32,10 @@ import {
   getVenueAnalytics,
   type VenueAnalytics,
 } from "@/lib/db/queries/venue-analytics";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 
 export const dynamic = "force-dynamic";
-
-const ROMANIAN_MONTHS = [
-  "Ian",
-  "Feb",
-  "Mar",
-  "Apr",
-  "Mai",
-  "Iun",
-  "Iul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Noi",
-  "Dec",
-];
 
 // Both analytics shapes are identical — this alias is just to make the
 // render code read naturally regardless of entity kind.
@@ -98,7 +85,13 @@ async function resolveAnalytics(): Promise<Resolved | "anon" | "none"> {
   return "none";
 }
 
-export default async function VendorAnalyticsPage() {
+export default async function VendorAnalyticsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const resolved = await resolveAnalytics();
   if (resolved === "anon") {
     redirect("/sign-in?redirect_url=/dashboard/analytics");
@@ -116,46 +109,49 @@ export default async function VendorAnalyticsPage() {
   const conversionDisplay =
     analytics.conversionPct === null ? "—" : `${analytics.conversionPct}%`;
 
-  const subtitleEntity = kind === "venue" ? "sala ta" : "profilul tău public";
+  const subtitleEntity =
+    kind === "venue"
+      ? t("vendor.analyticsPage.entityVenue", locale)
+      : t("vendor.analyticsPage.entityArtist", locale);
 
   const stats = [
     {
-      label: "Vizite luna asta",
+      label: t("vendor.analyticsPage.visitsThisMonth", locale),
       value: analytics.viewsThisMonth.toLocaleString("ro-MD"),
       change: `${deltaSign}${analytics.viewsDeltaPct}%`,
       icon: Eye,
       color: "text-info",
     },
     {
-      label: "Cereri luna asta",
+      label: t("vendor.analyticsPage.requestsThisMonth", locale),
       value: analytics.leadsThisMonth.toString(),
       change: "",
       icon: MessageSquare,
       color: "text-gold",
     },
     {
-      label: "Rezervări confirmate",
+      label: t("vendor.analyticsPage.confirmedBookings", locale),
       value: analytics.confirmedTotal.toString(),
       change: "",
       icon: CheckCircle2,
       color: "text-success",
     },
     {
-      label: "Rata conversie",
+      label: t("vendor.analyticsPage.conversionRate", locale),
       value: conversionDisplay,
       change: "",
       icon: Percent,
       color: "text-warning",
     },
     {
-      label: `Zile rezervate ${year}`,
+      label: t("vendor.analyticsPage.daysBookedYear", locale, { year }),
       value: analytics.daysBookedThisYear.toString(),
       change: "",
       icon: CalendarDays,
       color: "text-gold",
     },
     {
-      label: "Trend luna vs luna",
+      label: t("vendor.analyticsPage.monthTrend", locale),
       value: `${deltaSign}${analytics.viewsDeltaPct}%`,
       change: "",
       icon: TrendingUp,
@@ -167,9 +163,9 @@ export default async function VendorAnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Analitice</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("dashboard.analytics", locale)}</h1>
         <p className="text-sm text-muted-foreground">
-          {entityName} · date live din {subtitleEntity}
+          {entityName} {t("vendor.analyticsPage.liveDataFrom", locale)} {subtitleEntity}
         </p>
       </div>
 
@@ -207,7 +203,7 @@ export default async function VendorAnalyticsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Vizite profil — {year}</CardTitle>
+            <CardTitle>{t("vendor.analyticsPage.profileVisitsYear", locale, { year })}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex h-40 items-end gap-1">
@@ -231,7 +227,7 @@ export default async function VendorAnalyticsPage() {
                     />
                   </div>
                   <span className="text-[10px] text-muted-foreground">
-                    {ROMANIAN_MONTHS[i]}
+                    {t(`vendor.monthShort${i + 1}`, locale)}
                   </span>
                 </div>
               ))}
@@ -241,12 +237,12 @@ export default async function VendorAnalyticsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Surse trafic (luna asta)</CardTitle>
+            <CardTitle>{t("vendor.analyticsPage.trafficSources", locale)}</CardTitle>
           </CardHeader>
           <CardContent>
             {analytics.traffic.length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">
-                Nu există încă vizite în luna curentă.
+                {t("vendor.analyticsPage.noVisits", locale)}
               </p>
             ) : (
               <div className="space-y-3">

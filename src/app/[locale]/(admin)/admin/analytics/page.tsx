@@ -15,6 +15,8 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { and, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { t } from "@/i18n";
+import { DEFAULT_LOCALE, isLocale, type AppLocale } from "@/lib/i18n/routing";
 import { db } from "@/lib/db";
 import { formatAmount } from "@/lib/format/price";
 import {
@@ -39,7 +41,13 @@ function startOfMonthIso(offset = 0): Date {
   return d;
 }
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const now = new Date();
   const thisMonth = startOfMonthIso(0);
   const lastMonth = startOfMonthIso(1);
@@ -215,42 +223,42 @@ export default async function AnalyticsPage() {
 
   const stats = [
     {
-      label: "Vizite luna asta",
+      label: t("adminUi.analytics.statVisits", locale),
       value: viewsThis.toLocaleString("ro-MD"),
       change: pctDelta(viewsThis, viewsLast),
       icon: Eye,
       color: "text-info",
     },
     {
-      label: "Solicitări noi",
+      label: t("adminUi.analytics.statLeads", locale),
       value: leadsThis.toString(),
       change: pctDelta(leadsThis, leadsLast),
       icon: MessageSquare,
       color: "text-gold",
     },
     {
-      label: "Artiști activi",
+      label: t("adminUi.analytics.statActiveArtists", locale),
       value: activeArtists.toString(),
       change: "",
       icon: Users,
       color: "text-success",
     },
     {
-      label: "Rezervări luna asta",
+      label: t("adminUi.analytics.statBookings", locale),
       value: bookingsThis.toString(),
       change: pctDelta(bookingsThis, bookingsLast),
       icon: Calendar,
       color: "text-warning",
     },
     {
-      label: `Revenue estimat ${year}`,
+      label: t("adminUi.analytics.statRevenue", locale, { year }),
       value: formatAmount(revenueYear),
       change: "",
       icon: DollarSign,
       color: "text-gold",
     },
     {
-      label: "Rata conversie",
+      label: t("adminUi.analytics.statConversion", locale),
       value: conversionPct,
       change: "",
       icon: TrendingUp,
@@ -261,12 +269,15 @@ export default async function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold">Analitice</h1>
-        <ExportButtons />
+        <h1 className="font-heading text-2xl font-bold">{t("adminUi.analytics.title", locale)}</h1>
+        <ExportButtons locale={locale} />
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Actualizat {new Date().toLocaleString("ro-MD")} · Data curentă: {todayIso}
+        {t("adminUi.analytics.updatedAt", locale, {
+          at: new Date().toLocaleString("ro-MD"),
+          date: todayIso,
+        })}
       </p>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -303,12 +314,12 @@ export default async function AnalyticsPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Top Artiști per Rezervări</CardTitle>
+            <CardTitle>{t("adminUi.analytics.topArtists", locale)}</CardTitle>
           </CardHeader>
           <CardContent>
             {topArtistsWithNames.length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">
-                Nu există încă rezervări.
+                {t("adminUi.analytics.noBookings", locale)}
               </p>
             ) : (
               <div className="space-y-3">
@@ -321,7 +332,7 @@ export default async function AnalyticsPage() {
                       {a.nameRo}
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {a.bookings} rez.
+                      {t("adminUi.analytics.bookingsShort", locale, { n: a.bookings })}
                     </span>
                     <span className="font-accent text-sm font-semibold text-gold">
                       {formatAmount(a.revenue)}
@@ -335,12 +346,12 @@ export default async function AnalyticsPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Surse Trafic</CardTitle>
+            <CardTitle>{t("adminUi.analytics.trafficSources", locale)}</CardTitle>
           </CardHeader>
           <CardContent>
             {trafficSources.length === 0 ? (
               <p className="py-4 text-sm text-muted-foreground">
-                Nu există date de trafic încă.
+                {t("adminUi.analytics.noTraffic", locale)}
               </p>
             ) : (
               <div className="space-y-3">
@@ -385,7 +396,7 @@ function bucketReferrer(referrer: string | null): string {
   }
 }
 
-function ExportButtons() {
+function ExportButtons({ locale }: { locale: AppLocale }) {
   return (
     <div className="flex gap-2">
       <a
@@ -393,21 +404,21 @@ function ExportButtons() {
         download
         className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-card px-3 py-1.5 text-xs font-medium hover:border-gold/30 hover:text-gold"
       >
-        📊 Export Artiști CSV
+        📊 {t("adminUi.analytics.exportArtists", locale)}
       </a>
       <a
         href="/api/export?type=leads"
         download
         className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-card px-3 py-1.5 text-xs font-medium hover:border-gold/30 hover:text-gold"
       >
-        📋 Export Leads CSV
+        📋 {t("adminUi.analytics.exportLeads", locale)}
       </a>
       <a
         href="/api/export?type=bookings"
         download
         className="inline-flex items-center gap-1.5 rounded-md border border-border/40 bg-card px-3 py-1.5 text-xs font-medium hover:border-gold/30 hover:text-gold"
       >
-        📅 Export Booking CSV
+        📅 {t("adminUi.analytics.exportBookings", locale)}
       </a>
     </div>
   );

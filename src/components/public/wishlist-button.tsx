@@ -126,14 +126,14 @@ export function WishlistButton({
           body: JSON.stringify({ entityType, entityId }),
         });
         if (!res.ok) throw new Error();
-        toast.success("Salvat în favorite");
+        toast.success(t("wishlist.toastSaved"));
       } else {
         const res = await fetch(
           `/api/wishlist?entityType=${entityType}&entityId=${entityId}`,
           { method: "DELETE" },
         );
         if (!res.ok) throw new Error();
-        toast.success("Scos din favorite");
+        toast.success(t("wishlist.toastRemoved"));
       }
     } catch {
       // Rollback
@@ -143,7 +143,7 @@ export function WishlistButton({
         else cache.delete(k);
         notify();
       }
-      toast.error("Eroare. Încearcă din nou.");
+      toast.error(t("wishlist.toastError"));
     } finally {
       setBusy(false);
     }

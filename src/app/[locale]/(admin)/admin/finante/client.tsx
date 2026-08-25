@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatRate, type CommissionRules } from "@/lib/commissions/rules";
 import { Check, RefreshCw, Settings2, AlertTriangle, ListChecks } from "lucide-react";
 import { formatAmount } from "@/lib/format/price";
+import { useLocale } from "@/hooks/use-locale";
 import { toast } from "sonner";
 
 interface Row {
@@ -38,21 +39,22 @@ interface Totals {
   count: number;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: "De achitat",
-  invoiced: "Facturat",
-  paid: "Achitat",
-  cancelled: "Anulat",
-  waived: "Scutit",
+const STATUS_LABEL_KEY: Record<string, string> = {
+  pending: "adminUi.finance.statusPending",
+  invoiced: "adminUi.finance.statusInvoiced",
+  paid: "adminUi.finance.statusPaid",
+  cancelled: "adminUi.finance.statusCancelled",
+  waived: "adminUi.finance.statusWaived",
 };
 
 const FILTERS = [
-  { key: "all", label: "Toate" },
-  { key: "pending,invoiced", label: "Neachitate" },
-  { key: "paid", label: "Achitate" },
+  { key: "all", labelKey: "common.all" },
+  { key: "pending,invoiced", labelKey: "adminUi.finance.filterUnpaid" },
+  { key: "paid", labelKey: "adminUi.finance.filterPaid" },
 ];
 
 export function FinanceClient({ initialRules }: { initialRules: CommissionRules }) {
+  const { t } = useLocale();
   const [rows, setRows] = useState<Row[]>([]);
   const [totals, setTotals] = useState<Totals>({ pending: 0, paid: 0, overdue: 0, count: 0 });
   const [filter, setFilter] = useState("all");
@@ -74,12 +76,12 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
       const { created } = (await res.json()) as { created: number };
       toast.success(
         created > 0
-          ? `${created} comisioane create`
-          : "Toate comenzile confirmate au deja comision",
+          ? t("adminUi.finance.toastCreated", { count: created })
+          : t("adminUi.finance.toastNothingToCreate"),
       );
       await load();
     } catch {
-      toast.error("Sincronizarea a eșuat");
+      toast.error(t("adminUi.finance.toastSyncFailed"));
     } finally {
       setReconciling(false);
     }
@@ -141,27 +143,26 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Finanțe</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("adminUi.finance.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Comisioanele datorate de furnizori. Achitarea se face în afara platformei;
-            marchează manual când banii au intrat.
+            {t("adminUi.finance.subtitle")}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowRules((v) => !v)} className="gap-2">
-            <Settings2 className="h-4 w-4" /> Reguli comision
+            <Settings2 className="h-4 w-4" /> {t("adminUi.finance.rules")}
           </Button>
           <Button variant="outline" onClick={() => void load()} className="gap-2">
-            <RefreshCw className="h-4 w-4" /> Reîmprospătează
+            <RefreshCw className="h-4 w-4" /> {t("adminUi.finance.refresh")}
           </Button>
           <Button
             variant="outline"
             disabled={reconciling}
             onClick={() => void reconcile()}
             className="gap-2"
-            title="Creează rândurile lipsă pentru comenzile confirmate. Sigur de rulat oricând."
+            title={t("adminUi.finance.syncHint")}
           >
-            <ListChecks className="h-4 w-4" /> Sincronizează
+            <ListChecks className="h-4 w-4" /> {t("adminUi.finance.sync")}
           </Button>
         </div>
       </div>
@@ -170,11 +171,11 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
         <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
           <div>
-            <p className="font-semibold">Comisionul pentru săli nu e configurat</p>
+            <p className="font-semibold">{t("adminUi.finance.venueUnsetTitle")}</p>
             <p className="text-muted-foreground">
-              Documentele legale lasă tarifele pentru locații „de aprobat separat", deci nu sunt
-              fixate în cod. Până le completezi în „Reguli comision", rezervările de săli
-              <strong> nu generează comision</strong> (artiștii sunt taxați normal cu 5%).
+              {t("adminUi.finance.venueUnsetBody1")}
+              <strong> {t("adminUi.finance.venueUnsetStrong")}</strong>{" "}
+              {t("adminUi.finance.venueUnsetBody2")}
             </p>
           </div>
         </div>
@@ -183,11 +184,11 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
       {showRules && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Reguli comision</CardTitle>
+            <CardTitle className="text-base">{t("adminUi.finance.rules")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <div>
-              <p className="mb-2 text-sm font-semibold">Artiști</p>
+              <p className="mb-2 text-sm font-semibold">{t("adminUi.finance.artists")}</p>
               <div className="flex items-center gap-2">
                 <Input
                   type="number"
@@ -201,15 +202,15 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
                   }
                 />
                 <span className="text-sm text-muted-foreground">
-                  % din valoarea comenzii confirmate (contractual: 5%)
+                  {t("adminUi.finance.artistRateHint")}
                 </span>
               </div>
             </div>
 
             <div className="border-t pt-4">
-              <p className="mb-2 text-sm font-semibold">Săli — prag pe număr de invitați</p>
+              <p className="mb-2 text-sm font-semibold">{t("adminUi.finance.venueThresholdTitle")}</p>
               <div className="mb-3 flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">Pragul:</span>
+                <span className="text-sm text-muted-foreground">{t("adminUi.finance.thresholdLabel")}</span>
                 <Input
                   type="number"
                   className="w-28"
@@ -221,19 +222,19 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
                     }))
                   }
                 />
-                <span className="text-sm text-muted-foreground">invitați</span>
+                <span className="text-sm text-muted-foreground">{t("common.guests")}</span>
               </div>
 
               {(["below", "atOrAbove"] as const).map((tierKey) => (
                 <div key={tierKey} className="mb-3 rounded-lg border p-3">
                   <p className="mb-2 text-sm font-medium">
                     {tierKey === "below"
-                      ? `Sub ${rules.venue.guestThreshold} invitați`
-                      : `De la ${rules.venue.guestThreshold} invitați`}
+                      ? t("adminUi.finance.tierBelow", { n: rules.venue.guestThreshold })
+                      : t("adminUi.finance.tierAtOrAbove", { n: rules.venue.guestThreshold })}
                   </p>
                   <div className="flex flex-wrap items-center gap-3">
                     <label className="flex items-center gap-2 text-sm">
-                      Procent:
+                      {t("adminUi.finance.percentLabel")}
                       <Input
                         type="number"
                         className="w-24"
@@ -260,9 +261,9 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
                       />
                       %
                     </label>
-                    <span className="text-xs text-muted-foreground">sau</span>
+                    <span className="text-xs text-muted-foreground">{t("common.or")}</span>
                     <label className="flex items-center gap-2 text-sm">
-                      Sumă fixă:
+                      {t("adminUi.finance.fixedAmountLabel")}
                       <Input
                         type="number"
                         className="w-24"
@@ -290,10 +291,10 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
 
             <div className="flex gap-2">
               <Button onClick={() => void saveRules()} disabled={savingRules}>
-                {savingRules ? "Se salvează…" : "Salvează regulile"}
+                {savingRules ? t("adminUi.finance.saving") : t("adminUi.finance.saveRules")}
               </Button>
               <Button variant="ghost" onClick={() => setShowRules(false)}>
-                Anulează
+                {t("common.cancel")}
               </Button>
             </div>
           </CardContent>
@@ -301,10 +302,10 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
       )}
 
       <div className="grid gap-4 sm:grid-cols-4">
-        <StatCard label="De achitat" value={`${totals.pending} ${cur}`} />
-        <StatCard label="Restante" value={`${totals.overdue} ${cur}`} danger={totals.overdue > 0} />
-        <StatCard label="Încasat" value={`${totals.paid} ${cur}`} />
-        <StatCard label="Total înregistrări" value={String(totals.count)} />
+        <StatCard label={t("adminUi.finance.statPending")} value={`${totals.pending} ${cur}`} />
+        <StatCard label={t("adminUi.finance.statOverdue")} value={`${totals.overdue} ${cur}`} danger={totals.overdue > 0} />
+        <StatCard label={t("adminUi.finance.statCollected")} value={`${totals.paid} ${cur}`} />
+        <StatCard label={t("adminUi.finance.statTotalRows")} value={String(totals.count)} />
       </div>
 
       <div className="flex gap-2">
@@ -315,7 +316,7 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
             variant={filter === f.key ? "default" : "outline"}
             onClick={() => setFilter(f.key)}
           >
-            {f.label}
+            {t(f.labelKey)}
           </Button>
         ))}
       </div>
@@ -323,26 +324,25 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <p className="p-6 text-sm text-muted-foreground">Se încarcă…</p>
+            <p className="p-6 text-sm text-muted-foreground">{t("adminUi.finance.loading")}</p>
           ) : rows.length === 0 ? (
             <p className="p-6 text-sm text-muted-foreground">
-              Niciun comision înregistrat încă. Se creează automat când o rezervare devine
-              confirmată și are un preț agreat.
+              {t("adminUi.finance.empty")}
             </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                   <tr>
-                    <th className="p-3">Furnizor</th>
-                    <th className="p-3">Client</th>
-                    <th className="p-3">Eveniment</th>
-                    <th className="p-3 text-right">Valoare</th>
-                    <th className="p-3 text-right">Rată</th>
-                    <th className="p-3 text-right">Comision</th>
-                    <th className="p-3">Scadent</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3">Acțiuni</th>
+                    <th className="p-3">{t("adminUi.finance.colVendor")}</th>
+                    <th className="p-3">{t("adminUi.finance.colClient")}</th>
+                    <th className="p-3">{t("adminUi.finance.colEvent")}</th>
+                    <th className="p-3 text-right">{t("adminUi.finance.colValue")}</th>
+                    <th className="p-3 text-right">{t("adminUi.finance.colRate")}</th>
+                    <th className="p-3 text-right">{t("adminUi.finance.colCommission")}</th>
+                    <th className="p-3">{t("adminUi.finance.colDue")}</th>
+                    <th className="p-3">{t("adminUi.finance.colStatus")}</th>
+                    <th className="p-3">{t("adminUi.finance.colActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -358,8 +358,8 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
                             {r.artistName ?? r.venueName ?? "—"}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {r.vendorType === "artist" ? "Artist" : "Sală"}
-                            {r.guestCount != null && ` · ${r.guestCount} invitați`}
+                            {r.vendorType === "artist" ? t("adminUi.finance.vendorArtist") : t("adminUi.finance.vendorVenue")}
+                            {r.guestCount != null && ` · ${r.guestCount} ${t("common.guests")}`}
                           </div>
                         </td>
                         <td className="p-3">{r.clientName ?? "—"}</td>
@@ -376,7 +376,7 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
                         </td>
                         <td className="p-3">
                           <Badge variant={r.status === "paid" ? "default" : "outline"}>
-                            {STATUS_LABEL[r.status] ?? r.status}
+                            {STATUS_LABEL_KEY[r.status] ? t(STATUS_LABEL_KEY[r.status]!) : r.status}
                           </Badge>
                         </td>
                         <td className="p-3">
@@ -388,7 +388,7 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
                                 void patch(r.id, "paid", { method: "manual" })
                               }
                             >
-                              <Check className="h-3.5 w-3.5" /> Achitat
+                              <Check className="h-3.5 w-3.5" /> {t("adminUi.finance.markPaid")}
                             </Button>
                           ) : (
                             <Button
@@ -396,7 +396,7 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
                               variant="ghost"
                               onClick={() => void patch(r.id, "pending")}
                             >
-                              Anulează
+                              {t("common.cancel")}
                             </Button>
                           )}
                         </td>

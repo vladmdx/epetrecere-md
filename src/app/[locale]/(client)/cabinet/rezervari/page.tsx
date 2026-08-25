@@ -34,6 +34,8 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
+import { useLocale } from "@/hooks/use-locale";
+import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
 
 interface BookingRequest {
   id: number;
@@ -65,25 +67,36 @@ type ChatMessage = {
   createdAt: string;
 };
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: "În așteptare", color: "text-warning border-warning/30 bg-warning/5" },
-  accepted: { label: "Acceptat de partener", color: "text-success border-success/30 bg-success/5" },
-  confirmed_by_client: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
-  rejected: { label: "Refuzat", color: "text-destructive border-destructive/30 bg-destructive/5" },
-  cancelled: { label: "Anulat", color: "text-muted-foreground border-border/40 bg-muted/5" },
-  completed: { label: "Finalizat", color: "text-gold border-gold/30 bg-gold/5" },
+// Both maps hold translation KEYS, not copy — the label is resolved at
+// render time so a status badge follows the reader's language.
+const statusConfig: Record<string, { labelKey: string; color: string }> = {
+  pending: { labelKey: "cabinet.reservations.statusPending", color: "text-warning border-warning/30 bg-warning/5" },
+  accepted: { labelKey: "cabinet.reservations.statusAccepted", color: "text-success border-success/30 bg-success/5" },
+  confirmed_by_client: { labelKey: "cabinet.reservations.statusConfirmed", color: "text-success border-success/30 bg-success/5" },
+  rejected: { labelKey: "cabinet.reservations.statusRejected", color: "text-destructive border-destructive/30 bg-destructive/5" },
+  cancelled: { labelKey: "cabinet.reservations.statusCancelled", color: "text-muted-foreground border-border/40 bg-muted/5" },
+  completed: { labelKey: "cabinet.reservations.statusCompleted", color: "text-gold border-gold/30 bg-gold/5" },
 };
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  baptism: "Botez",
-  cumatrie: "Cumătrie",
-  corporate: "Corporate",
-  birthday: "Aniversare",
-  other: "Alt eveniment",
+const EVENT_TYPE_LABEL_KEYS: Record<string, string> = {
+  wedding: "event_types.wedding",
+  baptism: "event_types.baptism",
+  cumatrie: "event_types.cumatrie",
+  corporate: "event_types.corporate",
+  birthday: "event_types.birthday",
+  other: "cabinet.reservations.eventOther",
+};
+
+/** Plural forms live next to `plural()` rather than in the dictionary —
+ *  a flat key/value map cannot express three Russian forms. */
+const BOOKINGS: AllForms = {
+  ro: { one: "rezervare", few: "rezervări", many: "rezervări" },
+  ru: { one: "бронирование", few: "бронирования", many: "бронирований" },
+  en: { one: "booking", other: "bookings" },
 };
 
 export default function ReservationsPage() {
+  const { t, locale } = useLocale();
   const { isSignedIn, user } = useUser();
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -135,10 +148,10 @@ export default function ReservationsPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut confirma");
+        toast.error(err.error || t("cabinet.reservations.confirmError"));
         return;
       }
-      toast.success("Rezervare confirmată!");
+      toast.success(t("cabinet.reservations.confirmed"));
       await refresh();
     } finally {
       setBusy(null);
@@ -146,7 +159,7 @@ export default function ReservationsPage() {
   }
 
   async function cancelBooking(b: BookingRequest) {
-    if (!confirm("Sigur vrei să anulezi această rezervare?")) return;
+    if (!confirm(t("cabinet.reservations.cancelConfirm"))) return;
     setBusy(b.id);
     try {
       const res = await fetch(`/api/booking-requests/${b.id}`, {
@@ -156,10 +169,10 @@ export default function ReservationsPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut anula");
+        toast.error(err.error || t("cabinet.reservations.cancelError"));
         return;
       }
-      toast.success("Rezervare anulată");
+      toast.success(t("cabinet.reservations.cancelled"));
       await refresh();
     } finally {
       setBusy(null);
@@ -170,7 +183,7 @@ export default function ReservationsPage() {
     if (!proposeDialog) return;
     const amt = Number(proposeAmount);
     if (!Number.isFinite(amt) || amt <= 0) {
-      toast.error("Introdu o sumă validă.");
+      toast.error(t("cabinet.reservations.invalidAmount"));
       return;
     }
     setBusy(proposeDialog.id);
@@ -186,10 +199,10 @@ export default function ReservationsPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut trimite oferta");
+        toast.error(err.error || t("cabinet.reservations.offerError"));
         return;
       }
-      toast.success("Ofertă trimisă partenerului");
+      toast.success(t("cabinet.reservations.offerSent"));
       setProposeDialog(null);
       setProposeAmount("");
       setProposeMessage("");
@@ -238,7 +251,7 @@ export default function ReservationsPage() {
     if (!messageDialog) return;
     const msg = messageText.trim();
     if (!msg) {
-      toast.error("Scrie un mesaj înainte să trimiți.");
+      toast.error(t("cabinet.reservations.emptyMessage"));
       return;
     }
     setMessageSending(true);
@@ -252,10 +265,10 @@ export default function ReservationsPage() {
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut trimite mesajul");
+        toast.error(t("cabinet.reservations.messageError"));
         return;
       }
-      toast.success("Mesaj trimis");
+      toast.success(t("cabinet.reservations.messageSent"));
       setMessageText("");
       const r = await fetch(`/api/chat?booking_request_id=${messageDialog.id}`);
       if (r.ok) {
@@ -263,7 +276,7 @@ export default function ReservationsPage() {
         setChats(prev => ({ ...prev, [messageDialog.id]: Array.isArray(data) ? data : [] }));
       }
     } catch {
-      toast.error("Eroare la trimitere");
+      toast.error(t("cabinet.reservations.sendError"));
     } finally {
       setMessageSending(false);
     }
@@ -275,28 +288,34 @@ export default function ReservationsPage() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold mb-1">Rezervările Mele</h1>
-      <p className="text-sm text-muted-foreground mb-6">{bookings.length} rezervări total</p>
+      <h1 className="font-heading text-2xl font-bold mb-1">{t("cabinet.reservations.title")}</h1>
+      <p className="text-sm text-muted-foreground mb-6">
+        {t("cabinet.reservations.totalCount", {
+          count: plural(bookings.length, locale, BOOKINGS),
+        })}
+      </p>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as "active" | "past")}>
         <TabsList>
           <TabsTrigger value="active" className="gap-1.5">
-            Active
+            {t("cabinet.reservations.tabActive")}
             {activeBookings.length > 0 && (
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold/20 px-1 text-[10px] font-bold text-gold">
                 {activeBookings.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="past">Trecute ({pastBookings.length})</TabsTrigger>
+          <TabsTrigger value="past">
+            {t("cabinet.reservations.tabPast")} ({pastBookings.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="active" className="mt-4">
           {activeBookings.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               <Calendar className="mx-auto mb-3 h-8 w-8 opacity-40" />
-              <p>Nu ai rezervări active.</p>
-              <p className="text-xs mt-1">Explorează artiști și fă prima ta rezervare!</p>
+              <p>{t("cabinet.reservations.emptyActive")}</p>
+              <p className="text-xs mt-1">{t("cabinet.reservations.emptyActiveHint")}</p>
             </div>
           ) : (
             <BookingsByEvent bookings={activeBookings} render={renderBookingCard} />
@@ -305,7 +324,7 @@ export default function ReservationsPage() {
 
         <TabsContent value="past" className="mt-4">
           {pastBookings.length === 0 ? (
-            <p className="py-12 text-center text-muted-foreground">Nu ai rezervări trecute.</p>
+            <p className="py-12 text-center text-muted-foreground">{t("cabinet.reservations.emptyPast")}</p>
           ) : (
             <BookingsByEvent bookings={pastBookings} render={renderBookingCard} />
           )}
@@ -316,33 +335,33 @@ export default function ReservationsPage() {
       <Dialog open={!!proposeDialog} onOpenChange={(o) => !o && setProposeDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Propune un preț</DialogTitle>
+            <DialogTitle>{t("cabinet.reservations.proposeTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Preț (€) *</Label>
+              <Label>{t("cabinet.reservations.priceLabel")}</Label>
               <Input
                 type="number"
                 value={proposeAmount}
                 onChange={(e) => setProposeAmount(e.target.value)}
-                placeholder="ex: 200"
+                placeholder={t("cabinet.reservations.pricePlaceholder")}
                 autoFocus
               />
             </div>
             <div>
-              <Label>Mesaj (opțional)</Label>
+              <Label>{t("cabinet.reservations.messageOptional")}</Label>
               <Textarea
                 value={proposeMessage}
                 onChange={(e) => setProposeMessage(e.target.value)}
-                placeholder="Adaugă un mesaj pentru partener..."
+                placeholder={t("cabinet.reservations.messagePlaceholder")}
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProposeDialog(null)}>Anulează</Button>
+            <Button variant="outline" onClick={() => setProposeDialog(null)}>{t("common.cancel")}</Button>
             <Button onClick={confirmPropose} disabled={busy === proposeDialog?.id} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
-              {busy === proposeDialog?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : "Trimite oferta"}
+              {busy === proposeDialog?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : t("cabinet.reservations.sendOffer")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -352,13 +371,19 @@ export default function ReservationsPage() {
       <Dialog open={!!messageDialog} onOpenChange={(o) => !o && setMessageDialog(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Mesaj cu {messageDialog?.artistName ?? "partener"}</DialogTitle>
+            <DialogTitle>
+              {t("cabinet.reservations.chatTitle", {
+                name:
+                  messageDialog?.artistName ??
+                  t("cabinet.reservations.partnerFallback"),
+              })}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             {/* History */}
             <div className="max-h-64 space-y-2 overflow-y-auto rounded-lg border border-border/40 bg-background/50 p-3">
               {chats[messageDialog?.id ?? -1]?.length === 0 ? (
-                <p className="text-center text-xs text-muted-foreground py-8">Niciun mesaj încă.</p>
+                <p className="text-center text-xs text-muted-foreground py-8">{t("cabinet.reservations.noMessages")}</p>
               ) : (
                 chats[messageDialog?.id ?? -1]?.map((m) => (
                   <div
@@ -379,14 +404,14 @@ export default function ReservationsPage() {
             <Textarea
               value={messageText}
               onChange={(e) => setMessageText(e.target.value)}
-              placeholder="Scrie un mesaj..."
+              placeholder={t("cabinet.reservations.chatPlaceholder")}
               rows={3}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setMessageDialog(null)}>Închide</Button>
+            <Button variant="outline" onClick={() => setMessageDialog(null)}>{t("common.close")}</Button>
             <Button onClick={sendMessageFromDialog} disabled={messageSending} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1">
-              {messageSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="h-4 w-4" /> Trimite</>}
+              {messageSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Send className="h-4 w-4" /> {t("common.submit")}</>}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -396,7 +421,10 @@ export default function ReservationsPage() {
 
   function renderBookingCard(b: BookingRequest) {
     const cfg = statusConfig[b.status] || statusConfig.pending;
-    const eventLabel = b.eventType ? (EVENT_TYPE_LABELS[b.eventType] || b.eventType) : "Eveniment";
+    const eventTypeKey = b.eventType ? EVENT_TYPE_LABEL_KEYS[b.eventType] : null;
+    const eventLabel = eventTypeKey
+      ? t(eventTypeKey)
+      : b.eventType || t("cabinet.reservations.eventFallback");
 
     const offers = b.priceOffers ?? [];
     const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
@@ -410,7 +438,7 @@ export default function ReservationsPage() {
               {/* Header */}
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-heading font-semibold text-base">{eventLabel}</span>
-                <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>
+                <Badge variant="outline" className={cn("text-xs", cfg.color)}>{t(cfg.labelKey)}</Badge>
                 {b.categoryNames && b.categoryNames.length > 0 && (
                   <Badge variant="outline" className="text-xs text-gold/80 border-gold/30 bg-gold/5">
                     {b.categoryNames.join(" · ")}
@@ -453,7 +481,7 @@ export default function ReservationsPage() {
                 {b.guestCount && (
                   <span className="flex items-center gap-1">
                     <Users className="h-3.5 w-3.5" />
-                    {b.guestCount} invitați
+                    {plural(b.guestCount, locale, NOUNS.guests)}
                   </span>
                 )}
               </div>
@@ -461,14 +489,14 @@ export default function ReservationsPage() {
               {/* Initial message */}
               {b.message && (
                 <div className="rounded-lg bg-accent/30 p-2.5 text-xs text-muted-foreground">
-                  <span className="font-medium text-foreground">Mesajul tău:</span> {b.message}
+                  <span className="font-medium text-foreground">{t("cabinet.reservations.yourMessage")}</span> {b.message}
                 </div>
               )}
 
               {/* Artist reply */}
               {b.artistReply && (
                 <div className="rounded-lg bg-gold/5 border border-gold/10 p-2.5 text-xs">
-                  <span className="font-medium text-gold">Răspunsul partenerului:</span>{" "}
+                  <span className="font-medium text-gold">{t("cabinet.reservations.partnerReply")}</span>{" "}
                   <span className="text-foreground">{b.artistReply}</span>
                 </div>
               )}
@@ -478,7 +506,7 @@ export default function ReservationsPage() {
                 <div className="rounded-lg border border-gold/20 bg-gold/5 p-3 space-y-2">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-gold">
                     <HandCoins className="h-3.5 w-3.5" />
-                    Istoric negociere preț
+                    {t("cabinet.reservations.offerHistory")}
                   </div>
                   <div className="space-y-1.5">
                     {offers.map((offer, idx) => (
@@ -494,7 +522,9 @@ export default function ReservationsPage() {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-1.5 font-semibold">
                             <span className={offer.from === "client" ? "text-blue-400" : "text-gold"}>
-                              {offer.from === "client" ? "Tu" : "Partenerul"}
+                              {offer.from === "client"
+                                ? t("cabinet.reservations.offerFromYou")
+                                : t("cabinet.reservations.offerFromPartner")}
                             </span>
                             <span className="text-base">{offer.amount}€</span>
                           </div>
@@ -511,14 +541,16 @@ export default function ReservationsPage() {
                   {/* Hint when waiting on partner */}
                   {lastOffer && lastOffer.from === "client" && b.status === "pending" && (
                     <p className="text-[11px] text-muted-foreground italic">
-                      ⏳ Așteptăm răspunsul partenerului la oferta ta.
+                      {t("cabinet.reservations.awaitingPartner")}
                     </p>
                   )}
                 </div>
               )}
 
               <p className="text-[10px] text-muted-foreground/60">
-                Trimisă pe {new Date(b.createdAt).toLocaleDateString("ro-MD")}
+                {t("cabinet.reservations.sentOn", {
+                  date: new Date(b.createdAt).toLocaleDateString("ro-MD"),
+                })}
               </p>
             </div>
 
@@ -537,7 +569,7 @@ export default function ReservationsPage() {
                   ) : (
                     <CheckCircle2 className="h-3.5 w-3.5" />
                   )}
-                  Confirmă
+                  {t("cabinet.reservations.confirm")}
                 </Button>
               )}
 
@@ -556,7 +588,7 @@ export default function ReservationsPage() {
                 className="gap-1"
               >
                 <MessageSquare className="h-3.5 w-3.5" />
-                Mesaj
+                {t("cabinet.reservations.messageCta")}
               </Button>
 
               {/* Cancel — only after the partner has actually accepted.
@@ -574,7 +606,7 @@ export default function ReservationsPage() {
                   className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
                 >
                   <XCircle className="h-3.5 w-3.5" />
-                  Anulează
+                  {t("common.cancel")}
                 </Button>
               )}
               {b.status === "pending" && (
@@ -584,7 +616,7 @@ export default function ReservationsPage() {
               {b.artistSlug && (
                 <Link href={`/artisti/${b.artistSlug}`}>
                   <Button variant="ghost" size="sm" className="gap-1 text-xs w-full">
-                    <Music className="h-3.5 w-3.5" /> Profil
+                    <Music className="h-3.5 w-3.5" /> {t("cabinet.reservations.profile")}
                   </Button>
                 </Link>
               )}
@@ -603,6 +635,7 @@ export default function ReservationsPage() {
  * via the cron sweep; this is purely UI feedback.
  */
 function PendingCountdown({ createdAt }: { createdAt: string }) {
+  const { t } = useLocale();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
@@ -624,14 +657,14 @@ function PendingCountdown({ createdAt }: { createdAt: string }) {
       )}
     >
       {expired ? (
-        "⌛ Cererea a expirat — așteaptă răspuns sau retrimite."
+        t("cabinet.reservations.expired")
       ) : (
         <>
-          ⏳ Partenerul are{" "}
+          {t("cabinet.reservations.countdownPrefix")}{" "}
           <strong>
             {hours}h {String(minutes).padStart(2, "0")}m
           </strong>{" "}
-          să răspundă
+          {t("cabinet.reservations.countdownSuffix")}
         </>
       )}
     </div>
@@ -651,6 +684,7 @@ function BookingsByEvent({
   bookings: BookingRequest[];
   render: (b: BookingRequest) => ReactElement;
 }) {
+  const { t, locale } = useLocale();
   const groups = new Map<string, BookingRequest[]>();
   for (const b of bookings) {
     const key = b.eventDate ?? "fără-dată";
@@ -669,7 +703,7 @@ function BookingsByEvent({
         const list = groups.get(dateKey) ?? [];
         const headerLabel =
           dateKey === "fără-dată"
-            ? "Fără dată stabilită"
+            ? t("cabinet.reservations.noDate")
             : new Date(dateKey + "T00:00:00").toLocaleDateString("ro-MD", {
                 weekday: "long",
                 day: "numeric",
@@ -683,8 +717,7 @@ function BookingsByEvent({
                 {headerLabel}
               </h3>
               <span className="text-xs text-muted-foreground">
-                {list.length} rezerv
-                {list.length === 1 ? "are" : "ări"}
+                {plural(list.length, locale, BOOKINGS)}
               </span>
             </div>
             {list.map((b) => render(b))}

@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import type { Guest } from "./guests-view";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 import {
   Dialog,
   DialogContent,
@@ -61,19 +62,43 @@ interface Props {
 
 type TableShape = "round" | "rectangular" | "long";
 
-const SHAPE_CONFIG: Record<TableShape, { label: string; seats: number; icon: typeof Circle }> = {
-  round: { label: "Masă Rotundă", seats: 10, icon: Circle },
-  rectangular: { label: "Masă Dreptunghiulară", seats: 8, icon: Square },
-  long: { label: "Masa de Onoare", seats: 14, icon: RectangleHorizontal },
+/** `nameBase` is deliberately NOT translated: it is written to the database as
+ *  the table's name, so it has to stay stable whatever language the planner
+ *  happens to be using. Only `labelKey`/`shortKey` are shown in the UI. */
+const SHAPE_CONFIG: Record<
+  TableShape,
+  { labelKey: string; shortKey: string; nameBase: string; seats: number; icon: typeof Circle }
+> = {
+  round: {
+    labelKey: "cabinet.seating.shapes.round",
+    shortKey: "cabinet.seating.shapesShort.round",
+    nameBase: "Rotundă",
+    seats: 10,
+    icon: Circle,
+  },
+  rectangular: {
+    labelKey: "cabinet.seating.shapes.rectangular",
+    shortKey: "cabinet.seating.shapesShort.rectangular",
+    nameBase: "Dreptunghiulară",
+    seats: 8,
+    icon: Square,
+  },
+  long: {
+    labelKey: "cabinet.seating.shapes.long",
+    shortKey: "cabinet.seating.shapesShort.long",
+    nameBase: "Masa de Onoare",
+    seats: 14,
+    icon: RectangleHorizontal,
+  },
 };
 
-const GROUP_LABELS: Record<string, string> = {
-  bride: "Partea miresei",
-  groom: "Partea mirelui",
-  family: "Familie",
-  friends: "Prieteni",
-  work: "Colegi",
-  other: "Altele",
+const GROUP_LABEL_KEYS: Record<string, string> = {
+  bride: "cabinet.seating.groups.bride",
+  groom: "cabinet.seating.groups.groom",
+  family: "cabinet.seating.groups.family",
+  friends: "cabinet.seating.groups.friends",
+  work: "cabinet.seating.groups.work",
+  other: "cabinet.seating.groups.other",
 };
 
 const GROUP_COLORS: Record<string, string> = {
@@ -93,6 +118,7 @@ export function SeatingView({
   onTablesChange,
   onSeatsChange,
 }: Props) {
+  const { t } = useLocale();
   const [adding, setAdding] = useState<TableShape | null>(null);
   const [search, setSearch] = useState("");
   const [autoPlacing, setAutoPlacing] = useState(false);
@@ -158,7 +184,7 @@ export function SeatingView({
     const config = SHAPE_CONFIG[shape];
     const tableNumber = tables.length + 1;
     const name =
-      shape === "long" ? "Masa de Onoare" : `${config.label.split(" ")[1]} ${tableNumber}`;
+      shape === "long" ? config.nameBase : `${config.nameBase} ${tableNumber}`;
     setAdding(shape);
     try {
       const res = await fetch(`/api/event-plans/${planId}/tables`, {
@@ -167,14 +193,14 @@ export function SeatingView({
         body: JSON.stringify({ name, seats: config.seats }),
       });
       if (!res.ok) {
-        toast.error("Eroare la adăugare masă.");
+        toast.error(t("cabinet.seating.err.addTable"));
         return;
       }
       const data = await res.json();
       onTablesChange([...tables, data.table]);
-      toast.success(`${name} adăugată (${config.seats} locuri)`);
+      toast.success(t("cabinet.seating.tableAdded", { name, seats: config.seats }));
     } catch {
-      toast.error("Eroare la adăugare masă.");
+      toast.error(t("cabinet.seating.err.addTable"));
     } finally {
       setAdding(null);
     }
@@ -183,11 +209,11 @@ export function SeatingView({
   async function addCustomTable() {
     const seatsNum = Number(customSeats);
     if (!customName.trim()) {
-      toast.error("Numele mesei este obligatoriu.");
+      toast.error(t("cabinet.seating.err.nameRequired"));
       return;
     }
     if (!Number.isFinite(seatsNum) || seatsNum < 1 || seatsNum > 30) {
-      toast.error("Numărul de locuri trebuie între 1 și 30.");
+      toast.error(t("cabinet.seating.err.seatsRange"));
       return;
     }
     setAddingCustom(true);
@@ -198,25 +224,25 @@ export function SeatingView({
         body: JSON.stringify({ name: customName.trim(), seats: seatsNum }),
       });
       if (!res.ok) {
-        toast.error("Eroare la adăugare masă.");
+        toast.error(t("cabinet.seating.err.addTable"));
         return;
       }
       const data = await res.json();
       onTablesChange([...tables, data.table]);
-      toast.success(`${customName} adăugată (${seatsNum} locuri)`);
+      toast.success(t("cabinet.seating.tableAdded", { name: customName, seats: seatsNum }));
       setCustomDialogOpen(false);
       setCustomName("");
       setCustomSeats("10");
       setCustomShape("round");
     } catch {
-      toast.error("Eroare la adăugare masă.");
+      toast.error(t("cabinet.seating.err.addTable"));
     } finally {
       setAddingCustom(false);
     }
   }
 
   async function renameTable(table: SeatingTable) {
-    const newName = prompt("Nume nou pentru masă:", table.name);
+    const newName = prompt(t("cabinet.seating.renamePrompt"), table.name);
     if (!newName || newName.trim() === table.name) return;
     const prev = tables;
     onTablesChange(tables.map((t) => (t.id === table.id ? { ...t, name: newName.trim() } : t)));
@@ -226,13 +252,13 @@ export function SeatingView({
       body: JSON.stringify({ name: newName.trim() }),
     });
     if (!res.ok) {
-      toast.error("Nu am putut redenumi masa.");
+      toast.error(t("cabinet.seating.err.rename"));
       onTablesChange(prev);
     }
   }
 
   async function deleteTable(table: SeatingTable) {
-    if (!confirm(`Ștergi masa "${table.name}"? Toți invitații așezați vor fi eliberați.`)) return;
+    if (!confirm(t("cabinet.seating.deleteConfirm", { name: table.name }))) return;
     const prev = { tables, seats };
     onTablesChange(tables.filter((t) => t.id !== table.id));
     onSeatsChange(seats.filter((s) => s.tableId !== table.id));
@@ -240,7 +266,7 @@ export function SeatingView({
       method: "DELETE",
     });
     if (!res.ok) {
-      toast.error("Nu am putut șterge masa.");
+      toast.error(t("cabinet.seating.err.delete"));
       onTablesChange(prev.tables);
       onSeatsChange(prev.seats);
     }
@@ -251,7 +277,7 @@ export function SeatingView({
     if (!table) return;
     const current = seatsByTable.get(tableId)?.length ?? 0;
     if (current >= table.seats) {
-      toast.error(`${table.name} este plină!`);
+      toast.error(t("cabinet.seating.err.tableFull", { name: table.name }));
       return;
     }
     const res = await fetch(`/api/event-plans/${planId}/seats`, {
@@ -261,7 +287,7 @@ export function SeatingView({
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      toast.error(err.error || "Nu am putut așeza invitatul.");
+      toast.error(err.error || t("cabinet.seating.err.assign"));
       return;
     }
     const data = await res.json();
@@ -277,7 +303,7 @@ export function SeatingView({
       { method: "DELETE" },
     );
     if (!res.ok) {
-      toast.error("Nu am putut elibera locul.");
+      toast.error(t("cabinet.seating.err.release"));
       onSeatsChange(prev);
     }
   }
@@ -285,10 +311,10 @@ export function SeatingView({
   // Auto-placement: group guests by their `group` field and fill tables sequentially
   async function autoPlace() {
     if (tables.length === 0) {
-      toast.error("Adaugă cel puțin o masă mai întâi.");
+      toast.error(t("cabinet.seating.err.noTables"));
       return;
     }
-    if (!confirm("Sugestia automată va așeza toți invitații neașezați pe mese în funcție de grupurile lor. Continui?")) return;
+    if (!confirm(t("cabinet.seating.autoConfirm"))) return;
     setAutoPlacing(true);
     try {
       const groupedUnassigned = new Map<string, Guest[]>();
@@ -323,7 +349,7 @@ export function SeatingView({
         }
       }
       onSeatsChange([...seats]);
-      toast.success(`${assigned} invitați așezați automat!`);
+      toast.success(t("cabinet.seating.autoDone", { count: assigned }));
     } finally {
       setAutoPlacing(false);
     }
@@ -334,22 +360,24 @@ export function SeatingView({
       const assigned = seats.filter((s) => s.tableId === table.id);
       const guestNames = assigned.map((s) => {
         const g = guests.find((gg) => gg.id === s.guestId);
-        return g ? g.fullName + (g.plusOnes > 0 ? ` (+${g.plusOnes})` : "") : `Invitat #${s.guestId}`;
+        return g
+          ? g.fullName + (g.plusOnes > 0 ? ` (+${g.plusOnes})` : "")
+          : t("cabinet.seating.pdfGuestFallback", { id: s.guestId });
       });
       return `<div style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;break-inside:avoid;margin-bottom:16px">
         <h3 style="color:#A08839;margin:0 0 8px;font-size:16px">${table.name}</h3>
-        <p style="color:#666;font-size:12px;margin:0 0 8px">${assigned.length}/${table.seats} locuri</p>
+        <p style="color:#666;font-size:12px;margin:0 0 8px">${t("cabinet.seating.pdfSeats", { assigned: assigned.length, total: table.seats })}</p>
         ${guestNames.length > 0
           ? `<ul style="margin:0;padding-left:18px;font-size:13px">${guestNames.map((n) => `<li style="margin-bottom:2px">${n}</li>`).join("")}</ul>`
-          : `<p style="color:#999;font-size:12px;font-style:italic">Niciun invitat asignat</p>`}
+          : `<p style="color:#999;font-size:12px;font-style:italic">${t("cabinet.seating.pdfNoGuests")}</p>`}
       </div>`;
     });
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Plan Așezare Mese</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t("cabinet.seating.pdfTitle")}</title>
       <style>body{font-family:system-ui,sans-serif;padding:40px;background:#fff;color:#222}
       h1{color:#A08839}h2{color:#666;font-size:14px;font-weight:normal}
       .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px}
       @media print{@page{margin:20mm}}</style></head>
-      <body><h1>Plan Așezare Mese</h1><h2>ePetrecere.md · ${new Date().toLocaleDateString("ro-RO")} · ${placedCount} așezați din ${totalGuests} total</h2>
+      <body><h1>${t("cabinet.seating.pdfTitle")}</h1><h2>ePetrecere.md · ${new Date().toLocaleDateString("ro-RO")} · ${t("cabinet.seating.pdfSummary", { placed: placedCount, total: totalGuests })}</h2>
       <div class="grid">${tableRows.join("")}</div></body></html>`;
     const w = window.open("", "_blank");
     if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
@@ -376,7 +404,7 @@ export function SeatingView({
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-sm">
             <Users className="h-4 w-4 text-gold" />
-            <span className="font-medium">Progres așezare</span>
+            <span className="font-medium">{t("cabinet.seating.progressTitle")}</span>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -391,7 +419,7 @@ export function SeatingView({
               ) : (
                 <Sparkles className="h-3.5 w-3.5" />
               )}
-              Sugestie Automată
+              {t("cabinet.seating.autoSuggest")}
             </Button>
             {tables.length > 0 && (
               <Button
@@ -400,7 +428,7 @@ export function SeatingView({
                 onClick={exportSeatingPDF}
                 className="gap-1.5 border-gold/30 text-gold hover:bg-gold/10"
               >
-                <Printer className="h-3.5 w-3.5" /> Export / Print
+                <Printer className="h-3.5 w-3.5" /> {t("cabinet.seating.exportPrint")}
               </Button>
             )}
           </div>
@@ -411,11 +439,11 @@ export function SeatingView({
           <div>
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="text-muted-foreground">
-                Au confirmat prezența
+                {t("cabinet.seating.confirmedLabel")}
               </span>
               <span className="font-medium">
                 <strong>{acceptedTotal}</strong>
-                <span className="text-muted-foreground"> / {totalGuests} invitați</span>
+                <span className="text-muted-foreground"> {t("cabinet.seating.ofGuests", { total: totalGuests })}</span>
                 <span className="ml-2 text-emerald-500">({acceptedPct}%)</span>
               </span>
             </div>
@@ -431,11 +459,11 @@ export function SeatingView({
           <div>
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="text-muted-foreground">
-                Așezați la mese
+                {t("cabinet.seating.seatedLabel")}
               </span>
               <span className="font-medium">
                 <strong>{placedCount}</strong>
-                <span className="text-muted-foreground"> / {acceptedTotal} confirmați</span>
+                <span className="text-muted-foreground"> {t("cabinet.seating.ofConfirmed", { total: acceptedTotal })}</span>
                 <span className="ml-2 text-gold">({placedPct}%)</span>
               </span>
             </div>
@@ -452,7 +480,7 @@ export function SeatingView({
       {/* Quick-add table shapes */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
         <p className="mb-3 text-xs font-medium uppercase text-muted-foreground">
-          Adaugă masă
+          {t("cabinet.seating.addTable")}
         </p>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           {(Object.keys(SHAPE_CONFIG) as TableShape[]).map((shape) => {
@@ -473,8 +501,8 @@ export function SeatingView({
                   )}
                 </div>
                 <div className="flex-1">
-                  <p className="text-sm font-medium">{cfg.label}</p>
-                  <p className="text-xs text-muted-foreground">{cfg.seats} locuri</p>
+                  <p className="text-sm font-medium">{t(cfg.labelKey)}</p>
+                  <p className="text-xs text-muted-foreground">{t("cabinet.seating.seatsCount", { count: cfg.seats })}</p>
                 </div>
                 <Plus className="h-4 w-4 text-muted-foreground" />
               </button>
@@ -490,8 +518,8 @@ export function SeatingView({
               <Settings2 className="h-5 w-5" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium">Masă Personalizată</p>
-              <p className="text-xs text-muted-foreground">Alege forma și numărul de locuri</p>
+              <p className="text-sm font-medium">{t("cabinet.seating.customTable")}</p>
+              <p className="text-xs text-muted-foreground">{t("cabinet.seating.customTableHint")}</p>
             </div>
             <Plus className="h-4 w-4 text-muted-foreground" />
           </button>
@@ -502,26 +530,25 @@ export function SeatingView({
       <Dialog open={customDialogOpen} onOpenChange={setCustomDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Adaugă masă personalizată</DialogTitle>
+            <DialogTitle>{t("cabinet.seating.customDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Alege forma mesei și numărul de locuri. Potrivit pentru sălile cu
-              configurări speciale.
+              {t("cabinet.seating.customDialogDesc")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="custom-name" className="text-xs">Nume masă</Label>
+              <Label htmlFor="custom-name" className="text-xs">{t("cabinet.seating.nameLabel")}</Label>
               <Input
                 id="custom-name"
                 className="mt-1"
                 value={customName}
                 onChange={(e) => setCustomName(e.target.value)}
-                placeholder="Ex: Masa Nașilor, Masa Copiilor..."
+                placeholder={t("cabinet.seating.namePlaceholder")}
                 autoFocus
               />
             </div>
             <div>
-              <Label className="text-xs">Forma mesei</Label>
+              <Label className="text-xs">{t("cabinet.seating.shapeLabel")}</Label>
               <div className="mt-1 grid grid-cols-3 gap-2">
                 {(Object.keys(SHAPE_CONFIG) as TableShape[]).map((shape) => {
                   const cfg = SHAPE_CONFIG[shape];
@@ -540,7 +567,7 @@ export function SeatingView({
                       )}
                     >
                       <Icon className="h-5 w-5" />
-                      <span className="text-xs">{cfg.label.replace("Masă ", "").replace("Masa de ", "")}</span>
+                      <span className="text-xs">{t(cfg.shortKey)}</span>
                     </button>
                   );
                 })}
@@ -548,7 +575,7 @@ export function SeatingView({
             </div>
             <div>
               <Label htmlFor="custom-seats" className="text-xs">
-                Număr de locuri (1-30)
+                {t("cabinet.seating.seatsLabel")}
               </Label>
               <Input
                 id="custom-seats"
@@ -567,7 +594,7 @@ export function SeatingView({
               onClick={() => setCustomDialogOpen(false)}
               disabled={addingCustom}
             >
-              Anulează
+              {t("cabinet.seating.cancel")}
             </Button>
             <Button
               onClick={addCustomTable}
@@ -579,7 +606,7 @@ export function SeatingView({
               ) : (
                 <Plus className="h-4 w-4" />
               )}
-              Adaugă masa
+              {t("cabinet.seating.addTableSubmit")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -589,7 +616,7 @@ export function SeatingView({
         {/* Sidebar — unassigned guests */}
         <div className="rounded-xl border border-border/40 bg-card p-4">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="font-heading text-base font-semibold">Invitați</h3>
+            <h3 className="font-heading text-base font-semibold">{t("cabinet.seating.guests")}</h3>
             <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
               {unassigned.length}
             </span>
@@ -599,15 +626,15 @@ export function SeatingView({
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Caută invitat..."
+              placeholder={t("cabinet.seating.searchPlaceholder")}
               className="h-8 pl-8 text-sm"
             />
           </div>
           {unassigned.length === 0 ? (
             <p className="py-4 text-center text-sm text-muted-foreground">
               {search
-                ? "Niciun rezultat."
-                : "Toți invitații sunt așezați."}
+                ? t("cabinet.seating.noResults")
+                : t("cabinet.seating.allSeated")}
             </p>
           ) : (
             <ul className="max-h-[500px] space-y-1.5 overflow-y-auto pr-1">
@@ -624,7 +651,9 @@ export function SeatingView({
                       groupColor,
                       dragGuest === g.id && "opacity-50",
                     )}
-                    title={`Trage pe o masă · Grup: ${g.group ? GROUP_LABELS[g.group] || g.group : "—"}`}
+                    title={t("cabinet.seating.dragHint", {
+                      group: g.group ? (GROUP_LABEL_KEYS[g.group] ? t(GROUP_LABEL_KEYS[g.group]) : g.group) : "—",
+                    })}
                   >
                     <span className="min-w-0 flex-1 truncate">
                       {g.fullName}
@@ -642,9 +671,9 @@ export function SeatingView({
           {tables.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border/40 bg-card py-16 text-center">
               <UtensilsCrossed className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-              <p className="text-sm font-medium">Niciun aranjament încă</p>
+              <p className="text-sm font-medium">{t("cabinet.seating.emptyTitle")}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Adaugă prima masă folosind butoanele de mai sus
+                {t("cabinet.seating.emptyHint")}
               </p>
             </div>
           ) : (
@@ -685,14 +714,14 @@ export function SeatingView({
                             isEmpty && "text-muted-foreground",
                           )}
                         >
-                          {assigned.length} / {table.seats} locuri
-                          {isFull && " · Completă"}
+                          {t("cabinet.seating.tableSeats", { assigned: assigned.length, total: table.seats })}
+                          {isFull && t("cabinet.seating.fullSuffix")}
                         </p>
                       </div>
                       <button
                         onClick={() => deleteTable(table)}
                         className="text-muted-foreground transition-colors hover:text-red-500"
-                        aria-label="Șterge masa"
+                        aria-label={t("cabinet.seating.deleteTableAria")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -722,7 +751,7 @@ export function SeatingView({
                     {/* Guest list */}
                     {assigned.length === 0 ? (
                       <p className="rounded-lg border border-dashed border-border/30 py-2 text-center text-xs text-muted-foreground">
-                        Trage un invitat aici
+                        {t("cabinet.seating.dropHere")}
                       </p>
                     ) : (
                       <ul className="space-y-1">
@@ -745,7 +774,7 @@ export function SeatingView({
                               <button
                                 onClick={() => unassign(g.id)}
                                 className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
-                                aria-label="Elimină de la masă"
+                                aria-label={t("cabinet.seating.removeGuestAria")}
                               >
                                 <UserMinus className="h-3 w-3" />
                               </button>

@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 type PackageRow = {
   id: number;
@@ -31,6 +32,7 @@ type PackageRow = {
 };
 
 export function PackagesManager({ artistId }: { artistId: number | null }) {
+  const { t } = useLocale();
   const [rows, setRows] = useState<PackageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -49,11 +51,11 @@ export function PackagesManager({ artistId }: { artistId: number | null }) {
       const list = (await res.json()) as PackageRow[];
       setRows(list);
     } catch {
-      toast.error("Nu am putut încărca pachetele");
+      toast.error(t("vendor.packages.errLoad"));
     } finally {
       setLoading(false);
     }
-  }, [artistId]);
+  }, [artistId, t]);
 
   useEffect(() => {
     if (artistId) reload();
@@ -63,7 +65,7 @@ export function PackagesManager({ artistId }: { artistId: number | null }) {
   async function add() {
     if (!artistId) return;
     if (name.trim().length < 2) {
-      toast.error("Numele pachetului e prea scurt");
+      toast.error(t("vendor.packages.errNameShort"));
       return;
     }
     setSubmitting(true);
@@ -89,9 +91,9 @@ export function PackagesManager({ artistId }: { artistId: number | null }) {
       setHours("");
       setDesc("");
       await reload();
-      toast.success("Pachet adăugat");
+      toast.success(t("vendor.packages.added"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Eroare");
+      toast.error(e instanceof Error ? e.message : t("vendor.packages.errGeneric"));
     } finally {
       setSubmitting(false);
     }
@@ -107,7 +109,7 @@ export function PackagesManager({ artistId }: { artistId: number | null }) {
       if (!res.ok) throw new Error("put failed");
       await reload();
     } catch {
-      toast.error("Nu am putut actualiza");
+      toast.error(t("vendor.packages.errUpdate"));
     }
   }
 
@@ -119,14 +121,14 @@ export function PackagesManager({ artistId }: { artistId: number | null }) {
       if (!res.ok) throw new Error("delete failed");
       await reload();
     } catch {
-      toast.error("Nu am putut șterge");
+      toast.error(t("vendor.packages.errDelete"));
     }
   }
 
   if (!artistId) {
     return (
       <p className="text-sm text-muted-foreground">
-        Salvează profilul înainte de a adăuga pachete.
+        {t("vendor.packages.saveProfileFirst")}
       </p>
     );
   }
@@ -142,31 +144,31 @@ export function PackagesManager({ artistId }: { artistId: number | null }) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-border/40 p-4">
-        <Label>Pachet nou</Label>
+        <Label>{t("vendor.packages.newPackage")}</Label>
         <div className="mt-2 grid gap-2">
           <Input
-            placeholder="Nume pachet (ex: Nuntă completă)"
+            placeholder={t("vendor.packages.namePlaceholder")}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
           <div className="grid grid-cols-2 gap-2">
             <Input
               type="number"
-              placeholder="Preț (€)"
+              placeholder={t("vendor.packages.pricePlaceholder")}
               value={price}
               onChange={(e) => setPrice(e.target.value)}
             />
             <Input
               type="number"
               step="0.5"
-              placeholder="Durată (ore)"
+              placeholder={t("vendor.packages.durationPlaceholder")}
               value={hours}
               onChange={(e) => setHours(e.target.value)}
             />
           </div>
           <textarea
             rows={3}
-            placeholder="Descriere scurtă"
+            placeholder={t("vendor.packages.descPlaceholder")}
             value={desc}
             onChange={(e) => setDesc(e.target.value)}
             className="rounded-md border border-border/40 bg-background px-3 py-2 text-sm"
@@ -177,7 +179,7 @@ export function PackagesManager({ artistId }: { artistId: number | null }) {
             ) : (
               <Plus className="h-4 w-4" />
             )}
-            Adaugă pachet
+            {t("vendor.packages.addButton")}
           </Button>
         </div>
       </div>
@@ -200,18 +202,21 @@ export function PackagesManager({ artistId }: { artistId: number | null }) {
                   <div className="mt-2 flex gap-4 text-xs text-muted-foreground">
                     {p.price !== null && (
                       <span>
-                        <strong className="text-gold">{p.price}€</strong> preț
+                        <strong className="text-gold">{p.price}€</strong>{" "}
+                        {t("vendor.packages.priceLabel")}
                       </span>
                     )}
                     {p.durationHours !== null && (
-                      <span>{p.durationHours}h durată</span>
+                      <span>
+                        {p.durationHours}h {t("vendor.packages.durationLabel")}
+                      </span>
                     )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground">
-                      Vizibil
+                      {t("vendor.packages.visible")}
                     </span>
                     <Switch
                       checked={p.isVisible}

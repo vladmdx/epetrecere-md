@@ -18,6 +18,7 @@ import {
   ShieldCheck,
   ShieldAlert,
 } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 export interface EventPhoto {
   id: number;
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function PhotosView({ planId }: Props) {
+  const { t } = useLocale();
   const [photos, setPhotos] = useState<EventPhoto[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -49,7 +51,7 @@ export function PhotosView({ planId }: Props) {
       const data = await res.json();
       setPhotos(data.photos ?? []);
     } catch {
-      toast.error("Nu am putut încărca fotografiile.");
+      toast.error(t("planner.photos.loadError"));
     } finally {
       setLoading(false);
     }
@@ -62,11 +64,11 @@ export function PhotosView({ planId }: Props) {
 
   async function handleUpload(file: File) {
     if (!file.type.startsWith("image/")) {
-      toast.error("Doar imagini sunt acceptate.");
+      toast.error(t("planner.photos.onlyImages"));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Maxim 10MB per fotografie.");
+      toast.error(t("planner.photos.tooLarge"));
       return;
     }
     setUploading(true);
@@ -78,7 +80,7 @@ export function PhotosView({ planId }: Props) {
       const upRes = await fetch("/api/upload", { method: "POST", body: fd });
       const upData = await upRes.json();
       if (!upRes.ok || !upData.url) {
-        toast.error(upData.error || "Upload eșuat.");
+        toast.error(upData.error || t("planner.photos.uploadFailed"));
         return;
       }
 
@@ -92,14 +94,14 @@ export function PhotosView({ planId }: Props) {
         }),
       });
       if (!res.ok) {
-        toast.error("Nu am putut salva fotografia.");
+        toast.error(t("planner.photos.saveError"));
         return;
       }
       const data = await res.json();
       setPhotos((prev) => [data.photo, ...prev]);
       setCaption("");
       if (fileRef.current) fileRef.current.value = "";
-      toast.success("Fotografie adăugată.");
+      toast.success(t("planner.photos.added"));
     } finally {
       setUploading(false);
     }
@@ -120,7 +122,7 @@ export function PhotosView({ planId }: Props) {
       },
     );
     if (!res.ok) {
-      toast.error("Nu am putut actualiza.");
+      toast.error(t("planner.photos.updateError"));
       setPhotos(prev);
     }
   }
@@ -133,7 +135,7 @@ export function PhotosView({ planId }: Props) {
       { method: "DELETE" },
     );
     if (!res.ok) {
-      toast.error("Nu am putut șterge.");
+      toast.error(t("planner.photos.deleteError"));
       setPhotos(prev);
     }
   }
@@ -144,16 +146,16 @@ export function PhotosView({ planId }: Props) {
       <div className="rounded-xl border border-dashed border-border/40 bg-card p-5">
         <div className="flex items-center gap-3">
           <Camera className="h-5 w-5 text-gold" />
-          <h3 className="font-heading text-base font-semibold">Adaugă fotografii</h3>
+          <h3 className="font-heading text-base font-semibold">{t("planner.photos.addTitle")}</h3>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Împărtășește momente din eveniment. JPG / PNG / WEBP, max 10MB.
+          {t("planner.photos.addHint")}
         </p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <Input
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder="Descriere (opțional)"
+            placeholder={t("planner.photos.captionPlaceholder")}
             className="flex-1"
           />
           <input
@@ -172,7 +174,7 @@ export function PhotosView({ planId }: Props) {
             className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-            Încarcă
+            {t("planner.photos.upload")}
           </Button>
         </div>
       </div>
@@ -180,11 +182,11 @@ export function PhotosView({ planId }: Props) {
       {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-10 text-muted-foreground">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Se încarcă…
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("planner.photos.loading")}
         </div>
       ) : photos.length === 0 ? (
         <p className="py-8 text-center text-muted-foreground">
-          Nicio fotografie încă.
+          {t("planner.photos.empty")}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
@@ -196,7 +198,7 @@ export function PhotosView({ planId }: Props) {
               { }
               <img
                 src={p.url}
-                alt={p.caption || "Event photo"}
+                alt={p.caption || t("planner.photos.altFallback")}
                 className="aspect-square w-full object-cover"
                 loading="lazy"
               />
@@ -204,7 +206,7 @@ export function PhotosView({ planId }: Props) {
                 <button
                   onClick={() => togglePublic(p)}
                   className="rounded-full bg-black/60 p-1.5 text-white backdrop-blur transition hover:bg-black/80"
-                  title={p.isPublic ? "Ascunde" : "Fă public"}
+                  title={p.isPublic ? t("planner.photos.hide") : t("planner.photos.makePublic")}
                 >
                   {p.isPublic ? (
                     <Eye className="h-3.5 w-3.5" />
@@ -215,7 +217,7 @@ export function PhotosView({ planId }: Props) {
                 <button
                   onClick={() => deletePhoto(p)}
                   className="rounded-full bg-black/60 p-1.5 text-white backdrop-blur transition hover:bg-red-500"
-                  title="Șterge"
+                  title={t("common.delete")}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
@@ -228,8 +230,12 @@ export function PhotosView({ planId }: Props) {
                     <ShieldAlert className="h-3 w-3 text-amber-400" />
                   )}
                   <span className="text-[10px] uppercase">
-                    {p.isApproved ? "Aprobat" : "În verificare"}
-                    {p.isPublic ? " · public" : " · privat"}
+                    {p.isApproved
+                      ? t("planner.photos.approved")
+                      : t("planner.photos.pending")}
+                    {p.isPublic
+                      ? ` · ${t("planner.photos.public")}`
+                      : ` · ${t("planner.photos.private")}`}
                   </span>
                 </div>
                 {p.caption && <p className="line-clamp-2">{p.caption}</p>}

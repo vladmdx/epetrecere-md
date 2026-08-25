@@ -26,10 +26,18 @@ import {
   getArtistProfileSnapshot,
 } from "@/lib/db/queries/artist-dashboard";
 import { DashboardClient } from "@/components/vendor/dashboard-client";
+import { t } from "@/i18n";
+import { DEFAULT_LOCALE, isLocale, type AppLocale } from "@/lib/i18n/routing";
 
 export const dynamic = "force-dynamic";
 
-export default async function VendorDashboard() {
+export default async function VendorDashboard({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   // Route the user to the right shell:
   //   has venue, no artist → /dashboard/sala
   //   role=user, no records → /cabinet (they're a client)
@@ -67,7 +75,7 @@ export default async function VendorDashboard() {
       redirect("/cabinet");
     }
     // Pending shell for new artists who haven't filled the profile yet.
-    return <ArtistPendingShell />;
+    return <ArtistPendingShell locale={locale} />;
   }
 
   // Fan-out all four reads in parallel. The dashboard is the first paint
@@ -79,7 +87,7 @@ export default async function VendorDashboard() {
     getArtistRecentRequests(artist.id, 3),
   ]);
 
-  if (!profile) return <ArtistPendingShell />;
+  if (!profile) return <ArtistPendingShell locale={locale} />;
 
   return (
     <DashboardClient
@@ -91,15 +99,15 @@ export default async function VendorDashboard() {
   );
 }
 
-function ArtistPendingShell() {
+function ArtistPendingShell({ locale }: { locale: AppLocale }) {
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <header>
         <h1 className="font-heading text-2xl font-bold sm:text-3xl">
-          Panoul Meu
+          {t("vendor.dashboard", locale)}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Completează profilul pentru a fi vizibil pe site.
+          {t("vendor.pending.subtitle", locale)}
         </p>
       </header>
 
@@ -109,10 +117,10 @@ function ArtistPendingShell() {
             <Sparkles className="h-6 w-6 shrink-0 text-gold" />
             <div>
               <p className="font-heading font-bold">
-                Profilul tău nu este încă creat
+                {t("vendor.pending.title", locale)}
               </p>
               <p className="text-sm text-muted-foreground">
-                Completează onboarding-ul pentru a deveni vizibil pe ePetrecere.md
+                {t("vendor.pending.hint", locale)}
               </p>
             </div>
           </div>
@@ -120,7 +128,7 @@ function ArtistPendingShell() {
             href="/dashboard/onboarding"
             className="group inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] transition-all duration-200 hover:bg-gold-dark hover:shadow-[0_4px_20px_rgba(201,168,76,0.35)] active:scale-95"
           >
-            Completează profilul
+            {t("vendor.pending.cta", locale)}
           </Link>
         </CardContent>
       </Card>

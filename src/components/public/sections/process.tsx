@@ -70,7 +70,7 @@ export function ProcessSection() {
               href="/planifica"
               className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#101019] shadow-[0_12px_28px_rgba(170,126,36,.24)] transition hover:-translate-y-0.5 hover:brightness-105"
             >
-              Planifică evenimentul
+              {t("home.reco.submit")}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

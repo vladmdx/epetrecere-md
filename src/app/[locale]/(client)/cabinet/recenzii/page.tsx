@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ReviewPhotoUploader } from "@/components/public/review-photo-uploader";
+import { useLocale } from "@/hooks/use-locale";
 
 interface ReviewableBooking {
   id: number;
@@ -30,6 +31,7 @@ interface ReviewableBooking {
 }
 
 export default function ReviewsCabinetPage() {
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const [bookings, setBookings] = useState<ReviewableBooking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,7 @@ export default function ReviewsCabinetPage() {
       const data = await res.json();
       setBookings(data.bookings ?? []);
     } catch {
-      toast.error("Nu am putut încărca rezervările.");
+      toast.error(t("cabinet.reviews.loadError"));
     } finally {
       setLoading(false);
     }
@@ -72,7 +74,7 @@ export default function ReviewsCabinetPage() {
       <div className="mx-auto max-w-md py-20 px-4 text-center">
         <MessageSquareText className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
         <p className="text-muted-foreground">
-          Autentifică-te pentru a lăsa recenzii verificate.
+          {t("cabinet.reviews.signIn")}
         </p>
       </div>
     );
@@ -84,28 +86,28 @@ export default function ReviewsCabinetPage() {
         href="/cabinet"
         className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
       >
-        <ArrowLeft className="h-3 w-3" /> Înapoi la cabinet
+        <ArrowLeft className="h-3 w-3" /> {t("cabinet.backToCabinet")}
       </Link>
       <h1 className="mt-2 font-heading text-2xl font-bold">
-        Recenziile tale verificate
+        {t("cabinet.reviews.title")}
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Poți lăsa o recenzie doar pentru evenimentele care au avut loc și pentru care ai confirmat rezervarea. Recenziile apar după verificare.
+        {t("cabinet.reviews.intro")}
       </p>
 
       <div className="mt-6 space-y-4">
         {loading ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground">
-            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Se încarcă…
+            <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("cabinet.reviews.loading")}
           </div>
         ) : bookings.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border/40 bg-card py-12 text-center">
             <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
             <p className="text-muted-foreground">
-              Nicio rezervare în așteptarea recenziei.
+              {t("cabinet.reviews.emptyTitle")}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              După un eveniment confirmat vei putea lăsa o recenzie aici.
+              {t("cabinet.reviews.emptyBody")}
             </p>
           </div>
         ) : (
@@ -125,6 +127,7 @@ function ReviewCard({
   booking: ReviewableBooking;
   onSubmitted: () => void;
 }) {
+  const { t } = useLocale();
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [text, setText] = useState("");
@@ -133,11 +136,11 @@ function ReviewCard({
 
   async function submit() {
     if (rating < 1) {
-      toast.error("Alege o notă de la 1 la 5 stele.");
+      toast.error(t("cabinet.reviews.ratingRequired"));
       return;
     }
     if (text.trim().length < 10) {
-      toast.error("Scrie cel puțin 10 caractere.");
+      toast.error(t("cabinet.reviews.textTooShort"));
       return;
     }
     setSubmitting(true);
@@ -154,10 +157,10 @@ function ReviewCard({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu am putut trimite recenzia.");
+        toast.error(err.error || t("cabinet.reviews.submitError"));
         return;
       }
-      toast.success("Mulțumim! Recenzia este în curs de verificare.");
+      toast.success(t("cabinet.reviews.submitSuccess"));
       onSubmitted();
     } finally {
       setSubmitting(false);
@@ -169,7 +172,7 @@ function ReviewCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-xs uppercase text-muted-foreground">
-            {booking.eventType || "Eveniment"} ·{" "}
+            {booking.eventType || t("cabinet.reviews.eventFallback")} ·{" "}
             {new Date(booking.eventDate).toLocaleDateString("ro-MD")}
           </p>
           {booking.artistSlug ? (
@@ -177,11 +180,11 @@ function ReviewCard({
               href={`/artisti/${booking.artistSlug}`}
               className="font-heading text-lg font-semibold hover:text-gold"
             >
-              {booking.artistName || "Artist"}
+              {booking.artistName || t("cabinet.reviews.artistFallback")}
             </Link>
           ) : (
             <h3 className="font-heading text-lg font-semibold">
-              {booking.artistName || "Artist"}
+              {booking.artistName || t("cabinet.reviews.artistFallback")}
             </h3>
           )}
         </div>
@@ -196,7 +199,7 @@ function ReviewCard({
             onMouseEnter={() => setHover(n)}
             onMouseLeave={() => setHover(0)}
             onClick={() => setRating(n)}
-            aria-label={`${n} stele`}
+            aria-label={t("cabinet.reviews.starsAria", { count: n })}
           >
             <Star
               className={cn(
@@ -217,7 +220,7 @@ function ReviewCard({
         <Textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          placeholder="Povestește-ne cum a fost experiența ta..."
+          placeholder={t("cabinet.reviews.textPlaceholder")}
           rows={4}
           maxLength={1000}
         />
@@ -229,7 +232,7 @@ function ReviewCard({
       {/* Photos */}
       <div className="mt-3">
         <p className="mb-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          Fotografii de la eveniment (opțional)
+          {t("cabinet.reviews.photosLabel")}
         </p>
         <ReviewPhotoUploader value={photos} onChange={setPhotos} max={5} />
       </div>
@@ -241,7 +244,7 @@ function ReviewCard({
           className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
         >
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          Trimite recenzia
+          {t("cabinet.reviews.submit")}
         </Button>
       </div>
     </div>

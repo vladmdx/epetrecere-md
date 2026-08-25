@@ -40,7 +40,7 @@ interface Props {
 }
 
 export function ArtistListCard({ artist, density }: Props) {
-  const { locale } = useLocale();
+  const { t, locale } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
@@ -110,12 +110,12 @@ export function ArtistListCard({ artist, density }: Props) {
               )}
               {showPrice && artist.priceFrom ? (
                 <span className="font-medium text-gold">
-                  de la {formatPrice(artist.priceFrom, artist.priceCurrency, locale)}
+                  {t("common.from")} {formatPrice(artist.priceFrom, artist.priceCurrency, locale)}
                 </span>
               ) : !showPrice ? (
                 <span className="flex items-center gap-1 text-gold/70">
                   <Lock className="h-3 w-3" />
-                  Preț la autentificare
+                  {t("common.priceOnLogin")}
                 </span>
               ) : null}
             </div>

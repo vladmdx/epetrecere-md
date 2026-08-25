@@ -24,8 +24,10 @@ import {
   Shield as ShieldIcon,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 export default function ProfilePage() {
+  const { t } = useLocale();
   const { user, isLoaded } = useUser();
   const { signOut, openUserProfile } = useClerk();
   const [firstName, setFirstName] = useState(user?.firstName || "");
@@ -88,9 +90,9 @@ export default function ProfilePage() {
     setSaving(true);
     try {
       await user.update({ firstName, lastName });
-      toast.success("Profil actualizat!");
+      toast.success(t("cabinet.profile.toastProfileUpdated"));
     } catch {
-      toast.error("Eroare la salvare.");
+      toast.error(t("cabinet.profile.toastSaveError"));
     } finally {
       setSaving(false);
     }
@@ -101,9 +103,9 @@ export default function ProfilePage() {
     if (!file || !user) return;
     try {
       await user.setProfileImage({ file });
-      toast.success("Fotografie actualizată!");
+      toast.success(t("cabinet.profile.toastPhotoUpdated"));
     } catch {
-      toast.error("Eroare la încărcare.");
+      toast.error(t("cabinet.profile.toastUploadError"));
     }
   }
 
@@ -122,16 +124,14 @@ export default function ProfilePage() {
       const created = await user.createPhoneNumber({ phoneNumber: phoneValue.trim() });
       // Prepare verification
       await created.prepareVerification();
-      toast.success(
-        "Cod de verificare trimis prin SMS. Verifică telefonul.",
-      );
+      toast.success(t("cabinet.profile.toastSmsSent"));
       // Force-refresh the local user so the UI flips from "Nu ai adăugat"
       // to "Modifică" immediately, even before verification finishes.
       await user.reload();
       setEditingPhone(false);
       openUserProfile();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Eroare la salvare telefon.";
+      const message = err instanceof Error ? err.message : t("cabinet.profile.toastPhoneSaveError");
       toast.error(message);
     } finally {
       setSavingPhone(false);
@@ -147,9 +147,9 @@ export default function ProfilePage() {
       await created.prepareVerification({ strategy: "email_code" });
       setEmailResource(Promise.resolve(created) as never);
       setEmailOtpSent(true);
-      toast.success("Cod de verificare trimis la noul email.");
+      toast.success(t("cabinet.profile.toastEmailCodeSent"));
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Eroare la trimiterea codului.";
+      const message = err instanceof Error ? err.message : t("cabinet.profile.toastCodeSendError");
       toast.error(message);
     } finally {
       setSavingEmail(false);
@@ -166,20 +166,20 @@ export default function ProfilePage() {
         (e) => e.emailAddress === newEmail.trim() && e.verification?.status !== "verified",
       );
       if (!unverified) {
-        toast.error("Email-ul nu a fost găsit. Încearcă din nou.");
+        toast.error(t("cabinet.profile.toastEmailNotFound"));
         return;
       }
       await unverified.attemptVerification({ code: emailOtp.trim() });
       // Set as primary
       await user.update({ primaryEmailAddressId: unverified.id });
-      toast.success("Email-ul a fost schimbat cu succes!");
+      toast.success(t("cabinet.profile.toastEmailChanged"));
       setEditingEmail(false);
       setEmailOtpSent(false);
       setNewEmail("");
       setEmailOtp("");
       setEmailResource(null);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Cod incorect sau expirat.";
+      const message = err instanceof Error ? err.message : t("cabinet.profile.toastCodeInvalid");
       toast.error(message);
     } finally {
       setSavingEmail(false);
@@ -213,15 +213,15 @@ export default function ProfilePage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="font-heading text-2xl font-bold mb-1">Contul Meu</h1>
+      <h1 className="font-heading text-2xl font-bold mb-1">{t("cabinet.profile.title")}</h1>
       <p className="text-sm text-muted-foreground mb-6">
-        Gestionează profilul și setările contului
+        {t("cabinet.profile.subtitle")}
       </p>
 
       {/* Profile photo + basic info */}
       <Card className="mb-4">
         <CardHeader>
-          <CardTitle className="text-lg font-heading">Profil</CardTitle>
+          <CardTitle className="text-lg font-heading">{t("cabinet.profile.cardProfile")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Photo */}
@@ -250,7 +250,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="text-lg font-semibold">
-                {user?.fullName || "Utilizator"}
+                {user?.fullName || t("cabinet.profile.anonymousUser")}
               </p>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Mail className="h-3.5 w-3.5" />
@@ -264,7 +264,7 @@ export default function ProfilePage() {
               )}
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                 <Calendar className="h-3 w-3" />
-                Membru din{" "}
+                {t("cabinet.profile.memberSince")}{" "}
                 {user?.createdAt
                   ? new Date(user.createdAt).toLocaleDateString("ro-MD")
                   : "—"}
@@ -275,21 +275,21 @@ export default function ProfilePage() {
           {/* Name fields */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="firstName">Prenume</Label>
+              <Label htmlFor="firstName">{t("cabinet.profile.firstName")}</Label>
               <Input
                 id="firstName"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
-                placeholder="Prenumele tău"
+                placeholder={t("cabinet.profile.firstNamePlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="lastName">Nume</Label>
+              <Label htmlFor="lastName">{t("cabinet.profile.lastName")}</Label>
               <Input
                 id="lastName"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                placeholder="Numele tău"
+                placeholder={t("cabinet.profile.lastNamePlaceholder")}
               />
             </div>
           </div>
@@ -304,7 +304,7 @@ export default function ProfilePage() {
             ) : (
               <Save className="mr-2 h-4 w-4" />
             )}
-            Salvează modificările
+            {t("cabinet.profile.saveChanges")}
           </Button>
         </CardContent>
       </Card>
@@ -314,7 +314,7 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle className="text-lg font-heading flex items-center gap-2">
             <Phone className="h-4 w-4 text-gold" />
-            Telefon
+            {t("cabinet.profile.cardPhone")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -325,7 +325,7 @@ export default function ProfilePage() {
                   <p className="text-sm font-medium">{currentPhone}</p>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Nu ai adăugat un număr de telefon.
+                    {t("cabinet.profile.noPhone")}
                   </p>
                 )}
               </div>
@@ -339,13 +339,13 @@ export default function ProfilePage() {
                 }}
               >
                 <Pencil className="h-3.5 w-3.5" />
-                {currentPhone ? "Modifică" : "Adaugă"}
+                {currentPhone ? t("cabinet.profile.edit") : t("cabinet.profile.add")}
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor="phone">Număr de telefon</Label>
+                <Label htmlFor="phone">{t("cabinet.profile.phoneNumber")}</Label>
                 <Input
                   id="phone"
                   type="tel"
@@ -354,7 +354,7 @@ export default function ProfilePage() {
                   placeholder="+373 69 123 456"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Include prefixul țării (ex: +373). Vei primi un SMS de verificare.
+                  {t("cabinet.profile.phoneHint")}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -369,7 +369,7 @@ export default function ProfilePage() {
                   ) : (
                     <Check className="h-3.5 w-3.5" />
                   )}
-                  Salvează
+                  {t("cabinet.profile.save")}
                 </Button>
                 <Button
                   variant="outline"
@@ -377,7 +377,7 @@ export default function ProfilePage() {
                   className="gap-1"
                   onClick={() => setEditingPhone(false)}
                 >
-                  <X className="h-3.5 w-3.5" /> Anulează
+                  <X className="h-3.5 w-3.5" /> {t("cabinet.profile.cancel")}
                 </Button>
               </div>
             </div>
@@ -390,7 +390,7 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle className="text-lg font-heading flex items-center gap-2">
             <Mail className="h-4 w-4 text-gold" />
-            Email
+            {t("cabinet.profile.cardEmail")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -399,7 +399,7 @@ export default function ProfilePage() {
               <div>
                 <p className="text-sm font-medium">{currentEmail}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Email principal al contului
+                  {t("cabinet.profile.primaryEmail")}
                 </p>
               </div>
               <Button
@@ -413,13 +413,13 @@ export default function ProfilePage() {
                   setEditingEmail(true);
                 }}
               >
-                <Pencil className="h-3.5 w-3.5" /> Modifică
+                <Pencil className="h-3.5 w-3.5" /> {t("cabinet.profile.edit")}
               </Button>
             </div>
           ) : !emailOtpSent ? (
             <div className="space-y-3">
               <div className="space-y-2">
-                <Label htmlFor="newEmail">Email nou</Label>
+                <Label htmlFor="newEmail">{t("cabinet.profile.newEmail")}</Label>
                 <Input
                   id="newEmail"
                   type="email"
@@ -428,7 +428,7 @@ export default function ProfilePage() {
                   placeholder="noul-tau@email.com"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Vei primi un cod de verificare (OTP) pe noul email.
+                  {t("cabinet.profile.newEmailHint")}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -443,7 +443,7 @@ export default function ProfilePage() {
                   ) : (
                     <Mail className="h-3.5 w-3.5" />
                   )}
-                  Trimite codul
+                  {t("cabinet.profile.sendCode")}
                 </Button>
                 <Button
                   variant="outline"
@@ -451,7 +451,7 @@ export default function ProfilePage() {
                   className="gap-1"
                   onClick={() => setEditingEmail(false)}
                 >
-                  <X className="h-3.5 w-3.5" /> Anulează
+                  <X className="h-3.5 w-3.5" /> {t("cabinet.profile.cancel")}
                 </Button>
               </div>
             </div>
@@ -459,12 +459,12 @@ export default function ProfilePage() {
             <div className="space-y-3">
               <div className="rounded-lg bg-gold/5 border border-gold/20 p-3 text-sm">
                 <p>
-                  Am trimis un cod de verificare la{" "}
+                  {t("cabinet.profile.codeSentTo")}{" "}
                   <span className="font-medium text-gold">{newEmail}</span>
                 </p>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="otp">Codul de verificare</Label>
+                <Label htmlFor="otp">{t("cabinet.profile.verificationCode")}</Label>
                 <Input
                   id="otp"
                   value={emailOtp}
@@ -485,7 +485,7 @@ export default function ProfilePage() {
                   ) : (
                     <Check className="h-3.5 w-3.5" />
                   )}
-                  Verifică & Schimbă
+                  {t("cabinet.profile.verifyAndChange")}
                 </Button>
                 <Button
                   variant="outline"
@@ -496,7 +496,7 @@ export default function ProfilePage() {
                     setEmailOtpSent(false);
                   }}
                 >
-                  <X className="h-3.5 w-3.5" /> Anulează
+                  <X className="h-3.5 w-3.5" /> {t("cabinet.profile.cancel")}
                 </Button>
               </div>
             </div>
@@ -509,12 +509,12 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle className="text-lg font-heading flex items-center gap-2">
             <Lock className="h-4 w-4 text-gold" />
-            Securitate
+            {t("cabinet.profile.cardSecurity")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Gestionează parola, autentificarea în doi pași și sesiunile active.
+            {t("cabinet.profile.securityText")}
           </p>
           <Button
             variant="outline"
@@ -522,7 +522,7 @@ export default function ProfilePage() {
             className="gap-2"
           >
             <ExternalLink className="h-4 w-4" />
-            Deschide setări securitate
+            {t("cabinet.profile.openSecurity")}
           </Button>
         </CardContent>
       </Card>
@@ -538,9 +538,9 @@ export default function ProfilePage() {
                 <SettingsIcon className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-heading font-bold text-sm">Setări</h3>
+                <h3 className="font-heading font-bold text-sm">{t("cabinet.profile.settingsCard")}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Notificări, preferințe limbă, cadență email
+                  {t("cabinet.profile.settingsCardHint")}
                 </p>
               </div>
             </CardContent>
@@ -553,9 +553,9 @@ export default function ProfilePage() {
                 <ShieldIcon className="h-5 w-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-heading font-bold text-sm">Confidențialitate</h3>
+                <h3 className="font-heading font-bold text-sm">{t("cabinet.profile.privacyCard")}</h3>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Date personale, GDPR, ștergere cont
+                  {t("cabinet.profile.privacyCardHint")}
                 </p>
               </div>
             </CardContent>
@@ -568,7 +568,7 @@ export default function ProfilePage() {
         <CardHeader>
           <CardTitle className="text-lg font-heading flex items-center gap-2 text-destructive">
             <LogOut className="h-4 w-4" />
-            Sesiune
+            {t("cabinet.profile.cardSession")}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -578,7 +578,7 @@ export default function ProfilePage() {
             className="border-destructive/30 text-destructive hover:bg-destructive hover:text-destructive-foreground"
           >
             <LogOut className="mr-2 h-4 w-4" />
-            Deconectare
+            {t("cabinet.profile.signOut")}
           </Button>
         </CardContent>
       </Card>

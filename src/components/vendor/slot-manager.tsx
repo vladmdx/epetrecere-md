@@ -20,6 +20,15 @@ import {
 import { toast } from "sonner";
 import { Plus, Clock, Trash2, Loader2, CalendarDays } from "lucide-react";
 import { CustomCalendar } from "@/components/public/custom-calendar";
+import { useLocale } from "@/hooks/use-locale";
+
+/** BCP-47 tag for `toLocaleDateString` — the day names used to be pinned to
+ *  ro-RO no matter which language the partner was browsing in. */
+const INTL_TAG: Record<string, string> = {
+  ro: "ro-RO",
+  ru: "ru-RU",
+  en: "en-GB",
+};
 
 type Slot = {
   id: number;
@@ -41,6 +50,8 @@ export function SlotManager({
    *  creates slots via its own endpoint). */
   refreshKey?: number;
 }) {
+  const { t, locale } = useLocale();
+  const intlTag = INTL_TAG[locale] ?? "ro-RO";
   const [slots, setSlots] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -81,11 +92,11 @@ export function SlotManager({
 
   async function addSlot() {
     if (!selectedDateIso) {
-      toast.error("Alege o dată mai întâi.");
+      toast.error(t("vendor.slots.errPickDate"));
       return;
     }
     if (startTime >= endTime) {
-      toast.error("Ora de sfârșit trebuie să fie după cea de început.");
+      toast.error(t("vendor.slots.errTimeOrder"));
       return;
     }
     setSaving(true);
@@ -103,12 +114,12 @@ export function SlotManager({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Eroare la salvare.");
+        toast.error(err.error || t("vendor.slots.errSave"));
         return;
       }
       const data = await res.json();
       setSlots((prev) => [...prev, data.slot]);
-      toast.success("Slot adăugat.");
+      toast.success(t("vendor.slots.added"));
       setAddOpen(false);
       setNote("");
       setPrice("");
@@ -119,20 +130,20 @@ export function SlotManager({
 
   async function removeSlot(slotId: number, isBooked: boolean) {
     if (isBooked) {
-      if (!confirm("Acest slot e rezervat. Sigur vrei să îl ștergi?")) return;
+      if (!confirm(t("vendor.slots.confirmDeleteBooked"))) return;
     }
     try {
       const res = await fetch(`/api/availability-slots/${slotId}`, {
         method: "DELETE",
       });
       if (!res.ok) {
-        toast.error("Eroare la ștergere.");
+        toast.error(t("vendor.slots.errDelete"));
         return;
       }
       setSlots((prev) => prev.filter((s) => s.id !== slotId));
-      toast.success("Slot șters.");
+      toast.success(t("vendor.slots.deleted"));
     } catch {
-      toast.error("Eroare de rețea.");
+      toast.error(t("vendor.slots.errNetwork"));
     }
   }
 
@@ -155,23 +166,23 @@ export function SlotManager({
       {/* ─── Day selector & slot list ─────────────────────────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Sloturi pe zi</CardTitle>
+          <CardTitle className="text-lg">{t("vendor.slots.dayTitle")}</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Alege o zi, apoi adaugă unul sau mai multe intervale cu preț.
+            {t("vendor.slots.dayHint")}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <CustomCalendar
             value={selectedDate}
             onChange={setSelectedDate}
-            placeholder="Alege o zi"
+            placeholder={t("vendor.slots.pickDay")}
           />
 
           {selectedDateIso && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">
-                  {new Date(selectedDateIso).toLocaleDateString("ro-RO", {
+                  {new Date(selectedDateIso).toLocaleDateString(intlTag, {
                     weekday: "long",
                     day: "numeric",
                     month: "long",
@@ -182,13 +193,13 @@ export function SlotManager({
                   onClick={() => setAddOpen(true)}
                   className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                 >
-                  <Plus className="h-3.5 w-3.5" /> Adaugă slot
+                  <Plus className="h-3.5 w-3.5" /> {t("vendor.slots.addSlot")}
                 </Button>
               </div>
 
               {daySlots.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border/40 py-6 text-center text-sm text-muted-foreground">
-                  Nu ai sloturi pe această zi.
+                  {t("vendor.slots.noneToday")}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -206,7 +217,9 @@ export function SlotManager({
                         <p className="text-sm font-medium">
                           {s.startTime} – {s.endTime}
                           {s.isBooked && (
-                            <span className="ml-2 text-xs text-destructive">REZERVAT</span>
+                            <span className="ml-2 text-xs text-destructive">
+                              {t("vendor.slots.bookedBadge")}
+                            </span>
                           )}
                         </p>
                         {s.note && (
@@ -224,7 +237,7 @@ export function SlotManager({
                         type="button"
                         onClick={() => removeSlot(s.id, s.isBooked)}
                         className="text-muted-foreground hover:text-destructive"
-                        aria-label="Șterge slot"
+                        aria-label={t("vendor.slots.deleteSlot")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -240,16 +253,18 @@ export function SlotManager({
       {/* ─── Upcoming list ─────────────────────────────────────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Următoarele sloturi libere</CardTitle>
+          <CardTitle className="text-lg">
+            {t("vendor.slots.upcomingTitle")}
+          </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Cele mai apropiate 20 sloturi neocupate din calendar.
+            {t("vendor.slots.upcomingHint")}
           </p>
         </CardHeader>
         <CardContent>
           {upcoming.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">
               <CalendarDays className="mx-auto mb-2 h-6 w-6 opacity-40" />
-              Nu ai sloturi libere în următoarele 6 luni.
+              {t("vendor.slots.noneUpcoming")}
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -261,7 +276,7 @@ export function SlotManager({
                   className="flex w-full items-center gap-3 rounded-lg border border-border/30 px-3 py-2 text-left transition-colors hover:border-gold/40 hover:bg-accent/20"
                 >
                   <span className="text-xs text-muted-foreground w-20 shrink-0">
-                    {new Date(s.date).toLocaleDateString("ro-RO", {
+                    {new Date(s.date).toLocaleDateString(intlTag, {
                       day: "numeric",
                       month: "short",
                     })}
@@ -284,12 +299,12 @@ export function SlotManager({
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Adaugă slot disponibil</DialogTitle>
+            <DialogTitle>{t("vendor.slots.dialogTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="start">Ora început</Label>
+                <Label htmlFor="start">{t("vendor.slots.startTime")}</Label>
                 <Input
                   id="start"
                   type="time"
@@ -298,7 +313,7 @@ export function SlotManager({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="end">Ora sfârșit</Label>
+                <Label htmlFor="end">{t("vendor.slots.endTime")}</Label>
                 <Input
                   id="end"
                   type="time"
@@ -308,40 +323,44 @@ export function SlotManager({
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="price">Preț pentru acest interval (EUR)</Label>
+              <Label htmlFor="price">{t("vendor.slots.priceLabel")}</Label>
               <Input
                 id="price"
                 type="number"
                 min="0"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                placeholder="Ex: 200"
+                placeholder={t("vendor.slots.pricePlaceholder")}
               />
               <p className="text-[11px] text-muted-foreground">
-                Lasă gol pentru „preț la cerere”.
+                {t("vendor.slots.priceHint")}
               </p>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="note">Notă (opțional)</Label>
+              <Label htmlFor="note">{t("vendor.slots.noteLabel")}</Label>
               <Textarea
                 id="note"
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={2}
-                placeholder="Ex: Nunți, include echipament."
+                placeholder={t("vendor.slots.notePlaceholder")}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               disabled={saving}
               onClick={addSlot}
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvează slot"}
+              {saving ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                t("vendor.slots.saveSlot")
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

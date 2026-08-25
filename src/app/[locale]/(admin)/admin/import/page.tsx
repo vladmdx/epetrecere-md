@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileSpreadsheet, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 import { toast } from "sonner";
 
 type ImportStep = "upload" | "mapping" | "importing" | "done";
@@ -24,24 +25,25 @@ interface ImportResult {
 }
 
 const fieldOptions = [
-  { value: "", label: "— Nu mapa —" },
-  { value: "name_ro", label: "Nume (RO)" },
-  { value: "name_ru", label: "Nume (RU)" },
-  { value: "name_en", label: "Nume (EN)" },
-  { value: "name", label: "Nume (general)" },
-  { value: "description_ro", label: "Descriere (RO)" },
-  { value: "description_ru", label: "Descriere (RU)" },
-  { value: "description", label: "Descriere (general)" },
-  { value: "phone", label: "Telefon" },
-  { value: "email", label: "Email" },
-  { value: "price", label: "Preț" },
-  { value: "location", label: "Locație" },
-  { value: "city", label: "Oraș" },
-  { value: "instagram", label: "Instagram" },
-  { value: "facebook", label: "Facebook" },
+  { value: "", labelKey: "adminUi.import.fieldNone" },
+  { value: "name_ro", labelKey: "adminUi.import.fieldNameRo" },
+  { value: "name_ru", labelKey: "adminUi.import.fieldNameRu" },
+  { value: "name_en", labelKey: "adminUi.import.fieldNameEn" },
+  { value: "name", labelKey: "adminUi.import.fieldName" },
+  { value: "description_ro", labelKey: "adminUi.import.fieldDescRo" },
+  { value: "description_ru", labelKey: "adminUi.import.fieldDescRu" },
+  { value: "description", labelKey: "adminUi.import.fieldDesc" },
+  { value: "phone", labelKey: "adminUi.import.fieldPhone" },
+  { value: "email", labelKey: "adminUi.import.fieldEmail" },
+  { value: "price", labelKey: "adminUi.import.fieldPrice" },
+  { value: "location", labelKey: "adminUi.import.fieldLocation" },
+  { value: "city", labelKey: "adminUi.import.fieldCity" },
+  { value: "instagram", labelKey: "adminUi.import.fieldInstagram" },
+  { value: "facebook", labelKey: "adminUi.import.fieldFacebook" },
 ];
 
 export default function ImportPage() {
+  const { t } = useLocale();
   const [step, setStep] = useState<ImportStep>("upload");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewData | null>(null);
@@ -79,7 +81,7 @@ export default function ImportPage() {
       setMapping(autoMapping);
       setStep("mapping");
     } catch {
-      toast.error("Eroare la parsarea fișierului");
+      toast.error(t("adminUi.import.toastParseError"));
     } finally {
       setLoading(false);
     }
@@ -101,9 +103,9 @@ export default function ImportPage() {
       const data: ImportResult = await res.json();
       setResult(data);
       setStep("done");
-      toast.success(`${data.processed} artiști importați cu succes!`);
+      toast.success(t("adminUi.import.toastImported", { count: data.processed }));
     } catch {
-      toast.error("Eroare la import");
+      toast.error(t("adminUi.import.toastImportError"));
       setStep("mapping");
     } finally {
       setLoading(false);
@@ -112,20 +114,20 @@ export default function ImportPage() {
 
   async function handleAIRegenerate() {
     setAiLoading(true);
-    toast.info("AI regenerarea descrierilor va începe în background...");
+    toast.info(t("adminUi.import.toastAiStarting"));
     // In production this would trigger an Inngest job
     setTimeout(() => {
       setAiLoading(false);
-      toast.success("Descrierile au fost trimise pentru regenerare AI.");
+      toast.success(t("adminUi.import.toastAiQueued"));
     }, 2000);
   }
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Import Artiști</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("adminUi.import.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Importă artiști din fișiere Excel (.xlsx) sau CSV
+          {t("adminUi.import.subtitle")}
         </p>
       </div>
 
@@ -139,8 +141,8 @@ export default function ImportPage() {
             >
               <Upload className="h-12 w-12 text-gold" />
               <div className="text-center">
-                <p className="font-medium">Click pentru a selecta fișierul</p>
-                <p className="text-sm text-muted-foreground">Sau trage fișierul aici (.xlsx, .xls, .csv)</p>
+                <p className="font-medium">{t("adminUi.import.clickToSelect")}</p>
+                <p className="text-sm text-muted-foreground">{t("adminUi.import.dropHint")}</p>
               </div>
               <input
                 ref={inputRef}
@@ -155,7 +157,7 @@ export default function ImportPage() {
             </div>
             {loading && (
               <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Se parsează fișierul...
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("adminUi.import.parsing")}
               </div>
             )}
           </CardContent>
@@ -169,7 +171,7 @@ export default function ImportPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileSpreadsheet className="h-5 w-5 text-gold" />
-                Mapare coloane — {preview.totalRows} rânduri detectate
+                {t("adminUi.import.mappingTitle", { count: preview.totalRows })}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -192,7 +194,7 @@ export default function ImportPage() {
                       }}
                     >
                       {fieldOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
                       ))}
                     </select>
                   </div>
@@ -204,7 +206,7 @@ export default function ImportPage() {
           {/* Preview Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Preview (primele 5 rânduri)</CardTitle>
+              <CardTitle>{t("adminUi.import.previewTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -234,7 +236,7 @@ export default function ImportPage() {
 
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => { setStep("upload"); setPreview(null); setFile(null); }}>
-              Înapoi
+              {t("common.back")}
             </Button>
             <Button
               onClick={handleImport}
@@ -242,7 +244,7 @@ export default function ImportPage() {
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              Importă {preview.totalRows} artiști
+              {t("adminUi.import.importBtn", { count: preview.totalRows })}
             </Button>
           </div>
         </>
@@ -253,7 +255,7 @@ export default function ImportPage() {
         <Card>
           <CardContent className="flex flex-col items-center gap-4 py-12">
             <Loader2 className="h-10 w-10 animate-spin text-gold" />
-            <p className="font-medium">Se importă artiștii...</p>
+            <p className="font-medium">{t("adminUi.import.importing")}</p>
             <Progress value={50} className="max-w-xs" />
           </CardContent>
         </Card>
@@ -267,20 +269,20 @@ export default function ImportPage() {
               <div className="flex flex-col items-center gap-4 text-center">
                 <CheckCircle className="h-12 w-12 text-success" />
                 <div>
-                  <p className="text-lg font-bold">{result.processed} artiști importați!</p>
+                  <p className="text-lg font-bold">{t("adminUi.import.doneCount", { count: result.processed })}</p>
                   {result.errors > 0 && (
-                    <p className="text-sm text-destructive">{result.errors} erori</p>
+                    <p className="text-sm text-destructive">{t("adminUi.import.errorCount", { count: result.errors })}</p>
                   )}
                 </div>
               </div>
 
               {result.errorDetails.length > 0 && (
                 <div className="mt-6 space-y-1">
-                  <p className="text-sm font-medium text-destructive">Erori:</p>
+                  <p className="text-sm font-medium text-destructive">{t("adminUi.import.errorsLabel")}</p>
                   {result.errorDetails.map((err, i) => (
                     <p key={i} className="text-xs text-muted-foreground">
                       <AlertCircle className="mr-1 inline h-3 w-3 text-destructive" />
-                      Rând {err.row}: {err.error}
+                      {t("adminUi.import.errorRow", { row: err.row })} {err.error}
                     </p>
                   ))}
                 </div>
@@ -295,10 +297,10 @@ export default function ImportPage() {
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
             >
               {aiLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-              Regenerează Descrieri cu AI
+              {t("adminUi.import.regenerateAi")}
             </Button>
             <Button variant="outline" onClick={() => { setStep("upload"); setResult(null); setFile(null); setPreview(null); }}>
-              Import Nou
+              {t("adminUi.import.newImport")}
             </Button>
           </div>
         </>

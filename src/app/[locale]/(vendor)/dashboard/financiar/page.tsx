@@ -21,25 +21,18 @@ import { db } from "@/lib/db";
 import { artists, bookingRequests, users } from "@/lib/db/schema";
 import { CommissionPanel } from "@/components/vendor/commission-panel";
 import { formatAmount } from "@/lib/format/price";
+import { DEFAULT_LOCALE, isLocale, type AppLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 
 export const dynamic = "force-dynamic";
 
-const ROMANIAN_MONTHS = [
-  "Ian",
-  "Feb",
-  "Mar",
-  "Apr",
-  "Mai",
-  "Iun",
-  "Iul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Noi",
-  "Dec",
-];
-
-export default async function VendorFinancialPage() {
+export default async function VendorFinancialPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const { userId: clerkId } = await auth();
   if (!clerkId) redirect("/sign-in");
 
@@ -64,10 +57,10 @@ export default async function VendorFinancialPage() {
   if (!artist) {
     return (
       <div className="space-y-6">
-        <h1 className="font-heading text-2xl font-bold">Financiar</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("vendor.financial", locale)}</h1>
         <Card>
           <CardContent className="py-16 text-center text-muted-foreground">
-            Nu ești înregistrat ca artist încă.
+            {t("vendor.finance.notAnArtist", locale)}
           </CardContent>
         </Card>
       </div>
@@ -132,25 +125,25 @@ export default async function VendorFinancialPage() {
 
   const stats = [
     {
-      label: "Venituri luna asta",
+      label: t("vendor.finance.revenueThisMonth", locale),
       value: formatAmount(monthRevenue),
       icon: DollarSign,
       color: "text-gold",
     },
     {
-      label: `Total ${year}`,
+      label: t("vendor.finance.totalYear", locale, { year }),
       value: formatAmount(totalYear),
       icon: TrendingUp,
       color: "text-success",
     },
     {
-      label: "Plăți în așteptare",
+      label: t("vendor.finance.pendingPayments", locale),
       value: formatAmount(pendingRevenue),
       icon: Clock,
       color: "text-warning",
     },
     {
-      label: "Plăți confirmate",
+      label: t("vendor.finance.confirmedPayments", locale),
       value: formatAmount(confirmedRevenue),
       icon: CheckCircle,
       color: "text-success",
@@ -163,9 +156,9 @@ export default async function VendorFinancialPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Financiar</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("vendor.financial", locale)}</h1>
           <p className="text-xs text-muted-foreground">
-            Estimat pe baza prețului tău public ({formatAmount(priceFrom)} / eveniment).
+            {t("vendor.finance.estimateNote", locale, { price: formatAmount(priceFrom) })}
           </p>
         </div>
       </div>
@@ -188,7 +181,7 @@ export default async function VendorFinancialPage() {
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-muted-foreground">
             <CalendarDays className="mb-3 h-10 w-10" />
-            <p>Nu ai rezervări pentru {year}.</p>
+            <p>{t("vendor.finance.noBookingsYear", locale, { year })}</p>
           </CardContent>
         </Card>
       ) : (
@@ -196,7 +189,7 @@ export default async function VendorFinancialPage() {
           {/* Revenue chart */}
           <Card>
             <CardHeader>
-              <CardTitle>Venituri estimate {year}</CardTitle>
+              <CardTitle>{t("vendor.finance.estimatedRevenueYear", locale, { year })}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex h-40 items-end gap-1">
@@ -218,7 +211,7 @@ export default async function VendorFinancialPage() {
                       />
                     </div>
                     <span className="text-[10px] text-muted-foreground">
-                      {ROMANIAN_MONTHS[i]}
+                      {t(`vendor.monthShort${i + 1}`, locale)}
                     </span>
                   </div>
                 ))}
@@ -229,21 +222,22 @@ export default async function VendorFinancialPage() {
           {/* Transactions */}
           <Card>
             <CardHeader>
-              <CardTitle>Rezervări</CardTitle>
+              <CardTitle>{t("vendor.bookings", locale)}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {upcoming.length > 0 && (
                   <div>
                     <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">
-                      Viitoare
+                      {t("vendor.finance.upcoming", locale)}
                     </p>
                     <div className="space-y-3">
-                      {upcoming.map((t) => (
+                      {upcoming.map((row) => (
                         <TransactionRow
-                          key={t.id}
-                          row={t}
+                          key={row.id}
+                          row={row}
                           amount={priceFrom}
+                          locale={locale}
                         />
                       ))}
                     </div>
@@ -252,14 +246,15 @@ export default async function VendorFinancialPage() {
                 {past.length > 0 && (
                   <div>
                     <p className="mb-2 mt-2 text-xs font-semibold uppercase text-muted-foreground">
-                      Trecute
+                      {t("vendor.finance.past", locale)}
                     </p>
                     <div className="space-y-3">
-                      {past.map((t) => (
+                      {past.map((row) => (
                         <TransactionRow
-                          key={t.id}
-                          row={t}
+                          key={row.id}
+                          row={row}
                           amount={priceFrom}
+                          locale={locale}
                         />
                       ))}
                     </div>
@@ -282,15 +277,16 @@ interface TransactionRowProps {
     status: "pending" | "accepted" | "confirmed_by_client" | "rejected" | "cancelled" | "completed" | "expired";
   };
   amount: number;
+  locale: AppLocale;
 }
 
-function TransactionRow({ row, amount }: TransactionRowProps) {
+function TransactionRow({ row, amount, locale }: TransactionRowProps) {
   const isConfirmed = row.status === "confirmed_by_client";
   return (
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
         <p className="truncate text-sm font-medium">
-          {row.eventType ?? "Eveniment"} — {row.clientName}
+          {row.eventType ?? t("vendor.finance.eventFallback", locale)} — {row.clientName}
         </p>
         <p className="text-xs text-muted-foreground">{row.eventDate}</p>
       </div>
@@ -306,7 +302,7 @@ function TransactionRow({ row, amount }: TransactionRowProps) {
               : "border-warning/30 text-warning text-xs"
           }
         >
-          {isConfirmed ? "Confirmat" : "În așteptare"}
+          {isConfirmed ? t("vendor.finance.statusConfirmed", locale) : t("vendor.finance.statusPending", locale)}
         </Badge>
       </div>
           <CommissionPanel />

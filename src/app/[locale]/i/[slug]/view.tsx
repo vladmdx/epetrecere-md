@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { getInvitationDesign, googleFontsUrl } from "@/lib/invitations/templates";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Invitation {
   id: number;
@@ -45,6 +46,7 @@ export function PublicInvitationView({
   invitation: Invitation;
   guest: Guest | null;
 }) {
+  const { t } = useLocale();
   const [rsvpStatus, setRsvpStatus] = useState<Guest["rsvpStatus"]>(
     guest?.rsvpStatus ?? "pending",
   );
@@ -58,7 +60,7 @@ export function PublicInvitationView({
   const [loading, setLoading] = useState(false);
 
   const title =
-    invitation.coupleNames || invitation.hostName || "Invitație";
+    invitation.coupleNames || invitation.hostName || t("invite.fallbackTitle");
 
   const design = getInvitationDesign(invitation.customColors?.designId);
 
@@ -85,9 +87,7 @@ export function PublicInvitationView({
 
   async function submitRsvp(status: "yes" | "no" | "maybe") {
     if (!guest?.rsvpToken) {
-      alert(
-        "Pentru a răspunde ai nevoie de link-ul personal trimis de gazdă.",
-      );
+      alert(t("invite.view.needPersonalLink"));
       return;
     }
     setLoading(true);
@@ -108,7 +108,7 @@ export function PublicInvitationView({
       setRsvpStatus(status);
       setSubmitted(true);
     } else {
-      alert("Eroare la salvare. Încearcă din nou.");
+      alert(t("invite.view.saveError"));
     }
   }
 
@@ -145,7 +145,7 @@ export function PublicInvitationView({
             className="mt-4 text-sm font-medium uppercase tracking-[4px]"
             style={{ color: "var(--inv-accent)" }}
           >
-            Ești invitat
+            {t("invite.view.youAreInvited")}
           </p>
           <h1
             className="mt-4 text-4xl font-bold md:text-6xl"
@@ -190,21 +190,23 @@ export function PublicInvitationView({
           {invitation.ceremonyLocation && (
             <DetailCard
               icon={MapPin}
-              title="Ceremonia"
+              title={t("invite.view.ceremony")}
               lines={[
                 invitation.ceremonyLocation,
-                invitation.ceremonyTime ? `Ora ${invitation.ceremonyTime}` : null,
+                invitation.ceremonyTime
+                  ? t("invite.view.atHour", { time: invitation.ceremonyTime })
+                  : null,
               ]}
             />
           )}
           {invitation.receptionLocation && (
             <DetailCard
               icon={MapPin}
-              title="Petrecerea"
+              title={t("invite.view.reception")}
               lines={[
                 invitation.receptionLocation,
                 invitation.receptionTime
-                  ? `Ora ${invitation.receptionTime}`
+                  ? t("invite.view.atHour", { time: invitation.receptionTime })
                   : null,
               ]}
             />
@@ -212,14 +214,14 @@ export function PublicInvitationView({
           {invitation.dressCode && (
             <DetailCard
               icon={Sparkles}
-              title="Cod vestimentar"
+              title={t("invite.view.dressCode")}
               lines={[invitation.dressCode]}
             />
           )}
           {invitation.rsvpDeadline && (
             <DetailCard
               icon={Calendar}
-              title="Confirmă până pe"
+              title={t("invite.view.rsvpBy")}
               lines={[
                 new Date(invitation.rsvpDeadline).toLocaleDateString("ro-RO", {
                   day: "numeric",
@@ -237,17 +239,16 @@ export function PublicInvitationView({
         <div className="rounded-2xl border border-gold/30 bg-card p-6 shadow-lg md:p-8">
           <div className="text-center">
             <h2 className="font-heading text-2xl font-bold">
-              Confirmă prezența
+              {t("invite.view.confirmAttendance")}
             </h2>
             {guest ? (
               <p className="mt-2 text-sm text-muted-foreground">
-                Salut, <strong>{guest.name}</strong>! Te rugăm să îți confirmi
-                prezența.
+                {t("invite.view.greeting")} <strong>{guest.name}</strong>
+                {t("invite.view.greetingSuffix")}
               </p>
             ) : (
               <p className="mt-2 text-sm text-muted-foreground">
-                Pentru a răspunde ai nevoie de link-ul personal trimis de
-                gazdă.
+                {t("invite.view.needPersonalLink")}
               </p>
             )}
           </div>
@@ -256,13 +257,13 @@ export function PublicInvitationView({
             <div className="mt-6 rounded-xl border border-success/30 bg-success/10 p-5 text-center">
               <Check className="mx-auto h-8 w-8 text-success" />
               <p className="mt-2 font-medium">
-                Răspunsul tău a fost înregistrat:{" "}
+                {t("invite.view.answerRecorded")}{" "}
                 <strong>
                   {rsvpStatus === "yes"
-                    ? "Da, voi participa"
+                    ? t("invite.view.answerYes")
                     : rsvpStatus === "no"
-                      ? "Nu pot participa"
-                      : "Poate voi participa"}
+                      ? t("invite.view.answerNo")
+                      : t("invite.view.answerMaybe")}
                 </strong>
               </p>
               <button
@@ -270,7 +271,7 @@ export function PublicInvitationView({
                 onClick={() => setSubmitted(false)}
                 className="mt-3 text-xs text-muted-foreground underline"
               >
-                Schimbă răspunsul
+                {t("invite.view.changeAnswer")}
               </button>
             </div>
           ) : (
@@ -280,7 +281,7 @@ export function PublicInvitationView({
                   active={rsvpStatus === "yes"}
                   onClick={() => setRsvpStatus("yes")}
                   icon={Check}
-                  label="Da, vin"
+                  label={t("invite.view.btnYes")}
                   color="success"
                   disabled={!guest}
                 />
@@ -288,7 +289,7 @@ export function PublicInvitationView({
                   active={rsvpStatus === "maybe"}
                   onClick={() => setRsvpStatus("maybe")}
                   icon={HelpCircle}
-                  label="Poate"
+                  label={t("invite.view.btnMaybe")}
                   color="warning"
                   disabled={!guest}
                 />
@@ -296,7 +297,7 @@ export function PublicInvitationView({
                   active={rsvpStatus === "no"}
                   onClick={() => setRsvpStatus("no")}
                   icon={X}
-                  label="Nu pot"
+                  label={t("invite.view.btnNo")}
                   color="destructive"
                   disabled={!guest}
                 />
@@ -311,17 +312,17 @@ export function PublicInvitationView({
                       onChange={(e) => setPlusOne(e.target.checked)}
                       className="h-4 w-4 accent-gold"
                     />
-                    Voi veni cu un însoțitor
+                    {t("invite.view.plusOneLabel")}
                   </label>
                   {plusOne && (
                     <Input
-                      placeholder="Numele însoțitorului"
+                      placeholder={t("invite.view.plusOneNamePlaceholder")}
                       value={plusOneName}
                       onChange={(e) => setPlusOneName(e.target.value)}
                     />
                   )}
                   <Textarea
-                    placeholder="Alergii / restricții alimentare (opțional)"
+                    placeholder={t("invite.view.dietaryPlaceholder")}
                     value={dietaryNotes}
                     onChange={(e) => setDietaryNotes(e.target.value)}
                     rows={2}
@@ -330,7 +331,7 @@ export function PublicInvitationView({
               )}
 
               <Textarea
-                placeholder="Mesaj pentru gazdă (opțional)"
+                placeholder={t("invite.view.messagePlaceholder")}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={3}
@@ -346,7 +347,7 @@ export function PublicInvitationView({
                 }
                 className="mt-6 w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
-                {loading ? "Se salvează..." : "Trimite răspunsul"}
+                {loading ? t("invite.view.saving") : t("invite.view.submit")}
               </Button>
             </>
           )}
@@ -355,7 +356,7 @@ export function PublicInvitationView({
 
       {/* Footer */}
       <footer className="border-t border-border/40 py-8 text-center text-xs text-muted-foreground">
-        Invitație creată cu{" "}
+        {t("invite.view.createdWith")}{" "}
         <Link
           href="/cabinet/invitatii/nou"
           className="text-gold hover:underline"

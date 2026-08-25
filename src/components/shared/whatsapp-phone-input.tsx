@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Phone, Loader2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   /** Initial value from the server. Can be null. */
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export function WhatsAppPhoneInput({ initialValue }: Props) {
+  const { t } = useLocale();
   const [value, setValue] = useState(initialValue ?? "");
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -34,14 +36,14 @@ export function WhatsAppPhoneInput({ initialValue }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut salva");
+        toast.error(err.error || t("whatsappPhone.toast.saveFailed"));
         return;
       }
       const data = await res.json();
       setValue(data.phone ?? "");
       setJustSaved(true);
       setTimeout(() => setJustSaved(false), 1800);
-      toast.success("Număr salvat");
+      toast.success(t("whatsappPhone.toast.saved"));
     } finally {
       setSaving(false);
     }
@@ -76,14 +78,10 @@ export function WhatsAppPhoneInput({ initialValue }: Props) {
           ) : justSaved ? (
             <Check className="h-4 w-4" />
           ) : null}
-          {justSaved ? "Salvat" : "Salvează"}
+          {justSaved ? t("whatsappPhone.savedLabel") : t("common.save")}
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Folosim acest număr pentru a-ți trimite notificări urgente pe WhatsApp
-        (booking confirmat, răspuns artist etc). Asigură-te că e asociat cu un
-        cont WhatsApp activ.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("whatsappPhone.hint")}</p>
     </div>
   );
 }

@@ -9,14 +9,19 @@ import { db } from "@/lib/db";
 import { adminAuditLog, users } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/admin";
 import { ArrowLeft, Clock, User } from "lucide-react";
+import { t } from "@/i18n";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 
 export const dynamic = "force-dynamic";
 
 interface Props {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ action?: string; admin?: string }>;
 }
 
-export default async function AuditLogPage({ searchParams }: Props) {
+export default async function AuditLogPage({ params, searchParams }: Props) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const admin = await requireAdmin();
   if (!admin.ok) {
     if (admin.status === 401) redirect("/sign-in?redirect_url=/admin/audit");
@@ -56,14 +61,16 @@ export default async function AuditLogPage({ searchParams }: Props) {
           href="/admin"
           className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
         >
-          <ArrowLeft className="h-3 w-3" /> Admin
+          <ArrowLeft className="h-3 w-3" /> {t("admin.audit.backLink", locale)}
         </Link>
       </div>
 
       <div>
-        <h1 className="font-heading text-2xl font-bold">Audit log</h1>
+        <h1 className="font-heading text-2xl font-bold">
+          {t("admin.audit.title", locale)}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Ultimele 200 acțiuni sensibile pe platformă.
+          {t("admin.audit.subtitle", locale)}
         </p>
       </div>
 
@@ -72,14 +79,14 @@ export default async function AuditLogPage({ searchParams }: Props) {
         <input
           type="text"
           name="action"
-          placeholder="Prefix acțiune (ex: bulk)"
+          placeholder={t("admin.audit.actionPlaceholder", locale)}
           defaultValue={actionFilter ?? ""}
           className="rounded-lg border border-border/60 bg-background px-3 py-1.5 text-sm"
         />
         <input
           type="text"
           name="admin"
-          placeholder="UUID admin"
+          placeholder={t("admin.audit.adminPlaceholder", locale)}
           defaultValue={adminFilter ?? ""}
           className="w-72 rounded-lg border border-border/60 bg-background px-3 py-1.5 text-sm font-mono"
         />
@@ -87,14 +94,14 @@ export default async function AuditLogPage({ searchParams }: Props) {
           type="submit"
           className="rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-[#0D0D0D] hover:bg-gold-dark"
         >
-          Filtrează
+          {t("admin.audit.filter", locale)}
         </button>
         {(actionFilter || adminFilter) && (
           <Link
             href="/admin/audit"
             className="rounded-lg border border-border/60 px-3 py-1.5 text-xs hover:bg-muted"
           >
-            Resetează
+            {t("admin.audit.reset", locale)}
           </Link>
         )}
       </form>
@@ -103,12 +110,12 @@ export default async function AuditLogPage({ searchParams }: Props) {
         <table className="w-full text-sm">
           <thead className="border-b border-border/40 bg-muted/30">
             <tr className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="p-3">Când</th>
-              <th className="p-3">Admin</th>
-              <th className="p-3">Acțiune</th>
-              <th className="p-3">Entitate</th>
-              <th className="p-3">IDs</th>
-              <th className="p-3">Metadata</th>
+              <th className="p-3">{t("admin.audit.colWhen", locale)}</th>
+              <th className="p-3">{t("admin.audit.colAdmin", locale)}</th>
+              <th className="p-3">{t("admin.audit.colAction", locale)}</th>
+              <th className="p-3">{t("admin.audit.colEntity", locale)}</th>
+              <th className="p-3">{t("admin.audit.colIds", locale)}</th>
+              <th className="p-3">{t("admin.audit.colMetadata", locale)}</th>
             </tr>
           </thead>
           <tbody>
@@ -118,7 +125,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
                   colSpan={6}
                   className="py-12 text-center text-muted-foreground"
                 >
-                  Niciun eveniment înregistrat.
+                  {t("admin.audit.empty", locale)}
                 </td>
               </tr>
             ) : (
@@ -157,7 +164,9 @@ export default async function AuditLogPage({ searchParams }: Props) {
                   <td className="p-3 font-mono text-[10px] text-muted-foreground/80">
                     {r.metadata && Object.keys(r.metadata).length > 0 ? (
                       <details>
-                        <summary className="cursor-pointer">Detalii</summary>
+                        <summary className="cursor-pointer">
+                          {t("admin.audit.details", locale)}
+                        </summary>
                         <pre className="mt-1 max-w-xs whitespace-pre-wrap break-words">
                           {JSON.stringify(r.metadata, null, 2)}
                         </pre>
@@ -174,8 +183,7 @@ export default async function AuditLogPage({ searchParams }: Props) {
       </div>
 
       <p className="text-xs text-muted-foreground/70">
-        Păstrăm toate acțiunile — fără limite de retenție. Poți naviga direct
-        la o entitate căutând după ID.
+        {t("admin.audit.footnote", locale)}
       </p>
     </div>
   );

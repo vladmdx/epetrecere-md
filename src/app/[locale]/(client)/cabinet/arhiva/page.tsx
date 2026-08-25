@@ -16,6 +16,7 @@ import {
   ArrowRight,
   Heart,
 } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 interface ArchivedPlan {
   id: number;
@@ -28,16 +29,17 @@ interface ArchivedPlan {
   archivedAt: string | null;
 }
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  baptism: "Botez",
-  cumatrie: "Cumătrie",
-  birthday: "Zi de naștere",
-  corporate: "Corporate",
-  other: "Alt tip",
+const EVENT_TYPE_KEYS: Record<string, string> = {
+  wedding: "event_types.wedding",
+  baptism: "event_types.baptism",
+  cumatrie: "event_types.cumatrie",
+  birthday: "cabinet.eventTypes.birthday",
+  corporate: "event_types.corporate",
+  other: "calc.eventType.other",
 };
 
 export default function ArchivePage() {
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const [plans, setPlans] = useState<ArchivedPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,7 +78,7 @@ export default function ArchivePage() {
       <div className="mx-auto max-w-md py-20 text-center">
         <Heart className="mx-auto mb-4 h-12 w-12 text-gold/40" />
         <p className="mt-2 text-sm text-muted-foreground">
-          Autentifică-te pentru a vedea arhiva.
+          {t("cabinet.archive.signIn")}
         </p>
       </div>
     );
@@ -86,9 +88,11 @@ export default function ArchivePage() {
     return (
       <div className="mx-auto max-w-md py-20 text-center">
         <Archive className="mx-auto mb-4 h-12 w-12 text-gold/40" />
-        <h1 className="font-heading text-xl font-bold">Arhiva este goală</h1>
+        <h1 className="font-heading text-xl font-bold">
+          {t("cabinet.archive.emptyTitle")}
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Aici vor apărea evenimentele tale după ce le marchezi ca finalizate.
+          {t("cabinet.archive.emptyBody")}
         </p>
       </div>
     );
@@ -99,17 +103,27 @@ export default function ArchivePage() {
       <div className="mb-6 flex items-center gap-3">
         <Archive className="h-6 w-6 text-gold" />
         <div>
-          <h1 className="font-heading text-2xl font-bold">Arhivă Evenimente</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("cabinet.archive.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            {plans.length} eveniment{plans.length === 1 ? "" : "e"} finalizate
+            {t(
+              plans.length === 1
+                ? "cabinet.archive.countOne"
+                : "cabinet.archive.countMany",
+              { count: plans.length },
+            )}
           </p>
         </div>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         {plans.map((p) => {
+          const typeKey = p.eventType ? EVENT_TYPE_KEYS[p.eventType] : null;
           const eventLabel = p.eventType
-            ? EVENT_TYPE_LABELS[p.eventType] ?? p.eventType
+            ? typeKey
+              ? t(typeKey)
+              : p.eventType
             : null;
           return (
             <Link
@@ -135,7 +149,9 @@ export default function ArchivePage() {
                           : "border-destructive/30 bg-destructive/5 text-destructive"
                       }`}
                     >
-                      {p.status === "completed" ? "Finalizat" : "Anulat"}
+                      {p.status === "completed"
+                        ? t("cabinet.archive.statusCompleted")
+                        : t("cabinet.archive.statusCancelled")}
                     </span>
                   </div>
                 </div>
@@ -162,7 +178,7 @@ export default function ArchivePage() {
                 {p.guestCountTarget && (
                   <span className="flex items-center gap-1">
                     <Users className="h-3 w-3" />
-                    {p.guestCountTarget} invitați
+                    {p.guestCountTarget} {t("common.guests")}
                   </span>
                 )}
               </div>

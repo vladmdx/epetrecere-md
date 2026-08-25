@@ -7,24 +7,26 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 type Message = {
   role: "user" | "assistant";
   content: string | Array<{ type: string; text?: string }>;
 };
 
-const SUGGESTIONS = [
-  "Ce rezervări am luna viitoare?",
-  "Care e rata mea de ocupare pe vara asta?",
-  "Sugerează-mi un preț competitiv",
-  "Blochează-mi 1-10 ianuarie pentru renovări",
-  "Cum mi-au mers vizitele profilului în ultimele 30 zile?",
-  "Arată-mi recenziile fără răspuns și ajută-mă să răspund",
-  "Îmbunătățește-mi descrierea în română",
-  "Generează meta SEO pentru profil",
+const SUGGESTION_KEYS = [
+  "aiChat.suggestVendor2",
+  "vendorSalaAi.suggestOccupancy",
+  "vendorSalaAi.suggestPrice",
+  "vendorSalaAi.suggestBlockDates",
+  "vendorSalaAi.suggestProfileViews",
+  "vendorSalaAi.suggestReviews",
+  "vendorSalaAi.suggestDescription",
+  "vendorSalaAi.suggestSeo",
 ];
 
 export default function VenueAIAssistantPage() {
+  const { t } = useLocale();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -57,12 +59,12 @@ export default function VenueAIAssistantPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Eroare");
+        throw new Error(err.error || t("vendorSalaAi.error"));
       }
       const data = await res.json();
       setMessages(data.messages || newMsgs);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("vendorSalaAi.error"));
     } finally {
       setLoading(false);
     }
@@ -82,9 +84,9 @@ export default function VenueAIAssistantPage() {
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col gap-4">
       <div>
-        <h1 className="font-heading text-2xl font-bold">AI Assistant</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("vendor.ai_assistant")}</h1>
         <p className="text-muted-foreground">
-          Asistent AI specializat pentru gestionarea sălii. Întrebă-l orice despre rezervări, ocupare, prețuri sau calendar.
+          {t("vendorSalaAi.subtitle")}
         </p>
       </div>
 
@@ -101,21 +103,21 @@ export default function VenueAIAssistantPage() {
                 </div>
                 <div className="text-center">
                   <h2 className="font-heading text-lg font-bold">
-                    Salut! Cu ce te pot ajuta?
+                    {t("vendorSalaAi.greeting")}
                   </h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Încearcă una dintre sugestiile de mai jos sau întreabă-mă direct.
+                    {t("vendorSalaAi.greetingHint")}
                   </p>
                 </div>
                 <div className="flex flex-wrap justify-center gap-2">
-                  {SUGGESTIONS.map((s) => (
+                  {SUGGESTION_KEYS.map((key) => (
                     <button
-                      key={s}
-                      onClick={() => send(s)}
+                      key={key}
+                      onClick={() => send(t(key))}
                       className="rounded-full border border-gold/30 bg-gold/5 px-3 py-1.5 text-xs text-gold transition-colors hover:bg-gold/10"
                     >
                       <Sparkles className="mr-1 inline h-3 w-3" />
-                      {s}
+                      {t(key)}
                     </button>
                   ))}
                 </div>
@@ -179,7 +181,7 @@ export default function VenueAIAssistantPage() {
                   send();
                 }
               }}
-              placeholder="Scrie un mesaj..."
+              placeholder={t("aiChat.placeholder")}
               rows={1}
               className="flex-1 resize-none"
               disabled={loading}

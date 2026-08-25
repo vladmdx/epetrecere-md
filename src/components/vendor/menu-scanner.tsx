@@ -42,6 +42,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 // Matches /api/venue-menu/scan output
 interface ScannedItem {
@@ -67,12 +68,12 @@ interface ScanResult {
 }
 
 const ICON_OPTIONS = [
-  { value: "salad", label: "🥗 Aperitiv / Salată" },
-  { value: "beef", label: "🍖 Fel principal" },
-  { value: "cake", label: "🍰 Desert" },
-  { value: "wine", label: "🍷 Alcool" },
-  { value: "coffee", label: "🥤 Non-alcoolice" },
-  { value: "utensils", label: "🍽 Altele" },
+  { value: "salad", labelKey: "vendorScanner.iconSalad" },
+  { value: "beef", labelKey: "vendorScanner.iconBeef" },
+  { value: "cake", labelKey: "vendorScanner.iconCake" },
+  { value: "wine", labelKey: "vendorScanner.iconWine" },
+  { value: "coffee", labelKey: "vendorScanner.iconCoffee" },
+  { value: "utensils", labelKey: "vendorScanner.iconUtensils" },
 ];
 
 interface Props {
@@ -82,6 +83,7 @@ interface Props {
 }
 
 export function MenuScanner({ venueId, onImported }: Props) {
+  const { t } = useLocale();
   const [stage, setStage] = useState<"idle" | "uploading" | "scanning" | "review">(
     "idle",
   );
@@ -158,14 +160,14 @@ export function MenuScanner({ venueId, onImported }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut citi URL-ul");
+        toast.error(err.error || t("vendorScanner.urlReadFailed"));
         setStage("idle");
         return;
       }
       const data = (await res.json()) as ScanResult & { cached?: boolean };
       applyScanResult(data);
     } catch {
-      toast.error("Eroare la scanare din URL");
+      toast.error(t("vendorScanner.urlScanError"));
       setStage("idle");
     }
   }
@@ -177,7 +179,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
       (!data.packages || data.packages.length === 0)
     ) {
       toast.error(
-        "AI nu a găsit niciun produs. Încearcă o pagină mai specifică (ex: /meniu) sau încarcă o poză/PDF al meniului.",
+        t("vendorScanner.noProductsFound"),
         { duration: 8000 },
       );
       setStage("idle");
@@ -192,11 +194,11 @@ export function MenuScanner({ venueId, onImported }: Props) {
       data.packages.length;
     if (data.cached) {
       toast.success(
-        `Încărcat din cache: ${data.categories.length} categorii · ${total} înregistrări`,
+        t("vendorScanner.loadedFromCache", { count: data.categories.length, total }),
       );
     } else {
       toast.success(
-        `Am extras ${data.categories.length} categorii · ${total} înregistrări`,
+        t("vendorScanner.extracted", { count: data.categories.length, total }),
       );
     }
   }
@@ -211,11 +213,11 @@ export function MenuScanner({ venueId, onImported }: Props) {
       "application/pdf",
     ];
     if (!allowed.includes(file.type)) {
-      toast.error("Doar JPG/PNG/WebP/GIF sau PDF");
+      toast.error(t("vendorScanner.onlyImageOrPdf"));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Fișierul depășește 10MB");
+      toast.error(t("vendorScanner.fileTooLarge"));
       return;
     }
 
@@ -232,13 +234,13 @@ export function MenuScanner({ venueId, onImported }: Props) {
       const up = await fetch("/api/upload", { method: "POST", body: fd });
       if (!up.ok) {
         const err = await up.json().catch(() => ({}));
-        throw new Error(err.error || "Upload eșuat");
+        throw new Error(err.error || t("vendorScanner.uploadFailed"));
       }
       const upData = (await up.json()) as { url: string };
       fileUrl = upData.url;
       setPreviewUrl(fileUrl);
     } catch (err) {
-      toast.error((err as Error).message || "Upload eșuat");
+      toast.error((err as Error).message || t("vendorScanner.uploadFailed"));
       setStage("idle");
       return;
     }
@@ -258,14 +260,14 @@ export function MenuScanner({ venueId, onImported }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "AI-ul nu a putut extrage meniul");
+        toast.error(err.error || t("vendorScanner.extractFailed"));
         setStage("idle");
         return;
       }
       const data = (await res.json()) as ScanResult & { cached?: boolean };
       applyScanResult(data);
     } catch {
-      toast.error("Eroare la scanare");
+      toast.error(t("vendorScanner.scanError"));
       setStage("idle");
     }
   }
@@ -376,15 +378,13 @@ export function MenuScanner({ venueId, onImported }: Props) {
       clean.categories.length +
       clean.packages.length;
     if (totalRows === 0) {
-      toast.error("Nimic de importat — completează măcar un rând.");
+      toast.error(t("vendorScanner.nothingToImport"));
       return;
     }
 
     if (replaceExisting) {
       if (
-        !confirm(
-          "Înlocuirea meniului existent șterge DEFINITIV toate categoriile, itemele și pachetele curente. Continui?",
-        )
+        !confirm(t("vendorScanner.replaceConfirm"))
       ) {
         return;
       }
@@ -404,7 +404,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Import eșuat");
+        toast.error(err.error || t("vendorScanner.importFailed"));
         return;
       }
       const data = (await res.json()) as {
@@ -413,7 +413,11 @@ export function MenuScanner({ venueId, onImported }: Props) {
       };
       const totalItems = data.categories.reduce((n, c) => n + c.itemCount, 0);
       toast.success(
-        `Importat: ${data.categories.length} categorii · ${totalItems} produse · ${data.packages.length} pachete`,
+        t("vendorScanner.imported", {
+          categories: data.categories.length,
+          items: totalItems,
+          packages: data.packages.length,
+        }),
       );
       reset();
       onImported();
@@ -431,7 +435,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
           <div className="flex items-center gap-2 text-gold">
             <Sparkles className="h-5 w-5" />
             <span className="font-heading text-sm font-bold">
-              Scanează meniul tău existent cu AI
+              {t("vendorScanner.title")}
             </span>
           </div>
 
@@ -439,7 +443,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
           <div
             className="inline-flex rounded-lg border border-border/50 p-0.5"
             role="tablist"
-            aria-label="Sursă meniu"
+            aria-label={t("vendorScanner.sourceTabsLabel")}
           >
             <button
               type="button"
@@ -453,7 +457,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <FileImage className="h-3.5 w-3.5" /> Poză / PDF
+              <FileImage className="h-3.5 w-3.5" /> {t("vendorScanner.tabFile")}
             </button>
             <button
               type="button"
@@ -467,7 +471,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <LinkIcon className="h-3.5 w-3.5" /> Link site / imagine
+              <LinkIcon className="h-3.5 w-3.5" /> {t("vendorScanner.tabUrl")}
             </button>
           </div>
 
@@ -488,13 +492,12 @@ export function MenuScanner({ venueId, onImported }: Props) {
             >
               <Upload className="h-9 w-9 text-muted-foreground" />
               <div>
-                <p className="text-sm font-medium">Trage aici o poză sau PDF</p>
+                <p className="text-sm font-medium">{t("vendorScanner.dropHint")}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  JPG / PNG / WebP / PDF · max 10MB
+                  {t("vendorScanner.dropFormats")}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  AI-ul recunoaște categorii, produse și pachete. Revezi totul
-                  înainte de import.
+                  {t("vendorScanner.dropDescription")}
                 </p>
               </div>
               <input
@@ -518,11 +521,10 @@ export function MenuScanner({ venueId, onImported }: Props) {
                 <div className="flex-1 space-y-2">
                   <div>
                     <p className="text-sm font-medium">
-                      Lipește un link către meniu
+                      {t("vendorScanner.urlTitle")}
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      URL-ul unei pagini web cu meniul, sau link direct la o
-                      imagine/PDF (Google Drive, site propriu, Facebook etc.).
+                      {t("vendorScanner.urlDescription")}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -544,12 +546,11 @@ export function MenuScanner({ venueId, onImported }: Props) {
                       disabled={!urlInput.trim()}
                       className="h-9 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                     >
-                      <Sparkles className="h-3.5 w-3.5" /> Scanează
+                      <Sparkles className="h-3.5 w-3.5" /> {t("vendorScanner.scan")}
                     </Button>
                   </div>
                   <p className="text-[11px] text-muted-foreground">
-                    ℹ️ Sitemap-uri SPA care randează JS nu pot fi citite. În
-                    acele cazuri fă un screenshot și trimite-l ca poză.
+                    {t("vendorScanner.spaNote")}
                   </p>
                 </div>
               </div>
@@ -567,13 +568,13 @@ export function MenuScanner({ venueId, onImported }: Props) {
           <Loader2 className="h-10 w-10 animate-spin text-gold" />
           <p className="font-heading text-sm font-bold">
             {stage === "uploading"
-              ? "Se încarcă fișierul..."
-              : "Claude scanează meniul..."}
+              ? t("vendorScanner.uploadingTitle")
+              : t("vendorScanner.scanningTitle")}
           </p>
           <p className="text-xs text-muted-foreground">
             {stage === "uploading"
-              ? "Upload în curs pe Vercel Blob"
-              : "Durează 15-30 secunde pentru o poză, 30-60s pentru PDF multi-pagină"}
+              ? t("vendorScanner.uploadingHint")
+              : t("vendorScanner.scanningHint")}
           </p>
           {previewUrl && previewMime?.startsWith("image/") && (
 
@@ -598,22 +599,23 @@ export function MenuScanner({ venueId, onImported }: Props) {
           <div className="flex items-center gap-2 text-sm">
             <CheckCircle2 className="h-4 w-4 text-gold" />
             <span>
-              <strong>{result.categories.length}</strong> categorii ·{" "}
+              <strong>{result.categories.length}</strong>{" "}
+              {t("vendorScanner.categoriesWord")} ·{" "}
               <strong>
                 {result.categories.reduce((n, c) => n + c.items.length, 0)}
               </strong>{" "}
-              produse · <strong>{result.packages.length}</strong> pachete —
-              revezi și editează mai jos înainte de import.
+              {t("vendorScanner.productsWord")} · <strong>{result.packages.length}</strong>{" "}
+              {t("vendorScanner.packagesWord")} — {t("vendorScanner.reviewHint")}
             </span>
             {fromCache && (
               <span className="ml-2 rounded-full bg-blue-500/15 px-2 py-0.5 text-[10px] font-medium text-blue-400">
-                ⚡ din cache
+                {t("vendorScanner.fromCache")}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={reset} className="gap-1">
-              <RefreshCw className="h-3.5 w-3.5" /> Scanează alt fișier
+              <RefreshCw className="h-3.5 w-3.5" /> {t("vendorScanner.scanAnother")}
             </Button>
           </div>
         </CardContent>
@@ -628,7 +630,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
             ) : (
               <FileImage className="mr-1 inline h-3 w-3" />
             )}
-            Vezi fișierul original
+            {t("vendorScanner.viewOriginal")}
           </summary>
           <div className="p-3">
             {previewMime?.startsWith("image/") ? (
@@ -645,7 +647,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                 rel="noopener"
                 className="text-xs text-gold hover:underline"
               >
-                Deschide PDF-ul →
+                {t("vendorScanner.openPdf")}
               </a>
             )}
           </div>
@@ -657,7 +659,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
         <Card>
           <CardContent className="p-4">
             <h3 className="mb-3 font-heading text-sm font-bold">
-              Categorii ({result.categories.length})
+              {t("vendorScanner.categoriesHeading", { count: result.categories.length })}
             </h3>
             <div className="space-y-2">
               {result.categories.map((cat, ci) => {
@@ -685,7 +687,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                         onChange={(e) =>
                           updateCategory(ci, { nameRo: e.target.value })
                         }
-                        placeholder="Nume categorie"
+                        placeholder={t("vendorScanner.categoryNamePlaceholder")}
                         className="h-8 flex-1 text-sm font-medium"
                       />
                       <Select
@@ -698,13 +700,13 @@ export function MenuScanner({ venueId, onImported }: Props) {
                         <SelectContent>
                           {ICON_OPTIONS.map((opt) => (
                             <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
+                              {t(opt.labelKey)}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                       <span className="text-xs text-muted-foreground">
-                        {cat.items.length} produse
+                        {cat.items.length} {t("vendorScanner.productsWord")}
                       </span>
                       <Button
                         size="icon"
@@ -725,7 +727,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                               onChange={(e) =>
                                 updateItem(ci, ii, { nameRo: e.target.value })
                               }
-                              placeholder="Nume produs"
+                              placeholder={t("vendorScanner.productNamePlaceholder")}
                               className="h-8 min-w-[200px] flex-1 text-xs"
                             />
                             <Input
@@ -757,7 +759,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                           onClick={() => addItem(ci)}
                           className="h-7 gap-1 text-xs"
                         >
-                          <Plus className="h-3 w-3" /> Adaugă produs
+                          <Plus className="h-3 w-3" /> {t("vendorScanner.addProduct")}
                         </Button>
                       </div>
                     )}
@@ -774,7 +776,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
         <Card>
           <CardContent className="p-4">
             <h3 className="mb-3 font-heading text-sm font-bold">
-              Pachete ({result.packages.length})
+              {t("vendorScanner.packagesHeading", { count: result.packages.length })}
             </h3>
             <div className="space-y-3">
               {result.packages.map((pkg, pi) => (
@@ -788,7 +790,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                       onChange={(e) =>
                         updatePackage(pi, { nameRo: e.target.value })
                       }
-                      placeholder="Nume pachet (ex: Standard)"
+                      placeholder={t("vendorScanner.packageNamePlaceholder")}
                       className="h-8 flex-1 text-sm font-medium"
                     />
                     <div className="flex items-center gap-1">
@@ -803,7 +805,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                         placeholder="600"
                         className="h-8 w-24 text-xs"
                       />
-                      <span className="text-xs text-muted-foreground">€/pers</span>
+                      <span className="text-xs text-muted-foreground">{t("vendorScanner.perPerson")}</span>
                     </div>
                     <div className="flex items-center gap-1">
                       <Input
@@ -820,7 +822,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                         className="h-8 w-20 text-xs"
                       />
                       <span className="text-xs text-muted-foreground">
-                        pers min
+                        {t("vendorScanner.minGuests")}
                       </span>
                     </div>
                     <Button
@@ -835,7 +837,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div>
                       <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        Include
+                        {t("vendorScanner.includes")}
                       </Label>
                       <Textarea
                         value={pkg.includes ?? ""}
@@ -844,12 +846,12 @@ export function MenuScanner({ venueId, onImported }: Props) {
                         }
                         rows={2}
                         className="mt-0.5 text-xs"
-                        placeholder="3 aperitive, 2 preparate calde, ..."
+                        placeholder={t("vendorScanner.includesPlaceholder")}
                       />
                     </div>
                     <div>
                       <Label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                        NU include
+                        {t("vendorScanner.excludes")}
                       </Label>
                       <Textarea
                         value={pkg.excludes ?? ""}
@@ -858,7 +860,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
                         }
                         rows={2}
                         className="mt-0.5 text-xs"
-                        placeholder="Băuturi tari, tort, ..."
+                        placeholder={t("vendorScanner.excludesPlaceholder")}
                       />
                     </div>
                   </div>
@@ -880,13 +882,13 @@ export function MenuScanner({ venueId, onImported }: Props) {
               className="h-4 w-4 accent-gold"
             />
             <span>
-              Înlocuiește meniul existent{" "}
-              <span className="text-muted-foreground">(șterge ce e acum)</span>
+              {t("vendorScanner.replaceExisting")}{" "}
+              <span className="text-muted-foreground">{t("vendorScanner.replaceExistingHint")}</span>
             </span>
           </label>
           <div className="flex gap-2">
             <Button variant="outline" onClick={reset} disabled={importing}>
-              Renunță
+              {t("vendorScanner.cancel")}
             </Button>
             <Button
               onClick={doImport}
@@ -901,7 +903,7 @@ export function MenuScanner({ venueId, onImported }: Props) {
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              Importă în meniu
+              {t("vendorScanner.importButton")}
             </Button>
           </div>
         </CardContent>

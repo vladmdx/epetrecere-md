@@ -36,6 +36,10 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { VenueStats } from "@/lib/db/queries/venue-stats";
+import { useLocale } from "@/hooks/use-locale";
+
+/** The shape `useLocale().t` has — kept local so helpers can take it as an argument. */
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
 interface ActivityItem {
   id: number;
@@ -74,13 +78,6 @@ interface Props {
   monthIndex: number;
 }
 
-const MONTHS_RO = [
-  "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-  "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie",
-];
-
-const WEEKDAYS_RO = ["L", "Ma", "Mi", "J", "V", "S", "D"];
-
 const EVENT_TYPE_COLORS: Record<string, string> = {
   wedding: "bg-red-500/80",
   nunta: "bg-red-500/80",
@@ -103,16 +100,16 @@ const STATUS_COLORS: Record<string, string> = {
   blocked: "bg-slate-500/30 border-slate-500/50",
 };
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, t: Translate): string {
   const then = new Date(iso).getTime();
   const now = Date.now();
   const diffMin = Math.round((now - then) / 60000);
-  if (diffMin < 1) return "acum";
-  if (diffMin < 60) return `acum ${diffMin}m`;
-  if (diffMin < 24 * 60) return `acum ${Math.floor(diffMin / 60)}h`;
+  if (diffMin < 1) return t("notifications.justNow");
+  if (diffMin < 60) return t("vendor.venueHome.minutesAgo", { count: diffMin });
+  if (diffMin < 24 * 60) return t("vendor.venueHome.hoursAgo", { count: Math.floor(diffMin / 60) });
   const diffDays = Math.floor(diffMin / (24 * 60));
-  if (diffDays === 1) return "ieri";
-  if (diffDays < 7) return `acum ${diffDays} zile`;
+  if (diffDays === 1) return t("vendor.venueHome.yesterday");
+  if (diffDays < 7) return t("vendor.venueHome.daysAgo", { count: diffDays });
   return new Date(iso).toLocaleDateString("ro-RO", {
     day: "numeric",
     month: "short",
@@ -140,6 +137,7 @@ export function VenueHomeDashboard({
   monthIndex,
 }: Props) {
   const router = useRouter();
+  const { t } = useLocale();
   const [recentBookings, setRecentBookings] =
     useState<RecentBooking[]>(initialBookings);
   const [actioning, setActioning] = useState<number | null>(null);
@@ -154,10 +152,10 @@ export function VenueHomeDashboard({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut accepta");
+        toast.error(err.error || t("vendor.venueHome.toastAcceptError"));
         return;
       }
-      toast.success("Rezervare acceptată");
+      toast.success(t("vendor.venueHome.toastAccepted"));
       setRecentBookings((prev) =>
         prev.map((b) => (b.id === id ? { ...b, status: "accepted" } : b)),
       );
@@ -168,7 +166,7 @@ export function VenueHomeDashboard({
   }
 
   async function quickDecline(id: number) {
-    if (!confirm("Refuzi această rezervare? Îi poți răspunde detaliat din pagina Rezervări.")) {
+    if (!confirm(t("vendor.venueHome.confirmDecline"))) {
       return;
     }
     setActioning(id);
@@ -178,15 +176,15 @@ export function VenueHomeDashboard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "decline",
-          reply: "Refuzat rapid din panoul principal",
+          reply: t("vendor.venueHome.quickDeclineReply"),
         }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut refuza");
+        toast.error(err.error || t("vendor.venueHome.toastDeclineError"));
         return;
       }
-      toast.success("Rezervare refuzată");
+      toast.success(t("vendor.venueHome.toastDeclined"));
       setRecentBookings((prev) =>
         prev.map((b) => (b.id === id ? { ...b, status: "rejected" } : b)),
       );
@@ -232,9 +230,9 @@ export function VenueHomeDashboard({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Panoul Meu</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("vendor.dashboard")}</h1>
           <p className="text-muted-foreground">
-            Bun venit în dashboard-ul pentru <strong>{venueName}</strong>
+            {t("vendor.venueHome.welcome")} <strong>{venueName}</strong>
           </p>
         </div>
         <Link
@@ -243,14 +241,14 @@ export function VenueHomeDashboard({
           className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-4 py-2 text-sm font-medium text-muted-foreground hover:border-gold/40 hover:text-gold"
         >
           <ExternalLink className="h-3.5 w-3.5" />
-          Vezi profilul public
+          {t("vendor.venueHome.viewPublicProfile")}
         </Link>
       </div>
 
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <KpiCard
-          label="Solicitări Noi"
+          label={t("vendor.venueHome.kpiNewRequests")}
           value={stats.pendingBookings}
           icon={Bell}
           accentColor="text-gold"
@@ -258,9 +256,9 @@ export function VenueHomeDashboard({
         />
 
         <KpiCard
-          label="Rata Ocupare Luna"
+          label={t("vendor.venueHome.kpiOccupancy")}
           value={`${stats.occupancyRate}%`}
-          subLabel={`${stats.occupancyBusyDays}/${stats.occupancyTotalDays} zile`}
+          subLabel={t("vendor.venueHome.occupancyDays", { busy: stats.occupancyBusyDays, total: stats.occupancyTotalDays })}
           icon={CalendarIcon}
           accentColor="text-blue-400"
           href="/dashboard/sala/calendar"
@@ -268,11 +266,11 @@ export function VenueHomeDashboard({
         />
 
         <KpiCard
-          label="Revenue Luna"
+          label={t("vendor.venueHome.kpiRevenue")}
           value={`${stats.revenueThisMonth.toLocaleString("ro-RO")}€`}
           subLabel={
             revenueDiffPct !== 0
-              ? `${revenueDiffPct > 0 ? "+" : ""}${revenueDiffPct}% vs luna trecută`
+              ? t("vendor.venueHome.vsLastMonth", { sign: revenueDiffPct > 0 ? "+" : "", pct: revenueDiffPct })
               : undefined
           }
           trendUp={revenueDiffPct > 0}
@@ -283,7 +281,7 @@ export function VenueHomeDashboard({
         />
 
         <KpiCard
-          label="Rating Mediu"
+          label={t("vendor.venueHome.kpiRating")}
           value={
             stats.ratingCount === 0 || stats.ratingAvg === null
               ? "—"
@@ -291,8 +289,8 @@ export function VenueHomeDashboard({
           }
           subLabel={
             stats.ratingCount > 0
-              ? `${stats.ratingCount} recenzii`
-              : "Niciuna"
+              ? t("vendor.venueHome.reviewCount", { count: stats.ratingCount })
+              : t("vendor.venueHome.none")
           }
           icon={Star}
           accentColor="text-amber-400"
@@ -308,18 +306,18 @@ export function VenueHomeDashboard({
           <CardContent className="p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-heading text-base font-semibold">
-                {MONTHS_RO[monthIndex]} {monthYear}
+                {t(`vendor.venueHome.month${monthIndex + 1}`)} {monthYear}
               </h2>
               <Link
                 href="/dashboard/sala/calendar"
                 className="text-xs text-gold hover:underline"
               >
-                Calendar complet →
+                {t("vendor.venueHome.fullCalendar")}
               </Link>
             </div>
             <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wider text-muted-foreground">
-              {WEEKDAYS_RO.map((d) => (
-                <div key={d} className="pb-2">{d}</div>
+              {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                <div key={d} className="pb-2">{t(`vendor.venueHome.weekday${d}`)}</div>
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1">
@@ -359,10 +357,10 @@ export function VenueHomeDashboard({
             {/* Legend — status colors (cell background) + event-type dots */}
             <div className="mt-4 space-y-2 border-t border-border/30 pt-3 text-[10px] text-muted-foreground">
               <div className="flex flex-wrap gap-3">
-                <LegendDot color="bg-emerald-500/50" label="Disponibil" />
-                <LegendDot color="bg-red-500/50" label="Rezervat" />
-                <LegendDot color="bg-yellow-500/50" label="Tentativ" />
-                <LegendDot color="bg-slate-500/50" label="Blocat" />
+                <LegendDot color="bg-emerald-500/50" label={t("common.available")} />
+                <LegendDot color="bg-red-500/50" label={t("vendor.venueHome.reserved")} />
+                <LegendDot color="bg-yellow-500/50" label={t("common.tentative")} />
+                <LegendDot color="bg-slate-500/50" label={t("common.blocked")} />
               </div>
               {/* Built from the same colour map the calendar dots use, so the
                   legend cannot fall out of step with what is drawn — it used
@@ -385,17 +383,17 @@ export function VenueHomeDashboard({
           <CardContent className="p-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="font-heading text-base font-semibold">
-                Activitate Recentă
+                {t("vendor.venueHome.recentActivity")}
               </h2>
               {activity.filter((a) => !a.isRead).length > 0 && (
                 <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[10px] font-medium text-gold">
-                  {activity.filter((a) => !a.isRead).length} noi
+                  {t("vendor.venueHome.newCount", { count: activity.filter((a) => !a.isRead).length })}
                 </span>
               )}
             </div>
             {activity.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
-                Nicio activitate recentă.
+                {t("vendor.venueHome.noActivity")}
               </p>
             ) : (
               <ul className="max-h-[320px] space-y-2 overflow-y-auto">
@@ -424,7 +422,7 @@ export function VenueHomeDashboard({
                           </p>
                         )}
                         <p className="mt-0.5 text-[10px] text-muted-foreground/70">
-                          {formatRelativeTime(item.createdAt)}
+                          {formatRelativeTime(item.createdAt, t)}
                         </p>
                       </div>
                     </div>
@@ -455,21 +453,21 @@ export function VenueHomeDashboard({
         <CardContent className="p-5">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-heading text-base font-semibold">
-              Ultimele Solicitări
+              {t("vendor.venueHome.latestRequests")}
             </h2>
             <Link
               href="/dashboard/sala/rezervari"
               className="inline-flex items-center gap-1 text-xs text-gold hover:underline"
             >
-              Vezi toate <ArrowRight className="h-3 w-3" />
+              {t("common.viewAll")} <ArrowRight className="h-3 w-3" />
             </Link>
           </div>
           {recentBookings.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border/40 py-12 text-center">
               <Inbox className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-              <p className="text-sm font-medium">Niciun booking încă</p>
+              <p className="text-sm font-medium">{t("vendor.venueHome.noBookings")}</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Solicitările primite vor apărea aici
+                {t("vendor.venueHome.noBookingsHint")}
               </p>
             </div>
           ) : (
@@ -477,13 +475,13 @@ export function VenueHomeDashboard({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
-                    <th className="pb-2 pr-3">Client</th>
-                    <th className="pb-2 pr-3">Eveniment</th>
-                    <th className="pb-2 pr-3">Data</th>
-                    <th className="pb-2 pr-3">Nr. pers</th>
-                    <th className="pb-2 pr-3">Status</th>
-                    <th className="pb-2 pr-3 text-right">Preț</th>
-                    <th className="pb-2 text-right">Acțiuni</th>
+                    <th className="pb-2 pr-3">{t("vendor.venueHome.colClient")}</th>
+                    <th className="pb-2 pr-3">{t("vendor.venueHome.colEvent")}</th>
+                    <th className="pb-2 pr-3">{t("vendor.venueHome.colDate")}</th>
+                    <th className="pb-2 pr-3">{t("vendor.venueHome.colGuests")}</th>
+                    <th className="pb-2 pr-3">{t("vendor.venueHome.colStatus")}</th>
+                    <th className="pb-2 pr-3 text-right">{t("vendor.venueHome.colPrice")}</th>
+                    <th className="pb-2 text-right">{t("vendor.venueHome.colActions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -531,7 +529,7 @@ export function VenueHomeDashboard({
                             <div className="inline-flex gap-1">
                               <Button
                                 size="icon-sm"
-                                aria-label="Acceptă"
+                                aria-label={t("vendor.venueHome.accept")}
                                 disabled={isActioning}
                                 onClick={() => quickAccept(b.id)}
                                 className="h-7 w-7 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25"
@@ -544,7 +542,7 @@ export function VenueHomeDashboard({
                               </Button>
                               <Button
                                 size="icon-sm"
-                                aria-label="Refuză"
+                                aria-label={t("vendor.venueHome.reject")}
                                 variant="ghost"
                                 disabled={isActioning}
                                 onClick={() => quickDecline(b.id)}
@@ -558,7 +556,7 @@ export function VenueHomeDashboard({
                               href="/dashboard/sala/rezervari"
                               className="text-xs text-muted-foreground hover:text-gold"
                             >
-                              Vezi →
+                              {t("vendor.venueHome.viewArrow")}
                             </Link>
                           )}
                         </td>
@@ -666,34 +664,35 @@ function KpiCard({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const cfg: Record<string, { label: string; className: string; icon: typeof CheckCircle2 }> = {
+  const { t } = useLocale();
+  const cfg: Record<string, { labelKey: string; className: string; icon: typeof CheckCircle2 }> = {
     pending: {
-      label: "În așteptare",
+      labelKey: "vendor.venueHome.statusPending",
       className: "bg-yellow-500/15 text-yellow-400",
       icon: Clock,
     },
     confirmed: {
-      label: "Confirmat",
+      labelKey: "vendor.venueHome.statusConfirmed",
       className: "bg-emerald-500/15 text-emerald-400",
       icon: CheckCircle2,
     },
     accepted: {
-      label: "Acceptat",
+      labelKey: "vendor.venueHome.statusAccepted",
       className: "bg-emerald-500/15 text-emerald-400",
       icon: CheckCircle2,
     },
     declined: {
-      label: "Refuzat",
+      labelKey: "vendor.venueHome.statusDeclined",
       className: "bg-red-500/15 text-red-400",
       icon: XCircle,
     },
     cancelled: {
-      label: "Anulat",
+      labelKey: "vendor.venueHome.statusCancelled",
       className: "bg-red-500/15 text-red-400",
       icon: XCircle,
     },
     completed: {
-      label: "Finalizat",
+      labelKey: "vendor.venueHome.statusCompleted",
       className: "bg-blue-500/15 text-blue-400",
       icon: CheckCircle2,
     },
@@ -708,7 +707,7 @@ function StatusBadge({ status }: { status: string }) {
       )}
     >
       <Icon className="h-3 w-3" />
-      {c.label}
+      {t(c.labelKey)}
     </span>
   );
 }

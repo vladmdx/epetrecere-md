@@ -18,6 +18,7 @@
  */
 
 import { useId, useMemo, useState } from "react";
+import { useLocale } from "@/hooks/use-locale";
 
 /* ── shared frame ───────────────────────────────────────────────── */
 
@@ -140,6 +141,7 @@ export function TimeSeriesChart({
   emptyText: string;
   formatValue?: (n: number) => string;
 }) {
+  const { t } = useLocale();
   const gid = useId().replace(/:/g, "");
   const [hover, setHover] = useState<number | null>(null);
 
@@ -178,7 +180,9 @@ export function TimeSeriesChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full touch-none"
         role="img"
-        aria-label={`${seriesLabels.join(" și ")} pe perioadă`}
+        aria-label={t("adminUi.charts.seriesOverPeriod", {
+          series: seriesLabels.join(t("adminUi.charts.and")),
+        })}
         onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => {
           const rect = e.currentTarget.getBoundingClientRect();
@@ -189,24 +193,24 @@ export function TimeSeriesChart({
           setHover(Math.min(points.length - 1, Math.max(0, i)));
         }}
       >
-        {ticks.map((t) => (
-          <g key={t}>
+        {ticks.map((tick) => (
+          <g key={tick}>
             <line
               x1={P.left}
               x2={W - P.right}
-              y1={y(t)}
-              y2={y(t)}
+              y1={y(tick)}
+              y2={y(tick)}
               stroke="var(--viz-grid)"
               strokeWidth={1}
             />
             <text
               x={P.left - 8}
-              y={y(t) + 4}
+              y={y(tick) + 4}
               textAnchor="end"
               fontSize={10}
               fill="var(--viz-axis)"
             >
-              {formatValue(t)}
+              {formatValue(tick)}
             </text>
           </g>
         ))}
@@ -312,6 +316,7 @@ export function BarSeriesChart({
   emptyText: string;
   formatValue?: (n: number) => string;
 }) {
+  const { t } = useLocale();
   const [hover, setHover] = useState<number | null>(null);
   const W = 720;
   const H = 200;
@@ -340,7 +345,7 @@ export function BarSeriesChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         role="img"
-        aria-label="Valoare pe perioadă"
+        aria-label={t("adminUi.charts.valueOverPeriod")}
         onMouseLeave={() => setHover(null)}
       >
         {ticksFor(max, 2).map((v) => {

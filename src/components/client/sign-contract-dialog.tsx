@@ -21,6 +21,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { FileSignature, Loader2, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface BookingPreview {
   clientName: string;
@@ -50,6 +51,7 @@ export function SignContractDialog({
   onSigned,
   trigger,
 }: Props) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [signature, setSignature] = useState("");
   const [agreed, setAgreed] = useState(false);
@@ -75,11 +77,11 @@ export function SignContractDialog({
 
   async function sign() {
     if (signature.trim().length < 2) {
-      toast.error("Scrie numele complet ca semnătură");
+      toast.error(t("contract.toast.signatureRequired"));
       return;
     }
     if (!agreed) {
-      toast.error("Trebuie să accepți termenii contractului");
+      toast.error(t("contract.toast.mustAgree"));
       return;
     }
     setBusy(true);
@@ -94,11 +96,11 @@ export function SignContractDialog({
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu am putut semna");
+        toast.error(err.error || t("contract.toast.signFailed"));
         return;
       }
       setSigned(true);
-      toast.success("Contract semnat. Poți descărca PDF-ul.");
+      toast.success(t("contract.toast.signed"));
       onSigned?.();
     } finally {
       setBusy(false);
@@ -114,7 +116,7 @@ export function SignContractDialog({
             className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             <FileSignature className="h-3.5 w-3.5" />
-            {signed ? "Vezi contract semnat" : "Semnează contract"}
+            {signed ? t("contract.viewSigned") : t("contract.signButton")}
           </Button>
         )}
       </div>
@@ -124,12 +126,12 @@ export function SignContractDialog({
           <DialogHeader>
             <DialogTitle className="font-heading flex items-center gap-2">
               <FileSignature className="h-5 w-5 text-gold" />
-              Contract booking #{bookingId}
+              {t("contract.dialogTitle", { id: bookingId })}
             </DialogTitle>
             <DialogDescription>
               {signed
-                ? "Contractul tău este deja semnat. Poți descărca PDF-ul."
-                : "Citește termenii și semnează electronic. Contractul are valoare juridică."}
+                ? t("contract.alreadySigned")
+                : t("contract.readAndSign")}
             </DialogDescription>
           </DialogHeader>
 
@@ -143,31 +145,34 @@ export function SignContractDialog({
               <div className="space-y-4">
                 <div className="border-b border-border/40 pb-3 text-center">
                   <p className="font-heading text-base font-bold text-gold">
-                    CONTRACT DE PRESTĂRI SERVICII
+                    {t("contract.heading")}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    ePetrecere.md · Republica Moldova
+                    ePetrecere.md · {t("contract.country")}
                   </p>
                 </div>
 
                 <div>
                   <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gold">
-                    Părțile Contractante
+                    {t("contract.partiesTitle")}
                   </p>
                   <div className="grid gap-1 text-xs">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">
-                        {preview.vendorKind === "sala" ? "Sala" : "Artist"} (Prestator):
+                        {preview.vendorKind === "sala"
+                          ? t("contract.roleHall")
+                          : t("contract.roleArtist")}{" "}
+                        {t("contract.providerLabel")}
                       </span>
                       <span className="font-medium">{preview.vendorName}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Client (Beneficiar):</span>
+                      <span className="text-muted-foreground">{t("contract.clientLabel")}</span>
                       <span className="font-medium">{preview.clientName}</span>
                     </div>
                     {preview.clientPhone && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Telefon client:</span>
+                        <span className="text-muted-foreground">{t("contract.clientPhoneLabel")}</span>
                         <span className="font-medium">{preview.clientPhone}</span>
                       </div>
                     )}
@@ -176,20 +181,20 @@ export function SignContractDialog({
 
                 <div>
                   <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gold">
-                    Detalii Eveniment
+                    {t("contract.eventDetailsTitle")}
                   </p>
                   <div className="grid gap-1 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tip eveniment:</span>
+                      <span className="text-muted-foreground">{t("contract.eventTypeLabel")}</span>
                       <span className="font-medium">{preview.eventType || "—"}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Data:</span>
+                      <span className="text-muted-foreground">{t("booking.card.dateLabel")}</span>
                       <span className="font-medium">{preview.eventDate || "—"}</span>
                     </div>
                     {(preview.startTime || preview.endTime) && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Interval orar:</span>
+                        <span className="text-muted-foreground">{t("contract.timeRangeLabel")}</span>
                         <span className="font-medium">
                           {preview.startTime || "—"} – {preview.endTime || "—"}
                         </span>
@@ -197,16 +202,16 @@ export function SignContractDialog({
                     )}
                     {preview.guestCount && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Număr invitați:</span>
+                        <span className="text-muted-foreground">{t("contract.guestCountLabel")}</span>
                         <span className="font-medium">{preview.guestCount}</span>
                       </div>
                     )}
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Preț agreat:</span>
+                      <span className="text-muted-foreground">{t("contract.agreedPriceLabel")}</span>
                       <span className="font-bold text-gold">
                         {preview.agreedPrice
                           ? `${preview.agreedPrice} EUR`
-                          : "de negociat"}
+                          : t("contract.negotiable")}
                       </span>
                     </div>
                   </div>
@@ -214,32 +219,19 @@ export function SignContractDialog({
 
                 <div>
                   <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gold">
-                    Termeni și Condiții
+                    {t("footer.terms")}
                   </p>
                   <ul className="space-y-1 text-xs text-muted-foreground">
-                    <li>
-                      • Prestatorul se obligă să execute serviciile convenite la
-                      data și în intervalul orar stabilit.
-                    </li>
-                    <li>
-                      • Clientul se obligă să achite prețul agreat conform
-                      modalității stabilite.
-                    </li>
-                    <li>
-                      • Anularea se face conform politicii platformei
-                      ePetrecere.md.
-                    </li>
-                    <li>
-                      • Semnătura electronică are valoare juridică echivalentă
-                      cu semnătura pe hârtie, conform legislației RM.
-                    </li>
+                    <li>{t("contract.term.delivery")}</li>
+                    <li>{t("contract.term.payment")}</li>
+                    <li>{t("contract.term.cancellation")}</li>
+                    <li>{t("contract.term.signature")}</li>
                   </ul>
                 </div>
               </div>
             ) : (
               <p className="py-4 text-center text-sm text-muted-foreground">
-                Nu s-au putut încărca detaliile contractului. Folosește
-                &quot;Deschide în tab nou&quot; pentru a vedea PDF-ul.
+                {t("contract.previewError")}
               </p>
             )}
           </div>
@@ -251,13 +243,13 @@ export function SignContractDialog({
                   htmlFor={`sig-${bookingId}`}
                   className="text-xs font-medium"
                 >
-                  Semnătura ta (numele complet)
+                  {t("contract.signatureLabel")}
                 </Label>
                 <Input
                   id={`sig-${bookingId}`}
                   value={signature}
                   onChange={(e) => setSignature(e.target.value)}
-                  placeholder="Ex: Ion Popescu"
+                  placeholder={t("contract.signaturePlaceholder")}
                   className="mt-1 font-accent text-lg italic"
                 />
               </div>
@@ -268,10 +260,7 @@ export function SignContractDialog({
                   className="mt-0.5"
                 />
                 <span className="text-xs leading-relaxed text-muted-foreground">
-                  Confirm că am citit contractul și sunt de acord cu termenii.
-                  Înțeleg că această semnătură electronică are valoare
-                  juridică echivalentă cu o semnătură pe hârtie conform
-                  legislației Republicii Moldova.
+                  {t("contract.consent")}
                 </span>
               </label>
             </div>
@@ -285,7 +274,7 @@ export function SignContractDialog({
               className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-2 text-xs hover:bg-muted"
             >
               <Eye className="h-3.5 w-3.5" />
-              Deschide PDF în tab nou
+              {t("contract.openPdf")}
             </a>
             {signed ? (
               <a
@@ -294,7 +283,7 @@ export function SignContractDialog({
                 className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-2 text-xs font-medium text-[#0D0D0D] hover:bg-gold-dark"
               >
                 <Download className="h-3.5 w-3.5" />
-                Descarcă PDF
+                {t("contract.downloadPdf")}
               </a>
             ) : (
               <Button
@@ -307,7 +296,7 @@ export function SignContractDialog({
                 ) : (
                   <FileSignature className="h-4 w-4" />
                 )}
-                Semnează electronic
+                {t("contract.signElectronically")}
               </Button>
             )}
           </DialogFooter>

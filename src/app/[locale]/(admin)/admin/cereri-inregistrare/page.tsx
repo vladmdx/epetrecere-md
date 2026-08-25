@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useLocale } from "@/hooks/use-locale";
 
 interface RegistrationRequest {
   id: number;
@@ -38,6 +39,7 @@ interface RegistrationRequest {
 }
 
 export default function RegistrationRequestsPage() {
+  const { t } = useLocale();
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<number | null>(null);
@@ -50,7 +52,7 @@ export default function RegistrationRequestsPage() {
       const data = await res.json();
       setRequests(data);
     } catch {
-      toast.error("Nu s-au putut încărca cererile");
+      toast.error(t("adminUi.registrations.toastLoadError"));
     } finally {
       setLoading(false);
     }
@@ -70,12 +72,12 @@ export default function RegistrationRequestsPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Eroare");
+        throw new Error(err.error || t("adminUi.registrations.genericError"));
       }
-      toast.success(action === "approve" ? "Cerere aprobată!" : "Cerere refuzată");
+      toast.success(action === "approve" ? t("adminUi.registrations.toastApproved") : t("adminUi.registrations.toastRejected"));
       setRequests((prev) => prev.filter((r) => !(r.id === id && r.type === type)));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la procesare");
+      toast.error(err instanceof Error ? err.message : t("adminUi.registrations.toastProcessError"));
     } finally {
       setProcessing(null);
     }
@@ -94,9 +96,9 @@ export default function RegistrationRequestsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Cereri Înregistrare</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("adminUi.registrations.title")}</h1>
         <p className="text-muted-foreground">
-          Artiști și săli care așteaptă aprobare ({requests.length})
+          {t("adminUi.registrations.subtitle", { count: requests.length })}
         </p>
       </div>
 
@@ -110,7 +112,7 @@ export default function RegistrationRequestsPage() {
             onClick={() => setFilter(f)}
             className={cn(filter === f && "bg-gold text-[#0D0D0D] hover:bg-gold-dark")}
           >
-            {f === "all" ? "Toate" : f === "artist" ? "Artiști" : "Săli"}
+            {f === "all" ? t("common.all") : f === "artist" ? t("adminUi.registrations.tabArtists") : t("adminUi.registrations.tabVenues")}
             {f === "all"
               ? ` (${requests.length})`
               : ` (${requests.filter((r) => r.type === f).length})`}
@@ -122,9 +124,9 @@ export default function RegistrationRequestsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <CheckCircle className="mb-3 h-12 w-12 text-green-500/50" />
-            <p className="text-lg font-medium">Nu sunt cereri noi</p>
+            <p className="text-lg font-medium">{t("adminUi.registrations.emptyTitle")}</p>
             <p className="text-sm text-muted-foreground">
-              Toate cererile de înregistrare au fost procesate.
+              {t("adminUi.registrations.emptyBody")}
             </p>
           </CardContent>
         </Card>
@@ -175,7 +177,7 @@ export default function RegistrationRequestsPage() {
                               : "bg-blue-500/10 text-blue-400",
                           )}
                         >
-                          {req.type === "artist" ? "Artist" : "Sală"}
+                          {req.type === "artist" ? t("adminUi.registrations.typeArtist") : t("adminUi.registrations.typeVenue")}
                         </span>
                       </div>
                       {req.categoryName && (
@@ -203,7 +205,7 @@ export default function RegistrationRequestsPage() {
                         {req.capacity && (
                           <span className="flex items-center gap-1">
                             <Users className="h-3.5 w-3.5" />
-                            {req.capacity} pers.
+                            {req.capacity} {t("adminUi.registrations.personsShort")}
                           </span>
                         )}
                         <span className="flex items-center gap-1">
@@ -238,7 +240,7 @@ export default function RegistrationRequestsPage() {
                       ) : (
                         <CheckCircle className="h-3.5 w-3.5" />
                       )}
-                      Aprobă
+                      {t("adminUi.registrations.approve")}
                     </Button>
                     <Button
                       size="sm"
@@ -248,7 +250,7 @@ export default function RegistrationRequestsPage() {
                       className="gap-1.5 border-red-500/30 text-red-400 hover:bg-red-500/10"
                     >
                       <XCircle className="h-3.5 w-3.5" />
-                      Refuză
+                      {t("adminUi.registrations.reject")}
                     </Button>
                     <Link
                       href={
@@ -259,7 +261,7 @@ export default function RegistrationRequestsPage() {
                     >
                       <Button size="sm" variant="ghost" className="gap-1.5 w-full">
                         <Eye className="h-3.5 w-3.5" />
-                        Detalii
+                        {t("adminUi.registrations.details")}
                       </Button>
                     </Link>
                   </div>

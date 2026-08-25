@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { useLocale } from "@/hooks/use-locale";
 
 interface BudgetItem {
   id: string;
@@ -32,90 +33,115 @@ interface BudgetCategory {
   items: BudgetItem[];
 }
 
-// Default tracker pre-populated with typical wedding categories
-const DEFAULT_CATEGORIES: BudgetCategory[] = [
+// Default tracker pre-populated with typical wedding categories. The labels
+// are i18n keys resolved at mount, so a RU/EN reader is seeded in their own
+// language; every label stays editable afterwards.
+interface DefaultCategory {
+  id: string;
+  labelKey: string;
+  items: { id: string; labelKey: string; estimated: number }[];
+}
+
+const DEFAULT_CATEGORIES: DefaultCategory[] = [
   {
     id: "venue",
-    label: "Sală & Închiriere",
+    labelKey: "cabinet.budget.catVenue",
     items: [
-      { id: "venue-rental", label: "Chirie sală", estimated: 1500, actual: 0, paid: false },
-      { id: "venue-tables", label: "Mese & scaune extra", estimated: 200, actual: 0, paid: false },
+      { id: "venue-rental", labelKey: "cabinet.budget.itemVenueRental", estimated: 1500 },
+      { id: "venue-tables", labelKey: "cabinet.budget.itemTables", estimated: 200 },
     ],
   },
   {
     id: "food",
-    label: "Mâncare & Băuturi",
+    labelKey: "cabinet.budget.catFood",
     items: [
-      { id: "menu", label: "Meniu principal", estimated: 4500, actual: 0, paid: false },
-      { id: "drinks", label: "Băuturi", estimated: 1200, actual: 0, paid: false },
-      { id: "cake", label: "Tort de nuntă", estimated: 300, actual: 0, paid: false },
-      { id: "candy-bar", label: "Candy bar", estimated: 250, actual: 0, paid: false },
+      { id: "menu", labelKey: "cabinet.budget.itemMenu", estimated: 4500 },
+      { id: "drinks", labelKey: "cabinet.budget.itemDrinks", estimated: 1200 },
+      { id: "cake", labelKey: "calc.wedding.cat.cake.label", estimated: 300 },
+      { id: "candy-bar", labelKey: "cabinet.budget.itemCandyBar", estimated: 250 },
     ],
   },
   {
     id: "attire",
-    label: "Îmbrăcăminte",
+    labelKey: "cabinet.budget.catAttire",
     items: [
-      { id: "bride-dress", label: "Rochia miresei", estimated: 900, actual: 0, paid: false },
-      { id: "groom-suit", label: "Costum mire", estimated: 400, actual: 0, paid: false },
-      { id: "shoes", label: "Pantofi", estimated: 200, actual: 0, paid: false },
-      { id: "accessories", label: "Accesorii", estimated: 150, actual: 0, paid: false },
+      { id: "bride-dress", labelKey: "calc.wedding.cat.brideDress.label", estimated: 900 },
+      { id: "groom-suit", labelKey: "calc.wedding.cat.groomSuit.label", estimated: 400 },
+      { id: "shoes", labelKey: "cabinet.budget.itemShoes", estimated: 200 },
+      { id: "accessories", labelKey: "cabinet.budget.itemAccessories", estimated: 150 },
     ],
   },
   {
     id: "rings-jewelry",
-    label: "Inele & Bijuterii",
+    labelKey: "cabinet.budget.catRings",
     items: [
-      { id: "rings", label: "Verighete", estimated: 700, actual: 0, paid: false },
-      { id: "jewelry", label: "Bijuterii mireasă", estimated: 200, actual: 0, paid: false },
+      { id: "rings", labelKey: "cabinet.budget.itemRings", estimated: 700 },
+      { id: "jewelry", labelKey: "cabinet.budget.itemBrideJewelry", estimated: 200 },
     ],
   },
   {
     id: "media",
-    label: "Foto & Video",
+    labelKey: "calc.wedding.cat.photoVideo.label",
     items: [
-      { id: "photographer", label: "Fotograf", estimated: 700, actual: 0, paid: false },
-      { id: "videographer", label: "Videograf", estimated: 500, actual: 0, paid: false },
-      { id: "album", label: "Album foto", estimated: 150, actual: 0, paid: false },
+      { id: "photographer", labelKey: "cabinet.budget.itemPhotographer", estimated: 700 },
+      { id: "videographer", labelKey: "cabinet.budget.itemVideographer", estimated: 500 },
+      { id: "album", labelKey: "cabinet.budget.itemAlbum", estimated: 150 },
     ],
   },
   {
     id: "entertainment",
-    label: "Muzică & Show",
+    labelKey: "cabinet.budget.catEntertainment",
     items: [
-      { id: "band", label: "Formație / DJ", estimated: 800, actual: 0, paid: false },
-      { id: "mc", label: "Moderator", estimated: 300, actual: 0, paid: false },
-      { id: "show", label: "Show program", estimated: 400, actual: 0, paid: false },
+      { id: "band", labelKey: "cabinet.budget.itemBand", estimated: 800 },
+      { id: "mc", labelKey: "cabinet.budget.itemMc", estimated: 300 },
+      { id: "show", labelKey: "cabinet.budget.itemShow", estimated: 400 },
     ],
   },
   {
     id: "decor",
-    label: "Decor & Flori",
+    labelKey: "cabinet.budget.catDecor",
     items: [
-      { id: "hall-decor", label: "Decor sală", estimated: 600, actual: 0, paid: false },
-      { id: "flowers", label: "Aranjamente florale", estimated: 400, actual: 0, paid: false },
-      { id: "bride-bouquet", label: "Buchetul miresei", estimated: 80, actual: 0, paid: false },
+      { id: "hall-decor", labelKey: "cabinet.budget.itemHallDecor", estimated: 600 },
+      { id: "flowers", labelKey: "cabinet.budget.itemFlowers", estimated: 400 },
+      { id: "bride-bouquet", labelKey: "cabinet.budget.itemBouquet", estimated: 80 },
     ],
   },
   {
     id: "beauty",
-    label: "Înfrumusețare",
+    labelKey: "cabinet.budget.catBeauty",
     items: [
-      { id: "makeup", label: "Machiaj", estimated: 100, actual: 0, paid: false },
-      { id: "hair", label: "Coafură", estimated: 80, actual: 0, paid: false },
+      { id: "makeup", labelKey: "cabinet.budget.itemMakeup", estimated: 100 },
+      { id: "hair", labelKey: "cabinet.budget.itemHair", estimated: 80 },
     ],
   },
   {
     id: "other",
-    label: "Diverse",
+    labelKey: "cabinet.budget.catOther",
     items: [
-      { id: "invitations", label: "Invitații & papetărie", estimated: 150, actual: 0, paid: false },
-      { id: "transport", label: "Transport / limuzină", estimated: 250, actual: 0, paid: false },
-      { id: "favors", label: "Mărțișoare invitați", estimated: 200, actual: 0, paid: false },
-      { id: "church", label: "Cununia religioasă", estimated: 100, actual: 0, paid: false },
+      { id: "invitations", labelKey: "calc.wedding.cat.invitations.label", estimated: 150 },
+      { id: "transport", labelKey: "cabinet.budget.itemTransport", estimated: 250 },
+      { id: "favors", labelKey: "cabinet.budget.itemFavors", estimated: 200 },
+      { id: "church", labelKey: "cabinet.budget.itemChurch", estimated: 100 },
     ],
   },
 ];
+
+/** Resolve the seed labels once, in the reader's language. */
+function seedCategories(
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): BudgetCategory[] {
+  return DEFAULT_CATEGORIES.map((cat) => ({
+    id: cat.id,
+    label: t(cat.labelKey),
+    items: cat.items.map((item) => ({
+      id: item.id,
+      label: t(item.labelKey),
+      estimated: item.estimated,
+      actual: 0,
+      paid: false,
+    })),
+  }));
+}
 
 const STORAGE_KEY = "epetrecere-budget-tracker";
 
@@ -128,8 +154,10 @@ function formatEUR(n: number): string {
 }
 
 export function BudgetTrackerClient() {
-  const [categories, setCategories] =
-    useState<BudgetCategory[]>(DEFAULT_CATEGORIES);
+  const { t } = useLocale();
+  const [categories, setCategories] = useState<BudgetCategory[]>(() =>
+    seedCategories(t),
+  );
   const [totalBudget, setTotalBudget] = useState(15000);
   const [loaded, setLoaded] = useState(false);
 
@@ -192,7 +220,7 @@ export function BudgetTrackerClient() {
   }
 
   function addItem(catId: string) {
-    const label = prompt("Numele cheltuielii:");
+    const label = prompt(t("cabinet.budget.promptName"));
     if (!label) return;
     setCategories((cats) =>
       cats.map((c) =>
@@ -240,7 +268,7 @@ export function BudgetTrackerClient() {
         </tr>
       `),
     );
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buget Nuntă — ePetrecere.md</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t("cabinet.budget.pdfDocTitle")}</title>
       <style>body{font-family:system-ui,sans-serif;background:#0D0D0D;color:#FAF8F2;padding:40px}
       h1{color:#C9A84C;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:20px}
       th{text-align:left;padding:8px;border-bottom:2px solid #C9A84C;color:#C9A84C;font-size:13px}
@@ -248,14 +276,14 @@ export function BudgetTrackerClient() {
       .box{background:#1A1A2E;padding:16px;border-radius:8px;border:1px solid rgba(201,168,76,0.15)}
       .box h3{font-size:12px;color:#A0A0B0;margin:0 0 4px}.box p{font-size:20px;margin:0;font-weight:bold;color:#C9A84C}
       @media print{body{background:white;color:black}th{color:#333;border-color:#333}td{border-color:#ccc}.box{background:#f5f5f5;border-color:#ddd}.box p{color:#333}}</style></head>
-      <body><h1>Buget Nuntă</h1><p style="color:#A0A0B0;margin:0 0 12px">ePetrecere.md — ${new Date().toLocaleDateString("ro-RO")}</p>
+      <body><h1>${t("cabinet.budget.pdfHeading")}</h1><p style="color:#A0A0B0;margin:0 0 12px">ePetrecere.md — ${new Date().toLocaleDateString("ro-RO")}</p>
       <div class="summary">
-        <div class="box"><h3>Buget Total</h3><p>${totalBudget.toLocaleString()}€</p></div>
-        <div class="box"><h3>Estimat</h3><p>${stats.estimated.toLocaleString()}€</p></div>
-        <div class="box"><h3>Cheltuit</h3><p>${stats.actual.toLocaleString()}€</p></div>
-        <div class="box"><h3>Plătit</h3><p>${stats.paid.toLocaleString()}€</p></div>
+        <div class="box"><h3>${t("cabinet.budget.pdfTotalBudget")}</h3><p>${totalBudget.toLocaleString()}€</p></div>
+        <div class="box"><h3>${t("cabinet.budget.estimated")}</h3><p>${stats.estimated.toLocaleString()}€</p></div>
+        <div class="box"><h3>${t("cabinet.budget.pdfSpent")}</h3><p>${stats.actual.toLocaleString()}€</p></div>
+        <div class="box"><h3>${t("cabinet.budget.paid")}</h3><p>${stats.paid.toLocaleString()}€</p></div>
       </div>
-      <table><thead><tr><th>Categorie</th><th>Cheltuială</th><th style="text-align:right">Estimat</th><th style="text-align:right">Real</th><th style="text-align:center">Plătit</th></tr></thead>
+      <table><thead><tr><th>${t("catalogFilters.category")}</th><th>${t("cabinet.budget.colExpense")}</th><th style="text-align:right">${t("cabinet.budget.estimated")}</th><th style="text-align:right">${t("cabinet.budget.pdfColActual")}</th><th style="text-align:center">${t("cabinet.budget.paid")}</th></tr></thead>
       <tbody>${rows.join("")}</tbody></table></body></html>`;
     const w = window.open("", "_blank");
     if (w) {
@@ -270,18 +298,17 @@ export function BudgetTrackerClient() {
       <header className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-[3px] text-gold">
-            Planificare
+            {t("cabinet.budget.eyebrow")}
           </p>
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            Buget nuntă — tracker
+            {t("cabinet.budget.title")}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground md:text-base">
-            Urmărește cheltuielile pe categorii: estimat, real și plătit. Datele
-            se salvează automat în browser.
+            {t("cabinet.budget.subtitle")}
           </p>
         </div>
         <Button variant="outline" className="gap-2 border-gold/30 text-gold hover:bg-gold/10 shrink-0" onClick={exportPDF}>
-          <Download className="h-4 w-4" /> Export PDF
+          <Download className="h-4 w-4" /> {t("cabinet.budget.exportPdf")}
         </Button>
       </header>
 
@@ -290,7 +317,7 @@ export function BudgetTrackerClient() {
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              Buget total
+              {t("cabinet.budget.totalBudget")}
               <Wallet className="h-4 w-4" />
             </div>
             <Input
@@ -306,7 +333,7 @@ export function BudgetTrackerClient() {
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              Estimat
+              {t("cabinet.budget.estimated")}
               <TrendingUp className="h-4 w-4" />
             </div>
             <div className="mt-2 font-accent text-2xl font-bold">
@@ -317,7 +344,7 @@ export function BudgetTrackerClient() {
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              Cheltuit real
+              {t("cabinet.budget.actualSpent")}
               <TrendingUp className="h-4 w-4" />
             </div>
             <div
@@ -332,7 +359,7 @@ export function BudgetTrackerClient() {
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              Plătit
+              {t("cabinet.budget.paid")}
               <Check className="h-4 w-4" />
             </div>
             <div className="mt-2 font-accent text-2xl font-bold text-success">
@@ -345,7 +372,7 @@ export function BudgetTrackerClient() {
       {overBudget && (
         <div className="mt-4 flex items-center gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           <AlertCircle className="h-4 w-4 shrink-0" />
-          Ai depășit bugetul cu{" "}
+          {t("cabinet.budget.overBudget")}{" "}
           <strong>{formatEUR(stats.actual - totalBudget)}</strong>
         </div>
       )}
@@ -354,7 +381,9 @@ export function BudgetTrackerClient() {
       <Card className="mt-4">
         <CardContent className="p-5">
           <div className="mb-2 flex justify-between text-sm">
-            <span className="text-muted-foreground">Utilizare buget</span>
+            <span className="text-muted-foreground">
+              {t("cabinet.budget.usage")}
+            </span>
             <span className="font-medium">
               {((stats.actual / Math.max(1, totalBudget)) * 100).toFixed(0)}%
             </span>
@@ -364,7 +393,8 @@ export function BudgetTrackerClient() {
             className="h-2"
           />
           <p className="mt-2 text-xs text-muted-foreground">
-            Rămas: <strong>{formatEUR(stats.remaining)}</strong>
+            {t("cabinet.budget.remaining")}{" "}
+            <strong>{formatEUR(stats.remaining)}</strong>
           </p>
         </CardContent>
       </Card>
@@ -395,7 +425,7 @@ export function BudgetTrackerClient() {
                   >
                     <div>
                       <Label className="text-xs text-muted-foreground">
-                        Cheltuială
+                        {t("cabinet.budget.colExpense")}
                       </Label>
                       <Input
                         value={item.label}
@@ -407,7 +437,7 @@ export function BudgetTrackerClient() {
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">
-                        Estimat €
+                        {t("cabinet.budget.colEstimatedEur")}
                       </Label>
                       <Input
                         type="number"
@@ -422,7 +452,7 @@ export function BudgetTrackerClient() {
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground">
-                        Real €
+                        {t("cabinet.budget.colActualEur")}
                       </Label>
                       <Input
                         type="number"
@@ -446,7 +476,7 @@ export function BudgetTrackerClient() {
                         }
                         className="h-4 w-4 accent-gold"
                       />
-                      Plătit
+                      {t("cabinet.budget.paid")}
                     </label>
                     <button
                       type="button"
@@ -463,7 +493,7 @@ export function BudgetTrackerClient() {
                   onClick={() => addItem(cat.id)}
                   className="gap-1"
                 >
-                  <Plus className="h-3 w-3" /> Adaugă cheltuială
+                  <Plus className="h-3 w-3" /> {t("cabinet.budget.addExpense")}
                 </Button>
               </CardContent>
             </Card>

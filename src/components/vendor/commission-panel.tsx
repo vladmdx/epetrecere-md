@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatRate } from "@/lib/commissions/rules";
 import { formatAmount } from "@/lib/format/price";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Row {
   id: number;
@@ -27,15 +28,17 @@ interface Row {
   guestCount: number | null;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  pending: "De achitat",
-  invoiced: "Facturat",
-  paid: "Achitat",
-  cancelled: "Anulat",
-  waived: "Scutit",
+/** Row status → translation key. The status itself is the API value, not copy. */
+const STATUS_KEY: Record<string, string> = {
+  pending: "vendor.commission.statusPending",
+  invoiced: "vendor.commission.statusInvoiced",
+  paid: "vendor.commission.statusPaid",
+  cancelled: "vendor.commission.statusCancelled",
+  waived: "vendor.commission.statusWaived",
 };
 
 export function CommissionPanel() {
+  const { t } = useLocale();
   const [rows, setRows] = useState<Row[]>([]);
   const [totals, setTotals] = useState({ pending: 0, paid: 0, overdue: 0, count: 0 });
   const [loading, setLoading] = useState(true);
@@ -67,30 +70,33 @@ export function CommissionPanel() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Comision platformă</CardTitle>
+        <CardTitle className="text-base">{t("vendor.commission.title")}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Se calculează la confirmarea rezervării. Achitarea se face prin transfer, în
-          termenul indicat; administratorul confirmă încasarea.
+          {t("vendor.commission.description")}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-3">
-          <Stat label="De achitat" value={`${totals.pending} ${cur}`} />
-          <Stat label="Restant" value={`${totals.overdue} ${cur}`} danger={totals.overdue > 0} />
-          <Stat label="Achitat" value={`${totals.paid} ${cur}`} />
+          <Stat label={t("vendor.commission.statusPending")} value={`${totals.pending} ${cur}`} />
+          <Stat
+            label={t("vendor.commission.totalOverdue")}
+            value={`${totals.overdue} ${cur}`}
+            danger={totals.overdue > 0}
+          />
+          <Stat label={t("vendor.commission.statusPaid")} value={`${totals.paid} ${cur}`} />
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b text-left text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="py-2">Client</th>
-                <th className="py-2">Eveniment</th>
-                <th className="py-2 text-right">Valoare</th>
-                <th className="py-2 text-right">Rată</th>
-                <th className="py-2 text-right">Comision</th>
-                <th className="py-2">Scadent</th>
-                <th className="py-2">Status</th>
+                <th className="py-2">{t("vendor.commission.colClient")}</th>
+                <th className="py-2">{t("vendor.commission.colEvent")}</th>
+                <th className="py-2 text-right">{t("vendor.commission.colValue")}</th>
+                <th className="py-2 text-right">{t("vendor.commission.colRate")}</th>
+                <th className="py-2 text-right">{t("vendor.commission.colFee")}</th>
+                <th className="py-2">{t("vendor.commission.colDue")}</th>
+                <th className="py-2">{t("vendor.commission.colStatus")}</th>
               </tr>
             </thead>
             <tbody>
@@ -115,7 +121,7 @@ export function CommissionPanel() {
                     </td>
                     <td className="py-2">
                       <Badge variant={r.status === "paid" ? "default" : "outline"}>
-                        {STATUS_LABEL[r.status] ?? r.status}
+                        {STATUS_KEY[r.status] ? t(STATUS_KEY[r.status]) : r.status}
                       </Badge>
                     </td>
                   </tr>

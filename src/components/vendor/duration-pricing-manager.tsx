@@ -27,6 +27,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/pricing/resolve";
 import { EventPricingManager } from "@/components/vendor/event-pricing-manager";
+import { useLocale } from "@/hooks/use-locale";
 
 type Scope = "base" | "weekend" | "weekday" | "evening" | "specific_day";
 
@@ -67,55 +68,71 @@ function emptyDraft(scope: Scope = "base"): Draft {
   };
 }
 
-const DAY_NAMES = [
-  "Duminică",
-  "Luni",
-  "Marți",
-  "Miercuri",
-  "Joi",
-  "Vineri",
-  "Sâmbătă",
+const DAY_NAME_KEYS = [
+  "vendor.durationPricing.daySunday",
+  "vendor.durationPricing.dayMonday",
+  "vendor.durationPricing.dayTuesday",
+  "vendor.durationPricing.dayWednesday",
+  "vendor.durationPricing.dayThursday",
+  "vendor.durationPricing.dayFriday",
+  "vendor.durationPricing.daySaturday",
 ];
 
 const SCOPE_META: Record<
   Scope,
-  { label: string; icon: React.ComponentType<{ className?: string }>; color: string }
+  { labelKey: string; icon: React.ComponentType<{ className?: string }>; color: string }
 > = {
-  base: { label: "Tarife de bază", icon: Clock, color: "text-foreground" },
+  base: {
+    labelKey: "vendor.durationPricing.scopeBase",
+    icon: Clock,
+    color: "text-foreground",
+  },
   weekend: {
-    label: "Weekend (Sâmbătă + Duminică)",
+    labelKey: "vendor.durationPricing.scopeWeekend",
     icon: Calendar,
     color: "text-purple-400",
   },
   weekday: {
-    label: "Zile lucrătoare (Luni–Vineri)",
+    labelKey: "vendor.durationPricing.scopeWeekday",
     icon: Calendar,
     color: "text-blue-400",
   },
-  evening: { label: "Seara", icon: Moon, color: "text-indigo-400" },
+  evening: {
+    labelKey: "vendor.durationPricing.scopeEvening",
+    icon: Moon,
+    color: "text-indigo-400",
+  },
   specific_day: {
-    label: "Zi specifică",
+    labelKey: "vendor.durationPricing.scopeSpecificDay",
     icon: Sparkles,
     color: "text-amber-400",
   },
 };
 
-function scopeDescription(pkg: Package): string {
+function scopeDescription(
+  pkg: Package,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
   switch (pkg.scope) {
     case "weekend":
-      return "Sâmbătă + Duminică";
+      return t("vendor.durationPricing.weekendDays");
     case "weekday":
-      return "Luni–Vineri";
+      return t("vendor.durationPricing.weekdayDays");
     case "evening":
-      return `De la ${pkg.scopeFromTime ?? "18:00"}`;
+      return t("vendor.durationPricing.fromTime", {
+        time: pkg.scopeFromTime ?? "18:00",
+      });
     case "specific_day":
-      return pkg.scopeDayOfWeek != null ? DAY_NAMES[pkg.scopeDayOfWeek] : "";
+      return pkg.scopeDayOfWeek != null
+        ? t(DAY_NAME_KEYS[pkg.scopeDayOfWeek])
+        : "";
     default:
       return "";
   }
 }
 
 export function DurationPricingManager({ artistId }: { artistId: number }) {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [packages, setPackages] = useState<Package[]>([]);
@@ -142,7 +159,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
       });
       setPackages(data);
     } catch {
-      toast.error("Nu s-au putut încărca tarifele");
+      toast.error(t("vendor.durationPricing.loadError"));
     } finally {
       setLoading(false);
     }
@@ -171,16 +188,16 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
       minutes < 0 ||
       minutes > 59
     ) {
-      toast.error("Durata trebuie completată corect (ore 0–24, minute 0–59)");
+      toast.error(t("vendor.durationPricing.badDuration"));
       return null;
     }
     if (hours === 0 && minutes === 0) {
-      toast.error("Durata nu poate fi zero");
+      toast.error(t("vendor.durationPricing.zeroDuration"));
       return null;
     }
     const price = Number(d.price);
     if (!Number.isFinite(price) || price < 0) {
-      toast.error("Prețul trebuie să fie un număr pozitiv");
+      toast.error(t("vendor.durationPricing.badPrice"));
       return null;
     }
     let scopeDayOfWeek: number | null = null;
@@ -188,13 +205,13 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
     if (d.scope === "specific_day") {
       scopeDayOfWeek = Number(d.scopeDayOfWeek);
       if (!Number.isFinite(scopeDayOfWeek) || scopeDayOfWeek < 0 || scopeDayOfWeek > 6) {
-        toast.error("Alege o zi validă");
+        toast.error(t("vendor.durationPricing.pickValidDay"));
         return null;
       }
     }
     if (d.scope === "evening") {
       if (!/^\d{2}:\d{2}$/.test(d.scopeFromTime)) {
-        toast.error("Alege o oră de început (HH:MM)");
+        toast.error(t("vendor.durationPricing.pickStartTime"));
         return null;
       }
       scopeFromTime = d.scopeFromTime;
@@ -237,12 +254,12 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Tarif adăugat");
+      toast.success(t("vendor.durationPricing.added"));
       setDraft(emptyDraft());
       setAddingScope(null);
       await load();
     } catch {
-      toast.error("Nu s-a putut salva tariful");
+      toast.error(t("vendor.durationPricing.saveError"));
     } finally {
       setSaving(false);
     }
@@ -271,27 +288,27 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Tarif actualizat");
+      toast.success(t("vendor.durationPricing.updated"));
       setEditingId(null);
       await load();
     } catch {
-      toast.error("Nu s-a putut salva modificarea");
+      toast.error(t("vendor.durationPricing.updateError"));
     } finally {
       setSaving(false);
     }
   }
 
   async function deletePackage(id: number) {
-    if (!confirm("Sigur ștergi acest tarif?")) return;
+    if (!confirm(t("vendor.durationPricing.deleteConfirm"))) return;
     try {
       const res = await fetch(`/api/artist-packages/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) throw new Error();
-      toast.success("Tarif șters");
+      toast.success(t("vendor.durationPricing.deleted"));
       await load();
     } catch {
-      toast.error("Nu s-a putut șterge");
+      toast.error(t("vendor.durationPricing.deleteError"));
     }
   }
 
@@ -343,7 +360,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
       {/* Duration (hours + minutes) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
-          <Label className="text-xs">Ore</Label>
+          <Label className="text-xs">{t("calendar.field.hours")}</Label>
           <Input
             type="number"
             min="0"
@@ -355,7 +372,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
           />
         </div>
         <div>
-          <Label className="text-xs">Minute</Label>
+          <Label className="text-xs">{t("vendor.durationPricing.minutes")}</Label>
           <Input
             type="number"
             min="0"
@@ -368,7 +385,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
           />
         </div>
         <div>
-          <Label className="text-xs">Preț (€) *</Label>
+          <Label className="text-xs">{t("vendor.durationPricing.priceLabel")}</Label>
           <Input
             type="number"
             min="0"
@@ -379,11 +396,11 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
           />
         </div>
         <div>
-          <Label className="text-xs">Nume (opțional)</Label>
+          <Label className="text-xs">{t("vendor.durationPricing.nameLabel")}</Label>
           <Input
             value={d.nameRo}
             onChange={(e) => setD({ ...d, nameRo: e.target.value })}
-            placeholder="Ex: Pachet standard"
+            placeholder={t("vendor.durationPricing.namePlaceholder")}
             className="mt-1"
             maxLength={120}
           />
@@ -393,7 +410,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
       {/* Scope-specific fields */}
       {d.scope === "specific_day" && (
         <div>
-          <Label className="text-xs">Ziua *</Label>
+          <Label className="text-xs">{t("vendor.durationPricing.dayLabel")}</Label>
           <select
             value={d.scopeDayOfWeek}
             onChange={(e) =>
@@ -401,9 +418,9 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
             }
             className="mt-1 flex h-10 w-full rounded-md border border-border/50 bg-background px-3 text-sm"
           >
-            {DAY_NAMES.map((name, i) => (
+            {DAY_NAME_KEYS.map((dayKey, i) => (
               <option key={i} value={i}>
-                {name}
+                {t(dayKey)}
               </option>
             ))}
           </select>
@@ -411,7 +428,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
       )}
       {d.scope === "evening" && (
         <div>
-          <Label className="text-xs">Aplicabil de la ora *</Label>
+          <Label className="text-xs">{t("vendor.durationPricing.fromHourLabel")}</Label>
           <Input
             type="time"
             value={d.scopeFromTime}
@@ -436,7 +453,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
           ) : (
             <Check className="h-3.5 w-3.5" />
           )}
-          Salvează
+          {t("common.save")}
         </Button>
         <Button
           size="sm"
@@ -444,7 +461,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
           onClick={onCancel}
           disabled={saving}
         >
-          <X className="h-3.5 w-3.5" /> Anulează
+          <X className="h-3.5 w-3.5" /> {t("common.cancel")}
         </Button>
       </div>
     </div>
@@ -462,11 +479,11 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
           <div className="flex items-center gap-2">
             <Icon className={cn("h-4 w-4", meta.color)} />
             <h3 className={cn("font-heading text-base font-bold", meta.color)}>
-              {meta.label}
+              {t(meta.labelKey)}
             </h3>
             {scope !== "base" && items.length === 0 && (
               <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-                Opțional
+                {t("vendor.durationPricing.optional")}
               </span>
             )}
           </div>
@@ -484,15 +501,16 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
               )}
             >
               <Plus className="h-3.5 w-3.5" />
-              Adaugă {scope === "base" ? "tarif" : "override"}
+              {scope === "base"
+                ? t("vendor.durationPricing.addRate")
+                : t("vendor.durationPricing.addOverride")}
             </Button>
           )}
         </div>
 
         {scope === "base" && items.length === 0 && !isAdding && (
           <p className="mt-3 text-xs text-muted-foreground">
-            Setează cel puțin un tarif de bază (ex. 1h = 100€). Acesta se aplică
-            mereu, în tot programul de lucru.
+            {t("vendor.durationPricing.baseHint")}
           </p>
         )}
 
@@ -518,7 +536,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
                 (pkg.durationHours ?? 0) * 60 + (pkg.durationMinutes ?? 0);
               const durationLabel =
                 totalMin > 0 ? formatDuration(totalMin) : "—";
-              const scopeInfo = scopeDescription(pkg);
+              const scopeInfo = scopeDescription(pkg, t);
 
               if (isEditing) {
                 return (
@@ -573,7 +591,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
                       className="gap-1 text-muted-foreground hover:text-foreground"
                     >
                       <Pencil className="h-3.5 w-3.5" />
-                      Editează
+                      {t("common.edit")}
                     </Button>
                     <Button
                       size="sm"
@@ -597,17 +615,12 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
     <div className="space-y-4">
       {/* Intro */}
       <div className="rounded-xl border border-border/40 bg-card p-6">
-        <h2 className="font-heading text-lg font-bold">Tarife</h2>
+        <h2 className="font-heading text-lg font-bold">{t("dashboard.rates")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Setează prețul pentru fiecare durată (ore + minute). Tarifele de
-          bază se aplică mereu, iar pentru weekend / seară / zile speciale poți
-          adăuga prețuri separate care înlocuiesc tariful de bază.
+          {t("vendor.durationPricing.introText")}
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
-          💡 Dacă un event al clientului e într-o sâmbătă și ai setat tarif
-          weekend, clientul va vedea prețul de weekend. Altfel, se folosește
-          tariful de bază. Dacă lucrezi cu preț fix pe eveniment (altul la
-          nuntă, altul la botez), folosește secțiunea de mai jos.
+          {t("vendor.durationPricing.introTip")}
         </p>
       </div>
 

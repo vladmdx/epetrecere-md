@@ -36,6 +36,11 @@ import {
   Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
+
+/** What `useLocale().t` looks like — sub-components and helpers take it as a
+ *  parameter instead of each calling the hook a second time. */
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -97,7 +102,20 @@ interface Conversation {
   clientUnread: number;
 }
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
+const EVENT_TYPE_KEYS: Record<string, string> = {
+  wedding: "event_types.wedding",
+  baptism: "event_types.baptism",
+  cumatrie: "event_types.cumatrie",
+  corporate: "event_types.corporate",
+  birthday: "event_types.birthday",
+  concert: "event_types.concert",
+  other: "cabinet.dashboard.eventGeneric",
+};
+
+/** The Romanian labels the stored plan titles were built with. Never
+ *  rendered — only used to strip the prefix off `plan.title`, which stays
+ *  Romanian in the database whatever language the reader picked. */
+const EVENT_TYPE_LABELS_RO: Record<string, string> = {
   wedding: "Nuntă",
   baptism: "Botez",
   cumatrie: "Cumătrie",
@@ -117,19 +135,19 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
  *  before comparing. */
 const SERVICE_BUCKETS: Array<{
   key: string;
-  label: string;
+  labelKey: string;
   Icon: typeof Music;
   matches: (categoryNames: string[]) => boolean;
 }> = [
   {
     key: "venue",
-    label: "Sală",
+    labelKey: "wizard.step_venue",
     Icon: Building2,
     matches: () => false, // venue bookings handled separately
   },
   {
     key: "music",
-    label: "Muzică",
+    labelKey: "services.filters.music",
     Icon: Music,
     matches: (names) =>
       names.some((n) =>
@@ -140,7 +158,7 @@ const SERVICE_BUCKETS: Array<{
   },
   {
     key: "photo",
-    label: "Foto/Video",
+    labelKey: "cabinet.dashboard.servicePhotoVideo",
     Icon: Camera,
     matches: (names) =>
       names.some((n) =>
@@ -149,13 +167,13 @@ const SERVICE_BUCKETS: Array<{
   },
   {
     key: "moderator",
-    label: "Moderator",
+    labelKey: "quiz.services.mc",
     Icon: Mic,
     matches: (names) => names.some((n) => n.includes("moderator")),
   },
   {
     key: "decor",
-    label: "Decor",
+    labelKey: "services.filters.decor",
     Icon: Sparkles,
     matches: (names) =>
       names.some((n) =>
@@ -184,6 +202,7 @@ interface ServiceTile {
 // ─── Component ────────────────────────────────────────────────────────
 
 export default function ClientCabinetPage() {
+  const { t } = useLocale();
   const { isSignedIn, user: clerkUser, isLoaded } = useUser();
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
@@ -258,7 +277,7 @@ export default function ClientCabinetPage() {
         const venueBookings = planBookings.filter((b) => b.venueId != null);
         tiles.push({
           key: "venue",
-          label: "Sală",
+          label: t("wizard.step_venue"),
           Icon: Building2,
           status: deriveStatus(venueBookings),
         });
@@ -271,13 +290,13 @@ export default function ClientCabinetPage() {
       });
       tiles.push({
         key: bucket.key,
-        label: bucket.label,
+        label: t(bucket.labelKey),
         Icon: bucket.Icon,
         status: deriveStatus(matching),
       });
     }
     return tiles;
-  }, [activePlan, planBookings]);
+  }, [activePlan, planBookings, t]);
 
   const pendingBookings = useMemo(
     () => planBookings.filter((b) => b.status === "pending").length,
@@ -319,8 +338,10 @@ export default function ClientCabinetPage() {
     const missingTile = services.find((s) => s.status === "missing");
     if (missingTile) {
       return {
-        title: `Alege ${missingTile.label.toLowerCase()} pentru eveniment`,
-        subtitle: missingTileSubtitle(missingTile.key),
+        title: t("cabinet.dashboard.nextChoose", {
+          service: missingTile.label.toLowerCase(),
+        }),
+        subtitle: missingTileSubtitle(missingTile.key, t),
         href: `/cabinet/planifica/${activePlan.id}?tab=${missingTile.key === "venue" ? "venues" : "bookings"}`,
       };
     }
@@ -330,7 +351,7 @@ export default function ClientCabinetPage() {
       if (nextItem) {
         return {
           title: nextItem.title,
-          subtitle: "Bifează când e gata — următoarea sarcină din checklist.",
+          subtitle: t("cabinet.dashboard.nextChecklist"),
           href: `/cabinet/planifica/${activePlan.id}?tab=checklist`,
         };
       }
@@ -338,14 +359,13 @@ export default function ClientCabinetPage() {
     // No checklist or all done — encourage the moments feature.
     if (activePlan.momentsEnabled) {
       return {
-        title: "Pregătește galeria foto cu QR",
-        subtitle:
-          "Imprimă QR-ul și pune-l pe mese ca invitații să încarce poze live.",
+        title: t("cabinet.dashboard.nextMomentsTitle"),
+        subtitle: t("cabinet.dashboard.nextMomentsSubtitle"),
         href: `/cabinet/moments/${activePlan.id}`,
       };
     }
     return null;
-  }, [activePlan, services, activeChecklist]);
+  }, [activePlan, services, activeChecklist, t]);
 
   // Venue cover image — fetched lazily by id from /api/venues/[id] so
   // we get the actual uploaded cover (not a guessed file path). Falls
@@ -403,10 +423,12 @@ export default function ClientCabinetPage() {
       {/* ── Welcome header ──────────────────────────────── */}
       <header>
         <h1 className="font-heading text-2xl font-bold sm:text-3xl">
-          Bun venit, {clerkUser?.firstName || "utilizator"}!
+          {t("cabinet.dashboard.welcome", {
+            name: clerkUser?.firstName || t("cabinet.dashboard.fallbackName"),
+          })}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Administrează evenimentul tău dintr-un singur loc.
+          {t("cabinet.dashboard.welcomeSubtitle")}
         </p>
       </header>
 
@@ -415,16 +437,16 @@ export default function ClientCabinetPage() {
         <div className="rounded-2xl border border-border/40 bg-card p-8 text-center sm:p-12">
           <Calendar className="mx-auto mb-3 h-10 w-10 text-gold/40" />
           <p className="font-heading text-lg font-bold">
-            Nu ai încă un eveniment activ
+            {t("cabinet.dashboard.noPlanTitle")}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Pornește planificarea în 7 pași — îți pregătim panoul complet.
+            {t("cabinet.dashboard.noPlanBody")}
           </p>
           <Link
             href="/planifica"
             className="group mt-5 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-medium text-[#0D0D0D] transition-all duration-200 hover:bg-gold-dark hover:shadow-[0_4px_20px_rgba(201,168,76,0.35)] active:scale-95"
           >
-            <Sparkles className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" /> Începe să planifici
+            <Sparkles className="h-4 w-4 transition-transform duration-300 group-hover:rotate-12" /> {t("cabinet.dashboard.startPlanning")}
           </Link>
         </div>
       ) : (
@@ -437,12 +459,12 @@ export default function ClientCabinetPage() {
             progressPct={progressPct}
             progressPrefix={
               activePlan.checklistEnabled && activeChecklist.length > 0
-                ? "Organizare"
-                : "Servicii confirmate"
+                ? t("tools.organization")
+                : t("cabinet.dashboard.servicesConfirmed")
             }
             progressSuffix={
               activePlan.checklistEnabled && activeChecklist.length > 0
-                ? "completă"
+                ? t("cabinet.dashboard.progressComplete")
                 : ""
             }
           />
@@ -496,6 +518,7 @@ function HeroCard({
   progressPrefix: string;
   progressSuffix: string;
 }) {
+  const { t } = useLocale();
   const dateLabel = plan.eventDate
     ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", {
         day: "numeric",
@@ -503,15 +526,19 @@ function HeroCard({
         year: "numeric",
       })
     : null;
-  const eventLabel = plan.eventType
-    ? EVENT_TYPE_LABELS[plan.eventType] ?? "Eveniment"
-    : "Eveniment";
+  const eventLabel = t(
+    (plan.eventType && EVENT_TYPE_KEYS[plan.eventType]) ||
+      "cabinet.dashboard.eventGeneric",
+  );
+  // The stored title is Romanian, so the prefix we strip must be too.
+  const eventPrefixRo =
+    (plan.eventType && EVENT_TYPE_LABELS_RO[plan.eventType]) || "Eveniment";
 
   return (
     <section className="overflow-hidden rounded-2xl border border-gold/30 bg-card shadow-[0_4px_30px_rgba(201,168,76,0.08)]">
       <div className="p-5 sm:p-6">
         <p className="text-[11px] font-semibold uppercase tracking-[3px] text-gold">
-          Evenimentul tău activ
+          {t("cabinet.dashboard.activeEvent")}
         </p>
 
         <div className="mt-3 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -519,7 +546,7 @@ function HeroCard({
           <div className="min-w-0 flex-1 space-y-3">
             <h2 className="font-heading text-2xl font-bold leading-tight sm:text-3xl">
               <span className="text-foreground/70">{eventLabel} ·</span>{" "}
-              <span>{stripEventPrefix(plan.title, eventLabel)}</span>
+              <span>{stripEventPrefix(plan.title, eventPrefixRo)}</span>
             </h2>
 
             <dl className="space-y-1.5 text-sm">
@@ -533,7 +560,7 @@ function HeroCard({
               {plan.guestsEnabled && plan.guestCountTarget && (
                 <MetaRow
                   Icon={Users}
-                  label={`${plan.guestCountTarget} invitați`}
+                  label={`${plan.guestCountTarget} ${t("common.guests")}`}
                 />
               )}
             </dl>
@@ -543,7 +570,7 @@ function HeroCard({
           <Link
             href={`/cabinet/planifica/${plan.id}`}
             className="group relative aspect-[4/3] w-full max-w-[280px] shrink-0 overflow-hidden rounded-xl border border-border/40 transition-all duration-300 hover:border-gold/40 hover:shadow-[0_8px_25px_rgba(201,168,76,0.15)] active:scale-[0.98] sm:aspect-[16/10] sm:w-56"
-            aria-label="Deschide planul evenimentului"
+            aria-label={t("cabinet.dashboard.openPlanAria")}
           >
             { }
             <img
@@ -581,7 +608,7 @@ function HeroCard({
             href={`/cabinet/planifica/${plan.id}`}
             className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-gold/40 px-4 py-2.5 text-sm font-medium text-gold transition-all duration-200 hover:border-gold hover:bg-gold/10 hover:shadow-[0_4px_14px_rgba(201,168,76,0.2)] active:scale-95"
           >
-            Vezi planul meu <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+            {t("cabinet.dashboard.viewMyPlan")} <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
           </Link>
         </div>
       </div>
@@ -609,6 +636,7 @@ function NextStepCard({
 }: {
   nextStep: { title: string; subtitle: string; href: string };
 }) {
+  const { t } = useLocale();
   return (
     <section className="group/card flex flex-col gap-4 rounded-2xl border border-border/40 bg-card p-5 transition-all duration-300 hover:border-gold/20 hover:shadow-[0_4px_20px_rgba(201,168,76,0.05)] sm:flex-row sm:items-center sm:justify-between sm:p-6">
       <div className="flex min-w-0 items-start gap-4">
@@ -617,7 +645,7 @@ function NextStepCard({
         </div>
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-[2px] text-muted-foreground">
-            Următorul pas
+            {t("cabinet.dashboard.nextStep")}
           </p>
           <h3 className="mt-0.5 font-heading text-lg font-bold leading-tight">
             {nextStep.title}
@@ -631,7 +659,7 @@ function NextStepCard({
         href={nextStep.href}
         className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-medium text-[#0D0D0D] transition-all duration-200 hover:bg-gold-dark hover:shadow-[0_4px_20px_rgba(201,168,76,0.35)] active:scale-95"
       >
-        Continuă organizarea <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
+        {t("cabinet.dashboard.continueOrganizing")} <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
       </Link>
     </section>
   );
@@ -648,6 +676,7 @@ function StatTiles({
   pendingBookings: number;
   unreadMessages: number;
 }) {
+  const { t } = useLocale();
   return (
     <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {/* RSVP tile — only when the client opted into guests in the wizard. */}
@@ -656,8 +685,10 @@ function StatTiles({
           Icon={CheckCircle}
           tint="success"
           big={rsvpYes}
-          primary="confirmate"
-          secondary={`din ${plan.guestCountTarget} invitați`}
+          primary={t("cabinet.dashboard.statConfirmed")}
+          secondary={t("cabinet.dashboard.statOfGuests", {
+            count: plan.guestCountTarget,
+          })}
           href={`/cabinet/planifica/${plan.id}?tab=guests`}
         />
       )}
@@ -665,16 +696,20 @@ function StatTiles({
         Icon={Clock}
         tint="gold"
         big={pendingBookings}
-        primary="în așteptare"
-        secondary="răspunsuri"
+        primary={t("cabinet.dashboard.statPending")}
+        secondary={t("cabinet.dashboard.statResponses")}
         href={`/cabinet/planifica/${plan.id}?tab=bookings`}
       />
       <StatTile
         Icon={MessageCircle}
         tint="indigo"
         big={unreadMessages}
-        primary={unreadMessages === 1 ? "mesaj nou" : "mesaje noi"}
-        secondary="de la furnizori"
+        primary={t(
+          unreadMessages === 1
+            ? "cabinet.dashboard.statNewMessage"
+            : "cabinet.dashboard.statNewMessages",
+        )}
+        secondary={t("cabinet.dashboard.statFromVendors")}
         href="/cabinet/mesaje"
       />
     </section>
@@ -733,17 +768,18 @@ function ServicesStrip({
   planId: number;
   services: ServiceTile[];
 }) {
+  const { t } = useLocale();
   return (
     <section className="rounded-2xl border border-border/40 bg-card p-5">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-heading text-base font-bold">
-          Servicii pentru eveniment
+          {t("cabinet.dashboard.servicesTitle")}
         </h3>
         <Link
           href={`/cabinet/planifica/${planId}?tab=bookings`}
           className="group inline-flex items-center gap-1 text-xs text-gold transition-all duration-200 hover:gap-2 hover:underline"
         >
-          Vezi toate <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+          {t("common.viewAll")} <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
       {/* Horizontal-scroll on mobile so we never crush the 5 tiles into
@@ -764,19 +800,20 @@ function ServiceTileCard({
   planId: number;
   service: ServiceTile;
 }) {
+  const { t } = useLocale();
   const statusCfg = {
     confirmed: {
-      label: "Confirmat",
+      label: t("cabinet.dashboard.statusConfirmed"),
       pill: "bg-emerald-500/10 text-emerald-400 ring-emerald-500/30",
       iconBg: "bg-emerald-500/10 text-emerald-400",
     },
     pending: {
-      label: "În așteptare",
+      label: t("cabinet.dashboard.statusPending"),
       pill: "bg-gold/15 text-gold ring-gold/30",
       iconBg: "bg-gold/15 text-gold",
     },
     missing: {
-      label: "De ales",
+      label: t("cabinet.dashboard.statusMissing"),
       pill: "bg-muted text-muted-foreground ring-border/30",
       iconBg: "bg-muted text-muted-foreground",
     },
@@ -814,6 +851,7 @@ function BottomRow({
   plan: PlanSummary;
   conversations: Conversation[];
 }) {
+  const { t } = useLocale();
   const recent = conversations.slice(0, 3);
   const totalUnread = conversations.reduce(
     (n, c) => n + (c.clientUnread ?? 0),
@@ -826,7 +864,9 @@ function BottomRow({
           stop showing the same nav twice on the dashboard. */}
       <div className="flex min-h-[10rem] flex-col rounded-2xl border border-border/40 bg-card p-5">
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="font-heading text-base font-bold">Mesaje recente</h3>
+          <h3 className="font-heading text-base font-bold">
+            {t("cabinet.dashboard.recentMessages")}
+          </h3>
           {totalUnread > 0 && (
             <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-semibold text-gold">
               {totalUnread}
@@ -835,7 +875,7 @@ function BottomRow({
         </div>
         {recent.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Nu ai mesaje încă. Deschide o conversație din pagina unui partener.
+            {t("cabinet.dashboard.noMessages")}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -851,10 +891,10 @@ function BottomRow({
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
                       <p className="truncate text-sm font-medium">
-                        {c.vendorName ?? "Furnizor"}
+                        {c.vendorName ?? t("cabinet.dashboard.vendorFallback")}
                       </p>
                       <p className="shrink-0 text-[11px] text-muted-foreground">
-                        {relativeTime(c.lastMessageAt)}
+                        {relativeTime(c.lastMessageAt, t)}
                       </p>
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
@@ -863,7 +903,7 @@ function BottomRow({
                   </div>
                   {c.clientUnread > 0 && (
                     <span
-                      aria-label="Mesaj necitit"
+                      aria-label={t("cabinet.dashboard.unreadAria")}
                       className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-gold"
                     />
                   )}
@@ -876,7 +916,7 @@ function BottomRow({
           href="/cabinet/mesaje"
           className="group mt-auto inline-flex items-center gap-1 self-start pt-3 text-xs text-gold transition-all duration-200 hover:gap-2 hover:underline"
         >
-          Vezi toate mesajele <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
+          {t("cabinet.dashboard.viewAllMessages")} <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
 
@@ -886,8 +926,8 @@ function BottomRow({
         {plan.budgetEnabled && (
           <FeatureCard
             Icon={Wallet}
-            title="Buget"
-            description="Calculator de buget pentru evenimentul tău."
+            title={t("form.budget")}
+            description={t("cabinet.dashboard.budgetCardDesc")}
             href="/calculatoare/buget"
           />
         )}
@@ -895,15 +935,15 @@ function BottomRow({
           <FeatureCard
             Icon={ImageIcon}
             title="Photo Moments"
-            description="Galerie live cu QR pentru invitați. Vezi pozele care vin."
+            description={t("cabinet.dashboard.momentsCardDesc")}
             href={`/cabinet/moments/${plan.id}`}
           />
         )}
         {!plan.budgetEnabled && !plan.momentsEnabled && (
           <FeatureCard
             Icon={Star}
-            title="Recenzii"
-            description="Recenziile pe care le-ai lăsat partenerilor."
+            title={t("dashboard.reviews")}
+            description={t("cabinet.dashboard.reviewsCardDesc")}
             href="/cabinet/recenzii"
           />
         )}
@@ -950,20 +990,20 @@ function deriveStatus(bookings: BookingRequest[]): ServiceStatus {
   return "missing";
 }
 
-function missingTileSubtitle(serviceKey: string): string {
+function missingTileSubtitle(serviceKey: string, t: Translate): string {
   switch (serviceKey) {
     case "venue":
-      return "Compară săli și trimite cereri — confirmă disponibilitatea.";
+      return t("cabinet.dashboard.hintVenue");
     case "music":
-      return "Creează atmosfera perfectă pentru ziua voastră.";
+      return t("cabinet.dashboard.hintMusic");
     case "photo":
-      return "Alege fotograf și videograf pentru ziua cea mare.";
+      return t("cabinet.dashboard.hintPhoto");
     case "moderator":
-      return "Un moderator bun salvează ritmul evenimentului.";
+      return t("cabinet.dashboard.hintModerator");
     case "decor":
-      return "Definește paleta și aranjamentele florale.";
+      return t("cabinet.dashboard.hintDecor");
     default:
-      return "Alege următorul partener pentru evenimentul tău.";
+      return t("cabinet.dashboard.hintDefault");
   }
 }
 
@@ -980,17 +1020,21 @@ function stripEventPrefix(title: string, eventLabel: string): string {
   return title;
 }
 
-function relativeTime(iso: string): string {
+function relativeTime(iso: string, t: Translate): string {
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return "";
   const diff = Date.now() - then;
   const min = Math.floor(diff / 60_000);
-  if (min < 1) return "acum";
-  if (min < 60) return `acum ${min} min`;
+  if (min < 1) return t("notifications.justNow");
+  if (min < 60) return t("cabinet.time.minutesAgo", { n: min });
   const hr = Math.floor(min / 60);
-  if (hr < 24) return `acum ${hr}h`;
+  if (hr < 24) return t("cabinet.time.hoursAgo", { n: hr });
   const day = Math.floor(hr / 24);
-  if (day < 7) return `acum ${day} ${day === 1 ? "zi" : "zile"}`;
+  if (day < 7)
+    return t(
+      day === 1 ? "cabinet.time.daysAgoOne" : "cabinet.time.daysAgoMany",
+      { n: day },
+    );
   return new Date(iso).toLocaleDateString("ro-MD", {
     day: "numeric",
     month: "short",

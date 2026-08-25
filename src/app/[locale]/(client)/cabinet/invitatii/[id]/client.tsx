@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Invitation {
   id: number;
@@ -53,6 +54,7 @@ interface Guest {
 }
 
 export function InvitationDetailClient({ id }: { id: number }) {
+  const { t } = useLocale();
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,7 +98,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
       setGuests((prev) => [...prev, created]);
       setNewGuestName("");
       setNewGuestEmail("");
-      toast.success("Invitat adăugat");
+      toast.success(t("cabinet.invitation.guestAdded"));
     }
   }
 
@@ -110,7 +112,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
     if (res.ok) {
       const updated = await res.json();
       setInvitation(updated);
-      toast.success("Invitație publicată!");
+      toast.success(t("cabinet.invitation.published"));
     }
     setPublishing(false);
   }
@@ -118,10 +120,10 @@ export function InvitationDetailClient({ id }: { id: number }) {
   async function sendInvitations() {
     const guestsWithEmail = guests.filter((g) => g.email);
     if (guestsWithEmail.length === 0) {
-      toast.error("Niciun invitat nu are email setat");
+      toast.error(t("cabinet.invitation.noGuestEmail"));
       return;
     }
-    if (!confirm(`Trimiți invitații pe email la ${guestsWithEmail.length} invitați?`)) return;
+    if (!confirm(t("cabinet.invitation.sendConfirm", { count: guestsWithEmail.length }))) return;
     setSending(true);
     try {
       const res = await fetch(`/api/invitations/${id}/send`, {
@@ -129,12 +131,12 @@ export function InvitationDetailClient({ id }: { id: number }) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Eroare la trimitere");
+        throw new Error(err.error || t("cabinet.invitation.sendError"));
       }
       const data = await res.json();
-      toast.success(`${data.sent} invitații trimise cu succes!`);
+      toast.success(t("cabinet.invitation.sendSuccess", { count: data.sent }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la trimitere");
+      toast.error(err instanceof Error ? err.message : t("cabinet.invitation.sendError"));
     } finally {
       setSending(false);
     }
@@ -144,7 +146,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
     if (!token || !invitation) return;
     const url = `${window.location.origin}/i/${invitation.slug}?rsvp=${token}`;
     navigator.clipboard.writeText(url);
-    toast.success("Link copiat");
+    toast.success(t("cabinet.invitation.linkCopied"));
   }
 
   if (loading) {
@@ -159,20 +161,20 @@ export function InvitationDetailClient({ id }: { id: number }) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center lg:px-8">
         <h1 className="font-heading text-2xl font-bold">
-          Invitația nu a fost găsită
+          {t("cabinet.invitation.notFound")}
         </h1>
         <Link
           href="/cabinet/invitatii"
           className="mt-4 inline-flex items-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
-          Înapoi la lista
+          {t("cabinet.invitation.backToList")}
         </Link>
       </div>
     );
   }
 
   const title =
-    invitation.coupleNames || invitation.hostName || "Invitație";
+    invitation.coupleNames || invitation.hostName || t("cabinet.invitation.fallbackTitle");
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 lg:px-8">
@@ -180,7 +182,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
         href="/cabinet/invitatii"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold"
       >
-        <ArrowLeft className="h-3 w-3" /> Înapoi
+        <ArrowLeft className="h-3 w-3" /> {t("cabinet.invitation.back")}
       </Link>
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
@@ -201,14 +203,14 @@ export function InvitationDetailClient({ id }: { id: number }) {
                 rel="noopener"
                 className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-4 py-2 text-sm font-medium hover:bg-muted"
               >
-                <ExternalLink className="h-3 w-3" /> Previzualizare
+                <ExternalLink className="h-3 w-3" /> {t("cabinet.invitation.preview")}
               </Link>
               <Link
                 href={`/cabinet/invitatii/${invitation.id}/checkin`}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-400 hover:bg-emerald-500/15"
               >
                 <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-                Check-in live
+                {t("cabinet.invitation.checkinLive")}
               </Link>
               <Button
                 onClick={sendInvitations}
@@ -220,7 +222,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
                 ) : (
                   <Send className="h-3.5 w-3.5" />
                 )}
-                Trimite invitații
+                {t("cabinet.invitation.sendInvitations")}
               </Button>
             </>
           )}
@@ -233,7 +235,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
               {publishing ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : null}
-              Publică
+              {t("cabinet.invitation.publish")}
             </Button>
           )}
         </div>
@@ -242,25 +244,25 @@ export function InvitationDetailClient({ id }: { id: number }) {
       {/* RSVP stats */}
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="Confirmat"
+          label={t("cabinet.invitation.statConfirmed")}
           value={stats.yes}
           icon={Check}
           color="text-success"
         />
         <StatCard
-          label="Refuzat"
+          label={t("cabinet.invitation.statRejected")}
           value={stats.no}
           icon={X}
           color="text-destructive"
         />
         <StatCard
-          label="Poate"
+          label={t("cabinet.invitation.statMaybe")}
           value={stats.maybe}
           icon={HelpCircle}
           color="text-warning"
         />
         <StatCard
-          label="În așteptare"
+          label={t("cabinet.invitation.statPending")}
           value={stats.pending}
           icon={Clock}
           color="text-muted-foreground"
@@ -270,15 +272,15 @@ export function InvitationDetailClient({ id }: { id: number }) {
       <Card className="mt-6">
         <CardContent className="p-5">
           <div className="mb-2 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Rata de răspuns</span>
+            <span className="text-muted-foreground">{t("cabinet.invitation.responseRate")}</span>
             <span className="font-medium">
               {stats.responseRate.toFixed(0)}% ({stats.total - stats.pending} / {stats.total})
             </span>
           </div>
           <Progress value={stats.responseRate} className="h-2" />
           <p className="mt-3 text-xs text-muted-foreground">
-            Total așteptat: <strong>{stats.yes + stats.plusOnes}</strong>{" "}
-            persoane (confirmați + însoțitori)
+            {t("cabinet.invitation.totalExpected")} <strong>{stats.yes + stats.plusOnes}</strong>{" "}
+            {t("cabinet.invitation.totalExpectedSuffix")}
           </p>
         </CardContent>
       </Card>
@@ -287,18 +289,18 @@ export function InvitationDetailClient({ id }: { id: number }) {
       <Card className="mt-6" id="guests">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Users className="h-4 w-4" /> Invitați ({guests.length})
+            <Users className="h-4 w-4" /> {t("cabinet.invitation.guestsHeading", { count: guests.length })}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
             <Input
-              placeholder="Nume invitat"
+              placeholder={t("cabinet.invitation.guestNamePlaceholder")}
               value={newGuestName}
               onChange={(e) => setNewGuestName(e.target.value)}
             />
             <Input
-              placeholder="Email (opțional)"
+              placeholder={t("cabinet.invitation.guestEmailPlaceholder")}
               value={newGuestEmail}
               onChange={(e) => setNewGuestEmail(e.target.value)}
             />
@@ -307,7 +309,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
               disabled={!newGuestName.trim()}
               className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
-              <Plus className="h-4 w-4" /> Adaugă
+              <Plus className="h-4 w-4" /> {t("cabinet.invitation.add")}
             </Button>
           </div>
 
@@ -343,7 +345,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
                     onClick={() => copyRsvpLink(g.rsvpToken)}
                     className="gap-1"
                   >
-                    <Copy className="h-3 w-3" /> Link RSVP
+                    <Copy className="h-3 w-3" /> {t("cabinet.invitation.rsvpLink")}
                   </Button>
                 </div>
               ))}
@@ -382,12 +384,13 @@ function StatCard({
 }
 
 function RsvpBadge({ status }: { status: Guest["rsvpStatus"] }) {
+  const { t } = useLocale();
   const map = {
-    yes: { label: "Da", cls: "bg-success/15 text-success" },
-    no: { label: "Nu", cls: "bg-destructive/15 text-destructive" },
-    maybe: { label: "Poate", cls: "bg-warning/15 text-warning" },
-    pending: { label: "—", cls: "bg-muted text-muted-foreground" },
+    yes: { labelKey: "cabinet.invitation.rsvp.yes", cls: "bg-success/15 text-success" },
+    no: { labelKey: "cabinet.invitation.rsvp.no", cls: "bg-destructive/15 text-destructive" },
+    maybe: { labelKey: "cabinet.invitation.rsvp.maybe", cls: "bg-warning/15 text-warning" },
+    pending: { labelKey: "cabinet.invitation.rsvp.pending", cls: "bg-muted text-muted-foreground" },
   };
   const s = map[status];
-  return <Badge className={s.cls}>{s.label}</Badge>;
+  return <Badge className={s.cls}>{t(s.labelKey)}</Badge>;
 }

@@ -29,6 +29,8 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
+import { useLocale } from "@/hooks/use-locale";
+import { NOUNS, plural } from "@/lib/i18n/plural";
 import type { ArtistStats } from "@/lib/db/queries/artist-stats";
 import type {
   ArtistProfileSnapshot,
@@ -44,30 +46,33 @@ interface Props {
 }
 
 // Used by the next-event header to drop "Sâmbătă, 24 mai 2025"-style
-// labels in Romanian.
-const WEEKDAYS_RO = [
-  "Duminică",
-  "Luni",
-  "Marți",
-  "Miercuri",
-  "Joi",
-  "Vineri",
-  "Sâmbătă",
+// labels. Sunday-first because `Date#getDay()` is.
+const WEEKDAY_KEYS = [
+  "sun",
+  "mon",
+  "tue",
+  "wed",
+  "thu",
+  "fri",
+  "sat",
 ] as const;
-const MONTHS_RO = [
-  "ianuarie",
-  "februarie",
-  "martie",
-  "aprilie",
-  "mai",
-  "iunie",
-  "iulie",
-  "august",
-  "septembrie",
-  "octombrie",
-  "noiembrie",
-  "decembrie",
+const MONTH_KEYS = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec",
 ] as const;
+
+/** Translator shape shared by the sub-components below. */
+type T = (key: string, vars?: Record<string, string | number>) => string;
 
 export function DashboardClient({
   profile,
@@ -75,6 +80,7 @@ export function DashboardClient({
   nextEvent,
   recentRequests,
 }: Props) {
+  const { t, locale } = useLocale();
   // Pre-format the deltas so the JSX stays readable. Each tile has its
   // own comparison window (yesterday / last week / last month) chosen to
   // match what the partner actually thinks about for that metric.
@@ -98,10 +104,10 @@ export function DashboardClient({
       {/* ── Welcome header ─────────────────────────────── */}
       <header>
         <h1 className="font-heading text-2xl font-bold sm:text-3xl">
-          Panoul Meu
+          {t("vendor.dashboard")}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Gestionează cererile, calendarul și veniturile dintr-un singur loc.
+          {t("vendor.home.subtitle")}
         </p>
       </header>
 
@@ -114,8 +120,8 @@ export function DashboardClient({
           Icon={BookOpen}
           tint="indigo"
           big={stats.pendingRequests}
-          label="Cereri noi"
-          deltaLabel={deltaLabel(pendingDelta, "ieri")}
+          label={t("vendor.home.tilePending")}
+          deltaLabel={deltaLabel(t, pendingDelta, t("vendor.home.vsYesterday"))}
           deltaPositive={pendingDelta >= 0}
           href="/dashboard/rezervari?status=pending"
         />
@@ -123,8 +129,12 @@ export function DashboardClient({
           Icon={CheckCircle2}
           tint="success"
           big={stats.confirmedThisMonth}
-          label="Evenimente confirmate"
-          deltaLabel={deltaLabel(confirmedDelta, "săpt. trecută")}
+          label={t("vendor.home.tileConfirmed")}
+          deltaLabel={deltaLabel(
+            t,
+            confirmedDelta,
+            t("vendor.home.vsLastWeek"),
+          )}
           deltaPositive={confirmedDelta >= 0}
           href="/dashboard/rezervari?status=confirmed"
         />
@@ -132,8 +142,8 @@ export function DashboardClient({
           Icon={MessageSquare}
           tint="info"
           big={stats.unreadMessages}
-          label="Mesaje noi"
-          deltaLabel={deltaLabel(messagesDelta, "ieri")}
+          label={t("vendor.home.tileMessages")}
+          deltaLabel={deltaLabel(t, messagesDelta, t("vendor.home.vsYesterday"))}
           deltaPositive={messagesDelta >= 0}
           href="/dashboard/mesaje"
         />
@@ -143,37 +153,40 @@ export function DashboardClient({
           // EUR cents are stored; format thousands with a dot for the
           // Romanian visual style "24.850" and append "€" as the unit.
           big={formatMoney(stats.revenueThisMonthEUR)}
-          label="Venit luna"
-          deltaLabel={`${revenuePctDelta >= 0 ? "+" : ""}${revenuePctDelta}% față de luna trecută`}
+          label={t("vendor.home.tileRevenue")}
+          deltaLabel={t("vendor.home.deltaPct", {
+            sign: revenuePctDelta >= 0 ? "+" : "",
+            n: revenuePctDelta,
+          })}
           deltaPositive={revenuePctDelta >= 0}
           href="/dashboard/financiar"
         />
       </section>
 
       {/* ── Next event card ────────────────────────────── */}
-      {nextEvent && <NextEventCard event={nextEvent} />}
+      {nextEvent && <NextEventCard event={nextEvent} locale={locale} t={t} />}
 
       {/* ── Recent requests list ───────────────────────── */}
-      <RecentRequests items={recentRequests} />
+      <RecentRequests items={recentRequests} locale={locale} t={t} />
 
       {/* ── 3 bottom shortcuts ─────────────────────────── */}
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ShortcutCard
           Icon={CalendarDays}
-          title="Calendar"
-          description="Vezi programul și evenimentele tale"
+          title={t("vendor.calendar")}
+          description={t("vendor.home.shortcutCalendar")}
           href="/dashboard/calendar"
         />
         <ShortcutCard
           Icon={Clock}
-          title="Tarife"
-          description="Gestionează pachetele și prețurile"
+          title={t("dashboard.rates")}
+          description={t("vendor.home.shortcutRates")}
           href="/dashboard/tarife"
         />
         <ShortcutCard
           Icon={Wallet}
-          title="Financiar"
-          description="Urmărește veniturile și plățile"
+          title={t("vendor.financial")}
+          description={t("vendor.home.shortcutFinance")}
           href="/dashboard/financiar"
         />
       </section>
@@ -181,7 +194,7 @@ export function DashboardClient({
       {/* ── Footer flourish ────────────────────────────── */}
       <p className="flex items-center justify-center gap-2 pt-2 text-center text-xs text-muted-foreground">
         <Sparkles className="h-3.5 w-3.5 text-gold" />
-        Succesul tău începe cu o organizare impecabilă.
+        {t("vendor.home.footerNote")}
       </p>
     </div>
   );
@@ -190,6 +203,7 @@ export function DashboardClient({
 // ─── Sub-components ───────────────────────────────────────
 
 function HeroCard({ profile }: { profile: ArtistProfileSnapshot }) {
+  const { t } = useLocale();
   const initials = profile.nameRo
     .split(/\s+/)
     .map((w) => w[0])
@@ -197,7 +211,9 @@ function HeroCard({ profile }: { profile: ArtistProfileSnapshot }) {
     .slice(0, 2)
     .join("")
     .toUpperCase();
-  const planLabel = profile.isPremium ? "Plan Premium" : "Plan Standard";
+  const planLabel = profile.isPremium
+    ? t("vendor.home.planPremium")
+    : t("vendor.home.planStandard");
 
   return (
     <section className="overflow-hidden rounded-2xl border border-gold/30 bg-gradient-to-br from-card via-card to-gold/5 shadow-[0_4px_30px_rgba(201,168,76,0.08)]">
@@ -227,7 +243,9 @@ function HeroCard({ profile }: { profile: ArtistProfileSnapshot }) {
 
           <div className="mt-3">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-foreground/80">Profil completat</span>
+              <span className="text-foreground/80">
+                {t("vendor.home.profileCompletion")}
+              </span>
               <span className="font-semibold text-gold">
                 {profile.profileCompletionPct}%
               </span>
@@ -246,7 +264,7 @@ function HeroCard({ profile }: { profile: ArtistProfileSnapshot }) {
           href="/dashboard/profil"
           className="group inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-gold/40 px-5 py-2.5 text-sm font-medium text-gold transition-all duration-200 hover:border-gold hover:bg-gold/10 hover:shadow-[0_4px_14px_rgba(201,168,76,0.2)] active:scale-95"
         >
-          Completează profilul
+          {t("vendor.pending.cta")}
           <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
@@ -309,12 +327,20 @@ function StatTile({
   );
 }
 
-function NextEventCard({ event }: { event: NextEvent }) {
+function NextEventCard({
+  event,
+  locale,
+  t,
+}: {
+  event: NextEvent;
+  locale: string;
+  t: T;
+}) {
   const date = new Date(event.eventDate + "T00:00:00");
-  const weekday = WEEKDAYS_RO[date.getDay()];
-  const dateLabel = `${date.getDate()} ${MONTHS_RO[date.getMonth()]} ${date.getFullYear()}`;
+  const weekday = t(`date.weekday.${WEEKDAY_KEYS[date.getDay()]}`);
+  const dateLabel = `${date.getDate()} ${t(`date.monthInDate.${MONTH_KEYS[date.getMonth()]}`)} ${date.getFullYear()}`;
   const headerDate = `${weekday}, ${dateLabel}`;
-  const eventLabel = eventCaption(event.eventType);
+  const eventLabel = eventCaption(event.eventType, locale, t);
   // Thematic fallback so the artist always gets a banner image — the
   // wedding shot is the safest default for the most common event type.
   const image = event.venueImage || "/images/backgrounds/party-dance.jpg";
@@ -326,7 +352,7 @@ function NextEventCard({ event }: { event: NextEvent }) {
         <div className="flex items-center gap-2 text-sm">
           <CalendarDays className="h-4 w-4 text-gold" />
           <span className="font-heading font-semibold">
-            Următorul eveniment
+            {t("vendor.home.nextEvent")}
           </span>
         </div>
         <span className="rounded-full bg-background/60 px-3 py-1 text-[11px] text-muted-foreground">
@@ -366,17 +392,17 @@ function NextEventCard({ event }: { event: NextEvent }) {
             {event.eventType && (
               <MetaRow
                 Icon={Sparkles}
-                label={`Tip eveniment: ${eventLabel}`}
+                label={t("vendor.home.metaEventType", { value: eventLabel })}
               />
             )}
             <MetaRow
               Icon={Users}
-              label={`Client: ${event.clientName}`}
+              label={t("vendor.home.metaClient", { value: event.clientName })}
             />
             {event.guestCount != null && (
               <MetaRow
                 Icon={Users}
-                label={`${event.guestCount} invitați`}
+                label={plural(event.guestCount, locale, NOUNS.guests)}
               />
             )}
           </dl>
@@ -387,14 +413,14 @@ function NextEventCard({ event }: { event: NextEvent }) {
               href={`/dashboard/rezervari?expand=${event.id}`}
               className="group inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-medium text-[#0D0D0D] transition-all duration-200 hover:bg-gold-dark hover:shadow-[0_4px_20px_rgba(201,168,76,0.35)] active:scale-95"
             >
-              <Eye className="h-4 w-4" /> Deschide cererea
+              <Eye className="h-4 w-4" /> {t("vendor.home.openRequest")}
               <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
             </Link>
             <Link
               href={`/dashboard/rezervari?expand=${event.id}#booking-${event.id}`}
               className="group inline-flex items-center gap-2 rounded-lg border border-border/60 px-4 py-2.5 text-sm font-medium text-foreground transition-all duration-200 hover:border-gold/40 hover:bg-gold/5 active:scale-95"
             >
-              <MessageSquare className="h-4 w-4" /> Mesaj client
+              <MessageSquare className="h-4 w-4" /> {t("vendor.home.messageClient")}
             </Link>
           </div>
         </div>
@@ -418,29 +444,38 @@ function MetaRow({
   );
 }
 
-function RecentRequests({ items }: { items: RecentRequest[] }) {
+function RecentRequests({
+  items,
+  locale,
+  t,
+}: {
+  items: RecentRequest[];
+  locale: string;
+  t: T;
+}) {
   return (
     <section className="rounded-2xl border border-border/40 bg-card p-5">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-heading text-base font-bold">Cereri recente</h3>
+        <h3 className="font-heading text-base font-bold">
+          {t("vendor.home.recentRequests")}
+        </h3>
         <Link
           href="/dashboard/rezervari"
           className="group inline-flex items-center gap-1 text-xs text-gold transition-all duration-200 hover:gap-2 hover:underline"
         >
-          Vezi toate{" "}
+          {t("common.viewAll")}{" "}
           <ArrowRight className="h-3 w-3 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
       {items.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground">
-          Încă nu ai cereri. Profilul tău e online — clienții te pot găsi
-          oricând.
+          {t("vendor.home.noRequests")}
         </p>
       ) : (
         <ul className="space-y-2">
           {items.map((req) => (
             <li key={req.id}>
-              <RecentRequestRow req={req} />
+              <RecentRequestRow req={req} locale={locale} t={t} />
             </li>
           ))}
         </ul>
@@ -449,10 +484,19 @@ function RecentRequests({ items }: { items: RecentRequest[] }) {
   );
 }
 
-function RecentRequestRow({ req }: { req: RecentRequest }) {
+function RecentRequestRow({
+  req,
+  locale,
+  t,
+}: {
+  req: RecentRequest;
+  locale: string;
+  t: T;
+}) {
   const date = new Date(req.eventDate + "T00:00:00");
-  const dateLabel = `${date.getDate()} ${MONTHS_RO[date.getMonth()].slice(0, 3)}. ${date.getFullYear()}`;
-  const eventLabel = eventCaption(req.eventType);
+  const month = t(`date.monthInDate.${MONTH_KEYS[date.getMonth()]}`);
+  const dateLabel = `${date.getDate()} ${month.slice(0, 3)}. ${date.getFullYear()}`;
+  const eventLabel = eventCaption(req.eventType, locale, t);
   const pill = statusPill(req.status);
 
   return (
@@ -478,7 +522,8 @@ function RecentRequestRow({ req }: { req: RecentRequest }) {
           {req.location && <span>· {req.location}</span>}
           {req.guestCount != null && (
             <span className="flex items-center gap-1">
-              <Users className="h-3 w-3" /> {req.guestCount} invitați
+              <Users className="h-3 w-3" />{" "}
+              {plural(req.guestCount, locale, NOUNS.guests)}
             </span>
           )}
         </div>
@@ -489,7 +534,7 @@ function RecentRequestRow({ req }: { req: RecentRequest }) {
           pill.badge,
         )}
       >
-        {pill.label}
+        {pill.labelKey ? t(pill.labelKey) : req.status}
       </span>
       <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-gold" />
     </Link>
@@ -532,17 +577,17 @@ function ShortcutCard({
  *  vocabulary; a missing or unrecognised type keeps the neutral
  *  "Eveniment" this dashboard has always shown rather than the
  *  helper's "Nespecificat", which reads badly next to a client name. */
-function eventCaption(raw: string | null): string {
+function eventCaption(raw: string | null, locale: string, t: T): string {
   const key = normalizeEventType(raw);
-  return key ? eventTypeLabel(key) : "Eveniment";
+  return key ? eventTypeLabel(key, locale) : t("vendor.home.eventFallback");
 }
 
 /** Formats the stat-tile delta caption like "+2 față de ieri" or
  *  "−1 față de săpt. trecută". Hides the sign for zero. */
-function deltaLabel(delta: number, vs: string): string {
-  if (delta === 0) return `0 față de ${vs}`;
+function deltaLabel(t: T, delta: number, vs: string): string {
+  if (delta === 0) return t("vendor.home.deltaZero", { vs });
   const sign = delta > 0 ? "+" : "−";
-  return `${sign}${Math.abs(delta)} față de ${vs}`;
+  return t("vendor.home.delta", { sign, n: Math.abs(delta), vs });
 }
 
 /** Format an EUR amount with thousand-dot separators like the mockup
@@ -560,51 +605,51 @@ function formatMoney(eur: number): string {
  *  pending → indigo (Nou), accepted → gold (În așteptare client),
  *  confirmed_by_client → emerald (Confirmat). */
 function statusPill(status: string): {
-  label: string;
+  labelKey: string | null;
   badge: string;
   iconBg: string;
 } {
   switch (status) {
     case "pending":
       return {
-        label: "Nou",
+        labelKey: "vendor.home.statusNew",
         badge: "bg-indigo-500/15 text-indigo-300 ring-1 ring-indigo-500/30",
         iconBg: "bg-indigo-500/15 text-indigo-300",
       };
     case "accepted":
       return {
-        label: "În așteptare",
+        labelKey: "vendor.home.statusWaiting",
         badge: "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30",
         iconBg: "bg-amber-500/15 text-amber-300",
       };
     case "confirmed_by_client":
     case "completed":
       return {
-        label: "Confirmat",
+        labelKey: "vendor.home.statusConfirmed",
         badge: "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-500/30",
         iconBg: "bg-emerald-500/15 text-emerald-400",
       };
     case "rejected":
       return {
-        label: "Refuzat",
+        labelKey: "vendor.home.statusRejected",
         badge: "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30",
         iconBg: "bg-rose-500/15 text-rose-300",
       };
     case "cancelled":
       return {
-        label: "Anulat",
+        labelKey: "vendor.home.statusCancelled",
         badge: "bg-rose-500/15 text-rose-300 ring-1 ring-rose-500/30",
         iconBg: "bg-rose-500/15 text-rose-300",
       };
     case "expired":
       return {
-        label: "Expirat",
+        labelKey: "vendor.home.statusExpired",
         badge: "bg-muted text-muted-foreground ring-1 ring-border/40",
         iconBg: "bg-muted text-muted-foreground",
       };
     default:
       return {
-        label: status,
+        labelKey: null,
         badge: "bg-muted text-muted-foreground ring-1 ring-border/40",
         iconBg: "bg-muted text-muted-foreground",
       };

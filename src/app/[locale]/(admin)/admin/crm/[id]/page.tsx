@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
+import { useLocale } from "@/hooks/use-locale";
 import { toast } from "sonner";
 
 interface Lead {
@@ -46,15 +47,15 @@ interface Activity {
   createdAt: string;
 }
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  new: { label: "Nou", color: "bg-info/10 text-info border-info/30" },
-  contacted: { label: "Contactat", color: "bg-warning/10 text-warning border-warning/30" },
-  proposal_sent: { label: "Propunere trimisă", color: "bg-gold/10 text-gold border-gold/30" },
-  negotiation: { label: "Negociere", color: "bg-purple-500/10 text-purple-500 border-purple-500/30" },
-  confirmed: { label: "Confirmat", color: "bg-success/10 text-success border-success/30" },
-  completed: { label: "Finalizat", color: "bg-success/10 text-success border-success/30" },
-  lost: { label: "Pierdut", color: "bg-destructive/10 text-destructive border-destructive/30" },
-  follow_up: { label: "Follow-up", color: "bg-warning/10 text-warning border-warning/30" },
+const statusConfig: Record<string, { labelKey: string; color: string }> = {
+  new: { labelKey: "adminUi.status.new", color: "bg-info/10 text-info border-info/30" },
+  contacted: { labelKey: "adminUi.status.contacted", color: "bg-warning/10 text-warning border-warning/30" },
+  proposal_sent: { labelKey: "adminUi.status.proposalSent", color: "bg-gold/10 text-gold border-gold/30" },
+  negotiation: { labelKey: "adminUi.status.negotiation", color: "bg-purple-500/10 text-purple-500 border-purple-500/30" },
+  confirmed: { labelKey: "adminUi.status.confirmed", color: "bg-success/10 text-success border-success/30" },
+  completed: { labelKey: "adminUi.status.completed", color: "bg-success/10 text-success border-success/30" },
+  lost: { labelKey: "adminUi.status.lost", color: "bg-destructive/10 text-destructive border-destructive/30" },
+  follow_up: { labelKey: "adminUi.status.followUp", color: "bg-warning/10 text-warning border-warning/30" },
 };
 
 const activityIcons: Record<string, typeof Clock> = {
@@ -67,6 +68,7 @@ const activityIcons: Record<string, typeof Clock> = {
 
 export default function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const { t } = useLocale();
   const router = useRouter();
   const [lead, setLead] = useState<Lead | null>(null);
   const [loading, setLoading] = useState(true);
@@ -107,9 +109,14 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
       setLead({ ...updated, activities });
       setStatusOpen(false);
-      toast.success(`Status schimbat: ${statusConfig[newStatus]?.label || newStatus}`);
+      const cfgNew = statusConfig[newStatus];
+      toast.success(
+        t("adminUi.crmLead.toastStatusChanged", {
+          status: cfgNew ? t(cfgNew.labelKey) : newStatus,
+        }),
+      );
     } catch {
-      toast.error("Eroare la actualizare status");
+      toast.error(t("adminUi.crmLead.toastStatusError"));
     } finally {
       setUpdatingStatus(false);
     }
@@ -131,22 +138,22 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
       setLead(prev => prev ? { ...prev, activities } : null);
       setNote("");
-      toast.success("Notă adăugată");
+      toast.success(t("adminUi.crmLead.toastNoteAdded"));
     } catch {
-      toast.error("Eroare la adăugare notă");
+      toast.error(t("adminUi.crmLead.toastNoteError"));
     } finally {
       setAddingNote(false);
     }
   }
 
   async function deleteLead() {
-    if (!confirm("Sigur dorești să ștergi acest lead?")) return;
+    if (!confirm(t("adminUi.crmLead.confirmDelete"))) return;
     try {
       await fetch(`/api/leads/${id}`, { method: "DELETE" });
-      toast.success("Lead șters");
+      toast.success(t("adminUi.crmLead.toastDeleted"));
       router.push("/admin/crm");
     } catch {
-      toast.error("Eroare la ștergere");
+      toast.error(t("adminUi.crmLead.toastDeleteError"));
     }
   }
 
@@ -174,9 +181,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       setEmailOpen(false);
       setEmailSubject("");
       setEmailBody("");
-      toast.success("Email trimis cu succes");
+      toast.success(t("adminUi.crmLead.toastEmailSent"));
     } catch {
-      toast.error("Eroare la trimiterea emailului");
+      toast.error(t("adminUi.crmLead.toastEmailError"));
     } finally {
       setSendingEmail(false);
     }
@@ -199,10 +206,10 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       const actRes = await fetch(`/api/leads/${id}/activities`);
       const activities = await actRes.json();
       setLead(prev => prev ? { ...prev, activities } : null);
-      toast.success(`Lead asignat la ${assignee}`);
+      toast.success(t("adminUi.crmLead.toastAssigned", { name: assignee }));
       setAssignee("");
     } catch {
-      toast.error("Eroare la asignare");
+      toast.error(t("adminUi.crmLead.toastAssignError"));
     }
   }
 
@@ -213,8 +220,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
   if (!lead) {
     return (
       <div className="text-center py-20">
-        <p className="text-muted-foreground">Lead-ul nu a fost găsit</p>
-        <Link href="/admin/crm"><Button variant="outline" className="mt-4">Înapoi la CRM</Button></Link>
+        <p className="text-muted-foreground">{t("adminUi.crmLead.notFound")}</p>
+        <Link href="/admin/crm"><Button variant="outline" className="mt-4">{t("adminUi.crmLead.backToCrm")}</Button></Link>
       </div>
     );
   }
@@ -227,12 +234,12 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link href="/admin/crm">
-          <Button variant="ghost" size="icon" aria-label="Înapoi la CRM"><ArrowLeft className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" aria-label={t("adminUi.crmLead.backToCrm")}><ArrowLeft className="h-4 w-4" /></Button>
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3">
             <h1 className="font-heading text-2xl font-bold">{lead.name}</h1>
-            <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>
+            <Badge variant="outline" className={cn("text-xs", cfg.color)}>{t(cfg.labelKey)}</Badge>
             <div className={cn(
               "flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold",
               score >= 70 ? "bg-success/10 text-success" :
@@ -243,16 +250,16 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Creat pe {new Date(lead.createdAt).toLocaleString("ro-RO")}
+            {t("adminUi.crmLead.createdOn", { date: new Date(lead.createdAt).toLocaleString("ro-RO") })}
           </p>
         </div>
         <div className="flex gap-2">
           <a href={`tel:${lead.phone}`}>
-            <Button variant="outline" size="sm" className="gap-1"><Phone className="h-3.5 w-3.5" /> Sună</Button>
+            <Button variant="outline" size="sm" className="gap-1"><Phone className="h-3.5 w-3.5" /> {t("adminUi.crmLead.call")}</Button>
           </a>
           {lead.email && (
             <a href={`mailto:${lead.email}`}>
-              <Button variant="outline" size="sm" className="gap-1"><Mail className="h-3.5 w-3.5" /> Email</Button>
+              <Button variant="outline" size="sm" className="gap-1"><Mail className="h-3.5 w-3.5" /> {t("adminUi.crmLead.email")}</Button>
             </a>
           )}
           {/* Status dropdown */}
@@ -260,7 +267,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
             <Button size="sm" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1"
               onClick={() => setStatusOpen(!statusOpen)} disabled={updatingStatus}>
               {updatingStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              Schimbă Status
+              {t("adminUi.crmLead.changeStatus")}
             </Button>
             {statusOpen && (
               <div className="absolute right-0 top-full mt-1 z-50 w-56 rounded-lg border border-border bg-card shadow-lg py-1">
@@ -273,8 +280,8 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                     onClick={() => updateStatus(key)}
                     disabled={lead.status === key}
                   >
-                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", val.color)}>{val.label}</Badge>
-                    {lead.status === key && <span className="text-xs text-muted-foreground ml-auto">actual</span>}
+                    <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", val.color)}>{t(val.labelKey)}</Badge>
+                    {lead.status === key && <span className="text-xs text-muted-foreground ml-auto">{t("adminUi.crmLead.current")}</span>}
                   </button>
                 ))}
               </div>
@@ -288,19 +295,19 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         <div className="lg:col-span-2 space-y-6">
           {/* Event Details */}
           <Card>
-            <CardHeader><CardTitle>Detalii Eveniment</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("adminUi.crmLead.eventDetails")}</CardTitle></CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-2">
-                {lead.eventType && <InfoRow icon={Calendar} label="Tip eveniment" value={eventTypeLabel(normalizeEventType(lead.eventType))} />}
-                {lead.eventDate && <InfoRow icon={Calendar} label="Data" value={lead.eventDate} />}
-                {lead.location && <InfoRow icon={MapPin} label="Locație" value={lead.location} />}
-                {lead.guestCount && <InfoRow icon={Users} label="Invitați" value={`${lead.guestCount}`} />}
-                {lead.budget && <InfoRow icon={DollarSign} label="Buget" value={`${lead.budget}€`} />}
-                {lead.source && <InfoRow icon={MessageSquare} label="Sursa" value={lead.source} />}
+                {lead.eventType && <InfoRow icon={Calendar} label={t("adminUi.crmLead.fieldEventType")} value={eventTypeLabel(normalizeEventType(lead.eventType))} />}
+                {lead.eventDate && <InfoRow icon={Calendar} label={t("adminUi.crmLead.fieldDate")} value={lead.eventDate} />}
+                {lead.location && <InfoRow icon={MapPin} label={t("adminUi.crmLead.fieldLocation")} value={lead.location} />}
+                {lead.guestCount && <InfoRow icon={Users} label={t("adminUi.crmLead.fieldGuests")} value={`${lead.guestCount}`} />}
+                {lead.budget && <InfoRow icon={DollarSign} label={t("adminUi.crmLead.fieldBudget")} value={`${lead.budget}€`} />}
+                {lead.source && <InfoRow icon={MessageSquare} label={t("adminUi.crmLead.fieldSource")} value={lead.source} />}
               </div>
               {lead.message && (
                 <div className="mt-4 rounded-lg bg-accent/50 p-4">
-                  <p className="text-sm font-medium mb-1">Mesaj:</p>
+                  <p className="text-sm font-medium mb-1">{t("adminUi.crmLead.messageLabel")}</p>
                   <p className="text-sm text-muted-foreground">{lead.message}</p>
                 </div>
               )}
@@ -309,29 +316,29 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Timeline */}
           <Card>
-            <CardHeader><CardTitle>Activitate</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("adminUi.crmLead.activity")}</CardTitle></CardHeader>
             <CardContent>
               {/* Add note */}
               <div className="mb-6">
                 <Textarea
                   value={note}
                   onChange={e => setNote(e.target.value)}
-                  placeholder="Adaugă o notă, rezumat convorbire, etc..."
+                  placeholder={t("adminUi.crmLead.notePlaceholder")}
                   rows={2}
                 />
                 <div className="flex gap-2 mt-2">
                   <Button size="sm" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1"
                     onClick={() => addNote("note")} disabled={addingNote || !note.trim()}>
                     {addingNote ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <StickyNote className="h-3.5 w-3.5" />}
-                    Notă
+                    {t("adminUi.crmLead.noteBtn")}
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1"
                     onClick={() => addNote("call")} disabled={addingNote || !note.trim()}>
-                    <PhoneCall className="h-3.5 w-3.5" /> Convorbire
+                    <PhoneCall className="h-3.5 w-3.5" /> {t("adminUi.crmLead.callBtn")}
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1"
                     onClick={() => addNote("email")} disabled={addingNote || !note.trim()}>
-                    <Send className="h-3.5 w-3.5" /> Email trimis
+                    <Send className="h-3.5 w-3.5" /> {t("adminUi.crmLead.emailSentBtn")}
                   </Button>
                 </div>
               </div>
@@ -355,7 +362,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   );
                 }) : (
                   <p className="text-sm text-muted-foreground text-center py-4">
-                    Nu există activitate încă. Adaugă o notă mai sus.
+                    {t("adminUi.crmLead.noActivity")}
                   </p>
                 )}
               </div>
@@ -367,7 +374,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
         <div className="space-y-4">
           {/* Contact card */}
           <Card>
-            <CardHeader><CardTitle>Contact</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("adminUi.crmLead.contact")}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <a href={`tel:${lead.phone}`} className="flex items-center gap-2 text-sm hover:text-gold transition-colors">
                 <Phone className="h-4 w-4 text-gold" /> {lead.phone}
@@ -383,7 +390,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           {/* AI Quality Score */}
           {(lead.aiScore !== null || (lead.aiReasons && lead.aiReasons.length > 0)) && (
             <Card>
-              <CardHeader><CardTitle className="flex items-center gap-2">Scor AI
+              <CardHeader><CardTitle className="flex items-center gap-2">{t("adminUi.crmLead.aiScore")}
                 {lead.aiScore !== null && (
                   <span className={cn(
                     "ml-auto flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold",
@@ -407,7 +414,7 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   </ul>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Scor în curs de calculare…
+                    {t("adminUi.crmLead.aiScorePending")}
                   </p>
                 )}
               </CardContent>
@@ -416,61 +423,61 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Quick actions */}
           <Card>
-            <CardHeader><CardTitle>Acțiuni Rapide</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("adminUi.crmLead.quickActions")}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {lead.status === "new" && (
                 <Button variant="outline" className="w-full justify-start gap-2" size="sm"
                   onClick={() => updateStatus("contacted")}>
-                  <CheckCircle className="h-4 w-4 text-success" /> Marchează Contactat
+                  <CheckCircle className="h-4 w-4 text-success" /> {t("adminUi.crmLead.markContacted")}
                 </Button>
               )}
               {lead.status === "contacted" && (
                 <Button variant="outline" className="w-full justify-start gap-2" size="sm"
                   onClick={() => updateStatus("proposal_sent")}>
-                  <Mail className="h-4 w-4 text-gold" /> Trimite Propunere
+                  <Mail className="h-4 w-4 text-gold" /> {t("adminUi.crmLead.sendProposal")}
                 </Button>
               )}
               {lead.status === "proposal_sent" && (
                 <Button variant="outline" className="w-full justify-start gap-2" size="sm"
                   onClick={() => updateStatus("negotiation")}>
-                  <MessageSquare className="h-4 w-4 text-purple-500" /> Începe Negociere
+                  <MessageSquare className="h-4 w-4 text-purple-500" /> {t("adminUi.crmLead.startNegotiation")}
                 </Button>
               )}
               {lead.status === "negotiation" && (
                 <Button variant="outline" className="w-full justify-start gap-2" size="sm"
                   onClick={() => updateStatus("confirmed")}>
-                  <CheckCircle className="h-4 w-4 text-success" /> Confirmă
+                  <CheckCircle className="h-4 w-4 text-success" /> {t("adminUi.crmLead.confirm")}
                 </Button>
               )}
               {lead.status === "confirmed" && (
                 <Button variant="outline" className="w-full justify-start gap-2" size="sm"
                   onClick={() => updateStatus("completed")}>
-                  <CheckCircle className="h-4 w-4 text-success" /> Marchează Finalizat
+                  <CheckCircle className="h-4 w-4 text-success" /> {t("adminUi.crmLead.markCompleted")}
                 </Button>
               )}
               {lead.status !== "follow_up" && lead.status !== "lost" && lead.status !== "completed" && (
                 <Button variant="outline" className="w-full justify-start gap-2" size="sm"
                   onClick={() => updateStatus("follow_up")}>
-                  <Clock className="h-4 w-4 text-warning" /> Follow-up
+                  <Clock className="h-4 w-4 text-warning" /> {t("adminUi.status.followUp")}
                 </Button>
               )}
               {lead.status !== "lost" && lead.status !== "completed" && (
                 <Button variant="outline" className="w-full justify-start gap-2 text-destructive hover:text-destructive" size="sm"
                   onClick={() => updateStatus("lost")}>
-                  <XCircle className="h-4 w-4" /> Marchează Pierdut
+                  <XCircle className="h-4 w-4" /> {t("adminUi.crmLead.markLost")}
                 </Button>
               )}
               {/* AD-06 — Send email button */}
               {lead.email && (
                 <Button variant="outline" className="w-full justify-start gap-2" size="sm"
                   onClick={() => setEmailOpen(!emailOpen)}>
-                  <Send className="h-4 w-4 text-gold" /> Trimite Email
+                  <Send className="h-4 w-4 text-gold" /> {t("adminUi.crmLead.sendEmail")}
                 </Button>
               )}
               <hr className="border-border/40" />
               <Button variant="outline" className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10" size="sm"
                 onClick={deleteLead}>
-                <Trash2 className="h-4 w-4" /> Șterge Lead
+                <Trash2 className="h-4 w-4" /> {t("adminUi.crmLead.deleteLead")}
               </Button>
             </CardContent>
           </Card>
@@ -478,17 +485,17 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
           {/* AD-06 — Email compose card */}
           {emailOpen && lead.email && (
             <Card>
-              <CardHeader><CardTitle className="text-sm">Trimite Email către {lead.email}</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-sm">{t("adminUi.crmLead.emailComposeTitle", { email: lead.email })}</CardTitle></CardHeader>
               <CardContent className="space-y-3">
                 <input
                   type="text"
-                  placeholder="Subiect email"
+                  placeholder={t("adminUi.crmLead.emailSubject")}
                   value={emailSubject}
                   onChange={e => setEmailSubject(e.target.value)}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 />
                 <Textarea
-                  placeholder="Conținut email..."
+                  placeholder={t("adminUi.crmLead.emailBody")}
                   value={emailBody}
                   onChange={e => setEmailBody(e.target.value)}
                   rows={4}
@@ -497,9 +504,9 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
                   <Button size="sm" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1"
                     onClick={handleSendEmail} disabled={sendingEmail || !emailSubject.trim() || !emailBody.trim()}>
                     {sendingEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                    Trimite
+                    {t("common.submit")}
                   </Button>
-                  <Button size="sm" variant="ghost" onClick={() => setEmailOpen(false)}>Anulează</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setEmailOpen(false)}>{t("common.cancel")}</Button>
                 </div>
               </CardContent>
             </Card>
@@ -507,18 +514,18 @@ export default function LeadDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* AD-08 — Assign to staff */}
           <Card>
-            <CardHeader><CardTitle className="text-sm">Asignare</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-sm">{t("adminUi.crmLead.assign")}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               <input
                 type="text"
-                placeholder="Numele persoanei responsabile"
+                placeholder={t("adminUi.crmLead.assigneePlaceholder")}
                 value={assignee}
                 onChange={e => setAssignee(e.target.value)}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
               <Button size="sm" variant="outline" className="w-full gap-1"
                 onClick={handleAssign} disabled={!assignee.trim()}>
-                <Users className="h-3.5 w-3.5" /> Asignează
+                <Users className="h-3.5 w-3.5" /> {t("adminUi.crmLead.assignBtn")}
               </Button>
             </CardContent>
           </Card>

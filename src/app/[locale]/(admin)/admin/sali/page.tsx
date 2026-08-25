@@ -9,6 +9,7 @@ import {  Edit, Eye, MapPin, Users, Star, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { BulkActionsBar } from "@/components/admin/bulk-actions-bar";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Venue {
   id: number;
@@ -34,6 +35,7 @@ async function loadAllVenues(): Promise<Venue[]> {
 }
 
 export default function AdminVenuesPage() {
+  const { t } = useLocale();
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -42,7 +44,7 @@ export default function AdminVenuesPage() {
     try {
       setVenues(await loadAllVenues());
     } catch {
-      toast.error("Nu s-au putut reîncărca sălile");
+      toast.error(t("adminUi.venues.toastReloadError"));
     }
   }
 
@@ -57,7 +59,7 @@ export default function AdminVenuesPage() {
       try {
         setVenues(await loadAllVenues());
       } catch {
-        toast.error("Nu s-au putut încărca sălile");
+        toast.error(t("adminUi.venues.toastLoadError"));
       } finally {
         setLoading(false);
       }
@@ -73,12 +75,12 @@ export default function AdminVenuesPage() {
       });
       if (res.ok) {
         setVenues((prev) => prev.map((v) => v.id === venueId ? { ...v, isActive: !currentState } : v));
-        toast.success(!currentState ? "Sala activată" : "Sala dezactivată");
+        toast.success(!currentState ? t("adminUi.venues.toastActivated") : t("adminUi.venues.toastDeactivated"));
       } else {
-        toast.error("Nu s-a putut actualiza statusul");
+        toast.error(t("adminUi.venues.toastStatusError"));
       }
     } catch {
-      toast.error("Eroare la actualizare");
+      toast.error(t("adminUi.venues.toastUpdateError"));
     }
   }
 
@@ -94,15 +96,15 @@ export default function AdminVenuesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Săli & Restaurante</h1>
-          <p className="text-sm text-muted-foreground">{venues.length} săli</p>
+          <h1 className="font-heading text-2xl font-bold">{t("adminUi.venues.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("adminUi.venues.count", { count: venues.length })}</p>
         </div>
       </div>
 
       {venues.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            Nu există săli înregistrate.
+            {t("adminUi.venues.empty")}
           </CardContent>
         </Card>
       ) : (
@@ -123,18 +125,18 @@ export default function AdminVenuesPage() {
                   type="checkbox"
                   checked={selected}
                   onChange={() => toggleSelect(venue.id)}
-                  aria-label={`Selectează ${venue.nameRo}`}
+                  aria-label={t("adminUi.venues.selectOne", { name: venue.nameRo })}
                   className="h-4 w-4 shrink-0 cursor-pointer accent-gold"
                 />
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gold/10 text-lg">🏛️</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{venue.nameRo}</span>
-                    {venue.isFeatured && <Badge className="bg-gold/10 text-gold border-gold/30 text-xs">Featured</Badge>}
+                    {venue.isFeatured && <Badge className="bg-gold/10 text-gold border-gold/30 text-xs">{t("adminUi.artists.badgeFeatured")}</Badge>}
                   </div>
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
                     {venue.city && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {venue.city}</span>}
-                    {venue.capacityMax && <span className="flex items-center gap-1"><Users className="h-3 w-3" /> max {venue.capacityMax}</span>}
+                    {venue.capacityMax && <span className="flex items-center gap-1"><Users className="h-3 w-3" /> {t("adminUi.venues.maxCapacity", { n: venue.capacityMax })}</span>}
                     {venue.pricePerPerson && <span>{venue.pricePerPerson}€/pers</span>}
                     {venue.ratingAvg && <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-gold text-gold" /> {Number(venue.ratingAvg).toFixed(1)}</span>}
                   </div>
@@ -144,10 +146,10 @@ export default function AdminVenuesPage() {
                   onCheckedChange={() => toggleActive(venue.id, venue.isActive)}
                 />
                 <Link href={`/admin/sali/${venue.id}`}>
-                  <Button variant="ghost" size="icon" aria-label="Editează sala"><Edit className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" aria-label={t("adminUi.venues.editVenue")}><Edit className="h-4 w-4" /></Button>
                 </Link>
                 <Link href={`/sali/${venue.slug}`} target="_blank">
-                  <Button variant="ghost" size="icon" aria-label="Vezi profil public sală"><Eye className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" aria-label={t("adminUi.venues.viewPublic")}><Eye className="h-4 w-4" /></Button>
                 </Link>
               </CardContent>
             </Card>

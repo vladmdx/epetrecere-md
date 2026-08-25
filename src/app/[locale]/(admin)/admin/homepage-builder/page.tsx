@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { GripVertical, Eye, Save, Loader2, ArrowUp, ArrowDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 // Fallback sections when DB is empty (initial seed)
 const defaultSections = [
@@ -25,20 +26,20 @@ const defaultSections = [
   { id: 0, type: "cta", sortOrder: 12, isVisible: true },
 ];
 
-const labelMap: Record<string, { label: string; icon: string }> = {
-  hero: { label: "Hero Section", icon: "🎬" },
-  search_bar: { label: "Quick Search Bar", icon: "🔍" },
-  categories: { label: "Categorii", icon: "📂" },
-  featured_artists: { label: "Artiști Recomandați", icon: "⭐" },
-  featured_venues: { label: "Săli Recomandate", icon: "🏛️" },
-  event_planner: { label: "Event Planner Teaser", icon: "📋" },
-  services: { label: "Servicii Extra", icon: "🛠️" },
-  process: { label: "Cum Funcționează", icon: "📌" },
-  testimonials: { label: "Testimoniale", icon: "💬" },
-  stats: { label: "Statistici Counter", icon: "📊" },
-  clients: { label: "Logo-uri Clienți", icon: "🏢" },
-  blog: { label: "Articole Blog", icon: "📝" },
-  cta: { label: "CTA Final", icon: "🎯" },
+const labelMap: Record<string, { labelKey: string; icon: string }> = {
+  hero: { labelKey: "admin.homepageBuilder.section.hero", icon: "🎬" },
+  search_bar: { labelKey: "admin.homepageBuilder.section.searchBar", icon: "🔍" },
+  categories: { labelKey: "admin.homepageBuilder.section.categories", icon: "📂" },
+  featured_artists: { labelKey: "admin.homepageBuilder.section.featuredArtists", icon: "⭐" },
+  featured_venues: { labelKey: "admin.homepageBuilder.section.featuredVenues", icon: "🏛️" },
+  event_planner: { labelKey: "admin.homepageBuilder.section.eventPlanner", icon: "📋" },
+  services: { labelKey: "admin.homepageBuilder.section.services", icon: "🛠️" },
+  process: { labelKey: "admin.homepageBuilder.section.process", icon: "📌" },
+  testimonials: { labelKey: "admin.homepageBuilder.section.testimonials", icon: "💬" },
+  stats: { labelKey: "admin.homepageBuilder.section.stats", icon: "📊" },
+  clients: { labelKey: "admin.homepageBuilder.section.clients", icon: "🏢" },
+  blog: { labelKey: "admin.homepageBuilder.section.blog", icon: "📝" },
+  cta: { labelKey: "admin.homepageBuilder.section.cta", icon: "🎯" },
 };
 
 interface Section {
@@ -49,6 +50,7 @@ interface Section {
 }
 
 export default function HomepageBuilderPage() {
+  const { t } = useLocale();
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -115,16 +117,16 @@ export default function HomepageBuilderPage() {
       });
       if (res.ok) {
         setDirty(false);
-        toast.success("Secțiunile au fost salvate!");
+        toast.success(t("admin.homepageBuilder.saved"));
       } else {
-        toast.error("Eroare la salvarea secțiunilor");
+        toast.error(t("admin.homepageBuilder.saveError"));
       }
     } catch {
-      toast.error("Eroare la salvarea secțiunilor");
+      toast.error(t("admin.homepageBuilder.saveError"));
     } finally {
       setSaving(false);
     }
-  }, [sections]);
+  }, [sections, t]);
 
   if (loading) {
     return (
@@ -138,15 +140,17 @@ export default function HomepageBuilderPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Homepage Builder</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("admin.homepageBuilder.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Gestionează secțiunile homepage-ului
+            {t("admin.homepageBuilder.subtitle")}
           </p>
         </div>
         <div className="flex gap-2">
           <a href="/" target="_blank">
             <Button variant="outline" className="gap-2">
-              <Eye className="h-4 w-4" /> Preview
+              <Eye className="h-4 w-4" /> {t("admin.homepageBuilder.preview")}
             </Button>
           </a>
           <Button
@@ -159,22 +163,24 @@ export default function HomepageBuilderPage() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            {saving ? "Se salvează..." : dirty ? "Salvează *" : "Salvat"}
+            {saving
+              ? t("admin.homepageBuilder.saving")
+              : dirty
+                ? t("admin.homepageBuilder.saveDirty")
+                : t("admin.homepageBuilder.savedState")}
           </Button>
         </div>
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Folosește săgețile pentru a reordona secțiunile. Activează/dezactivează
-        vizibilitatea cu switch-ul.
+        {t("admin.homepageBuilder.hint")}
       </p>
 
       <div className="space-y-2">
         {sections.map((section, index) => {
-          const meta = labelMap[section.type] || {
-            label: section.type,
-            icon: "📦",
-          };
+          const meta = labelMap[section.type];
+          const label = meta ? t(meta.labelKey) : section.type;
+          const icon = meta ? meta.icon : "📦";
           return (
             <Card
               key={section.type}
@@ -185,9 +191,9 @@ export default function HomepageBuilderPage() {
             >
               <CardContent className="flex items-center gap-4 py-3">
                 <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-xl shrink-0">{meta.icon}</span>
+                <span className="text-xl shrink-0">{icon}</span>
                 <div className="flex-1">
-                  <span className="font-medium text-sm">{meta.label}</span>
+                  <span className="font-medium text-sm">{label}</span>
                   <span className="ml-2 text-xs text-muted-foreground">
                     {section.type}
                   </span>
@@ -196,7 +202,7 @@ export default function HomepageBuilderPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Mută sus"
+                    aria-label={t("admin.homepageBuilder.moveUp")}
                     className="h-7 w-7"
                     onClick={() => moveUp(index)}
                     disabled={index === 0}
@@ -206,7 +212,7 @@ export default function HomepageBuilderPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Mută jos"
+                    aria-label={t("admin.homepageBuilder.moveDown")}
                     className="h-7 w-7"
                     onClick={() => moveDown(index)}
                     disabled={index === sections.length - 1}

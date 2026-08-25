@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
+import { useLocale } from "@/hooks/use-locale";
 import { toast } from "sonner";
 
 interface OfferRequest {
@@ -35,6 +36,7 @@ interface OfferRequest {
 type FilterTab = "new" | "accepted" | "rejected" | "all";
 
 export default function AdminOfferRequestsPage() {
+  const { t } = useLocale();
   const [requests, setRequests] = useState<OfferRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>("new");
@@ -43,7 +45,7 @@ export default function AdminOfferRequestsPage() {
     fetch("/api/offer-requests")
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(data => { setRequests(data); })
-      .catch(() => toast.error("Nu s-au putut încărca cererile de ofertă"))
+      .catch(() => toast.error(t("adminUi.offers.toastLoadError")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -58,48 +60,48 @@ export default function AdminOfferRequestsPage() {
         r.id === id ? { ...r, status, adminSeen: true, ...extraFields } : r
       ));
     } catch {
-      toast.error("Eroare la actualizare");
+      toast.error(t("adminUi.offers.toastUpdateError"));
     }
   }
 
   async function acceptRequest(id: number) {
     await updateStatus(id, "accepted");
-    toast.success("Cerere acceptată");
+    toast.success(t("adminUi.offers.toastAccepted"));
   }
 
   async function rejectRequest(id: number) {
     await updateStatus(id, "rejected");
-    toast.success("Cerere refuzată");
+    toast.success(t("adminUi.offers.toastRejected"));
   }
 
   async function deleteRequest(id: number) {
     try {
       await fetch(`/api/offer-requests/${id}`, { method: "DELETE" });
       setRequests(prev => prev.filter(r => r.id !== id));
-      toast.success("Cerere eliminată");
+      toast.success(t("adminUi.offers.toastRemoved"));
     } catch {
-      toast.error("Eroare la ștergere");
+      toast.error(t("adminUi.offers.toastDeleteError"));
     }
   }
 
   async function restoreRequest(id: number) {
     await updateStatus(id, "new", { adminSeen: false });
-    toast.success("Cerere restaurată");
+    toast.success(t("adminUi.offers.toastRestored"));
   }
 
   async function sendToCRM(id: number) {
     try {
       await fetch(`/api/offer-requests/${id}/to-crm`, { method: "POST" });
       await updateStatus(id, "in_crm");
-      toast.success("Trimis în CRM");
+      toast.success(t("adminUi.offers.toastSentToCrm"));
     } catch {
-      toast.error("Eroare la trimitere în CRM");
+      toast.error(t("adminUi.offers.toastSendCrmError"));
     }
   }
 
   async function addComment(id: number, comment: string) {
     await updateStatus(id, requests.find(r => r.id === id)?.status || "new", { adminComment: comment });
-    toast.success("Comentariu salvat");
+    toast.success(t("adminUi.offers.toastCommentSaved"));
   }
 
   const counts = {
@@ -117,18 +119,20 @@ export default function AdminOfferRequestsPage() {
   });
 
   const tabs: { key: FilterTab; label: string; count: number }[] = [
-    { key: "new", label: "Noi", count: counts.new },
-    { key: "accepted", label: "Acceptate", count: counts.accepted },
-    { key: "rejected", label: "Refuzate", count: counts.rejected },
-    { key: "all", label: "Toate", count: counts.all },
+    { key: "new", label: t("adminUi.offers.tabNew"), count: counts.new },
+    { key: "accepted", label: t("adminUi.offers.tabAccepted"), count: counts.accepted },
+    { key: "rejected", label: t("adminUi.offers.tabRejected"), count: counts.rejected },
+    { key: "all", label: t("common.all"), count: counts.all },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Cereri de Oferte</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("adminUi.offers.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          {counts.new > 0 ? `${counts.new} cereri noi de procesat` : "Toate cererile procesate"}
+          {counts.new > 0
+            ? t("adminUi.offers.pendingCount", { count: counts.new })
+            : t("adminUi.offers.allProcessed")}
         </p>
       </div>
 
@@ -168,10 +172,10 @@ export default function AdminOfferRequestsPage() {
           ))}
           {filtered.length === 0 && (
             <p className="py-8 text-center text-muted-foreground">
-              {filter === "new" ? "Nu sunt cereri noi" :
-               filter === "accepted" ? "Nu sunt cereri acceptate" :
-               filter === "rejected" ? "Nu sunt cereri refuzate" :
-               "Nu sunt cereri"}
+              {filter === "new" ? t("adminUi.offers.emptyNew") :
+               filter === "accepted" ? t("adminUi.offers.emptyAccepted") :
+               filter === "rejected" ? t("adminUi.offers.emptyRejected") :
+               t("adminUi.offers.emptyAll")}
             </p>
           )}
         </div>
@@ -191,17 +195,18 @@ function OfferCard({
   onSendToCRM: (id: number) => void;
   onComment: (id: number, comment: string) => void;
 }) {
+  const { t } = useLocale();
   const [comment, setComment] = useState(request.adminComment || "");
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const statusBadge = {
-    new: { label: "Nou", className: "text-warning border-warning/30 bg-warning/10" },
-    accepted: { label: "Acceptat", className: "text-success border-success/30 bg-success/10" },
-    rejected: { label: "Refuzat", className: "text-destructive border-destructive/30 bg-destructive/10" },
-    in_crm: { label: "În CRM", className: "text-info border-info/30 bg-info/10" },
-    seen: { label: "Văzut", className: "text-info border-info/30 bg-info/10" },
-    processed: { label: "Procesat", className: "text-success border-success/30 bg-success/10" },
+    new: { label: t("adminUi.status.new"), className: "text-warning border-warning/30 bg-warning/10" },
+    accepted: { label: t("adminUi.status.accepted"), className: "text-success border-success/30 bg-success/10" },
+    rejected: { label: t("adminUi.offers.statusRejected"), className: "text-destructive border-destructive/30 bg-destructive/10" },
+    in_crm: { label: t("adminUi.offers.statusInCrm"), className: "text-info border-info/30 bg-info/10" },
+    seen: { label: t("adminUi.offers.statusSeen"), className: "text-info border-info/30 bg-info/10" },
+    processed: { label: t("adminUi.offers.statusProcessed"), className: "text-success border-success/30 bg-success/10" },
   }[request.status] || { label: request.status, className: "" };
 
   return (
@@ -223,7 +228,7 @@ function OfferCard({
                 <Badge variant="secondary" className="text-xs">🏛 → {request.venueName}</Badge>
               )}
               {!request.artistName && !request.venueName && (
-                <Badge variant="secondary" className="text-xs">📋 Generală</Badge>
+                <Badge variant="secondary" className="text-xs">📋 {t("adminUi.offers.general")}</Badge>
               )}
               <Badge variant="outline" className={cn("text-xs", statusBadge.className)}>
                 {statusBadge.label}
@@ -266,12 +271,12 @@ function OfferCard({
             )}
             {editing && (
               <div className="flex gap-2">
-                <Input value={comment} onChange={e => setComment(e.target.value)} placeholder="Comentariu admin..." className="flex-1" />
+                <Input value={comment} onChange={e => setComment(e.target.value)} placeholder={t("adminUi.offers.commentPlaceholder")} className="flex-1" />
                 <Button size="sm" className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                   onClick={() => { onComment(request.id, comment); setEditing(false); }}>
-                  Salvează
+                  {t("common.save")}
                 </Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Anulează</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>{t("common.cancel")}</Button>
               </div>
             )}
           </div>
@@ -282,13 +287,13 @@ function OfferCard({
             {request.status === "new" && (
               <>
                 <Button size="sm" className="gap-1.5 bg-success/90 hover:bg-success text-white" onClick={() => onAccept(request.id)}>
-                  <CheckCircle className="h-3.5 w-3.5" /> Acceptă
+                  <CheckCircle className="h-3.5 w-3.5" /> {t("adminUi.offers.accept")}
                 </Button>
                 <Button size="sm" variant="outline" className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => onReject(request.id)}>
-                  <XCircle className="h-3.5 w-3.5" /> Refuză
+                  <XCircle className="h-3.5 w-3.5" /> {t("adminUi.offers.reject")}
                 </Button>
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(true)}>
-                  <MessageSquare className="h-3.5 w-3.5" /> Notă
+                  <MessageSquare className="h-3.5 w-3.5" /> {t("adminUi.offers.note")}
                 </Button>
               </>
             )}
@@ -297,10 +302,10 @@ function OfferCard({
             {(request.status === "accepted") && (
               <>
                 <Button size="sm" className="gap-1.5 bg-gold hover:bg-gold-dark text-[#0D0D0D]" onClick={() => onSendToCRM(request.id)}>
-                  <Send className="h-3.5 w-3.5" /> Trimite în CRM
+                  <Send className="h-3.5 w-3.5" /> {t("adminUi.offers.sendToCrm")}
                 </Button>
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditing(true)}>
-                  <MessageSquare className="h-3.5 w-3.5" /> Notă
+                  <MessageSquare className="h-3.5 w-3.5" /> {t("adminUi.offers.note")}
                 </Button>
               </>
             )}
@@ -308,7 +313,7 @@ function OfferCard({
             {/* In CRM */}
             {request.status === "in_crm" && (
               <Badge className="bg-info/10 text-info border-info/30 text-xs px-3 py-1.5">
-                <ArrowRight className="h-3 w-3 mr-1" /> În CRM
+                <ArrowRight className="h-3 w-3 mr-1" /> {t("adminUi.offers.statusInCrm")}
               </Badge>
             )}
 
@@ -316,17 +321,17 @@ function OfferCard({
             {request.status === "rejected" && (
               <>
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => onRestore(request.id)}>
-                  <RotateCcw className="h-3.5 w-3.5" /> Restaurează
+                  <RotateCcw className="h-3.5 w-3.5" /> {t("adminUi.offers.restore")}
                 </Button>
                 {!confirmDelete ? (
                   <Button size="sm" variant="outline" className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
                     onClick={() => setConfirmDelete(true)}>
-                    <Trash2 className="h-3.5 w-3.5" /> Elimină
+                    <Trash2 className="h-3.5 w-3.5" /> {t("adminUi.offers.remove")}
                   </Button>
                 ) : (
                   <Button size="sm" className="gap-1.5 bg-destructive hover:bg-destructive/90 text-white"
                     onClick={() => onDelete(request.id)}>
-                    <Trash2 className="h-3.5 w-3.5" /> Confirmi?
+                    <Trash2 className="h-3.5 w-3.5" /> {t("adminUi.offers.confirmQ")}
                   </Button>
                 )}
               </>
@@ -336,10 +341,10 @@ function OfferCard({
             {(request.status === "seen" || request.status === "processed") && (
               <>
                 <Button size="sm" className="gap-1.5 bg-success/90 hover:bg-success text-white" onClick={() => onAccept(request.id)}>
-                  <CheckCircle className="h-3.5 w-3.5" /> Acceptă
+                  <CheckCircle className="h-3.5 w-3.5" /> {t("adminUi.offers.accept")}
                 </Button>
                 <Button size="sm" variant="outline" className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => onReject(request.id)}>
-                  <XCircle className="h-3.5 w-3.5" /> Refuză
+                  <XCircle className="h-3.5 w-3.5" /> {t("adminUi.offers.reject")}
                 </Button>
               </>
             )}

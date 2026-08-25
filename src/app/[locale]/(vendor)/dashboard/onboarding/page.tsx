@@ -50,21 +50,22 @@ interface Category {
   type: string;
 }
 
-const STEP_LABELS = [
-  "Categorie",
-  "Date personale",
-  "Descriere",
-  "Locație & deplasare",
-  "Preț",
-  "Confirmare",
-];
+const STEP_KEYS = [
+  "category",
+  "personal",
+  "description",
+  "location",
+  "price",
+  "confirm",
+] as const;
 
 const MIN_AI_INPUT = 40;
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useUser();
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
+  const STEP_LABELS = STEP_KEYS.map((k) => t(`vendor.onboarding.step.${k}`));
   const [step, setStep] = useState(0);
   // Vendors must sign the Legal Pack before their profile is submitted.
   const [signature, setSignature] = useState<ESignatureValue | null>(null);
@@ -114,7 +115,7 @@ export default function OnboardingPage() {
           ),
         ),
       )
-      .catch(() => toast.error("Nu s-au putut încărca categoriile"));
+      .catch(() => toast.error(t("vendor.onboarding.errCategories")));
 
     if (user) {
       // Only seed Clerk values when the local fields are still empty.
@@ -136,11 +137,11 @@ export default function OnboardingPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Selectează o imagine validă");
+      toast.error(t("vendor.onboarding.errImageType"));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Imaginea nu poate depăși 10MB");
+      toast.error(t("vendor.onboarding.errImageSize"));
       return;
     }
     setUploadingPhoto(true);
@@ -155,12 +156,12 @@ export default function OnboardingPage() {
       }
       const { url } = await res.json();
       update({ imageUrl: url });
-      toast.success("Poza încărcată!");
+      toast.success(t("vendor.onboarding.photoUploaded"));
     } catch (err) {
       const msg =
         err instanceof Error && err.message
           ? err.message
-          : "Nu s-a putut încărca imaginea";
+          : t("vendor.onboarding.errUpload");
       toast.error(msg);
     } finally {
       setUploadingPhoto(false);
@@ -173,14 +174,12 @@ export default function OnboardingPage() {
   // anything specific, so we gate the button.
   async function handleGenerateAi() {
     if (data.description.trim().length < MIN_AI_INPUT) {
-      toast.error(
-        `Scrie minim ${MIN_AI_INPUT} caractere despre tine, apoi AI-ul va îmbunătăți textul.`,
-      );
+      toast.error(t("vendor.onboarding.errAiTooShort", { n: MIN_AI_INPUT }));
       return;
     }
     const category = categories.find((c) => c.id === data.categoryId);
     if (!category) {
-      toast.error("Selectează mai întâi categoria");
+      toast.error(t("vendor.onboarding.errNoCategory"));
       return;
     }
     setGeneratingAi(true);
@@ -201,18 +200,20 @@ export default function OnboardingPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Generarea a eșuat");
+        throw new Error(err.error || t("vendor.onboarding.errGenerate"));
       }
       // The endpoint returns { result: "..." }, not { description: "..." }.
       const { result } = await res.json();
       if (typeof result === "string" && result.trim().length > 0) {
         update({ description: result });
-        toast.success("Descriere generată cu AI!");
+        toast.success(t("vendor.onboarding.aiDone"));
       } else {
-        toast.error("AI nu a returnat un rezultat valid");
+        toast.error(t("vendor.onboarding.errAiInvalid"));
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la generare AI");
+      toast.error(
+        err instanceof Error ? err.message : t("vendor.onboarding.errAi"),
+      );
     } finally {
       setGeneratingAi(false);
     }
@@ -288,12 +289,12 @@ export default function OnboardingPage() {
         }
       }
 
-      toast.success(
-        "Profilul a fost trimis pentru aprobare! Vei fi notificat când administratorul îl aprobă.",
-      );
+      toast.success(t("vendor.onboarding.submitted"));
       router.push("/dashboard");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la înregistrare");
+      toast.error(
+        err instanceof Error ? err.message : t("vendor.onboarding.errSubmit"),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -320,9 +321,11 @@ export default function OnboardingPage() {
     <div className="mx-auto max-w-2xl py-12 px-4">
       <div className="mb-8 text-center">
         <Sparkles className="mx-auto mb-3 h-10 w-10 text-gold" />
-        <h1 className="font-heading text-2xl font-bold">Înregistrare Partener</h1>
+        <h1 className="font-heading text-2xl font-bold">
+          {t("vendor.onboarding.title")}
+        </h1>
         <p className="mt-1 text-muted-foreground">
-          Completează profilul pentru a fi vizibil pe ePetrecere.md
+          {t("vendor.pending.hint")}
         </p>
       </div>
 
@@ -353,7 +356,9 @@ export default function OnboardingPage() {
       {/* Step 0: Category */}
       {step === 0 && (
         <div className="space-y-4 rounded-xl border border-border/40 bg-card p-6">
-          <h2 className="font-heading text-lg font-bold">Alege categoria ta</h2>
+          <h2 className="font-heading text-lg font-bold">
+            {t("vendor.onboarding.pickCategory")}
+          </h2>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {categories.map((cat) => (
               <button
@@ -376,16 +381,18 @@ export default function OnboardingPage() {
       {/* Step 1: Name + Photo */}
       {step === 1 && (
         <div className="space-y-5 rounded-xl border border-border/40 bg-card p-6">
-          <h2 className="font-heading text-lg font-bold">Datele tale</h2>
+          <h2 className="font-heading text-lg font-bold">
+            {t("vendor.onboarding.yourData")}
+          </h2>
 
           <div>
-            <Label>Poză de profil</Label>
+            <Label>{t("vendor.onboarding.profilePhoto")}</Label>
             <div className="mt-2 flex items-center gap-4">
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border/40 bg-muted">
                 {data.imageUrl ? (
                   <Image
                     src={data.imageUrl}
-                    alt="Profil"
+                    alt={t("vendor.profile")}
                     fill
                     sizes="96px"
                     className="object-cover"
@@ -417,7 +424,9 @@ export default function OnboardingPage() {
                   ) : (
                     <Upload className="h-4 w-4" />
                   )}
-                  {data.imageUrl ? "Schimbă poza" : "Încarcă poza"}
+                  {data.imageUrl
+                    ? t("vendor.onboarding.changePhoto")
+                    : t("vendor.onboarding.uploadPhoto")}
                 </Button>
                 {data.imageUrl && (
                   <button
@@ -425,7 +434,7 @@ export default function OnboardingPage() {
                     className="text-xs text-destructive hover:underline"
                     onClick={() => update({ imageUrl: "" })}
                   >
-                    Șterge poza
+                    {t("vendor.onboarding.deletePhoto")}
                   </button>
                 )}
               </div>
@@ -433,11 +442,11 @@ export default function OnboardingPage() {
           </div>
 
           <div>
-            <Label>Nume artistic *</Label>
+            <Label>{t("vendor.onboarding.stageName")}</Label>
             <Input
               value={data.name}
               onChange={(e) => update({ name: e.target.value })}
-              placeholder="Ex: Ion Suruceanu"
+              placeholder={t("vendor.onboarding.stageNamePlaceholder")}
             />
           </div>
         </div>
@@ -447,26 +456,30 @@ export default function OnboardingPage() {
       {step === 2 && (
         <div className="space-y-4 rounded-xl border border-border/40 bg-card p-6">
           <div>
-            <h2 className="font-heading text-lg font-bold">Descriere</h2>
+            <h2 className="font-heading text-lg font-bold">
+              {t("vendor.onboarding.step.description")}
+            </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Spune-le clienților ce te face deosebit. Scrie minim {MIN_AI_INPUT}{" "}
-              caractere și apoi apasă <strong>Generează cu AI</strong> ca să-ți
-              îmbunătățim textul automat.
+              {t("vendor.onboarding.descHintBefore", { n: MIN_AI_INPUT })}{" "}
+              <strong>{t("vendor.onboarding.generateAi")}</strong>{" "}
+              {t("vendor.onboarding.descHintAfter")}
             </p>
           </div>
           <textarea
             value={data.description}
             onChange={(e) => update({ description: e.target.value })}
-            placeholder="Ex: Cânt la nunți și evenimente private de peste 10 ani. Repertoriu variat — populară, pop, retro. Dispun de echipament propriu..."
+            placeholder={t("vendor.onboarding.descPlaceholder")}
             rows={8}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
-              {data.description.length} caractere
+              {t("vendor.onboarding.charCount", {
+                n: data.description.length,
+              })}
               {data.description.trim().length < MIN_AI_INPUT && (
                 <span className="text-amber-500 ml-1">
-                  (minim {MIN_AI_INPUT} pentru AI)
+                  {t("vendor.onboarding.minForAi", { n: MIN_AI_INPUT })}
                 </span>
               )}
             </p>
@@ -483,7 +496,7 @@ export default function OnboardingPage() {
               ) : (
                 <Wand2 className="h-3.5 w-3.5" />
               )}
-              Generează cu AI
+              {t("vendor.onboarding.generateAi")}
             </Button>
           </div>
         </div>
@@ -495,16 +508,15 @@ export default function OnboardingPage() {
           <div>
             <h2 className="font-heading text-lg font-bold flex items-center gap-2">
               <MapPin className="h-5 w-5 text-gold" />
-              Locație și deplasare
+              {t("vendor.settings.travelTitle")}
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Stabilește unde activezi și cât de departe te deplasezi. Aceste
-              setări determină ce clienți te văd în rezultate.
+              {t("vendor.onboarding.locationHint")}
             </p>
           </div>
 
           <div>
-            <Label>Orașul de bază *</Label>
+            <Label>{t("vendor.onboarding.baseCityRequired")}</Label>
             <select
               value={data.baseCity}
               onChange={(e) => update({ baseCity: e.target.value, location: e.target.value })}
@@ -517,12 +529,12 @@ export default function OnboardingPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-muted-foreground">
-              Punctul de pornire pentru calculul distanței.
+              {t("vendor.settings.baseCityHint")}
             </p>
           </div>
 
           <div>
-            <Label>Distanța maximă de deplasare</Label>
+            <Label>{t("vendor.settings.maxDistance")}</Label>
             <select
               value={data.travelDistanceKm}
               onChange={(e) => update({ travelDistanceKm: Number(e.target.value) })}
@@ -535,17 +547,16 @@ export default function OnboardingPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-muted-foreground">
-              Cât de departe ești dispus să mergi pentru un eveniment.
+              {t("vendor.settings.maxDistanceHint")}
             </p>
           </div>
 
           <div className="rounded-lg border border-border/40 bg-background/50 p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <Label>Plată suplimentară pentru deplasare</Label>
+                <Label>{t("vendor.settings.travelFee")}</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Activează dacă percepi extra pentru evenimente în afara orașului
-                  de bază.
+                  {t("vendor.onboarding.travelFeeHint")}
                 </p>
               </div>
               <input
@@ -557,14 +568,16 @@ export default function OnboardingPage() {
             </div>
             {data.travelSurchargeEnabled && (
               <div className="flex items-center gap-3">
-                <Label className="flex-1">Sumă (€)</Label>
+                <Label className="flex-1">
+                  {t("vendor.onboarding.amountEur")}
+                </Label>
                 <Input
                   type="number"
                   min={0}
                   value={data.travelSurchargeAmount || ""}
                   onChange={(e) => update({ travelSurchargeAmount: Number(e.target.value) })}
                   className="w-32"
-                  placeholder="ex: 100"
+                  placeholder={t("vendor.settings.travelAmountPlaceholder")}
                 />
               </div>
             )}
@@ -578,11 +591,10 @@ export default function OnboardingPage() {
           <div>
             <h2 className="font-heading text-lg font-bold flex items-center gap-2">
               <Euro className="h-5 w-5 text-gold" />
-              Tarife
+              {t("dashboard.rates")}
             </h2>
             <p className="text-xs text-muted-foreground mt-1">
-              Adaugă tarifele tale pe durată. Poți completa variante
-              suplimentare (weekend, evening) ulterior din{" "}
+              {t("vendor.onboarding.ratesHint")}{" "}
               <strong>/dashboard/tarife</strong>.
             </p>
           </div>
@@ -595,7 +607,9 @@ export default function OnboardingPage() {
                 >
                   <div className="grid grid-cols-12 items-end gap-2">
                     <div className="col-span-3">
-                      <Label className="text-[11px]">Ore</Label>
+                      <Label className="text-[11px]">
+                        {t("vendor.onboarding.hours")}
+                      </Label>
                       <Input
                         type="number"
                         min={0}
@@ -612,7 +626,9 @@ export default function OnboardingPage() {
                       />
                     </div>
                     <div className="col-span-3">
-                      <Label className="text-[11px]">Min</Label>
+                      <Label className="text-[11px]">
+                        {t("vendor.onboarding.minutes")}
+                      </Label>
                       <Input
                         type="number"
                         min={0}
@@ -630,7 +646,9 @@ export default function OnboardingPage() {
                       />
                     </div>
                     <div className="col-span-4">
-                      <Label className="text-[11px]">Preț (€)</Label>
+                      <Label className="text-[11px]">
+                        {t("vendor.calPage.priceLabel")}
+                      </Label>
                       <Input
                         type="number"
                         min={0}
@@ -674,7 +692,7 @@ export default function OnboardingPage() {
                 }
                 className="w-full rounded-lg border border-dashed border-border/40 px-3 py-2 text-xs text-muted-foreground hover:border-gold/40 hover:text-gold"
               >
-                + Adaugă tarif
+                {t("vendor.onboarding.addRate")}
               </button>
             </div>
           )}
@@ -690,11 +708,11 @@ export default function OnboardingPage() {
                 className="mt-1 h-4 w-4 rounded border-input"
               />
               <div className="flex-1">
-                <p className="text-sm font-medium">Nu indica prețul public</p>
+                <p className="text-sm font-medium">
+                  {t("vendor.settings.hidePrice")}
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Clientul va vedea „Preț la cerere” și va trebui să-ți scrie
-                  pentru ofertă personalizată. Util pentru tarife negociabile
-                  (în funcție de eveniment, durată, zonă etc.).
+                  {t("vendor.onboarding.hidePriceHint")}
                 </p>
               </div>
             </label>
@@ -705,13 +723,15 @@ export default function OnboardingPage() {
       {/* Step 5: Confirm */}
       {step === 5 && (
         <div className="space-y-4 rounded-xl border border-border/40 bg-card p-6">
-          <h2 className="font-heading text-lg font-bold">Confirmă datele</h2>
+          <h2 className="font-heading text-lg font-bold">
+            {t("vendor.onboarding.confirmData")}
+          </h2>
           {data.imageUrl && (
             <div className="flex justify-center">
               <div className="relative h-28 w-28 overflow-hidden rounded-xl border border-gold/30">
                 <Image
                   src={data.imageUrl}
-                  alt="Profil"
+                  alt={t("vendor.profile")}
                   fill
                   sizes="112px"
                   className="object-cover"
@@ -721,7 +741,7 @@ export default function OnboardingPage() {
           )}
           <div className="space-y-2 text-sm">
             <SummaryRow
-              label="Categorie"
+              label={t("vendor.onboarding.step.category")}
               value={
                 (() => {
                   const category = categories.find((c) => c.id === data.categoryId);
@@ -729,17 +749,29 @@ export default function OnboardingPage() {
                 })()
               }
             />
-            <SummaryRow label="Nume" value={data.name} />
-            <SummaryRow label="Oraș de bază" value={data.baseCity} />
             <SummaryRow
-              label="Deplasare"
+              label={t("vendor.onboarding.sumName")}
+              value={data.name}
+            />
+            <SummaryRow
+              label={t("vendor.settings.baseCity")}
+              value={data.baseCity}
+            />
+            <SummaryRow
+              label={t("vendor.onboarding.sumTravel")}
               value={TRAVEL_DISTANCE_OPTIONS.find((o) => o.value === data.travelDistanceKm)?.label ?? "—"}
             />
             {data.travelSurchargeEnabled && (
-              <SummaryRow label="Plată deplasare" value={`${data.travelSurchargeAmount}€`} />
+              <SummaryRow
+                label={t("vendor.onboarding.sumTravelFee")}
+                value={`${data.travelSurchargeAmount}€`}
+              />
             )}
             {data.priceFrom > 0 && (
-              <SummaryRow label="Preț de start" value={`${data.priceFrom}€`} />
+              <SummaryRow
+                label={t("vendor.onboarding.sumStartPrice")}
+                value={`${data.priceFrom}€`}
+              />
             )}
             {(() => {
               const tiers = data.pricePackages.filter(
@@ -748,7 +780,7 @@ export default function OnboardingPage() {
               if (tiers.length === 0) return null;
               return (
                 <SummaryRow
-                  label="Tarife"
+                  label={t("dashboard.rates")}
                   value={tiers
                     .map((p) => {
                       const dur =
@@ -763,14 +795,15 @@ export default function OnboardingPage() {
             })()}
             {data.description && (
               <div className="rounded-lg bg-muted/40 p-3 mt-3">
-                <p className="text-xs font-medium text-muted-foreground mb-1">Descriere</p>
+                <p className="text-xs font-medium text-muted-foreground mb-1">
+                  {t("vendor.onboarding.step.description")}
+                </p>
                 <p className="text-sm whitespace-pre-wrap">{data.description}</p>
               </div>
             )}
           </div>
           <div className="rounded-lg bg-warning/10 border border-warning/30 p-4 text-sm text-warning">
-            După trimitere, profilul tău va fi verificat de administrator. Vei
-            primi notificare când profilul este aprobat și va fi vizibil pe site.
+            {t("vendor.onboarding.approvalNote")}
           </div>
         </div>
       )}
@@ -783,7 +816,7 @@ export default function OnboardingPage() {
           onClick={() => setStep(step - 1)}
           className="gap-2"
         >
-          <ArrowLeft className="h-4 w-4" /> Înapoi
+          <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </Button>
         {step < STEP_LABELS.length - 1 ? (
           <Button
@@ -791,7 +824,7 @@ export default function OnboardingPage() {
             disabled={!canContinue()}
             className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
           >
-            Continuă <ArrowRight className="h-4 w-4" />
+            {t("common.next")} <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
           <>
@@ -807,10 +840,11 @@ export default function OnboardingPage() {
             className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
           >
             {submitting ? (
-              "Se trimite..."
+              t("vendor.onboarding.sending")
             ) : (
               <>
-                <CheckCircle className="h-4 w-4" /> Trimite pentru aprobare
+                <CheckCircle className="h-4 w-4" />{" "}
+                {t("vendor.onboarding.submitForApproval")}
               </>
             )}
           </Button>

@@ -24,6 +24,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
+import { plural } from "@/lib/i18n/plural";
 
 type Entity = "artist" | "venue";
 
@@ -48,6 +50,7 @@ interface Response {
 }
 
 export default function AdminDuplicatesPage() {
+  const { t, locale } = useLocale();
   const [entity, setEntity] = useState<Entity>("artist");
   const [data, setData] = useState<Response | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +65,7 @@ export default function AdminDuplicatesPage() {
       const res = await fetch(`/api/admin/duplicates?entity=${target}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-au putut încărca duplicatele");
+        toast.error(err.error || t("adminUi.duplicates.toastLoadError"));
         return;
       }
       const payload = (await res.json()) as Response;
@@ -86,7 +89,10 @@ export default function AdminDuplicatesPage() {
   }
 
   const Icon = entity === "artist" ? Users : Building2;
-  const entityLabel = entity === "artist" ? "Artiști" : "Săli";
+  const entityLabelLower =
+    entity === "artist"
+      ? t("adminUi.duplicates.entityArtistsLower")
+      : t("adminUi.duplicates.entityVenuesLower");
   const editPrefix = entity === "artist" ? "/admin/artisti" : "/admin/sali";
   const publicPrefix = entity === "artist" ? "/artisti" : "/sali";
 
@@ -94,10 +100,9 @@ export default function AdminDuplicatesPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Duplicate detectate</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("adminUi.duplicates.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            Potențiale înregistrări duplicate — revizuiește manual înainte de
-            dezactivare sau merge.
+            {t("adminUi.duplicates.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -124,7 +129,9 @@ export default function AdminDuplicatesPage() {
                 ) : (
                   <Building2 className="h-3.5 w-3.5" />
                 )}
-                {e === "artist" ? "Artiști" : "Săli"}
+                {e === "artist"
+                  ? t("adminUi.duplicates.entityArtists")
+                  : t("adminUi.duplicates.entityVenues")}
               </button>
             ))}
           </div>
@@ -140,7 +147,7 @@ export default function AdminDuplicatesPage() {
             ) : (
               <RefreshCw className="h-3.5 w-3.5" />
             )}
-            Reîmprospătează
+            {t("adminUi.duplicates.refresh")}
           </Button>
         </div>
       </div>
@@ -157,11 +164,13 @@ export default function AdminDuplicatesPage() {
             </div>
             <div className="text-center">
               <h3 className="font-heading text-lg font-bold">
-                Nu s-au găsit duplicate
+                {t("adminUi.duplicates.noneFound")}
               </h3>
               <p className="mt-1 text-sm text-muted-foreground">
-                Baza de date pare curată pentru {entityLabel.toLowerCase()}{" "}
-                ({data.total} înregistrări analizate).
+                {t("adminUi.duplicates.cleanFor", {
+                  entity: entityLabelLower,
+                  total: data.total,
+                })}
               </p>
             </div>
           </CardContent>
@@ -173,15 +182,18 @@ export default function AdminDuplicatesPage() {
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
               <div>
                 <p className="font-medium">
-                  {data.groups.length}{" "}
-                  {data.groups.length === 1 ? "grup" : "grupuri"} de duplicate
-                  potențiale din {data.total} {entityLabel.toLowerCase()}
-                  .
+                  {t("adminUi.duplicates.summary", {
+                    groups: plural(data.groups.length, locale, {
+                      ro: { one: "grup", few: "grupuri", many: "grupuri" },
+                      ru: { one: "группа", few: "группы", many: "групп" },
+                      en: { one: "group", other: "groups" },
+                    }),
+                    total: data.total,
+                    entity: entityLabelLower,
+                  })}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Heuristici: nume identic, același telefon, oraș identic +
-                  nume similar. Verifică manual — brand-uri de franciza pot
-                  produce fals-pozitive legitime.
+                  {t("adminUi.duplicates.heuristics")}
                 </p>
               </div>
             </CardContent>
@@ -194,7 +206,7 @@ export default function AdminDuplicatesPage() {
                   <CardTitle className="flex items-center justify-between text-base">
                     <span className="inline-flex items-center gap-2">
                       <Icon className="h-4 w-4 text-gold" />
-                      {group.rows.length} înregistrări potențial duplicate
+                      {t("adminUi.duplicates.groupSize", { count: group.rows.length })}
                     </span>
                   </CardTitle>
                   <div className="flex flex-wrap gap-1.5">
@@ -229,13 +241,13 @@ export default function AdminDuplicatesPage() {
                       </div>
                       <div className="flex gap-1">
                         <Link href={`${publicPrefix}/${row.slug}`} target="_blank">
-                          <Button variant="ghost" size="icon" aria-label="Vezi profil public">
+                          <Button variant="ghost" size="icon" aria-label={t("adminUi.duplicates.viewPublic")}>
                             <ExternalLink className="h-4 w-4" />
                           </Button>
                         </Link>
                         <Link href={`${editPrefix}/${row.id}`}>
                           <Button variant="outline" size="sm">
-                            Editează
+                            {t("common.edit")}
                           </Button>
                         </Link>
                       </div>

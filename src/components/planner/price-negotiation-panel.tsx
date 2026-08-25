@@ -26,6 +26,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 export type BookingPriceOffer = {
   from: "artist" | "client";
@@ -58,6 +59,7 @@ export function PriceNegotiationPanel({
   /** Fires after any successful mutation so the parent can refresh its list. */
   onUpdate: () => void | Promise<void>;
 }) {
+  const { t } = useLocale();
   const [openPropose, setOpenPropose] = useState(false);
   const [openAccept, setOpenAccept] = useState(false);
   const [amount, setAmount] = useState("");
@@ -76,7 +78,7 @@ export function PriceNegotiationPanel({
   async function proposePrice() {
     const amt = Number(amount);
     if (!amt || amt <= 0) {
-      toast.error("Introdu o sumă validă.");
+      toast.error(t("planner.negotiation.invalidAmount"));
       return;
     }
     setBusy(true);
@@ -91,16 +93,16 @@ export function PriceNegotiationPanel({
         }),
       });
       if (!res.ok) {
-        toast.error("Eroare la trimiterea ofertei.");
+        toast.error(t("planner.negotiation.offerError"));
         return;
       }
-      toast.success("Ofertă trimisă.");
+      toast.success(t("planner.negotiation.offerSent"));
       setOpenPropose(false);
       setAmount("");
       setMessage("");
       await onUpdate();
     } catch {
-      toast.error("Eroare de rețea.");
+      toast.error(t("planner.negotiation.networkError"));
     } finally {
       setBusy(false);
     }
@@ -108,11 +110,11 @@ export function PriceNegotiationPanel({
 
   async function acceptAtPrice(agreedAmount: number) {
     if (perspective !== "artist") {
-      toast.error("Doar artistul poate sigila prețul final.");
+      toast.error(t("planner.negotiation.artistOnly"));
       return;
     }
     if (!agreedAmount || agreedAmount <= 0) {
-      toast.error("Preț invalid.");
+      toast.error(t("planner.negotiation.invalidPrice"));
       return;
     }
     setBusy(true);
@@ -127,16 +129,16 @@ export function PriceNegotiationPanel({
         }),
       });
       if (!res.ok) {
-        toast.error("Eroare la acceptare.");
+        toast.error(t("planner.negotiation.acceptError"));
         return;
       }
-      toast.success("Rezervare acceptată!");
+      toast.success(t("planner.negotiation.accepted"));
       setOpenAccept(false);
       setAmount("");
       setMessage("");
       await onUpdate();
     } catch {
-      toast.error("Eroare de rețea.");
+      toast.error(t("planner.negotiation.networkError"));
     } finally {
       setBusy(false);
     }
@@ -152,10 +154,10 @@ export function PriceNegotiationPanel({
         body: JSON.stringify({ action: "client_confirm" }),
       });
       if (!res.ok) {
-        toast.error("Eroare la confirmare.");
+        toast.error(t("planner.negotiation.confirmError"));
         return;
       }
-      toast.success("Rezervare confirmată! Suma e alocată în buget.");
+      toast.success(t("planner.negotiation.confirmed"));
       await onUpdate();
     } finally {
       setBusy(false);
@@ -172,7 +174,7 @@ export function PriceNegotiationPanel({
       {offers.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-            Istoric oferte
+            {t("planner.negotiation.history")}
           </p>
           <div className="space-y-1.5">
             {offers.map((o, i) => (
@@ -193,7 +195,9 @@ export function PriceNegotiationPanel({
                 />
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-muted-foreground">
-                    {o.from === perspective ? "Oferta ta" : "Oferta lor"}
+                    {o.from === perspective
+                      ? t("planner.negotiation.yourOffer")
+                      : t("planner.negotiation.theirOffer")}
                     {" · "}
                     {new Date(o.at).toLocaleDateString("ro-RO", {
                       day: "numeric",
@@ -231,7 +235,9 @@ export function PriceNegotiationPanel({
                 className="gap-1 bg-success text-white hover:bg-success/90"
               >
                 <Handshake className="h-3.5 w-3.5" />
-                Acceptă la {theirPendingOffer.amount}€
+                {t("planner.negotiation.acceptAt", {
+                  amount: theirPendingOffer.amount,
+                })}
               </Button>
             )}
             <Button
@@ -242,7 +248,9 @@ export function PriceNegotiationPanel({
               className="gap-1"
             >
               <ArrowLeftRight className="h-3.5 w-3.5" />
-              {theirPendingOffer ? "Contra-ofertă" : "Propune preț"}
+              {theirPendingOffer
+                ? t("planner.negotiation.counterOffer")
+                : t("planner.negotiation.proposePrice")}
             </Button>
             <Button
               size="sm"
@@ -252,7 +260,7 @@ export function PriceNegotiationPanel({
               className="gap-1 border-success/50 text-success hover:bg-success/10"
             >
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Acceptă & setează preț
+              {t("planner.negotiation.acceptAndSet")}
             </Button>
           </>
         )}
@@ -270,7 +278,9 @@ export function PriceNegotiationPanel({
                 className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
                 <Handshake className="h-3.5 w-3.5" />
-                Sunt de acord cu {theirPendingOffer.amount}€
+                {t("planner.negotiation.agreeTo", {
+                  amount: theirPendingOffer.amount,
+                })}
               </Button>
             )}
             <Button
@@ -281,7 +291,9 @@ export function PriceNegotiationPanel({
               className="gap-1"
             >
               <ArrowLeftRight className="h-3.5 w-3.5" />
-              {theirPendingOffer ? "Contra-ofertă" : "Propune preț"}
+              {theirPendingOffer
+                ? t("planner.negotiation.counterOffer")
+                : t("planner.negotiation.proposePrice")}
             </Button>
           </>
         )}
@@ -295,7 +307,7 @@ export function PriceNegotiationPanel({
             className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Confirmă rezervarea
+            {t("planner.negotiation.confirmBooking")}
             {booking.agreedPrice ? ` (${booking.agreedPrice}€)` : ""}
           </Button>
         )}
@@ -303,7 +315,7 @@ export function PriceNegotiationPanel({
         {myLastIsWaiting && booking.status === "pending" && (
           <span className="text-xs text-muted-foreground self-center">
             <MessageCircle className="inline h-3 w-3 mr-1" />
-            Se așteaptă răspuns…
+            {t("planner.negotiation.awaitingReply")}
           </span>
         )}
       </div>
@@ -312,34 +324,34 @@ export function PriceNegotiationPanel({
       <Dialog open={openPropose} onOpenChange={setOpenPropose}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Propune un preț</DialogTitle>
+            <DialogTitle>{t("planner.negotiation.proposeTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="price">Sumă (EUR)</Label>
+              <Label htmlFor="price">{t("planner.negotiation.amountLabel")}</Label>
               <Input
                 id="price"
                 type="number"
                 min="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="Ex: 250"
+                placeholder={t("planner.negotiation.amountPlaceholder")}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="msg">Mesaj (opțional)</Label>
+              <Label htmlFor="msg">{t("planner.negotiation.messageOptional")}</Label>
               <Textarea
                 id="msg"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={2}
-                placeholder="Ex: Prețul include 2 ore + echipament."
+                placeholder={t("planner.negotiation.messagePlaceholder")}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenPropose(false)}>
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               disabled={busy || !amount}
@@ -349,7 +361,7 @@ export function PriceNegotiationPanel({
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "Trimite oferta"
+                t("planner.negotiation.sendOffer")
               )}
             </Button>
           </DialogFooter>
@@ -360,37 +372,37 @@ export function PriceNegotiationPanel({
       <Dialog open={openAccept} onOpenChange={setOpenAccept}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Acceptă rezervarea și setează prețul final</DialogTitle>
+            <DialogTitle>{t("planner.negotiation.acceptTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="price-accept">Preț final (EUR)</Label>
+              <Label htmlFor="price-accept">{t("planner.negotiation.finalPriceLabel")}</Label>
               <Input
                 id="price-accept"
                 type="number"
                 min="0"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="Ex: 250"
+                placeholder={t("planner.negotiation.amountPlaceholder")}
               />
               <p className="text-xs text-muted-foreground">
-                Această sumă va fi alocată în bugetul clientului.
+                {t("planner.negotiation.budgetNote")}
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="msg-accept">Mesaj pentru client</Label>
+              <Label htmlFor="msg-accept">{t("planner.negotiation.clientMessageLabel")}</Label>
               <Textarea
                 id="msg-accept"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 rows={2}
-                placeholder="Ex: Mulțumesc pentru rezervare!"
+                placeholder={t("planner.negotiation.clientMessagePlaceholder")}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpenAccept(false)}>
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               disabled={busy || !amount}
@@ -400,7 +412,7 @@ export function PriceNegotiationPanel({
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                "Acceptă și sigilează"
+                t("planner.negotiation.acceptAndSeal")
               )}
             </Button>
           </DialogFooter>
@@ -427,10 +439,10 @@ export function PriceNegotiationPanel({
         }),
       });
       if (!res.ok) {
-        toast.error("Eroare.");
+        toast.error(t("planner.negotiation.genericError"));
         return;
       }
-      toast.success("Acord trimis. Aștepți sigilarea de la artist.");
+      toast.success(t("planner.negotiation.agreementSent"));
       await onUpdate();
     } finally {
       setBusy(false);

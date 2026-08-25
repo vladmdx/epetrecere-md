@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Sparkles, Send, Loader2, Bot, Wand2 } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 type ContentBlock =
   | { type: "text"; text: string }
@@ -30,6 +31,7 @@ export function AIArtistPickerChat({
   /** Parent refreshes the bookings list after the AI sends requests. */
   onBookingsCreated: () => void;
 }) {
+  const { t } = useLocale();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -60,18 +62,20 @@ export function AIArtistPickerChat({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Eroare AI.");
+        toast.error(err.error || t("cabinet.aiPicker.errorAi"));
         setMessages(messages);
         return;
       }
       const data: { messages: Message[]; requestsSent: number } = await res.json();
       setMessages(data.messages);
       if (data.requestsSent > 0) {
-        toast.success(`Am trimis ${data.requestsSent} cereri de rezervare.`);
+        toast.success(
+          t("cabinet.aiPicker.requestsSent", { count: data.requestsSent }),
+        );
         onBookingsCreated();
       }
     } catch {
-      toast.error("Eroare de rețea.");
+      toast.error(t("cabinet.aiPicker.errorNetwork"));
       setMessages(messages);
     } finally {
       setBusy(false);
@@ -89,9 +93,11 @@ export function AIArtistPickerChat({
         <CardContent className="flex items-center gap-3 py-4">
           <Wand2 className="h-5 w-5 text-gold" />
           <div className="flex-1">
-            <p className="text-sm font-medium">Cere AI să-ți aleagă artiștii</p>
+            <p className="text-sm font-medium">
+              {t("cabinet.aiPicker.ctaTitle")}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Ex: &ldquo;Găsește-mi top 3 DJ cu rating 4+ pentru data mea&rdquo;
+              {t("cabinet.aiPicker.ctaExample")}
             </p>
           </div>
           <Button
@@ -99,7 +105,7 @@ export function AIArtistPickerChat({
             variant="outline"
             className="gap-1 border-gold/30 text-gold hover:bg-gold/10"
           >
-            <Sparkles className="h-3.5 w-3.5" /> Deschide
+            <Sparkles className="h-3.5 w-3.5" /> {t("utilitati.open")}
           </Button>
         </CardContent>
       </Card>
@@ -112,10 +118,10 @@ export function AIArtistPickerChat({
         <div>
           <CardTitle className="flex items-center gap-2 text-lg">
             <Sparkles className="h-4 w-4 text-gold" />
-            Asistent AI
+            {t("cabinet.aiPicker.title")}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Filtrez artiști, îi prezint, apoi trimit cereri la confirmarea ta.
+            {t("cabinet.aiPicker.subtitle")}
           </p>
         </div>
         <button
@@ -123,7 +129,7 @@ export function AIArtistPickerChat({
           onClick={() => setOpen(false)}
           className="text-xs text-muted-foreground hover:text-foreground"
         >
-          Închide
+          {t("common.close")}
         </button>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -135,16 +141,13 @@ export function AIArtistPickerChat({
             <div className="space-y-3 py-2">
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Bot className="h-4 w-4 mt-0.5 text-gold shrink-0" />
-                <p>
-                  Îți pot recomanda artiști pe baza bugetului, rating-ului și
-                  categoriilor. Spune-mi ce cauți.
-                </p>
+                <p>{t("cabinet.aiPicker.intro")}</p>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  "Top 3 artiști ieftini cu rating 4+",
-                  "Cei mai bine cotați fotografi pentru data mea",
-                  "DJ sub 300€ cu rating peste 4.5",
+                  t("cabinet.aiPicker.suggestCheap"),
+                  t("cabinet.aiPicker.suggestPhotographers"),
+                  t("cabinet.aiPicker.suggestDj"),
                 ].map((s) => (
                   <button
                     key={s}
@@ -192,17 +195,17 @@ export function AIArtistPickerChat({
                         : "bg-accent/40 text-foreground"
                     }`}
                   >
-                    {textParts.map((t, j) => (
+                    {textParts.map((part, j) => (
                       <p key={j} className="whitespace-pre-wrap">
-                        {t}
+                        {part}
                       </p>
                     ))}
                     {toolCalls.map((tc) => {
                       const label =
                         tc.name === "list_available_artists"
-                          ? "🔎 Caut artiști…"
+                          ? t("cabinet.aiPicker.toolSearching")
                           : tc.name === "send_booking_requests"
-                            ? "📨 Trimit cereri…"
+                            ? t("cabinet.aiPicker.toolSending")
                             : `🛠️ ${tc.name}`;
                       return (
                         <p
@@ -221,7 +224,7 @@ export function AIArtistPickerChat({
           {busy && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin text-gold" />
-              Caut / mă gândesc…
+              {t("cabinet.aiPicker.thinking")}
             </div>
           )}
         </div>
@@ -230,7 +233,7 @@ export function AIArtistPickerChat({
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ex: caută-mi DJ ieftini cu rating 4+"
+            placeholder={t("cabinet.aiPicker.inputPlaceholder")}
             disabled={busy}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -258,7 +261,7 @@ export function AIArtistPickerChat({
             onClick={() => setMessages([])}
             className="text-[11px] text-muted-foreground hover:text-gold"
           >
-            Începe conversație nouă
+            {t("cabinet.aiPicker.newConversation")}
           </button>
         )}
       </CardContent>

@@ -125,7 +125,7 @@ export function SearchAutocomplete() {
 
           {!loading && error && (
             <div className="px-4 py-3 text-sm text-destructive">
-              Eroare la căutare. Încercați din nou.
+              {t("search.errorRetry")}
             </div>
           )}
 

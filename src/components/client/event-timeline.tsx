@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Sparkles, Loader2, Plus, Trash2, Save, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface TimelineItem {
   time: string;
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export function EventTimeline({ planId, initial }: Props) {
+  const { t } = useLocale();
   const [items, setItems] = useState<TimelineItem[]>(initial);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -39,12 +41,12 @@ export function EventTimeline({ planId, initial }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "AI indisponibil");
+        toast.error(err.error || t("timeline.toast.aiUnavailable"));
         return;
       }
       const data = await res.json();
       setItems(data.items);
-      toast.success("Agendă generată cu AI");
+      toast.success(t("timeline.toast.generated"));
     } finally {
       setGenerating(false);
     }
@@ -59,10 +61,10 @@ export function EventTimeline({ planId, initial }: Props) {
         body: JSON.stringify({ planId, items }),
       });
       if (!res.ok) {
-        toast.error("Nu am putut salva");
+        toast.error(t("timeline.toast.saveFailed"));
         return;
       }
-      toast.success("Agenda salvată");
+      toast.success(t("timeline.toast.saved"));
       setEditing(false);
     } finally {
       setSaving(false);
@@ -84,7 +86,7 @@ export function EventTimeline({ planId, initial }: Props) {
       : "14:00";
     setItems((prev) => [
       ...prev,
-      { time: nextTime, label: "Moment nou", durationMin: 30 },
+      { time: nextTime, label: t("timeline.newMoment"), durationMin: 30 },
     ]);
   }
 
@@ -95,12 +97,12 @@ export function EventTimeline({ planId, initial }: Props) {
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               <Clock className="h-4 w-4 text-gold" />
-              Agenda evenimentului
+              {t("timeline.title")}
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
               {items.length > 0
-                ? "Editează orele și denumirile sau regenerează cu AI."
-                : "Generează agenda cu AI pe baza datelor evenimentului, apoi ajustează după preferințe."}
+                ? t("timeline.hintEdit")
+                : t("timeline.hintGenerate")}
             </p>
           </div>
           <div className="flex gap-2">
@@ -116,7 +118,7 @@ export function EventTimeline({ planId, initial }: Props) {
                 ) : (
                   <Save className="h-3.5 w-3.5" />
                 )}
-                Salvează
+                {t("common.save")}
               </Button>
             )}
             {items.length > 0 && !editing && (
@@ -126,7 +128,7 @@ export function EventTimeline({ planId, initial }: Props) {
                 variant="outline"
                 className="gap-1.5"
               >
-                Editează
+                {t("common.edit")}
               </Button>
             )}
             <Button
@@ -145,7 +147,7 @@ export function EventTimeline({ planId, initial }: Props) {
               ) : (
                 <Sparkles className="h-3.5 w-3.5" />
               )}
-              {items.length > 0 ? "Regenerează" : "Generează cu AI"}
+              {items.length > 0 ? t("timeline.regenerate") : t("timeline.generateWithAi")}
             </Button>
           </div>
         </div>
@@ -155,9 +157,7 @@ export function EventTimeline({ planId, initial }: Props) {
           <div className="rounded-lg border border-dashed border-border/40 p-6 text-center">
             <Sparkles className="mx-auto h-8 w-8 text-gold/60" />
             <p className="mt-3 text-sm text-muted-foreground">
-              Nicio agendă încă. Claude va propune un program complet pe
-              baza tipului evenimentului, orei de început și numărului de
-              invitați.
+              {t("timeline.empty")}
             </p>
           </div>
         ) : (
@@ -207,16 +207,18 @@ export function EventTimeline({ planId, initial }: Props) {
                         }
                         className="w-16 text-right text-xs"
                       />
-                      <span>min</span>
+                      <span>{t("moments.unitMin")}</span>
                     </div>
                   ) : (
-                    <span>{it.durationMin} min</span>
+                    <span>
+                      {it.durationMin} {t("moments.unitMin")}
+                    </span>
                   )}
                 </div>
                 {editing && (
                   <button
                     onClick={() => removeItem(i)}
-                    aria-label="Șterge"
+                    aria-label={t("common.delete")}
                     className="shrink-0 rounded-lg p-1.5 text-muted-foreground hover:bg-red-500/10 hover:text-red-400"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -232,7 +234,7 @@ export function EventTimeline({ planId, initial }: Props) {
                 className="w-full gap-1.5"
               >
                 <Plus className="h-3.5 w-3.5" />
-                Adaugă moment
+                {t("timeline.addMoment")}
               </Button>
             )}
           </div>

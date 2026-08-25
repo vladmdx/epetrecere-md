@@ -11,6 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Sparkles, Send, Loader2, Bot } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
+import { plural, type AllForms } from "@/lib/i18n/plural";
+
+/** "slot" needs three Russian forms, which a flat dictionary cannot hold. */
+const SLOTS: AllForms = {
+  ro: { one: "slot", few: "sloturi", many: "sloturi" },
+  ru: { one: "слот", few: "слота", many: "слотов" },
+  en: { one: "slot", other: "slots" },
+};
 
 type ContentBlock =
   | { type: "text"; text: string }
@@ -29,6 +38,7 @@ export function AICalendarChat({
    *  parent can re-fetch its list. */
   onSlotsCreated: () => void;
 }) {
+  const { t, locale } = useLocale();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -56,7 +66,7 @@ export function AICalendarChat({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Eroare AI.");
+        toast.error(err.error || t("vendor.aiChat.errAi"));
         // Roll back the optimistic user message.
         setMessages(messages);
         return;
@@ -64,11 +74,15 @@ export function AICalendarChat({
       const data: { messages: Message[]; slotsCreated: number } = await res.json();
       setMessages(data.messages);
       if (data.slotsCreated > 0) {
-        toast.success(`Am adăugat ${data.slotsCreated} sloturi în calendar.`);
+        toast.success(
+          t("vendor.aiChat.slotsAdded", {
+            slots: plural(data.slotsCreated, locale, SLOTS),
+          }),
+        );
         onSlotsCreated();
       }
     } catch {
-      toast.error("Eroare de rețea.");
+      toast.error(t("vendor.aiChat.errNetwork"));
       setMessages(messages);
     } finally {
       setBusy(false);
@@ -80,11 +94,10 @@ export function AICalendarChat({
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-lg">
           <Sparkles className="h-4 w-4 text-gold" />
-          AI Asistent Calendar
+          {t("vendor.aiChat.title")}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Descrie-mi cum vrei să-ți completez calendarul — întreb ce lipsește
-          și adaug sloturile automat.
+          {t("vendor.aiChat.subtitle")}
         </p>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -97,17 +110,15 @@ export function AICalendarChat({
               <div className="flex items-start gap-2 text-sm text-muted-foreground">
                 <Bot className="h-4 w-4 mt-0.5 text-gold shrink-0" />
                 <p>
-                  Exemplu: <em>
-                    &ldquo;Sesiunile durează 2 ore, 200€ weekend. Lucrez
-                    15:00–23:00, completează pe 3 luni&rdquo;
-                  </em>
+                  {t("vendor.aiChat.exampleLabel")}{" "}
+                  <em>&ldquo;{t("vendor.aiChat.exampleText")}&rdquo;</em>
                 </p>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {[
-                  "Completează-mi weekendurile pe 3 luni, 250€",
-                  "Vineri și sâmbăta 18:00-01:00, 300€, timp de 6 luni",
-                  "Sunt liber serile 19:00-23:00 în aprilie, 150€",
+                  t("vendor.aiChat.suggest1"),
+                  t("vendor.aiChat.suggest2"),
+                  t("vendor.aiChat.suggest3"),
                 ].map((s) => (
                   <button
                     key={s}
@@ -151,9 +162,9 @@ export function AICalendarChat({
                         : "bg-accent/40 text-foreground"
                     }`}
                   >
-                    {textParts.map((t, j) => (
+                    {textParts.map((part, j) => (
                       <p key={j} className="whitespace-pre-wrap">
-                        {t}
+                        {part}
                       </p>
                     ))}
                     {toolCalls.map((tc) => {
@@ -170,7 +181,10 @@ export function AICalendarChat({
                           key={tc.id}
                           className="mt-1 text-xs italic text-gold"
                         >
-                          ⚡ Creez {count} slot{count === 1 ? "" : "uri"}…
+                          ⚡{" "}
+                          {t("vendor.aiChat.creatingSlots", {
+                            slots: plural(count, locale, SLOTS),
+                          })}
                         </p>
                       );
                     })}
@@ -182,7 +196,7 @@ export function AICalendarChat({
           {busy && (
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3 w-3 animate-spin text-gold" />
-              Mă gândesc…
+              {t("vendor.aiChat.thinking")}
             </div>
           )}
         </div>
@@ -191,7 +205,7 @@ export function AICalendarChat({
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Descrie-mi calendarul tău…"
+            placeholder={t("vendor.aiChat.inputPlaceholder")}
             disabled={busy}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
@@ -219,7 +233,7 @@ export function AICalendarChat({
             onClick={() => setMessages([])}
             className="text-[11px] text-muted-foreground hover:text-gold"
           >
-            Începe conversație nouă
+            {t("vendor.aiChat.newConversation")}
           </button>
         )}
       </CardContent>

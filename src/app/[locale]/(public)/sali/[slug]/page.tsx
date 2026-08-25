@@ -30,7 +30,7 @@ async function resolveLegacySlug(slug: string): Promise<string | null> {
 }
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { venueJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
-import { getLocalized } from "@/i18n";
+import { getLocalized, t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { VenueDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
@@ -96,7 +96,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function VenuePage({ params }: Props) {
-  const { slug } = await params;
+  const { locale: rawLocale, slug } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
 
   // Check redirects FIRST — if slug was renamed, 308 to the new path
   // before loading any venue data.
@@ -178,8 +179,8 @@ export default async function VenuePage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: safeJsonLd(breadcrumbJsonLd([
-            { name: "Acasă", url: "/" },
-            { name: "Săli", url: "/sali" },
+            { name: t("nav.home", locale), url: "/" },
+            { name: t("venuesPage.breadcrumb", locale), url: "/sali" },
             { name, url: `/sali/${slug}` },
           ])),
         }}

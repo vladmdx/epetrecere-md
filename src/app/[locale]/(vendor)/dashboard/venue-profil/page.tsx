@@ -38,21 +38,27 @@ import {
   WorkingHoursEditor,
   type WorkingHours,
 } from "@/components/vendor/working-hours-editor";
+import { useLocale } from "@/hooks/use-locale";
 
-const CANONICAL_FACILITIES = [
-  "Parcare",
-  "Aer condiționat",
-  "Sunet profesional",
-  "Proiector",
-  "Ring de dans",
-  "Terasa",
-  "Grădină",
-  "Capelă / loc ceremonie",
-  "Cameră miri",
-  "Acces persoane cu dizabilități",
-  "Wi-Fi gratuit",
-  "Fumat permis",
-];
+// The Romanian string IS the value stored in `venues.facilities` and the one
+// the public catalogue filters on, so it must not change per locale. Only the
+// label the owner reads is translated, through this lookup.
+const FACILITY_LABEL_KEYS: Record<string, string> = {
+  Parcare: "compare.facility.parking",
+  "Aer condiționat": "compare.facility.airConditioning",
+  "Sunet profesional": "compare.facility.professionalSound",
+  Proiector: "compare.facility.projector",
+  "Ring de dans": "compare.facility.danceFloor",
+  Terasa: "compare.facility.terrace",
+  Grădină: "compare.facility.garden",
+  "Capelă / loc ceremonie": "vendor.venueProfile.facilityChapel",
+  "Cameră miri": "compare.facility.bridalSuite",
+  "Acces persoane cu dizabilități": "vendor.venueProfile.facilityAccessible",
+  "Wi-Fi gratuit": "compare.facility.freeWifi",
+  "Fumat permis": "vendor.venueProfile.facilitySmoking",
+};
+
+const CANONICAL_FACILITIES = Object.keys(FACILITY_LABEL_KEYS);
 
 interface Venue {
   id: number;
@@ -90,6 +96,7 @@ interface Venue {
 }
 
 export default function VenueProfilePage() {
+  const { t } = useLocale();
   const [venue, setVenue] = useState<Venue | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -147,18 +154,18 @@ export default function VenueProfilePage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut genera descrierea");
+        toast.error(err.error || t("vendor.venueProfile.descGenerateFailed"));
         return;
       }
       const data = (await res.json()) as { description?: string };
       if (!data.description) {
-        toast.error("Răspuns invalid de la AI");
+        toast.error(t("vendor.venueProfile.invalidAiResponse"));
         return;
       }
       update({ [field]: data.description } as Partial<Venue>);
-      toast.success("Descriere generată — nu uita să salvezi");
+      toast.success(t("vendor.venueProfile.descGenerated"));
     } catch {
-      toast.error("Eroare la generare");
+      toast.error(t("vendor.venueProfile.generateError"));
     }
   }
 
@@ -204,11 +211,13 @@ export default function VenueProfilePage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Eroare la salvare");
+        throw new Error(err.error || t("vendor.venueProfile.saveError"));
       }
-      toast.success("Sala a fost salvată!");
+      toast.success(t("vendor.venueProfile.saved"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la salvare");
+      toast.error(
+        err instanceof Error ? err.message : t("vendor.venueProfile.saveError"),
+      );
     } finally {
       setSaving(false);
     }
@@ -227,17 +236,16 @@ export default function VenueProfilePage() {
       <div className="mx-auto max-w-xl rounded-2xl border border-dashed border-border/40 p-12 text-center">
         <Building2 className="mx-auto h-12 w-12 text-gold" />
         <h1 className="mt-4 font-heading text-xl font-bold">
-          Nu ai o sală înregistrată
+          {t("vendor.venueProfile.noVenue")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Completează datele sălii tale pentru a începe să primești cereri de
-          ofertă.
+          {t("vendor.venueProfile.noVenueHint")}
         </p>
         <Link
           href="/dashboard/venue-onboarding"
           className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
-          Înregistrează sala
+          {t("vendor.venueProfile.registerVenue")}
         </Link>
       </div>
     );
@@ -249,16 +257,16 @@ export default function VenueProfilePage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Profilul Sălii</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("vendor.venueProfile.title")}</h1>
           <p className="text-sm text-muted-foreground">
             {venue.nameRo}
             {venue.isActive ? (
               <span className="ml-2 rounded bg-success/15 px-2 py-0.5 text-xs text-success">
-                Publicată
+                {t("vendor.venueProfile.published")}
               </span>
             ) : (
               <span className="ml-2 rounded bg-warning/15 px-2 py-0.5 text-xs text-warning">
-                În așteptare
+                {t("vendor.venueFinance.statusPending")}
               </span>
             )}
           </p>
@@ -271,7 +279,7 @@ export default function VenueProfilePage() {
               rel="noopener"
               className="inline-flex items-center gap-1 rounded-lg border border-border/60 px-3 py-2 text-sm hover:bg-muted"
             >
-              <ExternalLink className="h-4 w-4" /> Vezi public
+              <ExternalLink className="h-4 w-4" /> {t("vendor.venueProfile.viewPublic")}
             </Link>
           )}
           <Button
@@ -284,7 +292,7 @@ export default function VenueProfilePage() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            Salvează
+            {t("common.save")}
           </Button>
         </div>
       </div>
@@ -293,47 +301,46 @@ export default function VenueProfilePage() {
         <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-4 text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
           <p>
-            Sala ta este în așteptare de aprobare. După verificare de către
-            administrator, profilul va deveni public pe ePetrecere.md.
+            {t("vendor.venueProfile.pendingApproval")}
           </p>
         </div>
       )}
 
       <Tabs defaultValue="general">
         <TabsList className="flex-wrap">
-          <TabsTrigger value="general">General</TabsTrigger>
-          <TabsTrigger value="description">Descriere</TabsTrigger>
-          <TabsTrigger value="gallery">Galerie</TabsTrigger>
-          <TabsTrigger value="capacity">Capacitate & Preț</TabsTrigger>
-          <TabsTrigger value="facilities">Facilități</TabsTrigger>
-          <TabsTrigger value="location">Locație</TabsTrigger>
+          <TabsTrigger value="general">{t("vendor.venueProfile.tabGeneral")}</TabsTrigger>
+          <TabsTrigger value="description">{t("artist.description")}</TabsTrigger>
+          <TabsTrigger value="gallery">{t("artist.gallery")}</TabsTrigger>
+          <TabsTrigger value="capacity">{t("vendor.venueProfile.tabCapacityPrice")}</TabsTrigger>
+          <TabsTrigger value="facilities">{t("venue.facilities")}</TabsTrigger>
+          <TabsTrigger value="location">{t("venue.location")}</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
-          <TabsTrigger value="extras">Meniu & Tur 360°</TabsTrigger>
+          <TabsTrigger value="extras">{t("vendor.venueProfile.tabMenuTour")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Date de bază</CardTitle>
+              <CardTitle>{t("vendor.venueOnboarding.stepBasics")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <Label>Nume (RO) *</Label>
+                  <Label>{t("vendor.packagesPage.nameRoLabel")}</Label>
                   <Input
                     value={venue.nameRo}
                     onChange={(e) => update({ nameRo: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Nume (RU)</Label>
+                  <Label>{t("vendor.packagesPage.nameRuLabel")}</Label>
                   <Input
                     value={venue.nameRu ?? ""}
                     onChange={(e) => update({ nameRu: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Name (EN)</Label>
+                  <Label>{t("vendor.packagesPage.nameEnLabel")}</Label>
                   <Input
                     value={venue.nameEn ?? ""}
                     onChange={(e) => update({ nameEn: e.target.value })}
@@ -344,7 +351,7 @@ export default function VenueProfilePage() {
                   Server re-validates on save and adds a redirect from the
                   old slug, so old links keep working. */}
               <div>
-                <Label>Adresă URL (slug)</Label>
+                <Label>{t("vendor.venueProfile.urlSlug")}</Label>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="shrink-0 select-none text-xs text-muted-foreground">
                     epetrecere.md/sali/
@@ -363,20 +370,19 @@ export default function VenueProfilePage() {
                   />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Doar litere mici, cifre și liniuțe. Linkurile vechi vor
-                  redirecționa automat la cel nou.
+                  {t("vendor.venueProfile.slugHint")}
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label>Telefon</Label>
+                  <Label>{t("form.phone")}</Label>
                   <Input
                     value={venue.phone ?? ""}
                     onChange={(e) => update({ phone: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Email</Label>
+                  <Label>{t("form.email")}</Label>
                   <Input
                     type="email"
                     value={venue.email ?? ""}
@@ -385,7 +391,7 @@ export default function VenueProfilePage() {
                 </div>
               </div>
               <div>
-                <Label>Website</Label>
+                <Label>{t("vendor.venueOnboarding.website")}</Label>
                 <Input
                   type="url"
                   placeholder="https://..."
@@ -422,14 +428,14 @@ export default function VenueProfilePage() {
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label>Oraș</Label>
+                  <Label>{t("compare.row.city")}</Label>
                   <Input
                     value={venue.city ?? ""}
                     onChange={(e) => update({ city: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Adresă</Label>
+                  <Label>{t("contactPage.address")}</Label>
                   <Input
                     value={venue.address ?? ""}
                     onChange={(e) => update({ address: e.target.value })}
@@ -441,10 +447,9 @@ export default function VenueProfilePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Program funcționare</CardTitle>
+              <CardTitle>{t("venue.detail.workingHours")}</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Apare pe profilul public sub formă de „Lu-Vi 10:00-22:00 ·
-                Sâ-Du 10:00-24:00&rdquo;. Lasă zilele închise dezactivate.
+                {t("vendor.venueProfile.workingHoursHint")}
               </p>
             </CardHeader>
             <CardContent>
@@ -462,31 +467,30 @@ export default function VenueProfilePage() {
             <CardHeader>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <CardTitle>Descriere</CardTitle>
+                  <CardTitle>{t("artist.description")}</CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Editor rich-text: bold, italic, titluri, liste, link-uri. AI-ul generează
-                    ~300 cuvinte pe baza numelui, capacității și facilităților sălii.
+                    {t("vendor.venueProfile.descEditorHint")}
                   </p>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               <DescriptionLangEditor
-                label="Descriere (RO)"
-                placeholder="Descrie sala ta — atmosferă, ce o face specială, evenimente potrivite..."
+                label={t("vendor.packagesPage.descriptionRoLabel")}
+                placeholder={t("vendor.venueProfile.descPlaceholderRo")}
                 value={venue.descriptionRo ?? ""}
                 onChange={(html) => update({ descriptionRo: html })}
                 onAi={() => improveDescription("ro")}
               />
               <DescriptionLangEditor
-                label="Descriere (RU)"
+                label={t("vendor.venueProfile.descriptionRuLabel")}
                 placeholder="Опишите ваш зал..."
                 value={venue.descriptionRu ?? ""}
                 onChange={(html) => update({ descriptionRu: html })}
                 onAi={() => improveDescription("ru")}
               />
               <DescriptionLangEditor
-                label="Description (EN)"
+                label={t("vendor.venueProfile.descriptionEnLabel")}
                 placeholder="Describe your venue — atmosphere, highlights, best-fit events..."
                 value={venue.descriptionEn ?? ""}
                 onChange={(html) => update({ descriptionEn: html })}
@@ -499,10 +503,9 @@ export default function VenueProfilePage() {
         <TabsContent value="gallery" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Galerie foto</CardTitle>
+              <CardTitle>{t("dashboard.photoGallery")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Minim 5 imagini recomandate. Prima imagine devine coperta sălii pe listing și pe
-                OpenGraph. JPG/PNG/WebP, max 10MB — comprimare automată la upload.
+                {t("vendor.venueProfile.galleryHint")}
               </p>
             </CardHeader>
             <CardContent>
@@ -514,11 +517,11 @@ export default function VenueProfilePage() {
         <TabsContent value="capacity" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Capacitate</CardTitle>
+              <CardTitle>{t("venue.capacity")}</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>Minim invitați</Label>
+                <Label>{t("vendor.venueProfile.minGuests")}</Label>
                 <Input
                   type="number"
                   value={venue.capacityMin ?? ""}
@@ -530,7 +533,7 @@ export default function VenueProfilePage() {
                 />
               </div>
               <div>
-                <Label>Maxim invitați</Label>
+                <Label>{t("vendor.venueProfile.maxGuests")}</Label>
                 <Input
                   type="number"
                   value={venue.capacityMax ?? ""}
@@ -545,11 +548,11 @@ export default function VenueProfilePage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Preț</CardTitle>
+              <CardTitle>{t("catalogFilters.price")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Preț per persoană (€)</Label>
+                <Label>{t("vendor.venueProfile.pricePerPerson")}</Label>
                 <Input
                   type="number"
                   value={venue.pricePerPerson ?? ""}
@@ -560,17 +563,17 @@ export default function VenueProfilePage() {
                         : null,
                     })
                   }
-                  placeholder="Ex: 35"
+                  placeholder={t("vendor.venueProfile.pricePlaceholder")}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Prețul este vizibil doar utilizatorilor autentificați.
+                  {t("vendor.venueProfile.priceVisibilityHint")}
                 </p>
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>Calendar de disponibilitate activ</Label>
+                  <Label>{t("vendor.venueProfile.calendarEnabled")}</Label>
                   <p className="text-xs text-muted-foreground">
-                    Afișează calendarul pe profil public
+                    {t("vendor.venueProfile.calendarEnabledHint")}
                   </p>
                 </div>
                 <Switch
@@ -585,10 +588,9 @@ export default function VenueProfilePage() {
         <TabsContent value="facilities" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Facilități</CardTitle>
+              <CardTitle>{t("venue.facilities")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Bifează tot ce oferă sala ta. Clienții filtrează după aceste
-                opțiuni când caută o locație.
+                {t("vendor.venueProfile.facilitiesHint")}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -604,13 +606,13 @@ export default function VenueProfilePage() {
                       onChange={() => toggleFacility(f)}
                       className="h-4 w-4 accent-gold"
                     />
-                    {f}
+                    {FACILITY_LABEL_KEYS[f] ? t(FACILITY_LABEL_KEYS[f]) : f}
                   </label>
                 ))}
               </div>
 
               <div>
-                <Label>Facilități personalizate</Label>
+                <Label>{t("vendor.venueProfile.customFacilities")}</Label>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {facilities
                     .filter((f) => !CANONICAL_FACILITIES.includes(f))
@@ -634,7 +636,7 @@ export default function VenueProfilePage() {
                   <Input
                     value={customFacility}
                     onChange={(e) => setCustomFacility(e.target.value)}
-                    placeholder="Ex: Lift, Piscină interioară..."
+                    placeholder={t("vendor.venueProfile.customFacilityPlaceholder")}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -647,7 +649,7 @@ export default function VenueProfilePage() {
                     onClick={addCustomFacility}
                     className="gap-1"
                   >
-                    <Plus className="h-4 w-4" /> Adaugă
+                    <Plus className="h-4 w-4" /> {t("common.add")}
                   </Button>
                 </div>
               </div>
@@ -658,15 +660,14 @@ export default function VenueProfilePage() {
         <TabsContent value="location" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Locație pe hartă</CardTitle>
+              <CardTitle>{t("vendor.venueProfile.mapLocation")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Click pe hartă sau trage pin-ul pentru a seta locația exactă a
-                sălii. Harta apare pe profilul public ca embed interactiv.
+                {t("vendor.venueProfile.mapHint")}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="address">Adresă completă</Label>
+                <Label htmlFor="address">{t("vendor.venueProfile.fullAddress")}</Label>
                 <Input
                   id="address"
                   className="mt-1"
@@ -677,7 +678,7 @@ export default function VenueProfilePage() {
               </div>
 
               <div>
-                <Label className="mb-2 block">Hartă interactivă</Label>
+                <Label className="mb-2 block">{t("vendor.venueProfile.interactiveMap")}</Label>
                 <MapPicker
                   lat={venue.lat}
                   lng={venue.lng}
@@ -687,25 +688,25 @@ export default function VenueProfilePage() {
                 />
                 {venue.lat !== null && venue.lng !== null ? (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Coordonate:{" "}
+                    {t("vendor.venueProfile.coordinates")}{" "}
                     <span className="font-mono text-gold">
                       {venue.lat.toFixed(6)}, {venue.lng.toFixed(6)}
                     </span>
                   </p>
                 ) : (
                   <p className="mt-2 text-xs text-amber-500">
-                    Click pe hartă pentru a seta locația sălii.
+                    {t("vendor.venueProfile.clickMapHint")}
                   </p>
                 )}
               </div>
 
               <details className="rounded-lg border border-border/40 bg-muted/20">
                 <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground">
-                  Editare manuală coordonate
+                  {t("vendor.venueProfile.manualCoords")}
                 </summary>
                 <div className="grid gap-3 p-3 sm:grid-cols-2">
                   <div>
-                    <Label htmlFor="lat" className="text-xs">Latitudine</Label>
+                    <Label htmlFor="lat" className="text-xs">{t("vendor.venueProfile.latitude")}</Label>
                     <Input
                       id="lat"
                       type="number"
@@ -722,7 +723,7 @@ export default function VenueProfilePage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="lng" className="text-xs">Longitudine</Label>
+                    <Label htmlFor="lng" className="text-xs">{t("vendor.venueProfile.longitude")}</Label>
                     <Input
                       id="lng"
                       type="number"
@@ -751,14 +752,13 @@ export default function VenueProfilePage() {
         <TabsContent value="extras" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Meniu digital</CardTitle>
+              <CardTitle>{t("vendor.venueProfile.digitalMenu")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Link către meniul tău — PDF, Google Docs, sau pagina proprie.
-                Apare ca buton „Vezi meniu” pe profilul public.
+                {t("vendor.venueProfile.menuHint")}
               </p>
             </CardHeader>
             <CardContent>
-              <Label>URL meniu</Label>
+              <Label>{t("vendor.venueProfile.menuUrlLabel")}</Label>
               <Input
                 type="url"
                 value={venue.menuUrl ?? ""}
@@ -770,14 +770,13 @@ export default function VenueProfilePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Tur virtual 360°</CardTitle>
+              <CardTitle>{t("venue.detail.virtualTour")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Link de embed pentru un tur 360° — Matterport, Kuula, YouTube
-                360 sau similar. Va fi afișat ca iframe pe profilul public.
+                {t("vendor.venueProfile.tourHint")}
               </p>
             </CardHeader>
             <CardContent>
-              <Label>URL embed</Label>
+              <Label>{t("vendor.venueProfile.embedUrlLabel")}</Label>
               <Input
                 type="url"
                 value={venue.virtualTourUrl ?? ""}
@@ -790,7 +789,7 @@ export default function VenueProfilePage() {
                     src={venue.virtualTourUrl}
                     className="h-full w-full"
                     allow="xr-spatial-tracking; fullscreen"
-                    title="Virtual tour preview"
+                    title={t("vendor.venueProfile.tourPreview")}
                   />
                 </div>
               )}
@@ -816,6 +815,7 @@ function DescriptionLangEditor({
   onChange: (html: string) => void;
   onAi: () => void;
 }) {
+  const { t } = useLocale();
   const [working, setWorking] = useState(false);
   const plainLength = value.replace(/<[^>]+>/g, "").trim().length;
   return (
@@ -824,7 +824,7 @@ function DescriptionLangEditor({
         <Label>{label}</Label>
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            {plainLength} caractere
+            {plainLength} {t("vendor.venueProfile.characters")}
           </span>
           <Button
             type="button"
@@ -846,7 +846,9 @@ function DescriptionLangEditor({
             ) : (
               <span className="text-sm">✨</span>
             )}
-            {plainLength > 0 ? "Îmbunătățește cu AI" : "Generează cu AI"}
+            {plainLength > 0
+              ? t("vendor.venueProfile.improveWithAi")
+              : t("vendor.venueProfile.generateWithAi")}
           </Button>
         </div>
       </div>
@@ -867,6 +869,7 @@ function SeoTabContent({
   venue: Venue;
   setVenue: (v: Venue) => void;
 }) {
+  const { t } = useLocale();
   const [lang, setLang] = useState<"ro" | "ru" | "en">("ro");
   const [generating, setGenerating] = useState(false);
 
@@ -918,7 +921,7 @@ function SeoTabContent({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut genera");
+        toast.error(err.error || t("vendor.venueProfile.generateFailed"));
         return;
       }
       const data = (await res.json()) as { title?: string; description?: string };
@@ -928,12 +931,12 @@ function SeoTabContent({
           [titleField]: data.title ?? title,
           [descField]: data.description ?? desc,
         });
-        toast.success("SEO generat — nu uita să salvezi");
+        toast.success(t("vendor.venueProfile.seoGenerated"));
       } else {
-        toast.error("Răspuns invalid de la AI");
+        toast.error(t("vendor.venueProfile.invalidAiResponse"));
       }
     } catch {
-      toast.error("Eroare la generare");
+      toast.error(t("vendor.venueProfile.generateError"));
     } finally {
       setGenerating(false);
     }
@@ -944,9 +947,9 @@ function SeoTabContent({
       <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle>Optimizare SEO</CardTitle>
+            <CardTitle>{t("vendor.venueProfile.seoOptimization")}</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              Titlu + descriere pentru Google și social media. Un titlu bun crește rata de click.
+              {t("vendor.venueProfile.seoHint")}
             </p>
           </div>
           <Button
@@ -962,7 +965,7 @@ function SeoTabContent({
             ) : (
               <span className="text-base">✨</span>
             )}
-            Generează cu AI
+            {t("vendor.venueProfile.generateWithAi")}
           </Button>
         </div>
       </CardHeader>
@@ -990,9 +993,9 @@ function SeoTabContent({
 
         <div>
           <Label htmlFor="seo-title">
-            Titlu SEO (meta title)
+            {t("vendor.venueProfile.seoTitleLabel")}
             <span className="ml-2 text-xs text-muted-foreground">
-              {title.length} / 60 caractere
+              {title.length} / 60 {t("vendor.venueProfile.characters")}
             </span>
           </Label>
           <Input
@@ -1004,16 +1007,16 @@ function SeoTabContent({
           />
           {title.length > 60 && (
             <p className="mt-1 text-xs text-amber-500">
-              ⚠ Titlul e prea lung — Google va trunchia după ~60 caractere
+              {t("vendor.venueProfile.titleTooLong")}
             </p>
           )}
         </div>
 
         <div>
           <Label htmlFor="seo-desc">
-            Meta description
+            {t("vendor.venueProfile.metaDescriptionLabel")}
             <span className="ml-2 text-xs text-muted-foreground">
-              {desc.length} / 160 caractere
+              {desc.length} / 160 {t("vendor.venueProfile.characters")}
             </span>
           </Label>
           <Textarea
@@ -1026,14 +1029,14 @@ function SeoTabContent({
           />
           {desc.length > 160 && (
             <p className="mt-1 text-xs text-amber-500">
-              ⚠ Descrierea e prea lungă — Google va trunchia după ~160 caractere
+              {t("vendor.venueProfile.descTooLong")}
             </p>
           )}
         </div>
 
         {/* SERP Preview */}
         <div>
-          <Label className="mb-2 block">Previzualizare Google</Label>
+          <Label className="mb-2 block">{t("vendor.venueProfile.googlePreview")}</Label>
           <div className="rounded-lg border border-border/40 bg-background p-4">
             <div className="text-xs text-muted-foreground">
               epetrecere.md › sali › {venue.slug}
@@ -1049,7 +1052,7 @@ function SeoTabContent({
             </div>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Textul real pe Google poate diferi — acesta e o aproximare fidelă.
+            {t("vendor.venueProfile.googlePreviewHint")}
           </p>
         </div>
 
@@ -1069,6 +1072,7 @@ function OgImageSelector({
   venue: Venue;
   setVenue: (v: Venue) => void;
 }) {
+  const { t } = useLocale();
   const [gallery, setGallery] = useState<
     Array<{ id: number; url: string; isCover: boolean; altRo: string | null }>
   >([]);
@@ -1088,7 +1092,7 @@ function OgImageSelector({
   return (
     <div className="space-y-2">
       <Label className="block">
-        OG Image (social share preview)
+        {t("vendor.venueProfile.ogImageLabel")}
         <span className="ml-2 text-xs text-muted-foreground">
           Facebook / WhatsApp / Twitter
         </span>
@@ -1099,7 +1103,7 @@ function OgImageSelector({
         </div>
       ) : gallery.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border/40 p-4 text-center text-xs text-muted-foreground">
-          Nu ai imagini încă — urcă câteva în tab-ul Galerie ca să poți alege OG image.
+          {t("vendor.venueProfile.ogNoImages")}
         </p>
       ) : (
         <>
@@ -1113,18 +1117,18 @@ function OgImageSelector({
                   ? "aspect-square overflow-hidden rounded-lg border-2 border-gold bg-gold/10"
                   : "aspect-square overflow-hidden rounded-lg border-2 border-transparent hover:border-gold/40"
               }
-              aria-label="Folosește coperta galeriei"
+              aria-label={t("vendor.venueProfile.useGalleryCover")}
             >
               {coverUrl ? (
 
                 <img
                   src={coverUrl}
-                  alt="Cover (default)"
+                  alt={t("vendor.venueProfile.coverDefault")}
                   className="h-full w-full object-cover opacity-80"
                 />
               ) : null}
               <span className="block px-1 pb-1 text-center text-[10px] font-medium">
-                Auto (cover)
+                {t("vendor.venueProfile.autoCover")}
               </span>
             </button>
             {gallery.map((g) => (
@@ -1137,7 +1141,7 @@ function OgImageSelector({
                     ? "aspect-square overflow-hidden rounded-lg border-2 border-gold"
                     : "aspect-square overflow-hidden rounded-lg border-2 border-transparent hover:border-gold/40"
                 }
-                aria-label={`Selectează imaginea ${g.id}`}
+                aria-label={t("vendor.venueProfile.selectImage", { id: g.id })}
               >
                 { }
                 <img
@@ -1149,9 +1153,10 @@ function OgImageSelector({
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
-            ℹ️ {currentUrl
-              ? "Imagine explicită selectată. Va fi afișată când linkul e partajat pe rețele sociale."
-              : "Se folosește automat coperta galeriei. Alege explicit dacă vrei altă imagine."}
+            ℹ️{" "}
+            {currentUrl
+              ? t("vendor.venueProfile.ogExplicit")
+              : t("vendor.venueProfile.ogAuto")}
           </p>
           {effectiveUrl && (
             <div className="overflow-hidden rounded-lg border border-border/40 bg-background">
@@ -1159,13 +1164,14 @@ function OgImageSelector({
                 { }
                 <img
                   src={effectiveUrl}
-                  alt="OG preview"
+                  alt={t("vendor.venueProfile.ogPreview")}
                   className="h-full w-full object-cover"
                 />
               </div>
               <div className="border-t border-border/40 p-3 text-xs">
                 <p className="font-medium">
-                  {venue.seoTitleRo || `${venue.nameRo} — Sală Evenimente`}
+                  {venue.seoTitleRo ||
+                    `${venue.nameRo} — ${t("vendor.venueProfile.eventVenue")}`}
                 </p>
                 <p className="mt-0.5 text-muted-foreground">epetrecere.md</p>
               </div>
@@ -1185,6 +1191,7 @@ function SlugEditor({
   venue: Venue;
   setVenue: (v: Venue) => void;
 }) {
+  const { t } = useLocale();
   const [draft, setDraft] = useState(venue.slug);
   const [saving, setSaving] = useState(false);
   const changed = draft.trim() !== venue.slug;
@@ -1202,14 +1209,17 @@ function SlugEditor({
   async function commitSlug() {
     const cleaned = slugify(draft);
     if (!cleaned) {
-      toast.error("Slug-ul trebuie să aibă cel puțin un caracter");
+      toast.error(t("vendor.venueProfile.slugTooShort"));
       setDraft(venue.slug);
       return;
     }
     if (cleaned === venue.slug) return;
     if (
       !confirm(
-        `Schimbarea slug-ului din "${venue.slug}" în "${cleaned}" va crea un redirect automat de la URL-ul vechi. Continui?`,
+        t("vendor.venueProfile.slugChangeConfirm", {
+          old: venue.slug,
+          new: cleaned,
+        }),
       )
     ) {
       setDraft(venue.slug);
@@ -1224,13 +1234,13 @@ function SlugEditor({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut actualiza slug-ul");
+        toast.error(err.error || t("vendor.venueProfile.slugUpdateFailed"));
         setDraft(venue.slug);
         return;
       }
       setVenue({ ...venue, slug: cleaned });
       setDraft(cleaned);
-      toast.success("Slug actualizat — URL-ul vechi redirectează automat");
+      toast.success(t("vendor.venueProfile.slugUpdated"));
     } finally {
       setSaving(false);
     }
@@ -1239,7 +1249,7 @@ function SlugEditor({
   return (
     <div>
       <Label htmlFor="venue-slug">
-        Slug URL
+        {t("vendor.venueProfile.slugUrlLabel")}
         <span className="ml-2 text-xs text-muted-foreground">
           epetrecere.md/sali/<strong className="text-foreground">{draft || "—"}</strong>
         </span>
@@ -1264,15 +1274,14 @@ function SlugEditor({
             {saving ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
-              "Schimbă"
+              t("vendor.venueProfile.change")
             )}
           </Button>
         )}
       </div>
       {changed && (
         <p className="mt-1 text-xs text-amber-500">
-          ⚠ Schimbarea slug-ului va crea un redirect automat de la URL-ul vechi.
-          Evită schimbări dese — afectează SEO-ul și link-urile existente.
+          {t("vendor.venueProfile.slugChangeWarning")}
         </p>
       )}
     </div>

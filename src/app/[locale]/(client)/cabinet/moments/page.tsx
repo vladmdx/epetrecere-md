@@ -27,6 +27,7 @@ import { useUser } from "@clerk/nextjs";
 import { Camera, Loader2, Plus, QrCode, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Plan {
   id: number;
@@ -37,6 +38,7 @@ interface Plan {
 }
 
 export default function MomentsHubPage() {
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
   const [plans, setPlans] = useState<Plan[] | null>(null);
@@ -77,7 +79,7 @@ export default function MomentsHubPage() {
   async function handleCreateStandalone() {
     const title = newTitle.trim();
     if (title.length < 2) {
-      toast.error("Adaugă un nume pentru galerie (minim 2 caractere).");
+      toast.error(t("cabinet.moments.nameTooShort"));
       return;
     }
     setCreating(true);
@@ -92,15 +94,17 @@ export default function MomentsHubPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Nu am putut crea galeria.");
+        throw new Error(err.error || t("cabinet.moments.createFailed"));
       }
       const payload = await res.json();
       const planId = payload?.plan?.id;
-      if (!planId) throw new Error("Răspuns invalid de la server.");
-      toast.success("Galerie creată!");
+      if (!planId) throw new Error(t("cabinet.moments.badResponse"));
+      toast.success(t("cabinet.moments.created"));
       router.push(`/cabinet/moments/${planId}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la creare");
+      toast.error(
+        err instanceof Error ? err.message : t("cabinet.moments.createError"),
+      );
     } finally {
       setCreating(false);
     }
@@ -124,11 +128,10 @@ export default function MomentsHubPage() {
           Photo Moments
         </p>
         <h1 className="mt-1 font-heading text-2xl font-bold md:text-3xl">
-          Galeriile tale foto
+          {t("cabinet.moments.title")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Creează o galerie QR pentru un eveniment existent sau una de sine
-          stătătoare (fără să planifici un eveniment întreg).
+          {t("cabinet.moments.subtitle")}
         </p>
       </header>
 
@@ -140,12 +143,10 @@ export default function MomentsHubPage() {
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="font-heading text-lg font-bold">
-              Creează o galerie nouă (fără eveniment)
+              {t("cabinet.moments.standaloneTitle")}
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Pentru o petrecere de moment, o aniversare improvizată sau un
-              eveniment corporate scurt. Dă-i doar un nume; primești QR-ul în
-              câteva secunde.
+              {t("cabinet.moments.standaloneBody")}
             </p>
             <form
               onSubmit={(e) => {
@@ -158,7 +159,7 @@ export default function MomentsHubPage() {
                 type="text"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                placeholder="Ex: Aniversare Ana 30 ani"
+                placeholder={t("cabinet.moments.namePlaceholder")}
                 maxLength={120}
                 className="flex-1 rounded-lg border border-border/40 bg-background px-3 py-2.5 text-sm focus:border-gold focus:outline-none"
               />
@@ -172,7 +173,7 @@ export default function MomentsHubPage() {
                 ) : (
                   <Plus className="h-4 w-4" />
                 )}
-                Creează galerie
+                {t("cabinet.moments.createCta")}
               </button>
             </form>
           </div>
@@ -184,7 +185,7 @@ export default function MomentsHubPage() {
       {enabled.length > 0 && (
         <section className="mt-10">
           <h2 className="mb-3 font-heading text-lg font-bold">
-            Galerii active ({enabled.length})
+            {t("cabinet.moments.activeCount", { count: enabled.length })}
           </h2>
           <ul className="space-y-2">
             {enabled.map((p) => (
@@ -204,8 +205,8 @@ export default function MomentsHubPage() {
                             "ro-MD",
                             { day: "numeric", month: "long", year: "numeric" },
                           )
-                        : "Fără dată"}{" "}
-                      · QR activ
+                        : t("cabinet.moments.noDate")}{" "}
+                      · {t("cabinet.moments.qrActive")}
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -221,7 +222,7 @@ export default function MomentsHubPage() {
       {disabled.length > 0 && (
         <section className="mt-10">
           <h2 className="mb-3 font-heading text-lg font-bold">
-            Sau activeaz-o pentru un eveniment existent
+            {t("cabinet.moments.orActivate")}
           </h2>
           <ul className="space-y-2">
             {disabled.map((p) => (
@@ -241,8 +242,8 @@ export default function MomentsHubPage() {
                             "ro-MD",
                             { day: "numeric", month: "long", year: "numeric" },
                           )
-                        : "Fără dată"}{" "}
-                      · Click pentru activare
+                        : t("cabinet.moments.noDate")}{" "}
+                      · {t("cabinet.moments.clickToActivate")}
                     </p>
                   </div>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -256,7 +257,7 @@ export default function MomentsHubPage() {
       {/* True empty state — never had any plans. Just a friendly nudge. */}
       {plans !== null && plans.length === 0 && (
         <p className="mt-10 rounded-xl border border-dashed border-border/40 p-6 text-center text-sm text-muted-foreground">
-          Nu ai încă nicio galerie. Creează una mai sus în câteva secunde.
+          {t("cabinet.moments.emptyState")}
         </p>
       )}
     </div>

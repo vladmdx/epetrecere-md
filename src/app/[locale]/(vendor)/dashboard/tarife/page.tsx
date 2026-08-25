@@ -8,8 +8,10 @@
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { DurationPricingManager } from "@/components/vendor/duration-pricing-manager";
+import { useLocale } from "@/hooks/use-locale";
 
 export default function TarifePage() {
+  const { t } = useLocale();
   const [artistId, setArtistId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -23,13 +25,11 @@ export default function TarifePage() {
         if (data?.artist?.id) {
           setArtistId(data.artist.id);
         } else {
-          setError(
-            "Profilul tău de artist nu e încă disponibil. Finalizează onboardingul pentru a seta tarife.",
-          );
+          setError(t("vendor.ratesPage.noProfile"));
         }
       })
       .catch(() => {
-        if (!cancelled) setError("Nu am putut încărca profilul tău");
+        if (!cancelled) setError(t("vendor.ratesPage.loadError"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -37,15 +37,14 @@ export default function TarifePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   return (
     <div className="space-y-6 p-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Tarife</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("dashboard.rates")}</h1>
         <p className="text-sm text-muted-foreground">
-          Setează prețurile pentru fiecare durată. Clienții vor vedea automat
-          tariful corect în funcție de data și ora evenimentului.
+          {t("vendor.ratesPage.subtitle")}
         </p>
       </div>
 

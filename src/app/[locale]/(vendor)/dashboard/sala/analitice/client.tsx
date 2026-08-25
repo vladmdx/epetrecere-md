@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Venue {
   id: number;
@@ -61,15 +62,22 @@ interface Props {
   cityComparison: CityComparison;
 }
 
-const PERIOD_OPTIONS: Array<{ key: string; label: string }> = [
-  { key: "7d", label: "7 zile" },
-  { key: "30d", label: "30 zile" },
-  { key: "90d", label: "3 luni" },
-  { key: "12m", label: "12 luni" },
+const PERIOD_OPTIONS: Array<{ key: string; labelKey: string }> = [
+  { key: "7d", labelKey: "vendorSalaAnalytics.period7d" },
+  { key: "30d", labelKey: "vendorSalaAnalytics.period30d" },
+  { key: "90d", labelKey: "vendorSalaAnalytics.period90d" },
+  { key: "12m", labelKey: "vendorSalaAnalytics.period12m" },
 ];
 
-function classifyReferrer(ref: string | null): { label: string; Icon: typeof Globe; color: string } {
-  if (!ref) return { label: "Direct", Icon: Globe, color: "text-muted-foreground" };
+/** `labelKey` is set for the captions that need translating; brand names and
+ *  the raw hostname keep the literal `label`. */
+function classifyReferrer(ref: string | null): {
+  label: string;
+  labelKey?: string;
+  Icon: typeof Globe;
+  color: string;
+} {
+  if (!ref) return { label: "Direct", labelKey: "vendorSalaAnalytics.referrerDirect", Icon: Globe, color: "text-muted-foreground" };
   if (ref.includes("google")) return { label: "Google", Icon: Search, color: "text-blue-400" };
   if (ref.includes("instagram")) return { label: "Instagram", Icon: Globe, color: "text-pink-400" };
   if (ref.includes("facebook")) return { label: "Facebook", Icon: Globe, color: "text-blue-500" };
@@ -78,7 +86,7 @@ function classifyReferrer(ref: string | null): { label: string; Icon: typeof Glo
     const host = new URL(ref.startsWith("http") ? ref : `https://${ref}`).hostname;
     return { label: host, Icon: Globe, color: "text-muted-foreground" };
   } catch {
-    return { label: "Referrer", Icon: Globe, color: "text-muted-foreground" };
+    return { label: "Referrer", labelKey: "vendorSalaAnalytics.referrerOther", Icon: Globe, color: "text-muted-foreground" };
   }
 }
 
@@ -92,6 +100,7 @@ export function VenueAnalyticsClient({
   referrerBreakdown,
   cityComparison,
 }: Props) {
+  const { t } = useLocale();
   const router = useRouter();
   const maxViews = Math.max(1, ...chartPoints.map((p) => p.views));
   const totalRefCount = referrerBreakdown.reduce((s, r) => s + r.count, 0);
@@ -140,7 +149,7 @@ export function VenueAnalyticsClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "AI-ul nu a răspuns");
+        toast.error(err.error || t("vendorSalaAnalytics.aiNoAnswer"));
         return;
       }
       const data = (await res.json()) as { suggestion: string };
@@ -176,15 +185,15 @@ export function VenueAnalyticsClient({
       : null;
 
   const currentPeriodLabel =
-    PERIOD_OPTIONS.find((p) => p.key === periodKey)?.label ?? "30 zile";
+    t(PERIOD_OPTIONS.find((p) => p.key === periodKey)?.labelKey ?? "vendorSalaAnalytics.period30d");
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Analytics</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("vendorSalaAnalytics.title")}</h1>
           <p className="text-muted-foreground">
-            Performanța profilului public pentru <strong>{venue.nameRo}</strong>{" "}
+            {t("vendorSalaAnalytics.subtitle")} <strong>{venue.nameRo}</strong>{" "}
             {venue.city && <>· {venue.city}</>}
           </p>
         </div>
@@ -192,7 +201,7 @@ export function VenueAnalyticsClient({
         <div
           className="inline-flex rounded-lg border border-border/50 p-0.5"
           role="tablist"
-          aria-label="Perioadă raport"
+          aria-label={t("vendorSalaAnalytics.periodLabel")}
         >
           {PERIOD_OPTIONS.map((p) => (
             <button
@@ -208,7 +217,7 @@ export function VenueAnalyticsClient({
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              {p.label}
+              {t(p.labelKey)}
             </button>
           ))}
         </div>
@@ -218,13 +227,13 @@ export function VenueAnalyticsClient({
       <div className="grid gap-4 md:grid-cols-3">
         <StatCard
           icon={Eye}
-          label={`Vizite profil (${currentPeriodLabel})`}
+          label={t("vendorSalaAnalytics.profileVisits", { period: currentPeriodLabel })}
           value={totalViews30d.toLocaleString("ro-RO")}
           accent="text-blue-400"
         />
         <StatCard
           icon={Star}
-          label="Rating mediu"
+          label={t("vendorSalaAnalytics.avgRating")}
           value={
             venue.ratingCount && venue.ratingAvg
               ? venue.ratingAvg.toFixed(1)
@@ -232,14 +241,14 @@ export function VenueAnalyticsClient({
           }
           subLabel={
             venue.ratingCount
-              ? `${venue.ratingCount} recenzii`
-              : "Nicio recenzie încă"
+              ? t("vendorSalaAnalytics.reviewsCount", { count: venue.ratingCount })
+              : t("vendorSalaAnalytics.noReviews")
           }
           accent="text-amber-400"
         />
         <StatCard
           icon={Wallet}
-          label="Preț curent / persoană"
+          label={t("vendorSalaAnalytics.currentPrice")}
           value={
             venue.pricePerPerson !== null ? `${venue.pricePerPerson}€` : "—"
           }
@@ -251,38 +260,38 @@ export function VenueAnalyticsClient({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard
           icon={MousePointerClick}
-          label='Click "Solicită"'
+          label={t("vendorSalaAnalytics.ctaClicks")}
           value={ctaClicks.toLocaleString("ro-RO")}
           subLabel={
             totalViews30d > 0
-              ? `${conversionRate}% conversie`
-              : "Nicio vizită încă"
+              ? t("vendorSalaAnalytics.conversionOf", { rate: conversionRate })
+              : t("vendorSalaAnalytics.noVisits")
           }
           accent={conversionRate >= 5 ? "text-emerald-400" : "text-gold"}
         />
         <StatCard
           icon={Phone}
-          label="Click telefon"
+          label={t("vendorSalaAnalytics.phoneClicks")}
           value={phoneClicks.toLocaleString("ro-RO")}
           accent="text-blue-400"
         />
         <StatCard
           icon={ImageIcon}
-          label="Vizualizări galerie"
+          label={t("vendorSalaAnalytics.galleryViews")}
           value={galleryClicks.toLocaleString("ro-RO")}
           accent="text-purple-400"
         />
         <StatCard
           icon={UtensilsCrossed}
-          label="Vizualizări meniu"
+          label={t("vendorSalaAnalytics.menuViews")}
           value={menuClicks.toLocaleString("ro-RO")}
           accent="text-orange-400"
         />
         <StatCard
           icon={TrendingUp}
-          label="Rata conversie"
+          label={t("vendorSalaAnalytics.conversionRate")}
           value={`${conversionRate}%`}
-          subLabel={`${ctaClicks}/${totalViews30d} vizite`}
+          subLabel={t("vendorSalaAnalytics.clicksOfVisits", { clicks: ctaClicks, views: totalViews30d })}
           accent={
             conversionRate >= 5
               ? "text-emerald-400"
@@ -299,17 +308,17 @@ export function VenueAnalyticsClient({
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Sparkles className="h-4 w-4 text-gold" />
-              Cum te compari cu alte săli din {venue.city}?
+              {t("vendorSalaAnalytics.compareTitle", { city: venue.city })}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Comparație anonimizată față de media celor{" "}
-              <strong>{cityComparison.venueCount}</strong> săli active din
-              același oraș.
+              {t("vendorSalaAnalytics.compareIntro")}{" "}
+              <strong>{cityComparison.venueCount}</strong>{" "}
+              {t("vendorSalaAnalytics.compareIntroTail")}
             </p>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
             <ComparisonCard
-              label="Preț / persoană"
+              label={t("vendorSalaAnalytics.pricePerPerson")}
               yourValue={
                 venue.pricePerPerson !== null ? `${venue.pricePerPerson}€` : "—"
               }
@@ -325,7 +334,7 @@ export function VenueAnalyticsClient({
               suffix="€"
             />
             <ComparisonCard
-              label="Rating"
+              label={t("vendorSalaAnalytics.rating")}
               yourValue={
                 venue.ratingAvg !== null ? venue.ratingAvg.toFixed(1) : "—"
               }
@@ -340,7 +349,7 @@ export function VenueAnalyticsClient({
               higherIsBetter
             />
             <ComparisonCard
-              label="Vizite profil (30z)"
+              label={t("vendorSalaAnalytics.profileVisits30d")}
               yourValue={totalViews30d.toLocaleString("ro-RO")}
               averageValue={
                 cityComparison.avgViewsPerVenue !== null
@@ -363,11 +372,10 @@ export function VenueAnalyticsClient({
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="font-heading text-sm font-bold">
-              Sugestii AI pentru îmbunătățire
+              {t("vendorSalaAnalytics.aiTitle")}
             </h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Claude analizează statisticile tale și compararea cu piața, apoi
-              propune 3 acțiuni concrete.
+              {t("vendorSalaAnalytics.aiDescription")}
             </p>
             {aiSuggestion ? (
               <div
@@ -394,7 +402,7 @@ export function VenueAnalyticsClient({
                 ) : (
                   <Sparkles className="h-3.5 w-3.5" />
                 )}
-                {aiLoading ? "Claude analizează..." : "Generează sugestii AI"}
+                {aiLoading ? t("vendorSalaAnalytics.aiLoading") : t("vendorSalaAnalytics.aiGenerate")}
               </Button>
             )}
           </div>
@@ -407,11 +415,11 @@ export function VenueAnalyticsClient({
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-heading text-base font-semibold">
               {periodDays <= 90
-                ? `Vizite pe zi — ${currentPeriodLabel}`
-                : `Vizite pe lună — 12 luni`}
+                ? t("vendorSalaAnalytics.visitsPerDay", { period: currentPeriodLabel })
+                : t("vendorSalaAnalytics.visitsPerMonth")}
             </h2>
             <span className="text-xs text-muted-foreground">
-              Total: <strong className="text-foreground">{totalViews30d}</strong>
+              {t("vendorSalaAnalytics.total")} <strong className="text-foreground">{totalViews30d}</strong>
             </span>
           </div>
           <div className="flex h-40 items-end gap-1">
@@ -454,11 +462,11 @@ export function VenueAnalyticsClient({
       <Card>
         <CardContent className="p-5">
           <h2 className="mb-4 font-heading text-base font-semibold">
-            Surse trafic (30 zile)
+            {t("vendorSalaAnalytics.trafficSources")}
           </h2>
           {referrerBreakdown.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              Nicio sursă de trafic înregistrată încă.
+              {t("vendorSalaAnalytics.noTrafficSources")}
             </p>
           ) : (
             <div className="space-y-3">
@@ -485,10 +493,10 @@ export function VenueAnalyticsClient({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between">
                           <span className="truncate text-sm font-medium">
-                            {cfg.label}
+                            {cfg.labelKey ? t(cfg.labelKey) : cfg.label}
                           </span>
                           <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                            {r.count} vizite · {pct}%
+                            {r.count} {t("vendorSalaAnalytics.visitsWord")} · {pct}%
                           </span>
                         </div>
                         <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
@@ -567,6 +575,7 @@ function ComparisonCard({
   neutral?: boolean;
   suffix?: string;
 }) {
+  const { t } = useLocale();
   const deltaRounded = delta !== null ? Number(delta.toFixed(1)) : null;
   const isPositive = deltaRounded !== null && deltaRounded > 0;
   const isNegative = deltaRounded !== null && deltaRounded < 0;
@@ -593,7 +602,7 @@ function ComparisonCard({
       <div className="mt-1 flex items-baseline gap-2">
         <span className="font-heading text-xl font-bold">{yourValue}</span>
         <span className="text-xs text-muted-foreground">
-          vs media {averageValue}
+          {t("vendorSalaAnalytics.vsAverage")} {averageValue}
         </span>
       </div>
       {delta !== null && (

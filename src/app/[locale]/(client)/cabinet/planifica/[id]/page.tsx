@@ -87,6 +87,7 @@ import { AIArtistPickerChat } from "@/components/planner/ai-artist-picker-chat";
 import { cn } from "@/lib/utils";
 import { normalizeEventType } from "@/lib/events/normalize";
 import { formatPrice } from "@/lib/format/price";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Plan {
   id: number;
@@ -146,22 +147,24 @@ interface BookingRequest {
   priceOffers?: BookingPriceOffer[] | null;
 }
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  baptism: "Botez",
-  cumatrie: "Cumătrie",
-  birthday: "Zi de naștere",
-  corporate: "Corporate",
-  other: "Alt tip",
+/** Event type → i18n key. The value stays the DB/API enum; only the
+ *  label is translated at render time. */
+const EVENT_TYPE_KEYS: Record<string, string> = {
+  wedding: "event_types.wedding",
+  baptism: "event_types.baptism",
+  cumatrie: "event_types.cumatrie",
+  birthday: "cabinet.plan.eventTypeBirthday",
+  corporate: "event_types.corporate",
+  other: "cabinet.plan.eventTypeOther",
 };
 
-const EVENT_TYPES = [
-  { value: "wedding", label: "Nuntă" },
-  { value: "baptism", label: "Botez" },
-  { value: "cumatrie", label: "Cumătrie" },
-  { value: "birthday", label: "Zi de naștere" },
-  { value: "corporate", label: "Corporate" },
-  { value: "other", label: "Alt tip" },
+const EVENT_TYPE_VALUES = [
+  "wedding",
+  "baptism",
+  "cumatrie",
+  "birthday",
+  "corporate",
+  "other",
 ];
 
 type TabKey =
@@ -180,7 +183,7 @@ type TabKey =
 type NavItem = {
   key: TabKey;
   icon: typeof LayoutDashboard;
-  label: string;
+  labelKey: string;
   /** When true, only rendered if plan.venueNeeded is set. */
   venueOnly?: boolean;
 };
@@ -192,21 +195,21 @@ type NavItem = {
  * plan as venue-needed.
  */
 const NAV_ITEMS: NavItem[] = [
-  { key: "overview", icon: LayoutDashboard, label: "Prezentare" },
+  { key: "overview", icon: LayoutDashboard, labelKey: "cabinet.plan.nav.overview" },
   // Săli before Rezervări Artiști — picking the venue first matches how
   // people actually plan: book the place, then assemble the show. The
   // tab still hides automatically when venueNeeded=false.
-  { key: "venues", icon: MapPin, label: "Săli", venueOnly: true },
-  { key: "bookings", icon: BookOpen, label: "Rezervări Artiști" },
+  { key: "venues", icon: MapPin, labelKey: "cabinet.plan.nav.venues", venueOnly: true },
+  { key: "bookings", icon: BookOpen, labelKey: "cabinet.plan.nav.bookings" },
   // Personal cererile trimise live in their own tab so the user
   // doesn't have to scan through every category to find them.
-  { key: "my-bookings", icon: BookOpen, label: "Cererile mele" },
-  { key: "checklist", icon: ClipboardList, label: "Checklist" },
+  { key: "my-bookings", icon: BookOpen, labelKey: "cabinet.plan.nav.myBookings" },
+  { key: "checklist", icon: ClipboardList, labelKey: "cabinet.plan.nav.checklist" },
   // Budget tab removed — see BudgetTab definition below; per-category
   // price filtering on the Rezervări Artiști tab replaces it.
-  { key: "guests", icon: Users, label: "Invitați" },
-  { key: "seating", icon: UtensilsCrossed, label: "Așezare Mese" },
-  { key: "settings", icon: Settings, label: "Setări" },
+  { key: "guests", icon: Users, labelKey: "cabinet.plan.nav.guests" },
+  { key: "seating", icon: UtensilsCrossed, labelKey: "cabinet.plan.nav.seating" },
+  { key: "settings", icon: Settings, labelKey: "cabinet.plan.nav.settings" },
 ];
 
 export default function PlanDetailPage({
@@ -218,6 +221,7 @@ export default function PlanDetailPage({
   const planId = Number(id);
   const router = useRouter();
   const { user } = useUser();
+  const { t } = useLocale();
 
   const [plan, setPlan] = useState<Plan | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
@@ -254,12 +258,13 @@ export default function PlanDetailPage({
         setSeats(data.seats ?? []);
         setPhotoCount((data.photos ?? []).length);
       } catch {
-        toast.error("Nu am putut încărca planul.");
+        toast.error(t("cabinet.plan.loadError"));
       } finally {
         setLoading(false);
       }
     }
     if (Number.isFinite(planId)) load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planId]);
 
   // Load user's bookings. We fetch ALL their bookings by email, then filter
@@ -329,9 +334,7 @@ export default function PlanDetailPage({
     const artistId = parsed?.artistId;
     if (!artistId || !Number.isFinite(artistId)) return;
     if (!plan.eventDate) {
-      toast.message(
-        "Adaugă o dată evenimentului ca să trimitem cererea către partener.",
-      );
+      toast.message(t("cabinet.plan.autoBookNeedsDate"));
       return;
     }
     void (async () => {
@@ -352,31 +355,29 @@ export default function PlanDetailPage({
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          toast.error(
-            err.error ||
-              "Nu am putut trimite cererea automat — încearcă din tabul Rezervări.",
-          );
+          toast.error(err.error || t("cabinet.plan.autoBookFailed"));
           return;
         }
-        toast.success("Cererea a fost trimisă către partener.");
+        toast.success(t("cabinet.plan.requestSentPartner"));
         await refreshBookings();
         // Switch to the bookings tab so the user sees the request right
         // after creation. Cheap UX win.
         setActiveTab("bookings" as TabKey);
       } catch {
-        toast.error("Eroare la trimiterea automată a cererii.");
+        toast.error(t("cabinet.plan.autoBookError"));
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, user, refreshBookings]);
 
   async function deletePlan() {
-    if (!confirm("Sigur vrei să ștergi acest plan? Operațiunea este ireversibilă.")) return;
+    if (!confirm(t("cabinet.plan.deleteConfirm"))) return;
     const res = await fetch(`/api/event-plans/${planId}`, { method: "DELETE" });
     if (!res.ok) {
-      toast.error("Nu am putut șterge planul.");
+      toast.error(t("cabinet.plan.deleteError"));
       return;
     }
-    toast.success("Plan șters.");
+    toast.success(t("cabinet.plan.deleted"));
     router.push("/cabinet/planifica");
   }
 
@@ -392,9 +393,9 @@ export default function PlanDetailPage({
     return (
       <div className="mx-auto max-w-md py-20 text-center">
         <ClipboardList className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
-        <p className="text-muted-foreground">Plan negăsit sau nu ai acces.</p>
+        <p className="text-muted-foreground">{t("cabinet.plan.notFound")}</p>
         <Link href="/cabinet/planifica" className="mt-4 inline-block text-sm text-gold hover:underline">
-          Înapoi la planuri
+          {t("cabinet.plan.backToPlans")}
         </Link>
       </div>
     );
@@ -440,7 +441,7 @@ export default function PlanDetailPage({
               )}
             >
               <Icon className="h-4 w-4 shrink-0" />
-              {item.label}
+              {t(item.labelKey)}
             </button>
           );
         })}
@@ -461,7 +462,7 @@ export default function PlanDetailPage({
               )}
             >
               <Icon className="h-4 w-4" />
-              {item.label}
+              {t(item.labelKey)}
             </button>
           );
         })}
@@ -578,7 +579,7 @@ export default function PlanDetailPage({
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-2xl font-heading font-bold">{photoCount}</p>
-                    <p className="text-xs text-muted-foreground">Fotografii</p>
+                    <p className="text-xs text-muted-foreground">{t("cabinet.plan.photos")}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-1">
                     <div className="h-8 w-8 rounded bg-accent/50 flex items-center justify-center">
@@ -594,7 +595,7 @@ export default function PlanDetailPage({
                   onClick={() => setActiveTab("photos")}
                   className="mt-2 text-xs text-gold hover:underline"
                 >
-                  Vezi mai mult
+                  {t("cabinet.plan.seeMore")}
                 </button>
               </CardContent>
             </Card>
@@ -602,27 +603,27 @@ export default function PlanDetailPage({
             {/* General Info Widget */}
             <Card>
               <CardContent className="py-4">
-                <h4 className="font-heading font-semibold text-sm mb-3">Info General</h4>
+                <h4 className="font-heading font-semibold text-sm mb-3">{t("cabinet.plan.generalInfo")}</h4>
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <Users className="h-4 w-4 text-gold" />
                     <div>
                       <p className="text-lg font-bold">{guestTotal}</p>
-                      <p className="text-[10px] text-muted-foreground">Invitați total</p>
+                      <p className="text-[10px] text-muted-foreground">{t("cabinet.plan.guestsTotal")}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <UtensilsCrossed className="h-4 w-4 text-gold" />
                     <div>
                       <p className="text-lg font-bold">{tables.length}</p>
-                      <p className="text-[10px] text-muted-foreground">Număr de mese</p>
+                      <p className="text-[10px] text-muted-foreground">{t("cabinet.plan.tableCount")}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Users className="h-4 w-4 text-gold" />
                     <div>
                       <p className="text-lg font-bold">{seatedGuests}</p>
-                      <p className="text-[10px] text-muted-foreground">Invitați așezați</p>
+                      <p className="text-[10px] text-muted-foreground">{t("cabinet.plan.guestsSeated")}</p>
                     </div>
                   </div>
                 </div>
@@ -640,6 +641,7 @@ export default function PlanDetailPage({
 
 function EditablePlanTitle({ plan }: { plan: Plan }) {
   const router = useRouter();
+  const { t } = useLocale();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(plan.title);
   const [saving, setSaving] = useState(false);
@@ -656,7 +658,7 @@ function EditablePlanTitle({ plan }: { plan: Plan }) {
       return;
     }
     if (next.length < 2) {
-      toast.error("Numele trebuie să aibă cel puțin 2 caractere");
+      toast.error(t("cabinet.plan.titleTooShort"));
       return;
     }
     setSaving(true);
@@ -667,11 +669,11 @@ function EditablePlanTitle({ plan }: { plan: Plan }) {
         body: JSON.stringify({ title: next }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Nume eveniment actualizat");
+      toast.success(t("cabinet.plan.titleUpdated"));
       setEditing(false);
       router.refresh();
     } catch {
-      toast.error("Nu s-a putut salva numele");
+      toast.error(t("cabinet.plan.titleSaveError"));
       setValue(plan.title);
     } finally {
       setSaving(false);
@@ -707,7 +709,7 @@ function EditablePlanTitle({ plan }: { plan: Plan }) {
       type="button"
       onClick={() => setEditing(true)}
       className="group inline-flex items-center gap-1.5 font-heading text-xl font-bold text-left hover:text-gold transition-colors"
-      title="Click pentru a redenumi evenimentul"
+      title={t("cabinet.plan.renameHint")}
     >
       <span>{plan.title}</span>
       <Pencil className="h-3.5 w-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
@@ -748,6 +750,7 @@ function OverviewTab({
   onCheckItem: (id: number, done: boolean) => void;
   onSwitchTab: (tab: TabKey) => void;
 }) {
+  const { t } = useLocale();
   return (
     <div className="space-y-6">
       {/* Event Hero Card */}
@@ -763,7 +766,9 @@ function OverviewTab({
                 <EditablePlanTitle plan={plan} />
                 {plan.eventType && (
                   <Badge className="bg-gold/20 text-gold border-gold/30 text-xs">
-                    {EVENT_TYPE_LABELS[plan.eventType] ?? plan.eventType}
+                    {EVENT_TYPE_KEYS[plan.eventType]
+                      ? t(EVENT_TYPE_KEYS[plan.eventType])
+                      : plan.eventType}
                   </Badge>
                 )}
               </div>
@@ -804,7 +809,7 @@ function OverviewTab({
             )}
             {bookings.length === 0 && !plan.location && (
               <span className="text-xs text-muted-foreground">
-                Adaugă locația și furnizori pentru a apărea aici
+                {t("cabinet.plan.addLocationHint")}
               </span>
             )}
           </div>
@@ -836,18 +841,20 @@ function OverviewTab({
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-heading">Sarcinile mele</CardTitle>
+              <CardTitle className="text-base font-heading">{t("cabinet.plan.myTasks")}</CardTitle>
               <span className="text-xs text-muted-foreground">
                 {checklistTotal > 0
-                  ? `Ai ${checklistTotal - checklistDone} sarcini de completat`
-                  : "Nicio sarcină"}
+                  ? t("cabinet.plan.tasksToComplete", {
+                      count: checklistTotal - checklistDone,
+                    })
+                  : t("cabinet.plan.noTasks")}
               </span>
             </div>
           </CardHeader>
           <CardContent>
             {checklistTotal === 0 ? (
               <p className="py-4 text-sm text-muted-foreground text-center">
-                Checklist-ul este gol. Adaugă sarcini din tab-ul Checklist.
+                {t("cabinet.plan.checklistEmpty")}
               </p>
             ) : (
               <div className="space-y-1">
@@ -874,7 +881,7 @@ function OverviewTab({
                         {item.title}
                       </span>
                       {item.priority === "high" && !item.done && (
-                        <span className="text-[10px] text-warning font-medium">Urgent</span>
+                        <span className="text-[10px] text-warning font-medium">{t("cabinet.plan.urgent")}</span>
                       )}
                     </label>
                   ))}
@@ -886,7 +893,7 @@ function OverviewTab({
                 onClick={() => onSwitchTab("checklist")}
                 className="mt-2 text-xs text-gold hover:underline flex items-center gap-1"
               >
-                Vezi mai mult <ChevronRight className="h-3 w-3" />
+                {t("cabinet.plan.seeMore")} <ChevronRight className="h-3 w-3" />
               </button>
             )}
           </CardContent>
@@ -897,13 +904,13 @@ function OverviewTab({
           <Card>
             <CardContent className="py-4 text-center">
               <p className="text-2xl font-heading font-bold">{guestTotal}</p>
-              <p className="text-xs text-muted-foreground">Invitați</p>
+              <p className="text-xs text-muted-foreground">{t("cabinet.plan.nav.guests")}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="py-4 text-center">
               <p className="text-2xl font-heading font-bold">{tables.length}</p>
-              <p className="text-xs text-muted-foreground">Mese</p>
+              <p className="text-xs text-muted-foreground">{t("cabinet.plan.statTables")}</p>
             </CardContent>
           </Card>
         </div>
@@ -915,6 +922,7 @@ function OverviewTab({
 // ─── Live Countdown ─────────────────────────────────────────────────
 
 function LiveCountdown({ targetDate }: { targetDate: string }) {
+  const { t } = useLocale();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -927,7 +935,7 @@ function LiveCountdown({ targetDate }: { targetDate: string }) {
 
   if (diff === 0) {
     return (
-      <p className="text-sm font-medium text-gold">Evenimentul a avut loc!</p>
+      <p className="text-sm font-medium text-gold">{t("cabinet.plan.eventHappened")}</p>
     );
   }
 
@@ -939,12 +947,12 @@ function LiveCountdown({ targetDate }: { targetDate: string }) {
   return (
     <div className="flex gap-3">
       {[
-        { value: days, label: "Zile" },
-        { value: hours, label: "Ore" },
-        { value: minutes, label: "Minute" },
-        { value: seconds, label: "Secunde" },
+        { value: days, label: t("cabinet.plan.countdown.days"), id: "d" },
+        { value: hours, label: t("cabinet.plan.countdown.hours"), id: "h" },
+        { value: minutes, label: t("cabinet.plan.countdown.minutes"), id: "m" },
+        { value: seconds, label: t("cabinet.plan.countdown.seconds"), id: "s" },
       ].map((unit) => (
-        <div key={unit.label} className="text-center rounded-lg border border-border/40 bg-accent/30 px-3 py-2 min-w-[56px]">
+        <div key={unit.id} className="text-center rounded-lg border border-border/40 bg-accent/30 px-3 py-2 min-w-[56px]">
           <p className="text-xl font-heading font-bold">{unit.value}</p>
           <p className="text-[10px] text-muted-foreground">{unit.label}</p>
         </div>
@@ -966,6 +974,7 @@ function BudgetProgress({
    *  contribute to the spent total alongside manual localStorage expenses. */
   bookings: BookingRequest[];
 }) {
+  const { t } = useLocale();
   const [manualSpent, setManualSpent] = useState(0);
 
   useEffect(() => {
@@ -1005,7 +1014,7 @@ function BudgetProgress({
   return (
     <div className="mt-2">
       <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-        <span>Folosit</span>
+        <span>{t("cabinet.plan.budget.used")}</span>
         <span>{pct}%</span>
       </div>
       <div className="h-2 w-full rounded-full bg-border/30 overflow-hidden">
@@ -1054,6 +1063,7 @@ function BudgetTab({
   bookings: BookingRequest[];
   onBookingUpdate: (b: BookingRequest) => void;
 }) {
+  const { t } = useLocale();
   const storageKey = `budget-expenses-${plan.id}`;
   const [expenses, setExpenses] = useState<BudgetExpense[]>([]);
   const [addOpen, setAddOpen] = useState(false);
@@ -1091,7 +1101,7 @@ function BudgetTab({
       if (!res.ok) throw new Error();
     } catch {
       onBookingUpdate(b);
-      toast.error("Eroare la actualizare.");
+      toast.error(t("cabinet.plan.updateError"));
     }
   }
 
@@ -1113,7 +1123,7 @@ function BudgetTab({
     setNewDesc("");
     setNewAmount("");
     setAddOpen(false);
-    toast.success("Cheltuială adăugată");
+    toast.success(t("cabinet.plan.budget.expenseAdded"));
   }
 
   function togglePaid(id: string) {
@@ -1148,9 +1158,11 @@ function BudgetTab({
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="font-heading text-xl font-bold">Buget și cheltuieli</h2>
+          <h2 className="font-heading text-xl font-bold">{t("cabinet.plan.budget.title")}</h2>
           <p className="text-sm text-muted-foreground">
-            Buget total: {budget > 0 ? `${budget}€` : "Nesetat"}
+            {t("cabinet.plan.budget.totalLabel", {
+              value: budget > 0 ? `${budget}€` : t("cabinet.plan.budget.notSet"),
+            })}
           </p>
         </div>
         <Button
@@ -1158,7 +1170,7 @@ function BudgetTab({
           className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           size="sm"
         >
-          <Plus className="h-4 w-4" /> Adaugă cheltuială
+          <Plus className="h-4 w-4" /> {t("cabinet.plan.budget.addExpense")}
         </Button>
       </div>
 
@@ -1167,19 +1179,19 @@ function BudgetTab({
         <Card>
           <CardContent className="py-3 text-center">
             <p className="text-lg font-bold">{budget}€</p>
-            <p className="text-[10px] text-muted-foreground">Budget total</p>
+            <p className="text-[10px] text-muted-foreground">{t("cabinet.plan.budget.totalCard")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-3 text-center">
             <p className="text-lg font-bold text-warning">{totalSpent}€</p>
-            <p className="text-[10px] text-muted-foreground">Planificat</p>
+            <p className="text-[10px] text-muted-foreground">{t("cabinet.plan.budget.planned")}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="py-3 text-center">
             <p className="text-lg font-bold text-success">{totalPaid}€</p>
-            <p className="text-[10px] text-muted-foreground">Achitat</p>
+            <p className="text-[10px] text-muted-foreground">{t("cabinet.plan.budget.paid")}</p>
           </CardContent>
         </Card>
         <Card>
@@ -1187,7 +1199,7 @@ function BudgetTab({
             <p className={cn("text-lg font-bold", remaining < 0 ? "text-destructive" : "text-foreground")}>
               {remaining}€
             </p>
-            <p className="text-[10px] text-muted-foreground">Rămas</p>
+            <p className="text-[10px] text-muted-foreground">{t("cabinet.plan.budget.remaining")}</p>
           </CardContent>
         </Card>
       </div>
@@ -1196,7 +1208,11 @@ function BudgetTab({
       {budget > 0 && (
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-            <span>Utilizat {Math.round((totalSpent / budget) * 100)}%</span>
+            <span>
+              {t("cabinet.plan.budget.usedPct", {
+                pct: Math.round((totalSpent / budget) * 100),
+              })}
+            </span>
             <span>{totalSpent}€ / {budget}€</span>
           </div>
           <div className="h-3 w-full rounded-full bg-border/30 overflow-hidden">
@@ -1218,9 +1234,9 @@ function BudgetTab({
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-gold" />
-                Artiști / Muzică
+                {t("cabinet.plan.budget.artistsMusic")}
                 <span className="text-[10px] font-normal text-muted-foreground">
-                  (din rezervări)
+                  {t("cabinet.plan.budget.fromBookings")}
                 </span>
               </CardTitle>
               <span className="text-sm font-bold">{bookingTotal}€</span>
@@ -1244,10 +1260,12 @@ function BudgetTab({
                       b.paidStatus === "paid" && "line-through text-muted-foreground",
                     )}
                   >
-                    {b.artistName ?? "Artist"}
+                    {b.artistName ?? t("cabinet.plan.artistFallback")}
                   </p>
                   <p className="text-[10px] text-muted-foreground">
-                    {STATUS_CONFIG[b.status]?.label ?? b.status}
+                    {STATUS_CONFIG[b.status]
+                      ? t(STATUS_CONFIG[b.status].labelKey)
+                      : b.status}
                   </p>
                 </div>
                 <span className="text-sm font-medium">{b.agreedPrice}€</span>
@@ -1255,7 +1273,7 @@ function BudgetTab({
                   <Link
                     href={`/artisti/${b.artistSlug}`}
                     className="text-muted-foreground hover:text-gold"
-                    title="Vezi artistul"
+                    title={t("cabinet.plan.viewArtist")}
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
                   </Link>
@@ -1270,8 +1288,8 @@ function BudgetTab({
       {grouped.length === 0 && bookingExpenses.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground">
           <Wallet className="mx-auto mb-3 h-8 w-8 opacity-40" />
-          <p>Nu ai cheltuieli încă.</p>
-          <p className="text-xs mt-1">Adaugă prima cheltuială pentru a urmări bugetul.</p>
+          <p>{t("cabinet.plan.budget.noExpenses")}</p>
+          <p className="text-xs mt-1">{t("cabinet.plan.budget.noExpensesHint")}</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -1317,11 +1335,11 @@ function BudgetTab({
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Cheltuială nouă</DialogTitle>
+            <DialogTitle>{t("cabinet.plan.budget.newExpense")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label>Categorie</Label>
+              <Label>{t("cabinet.plan.budget.category")}</Label>
               <Select value={newCat} onValueChange={(v) => { if (v) setNewCat(v); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -1332,18 +1350,18 @@ function BudgetTab({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Descriere</Label>
-              <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Ex: Sală Nuntă" />
+              <Label>{t("cabinet.plan.budget.description")}</Label>
+              <Input value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder={t("cabinet.plan.budget.descPlaceholder")} />
             </div>
             <div className="space-y-2">
-              <Label>Sumă (EUR)</Label>
+              <Label>{t("cabinet.plan.budget.amount")}</Label>
               <Input type="number" min="0" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} placeholder="0" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Anulează</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>{t("common.cancel")}</Button>
             <Button onClick={addExpense} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark" disabled={!newDesc.trim() || !newAmount}>
-              Adaugă
+              {t("common.add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1355,11 +1373,12 @@ function BudgetTab({
 // ─── Timeline Tab ───────────────────────────────────────────────────
 
 function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eventDate: string | null }) {
+  const { t } = useLocale();
   if (!eventDate) {
     return (
       <div className="py-12 text-center text-muted-foreground">
         <Clock className="mx-auto mb-3 h-8 w-8 opacity-40" />
-        <p>Setează data evenimentului pentru a vedea cronologia.</p>
+        <p>{t("cabinet.plan.timeline.needDate")}</p>
       </div>
     );
   }
@@ -1370,12 +1389,12 @@ function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eve
 
   // Group tasks by time period
   const periods = [
-    { label: "Depășite", min: -Infinity, max: 0, color: "text-destructive", borderColor: "border-destructive/30" },
-    { label: "Această săptămână", min: 0, max: 7, color: "text-warning", borderColor: "border-warning/30" },
-    { label: "Această lună", min: 7, max: 30, color: "text-gold", borderColor: "border-gold/30" },
-    { label: "1-3 luni", min: 30, max: 90, color: "text-foreground", borderColor: "border-border/40" },
-    { label: "3-6 luni", min: 90, max: 180, color: "text-muted-foreground", borderColor: "border-border/30" },
-    { label: "6+ luni", min: 180, max: Infinity, color: "text-muted-foreground/60", borderColor: "border-border/20" },
+    { id: "overdue", label: t("cabinet.plan.timeline.overdue"), min: -Infinity, max: 0, color: "text-destructive", borderColor: "border-destructive/30" },
+    { id: "week", label: t("cabinet.plan.timeline.thisWeek"), min: 0, max: 7, color: "text-warning", borderColor: "border-warning/30" },
+    { id: "month", label: t("cabinet.plan.timeline.thisMonth"), min: 7, max: 30, color: "text-gold", borderColor: "border-gold/30" },
+    { id: "m1to3", label: t("cabinet.plan.timeline.months1to3"), min: 30, max: 90, color: "text-foreground", borderColor: "border-border/40" },
+    { id: "m3to6", label: t("cabinet.plan.timeline.months3to6"), min: 90, max: 180, color: "text-muted-foreground", borderColor: "border-border/30" },
+    { id: "m6plus", label: t("cabinet.plan.timeline.months6plus"), min: 180, max: Infinity, color: "text-muted-foreground/60", borderColor: "border-border/20" },
   ];
 
   const itemsWithDue = checklist
@@ -1389,14 +1408,16 @@ function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eve
 
   return (
     <div>
-      <h2 className="font-heading text-xl font-bold mb-1">Cronologie</h2>
+      <h2 className="font-heading text-xl font-bold mb-1">{t("cabinet.plan.timeline.title")}</h2>
       <p className="text-sm text-muted-foreground mb-6">
-        {daysUntil > 0 ? `${daysUntil} zile până la eveniment` : "Evenimentul a trecut"}
+        {daysUntil > 0
+          ? t("cabinet.plan.timeline.daysUntil", { days: daysUntil })
+          : t("cabinet.plan.timeline.eventPassed")}
       </p>
 
       {itemsWithDue.length === 0 ? (
         <p className="py-8 text-center text-muted-foreground text-sm">
-          Nicio sarcină cu termen setat.
+          {t("cabinet.plan.timeline.noDueTasks")}
         </p>
       ) : (
         <div className="space-y-6">
@@ -1406,7 +1427,7 @@ function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eve
             );
             if (items.length === 0) return null;
             return (
-              <div key={period.label}>
+              <div key={period.id}>
                 <h3 className={cn("text-sm font-semibold mb-2", period.color)}>
                   {period.label} ({items.length})
                 </h3>
@@ -1419,7 +1440,9 @@ function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eve
                       <div className={cn("h-2 w-2 rounded-full shrink-0", period.color === "text-destructive" ? "bg-destructive" : period.color === "text-warning" ? "bg-warning" : "bg-gold")} />
                       <span className="text-sm flex-1">{item.title}</span>
                       <span className="text-[10px] text-muted-foreground shrink-0">
-                        {item.daysBeforeEvent > 0 ? `${item.daysBeforeEvent}z înainte` : "Ziua evenimentului"}
+                        {item.daysBeforeEvent > 0
+                          ? t("cabinet.plan.timeline.daysBefore", { days: item.daysBeforeEvent })
+                          : t("cabinet.plan.timeline.eventDay")}
                       </span>
                     </div>
                   ))}
@@ -1432,7 +1455,7 @@ function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eve
           {itemsWithDue.filter((i) => i.done).length > 0 && (
             <div>
               <h3 className="text-sm font-semibold text-success mb-2">
-                Completate ({itemsWithDue.filter((i) => i.done).length})
+                {t("cabinet.plan.timeline.completed")} ({itemsWithDue.filter((i) => i.done).length})
               </h3>
               <div className="space-y-1">
                 {itemsWithDue
@@ -1454,15 +1477,15 @@ function TimelineTab({ checklist, eventDate }: { checklist: ChecklistItem[]; eve
 
 // ─── Bookings Tab ───────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  pending: { label: "In așteptare", color: "text-warning border-warning/30 bg-warning/5" },
+const STATUS_CONFIG: Record<string, { labelKey: string; color: string }> = {
+  pending: { labelKey: "cabinet.plan.status.pending", color: "text-warning border-warning/30 bg-warning/5" },
   // Both `accepted` (legacy) and `confirmed_by_client` (new) render as
   // "Confirmat" — the artist's accept is now the final step.
-  accepted: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
-  confirmed_by_client: { label: "Confirmat", color: "text-success border-success/30 bg-success/5" },
-  rejected: { label: "Refuzat", color: "text-destructive border-destructive/30 bg-destructive/5" },
-  cancelled: { label: "Anulat", color: "text-muted-foreground border-border/40 bg-muted/5" },
-  completed: { label: "Finalizat", color: "text-gold border-gold/30 bg-gold/5" },
+  accepted: { labelKey: "cabinet.plan.status.confirmed", color: "text-success border-success/30 bg-success/5" },
+  confirmed_by_client: { labelKey: "cabinet.plan.status.confirmed", color: "text-success border-success/30 bg-success/5" },
+  rejected: { labelKey: "cabinet.plan.status.rejected", color: "text-destructive border-destructive/30 bg-destructive/5" },
+  cancelled: { labelKey: "cabinet.plan.status.cancelled", color: "text-muted-foreground border-border/40 bg-muted/5" },
+  completed: { labelKey: "cabinet.plan.status.completed", color: "text-gold border-gold/30 bg-gold/5" },
 };
 
 // ─── Rezervări Artiști Tab ──────────────────────────────────────────
@@ -1518,6 +1541,7 @@ function BookingsTab({
   onRefresh: () => Promise<void> | void;
 }) {
   const { user } = useUser();
+  const { t } = useLocale();
   /** Discovery artists keyed by category id — each category gets its own
    *  section in the UI so the user sees "Fotografi: 6 disponibili" etc. */
   const [byCategory, setByCategory] = useState<
@@ -1583,7 +1607,7 @@ function BookingsTab({
           setByCategory([
             {
               categoryId: 0,
-              categoryName: "Toți artiștii",
+              categoryName: t("cabinet.plan.allArtists"),
               artists: promote((res.items ?? []) as DiscoveryArtist[]),
             },
           ]);
@@ -1598,7 +1622,9 @@ function BookingsTab({
             ).then((r) => (r.ok ? r.json() : { items: [] }));
             return {
               categoryId: catId,
-              categoryName: catNameById.get(catId) ?? `Categorie #${catId}`,
+              categoryName:
+                catNameById.get(catId) ??
+                t("cabinet.plan.categoryFallback", { id: catId }),
               artists: promote((res.items ?? []) as DiscoveryArtist[]),
             };
           }),
@@ -1610,7 +1636,7 @@ function BookingsTab({
         setDiscoveryLoading(false);
       }
     })();
-  }, [plan.eventDate, plan.selectedCategories]);
+  }, [plan.eventDate, plan.selectedCategories, t]);
 
   // Active bookings indexed by artistId. Rejected / cancelled / expired
   // entries don't count — those slots free up so the client can shop
@@ -1648,7 +1674,7 @@ function BookingsTab({
         if (!categoryBlocker.has(section.categoryId)) {
           categoryBlocker.set(section.categoryId, {
             artistId: a.id,
-            artistName: a.nameRo ?? "Artist",
+            artistName: a.nameRo ?? t("cabinet.plan.artistFallback"),
             status: b.status,
             createdAt: b.createdAt ?? new Date().toISOString(),
           });
@@ -1713,19 +1739,21 @@ function BookingsTab({
       {/* ─── Section 1: Existing bookings, split confirmed vs pending ── */}
       <section>
         <div className="mb-4">
-          <h2 className="font-heading text-xl font-bold">Rezervările mele</h2>
+          <h2 className="font-heading text-xl font-bold">{t("cabinet.plan.bookingsTitle")}</h2>
           <p className="text-sm text-muted-foreground">
-            {confirmedBookings.length} cu succes · {pendingBookings.length}{" "}
-            în așteptare
+            {t("cabinet.plan.bookingsSummary", {
+              done: confirmedBookings.length,
+              pending: pendingBookings.length,
+            })}
           </p>
         </div>
 
         {planBookings.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
             <BookOpen className="mx-auto mb-3 h-8 w-8 opacity-40" />
-            <p className="text-sm">Nu ai rezervări încă.</p>
+            <p className="text-sm">{t("cabinet.plan.noBookings")}</p>
             <p className="text-xs mt-1">
-              Alege un artist din secțiunea de mai jos pentru a trimite prima cerere.
+              {t("cabinet.plan.noBookingsHint")}
             </p>
           </div>
         ) : (
@@ -1733,7 +1761,7 @@ function BookingsTab({
             {confirmedBookings.length > 0 && (
               <div>
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-success">
-                  <Check className="h-3.5 w-3.5" /> Rezervări cu succes
+                  <Check className="h-3.5 w-3.5" /> {t("cabinet.plan.bookingsConfirmed")}
                   <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] text-success">
                     {confirmedBookings.length}
                   </span>
@@ -1753,7 +1781,7 @@ function BookingsTab({
             {pendingBookings.length > 0 && (
               <div>
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-warning">
-                  <Clock className="h-3.5 w-3.5" /> Rezervări în așteptare
+                  <Clock className="h-3.5 w-3.5" /> {t("cabinet.plan.bookingsPending")}
                   <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] text-warning">
                     {pendingBookings.length}
                   </span>
@@ -1816,14 +1844,14 @@ const MOBILE_COLUMN_STORAGE_KEY = "plan-bookings-mobile-columns";
 type BudgetBracket = "all" | "small" | "medium" | "large";
 const BUDGET_BRACKETS: Array<{
   key: BudgetBracket;
-  label: string;
+  labelKey: string;
   min?: number;
   max?: number;
 }> = [
-  { key: "all", label: "Toți" },
-  { key: "small", label: "Buget mic", max: 200 },
-  { key: "medium", label: "Buget mediu", min: 200, max: 500 },
-  { key: "large", label: "Buget mare", min: 500 },
+  { key: "all", labelKey: "cabinet.plan.bracket.all" },
+  { key: "small", labelKey: "cabinet.plan.bracket.small", max: 200 },
+  { key: "medium", labelKey: "cabinet.plan.bracket.medium", min: 200, max: 500 },
+  { key: "large", labelKey: "cabinet.plan.bracket.large", min: 500 },
 ];
 
 function inBudgetBracket(
@@ -1878,6 +1906,7 @@ function DiscoverySection({
 }) {
   // Columns preference — persisted per user in localStorage so the layout
   // stays consistent between plan visits.
+  const { t } = useLocale();
   const [columns, setColumns] = useState<ColumnCount>(4);
   const [mobileColumns, setMobileColumns] =
     useState<MobileColumnCount>(2);
@@ -1940,7 +1969,7 @@ function DiscoverySection({
       <div className="mb-2 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h2 className="font-heading text-xl font-bold">
-            Artiști disponibili pentru data ta
+            {t("cabinet.plan.discovery.title")}
           </h2>
           <p className="text-sm text-muted-foreground">
             {new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", {
@@ -1949,9 +1978,14 @@ function DiscoverySection({
               year: "numeric",
             })}
             {plan.selectedCategories && plan.selectedCategories.length > 0 && (
-              <span> · {plan.selectedCategories.length} categorii selectate</span>
+              <span>
+                {" · "}
+                {t("cabinet.plan.discovery.categoriesSelected", {
+                  count: plan.selectedCategories.length,
+                })}
+              </span>
             )}
-            {" · max 5 cereri per categorie"}
+            {" · " + t("cabinet.plan.discovery.maxRequests")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -1966,10 +2000,10 @@ function DiscoverySection({
                   ? "bg-gold text-[#0D0D0D]"
                   : "text-muted-foreground hover:bg-accent",
               )}
-              title="Vizualizare grilă"
+              title={t("cabinet.plan.discovery.gridViewTitle")}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Grilă</span>
+              <span className="hidden sm:inline">{t("cabinet.plan.discovery.grid")}</span>
             </button>
             <button
               type="button"
@@ -1980,10 +2014,10 @@ function DiscoverySection({
                   ? "bg-gold text-[#0D0D0D]"
                   : "text-muted-foreground hover:bg-accent",
               )}
-              title="Vizualizare listă"
+              title={t("cabinet.plan.discovery.listViewTitle")}
             >
               <List className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Listă</span>
+              <span className="hidden sm:inline">{t("cabinet.plan.discovery.list")}</span>
             </button>
           </div>
           {/* Column picker — desktop (3/4/5 cards per row) and mobile
@@ -1995,7 +2029,7 @@ function DiscoverySection({
             <>
               <div className="hidden lg:flex items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
                 <span className="px-2 text-xs text-muted-foreground">
-                  Coloane:
+                  {t("cabinet.plan.discovery.columns")}
                 </span>
                 {COLUMN_OPTIONS.map((n) => (
                   <button
@@ -2015,7 +2049,7 @@ function DiscoverySection({
               </div>
               <div className="flex sm:hidden items-center gap-1 rounded-lg border border-border/40 bg-card p-1">
                 <span className="px-2 text-[11px] text-muted-foreground">
-                  Pe rând:
+                  {t("cabinet.plan.discovery.perRow")}
                 </span>
                 {MOBILE_COLUMN_OPTIONS.map((n) => (
                   <button
@@ -2046,12 +2080,12 @@ function DiscoverySection({
         <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
           <p className="text-sm">
             {plan.selectedCategories && plan.selectedCategories.length > 0
-              ? "Niciun artist disponibil în categoriile selectate pentru această dată."
-              : "Niciun artist disponibil pentru această dată."}
+              ? t("cabinet.plan.discovery.noneInCategories")
+              : t("cabinet.plan.discovery.noneForDate")}
           </p>
           <Link href="/artisti">
             <Button variant="outline" size="sm" className="mt-4">
-              Explorează toți artiștii
+              {t("cabinet.plan.discovery.exploreAll")}
             </Button>
           </Link>
         </div>
@@ -2112,6 +2146,7 @@ function SequentialCategories({
   clientEmail?: string;
   onRefresh: () => Promise<void> | void;
 }) {
+  const { t } = useLocale();
   const [currentIdx, setCurrentIdx] = useState(0);
   // Per-category visible count (Load more) and budget bracket. The
   // brackets are keyed by categoryId so going back keeps the previous
@@ -2241,15 +2276,23 @@ function SequentialCategories({
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wider text-gold/70">
-            Categoria {currentIdx + 1} din {byCategory.length}
+            {t("cabinet.plan.categoryStep", {
+              current: currentIdx + 1,
+              total: byCategory.length,
+            })}
           </p>
           <h3 className="font-heading text-xl font-bold">
             {section.categoryName}
           </h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            {filtered.length} artiști{" "}
-            {bracket !== "all" ? "în bugetul ales" : "disponibili"} · {used}/1
-            cerere activă
+            {t("cabinet.plan.categoryCount", {
+              count: filtered.length,
+              qualifier:
+                bracket !== "all"
+                  ? t("cabinet.plan.inChosenBudget")
+                  : t("cabinet.plan.available"),
+              used,
+            })}
           </p>
         </div>
         <div className="flex items-center gap-2 text-xs">
@@ -2264,7 +2307,7 @@ function SequentialCategories({
                 : "border-border/40 hover:border-gold/30 hover:text-foreground",
             )}
           >
-            ← Înapoi
+            ← {t("cabinet.plan.backBtn")}
           </button>
           {!isLast && (
             <button
@@ -2272,7 +2315,7 @@ function SequentialCategories({
               onClick={() => setCurrentIdx((i) => i + 1)}
               className="rounded-lg border border-border/40 px-3 py-1.5 hover:border-gold/30"
             >
-              Sări peste →
+              {t("cabinet.plan.skip")} →
             </button>
           )}
         </div>
@@ -2294,18 +2337,18 @@ function SequentialCategories({
                   : "border-border/40 text-muted-foreground hover:border-gold/30",
               )}
             >
-              {b.label}
+              {t(b.labelKey)}
               {b.min !== undefined && b.max !== undefined ? (
                 <span className="ml-1 text-muted-foreground/70">
                   ({b.min}–{b.max}€)
                 </span>
               ) : b.min !== undefined ? (
                 <span className="ml-1 text-muted-foreground/70">
-                  (peste {b.min}€)
+                  ({t("cabinet.plan.over")} {b.min}€)
                 </span>
               ) : b.max !== undefined ? (
                 <span className="ml-1 text-muted-foreground/70">
-                  (sub {b.max}€)
+                  ({t("cabinet.plan.under")} {b.max}€)
                 </span>
               ) : null}
             </button>
@@ -2316,8 +2359,8 @@ function SequentialCategories({
       {isEmpty ? (
         <div className="rounded-xl border border-dashed border-border/40 py-8 text-center text-xs text-muted-foreground">
           {bracket === "all"
-            ? "Niciun artist disponibil în această categorie pentru data aleasă."
-            : "Niciun artist în această categorie cu bugetul selectat. Încearcă alt buget sau sări la următoarea categorie."}
+            ? t("cabinet.plan.noArtistsInCategory")
+            : t("cabinet.plan.noArtistsInBudget")}
         </div>
       ) : (
         <>
@@ -2352,8 +2395,10 @@ function SequentialCategories({
                 onClick={() => showMore(section.categoryId)}
                 className="gap-2"
               >
-                Încarcă mai mulți {section.categoryName.toLowerCase()} (
-                {filtered.length - visible} rămași)
+                {t("cabinet.plan.loadMore", {
+                  name: section.categoryName.toLowerCase(),
+                  count: filtered.length - visible,
+                })}
               </Button>
             </div>
           )}
@@ -2375,11 +2420,11 @@ function SequentialCategories({
               : "border-border/40 hover:border-gold/30",
           )}
         >
-          ← Categoria precedentă
+          ← {t("cabinet.plan.prevCategory")}
         </button>
         {isLast ? (
           <span className="text-xs text-muted-foreground">
-            Aceasta a fost ultima categorie aleasă.
+            {t("cabinet.plan.lastCategory")}
           </span>
         ) : (
           <button
@@ -2387,7 +2432,10 @@ function SequentialCategories({
             onClick={() => setCurrentIdx((i) => i + 1)}
             className="rounded-lg bg-gold px-4 py-2 text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark"
           >
-            Continuă la {byCategory[currentIdx + 1]?.categoryName} →
+            {t("cabinet.plan.continueTo", {
+              name: byCategory[currentIdx + 1]?.categoryName ?? "",
+            })}{" "}
+            →
           </button>
         )}
       </div>
@@ -2409,6 +2457,7 @@ function BookingListCard({
   booking: BookingRequest;
   onRefresh: () => Promise<void> | void;
 }) {
+  const { t } = useLocale();
   const cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG.pending;
   const isPending = b.status === "pending";
   return (
@@ -2421,7 +2470,7 @@ function BookingListCard({
             </div>
             <div className="min-w-0">
               <p className="text-sm font-medium truncate">
-                {b.artistName || "Artist"}
+                {b.artistName || t("cabinet.plan.artistFallback")}
               </p>
               {b.categoryNames && b.categoryNames.length > 0 && (
                 <p className="text-[11px] uppercase tracking-wide text-gold/80">
@@ -2439,7 +2488,7 @@ function BookingListCard({
                   </span>
                 )}
                 {b.eventType &&
-                  ` · ${EVENT_TYPE_LABELS[b.eventType] || b.eventType}`}
+                  ` · ${EVENT_TYPE_KEYS[b.eventType] ? t(EVENT_TYPE_KEYS[b.eventType]) : b.eventType}`}
               </p>
             </div>
           </div>
@@ -2447,7 +2496,7 @@ function BookingListCard({
             variant="outline"
             className={cn("text-xs shrink-0", cfg.color)}
           >
-            {cfg.label}
+            {t(cfg.labelKey)}
           </Badge>
         </div>
 
@@ -2469,9 +2518,9 @@ function BookingListCard({
               <span className="text-xs text-muted-foreground">
                 {lastOffer
                   ? lastOffer.from === "artist"
-                    ? "Ofertă partener"
-                    : "Ofertă ta"
-                  : "Preț agreat"}
+                    ? t("cabinet.plan.offerPartner")
+                    : t("cabinet.plan.offerYours")
+                  : t("cabinet.plan.agreedPrice")}
               </span>
               <span className="text-sm font-semibold text-gold">
                 {displayPrice}€
@@ -2484,7 +2533,7 @@ function BookingListCard({
         {(b.priceOffers ?? []).length > 0 && (
           <div className="mt-3 rounded-lg border border-gold/20 bg-gold/5 p-3 space-y-1.5">
             <p className="text-[11px] font-semibold text-gold uppercase tracking-wide">
-              Istoric negociere
+              {t("cabinet.plan.negotiationHistory")}
             </p>
             {(b.priceOffers ?? []).map((offer, idx) => (
               <div
@@ -2498,7 +2547,10 @@ function BookingListCard({
               >
                 <div className="min-w-0 flex-1">
                   <span className={cn("font-semibold", offer.from === "client" ? "text-blue-400" : "text-gold")}>
-                    {offer.from === "client" ? "Tu" : "Partenerul"}:
+                    {offer.from === "client"
+                      ? t("cabinet.plan.you")
+                      : t("cabinet.plan.partner")}
+                    :
                   </span>{" "}
                   <span className="font-bold">{offer.amount}€</span>
                   {offer.message && (
@@ -2562,25 +2614,22 @@ function PendingCountdown({
    *  an artistId or venueId. */
   windowHours?: number;
 }) {
+  const { t } = useLocale();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
   }, []);
 
   if (!createdAt) {
     return (
-      <span>
-        Partenerul are {windowHours}h să răspundă, altfel cererea se anulează automat.
-      </span>
+      <span>{t("cabinet.plan.partnerHasHours", { hours: windowHours })}</span>
     );
   }
   const created = new Date(createdAt).getTime();
   if (!Number.isFinite(created)) {
     return (
-      <span>
-        Partenerul are {windowHours}h să răspundă, altfel cererea se anulează automat.
-      </span>
+      <span>{t("cabinet.plan.partnerHasHours", { hours: windowHours })}</span>
     );
   }
   const deadline = created + windowHours * 60 * 60 * 1000;
@@ -2588,8 +2637,7 @@ function PendingCountdown({
   if (remainingMs <= 0) {
     return (
       <span>
-        Cererea va fi anulată în curând ({windowHours}h depășite). Revino în câteva
-        minute.
+        {t("cabinet.plan.requestExpiringSoon", { hours: windowHours })}
       </span>
     );
   }
@@ -2598,11 +2646,13 @@ function PendingCountdown({
   const minutes = totalMin % 60;
   return (
     <div className="flex flex-col gap-1">
-      <span>
-        Partenerul are 24h să răspundă, altfel cererea se anulează automat.
-      </span>
+      <span>{t("cabinet.plan.partnerHasHours", { hours: windowHours })}</span>
       <span className="font-mono text-xs text-warning">
-        ⏳ Cererea va fi anulată în {hours}h {String(minutes).padStart(2, "0")}m
+        ⏳{" "}
+        {t("cabinet.plan.requestCancelsIn", {
+          hours,
+          minutes: String(minutes).padStart(2, "0"),
+        })}
       </span>
     </div>
   );
@@ -2641,6 +2691,7 @@ function PlanArtistCard({
   viewMode?: ViewMode;
   onRefresh: () => void;
 }) {
+  const { t } = useLocale();
   const [modalOpen, setModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2809,23 +2860,23 @@ function PlanArtistCard({
     previouslyDeclined ||
     !!blockedByOtherArtistName;
   const primaryLabel = isConfirmed
-    ? "Rezervat"
+    ? t("cabinet.plan.card.booked")
     : isPending
-      ? "Cerere trimisă"
+      ? t("cabinet.plan.card.requestSent")
       : previouslyDeclined
-        ? "Refuzat anterior"
+        ? t("cabinet.plan.card.previouslyDeclined")
         : blockedByOtherArtistName
-          ? "Categorie ocupată"
-          : "Solicită rezervare";
+          ? t("cabinet.plan.card.categoryTaken")
+          : t("booking.card.requestBooking");
   // Hover hint for the disabled CTA — surfaces *why* the button is off.
   const disabledHint = blockedByOtherArtistName
-    ? `Așteaptă răspunsul lui ${blockedByOtherArtistName} (până la 24h)`
+    ? t("cabinet.plan.card.waitingFor", { name: blockedByOtherArtistName })
     : previouslyDeclined
-      ? "Acest artist a refuzat cererea ta"
+      ? t("cabinet.plan.card.artistDeclined")
       : isPending
-        ? "Cerere deja trimisă acestui artist"
+        ? t("cabinet.plan.card.alreadyRequested")
         : isConfirmed
-          ? "Rezervare confirmată"
+          ? t("cabinet.plan.card.bookingConfirmed")
           : null;
 
   function pickSlot(slot: { id: number; startTime: string; endTime: string }) {
@@ -2927,11 +2978,11 @@ function PlanArtistCard({
       if (hasPricedOffer && selectedDurationMinutes == null && selectedEventTierId == null) {
         toast.error(
           eventOffers.length > 0 && durationOptions.length === 0
-            ? "Alege prețul per eveniment."
-            : "Alege durata de participare a artistului.",
+            ? t("cabinet.plan.modal.choosePerEvent")
+            : t("cabinet.plan.modal.chooseDuration"),
         );
       } else {
-        toast.error("Alege ora de început și durata.");
+        toast.error(t("cabinet.plan.modal.chooseStartAndDuration"));
       }
       return;
     }
@@ -2962,15 +3013,17 @@ function PlanArtistCard({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Eroare la trimitere");
+        throw new Error(err.error || t("cabinet.plan.sendError"));
       }
       const summary =
         selectedDurationMinutes != null && computedPrice != null
           ? `${formatDuration(selectedDurationMinutes)} · ${formatPrice(computedPrice)}`
           : selectedEventTierId != null && computedPrice != null
-            ? `${resolvedForSelection?.tier.nameRo ?? "Preț per eveniment"} · ${formatPrice(computedPrice)}`
+            ? `${resolvedForSelection?.tier.nameRo ?? t("cabinet.plan.modal.perEventPrice")} · ${formatPrice(computedPrice)}`
             : `${startTime}–${endTime}`;
-      toast.success(`Cerere trimisă către ${artist.nameRo} (${summary})`);
+      toast.success(
+        t("cabinet.plan.requestSentTo", { name: artist.nameRo, summary }),
+      );
       setModalOpen(false);
       setMessage("");
       setSelectedSlotId(null);
@@ -2980,7 +3033,9 @@ function PlanArtistCard({
       setEndTime("");
       onRefresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la trimitere");
+      toast.error(
+        err instanceof Error ? err.message : t("cabinet.plan.sendError"),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -3004,7 +3059,7 @@ function PlanArtistCard({
       );
       setChatMessages(Array.isArray(msgs) ? msgs : []);
     } catch {
-      toast.error("Nu am putut deschide chatul.");
+      toast.error(t("cabinet.plan.chatOpenError"));
     } finally {
       setChatLoading(false);
     }
@@ -3028,7 +3083,7 @@ function PlanArtistCard({
       setChatMessages((prev) => [...prev, inserted]);
       setChatDraft("");
     } catch {
-      toast.error("Mesajul nu a fost trimis.");
+      toast.error(t("cabinet.plan.messageNotSent"));
     } finally {
       setChatSending(false);
     }
@@ -3057,7 +3112,7 @@ function PlanArtistCard({
                 <header className="flex shrink-0 items-center justify-between border-b border-border/40 px-5 py-4">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Solicită rezervare
+                      {t("booking.card.requestBooking")}
                     </p>
                     <p className="truncate font-heading text-lg font-bold">
                       {artist.nameRo}
@@ -3066,7 +3121,7 @@ function PlanArtistCard({
                   <button
                     onClick={() => !submitting && setModalOpen(false)}
                     className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-accent"
-                    aria-label="Închide"
+                    aria-label={t("common.close")}
                     disabled={submitting}
                   >
                     <X className="h-5 w-5" />
@@ -3076,11 +3131,13 @@ function PlanArtistCard({
                 <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
                 <div className="space-y-1 rounded-lg border border-border/40 bg-muted/30 p-3 text-sm">
                   <p className="text-xs font-semibold text-muted-foreground">
-                    Eveniment
+                    {t("cabinet.plan.modal.event")}
                   </p>
                   {plan.eventDate && (
                     <p>
-                      <span className="text-muted-foreground">Data:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {t("cabinet.plan.modal.dateLabel")}
+                      </span>{" "}
                       {new Date(plan.eventDate + "T00:00:00").toLocaleDateString(
                         "ro-RO",
                         { day: "numeric", month: "long", year: "numeric" },
@@ -3089,7 +3146,9 @@ function PlanArtistCard({
                   )}
                   {plan.startTime && plan.durationHours ? (
                     <p>
-                      <span className="text-muted-foreground">Durata eveniment:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {t("cabinet.plan.modal.eventDuration")}
+                      </span>{" "}
                       {plan.startTime} – {(() => {
                         const [h, m] = plan.startTime.split(":").map(Number);
                         const endH = (h + plan.durationHours) % 24;
@@ -3099,7 +3158,9 @@ function PlanArtistCard({
                   ) : null}
                   {plan.guestCountTarget ? (
                     <p>
-                      <span className="text-muted-foreground">Invitați:</span>{" "}
+                      <span className="text-muted-foreground">
+                        {t("cabinet.plan.modal.guestsLabel")}
+                      </span>{" "}
                       {plan.guestCountTarget}
                     </p>
                   ) : null}
@@ -3108,7 +3169,7 @@ function PlanArtistCard({
                 {slots.length > 0 && (
                   <div>
                     <Label className="text-xs text-muted-foreground">
-                      Intervale oferite de artist (apasă pentru a prelua)
+                      {t("cabinet.plan.modal.artistSlots")}
                     </Label>
                     <div className="mt-1 flex flex-wrap gap-2">
                       {slots.map((s) => {
@@ -3140,9 +3201,9 @@ function PlanArtistCard({
 
                 {/* Start time picker */}
                 <div>
-                  <Label>Ora de început *</Label>
+                  <Label>{t("cabinet.plan.modal.startTime")}</Label>
                   <p className="mb-2 text-xs text-muted-foreground">
-                    La ce oră dorești să înceapă artistul?
+                    {t("cabinet.plan.modal.startTimeHint")}
                   </p>
                   <TimePicker
                     value={startTime}
@@ -3157,7 +3218,7 @@ function PlanArtistCard({
                   />
                   {artistWorkingHours === null && (
                     <p className="mt-1 text-[11px] text-destructive">
-                      Această zi nu este zi de lucru pentru artist.
+                      {t("cabinet.plan.modal.dayOff")}
                     </p>
                   )}
                 </div>
@@ -3167,9 +3228,9 @@ function PlanArtistCard({
                     duration choice rather than adding to it. */}
                 {eventOffers.length > 0 && (
                   <div>
-                    <Label>Preț per eveniment</Label>
+                    <Label>{t("cabinet.plan.modal.perEventPrice")}</Label>
                     <p className="mb-2 text-xs text-muted-foreground">
-                      Artistul are un preț fix pentru acest tip de eveniment.
+                      {t("cabinet.plan.modal.perEventHint")}
                     </p>
                     <div className="grid gap-2 sm:grid-cols-2">
                       {eventOffers.map((offer) => {
@@ -3202,7 +3263,7 @@ function PlanArtistCard({
                                   selected ? "text-gold" : "text-foreground",
                                 )}
                               >
-                                {offer.tier.nameRo || "Preț per eveniment"}
+                                {offer.tier.nameRo || t("cabinet.plan.modal.perEventPrice")}
                               </span>
                               <span
                                 className={cn(
@@ -3215,7 +3276,9 @@ function PlanArtistCard({
                             </div>
                             {minutes != null && (
                               <span className="text-[11px] text-muted-foreground">
-                                ~{formatDuration(minutes)} în medie
+                                {t("cabinet.plan.modal.averageDuration", {
+                                  duration: formatDuration(minutes),
+                                })}
                               </span>
                             )}
                           </button>
@@ -3228,20 +3291,20 @@ function PlanArtistCard({
                 {/* Duration picker — the resolver picks the right price */}
                 <div>
                   <Label>
-                    Durata de participare{" "}
+                    {t("cabinet.plan.modal.participationDuration")}{" "}
                     {eventOffers.length > 0 && selectedEventTierId != null
-                      ? "(înlocuită de prețul per eveniment)"
+                      ? t("cabinet.plan.modal.replacedByPerEvent")
                       : "*"}
                   </Label>
                   <p className="mb-2 text-xs text-muted-foreground">
                     {durationOptions.length > 0
-                      ? "Alege durata. Prețul se calculează în funcție de dată și oră."
-                      : "Artistul nu a definit tarife. Alege manual ora de sfârșit."}
+                      ? t("cabinet.plan.modal.durationHint")
+                      : t("cabinet.plan.modal.noTariffs")}
                   </p>
                   {packagesLoading ? (
                     <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      Se încarcă pachetele…
+                      {t("cabinet.plan.modal.loadingPackages")}
                     </div>
                   ) : durationOptions.length > 0 ? (
                     <div className="grid grid-cols-2 gap-2">
@@ -3280,13 +3343,13 @@ function PlanArtistCard({
                         const overrideLabel =
                           preview && preview.tier.scope !== "base"
                             ? preview.tier.scope === "weekend"
-                              ? "weekend"
+                              ? t("cabinet.plan.scope.weekend")
                               : preview.tier.scope === "weekday"
-                                ? "zi lucr."
+                                ? t("cabinet.plan.scope.weekday")
                                 : preview.tier.scope === "evening"
-                                  ? "seara"
+                                  ? t("cabinet.plan.scope.evening")
                                   : preview.tier.scope === "specific_day"
-                                    ? "zi specială"
+                                    ? t("cabinet.plan.scope.specificDay")
                                     : ""
                             : "";
                         return (
@@ -3296,7 +3359,9 @@ function PlanArtistCard({
                             disabled={submitting || exceedsWorkingHours}
                             title={
                               exceedsWorkingHours
-                                ? `Depășește orele de lucru ale artistului (până la ${artistWorkingHours?.end})`
+                                ? t("cabinet.plan.modal.exceedsHours", {
+                                    end: artistWorkingHours?.end ?? "",
+                                  })
                                 : undefined
                             }
                             onClick={() => {
@@ -3339,13 +3404,15 @@ function PlanArtistCard({
                                 </span>
                               ) : (
                                 <span className="text-[10px] uppercase text-muted-foreground">
-                                  preț la cerere
+                                  {t("cabinet.plan.modal.priceOnRequest")}
                                 </span>
                               )}
                             </div>
                             {overrideLabel && (
                               <span className="text-[10px] uppercase tracking-wide text-purple-400">
-                                Tarif {overrideLabel}
+                                {t("cabinet.plan.modal.tariffPrefix", {
+                                  scope: overrideLabel,
+                                })}
                               </span>
                             )}
                           </button>
@@ -3360,7 +3427,7 @@ function PlanArtistCard({
                         setEndTime(v);
                         setSelectedSlotId(null);
                       }}
-                      placeholder="Ora de sfârșit"
+                      placeholder={t("cabinet.plan.modal.endTime")}
                     />
                   )}
                 </div>
@@ -3398,20 +3465,20 @@ function PlanArtistCard({
                       </div>
                     ) : (
                       <p className="text-xs">
-                        Ora de început și durata trebuie să fie setate.
+                        {t("cabinet.plan.modal.needStartAndDuration")}
                       </p>
                     )}
                   </div>
                 )}
 
                 <div>
-                  <Label htmlFor={`msg-${artist.id}`}>Mesaj (opțional)</Label>
+                  <Label htmlFor={`msg-${artist.id}`}>{t("cabinet.plan.modal.messageOptional")}</Label>
                   <Textarea
                     id={`msg-${artist.id}`}
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     rows={3}
-                    placeholder="Alte detalii despre eveniment..."
+                    placeholder={t("cabinet.plan.modal.messagePlaceholder")}
                     className="mt-1"
                     disabled={submitting}
                   />
@@ -3424,7 +3491,7 @@ function PlanArtistCard({
                     target="_blank"
                     className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
                   >
-                    Vezi profil <ExternalLink className="h-3 w-3" />
+                    {t("booking.card.viewProfile")} <ExternalLink className="h-3 w-3" />
                   </Link>
                   <div className="flex gap-2">
                     <Button
@@ -3433,7 +3500,7 @@ function PlanArtistCard({
                       onClick={() => setModalOpen(false)}
                       disabled={submitting}
                     >
-                      Anulează
+                      {t("common.cancel")}
                     </Button>
                     <Button
                       size="sm"
@@ -3446,7 +3513,7 @@ function PlanArtistCard({
                       ) : (
                         <Send className="h-4 w-4" />
                       )}
-                      Trimite cerere
+                      {t("booking.card.sendRequest")}
                     </Button>
                   </div>
                 </footer>
@@ -3474,7 +3541,7 @@ function PlanArtistCard({
               <header className="flex items-center justify-between border-b border-border/40 bg-background/60 px-4 py-3">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Chat direct
+                    {t("chat.direct")}
                   </p>
                   <p className="font-heading text-sm font-bold">
                     {artist.nameRo}
@@ -3483,7 +3550,7 @@ function PlanArtistCard({
                 <button
                   onClick={() => setChatOpen(false)}
                   className="rounded-full p-1.5 text-muted-foreground hover:bg-accent"
-                  aria-label="Închide chat"
+                  aria-label={t("cabinet.plan.chat.close")}
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -3495,7 +3562,7 @@ function PlanArtistCard({
                   </div>
                 ) : chatMessages.length === 0 ? (
                   <p className="py-8 text-center text-xs text-muted-foreground">
-                    Scrie primul mesaj — artistul va primi notificare.
+                    {t("cabinet.plan.chat.firstMessage")}
                   </p>
                 ) : (
                   chatMessages.map((m) => (
@@ -3529,14 +3596,14 @@ function PlanArtistCard({
                       sendChatMessage();
                     }
                   }}
-                  placeholder="Scrie un mesaj..."
+                  placeholder={t("chat.inputPlaceholder")}
                   className="flex-1 rounded-full border border-border/40 bg-background px-4 py-2 text-sm focus:border-gold/50 focus:outline-none"
                   disabled={!conversationId || chatSending}
                 />
                 <Button
                   type="button"
                   size="icon"
-                  aria-label="Trimite mesaj"
+                  aria-label={t("chat.send")}
                   onClick={sendChatMessage}
                   disabled={!chatDraft.trim() || !conversationId || chatSending}
                   className="shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
@@ -3607,7 +3674,9 @@ function PlanArtistCard({
               const multiple = count > 1 || (max != null && max > min);
               return (
                 <span className="shrink-0 text-sm font-semibold text-gold">
-                  {multiple ? `de la ${min}€` : `${min}€`}
+                  {multiple
+                    ? t("cabinet.plan.card.priceFrom", { price: min })
+                    : `${min}€`}
                 </span>
               );
             })()}
@@ -3623,11 +3692,15 @@ function PlanArtistCard({
           {/* Available time slots for the event date */}
           <div className="mt-3">
             <p className="text-xs font-semibold text-muted-foreground">
-              Disponibil pe {plan.eventDate ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", { day: "numeric", month: "short" }) : "data evenimentului"}:
+              {t("cabinet.plan.card.availableOn", {
+                date: plan.eventDate
+                  ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", { day: "numeric", month: "short" })
+                  : t("cabinet.plan.card.eventDateFallback"),
+              })}
             </p>
             {slots.length === 0 ? (
               <p className="mt-1 text-xs text-muted-foreground">
-                Toată ziua (nu are intervale definite)
+                {t("cabinet.plan.card.allDay")}
               </p>
             ) : (
               <div className="mt-1 flex flex-wrap gap-1">
@@ -3661,7 +3734,8 @@ function PlanArtistCard({
             >
               {isConfirmed && (
                 <span>
-                  ✓ Rezervat {existingBooking.startTime && existingBooking.endTime ? `${existingBooking.startTime}–${existingBooking.endTime}` : ""}
+                  ✓ {t("cabinet.plan.card.booked")}{" "}
+                  {existingBooking.startTime && existingBooking.endTime ? `${existingBooking.startTime}–${existingBooking.endTime}` : ""}
                   {existingBooking.agreedPrice ? ` · ${existingBooking.agreedPrice}€` : ""}
                 </span>
               )}
@@ -3704,11 +3778,11 @@ function PlanArtistCard({
               size="sm"
               onClick={openChat}
               className="w-full gap-1.5 border-gold/40 text-gold hover:bg-gold/10 @[280px]/card:w-auto @[280px]/card:shrink-0"
-              title="Trimite mesaj artistului"
+              title={t("cabinet.plan.card.messageArtistTitle")}
             >
               <MessageCircle className="h-3.5 w-3.5 shrink-0" />
               <span className="@[320px]/card:inline @[280px]/card:hidden">
-                Mesaj
+                {t("cabinet.plan.card.message")}
               </span>
             </Button>
           </div>
@@ -3747,6 +3821,7 @@ function VenuesTab({
   bookings: BookingRequest[];
   onRefresh: () => Promise<void> | void;
 }) {
+  const { t } = useLocale();
   const [venues, setVenues] = useState<DiscoveryVenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState<number>(plan.venueRadiusKm ?? 25);
@@ -3811,7 +3886,7 @@ function VenuesTab({
   return (
     <div className="space-y-8">
       <section>
-        <h2 className="font-heading text-xl font-bold">Săli pentru evenimentul tău</h2>
+        <h2 className="font-heading text-xl font-bold">{t("cabinet.plan.venues.title")}</h2>
         <p className="text-sm text-muted-foreground">
           {plan.eventDate && (
             <>
@@ -3823,22 +3898,31 @@ function VenuesTab({
             </>
           )}
           {plan.location && <> · {plan.location}</>}
-          {radius > 0 && radius < 999 && <> · rază {radius} km</>}
-          {radius >= 999 && <> · toată Moldova</>}
-          {plan.guestCountTarget && <> · min. {plan.guestCountTarget} invitați</>}
+          {radius > 0 && radius < 999 && (
+            <> · {t("cabinet.plan.venues.radius", { km: radius })}</>
+          )}
+          {radius >= 999 && <> · {t("cabinet.plan.venues.allMoldova")}</>}
+          {plan.guestCountTarget && (
+            <>
+              {" · "}
+              {t("cabinet.plan.venues.minGuests", {
+                count: plan.guestCountTarget,
+              })}
+            </>
+          )}
         </p>
         <p className="mt-2 text-xs text-muted-foreground/80">
-          Rezervările de săli nu sunt incluse în buget — bugetul e format doar din artiști.
+          {t("cabinet.plan.venues.notInBudget")}
         </p>
 
         {/* Radius override — so the user can tweak after the wizard. */}
         <div className="mt-4 flex flex-wrap gap-2">
           {[
-            { value: 0, label: "Doar în oraș" },
-            { value: 25, label: "25 km" },
-            { value: 50, label: "50 km" },
-            { value: 100, label: "100 km" },
-            { value: 999, label: "Toată Moldova" },
+            { value: 0, label: t("cabinet.plan.venues.cityOnly") },
+            { value: 25, label: t("cabinet.plan.venues.km", { km: 25 }) },
+            { value: 50, label: t("cabinet.plan.venues.km", { km: 50 }) },
+            { value: 100, label: t("cabinet.plan.venues.km", { km: 100 }) },
+            { value: 999, label: t("cabinet.plan.venues.allMoldovaOption") },
           ].map((opt) => (
             <button
               key={opt.value}
@@ -3858,7 +3942,9 @@ function VenuesTab({
 
         {expandedCities.length > 1 && (
           <p className="mt-2 text-xs text-muted-foreground">
-            Orașe incluse: {expandedCities.join(", ")}
+            {t("cabinet.plan.venues.citiesIncluded", {
+              cities: expandedCities.join(", "),
+            })}
           </p>
         )}
       </section>
@@ -3870,10 +3956,10 @@ function VenuesTab({
       ) : venues.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/40 py-10 text-center text-muted-foreground">
           <MapPin className="mx-auto mb-3 h-8 w-8 opacity-40" />
-          <p className="text-sm">Nicio sală disponibilă cu aceste criterii.</p>
+          <p className="text-sm">{t("cabinet.plan.venues.noneAvailable")}</p>
           <Link href="/sali">
             <Button variant="outline" size="sm" className="mt-4">
-              Explorează toate sălile
+              {t("cabinet.plan.venues.exploreAll")}
             </Button>
           </Link>
         </div>
@@ -3902,7 +3988,9 @@ function VenuesTab({
                     !!activeVenueBooking &&
                     activeVenueBooking.venueId !== v.id
                       ? {
-                          venueName: activeVenueBooking.venueName ?? "altă sală",
+                          venueName:
+                            activeVenueBooking.venueName ??
+                            t("cabinet.plan.venues.otherVenue"),
                           createdAt: activeVenueBooking.createdAt,
                           status: activeVenueBooking.status,
                         }
@@ -3931,6 +4019,7 @@ function SettingsTab({
   onUpdate: (p: Plan) => void;
   onDelete: () => void;
 }) {
+  const { t } = useLocale();
   const [title, setTitle] = useState(plan.title);
   const [eventType, setEventType] = useState(plan.eventType || "wedding");
   const [eventDate, setEventDate] = useState(plan.eventDate || "");
@@ -4003,21 +4092,21 @@ function SettingsTab({
         }),
       });
       if (!res.ok) {
-        toast.error("Eroare la salvare.");
+        toast.error(t("cabinet.plan.saveError"));
         return;
       }
       const data = await res.json();
       onUpdate(data.plan);
-      toast.success("Setări salvate!");
+      toast.success(t("cabinet.plan.settingsSaved"));
     } catch {
-      toast.error("Eroare la salvare.");
+      toast.error(t("cabinet.plan.saveError"));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleArchive() {
-    if (!confirm("Marchezi evenimentul ca finalizat? Va apărea în secțiunea Arhivă.")) return;
+    if (!confirm(t("cabinet.plan.archiveConfirm"))) return;
     setArchiving(true);
     try {
       const res = await fetch(`/api/event-plans/${plan.id}`, {
@@ -4026,10 +4115,10 @@ function SettingsTab({
         body: JSON.stringify({ status: "completed" }),
       });
       if (!res.ok) {
-        toast.error("Eroare la arhivare.");
+        toast.error(t("cabinet.plan.archiveError"));
         return;
       }
-      toast.success("Eveniment finalizat.");
+      toast.success(t("cabinet.plan.eventCompleted"));
       router.push("/cabinet/arhiva");
     } finally {
       setArchiving(false);
@@ -4038,58 +4127,58 @@ function SettingsTab({
 
   return (
     <div className="max-w-lg">
-      <h2 className="font-heading text-xl font-bold mb-6">Setări plan</h2>
+      <h2 className="font-heading text-xl font-bold mb-6">{t("cabinet.plan.settings.title")}</h2>
 
       <div className="space-y-5">
         <div className="space-y-2">
-          <Label htmlFor="s-title">Titlul planului</Label>
+          <Label htmlFor="s-title">{t("cabinet.plan.settings.planTitle")}</Label>
           <Input id="s-title" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label>Tip eveniment</Label>
+            <Label>{t("cabinet.plan.settings.eventType")}</Label>
             <Select value={eventType} onValueChange={(v) => { if (v) setEventType(v); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {EVENT_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                {EVENT_TYPE_VALUES.map((v) => (
+                  <SelectItem key={v} value={v}>{t(EVENT_TYPE_KEYS[v])}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="s-date">Data evenimentului</Label>
+            <Label htmlFor="s-date">{t("cabinet.plan.settings.eventDate")}</Label>
             <CustomCalendar
               value={eventDate ? new Date(eventDate + "T00:00:00") : null}
               onChange={(d) => {
                 const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
                 setEventDate(iso);
               }}
-              placeholder="Alege data"
+              placeholder={t("calendar.placeholder")}
               className="flex-none"
             />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="s-loc">Locație</Label>
+          <Label htmlFor="s-loc">{t("cabinet.plan.settings.location")}</Label>
           <Input id="s-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Chișinău" />
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="s-guests">Invitați estimați</Label>
+            <Label htmlFor="s-guests">{t("cabinet.plan.settings.estimatedGuests")}</Label>
             <Input id="s-guests" type="number" min="0" value={guestCount} onChange={(e) => setGuestCount(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="s-budget">Buget (EUR)</Label>
+            <Label htmlFor="s-budget">{t("cabinet.plan.settings.budgetEur")}</Label>
             <Input id="s-budget" type="number" min="0" value={budget} onChange={(e) => setBudget(e.target.value)} />
           </div>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="s-notes">Note</Label>
+          <Label htmlFor="s-notes">{t("cabinet.plan.settings.notes")}</Label>
           <Textarea id="s-notes" value={notes} onChange={(e) => setNotes(e.target.value)} rows={3} />
         </div>
 
@@ -4097,10 +4186,11 @@ function SettingsTab({
             the user can fix a plan that was saved with missing categories
             (happened when the wizard's service→slug map was incomplete). */}
         <div className="space-y-2">
-          <Label>Categorii de artiști dorite</Label>
+          <Label>{t("cabinet.plan.settings.wantedCategories")}</Label>
           <p className="text-xs text-muted-foreground">
-            Apasă pentru a adăuga sau scoate o categorie. Acestea conduc
-            secțiunile din tabul <span className="text-gold">Rezervări Artiști</span>.
+            {t("cabinet.plan.settings.categoriesHintPrefix")}
+            <span className="text-gold">{t("cabinet.plan.nav.bookings")}</span>
+            {t("cabinet.plan.settings.categoriesHintSuffix")}
           </p>
           <div className="flex flex-wrap gap-1.5 pt-1">
             {allCategories.length === 0 ? (
@@ -4128,7 +4218,9 @@ function SettingsTab({
           </div>
           {selectedCategoryIds.length > 0 && (
             <p className="text-[11px] text-muted-foreground">
-              {selectedCategoryIds.length} categorii selectate
+              {t("cabinet.plan.discovery.categoriesSelected", {
+                count: selectedCategoryIds.length,
+              })}
             </p>
           )}
         </div>
@@ -4140,17 +4232,19 @@ function SettingsTab({
             className="mt-0.5"
           />
           <div className="flex-1 text-sm">
-            <p className="font-medium">Am nevoie de sală / restaurant</p>
+            <p className="font-medium">{t("cabinet.plan.settings.needVenue")}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Activează tabul <span className="text-gold">Săli</span> pentru a vedea locații disponibile.
+              {t("cabinet.plan.settings.enableTabPrefix")}
+              <span className="text-gold">{t("cabinet.plan.nav.venues")}</span>
+              {t("cabinet.plan.settings.venueTabSuffix")}
             </p>
           </div>
         </label>
 
         <div className="space-y-2 pt-2">
-          <h3 className="text-sm font-semibold">Funcții opționale</h3>
+          <h3 className="text-sm font-semibold">{t("cabinet.plan.settings.optionalFeatures")}</h3>
           <p className="text-xs text-muted-foreground">
-            Activează tab-urile pe care vrei să le folosești pentru acest eveniment.
+            {t("cabinet.plan.settings.optionalHint")}
           </p>
         </div>
 
@@ -4161,9 +4255,9 @@ function SettingsTab({
             className="mt-0.5"
           />
           <div className="flex-1 text-sm">
-            <p className="font-medium">Checklist</p>
+            <p className="font-medium">{t("cabinet.plan.nav.checklist")}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Lista pașilor de pregătire pentru evenimentul tău.
+              {t("cabinet.plan.settings.checklistHint")}
             </p>
           </div>
         </label>
@@ -4181,9 +4275,9 @@ function SettingsTab({
             className="mt-0.5"
           />
           <div className="flex-1 text-sm">
-            <p className="font-medium">Listă invitați</p>
+            <p className="font-medium">{t("cabinet.plan.settings.guestList")}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              Importă, RSVP, alocare la mese.
+              {t("cabinet.plan.settings.guestListHint")}
             </p>
           </div>
         </label>
@@ -4196,9 +4290,9 @@ function SettingsTab({
               className="mt-0.5"
             />
             <div className="flex-1 text-sm">
-              <p className="font-medium">Așezare mese</p>
+              <p className="font-medium">{t("cabinet.plan.settings.seating")}</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Disponibil doar când ai listă de invitați activă.
+                {t("cabinet.plan.settings.seatingHint")}
               </p>
             </div>
           </label>
@@ -4210,12 +4304,12 @@ function SettingsTab({
           className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
         >
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Salvează setările
+          {t("cabinet.plan.settings.save")}
         </Button>
 
         <div className="pt-6 border-t border-border/20 space-y-3">
           <div>
-            <h3 className="text-sm font-semibold mb-2">Finalizare</h3>
+            <h3 className="text-sm font-semibold mb-2">{t("cabinet.plan.settings.finalize")}</h3>
             {(() => {
               // Block early finalize — the user used to be able to mark
               // an event "completed" months before it actually happened,
@@ -4244,11 +4338,11 @@ function SettingsTab({
                     ) : (
                       <Save className="h-4 w-4" />
                     )}
-                    Marchează ca finalizat → Arhivă
+                    {t("cabinet.plan.settings.markComplete")}
                   </Button>
                   {!eventOver && (
                     <p className="mt-2 text-xs text-muted-foreground">
-                      Disponibil după ce evenimentul are loc.
+                      {t("cabinet.plan.settings.availableAfterEvent")}
                     </p>
                   )}
                 </>
@@ -4256,14 +4350,14 @@ function SettingsTab({
             })()}
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-destructive mb-2">Zona periculoasă</h3>
+            <h3 className="text-sm font-semibold text-destructive mb-2">{t("cabinet.plan.settings.dangerZone")}</h3>
             <Button
               onClick={onDelete}
               variant="outline"
               size="sm"
               className="gap-1 text-destructive hover:bg-destructive/5 border-destructive/30"
             >
-              <Trash2 className="h-4 w-4" /> Șterge planul complet
+              <Trash2 className="h-4 w-4" /> {t("cabinet.plan.settings.deletePlan")}
             </Button>
           </div>
         </div>
@@ -4307,6 +4401,7 @@ function EventProgressCard({
 }) {
   void _onSwitchTab;
   const router = useRouter();
+  const { t } = useLocale();
   const [archiving, setArchiving] = useState(false);
 
   // Bookings buckets — fixed colour codes the user can read at a glance.
@@ -4351,15 +4446,15 @@ function EventProgressCard({
         body: JSON.stringify({ status: "completed" }),
       });
       if (!res.ok) {
-        toast.error("Nu am putut marca evenimentul ca finalizat.");
+        toast.error(t("cabinet.plan.markCompleteError"));
         return;
       }
       const data = await res.json().catch(() => null);
       if (data?.plan) onPlanUpdate(data.plan);
-      toast.success("Eveniment finalizat. Mulțumim!");
+      toast.success(t("cabinet.plan.eventCompletedThanks"));
       router.refresh();
     } catch {
-      toast.error("Eroare la finalizare.");
+      toast.error(t("cabinet.plan.finalizeError"));
     } finally {
       setArchiving(false);
     }
@@ -4369,19 +4464,18 @@ function EventProgressCard({
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-heading">
-          Progresul evenimentului
+          {t("cabinet.plan.progress.title")}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Verde = confirmat · Galben = în așteptare · Roșu = refuzat ·
-          Gri = neînceput
+          {t("cabinet.plan.progress.legend")}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Parteneri */}
         {totalSlots > 0 ? (
           <ProgressRow
-            label="Parteneri"
-            sub={`${confirmedB}/${totalSlots} confirmați${pendingB ? ` · ${pendingB} în așteptare` : ""}${rejectedB ? ` · ${rejectedB} refuzate` : ""}`}
+            label={t("cabinet.plan.progress.partners")}
+            sub={`${t("cabinet.plan.progress.partnersSub", { confirmed: confirmedB, total: totalSlots })}${pendingB ? t("cabinet.plan.progress.pendingSuffix", { count: pendingB }) : ""}${rejectedB ? t("cabinet.plan.progress.rejectedSuffix", { count: rejectedB }) : ""}`}
             segments={[
               ...Array(confirmedB).fill("confirmed" as const),
               ...Array(pendingB).fill("pending" as const),
@@ -4391,8 +4485,8 @@ function EventProgressCard({
           />
         ) : (
           <ProgressRow
-            label="Parteneri"
-            sub="Nu ai trimis cereri încă"
+            label={t("cabinet.plan.progress.partners")}
+            sub={t("cabinet.plan.progress.noRequests")}
             segments={["idle", "idle", "idle", "idle"]}
           />
         )}
@@ -4400,11 +4494,25 @@ function EventProgressCard({
         {/* Invitați — only if the section is on */}
         {plan.guestsEnabled && (
           <PercentBar
-            label="Invitați"
+            label={t("cabinet.plan.nav.guests")}
             sub={
               guestTarget > 0
-                ? `${guestAccepted} acceptat${guestAccepted === 1 ? "" : "i"} din ${guestTarget}${guestDeclined ? ` · ${guestDeclined} refuzat${guestDeclined === 1 ? "" : "i"}` : ""}`
-                : "Adaugă invitați pentru a urmări RSVP"
+                ? `${t(
+                    guestAccepted === 1
+                      ? "cabinet.plan.progress.guestsAcceptedOne"
+                      : "cabinet.plan.progress.guestsAcceptedMany",
+                    { count: guestAccepted, total: guestTarget },
+                  )}${
+                    guestDeclined
+                      ? t(
+                          guestDeclined === 1
+                            ? "cabinet.plan.progress.guestsDeclinedOne"
+                            : "cabinet.plan.progress.guestsDeclinedMany",
+                          { count: guestDeclined },
+                        )
+                      : ""
+                  }`
+                : t("cabinet.plan.progress.addGuests")
             }
             buckets={{
               confirmed: guestAccepted,
@@ -4419,8 +4527,12 @@ function EventProgressCard({
         {/* Checklist — only if the section is on */}
         {plan.checklistEnabled && checklistTotal > 0 && (
           <PercentBar
-            label="Checklist"
-            sub={`${checklistDone} din ${checklistTotal} bifate (${checklistPct}%)`}
+            label={t("cabinet.plan.nav.checklist")}
+            sub={t("cabinet.plan.progress.checklistSub", {
+              done: checklistDone,
+              total: checklistTotal,
+              pct: checklistPct,
+            })}
             buckets={{
               confirmed: checklistDone,
               pending: 0,
@@ -4445,15 +4557,12 @@ function EventProgressCard({
               ) : (
                 <CheckCircle2 className="h-4 w-4" />
               )}
-              Marchează evenimentul ca finalizat
+              {t("cabinet.plan.progress.markComplete")}
             </button>
           ) : (
             <div className="flex items-start gap-2 text-xs text-muted-foreground">
               <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                Evenimentul poate fi marcat ca finalizat după ce a avut
-                loc și toate cererile au răspuns.
-              </span>
+              <span>{t("cabinet.plan.progress.markCompleteHint")}</span>
             </div>
           )}
         </div>
@@ -4558,6 +4667,7 @@ function AllCategoriesBookedPanel({
   bookings: BookingRequest[];
 }) {
   const router = useRouter();
+  const { t } = useLocale();
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
   const confirmedCount = bookings.filter(
     (b) => b.status === "accepted" || b.status === "confirmed_by_client",
@@ -4569,12 +4679,15 @@ function AllCategoriesBookedPanel({
 
   const headline =
     pendingCount > 0
-      ? "Toate categoriile au cereri trimise — așteptăm răspunsurile"
-      : "Toți partenerii confirmați!";
+      ? t("cabinet.plan.done.headlinePending")
+      : t("cabinet.plan.done.headlineConfirmed");
   const subline =
     pendingCount > 0
-      ? `${confirmedCount} confirmate · ${pendingCount} în așteptare. Vei primi notificare când răspund. Partenerii au 24h să răspundă.`
-      : "Toți cei pe care i-ai invitat au confirmat — felicitări!";
+      ? t("cabinet.plan.done.sublinePending", {
+          confirmed: confirmedCount,
+          pending: pendingCount,
+        })
+      : t("cabinet.plan.done.sublineConfirmed");
 
   // Catalogue of artist/service categories user could ADD. Strips
   // anything already on the plan so the picker only offers extras.
@@ -4608,13 +4721,13 @@ function AllCategoriesBookedPanel({
         body: JSON.stringify({ [field]: true }),
       });
       if (!res.ok) {
-        toast.error("Nu am putut activa secțiunea.");
+        toast.error(t("cabinet.plan.done.activateError"));
         return;
       }
       router.refresh();
-      toast.success("Activat. Reîncarcă pagina ca să-l vezi în meniu.");
+      toast.success(t("cabinet.plan.done.activated"));
     } catch {
-      toast.error("Eroare la activare.");
+      toast.error(t("cabinet.plan.done.activateFailed"));
     }
   }
 
@@ -4628,13 +4741,13 @@ function AllCategoriesBookedPanel({
         body: JSON.stringify({ selectedCategories: next }),
       });
       if (!res.ok) {
-        toast.error("Nu am putut adăuga categoria.");
+        toast.error(t("cabinet.plan.done.addCategoryError"));
         return;
       }
-      toast.success("Categorie adăugată — caut artiștii disponibili.");
+      toast.success(t("cabinet.plan.done.categoryAdded"));
       router.refresh();
     } catch {
-      toast.error("Eroare la salvare.");
+      toast.error(t("cabinet.plan.saveError"));
     } finally {
       setAdding(false);
     }
@@ -4658,7 +4771,7 @@ function AllCategoriesBookedPanel({
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-base">Ce mai poți face acum</CardTitle>
+          <CardTitle className="text-base">{t("cabinet.plan.done.whatNext")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
           {plan.checklistEnabled && (
@@ -4669,7 +4782,7 @@ function AllCategoriesBookedPanel({
               <div className="flex items-center gap-3">
                 <ClipboardList className="h-4 w-4 text-gold" />
                 <span className="text-sm font-medium">
-                  Vezi checklist-ul evenimentului
+                  {t("cabinet.plan.done.seeChecklist")}
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">→</span>
@@ -4683,7 +4796,7 @@ function AllCategoriesBookedPanel({
               <div className="flex items-center gap-3">
                 <Users className="h-4 w-4 text-gold" />
                 <span className="text-sm font-medium">
-                  Lista de invitați + RSVP
+                  {t("cabinet.plan.done.guestListRsvp")}
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">→</span>
@@ -4697,7 +4810,7 @@ function AllCategoriesBookedPanel({
               <div className="flex items-center gap-3">
                 <MapPin className="h-4 w-4 text-gold" />
                 <span className="text-sm font-medium">
-                  Verifică sala rezervată
+                  {t("cabinet.plan.done.checkVenue")}
                 </span>
               </div>
               <span className="text-xs text-muted-foreground">→</span>
@@ -4710,7 +4823,7 @@ function AllCategoriesBookedPanel({
             <div className="flex items-center gap-3">
               <LayoutDashboard className="h-4 w-4 text-gold" />
               <span className="text-sm font-medium">
-                Înapoi la prezentare
+                {t("cabinet.plan.done.backToOverview")}
               </span>
             </div>
             <span className="text-xs text-muted-foreground">→</span>
@@ -4722,10 +4835,10 @@ function AllCategoriesBookedPanel({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
-              Suplimentar, poți activa
+              {t("cabinet.plan.done.canAlsoEnable")}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Secțiuni care te ajută să planifici ce a mai rămas.
+              {t("cabinet.plan.done.canAlsoEnableHint")}
             </p>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -4738,14 +4851,14 @@ function AllCategoriesBookedPanel({
                 <div className="flex items-center gap-3">
                   <ClipboardList className="h-4 w-4 text-gold" />
                   <div>
-                    <p className="text-sm font-medium">Activează Checklist</p>
+                    <p className="text-sm font-medium">{t("cabinet.plan.done.enableChecklist")}</p>
                     <p className="text-xs text-muted-foreground">
-                      Lista pașilor pre-populată după tipul evenimentului.
+                      {t("cabinet.plan.done.enableChecklistHint")}
                     </p>
                   </div>
                 </div>
                 <span className="rounded-md border border-gold/30 px-2 py-1 text-xs text-gold">
-                  Activează
+                  {t("cabinet.plan.done.enable")}
                 </span>
               </button>
             )}
@@ -4759,15 +4872,15 @@ function AllCategoriesBookedPanel({
                   <Users className="h-4 w-4 text-gold" />
                   <div>
                     <p className="text-sm font-medium">
-                      Activează Lista Invitaților
+                      {t("cabinet.plan.done.enableGuests")}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Importă, RSVP, alocare la mese.
+                      {t("cabinet.plan.settings.guestListHint")}
                     </p>
                   </div>
                 </div>
                 <span className="rounded-md border border-gold/30 px-2 py-1 text-xs text-gold">
-                  Activează
+                  {t("cabinet.plan.done.enable")}
                 </span>
               </button>
             )}
@@ -4779,11 +4892,10 @@ function AllCategoriesBookedPanel({
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base">
-              Mai vrei alți parteneri cât aștepți răspunsul?
+              {t("cabinet.plan.done.morePartners")}
             </CardTitle>
             <p className="text-xs text-muted-foreground">
-              Adaugă o categorie nouă de parteneri pe planul tău; rămân
-              alături de cele existente.
+              {t("cabinet.plan.done.morePartnersHint")}
             </p>
           </CardHeader>
           <CardContent>
@@ -4807,7 +4919,7 @@ function AllCategoriesBookedPanel({
       {everythingEnabled && pendingCount === 0 && (
         <Card className="border-emerald-500/40 bg-emerald-500/5">
           <CardContent className="py-4 text-center text-sm text-emerald-300">
-            Tot e bifat. Vei primi notificare dacă apare ceva nou.
+            {t("cabinet.plan.done.allChecked")}
           </CardContent>
         </Card>
       )}
@@ -4822,6 +4934,7 @@ function AllCategoriesBookedPanel({
  * still live on /cabinet/rezervari for now.
  */
 function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
+  const { t } = useLocale();
   const ACTIVE_STATUSES = new Set([
     "accepted",
     "confirmed_by_client",
@@ -4843,13 +4956,13 @@ function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
         className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/40 bg-card/60 p-3 text-sm"
       >
         <div className="flex-1 min-w-0">
-          <p className="font-medium">{target?.name ?? "Partener"}</p>
+          <p className="font-medium">{target?.name ?? t("cabinet.plan.my.partnerFallback")}</p>
           <p className="text-xs text-muted-foreground">
             {target?.type === "venue"
-              ? "Sală"
+              ? t("cabinet.plan.my.venue")
               : b.categoryNames && b.categoryNames.length > 0
                 ? b.categoryNames.join(" · ")
-                : "Artist"}
+                : t("cabinet.plan.artistFallback")}
             {b.eventDate &&
               ` · ${new Date(b.eventDate + "T00:00:00").toLocaleDateString(
                 "ro-MD",
@@ -4868,7 +4981,7 @@ function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
             href={`/artisti/${target.slug}`}
             className="text-xs text-gold hover:underline"
           >
-            Profil →
+            {t("cabinet.plan.my.profile")} →
           </Link>
         )}
         {target?.slug && target.type === "venue" && (
@@ -4876,7 +4989,7 @@ function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
             href={`/sali/${target.slug}`}
             className="text-xs text-gold hover:underline"
           >
-            Profil →
+            {t("cabinet.plan.my.profile")} →
           </Link>
         )}
       </div>
@@ -4886,20 +4999,19 @@ function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
   return (
     <div className="space-y-6">
       <header>
-        <h2 className="font-heading text-xl font-bold">Cererile mele</h2>
+        <h2 className="font-heading text-xl font-bold">{t("cabinet.plan.nav.myBookings")}</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Toate cererile pe care le-ai trimis pentru acest eveniment —
-          săli și parteneri într-un singur loc.
+          {t("cabinet.plan.my.subtitle")}
         </p>
       </header>
 
       <section>
         <h3 className="mb-2 font-heading text-sm font-bold text-gold">
-          Rezervate ({confirmed.length})
+          {t("cabinet.plan.my.booked")} ({confirmed.length})
         </h3>
         {confirmed.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border/40 px-3 py-6 text-center text-xs text-muted-foreground">
-            Nicio rezervare confirmată încă.
+            {t("cabinet.plan.my.noneConfirmed")}
           </p>
         ) : (
           <div className="space-y-2">{confirmed.map(row)}</div>
@@ -4908,11 +5020,11 @@ function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
 
       <section>
         <h3 className="mb-2 font-heading text-sm font-bold text-amber-500">
-          În așteptare ({pending.length})
+          {t("cabinet.plan.my.pending")} ({pending.length})
         </h3>
         {pending.length === 0 ? (
           <p className="rounded-lg border border-dashed border-border/40 px-3 py-6 text-center text-xs text-muted-foreground">
-            Nicio cerere în așteptare.
+            {t("cabinet.plan.my.nonePending")}
           </p>
         ) : (
           <div className="space-y-2">{pending.map(row)}</div>
@@ -4947,6 +5059,7 @@ function VenueDiscoveryCard({
 }) {
   const { user } = useUser();
   const router = useRouter();
+  const { t } = useLocale();
   const [submitting, setSubmitting] = useState(false);
 
   const isHolder = !!existingBooking && existingBooking.status === "pending";
@@ -4960,7 +5073,7 @@ function VenueDiscoveryCard({
 
   async function sendRequest() {
     if (!plan.eventDate) {
-      toast.error("Adaugă mai întâi data evenimentului în planul tău");
+      toast.error(t("cabinet.plan.venueCard.needDate"));
       return;
     }
     setSubmitting(true);
@@ -4982,9 +5095,9 @@ function VenueDiscoveryCard({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Eroare la trimitere");
+        throw new Error(err.error || t("cabinet.plan.sendError"));
       }
-      toast.success(`Cerere trimisă la ${v.nameRo}!`);
+      toast.success(t("cabinet.plan.venueCard.requestSent", { name: v.nameRo }));
       await onRefresh();
       // Hand control to the partners tab — booking the venue is the
       // first decision; assembling the show is what comes next. The
@@ -4994,7 +5107,7 @@ function VenueDiscoveryCard({
         router.replace(`/cabinet/planifica/${plan.id}?tab=bookings`);
       }, 2500);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("cabinet.plan.genericError"));
     } finally {
       setSubmitting(false);
     }
@@ -5026,10 +5139,19 @@ function VenueDiscoveryCard({
           <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
             {v.capacityMin && v.capacityMax && (
               <span>
-                {v.capacityMin}–{v.capacityMax} locuri
+                {t("cabinet.plan.venueCard.seats", {
+                  min: v.capacityMin,
+                  max: v.capacityMax,
+                })}
               </span>
             )}
-            {v.pricePerPerson != null && <span>{v.pricePerPerson}€/pers</span>}
+            {v.pricePerPerson != null && (
+              <span>
+                {t("cabinet.plan.venueCard.perPerson", {
+                  price: v.pricePerPerson,
+                })}
+              </span>
+            )}
           </div>
         </div>
       </Link>
@@ -5040,7 +5162,9 @@ function VenueDiscoveryCard({
         <div className="mt-3 rounded-lg border px-3 py-2 text-xs">
           {isHolder ? (
             <div className="flex flex-col gap-0.5 text-amber-500">
-              <span className="font-medium">⏳ Cerere în așteptare</span>
+              <span className="font-medium">
+                ⏳ {t("cabinet.plan.venueCard.pending")}
+              </span>
               <PendingCountdown
                 createdAt={existingBooking.createdAt ?? null}
                 windowHours={72}
@@ -5048,11 +5172,11 @@ function VenueDiscoveryCard({
             </div>
           ) : isConfirmed ? (
             <div className="text-success">
-              ✓ Sala a confirmat — verifică detaliile pe contractul/email-ul tău.
+              ✓ {t("cabinet.plan.venueCard.confirmed")}
             </div>
           ) : (
             <div className="text-muted-foreground">
-              Cererea anterioară către această sală a fost respinsă/anulată.
+              {t("cabinet.plan.venueCard.declined")}
             </div>
           )}
         </div>
@@ -5064,8 +5188,9 @@ function VenueDiscoveryCard({
           countdown the holder card has. */}
       {!existingBooking && blockedByOtherVenue && (
         <div className="mt-3 rounded-lg border border-border/40 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-          Ai deja o cerere în așteptare la {blockedByOtherVenue.venueName}. Vei
-          putea trimite o solicitare aici după ce răspunde.
+          {t("cabinet.plan.venueCard.blockedByOther", {
+            name: blockedByOtherVenue.venueName,
+          })}
         </div>
       )}
 
@@ -5077,9 +5202,11 @@ function VenueDiscoveryCard({
           className="flex-1 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           title={
             blockedByOtherVenue
-              ? `Așteaptă răspunsul de la ${blockedByOtherVenue.venueName}`
+              ? t("cabinet.plan.venueCard.waitingFor", {
+                  name: blockedByOtherVenue.venueName,
+                })
               : declinedHere
-                ? "Această sală a refuzat cererea anterioară"
+                ? t("cabinet.plan.venueCard.declinedTitle")
                 : undefined
           }
         >
@@ -5091,19 +5218,19 @@ function VenueDiscoveryCard({
             <BookOpen className="h-3.5 w-3.5" />
           )}
           {declinedHere
-            ? "Refuzată"
+            ? t("cabinet.plan.venueCard.ctaDeclined")
             : isConfirmed
-              ? "Confirmată"
+              ? t("cabinet.plan.venueCard.ctaConfirmed")
               : isHolder
-                ? "În așteptare"
+                ? t("cabinet.plan.my.pending")
                 : blockedByOtherVenue
-                  ? "Indisponibil"
-                  : "Solicită rezervare"}
+                  ? t("cabinet.plan.venueCard.ctaUnavailable")
+                  : t("booking.card.requestBooking")}
         </Button>
         <Link href={`/sali/${v.slug}?plan=${plan.id}`} target="_blank">
           <Button size="sm" variant="outline" className="gap-1.5">
             <ExternalLink className="h-3.5 w-3.5" />
-            Detalii
+            {t("cabinet.plan.venueCard.details")}
           </Button>
         </Link>
       </div>

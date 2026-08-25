@@ -29,6 +29,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { useLocale } from "@/hooks/use-locale";
 
 export type GuestType = "single" | "couple" | "family";
 export type ContactChannel =
@@ -55,10 +56,10 @@ export interface Guest {
   notes: string | null;
 }
 
-const GUEST_TYPE_LABELS: Record<GuestType, string> = {
-  single: "Singură persoană",
-  couple: "Cuplu",
-  family: "Familie",
+const GUEST_TYPE_KEYS: Record<GuestType, string> = {
+  single: "cabinet.guests.typeSingle",
+  couple: "cabinet.guests.typeCouple",
+  family: "cabinet.guests.typeFamily",
 };
 
 const CHANNEL_LABELS: Record<ContactChannel, string> = {
@@ -69,17 +70,22 @@ const CHANNEL_LABELS: Record<ContactChannel, string> = {
   telegram: "Telegram",
 };
 
-const CHANNEL_PLACEHOLDERS: Record<ContactChannel, string> = {
-  email: "email@exemplu.com",
-  sms: "+373 60 000 000",
-  whatsapp: "+373 60 000 000",
-  viber: "+373 60 000 000",
-  telegram: "@username sau +373 60 000 000",
+const CHANNEL_PLACEHOLDER_KEYS: Record<ContactChannel, string> = {
+  email: "cabinet.guests.phEmail",
+  sms: "cabinet.guests.phPhone",
+  whatsapp: "cabinet.guests.phPhone",
+  viber: "cabinet.guests.phPhone",
+  telegram: "cabinet.guests.phTelegram",
 };
 
 /** Singular / plural greeting line that sits between the guest name
  *  and the event title. Couples + families get the plural form so the
- *  copy doesn't address one person when two or more were invited. */
+ *  copy doesn't address one person when two or more were invited.
+ *
+ *  Deliberately NOT translated: this is the invitation's own copy, and
+ *  the email the guests receive is rendered in Romanian server-side. A
+ *  translated preview would show the host something their guests never
+ *  get. */
 function defaultGreeting(guestType: GuestType | null | undefined): string {
   if (guestType === "couple" || guestType === "family") {
     return "Sunteți invitați";
@@ -97,14 +103,14 @@ const DECOR_ICONS = [
  *  when the design is rendered. Keeping it small so the preview stays
  *  snappy and font requests don't stack up. */
 const FONT_OPTIONS = [
-  { value: "__default__", label: "Implicit (din șablon)" },
-  { value: "Playfair Display", label: "Playfair Display (clasic)" },
-  { value: "Cormorant Garamond", label: "Cormorant Garamond (elegant)" },
-  { value: "Dancing Script", label: "Dancing Script (cursiv)" },
-  { value: "Great Vibes", label: "Great Vibes (caligrafic)" },
-  { value: "Inter", label: "Inter (modern)" },
-  { value: "Montserrat", label: "Montserrat (modern bold)" },
-  { value: "Pacifico", label: "Pacifico (relaxat)" },
+  { value: "__default__", labelKey: "cabinet.guests.fontDefault" },
+  { value: "Playfair Display", labelKey: "cabinet.guests.fontPlayfair" },
+  { value: "Cormorant Garamond", labelKey: "cabinet.guests.fontCormorant" },
+  { value: "Dancing Script", labelKey: "cabinet.guests.fontDancing" },
+  { value: "Great Vibes", labelKey: "cabinet.guests.fontGreatVibes" },
+  { value: "Inter", labelKey: "cabinet.guests.fontInter" },
+  { value: "Montserrat", labelKey: "cabinet.guests.fontMontserrat" },
+  { value: "Pacifico", labelKey: "cabinet.guests.fontPacifico" },
 ];
 
 interface PlanContext {
@@ -126,12 +132,12 @@ interface Props {
 
 const RSVP_CONFIG: Record<
   Guest["rsvp"],
-  { label: string; color: string; icon: React.ComponentType<{ className?: string }> }
+  { labelKey: string; color: string; icon: React.ComponentType<{ className?: string }> }
 > = {
-  pending: { label: "În așteptare", color: "text-muted-foreground", icon: UserMinus },
-  accepted: { label: "Confirmat", color: "text-emerald-500", icon: UserCheck },
-  declined: { label: "Refuzat", color: "text-red-500", icon: UserX },
-  maybe: { label: "Posibil", color: "text-amber-500", icon: UserMinus },
+  pending: { labelKey: "cabinet.guests.rsvpPending", color: "text-muted-foreground", icon: UserMinus },
+  accepted: { labelKey: "cabinet.guests.rsvpAccepted", color: "text-emerald-500", icon: UserCheck },
+  declined: { labelKey: "cabinet.guests.rsvpDeclined", color: "text-red-500", icon: UserX },
+  maybe: { labelKey: "cabinet.guests.rsvpMaybe", color: "text-amber-500", icon: UserMinus },
 };
 
 function ThemedDateInput({
@@ -164,6 +170,7 @@ function ThemedDateInput({
 }
 
 export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }: Props) {
+  const { t } = useLocale();
   const [name, setName] = useState("");
   const [guestType, setGuestType] = useState<GuestType>("single");
   /** Adults — only meaningful for type="family" (2..8). couple is locked
@@ -234,7 +241,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
    *  preview renders the image instead of the emoji glyph. */
   async function handleIconUpload(file: File) {
     if (!file.type.startsWith("image/")) {
-      toast.error("Selectează un fișier imagine.");
+      toast.error(t("cabinet.guests.pickImage"));
       return;
     }
     setUploadingIcon(true);
@@ -250,7 +257,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       const data = await res.json();
       setCustom((s) => ({ ...s, iconImageUrl: data.url }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la upload");
+      toast.error(
+        err instanceof Error ? err.message : t("cabinet.guests.uploadError"),
+      );
     } finally {
       setUploadingIcon(false);
     }
@@ -258,7 +267,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
 
   function openSendDialog() {
     if (!plan) {
-      toast.error("Date insuficiente despre eveniment.");
+      toast.error(t("cabinet.guests.missingEventData"));
       return;
     }
     // Auto-fill event metadata from the plan, but keep whichever design
@@ -286,7 +295,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       (g) => g.email || g.phone,
     );
     if (guestsWithContact.length === 0) {
-      toast.error("Niciun invitat nu are un contact (email/telefon).");
+      toast.error(t("cabinet.guests.noContacts"));
       return;
     }
     setSending(true);
@@ -343,7 +352,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       });
       if (!createRes.ok) {
         const err = await createRes.json().catch(() => ({}));
-        throw new Error(err.error || "Nu s-a putut crea invitația");
+        throw new Error(err.error || t("cabinet.guests.createFailed"));
       }
       const invitation = await createRes.json();
 
@@ -360,14 +369,14 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       });
       if (sendRes.ok) {
         const d = await sendRes.json();
-        toast.success(`${d.sent} invitații trimise!`);
+        toast.success(t("cabinet.guests.sentCount", { count: d.sent }));
       } else {
-        toast.success("Invitație creată. Emailurile vor fi trimise.");
+        toast.success(t("cabinet.guests.createdQueued"));
       }
       setSendDialogOpen(false);
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Eroare la trimitere",
+        err instanceof Error ? err.message : t("booking.card.sendError"),
       );
     } finally {
       setSending(false);
@@ -384,7 +393,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
 
       if (rows.length === 0) {
-        toast.error("Fișierul nu conține rânduri.");
+        toast.error(t("cabinet.guests.emptyFile"));
         return;
       }
 
@@ -434,10 +443,10 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         onChange([...guests, ...newGuests]);
       }
 
-      toast.success(`Au fost importați ${imported} invitați.`);
+      toast.success(t("cabinet.guests.importedCount", { count: imported }));
     } catch (err) {
       console.error(err);
-      toast.error("Eroare la importul fișierului.");
+      toast.error(t("cabinet.guests.importError"));
     } finally {
       setImporting(false);
       // reset file input so the same file can be re-imported if needed
@@ -477,7 +486,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
 
   async function addGuest() {
     if (name.trim().length < 1) {
-      toast.error("Numele este obligatoriu.");
+      toast.error(t("cabinet.guests.nameRequired"));
       return;
     }
     setAdding(true);
@@ -506,7 +515,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         }),
       });
       if (!res.ok) {
-        toast.error("Eroare la adăugare.");
+        toast.error(t("cabinet.guests.addError"));
         return;
       }
       const data = await res.json();
@@ -530,7 +539,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       body: JSON.stringify({ rsvp }),
     });
     if (!res.ok) {
-      toast.error("Nu am putut actualiza.");
+      toast.error(t("cabinet.guests.updateError"));
       onChange(prev);
     }
   }
@@ -542,7 +551,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       method: "DELETE",
     });
     if (!res.ok) {
-      toast.error("Nu am putut șterge.");
+      toast.error(t("cabinet.guests.deleteError"));
       onChange(prev);
     }
   }
@@ -551,11 +560,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
     <div className="space-y-5">
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-        <StatCard icon={Users} label="Total" value={stats.total} target={guestCountTarget} />
-        <StatCard icon={UserCheck} label="Confirmați" value={stats.accepted} color="text-emerald-500" />
-        <StatCard icon={UserMinus} label="În așteptare" value={stats.pending} />
-        <StatCard icon={UserMinus} label="Posibil" value={stats.maybe} color="text-amber-500" />
-        <StatCard icon={UserX} label="Refuzați" value={stats.declined} color="text-red-500" />
+        <StatCard icon={Users} label={t("cabinet.guests.statTotal")} value={stats.total} target={guestCountTarget} />
+        <StatCard icon={UserCheck} label={t("cabinet.guests.statAccepted")} value={stats.accepted} color="text-emerald-500" />
+        <StatCard icon={UserMinus} label={t("cabinet.guests.rsvpPending")} value={stats.pending} />
+        <StatCard icon={UserMinus} label={t("cabinet.guests.rsvpMaybe")} value={stats.maybe} color="text-amber-500" />
+        <StatCard icon={UserX} label={t("cabinet.guests.statDeclined")} value={stats.declined} color="text-red-500" />
       </div>
 
       {/* Inline design picker + customization editor. The 4 baseline
@@ -577,7 +586,8 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             : guests.find((g) => g.id === previewGuestId) ?? null;
         const previewType: GuestType =
           (previewGuest?.guestType as GuestType | null) ?? "single";
-        const previewName = previewGuest?.fullName || "{Numele invitatului}";
+        const previewName =
+          previewGuest?.fullName || t("cabinet.guests.previewNamePlaceholder");
         // Effective values = customization override OR template default.
         const effIcon =
           custom.decorIcon ||
@@ -616,9 +626,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
           <div className="rounded-xl border border-border/40 bg-card p-4">
             <div className="mb-3 flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <p className="font-heading font-bold">Design invitație</p>
+                <p className="font-heading font-bold">
+                  {t("cabinet.guests.designTitle")}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Alege un șablon și personalizează-l. Modificările sunt vizibile în previzualizare.
+                  {t("cabinet.guests.designSubtitle")}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -635,7 +647,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                     showCustomize && "bg-gold text-[#0D0D0D] hover:bg-gold-dark",
                   )}
                 >
-                  {showCustomize ? "Ascunde" : "Personalizează"}
+                  {showCustomize
+                    ? t("cabinet.guests.hide")
+                    : t("cookies.customize")}
                 </Button>
               </div>
             </div>
@@ -704,7 +718,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                 <div className="space-y-4 rounded-lg border border-border/40 bg-background/40 p-4">
                   {/* Header text */}
                   <div>
-                    <Label className="text-xs">Text de sus</Label>
+                    <Label className="text-xs">
+                      {t("cabinet.guests.fieldTopText")}
+                    </Label>
                     <Input
                       className="mt-1"
                       value={custom.headerText}
@@ -717,17 +733,21 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
 
                   {/* Event name (the big title shown on the invitation) */}
                   <div>
-                    <Label className="text-xs">Nume eveniment afișat</Label>
+                    <Label className="text-xs">
+                      {t("cabinet.guests.fieldEventName")}
+                    </Label>
                     <Input
                       className="mt-1"
                       value={custom.eventName}
                       onChange={(e) =>
                         setCustom((s) => ({ ...s, eventName: e.target.value }))
                       }
-                      placeholder={plan.title || "Ex: Nunta Ana & Ion"}
+                      placeholder={plan.title || t("cabinet.guests.eventNameExample")}
                     />
                     <p className="mt-1 text-[11px] text-muted-foreground">
-                      Lasă gol pentru a folosi titlul evenimentului ({plan.title || "—"}).
+                      {t("cabinet.guests.fieldEventNameHint", {
+                        title: plan.title || "—",
+                      })}
                     </p>
                   </div>
 
@@ -735,7 +755,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <Label className="text-xs">
-                        Dimensiune nume ({custom.titleSize}px)
+                        {t("cabinet.guests.fieldTitleSize", {
+                          size: custom.titleSize,
+                        })}
                       </Label>
                       <input
                         type="range"
@@ -753,7 +775,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Aliniere nume</Label>
+                      <Label className="text-xs">
+                        {t("cabinet.guests.fieldTitleAlign")}
+                      </Label>
                       <div className="mt-1 grid grid-cols-3 gap-1">
                         {(["left", "center", "right"] as Align[]).map((a) => (
                           <button
@@ -769,7 +793,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                                 : "border-border/40 hover:border-gold/40",
                             )}
                           >
-                            {a === "left" ? "⬅ Stg" : a === "center" ? "◆ Cn" : "Drp ➡"}
+                            {a === "left"
+                              ? t("cabinet.guests.alignLeft")
+                              : a === "center"
+                                ? t("cabinet.guests.alignCenter")
+                                : t("cabinet.guests.alignRight")}
                           </button>
                         ))}
                       </div>
@@ -778,7 +806,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
 
                   {/* Icon picker — emoji glyphs */}
                   <div>
-                    <Label className="text-xs">Iconiță (din listă)</Label>
+                    <Label className="text-xs">
+                      {t("cabinet.guests.fieldIconList")}
+                    </Label>
                     <div className="mt-1 flex flex-wrap gap-1.5">
                       {DECOR_ICONS.map((ic) => {
                         const active =
@@ -812,7 +842,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
 
                   {/* Custom icon upload */}
                   <div>
-                    <Label className="text-xs">Sau încarcă o iconiță proprie</Label>
+                    <Label className="text-xs">
+                      {t("cabinet.guests.fieldIconUpload")}
+                    </Label>
                     <div className="mt-1 flex items-center gap-2">
                       <input
                         ref={iconFileInputRef}
@@ -838,7 +870,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                         ) : (
                           <FileUp className="h-3.5 w-3.5" />
                         )}
-                        {custom.iconImageUrl ? "Schimbă imaginea" : "Încarcă imagine"}
+                        {custom.iconImageUrl
+                          ? t("cabinet.guests.changeImage")
+                          : t("cabinet.guests.uploadImage")}
                       </Button>
                       {custom.iconImageUrl && (
                         <>
@@ -856,7 +890,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                             }
                             className="text-xs text-muted-foreground hover:text-destructive"
                           >
-                            Șterge
+                            {t("common.delete")}
                           </Button>
                         </>
                       )}
@@ -867,7 +901,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <Label className="text-xs">
-                        Dimensiune iconiță ({custom.iconSize}px)
+                        {t("cabinet.guests.fieldIconSize", {
+                          size: custom.iconSize,
+                        })}
                       </Label>
                       <input
                         type="range"
@@ -885,7 +921,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                       />
                     </div>
                     <div>
-                      <Label className="text-xs">Aliniere iconiță</Label>
+                      <Label className="text-xs">
+                        {t("cabinet.guests.fieldIconAlign")}
+                      </Label>
                       <div className="mt-1 grid grid-cols-3 gap-1">
                         {(["left", "center", "right"] as Align[]).map((a) => (
                           <button
@@ -901,7 +939,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                                 : "border-border/40 hover:border-gold/40",
                             )}
                           >
-                            {a === "left" ? "⬅ Stg" : a === "center" ? "◆ Cn" : "Drp ➡"}
+                            {a === "left"
+                              ? t("cabinet.guests.alignLeft")
+                              : a === "center"
+                                ? t("cabinet.guests.alignCenter")
+                                : t("cabinet.guests.alignRight")}
                           </button>
                         ))}
                       </div>
@@ -911,7 +953,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                   {/* Colors */}
                   <div className="grid gap-3 sm:grid-cols-3">
                     <div>
-                      <Label className="text-xs">Fundal</Label>
+                      <Label className="text-xs">
+                        {t("cabinet.guests.fieldBg")}
+                      </Label>
                       <div className="mt-1 flex items-center gap-2">
                         <input
                           type="color"
@@ -931,7 +975,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                       </div>
                     </div>
                     <div>
-                      <Label className="text-xs">Text</Label>
+                      <Label className="text-xs">
+                        {t("cabinet.guests.fieldText")}
+                      </Label>
                       <div className="mt-1 flex items-center gap-2">
                         <input
                           type="color"
@@ -951,7 +997,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                       </div>
                     </div>
                     <div>
-                      <Label className="text-xs">Accent</Label>
+                      <Label className="text-xs">
+                        {t("cabinet.guests.fieldAccent")}
+                      </Label>
                       <div className="mt-1 flex items-center gap-2">
                         <input
                           type="color"
@@ -974,7 +1022,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
 
                   {/* Font */}
                   <div>
-                    <Label className="text-xs">Font titlu</Label>
+                    <Label className="text-xs">
+                      {t("cabinet.guests.fieldFont")}
+                    </Label>
                     <Select
                       value={custom.fontHeading || "__default__"}
                       onValueChange={(v) =>
@@ -985,18 +1035,23 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                       }
                     >
                       <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Implicit (din șablon)">
+                        <SelectValue
+                          placeholder={t("cabinet.guests.fontDefault")}
+                        >
                           {custom.fontHeading
-                            ? (FONT_OPTIONS.find(
-                                (f) => f.value === custom.fontHeading,
-                              )?.label ?? custom.fontHeading)
-                            : "Implicit (din șablon)"}
+                            ? (() => {
+                                const opt = FONT_OPTIONS.find(
+                                  (f) => f.value === custom.fontHeading,
+                                );
+                                return opt ? t(opt.labelKey) : custom.fontHeading;
+                              })()
+                            : t("cabinet.guests.fontDefault")}
                         </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {FONT_OPTIONS.map((f) => (
                           <SelectItem key={f.value} value={f.value}>
-                            {f.label}
+                            {t(f.labelKey)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -1012,11 +1067,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                         onClick={() => setCustom(initialCustom)}
                         className="text-xs"
                       >
-                        Resetează la șablon
+                        {t("cabinet.guests.resetTemplate")}
                       </Button>
                     ) : (
                       <span className="text-[11px] text-muted-foreground">
-                        Modificările folosesc valorile din șablon implicit.
+                        {t("cabinet.guests.usingDefaults")}
                       </span>
                     )}
                   </div>
@@ -1026,7 +1081,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                 <div className="space-y-2">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                      Previzualizare
+                      {t("cabinet.guests.preview")}
                     </Label>
                     {/* Preview-as selector — pick a real guest (or the
                         demo placeholder) so the host sees how the
@@ -1041,18 +1096,24 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                         }
                       >
                         <SelectTrigger className="h-7 w-auto gap-1 text-xs">
-                          <SelectValue placeholder="Previzualizează ca…" />
+                          <SelectValue
+                            placeholder={t("cabinet.guests.previewAs")}
+                          />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="demo">Placeholder</SelectItem>
+                          <SelectItem value="demo">
+                            {t("cabinet.guests.previewDemo")}
+                          </SelectItem>
                           {guests.map((g) => (
                             <SelectItem key={g.id} value={String(g.id)}>
                               {g.fullName} (
-                              {g.guestType === "couple"
-                                ? "cuplu"
-                                : g.guestType === "family"
-                                  ? "familie"
-                                  : "singură"}
+                              {t(
+                                g.guestType === "couple"
+                                  ? "cabinet.guests.typeCoupleLower"
+                                  : g.guestType === "family"
+                                    ? "cabinet.guests.typeFamilyLower"
+                                    : "cabinet.guests.typeSingleLower",
+                              )}
                               )
                             </SelectItem>
                           ))}
@@ -1144,7 +1205,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                         textAlign: custom.titleAlign,
                       }}
                     >
-                      {plan.eventDate || "Data evenimentului"}
+                      {plan.eventDate || t("cabinet.guests.fieldEventDate")}
                     </div>
                   </div>
                 </div>
@@ -1162,9 +1223,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               <Mail className="h-4 w-4" />
             </div>
             <div>
-              <p className="font-heading font-bold">Trimite invitații electronice</p>
+              <p className="font-heading font-bold">
+                {t("cabinet.guests.sendTitle")}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Alege un design și trimite invitația cu RSVP la toți invitații.
+                {t("cabinet.guests.sendSubtitle")}
               </p>
             </div>
           </div>
@@ -1173,7 +1236,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             <Send className="h-4 w-4" />
-            Configurează și trimite
+            {t("cabinet.guests.configureAndSend")}
           </Button>
         </div>
       )}
@@ -1181,25 +1244,25 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       {/* Add guest */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
         <p className="mb-3 text-xs font-medium uppercase text-muted-foreground">
-          Adaugă invitat
+          {t("cabinet.guests.addGuest")}
         </p>
 
         {/* Row 1 — name + type + (optional) family size */}
         <div className="grid gap-3 md:grid-cols-12">
           <div className="md:col-span-5">
             <Label htmlFor="gname" className="text-xs">
-              Nume invitat
+              {t("cabinet.guests.fieldGuestName")}
             </Label>
             <Input
               id="gname"
               className="mt-1"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex: Ion Popescu"
+              placeholder={t("cabinet.guests.guestNameExample")}
             />
           </div>
           <div className="md:col-span-4">
-            <Label className="text-xs">Tip</Label>
+            <Label className="text-xs">{t("cabinet.guests.fieldType")}</Label>
             <Select
               value={guestType}
               onValueChange={(v) => {
@@ -1211,19 +1274,25 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               }}
             >
               <SelectTrigger className="mt-1">
-                <SelectValue>{GUEST_TYPE_LABELS[guestType]}</SelectValue>
+                <SelectValue>{t(GUEST_TYPE_KEYS[guestType])}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="single">Singură persoană (1)</SelectItem>
-                <SelectItem value="couple">Cuplu (2)</SelectItem>
-                <SelectItem value="family">Familie (2-8)</SelectItem>
+                <SelectItem value="single">
+                  {t("cabinet.guests.optSingle")}
+                </SelectItem>
+                <SelectItem value="couple">
+                  {t("cabinet.guests.optCouple")}
+                </SelectItem>
+                <SelectItem value="family">
+                  {t("cabinet.guests.optFamily")}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
           {guestType === "family" && (
             <div className="md:col-span-3">
               <Label className="text-xs" htmlFor="famsize">
-                Persoane în familie
+                {t("cabinet.guests.fieldFamilySize")}
               </Label>
               <Input
                 id="famsize"
@@ -1241,7 +1310,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         {/* Row 2 — channel + contact value + kids */}
         <div className="mt-3 grid gap-3 md:grid-cols-12">
           <div className="md:col-span-3">
-            <Label className="text-xs">Canal contact</Label>
+            <Label className="text-xs">
+              {t("cabinet.guests.fieldChannel")}
+            </Label>
             <Select
               value={contactChannel}
               onValueChange={(v) => {
@@ -1262,19 +1333,21 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
           </div>
           <div className="md:col-span-6">
             <Label className="text-xs">
-              {contactChannel === "email" ? "Email" : "Telefon / Username"}
+              {contactChannel === "email"
+                ? "Email"
+                : t("cabinet.guests.fieldPhoneOrUsername")}
             </Label>
             <Input
               className="mt-1"
               type={contactChannel === "email" ? "email" : "text"}
               value={contactValue}
               onChange={(e) => setContactValue(e.target.value)}
-              placeholder={CHANNEL_PLACEHOLDERS[contactChannel]}
+              placeholder={t(CHANNEL_PLACEHOLDER_KEYS[contactChannel])}
             />
           </div>
           <div className="md:col-span-3">
             <Label className="text-xs" htmlFor="kids">
-              Copii
+              {t("cabinet.guests.fieldKids")}
             </Label>
             <Input
               id="kids"
@@ -1311,7 +1384,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             ) : (
               <FileUp className="h-4 w-4" />
             )}
-            Import Excel
+            {t("cabinet.guests.importExcel")}
           </Button>
           <Button
             onClick={addGuest}
@@ -1323,23 +1396,25 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             ) : (
               <Plus className="h-4 w-4" />
             )}
-            Adaugă
+            {t("common.add")}
           </Button>
         </div>
       </div>
 
       {/* Table */}
       {guests.length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">Niciun invitat încă.</p>
+        <p className="py-8 text-center text-muted-foreground">
+          {t("cabinet.guests.emptyList")}
+        </p>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border/40 bg-card">
           <table className="w-full text-sm">
             <thead className="border-b border-border/40 text-xs uppercase text-muted-foreground">
               <tr>
-                <th className="p-3 text-left">Nume</th>
-                <th className="p-3 text-left">Tip</th>
-                <th className="p-3 text-left">Contact</th>
-                <th className="p-3 text-left">Copii</th>
+                <th className="p-3 text-left">{t("form.name")}</th>
+                <th className="p-3 text-left">{t("cabinet.guests.fieldType")}</th>
+                <th className="p-3 text-left">{t("cabinet.guests.colContact")}</th>
+                <th className="p-3 text-left">{t("cabinet.guests.fieldKids")}</th>
                 <th className="p-3 text-left">RSVP</th>
                 <th className="p-3" />
               </tr>
@@ -1356,10 +1431,13 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                     <td className="p-3 font-medium">{g.fullName}</td>
                     <td className="p-3 text-muted-foreground">
                       {(() => {
-                        const t = (g.guestType ?? "single") as GuestType;
-                        if (t === "single") return "Singură";
-                        if (t === "couple") return "Cuplu (2)";
-                        return `Familie (${g.partySize ?? 2})`;
+                        const gt = (g.guestType ?? "single") as GuestType;
+                        if (gt === "single")
+                          return t("cabinet.guests.typeSingleShort");
+                        if (gt === "couple") return t("cabinet.guests.optCouple");
+                        return t("cabinet.guests.familyOfCount", {
+                          count: g.partySize ?? 2,
+                        });
                       })()}
                     </td>
                     <td className="p-3 text-muted-foreground">
@@ -1368,7 +1446,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                         const v =
                           g.contactValue ?? g.email ?? g.phone ?? null;
                         if (!v) return "—";
-                        const label = ch ? CHANNEL_LABELS[ch] : "Contact";
+                        const label = ch
+                          ? CHANNEL_LABELS[ch]
+                          : t("cabinet.guests.colContact");
                         return (
                           <span className="inline-flex items-center gap-1.5">
                             <span className="rounded-md bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase">
@@ -1379,7 +1459,11 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                         );
                       })()}
                     </td>
-                    <td className="p-3">{(g.kidsCount ?? 0) > 0 ? `+${g.kidsCount} copii` : "—"}</td>
+                    <td className="p-3">
+                      {(g.kidsCount ?? 0) > 0
+                        ? t("cabinet.guests.kidsCount", { count: g.kidsCount ?? 0 })
+                        : "—"}
+                    </td>
                     <td className="p-3">
                       <Select
                         value={g.rsvp}
@@ -1392,10 +1476,18 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="pending">În așteptare</SelectItem>
-                          <SelectItem value="accepted">Confirmat</SelectItem>
-                          <SelectItem value="maybe">Posibil</SelectItem>
-                          <SelectItem value="declined">Refuzat</SelectItem>
+                          <SelectItem value="pending">
+                            {t("cabinet.guests.rsvpPending")}
+                          </SelectItem>
+                          <SelectItem value="accepted">
+                            {t("cabinet.guests.rsvpAccepted")}
+                          </SelectItem>
+                          <SelectItem value="maybe">
+                            {t("cabinet.guests.rsvpMaybe")}
+                          </SelectItem>
+                          <SelectItem value="declined">
+                            {t("cabinet.guests.rsvpDeclined")}
+                          </SelectItem>
                         </SelectContent>
                       </Select>
                     </td>
@@ -1403,7 +1495,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                       <button
                         onClick={() => deleteGuest(g)}
                         className="text-muted-foreground transition-colors hover:text-red-500"
-                        aria-label="Șterge"
+                        aria-label={t("common.delete")}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -1420,17 +1512,18 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       <Dialog open={sendDialogOpen} onOpenChange={setSendDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Configurează invitația</DialogTitle>
+            <DialogTitle>{t("cabinet.guests.dialogTitle")}</DialogTitle>
             <DialogDescription>
-              Alege designul și verifică informațiile care vor apărea pe invitație.
-              Datele sunt precompletate din evenimentul tău.
+              {t("cabinet.guests.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-5">
             {/* Design picker */}
             <div>
-              <Label className="mb-2 block">Design invitație</Label>
+              <Label className="mb-2 block">
+                {t("cabinet.guests.designTitle")}
+              </Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {INVITATION_DESIGN_LIST.map((d) => {
                   const active = invData.designId === d.id;
@@ -1496,7 +1589,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             {/* Editable fields */}
             <div className="space-y-3">
               <div>
-                <Label className="text-xs">Nume afișat pe invitație</Label>
+                <Label className="text-xs">
+                  {t("cabinet.guests.fieldDisplayName")}
+                </Label>
                 <Input
                   className="mt-1"
                   value={invData.coupleNames}
@@ -1508,7 +1603,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label className="text-xs">Data evenimentului</Label>
+                  <Label className="text-xs">
+                    {t("cabinet.guests.fieldEventDate")}
+                  </Label>
                   <div className="mt-1">
                     <ThemedDateInput
                       value={invData.eventDate}
@@ -1517,7 +1614,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs">Termen limită RSVP</Label>
+                  <Label className="text-xs">
+                    {t("cabinet.guests.fieldRsvpDeadline")}
+                  </Label>
                   <div className="mt-1">
                     <ThemedDateInput
                       value={invData.rsvpDeadline}
@@ -1528,7 +1627,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label className="text-xs">Ora ceremoniei</Label>
+                  <Label className="text-xs">
+                    {t("cabinet.guests.fieldCeremonyTime")}
+                  </Label>
                   <div className="mt-1">
                     <TimePicker
                       value={invData.ceremonyTime}
@@ -1537,7 +1638,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                   </div>
                 </div>
                 <div>
-                  <Label className="text-xs">Ora petrecerii</Label>
+                  <Label className="text-xs">
+                    {t("cabinet.guests.fieldReceptionTime")}
+                  </Label>
                   <div className="mt-1">
                     <TimePicker
                       value={invData.receptionTime}
@@ -1547,7 +1650,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Locația ceremoniei</Label>
+                <Label className="text-xs">
+                  {t("cabinet.guests.fieldCeremonyLocation")}
+                </Label>
                 <Input
                   className="mt-1"
                   value={invData.ceremonyLocation}
@@ -1560,7 +1665,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                 />
               </div>
               <div>
-                <Label className="text-xs">Locația petrecerii</Label>
+                <Label className="text-xs">
+                  {t("cabinet.guests.fieldReceptionLocation")}
+                </Label>
                 <Input
                   className="mt-1"
                   value={invData.receptionLocation}
@@ -1573,7 +1680,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                 />
               </div>
               <div>
-                <Label className="text-xs">Mesaj personal</Label>
+                <Label className="text-xs">
+                  {t("cabinet.guests.fieldMessage")}
+                </Label>
                 <Textarea
                   className="mt-1"
                   value={invData.message}
@@ -1584,14 +1693,16 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                 />
               </div>
               <div>
-                <Label className="text-xs">Cod vestimentar (opțional)</Label>
+                <Label className="text-xs">
+                  {t("cabinet.guests.fieldDressCode")}
+                </Label>
                 <Input
                   className="mt-1"
                   value={invData.dressCode}
                   onChange={(e) =>
                     setInvData((s) => ({ ...s, dressCode: e.target.value }))
                   }
-                  placeholder="Ținută elegantă"
+                  placeholder={t("cabinet.guests.dressCodeExample")}
                 />
               </div>
             </div>
@@ -1603,7 +1714,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               onClick={() => setSendDialogOpen(false)}
               disabled={sending}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={createAndSendInvitation}
@@ -1615,7 +1726,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Trimite invitațiile ({guests.filter((g) => g.email || g.phone).length})
+              {t("cabinet.guests.sendInvitations", {
+                count: guests.filter((g) => g.email || g.phone).length,
+              })}
             </Button>
           </DialogFooter>
         </DialogContent>

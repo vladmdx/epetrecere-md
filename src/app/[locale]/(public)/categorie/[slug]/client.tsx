@@ -135,7 +135,7 @@ function FilterPanel({
             onChange={(event) =>
               onPriceMinChange(event.target.value.replace(/\D/g, ""))
             }
-            placeholder="Min €"
+            placeholder={t("catalogFilters.priceMin")}
             className="h-9 rounded-lg border border-white/10 bg-black/18 px-2.5 text-xs text-white outline-none placeholder:text-white/35 focus:border-[#e6b84d]/60"
           />
           <input
@@ -144,7 +144,7 @@ function FilterPanel({
             onChange={(event) =>
               onPriceMaxChange(event.target.value.replace(/\D/g, ""))
             }
-            placeholder="Max €"
+            placeholder={t("catalogFilters.priceMax")}
             className="h-9 rounded-lg border border-white/10 bg-black/18 px-2.5 text-xs text-white outline-none placeholder:text-white/35 focus:border-[#e6b84d]/60"
           />
         </div>

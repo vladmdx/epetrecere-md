@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 const RichEditor = dynamic(
   () => import("@/components/shared/rich-editor").then((m) => m.RichEditor),
@@ -62,6 +63,7 @@ interface VenueData {
 }
 
 export default function AdminEditVenuePage() {
+  const { t } = useLocale();
   const params = useParams();
   const id = Number(params?.id);
   const [venue, setVenue] = useState<VenueData | null>(null);
@@ -77,14 +79,14 @@ export default function AdminEditVenuePage() {
       .then((data) => {
         if (cancelled) return;
         if (data) setVenue(data);
-        else toast.error("Sala nu a fost găsită");
+        else toast.error(t("admin.venueEdit.notFoundToast"));
       })
-      .catch(() => toast.error("Eroare la încărcare"))
+      .catch(() => toast.error(t("admin.venueEdit.loadError")))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, t]);
 
   function update(partial: Partial<VenueData>) {
     setVenue((prev) => (prev ? { ...prev, ...partial } : prev));
@@ -126,9 +128,9 @@ export default function AdminEditVenuePage() {
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Sala a fost salvată!");
+      toast.success(t("admin.venueEdit.saved"));
     } catch {
-      toast.error("Eroare la salvare");
+      toast.error(t("admin.venueEdit.saveError"));
     } finally {
       setSaving(false);
     }
@@ -137,9 +139,7 @@ export default function AdminEditVenuePage() {
   async function handleDelete() {
     if (!venue) return;
     if (
-      !confirm(
-        `Sigur ștergi sala "${venue.nameRo}"? Acțiunea este ireversibilă și va elimina galeria, meniul și recenziile asociate.`,
-      )
+      !confirm(t("admin.venueEdit.deleteConfirm", { name: venue.nameRo }))
     ) {
       return;
     }
@@ -150,10 +150,10 @@ export default function AdminEditVenuePage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut șterge");
+        toast.error(err.error || t("admin.venueEdit.deleteError"));
         return;
       }
-      toast.success("Sala a fost ștearsă");
+      toast.success(t("admin.venueEdit.deleted"));
       // Hard navigate so the list re-fetches
       window.location.href = "/admin/sali";
     } finally {
@@ -173,12 +173,14 @@ export default function AdminEditVenuePage() {
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
         <AlertCircle className="h-10 w-10 text-destructive" />
-        <p className="text-sm text-muted-foreground">Sala nu a fost găsită.</p>
+        <p className="text-sm text-muted-foreground">
+          {t("admin.venueEdit.notFound")}
+        </p>
         <Link
           href="/admin/sali"
           className="text-sm text-gold hover:underline"
         >
-          Înapoi la listă
+          {t("admin.venueEdit.backToList")}
         </Link>
       </div>
     );
@@ -191,7 +193,7 @@ export default function AdminEditVenuePage() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Înapoi la listă săli"
+            aria-label={t("admin.venueEdit.backToVenues")}
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
@@ -208,7 +210,7 @@ export default function AdminEditVenuePage() {
           <Link href={`/sali/${venue.slug}`} target="_blank" rel="noopener">
             <Button variant="outline" size="sm" className="gap-2">
               <Eye className="h-4 w-4" />
-              Vezi public
+              {t("admin.venueEdit.viewPublic")}
             </Button>
           </Link>
           <Button
@@ -223,7 +225,7 @@ export default function AdminEditVenuePage() {
             ) : (
               <Trash2 className="h-4 w-4" />
             )}
-            Șterge
+            {t("admin.venueEdit.delete")}
           </Button>
           <Button
             onClick={save}
@@ -235,7 +237,7 @@ export default function AdminEditVenuePage() {
             ) : (
               <Save className="h-4 w-4" />
             )}
-            Salvează
+            {t("admin.venueEdit.save")}
           </Button>
         </div>
       </div>
@@ -245,9 +247,11 @@ export default function AdminEditVenuePage() {
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2">
           <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
             <div>
-              <p className="text-sm font-medium">Publicată</p>
+              <p className="text-sm font-medium">
+                {t("admin.venueEdit.published")}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Vizibilă pe /sali
+                {t("admin.venueEdit.publishedHint")}
               </p>
             </div>
             <Switch
@@ -257,9 +261,11 @@ export default function AdminEditVenuePage() {
           </div>
           <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
             <div>
-              <p className="text-sm font-medium">Featured</p>
+              <p className="text-sm font-medium">
+                {t("admin.venueEdit.featured")}
+              </p>
               <p className="text-xs text-muted-foreground">
-                Promovată pe homepage
+                {t("admin.venueEdit.featuredHint")}
               </p>
             </div>
             <Switch
@@ -272,42 +278,44 @@ export default function AdminEditVenuePage() {
 
       <Tabs defaultValue="info">
         <TabsList>
-          <TabsTrigger value="info">Informații</TabsTrigger>
-          <TabsTrigger value="description">Descriere</TabsTrigger>
-          <TabsTrigger value="seo">SEO</TabsTrigger>
-          <TabsTrigger value="extras">Meniu & Tur 360°</TabsTrigger>
+          <TabsTrigger value="info">{t("admin.venueEdit.tabInfo")}</TabsTrigger>
+          <TabsTrigger value="description">
+            {t("admin.venueEdit.tabDescription")}
+          </TabsTrigger>
+          <TabsTrigger value="seo">{t("admin.venueEdit.tabSeo")}</TabsTrigger>
+          <TabsTrigger value="extras">{t("admin.venueEdit.tabExtras")}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="mt-6 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Date generale</CardTitle>
+              <CardTitle>{t("admin.venueEdit.generalData")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <Label>Nume (RO)</Label>
+                  <Label>{t("admin.venueEdit.nameRo")}</Label>
                   <Input
                     value={venue.nameRo}
                     onChange={(e) => update({ nameRo: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Nume (RU)</Label>
+                  <Label>{t("admin.venueEdit.nameRu")}</Label>
                   <Input
                     value={venue.nameRu ?? ""}
                     onChange={(e) => update({ nameRu: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Nume (EN)</Label>
+                  <Label>{t("admin.venueEdit.nameEn")}</Label>
                   <Input
                     value={venue.nameEn ?? ""}
                     onChange={(e) => update({ nameEn: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Oraș</Label>
+                  <Label>{t("admin.venueEdit.city")}</Label>
                   <Input
                     value={venue.city ?? ""}
                     onChange={(e) => update({ city: e.target.value })}
@@ -315,7 +323,7 @@ export default function AdminEditVenuePage() {
                 </div>
               </div>
               <div>
-                <Label>Adresă</Label>
+                <Label>{t("admin.venueEdit.address")}</Label>
                 <Input
                   value={venue.address ?? ""}
                   onChange={(e) => update({ address: e.target.value })}
@@ -323,7 +331,7 @@ export default function AdminEditVenuePage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <Label>Capacitate min.</Label>
+                  <Label>{t("admin.venueEdit.capacityMin")}</Label>
                   <Input
                     type="number"
                     value={venue.capacityMin ?? ""}
@@ -337,7 +345,7 @@ export default function AdminEditVenuePage() {
                   />
                 </div>
                 <div>
-                  <Label>Capacitate max.</Label>
+                  <Label>{t("admin.venueEdit.capacityMax")}</Label>
                   <Input
                     type="number"
                     value={venue.capacityMax ?? ""}
@@ -351,7 +359,7 @@ export default function AdminEditVenuePage() {
                   />
                 </div>
                 <div>
-                  <Label>Preț per persoană (€)</Label>
+                  <Label>{t("admin.venueEdit.pricePerPerson")}</Label>
                   <Input
                     type="number"
                     value={venue.pricePerPerson ?? ""}
@@ -367,14 +375,14 @@ export default function AdminEditVenuePage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <Label>Telefon</Label>
+                  <Label>{t("admin.venueEdit.phone")}</Label>
                   <Input
                     value={venue.phone ?? ""}
                     onChange={(e) => update({ phone: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Email</Label>
+                  <Label>{t("admin.venueEdit.email")}</Label>
                   <Input
                     type="email"
                     value={venue.email ?? ""}
@@ -382,7 +390,7 @@ export default function AdminEditVenuePage() {
                   />
                 </div>
                 <div>
-                  <Label>Website</Label>
+                  <Label>{t("admin.venueEdit.website")}</Label>
                   <Input
                     type="url"
                     value={venue.website ?? ""}
@@ -397,28 +405,34 @@ export default function AdminEditVenuePage() {
         <TabsContent value="description" className="mt-6 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Descriere</CardTitle>
+              <CardTitle>{t("admin.venueEdit.descriptionTitle")}</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Editori rich-text pentru fiecare limbă.
+                {t("admin.venueEdit.descriptionHint")}
               </p>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <Label className="mb-2 block">Descriere (RO)</Label>
+                <Label className="mb-2 block">
+                  {t("admin.venueEdit.descriptionRo")}
+                </Label>
                 <RichEditor
                   content={venue.descriptionRo ?? ""}
                   onChange={(v) => update({ descriptionRo: v })}
                 />
               </div>
               <div>
-                <Label className="mb-2 block">Descriere (RU)</Label>
+                <Label className="mb-2 block">
+                  {t("admin.venueEdit.descriptionRu")}
+                </Label>
                 <RichEditor
                   content={venue.descriptionRu ?? ""}
                   onChange={(v) => update({ descriptionRu: v })}
                 />
               </div>
               <div>
-                <Label className="mb-2 block">Descriere (EN)</Label>
+                <Label className="mb-2 block">
+                  {t("admin.venueEdit.descriptionEn")}
+                </Label>
                 <RichEditor
                   content={venue.descriptionEn ?? ""}
                   onChange={(v) => update({ descriptionEn: v })}
@@ -431,7 +445,7 @@ export default function AdminEditVenuePage() {
         <TabsContent value="seo" className="mt-6 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>SEO multi-limbă</CardTitle>
+              <CardTitle>{t("admin.venueEdit.seoTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {(["Ro", "Ru", "En"] as const).map((lang) => {
@@ -443,14 +457,14 @@ export default function AdminEditVenuePage() {
                   <div key={lang} className="space-y-3">
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       {lang === "Ro"
-                        ? "🇷🇴 Română"
+                        ? t("admin.venueEdit.langRo")
                         : lang === "Ru"
-                          ? "🇷🇺 Rusă"
-                          : "🇬🇧 Engleză"}
+                          ? t("admin.venueEdit.langRu")
+                          : t("admin.venueEdit.langEn")}
                     </p>
                     <div>
                       <Label>
-                        Meta title
+                        {t("admin.venueEdit.metaTitle")}
                         <span className="ml-2 text-xs text-muted-foreground">
                           {title.length}/60
                         </span>
@@ -464,7 +478,7 @@ export default function AdminEditVenuePage() {
                     </div>
                     <div>
                       <Label>
-                        Meta description
+                        {t("admin.venueEdit.metaDescription")}
                         <span className="ml-2 text-xs text-muted-foreground">
                           {desc.length}/160
                         </span>
@@ -487,14 +501,14 @@ export default function AdminEditVenuePage() {
         <TabsContent value="extras" className="mt-6 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Meniu digital</CardTitle>
+              <CardTitle>{t("admin.venueEdit.digitalMenu")}</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Owner-ul sălii îl editează din dashboard — aici e doar read.
+                {t("admin.venueEdit.digitalMenuHint")}
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label>URL meniu (extern)</Label>
+                <Label>{t("admin.venueEdit.menuUrl")}</Label>
                 <Input
                   type="url"
                   value={venue.menuUrl ?? ""}
@@ -502,7 +516,7 @@ export default function AdminEditVenuePage() {
                 />
               </div>
               <div>
-                <Label>PDF meniu (încărcat)</Label>
+                <Label>{t("admin.venueEdit.menuPdf")}</Label>
                 <Input
                   type="url"
                   value={venue.menuPdfUrl ?? ""}
@@ -514,11 +528,11 @@ export default function AdminEditVenuePage() {
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle>Tur virtual 360°</CardTitle>
+              <CardTitle>{t("admin.venueEdit.virtualTour")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div>
-                <Label>URL embed</Label>
+                <Label>{t("admin.venueEdit.embedUrl")}</Label>
                 <Input
                   type="url"
                   value={venue.virtualTourUrl ?? ""}
@@ -534,7 +548,7 @@ export default function AdminEditVenuePage() {
                     src={venue.virtualTourUrl}
                     className="h-full w-full"
                     allow="xr-spatial-tracking; fullscreen"
-                    title="Virtual tour preview"
+                    title={t("admin.venueEdit.tourPreview")}
                   />
                 </div>
               )}

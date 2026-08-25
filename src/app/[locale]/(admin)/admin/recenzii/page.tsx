@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Star, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Review {
   id: number;
@@ -21,6 +22,7 @@ interface Review {
 }
 
 export default function AdminReviewsPage() {
+  const { t } = useLocale();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "approved">("pending");
@@ -29,9 +31,9 @@ export default function AdminReviewsPage() {
     fetch("/api/reviews/list")
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data) => { setReviews(data); })
-      .catch(() => toast.error("Nu s-au putut încărca recenziile"))
+      .catch(() => toast.error(t("admin.reviews.loadError")))
       .finally(() => setLoading(false));
-  }, []);
+  }, [t]);
 
   async function handleAction(id: number, action: "approve" | "reject") {
     try {
@@ -42,13 +44,13 @@ export default function AdminReviewsPage() {
       });
       if (action === "approve") {
         setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, isApproved: true } : r)));
-        toast.success("Recenzie aprobată!");
+        toast.success(t("admin.reviews.approved"));
       } else {
         setReviews((prev) => prev.filter((r) => r.id !== id));
-        toast.success("Recenzie respinsă și ștearsă.");
+        toast.success(t("admin.reviews.rejected"));
       }
     } catch {
-      toast.error("Eroare");
+      toast.error(t("admin.reviews.actionError"));
     }
   }
 
@@ -63,9 +65,13 @@ export default function AdminReviewsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Recenzii</h1>
+        <h1 className="font-heading text-2xl font-bold">
+          {t("admin.reviews.title")}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          {pendingCount > 0 ? `${pendingCount} recenzii așteaptă aprobare` : "Toate recenziile sunt procesate"}
+          {pendingCount > 0
+            ? t("admin.reviews.pendingCount", { count: pendingCount })
+            : t("admin.reviews.allProcessed")}
         </p>
       </div>
 
@@ -78,7 +84,11 @@ export default function AdminReviewsPage() {
             className={filter === f ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
             onClick={() => setFilter(f)}
           >
-            {f === "pending" ? `De aprobat (${pendingCount})` : f === "approved" ? "Aprobate" : "Toate"}
+            {f === "pending"
+              ? t("admin.reviews.filterPending", { count: pendingCount })
+              : f === "approved"
+                ? t("admin.reviews.filterApproved")
+                : t("admin.reviews.filterAll")}
           </Button>
         ))}
       </div>
@@ -96,7 +106,9 @@ export default function AdminReviewsPage() {
                       <span className="font-medium">{review.authorName}</span>
                       {review.eventType && <Badge variant="secondary" className="text-xs">{review.eventType}</Badge>}
                       <Badge variant="outline" className={cn("text-xs", review.isApproved ? "text-success border-success/30" : "text-warning border-warning/30")}>
-                        {review.isApproved ? "Aprobat" : "În așteptare"}
+                        {review.isApproved
+                          ? t("admin.reviews.badgeApproved")
+                          : t("admin.reviews.badgePending")}
                       </Badge>
                     </div>
                     <div className="mt-1 flex gap-0.5">
@@ -118,7 +130,7 @@ export default function AdminReviewsPage() {
                         className="bg-success text-white hover:bg-success/90 gap-1"
                         onClick={() => handleAction(review.id, "approve")}
                       >
-                        <CheckCircle className="h-3.5 w-3.5" /> Aprobă
+                        <CheckCircle className="h-3.5 w-3.5" /> {t("admin.reviews.approve")}
                       </Button>
                     )}
                     <Button
@@ -127,7 +139,10 @@ export default function AdminReviewsPage() {
                       className="text-destructive gap-1"
                       onClick={() => handleAction(review.id, "reject")}
                     >
-                      <XCircle className="h-3.5 w-3.5" /> {review.isApproved ? "Șterge" : "Respinge"}
+                      <XCircle className="h-3.5 w-3.5" />{" "}
+                      {review.isApproved
+                        ? t("admin.reviews.delete")
+                        : t("admin.reviews.reject")}
                     </Button>
                   </div>
                 </div>
@@ -137,7 +152,9 @@ export default function AdminReviewsPage() {
 
           {filtered.length === 0 && (
             <p className="py-8 text-center text-muted-foreground">
-              {filter === "pending" ? "Nu sunt recenzii de aprobat" : "Nu există recenzii"}
+              {filter === "pending"
+                ? t("admin.reviews.emptyPending")
+                : t("admin.reviews.empty")}
             </p>
           )}
         </div>

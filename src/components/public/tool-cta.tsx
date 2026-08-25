@@ -24,12 +24,7 @@ interface Props {
 
 export function ToolCta({ cabinetPath, label }: Props) {
   const { isLoaded, isSignedIn } = useUser();
-  const { locale, t } = useLocale();
-  const defaults = {
-    ro: { start: "Începe acum", next: "Continuă" },
-    ru: { start: "Начать", next: "Продолжить" },
-    en: { start: "Start now", next: "Continue" },
-  }[locale];
+  const { t } = useLocale();
 
   if (!isLoaded) {
     // Reserve space so the layout doesn't jump on hydration.
@@ -44,7 +39,7 @@ export function ToolCta({ cabinetPath, label }: Props) {
     return (
       <Link href={cabinetPath}>
         <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
-          {label ?? defaults.next}
+          {label ?? t("common.next")}
           <ArrowRight className="h-4 w-4" />
         </Button>
       </Link>
@@ -64,7 +59,7 @@ export function ToolCta({ cabinetPath, label }: Props) {
     >
       <Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
         <LogIn className="h-4 w-4" />
-        {label ?? defaults.start}
+        {label ?? t("toolCta.startNow")}
       </Button>
     </Link>
   );

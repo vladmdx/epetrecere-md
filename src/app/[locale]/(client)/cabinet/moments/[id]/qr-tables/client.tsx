@@ -12,6 +12,7 @@ import Link from "next/link";
 import { ArrowLeft, Printer, Loader2 } from "lucide-react";
 import QRCode from "qrcode";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface State {
   title: string;
@@ -21,6 +22,7 @@ interface State {
 }
 
 export function QrTablesClient({ planId }: { planId: number }) {
+  const { t } = useLocale();
   const [state, setState] = useState<State | null>(null);
   const [loading, setLoading] = useState(true);
   const [qrByLabel, setQrByLabel] = useState<Record<string, string>>({});
@@ -44,7 +46,7 @@ export function QrTablesClient({ planId }: { planId: number }) {
           tables: Array.isArray(momentsData.tables) ? momentsData.tables : [],
         });
       } catch {
-        toast.error("Nu am putut încărca datele");
+        toast.error(t("cabinet.qrTables.loadError"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -100,13 +102,13 @@ export function QrTablesClient({ planId }: { planId: number }) {
     return (
       <div className="mx-auto max-w-xl px-4 py-20 text-center">
         <p className="text-sm text-muted-foreground">
-          Activează galeria Photo Moments mai întâi.
+          {t("cabinet.qrTables.enableGalleryFirst")}
         </p>
         <Link
           href={`/cabinet/moments/${planId}`}
           className="mt-4 inline-block text-sm text-gold hover:underline"
         >
-          ← Înapoi la galerie
+          {t("cabinet.qrTables.backToGalleryArrow")}
         </Link>
       </div>
     );
@@ -116,14 +118,13 @@ export function QrTablesClient({ planId }: { planId: number }) {
     return (
       <div className="mx-auto max-w-xl px-4 py-20 text-center">
         <p className="text-sm text-muted-foreground">
-          Adaugă mai întâi lista meselor în pagina galeriei (textarea
-          „Mese / locații” din setări).
+          {t("cabinet.qrTables.addTablesFirst")}
         </p>
         <Link
           href={`/cabinet/moments/${planId}`}
           className="mt-4 inline-block text-sm text-gold hover:underline"
         >
-          ← Înapoi la galerie
+          {t("cabinet.qrTables.backToGalleryArrow")}
         </Link>
       </div>
     );
@@ -136,25 +137,24 @@ export function QrTablesClient({ planId }: { planId: number }) {
           href={`/cabinet/moments/${planId}`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold"
         >
-          <ArrowLeft className="h-3 w-3" /> Înapoi la galerie
+          <ArrowLeft className="h-3 w-3" /> {t("cabinet.qrTables.backToGallery")}
         </Link>
         <button
           onClick={() => window.print()}
           className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
-          <Printer className="h-4 w-4" /> Tipărește / Salvează PDF
+          <Printer className="h-4 w-4" /> {t("cabinet.qrTables.print")}
         </button>
       </div>
 
       <p className="print-hide mb-4 text-xs text-muted-foreground">
-        {state.tables.length} carduri — 3 per rând, taie pe linie după
-        printare.
+        {t("cabinet.qrTables.cardsHint", { count: state.tables.length })}
       </p>
 
       <article className="collage-sheet rounded-2xl border border-border/40 bg-card p-6 print:border-0 print:bg-white">
         <header className="mb-6 text-center">
           <p className="text-[10px] font-semibold uppercase tracking-[5px] text-gold">
-            Photo Moments per masă
+            {t("cabinet.qrTables.sheetTitle")}
           </p>
           <h1 className="mt-1 font-heading text-2xl font-bold">
             {state.title}
@@ -194,7 +194,7 @@ export function QrTablesClient({ planId }: { planId: number }) {
                   </div>
                 )}
                 <p className="mt-1 text-[9px] text-black/60">
-                  Scanează pentru a încărca poze
+                  {t("cabinet.qrTables.scanHint")}
                 </p>
               </div>
             );

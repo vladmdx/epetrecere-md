@@ -10,6 +10,7 @@ import { Clock, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { useLocale } from "@/hooks/use-locale";
 
 export type DayHours = { open: string; close: string } | null;
 
@@ -33,14 +34,14 @@ const DAY_KEYS: Array<keyof WorkingHours> = [
   "sun",
 ];
 
-const DAY_LABELS: Record<keyof WorkingHours, string> = {
-  mon: "Luni",
-  tue: "Marți",
-  wed: "Miercuri",
-  thu: "Joi",
-  fri: "Vineri",
-  sat: "Sâmbătă",
-  sun: "Duminică",
+const DAY_LABEL_KEYS: Record<keyof WorkingHours, string> = {
+  mon: "vendorHours.dayMon",
+  tue: "vendorHours.dayTue",
+  wed: "vendorHours.dayWed",
+  thu: "vendorHours.dayThu",
+  fri: "vendorHours.dayFri",
+  sat: "vendorHours.daySat",
+  sun: "vendorHours.daySun",
 };
 
 const DEFAULT_OPEN = "10:00";
@@ -52,6 +53,7 @@ interface Props {
 }
 
 export function WorkingHoursEditor({ value, onChange }: Props) {
+  const { t } = useLocale();
   const [draft, setDraft] = useState<WorkingHours>(
     value ?? {
       mon: null,
@@ -115,7 +117,7 @@ export function WorkingHoursEditor({ value, onChange }: Props) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="h-3 w-3" />
-          Setează program pe fiecare zi. Lasă zilele închise dezactivate.
+          {t("vendorHours.hint")}
         </div>
         <div className="flex gap-2">
           <Button
@@ -127,7 +129,7 @@ export function WorkingHoursEditor({ value, onChange }: Props) {
             className="h-7 gap-1 text-xs"
           >
             <Copy className="h-3 w-3" />
-            Copie Lu → Vi
+            {t("vendorHours.copyWeekdays")}
           </Button>
           <Button
             type="button"
@@ -136,7 +138,7 @@ export function WorkingHoursEditor({ value, onChange }: Props) {
             onClick={setWeekendClosed}
             className="h-7 text-xs"
           >
-            Weekend închis
+            {t("vendorHours.weekendClosed")}
           </Button>
         </div>
       </div>
@@ -155,13 +157,13 @@ export function WorkingHoursEditor({ value, onChange }: Props) {
               }
             >
               <span className="w-20 shrink-0 text-sm font-medium">
-                {DAY_LABELS[key]}
+                {t(DAY_LABEL_KEYS[key])}
               </span>
               <Switch checked={open} onCheckedChange={() => toggleDay(key)} />
               {open && day ? (
                 <>
                   <Label htmlFor={`open-${key}`} className="text-xs text-muted-foreground">
-                    De la
+                    {t("vendorHours.from")}
                   </Label>
                   <input
                     id={`open-${key}`}
@@ -171,7 +173,7 @@ export function WorkingHoursEditor({ value, onChange }: Props) {
                     className="h-8 w-24 rounded-md border border-border/40 bg-background px-2 text-xs font-mono"
                   />
                   <Label htmlFor={`close-${key}`} className="text-xs text-muted-foreground">
-                    până la
+                    {t("vendorHours.to")}
                   </Label>
                   <input
                     id={`close-${key}`}
@@ -182,7 +184,7 @@ export function WorkingHoursEditor({ value, onChange }: Props) {
                   />
                 </>
               ) : (
-                <span className="text-xs text-muted-foreground">Închis</span>
+                <span className="text-xs text-muted-foreground">{t("vendorHours.closed")}</span>
               )}
             </div>
           );

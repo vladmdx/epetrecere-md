@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface VenueImage {
   id: number;
@@ -72,6 +73,7 @@ export function VenueGalleryManager({
   venueName,
   maxImages = 10,
 }: Props) {
+  const { t } = useLocale();
   const [images, setImages] = useState<VenueImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(0); // count in-flight uploads
@@ -104,7 +106,7 @@ export function VenueGalleryManager({
         ),
       );
     } catch {
-      toast.error("Nu s-au putut încărca imaginile");
+      toast.error(t("vendor.venueGallery.toastLoadError"));
     } finally {
       setLoading(false);
     }
@@ -123,21 +125,21 @@ export function VenueGalleryManager({
     const list = Array.from(files);
     const slotsLeft = maxImages - images.length - uploading;
     if (slotsLeft <= 0) {
-      toast.error(`Ai atins limita de ${maxImages} imagini pentru planul curent`);
+      toast.error(t("vendor.venueGallery.toastPlanLimit", { max: maxImages }));
       return;
     }
     if (list.length > slotsLeft) {
-      toast.error(`Poți adăuga doar ${slotsLeft} imagine(-i) pe planul curent`);
+      toast.error(t("vendor.venueGallery.toastSlotsLeft", { count: slotsLeft }));
     }
     const toUpload = list.slice(0, slotsLeft);
 
     for (const file of toUpload) {
       if (!file.type.startsWith("image/")) {
-        toast.error(`${file.name} nu e imagine`);
+        toast.error(t("vendor.venueGallery.toastNotImage", { name: file.name }));
         continue;
       }
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} > 10MB`);
+        toast.error(t("vendor.venueGallery.toastTooBig", { name: file.name }));
         continue;
       }
 
@@ -152,7 +154,7 @@ export function VenueGalleryManager({
         });
         if (!upRes.ok) {
           const err = await upRes.json().catch(() => ({}));
-          toast.error(err.error || `Upload eșuat: ${file.name}`);
+          toast.error(err.error || t("vendor.venueGallery.toastUploadFailed", { name: file.name }));
           continue;
         }
         const upData = (await upRes.json()) as { url: string };
@@ -171,7 +173,7 @@ export function VenueGalleryManager({
           }),
         });
         if (!createRes.ok) {
-          toast.error("Nu s-a putut salva în galerie");
+          toast.error(t("vendor.venueGallery.toastSaveError"));
           continue;
         }
         const saved = (await createRes.json()) as VenueImage;
@@ -181,7 +183,7 @@ export function VenueGalleryManager({
       }
     }
     if (toUpload.length) {
-      toast.success(`${toUpload.length} imagine(-i) adăugată(-e)`);
+      toast.success(t("vendor.venueGallery.toastAdded", { count: toUpload.length }));
     }
   }
 
@@ -196,23 +198,23 @@ export function VenueGalleryManager({
       body: JSON.stringify({ isCover: true }),
     });
     if (!res.ok) {
-      toast.error("Nu s-a putut seta coperta");
+      toast.error(t("vendor.venueGallery.toastCoverError"));
       void reload();
     } else {
-      toast.success("Coperta actualizată");
+      toast.success(t("vendor.venueGallery.toastCoverUpdated"));
     }
   }
 
   async function removeImage(id: number) {
-    if (!confirm("Ștergi această imagine? Acțiunea e ireversibilă.")) return;
+    if (!confirm(t("vendor.venueGallery.confirmDelete"))) return;
     const prev = images;
     setImages((x) => x.filter((i) => i.id !== id));
     const res = await fetch(`/api/venue-images/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      toast.error("Nu s-a putut șterge");
+      toast.error(t("vendor.venueGallery.toastDeleteError"));
       setImages(prev);
     } else {
-      toast.success("Imagine ștearsă");
+      toast.success(t("vendor.venueGallery.toastDeleted"));
     }
   }
 
@@ -232,7 +234,7 @@ export function VenueGalleryManager({
       body: JSON.stringify({ venueId, items }),
     });
     if (!res.ok) {
-      toast.error("Nu s-a putut salva ordinea");
+      toast.error(t("vendor.venueGallery.toastOrderError"));
       void reload();
     }
   }
@@ -256,7 +258,7 @@ export function VenueGalleryManager({
       }),
     });
     if (!res.ok) {
-      toast.error("Nu s-a putut salva textul alt");
+      toast.error(t("vendor.venueGallery.toastAltError"));
       return;
     }
     setImages((prev) =>
@@ -271,7 +273,7 @@ export function VenueGalleryManager({
           : i,
       ),
     );
-    toast.success("Text alt salvat");
+    toast.success(t("vendor.venueGallery.toastAltSaved"));
     setEditingAlt(null);
   }
 
@@ -312,16 +314,16 @@ export function VenueGalleryManager({
         <div className="text-center">
           <p className="text-sm font-medium">
             {uploading > 0
-              ? `Se uploadează (${uploading})...`
+              ? t("vendor.venueGallery.uploading", { count: uploading })
               : atLimit
-                ? `Ai atins limita de ${maxImages} imagini`
-                : "Trage imaginile aici sau click"}
+                ? t("vendor.venueGallery.atLimit", { max: maxImages })
+                : t("vendor.venueGallery.dropzone")}
           </p>
           <p className="text-xs text-muted-foreground">
-            JPG / PNG / WebP · max 10MB pe imagine
+            {t("vendor.venueGallery.formatsHint")}
           </p>
           <p className="mt-1 text-xs font-medium text-gold">
-            {images.length}/{maxImages} imagini
+            {t("vendor.venueGallery.countLabel", { count: images.length, max: maxImages })}
           </p>
         </div>
         <input
@@ -345,7 +347,7 @@ export function VenueGalleryManager({
         <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border/40 py-10 text-center">
           <ImageIcon className="h-10 w-10 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">
-            Nicio imagine încă. Adaugă prima — va deveni automat copertă.
+            {t("vendor.venueGallery.emptyHint")}
           </p>
         </div>
       ) : (
@@ -375,8 +377,7 @@ export function VenueGalleryManager({
 
       <p className="flex items-start gap-2 text-xs text-muted-foreground">
         <Info className="mt-0.5 h-3 w-3 shrink-0" />
-        Prima imagine (cu badge <strong>COVER</strong>) e afișată pe listing și
-        ca OG image. Trage pentru a reordona galeria.
+        {t("vendor.venueGallery.coverNoteBefore")} <strong>COVER</strong>{t("vendor.venueGallery.coverNoteAfter")}
       </p>
 
       {/* Alt-text editor dialog */}
@@ -386,13 +387,16 @@ export function VenueGalleryManager({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Text alternativ (alt)</DialogTitle>
+            <DialogTitle>{t("vendor.venueGallery.altDialogTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-xs text-muted-foreground">
-              Textul alt ajută utilizatorii cu cititor de ecran și SEO-ul
-              imaginilor. Ex: <em>&ldquo;Sala de nuntă {venueName} — vedere
-              spre grădină&rdquo;</em>.
+              {t("vendor.venueGallery.altHelp")}{" "}
+              <em>
+                &ldquo;{t("vendor.venueGallery.altExamplePrefix")} {venueName}{" "}
+                {t("vendor.venueGallery.altExampleSuffix")}&rdquo;
+              </em>
+              .
             </p>
             <div>
               <Label htmlFor="alt-ro">Română</Label>
@@ -427,13 +431,13 @@ export function VenueGalleryManager({
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingAlt(null)}>
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={saveAlt}
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
-              Salvează
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -461,6 +465,7 @@ function SortableThumb({
     transition,
     isDragging,
   } = useSortable({ id: img.id });
+  const { t } = useLocale();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -489,7 +494,7 @@ function SortableThumb({
         type="button"
         {...attributes}
         {...listeners}
-        aria-label="Trage pentru reordonare"
+        aria-label={t("vendor.venueGallery.dragAria")}
         className="absolute left-1 top-1 rounded bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 cursor-grab active:cursor-grabbing touch-none"
       >
         <GripVertical className="h-3.5 w-3.5" />
@@ -500,7 +505,7 @@ function SortableThumb({
         <Button
           size="icon"
           variant="ghost"
-          aria-label="Setează ca copertă"
+          aria-label={t("vendor.venueGallery.setCoverAria")}
           className="h-8 w-8 text-white hover:bg-white/20"
           onClick={onSetCover}
         >
@@ -511,7 +516,7 @@ function SortableThumb({
         <Button
           size="icon"
           variant="ghost"
-          aria-label="Editează alt text"
+          aria-label={t("vendor.venueGallery.editAltAria")}
           className="h-8 w-8 text-white hover:bg-white/20"
           onClick={onEditAlt}
         >
@@ -520,7 +525,7 @@ function SortableThumb({
         <Button
           size="icon"
           variant="ghost"
-          aria-label="Șterge imaginea"
+          aria-label={t("upload.deleteAria")}
           className="h-8 w-8 text-white hover:bg-red-500/50"
           onClick={onDelete}
         >

@@ -35,77 +35,31 @@ import { useLocale } from "@/hooks/use-locale";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
 
 const navItems = [
-  { href: "/admin", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/admin/eveniment-nou", icon: PartyPopper, label: "Eveniment Nou" },
-  { href: "/admin/cereri-inregistrare", icon: UserCheck, label: "Cereri Înregistrare" },
-  { href: "/admin/cereri-oferte", icon: Star, label: "Cereri Oferte" },
-  { href: "/admin/crm", icon: MessageSquare, label: "CRM" },
-  { href: "/admin/finante", icon: Wallet, label: "Finanțe" },
-  { href: "/admin/contracte", icon: FileSignature, label: "Contracte" },
-  { href: "/admin/artisti", icon: Users, label: "Artiști" },
-  { href: "/admin/categorii", icon: Grid3X3, label: "Categorii" },
-  { href: "/admin/sali", icon: Building2, label: "Săli" },
-  { href: "/admin/recenzii", icon: Star, label: "Recenzii" },
-  { href: "/admin/foto-ugc", icon: Camera, label: "Fotografii UGC" },
-  { href: "/admin/blog", icon: FileText, label: "Blog" },
-  { href: "/admin/pagini", icon: FileText, label: "Pagini" },
-  { href: "/admin/meta", icon: Globe, label: "Meta Pagini" },
-  { href: "/admin/seo", icon: Globe, label: "SEO" },
-  { href: "/admin/import", icon: Upload, label: "Import" },
-  { href: "/admin/homepage-builder", icon: Home, label: "Homepage" },
-  { href: "/admin/statistici", icon: BarChart3, label: "Statistici" },
-  { href: "/admin/analytics", icon: BarChart3, label: "Analitice" },
-  { href: "/admin/ai-assistant", icon: Bot, label: "AI Assistant" },
-  { href: "/admin/duplicates", icon: GitMerge, label: "Duplicate" },
-  { href: "/admin/audit", icon: FileText, label: "Audit log" },
-  { href: "/admin/setari", icon: Settings, label: "Setări" },
+  { href: "/admin", icon: LayoutDashboard, labelKey: "admin.sidebar.dashboard" },
+  { href: "/admin/eveniment-nou", icon: PartyPopper, labelKey: "admin.sidebar.newEvent" },
+  { href: "/admin/cereri-inregistrare", icon: UserCheck, labelKey: "admin.sidebar.signupRequests" },
+  { href: "/admin/cereri-oferte", icon: Star, labelKey: "admin.sidebar.offerRequests" },
+  { href: "/admin/crm", icon: MessageSquare, labelKey: "admin.sidebar.crm" },
+  { href: "/admin/finante", icon: Wallet, labelKey: "admin.sidebar.finance" },
+  { href: "/admin/contracte", icon: FileSignature, labelKey: "admin.sidebar.contracts" },
+  { href: "/admin/artisti", icon: Users, labelKey: "admin.sidebar.artists" },
+  { href: "/admin/categorii", icon: Grid3X3, labelKey: "admin.sidebar.categories" },
+  { href: "/admin/sali", icon: Building2, labelKey: "admin.sidebar.venues" },
+  { href: "/admin/recenzii", icon: Star, labelKey: "admin.sidebar.reviews" },
+  { href: "/admin/foto-ugc", icon: Camera, labelKey: "admin.sidebar.ugcPhotos" },
+  { href: "/admin/blog", icon: FileText, labelKey: "admin.sidebar.blog" },
+  { href: "/admin/pagini", icon: FileText, labelKey: "admin.sidebar.pages" },
+  { href: "/admin/meta", icon: Globe, labelKey: "admin.sidebar.metaPages" },
+  { href: "/admin/seo", icon: Globe, labelKey: "admin.sidebar.seo" },
+  { href: "/admin/import", icon: Upload, labelKey: "admin.sidebar.import" },
+  { href: "/admin/homepage-builder", icon: Home, labelKey: "admin.sidebar.homepage" },
+  { href: "/admin/statistici", icon: BarChart3, labelKey: "admin.sidebar.statistics" },
+  { href: "/admin/analytics", icon: BarChart3, labelKey: "admin.sidebar.analytics" },
+  { href: "/admin/ai-assistant", icon: Bot, labelKey: "admin.sidebar.aiAssistant" },
+  { href: "/admin/duplicates", icon: GitMerge, labelKey: "admin.sidebar.duplicates" },
+  { href: "/admin/audit", icon: FileText, labelKey: "admin.sidebar.auditLog" },
+  { href: "/admin/setari", icon: Settings, labelKey: "admin.sidebar.settings" },
 ];
-
-const translatedLabels: Record<"ro" | "ru" | "en", Record<string, string>> = {
-  ro: {},
-  ru: {
-    Dashboard: "Панель управления",
-    "Eveniment Nou": "Новое событие",
-    "Cereri Înregistrare": "Заявки на регистрацию",
-    "Cereri Oferte": "Запросы предложений",
-    Artiști: "Артисты",
-    Categorii: "Категории",
-    Săli: "Залы",
-    Recenzii: "Отзывы",
-    "Fotografii UGC": "Фотографии UGC",
-    Blog: "Блог",
-    Pagini: "Страницы",
-    "Meta Pagini": "Мета страниц",
-    Import: "Импорт",
-    Homepage: "Главная",
-    Statistici: "Статистика",
-    Analitice: "Аналитика",
-    Duplicate: "Дубликаты",
-    "Audit log": "Журнал аудита",
-    Setări: "Настройки",
-  },
-  en: {
-    Dashboard: "Dashboard",
-    "Eveniment Nou": "New Event",
-    "Cereri Înregistrare": "Registration Requests",
-    "Cereri Oferte": "Quote Requests",
-    Artiști: "Artists",
-    Categorii: "Categories",
-    Săli: "Venues",
-    Recenzii: "Reviews",
-    "Fotografii UGC": "UGC Photos",
-    Blog: "Blog",
-    Pagini: "Pages",
-    "Meta Pagini": "Page Metadata",
-    Import: "Import",
-    Homepage: "Homepage",
-    Statistici: "Statistics",
-    Analitice: "Analytics",
-    Duplicate: "Duplicates",
-    "Audit log": "Audit Log",
-    Setări: "Settings",
-  },
-};
 
 function NavList({
   pathname,
@@ -116,7 +70,7 @@ function NavList({
   collapsed: boolean;
   onNavigate?: () => void;
 }) {
-  const { locale } = useLocale();
+  const { t } = useLocale();
   return (
     <nav className="flex-1 overflow-y-auto p-2">
       {navItems.map((item) => {
@@ -137,10 +91,10 @@ function NavList({
                 : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground",
               collapsed && "justify-center px-0",
             )}
-            title={collapsed ? translatedLabels[locale][item.label] || item.label : undefined}
+            title={collapsed ? t(item.labelKey) : undefined}
           >
             <item.icon className="h-5 w-5 shrink-0" />
-            {!collapsed && <span>{translatedLabels[locale][item.label] || item.label}</span>}
+            {!collapsed && <span>{t(item.labelKey)}</span>}
           </Link>
         );
       })}
@@ -175,7 +129,11 @@ export function AdminSidebar() {
         <Button
           variant="ghost"
           size="icon"
-          aria-label={collapsed ? "Extinde meniul" : "Restrânge meniul"}
+          aria-label={
+            collapsed
+              ? t("admin.sidebar.expandMenu")
+              : t("admin.sidebar.collapseMenu")
+          }
           onClick={() => setCollapsed(!collapsed)}
           className="shrink-0"
         >
@@ -211,7 +169,7 @@ export function AdminSidebar() {
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        aria-label="Deschide meniul"
+        aria-label={t("admin.sidebar.openMenu")}
         className="fixed left-3 top-3 z-40 flex h-10 w-10 items-center justify-center rounded-lg border border-border/40 bg-background/90 backdrop-blur-sm text-foreground shadow-sm lg:hidden"
       >
         <Menu className="h-5 w-5" />
@@ -240,7 +198,7 @@ export function AdminSidebar() {
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                aria-label="Închide meniul"
+                aria-label={t("admin.sidebar.closeMenu")}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent/50"
               >
                 <X className="h-4 w-4" />

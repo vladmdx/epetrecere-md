@@ -46,6 +46,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import type { VenueBookingTab } from "@/lib/db/queries/venue-bookings";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Booking {
   id: number;
@@ -86,11 +87,11 @@ interface Props {
   counts: Record<VenueBookingTab, number>;
 }
 
-const TABS: Array<{ key: VenueBookingTab; label: string }> = [
-  { key: "noi", label: "Noi" },
-  { key: "acceptate", label: "Acceptate" },
-  { key: "finalizate", label: "Finalizate" },
-  { key: "anulate", label: "Anulate" },
+const TABS: Array<{ key: VenueBookingTab; labelKey: string }> = [
+  { key: "noi", labelKey: "vendorSalaBookings.tabNew" },
+  { key: "acceptate", labelKey: "vendorSalaBookings.tabAccepted" },
+  { key: "finalizate", labelKey: "vendorSalaBookings.tabCompleted" },
+  { key: "anulate", labelKey: "vendorSalaBookings.tabCancelled" },
 ];
 
 const EVENT_TYPE_BORDER: Record<string, string> = {
@@ -106,12 +107,14 @@ const EVENT_TYPE_BORDER: Record<string, string> = {
   kids_birthday: "border-l-amber-500",
 };
 
+/** Keys, not text: the picked reason is rendered translated and the same
+ *  translated wording is what gets sent to the client as the reply. */
 const DECLINE_REASONS = [
-  "Ocupat în data respectivă",
-  "Prea mulți invitați pentru capacitatea sălii",
-  "Tip eveniment incompatibil",
-  "Buget nepotrivit",
-  "Alt motiv",
+  "vendorSalaBookings.declineBusy",
+  "vendorSalaBookings.declineTooManyGuests",
+  "vendorSalaBookings.declineEventType",
+  "vendorSalaBookings.declineBudget",
+  "vendorSalaBookings.declineOther",
 ];
 
 /**
@@ -121,7 +124,7 @@ const DECLINE_REASONS = [
 function computeLeadScore(
   b: Booking,
   venueCapacityMax: number | null,
-): { tier: "hot" | "warm" | "cold"; label: string; emoji: string; className: string } {
+): { tier: "hot" | "warm" | "cold"; labelKey: string; emoji: string; className: string } {
   let score = 0;
 
   // Budget
@@ -161,20 +164,20 @@ function computeLeadScore(
   if (score >= 6)
     return {
       tier: "hot",
-      label: "Hot",
+      labelKey: "vendorSalaBookings.leadHot",
       emoji: "🔥",
       className: "bg-red-500/15 text-red-400 border-red-500/40",
     };
   if (score >= 3)
     return {
       tier: "warm",
-      label: "Warm",
+      labelKey: "vendorSalaBookings.leadWarm",
       emoji: "🌡️",
       className: "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
     };
   return {
     tier: "cold",
-    label: "Cold",
+    labelKey: "vendorSalaBookings.leadCold",
     emoji: "❄️",
     className: "bg-blue-500/15 text-blue-400 border-blue-500/40",
   };
@@ -186,6 +189,7 @@ export function VenueBookingsClient({
   initialBookings,
   counts,
 }: Props) {
+  const { t } = useLocale();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
@@ -301,10 +305,10 @@ export function VenueBookingsClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut accepta");
+        toast.error(err.error || t("vendorSalaBookings.acceptFailed"));
         return;
       }
-      toast.success("Rezervare acceptată!");
+      toast.success(t("vendorSalaBookings.acceptSuccess"));
       setAcceptDialog(null);
       setAcceptReply("");
       setBookings((prev) => prev.filter((b) => b.id !== acceptDialog.id));
@@ -325,10 +329,10 @@ export function VenueBookingsClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut finaliza");
+        toast.error(err.error || t("vendorSalaBookings.completeFailed"));
         return;
       }
-      toast.success("Rezervare finalizată — poți cere recenzia acum!");
+      toast.success(t("vendorSalaBookings.completeSuccess"));
       setCompleteDialog(null);
       setBookings((prev) => prev.filter((b) => b.id !== completeDialog.id));
       router.refresh();
@@ -351,10 +355,10 @@ export function VenueBookingsClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut anula");
+        toast.error(err.error || t("vendorSalaBookings.cancelFailed"));
         return;
       }
-      toast.success("Rezervare anulată. Clientul a fost notificat.");
+      toast.success(t("vendorSalaBookings.cancelSuccess"));
       setCancelDialog(null);
       setCancelReason("");
       setBookings((prev) => prev.filter((b) => b.id !== cancelDialog.id));
@@ -374,10 +378,10 @@ export function VenueBookingsClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut trimite invitația");
+        toast.error(err.error || t("vendorSalaBookings.reviewInviteFailed"));
         return;
       }
-      toast.success("Email trimis către client — îți va lăsa o recenzie");
+      toast.success(t("vendorSalaBookings.reviewInviteSent"));
       setReviewRequested((prev) => new Set(prev).add(bookingId));
     } finally {
       setBusy(null);
@@ -390,8 +394,8 @@ export function VenueBookingsClient({
     try {
       const reply =
         declineMessage.trim().length > 0
-          ? `${declineReason}. ${declineMessage.trim()}`
-          : declineReason;
+          ? `${t(declineReason)}. ${declineMessage.trim()}`
+          : t(declineReason);
       const res = await fetch(`/api/booking-requests/${declineDialog.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -402,10 +406,10 @@ export function VenueBookingsClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut refuza");
+        toast.error(err.error || t("vendorSalaBookings.declineFailed"));
         return;
       }
-      toast.success("Rezervare refuzată");
+      toast.success(t("vendorSalaBookings.declineSuccess"));
       setDeclineDialog(null);
       setDeclineMessage("");
       setDeclineReason(DECLINE_REASONS[0]);
@@ -419,9 +423,9 @@ export function VenueBookingsClient({
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Rezervări</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("dashboard.bookings")}</h1>
         <p className="text-muted-foreground">
-          Gestionează solicitările primite pentru sala ta.
+          {t("vendorSalaBookings.subtitle")}
         </p>
       </div>
 
@@ -441,7 +445,7 @@ export function VenueBookingsClient({
                   : "border-transparent text-muted-foreground hover:text-foreground",
               )}
             >
-              {tab.label}
+              {t(tab.labelKey)}
               {count > 0 && (
                 <span
                   className={cn(
@@ -465,20 +469,20 @@ export function VenueBookingsClient({
           <CardContent className="flex flex-wrap items-end gap-3 p-3">
             <div className="flex-1 min-w-[200px]">
               <Label htmlFor="rez-search" className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <Search className="mr-1 inline h-3 w-3" /> Caută
+                <Search className="mr-1 inline h-3 w-3" /> {t("common.search")}
               </Label>
               <input
                 id="rez-search"
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Nume, telefon, email, mesaj..."
+                placeholder={t("vendorSalaBookings.searchPlaceholder")}
                 className="mt-1 h-8 w-full rounded-md border border-border/50 bg-background px-2 text-xs"
               />
             </div>
             <div>
               <Label htmlFor="rez-evtype" className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <Filter className="mr-1 inline h-3 w-3" /> Tip eveniment
+                <Filter className="mr-1 inline h-3 w-3" /> {t("vendorSalaBookings.eventTypeLabel")}
               </Label>
               <select
                 id="rez-evtype"
@@ -486,7 +490,7 @@ export function VenueBookingsClient({
                 onChange={(e) => setFilterEventType(e.target.value)}
                 className="mt-1 h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
               >
-                <option value="all">Toate</option>
+                <option value="all">{t("common.all")}</option>
                 {availableEventTypes.map((t) => (
                   <option key={t} value={t}>
                     {eventTypeLabel(normalizeEventType(t))}
@@ -496,7 +500,7 @@ export function VenueBookingsClient({
             </div>
             <div>
               <Label htmlFor="rez-from" className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                De la
+                {t("vendorSalaBookings.dateFrom")}
               </Label>
               <input
                 id="rez-from"
@@ -508,7 +512,7 @@ export function VenueBookingsClient({
             </div>
             <div>
               <Label htmlFor="rez-to" className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                Până la
+                {t("vendorSalaBookings.dateTo")}
               </Label>
               <input
                 id="rez-to"
@@ -520,7 +524,7 @@ export function VenueBookingsClient({
             </div>
             <div>
               <Label htmlFor="rez-sort" className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <ArrowUpDown className="mr-1 inline h-3 w-3" /> Sortează
+                <ArrowUpDown className="mr-1 inline h-3 w-3" /> {t("vendorSalaBookings.sortLabel")}
               </Label>
               <select
                 id="rez-sort"
@@ -528,15 +532,15 @@ export function VenueBookingsClient({
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
                 className="mt-1 h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
               >
-                <option value="date_desc">Dată (cele mai noi)</option>
-                <option value="date_asc">Dată (cele mai vechi)</option>
-                <option value="guests_desc">Nr. persoane</option>
-                <option value="price_desc">Sumă</option>
+                <option value="date_desc">{t("vendorSalaBookings.sortDateDesc")}</option>
+                <option value="date_asc">{t("vendorSalaBookings.sortDateAsc")}</option>
+                <option value="guests_desc">{t("vendorSalaBookings.sortGuests")}</option>
+                <option value="price_desc">{t("vendorSalaBookings.sortAmount")}</option>
               </select>
             </div>
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={resetFilters} className="h-8">
-                Resetează
+                {t("vendorSalaBookings.reset")}
               </Button>
             )}
           </CardContent>
@@ -548,11 +552,11 @@ export function VenueBookingsClient({
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-center">
             <Inbox className="mb-3 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="font-heading text-lg font-bold">Nicio rezervare aici</h3>
+            <h3 className="font-heading text-lg font-bold">{t("vendorSalaBookings.emptyTitle")}</h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {initialTab === "noi"
-                ? "Solicitările noi vor apărea aici când clienții trimit cereri."
-                : "Nu există rezervări cu acest status."}
+                ? t("vendorSalaBookings.emptyNewTab")
+                : t("vendorSalaBookings.emptyOtherTab")}
             </p>
           </CardContent>
         </Card>
@@ -561,12 +565,12 @@ export function VenueBookingsClient({
           {visibleBookings.length === 0 && (
             <Card>
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                Niciun rezultat pentru filtrele curente.{" "}
+                {t("vendorSalaBookings.noFilterResults")}{" "}
                 <button
                   onClick={resetFilters}
                   className="text-gold hover:underline"
                 >
-                  Resetează filtrele
+                  {t("vendorSalaBookings.resetFilters")}
                 </button>
               </CardContent>
             </Card>
@@ -574,7 +578,7 @@ export function VenueBookingsClient({
           {visibleBookings.map((b) => {
             const eventKey = (b.eventType || "other").toLowerCase();
             const eventTypeKey = normalizeEventType(b.eventType);
-            const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment";
+            const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : t("vendorSalaBookings.eventFallback");
             const borderColor = EVENT_TYPE_BORDER[eventKey] || "border-l-muted-foreground";
             const overCapacity =
               venueCapacityMax !== null &&
@@ -600,10 +604,12 @@ export function VenueBookingsClient({
                               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold",
                               leadScore.className,
                             )}
-                            title={`Lead Score: ${leadScore.label}`}
+                            title={t("vendorSalaBookings.leadScoreTitle", {
+                              tier: t(leadScore.labelKey),
+                            })}
                           >
                             <span aria-hidden>{leadScore.emoji}</span>
-                            {leadScore.label}
+                            {t(leadScore.labelKey)}
                           </span>
                         )}
                         <span className="rounded-full bg-muted/50 px-2.5 py-0.5 text-xs font-medium">
@@ -666,7 +672,7 @@ export function VenueBookingsClient({
                           {b.guestCount && (
                             <span className="inline-flex items-center gap-1">
                               <Users className="h-3 w-3" />
-                              {b.guestCount} pers.
+                              {b.guestCount} {t("vendorSalaBookings.personsShort")}
                             </span>
                           )}
                           {b.agreedPrice && (
@@ -682,8 +688,10 @@ export function VenueBookingsClient({
                         <div className="flex items-center gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-500">
                           <AlertTriangle className="h-4 w-4 shrink-0" />
                           <span>
-                            <strong>{b.guestCount} persoane</strong> — depășește
-                            capacitatea sălii (max {venueCapacityMax})
+                            <strong>
+                              {t("vendorSalaBookings.guestsCount", { count: b.guestCount ?? 0 })}
+                            </strong>{" "}
+                            {t("vendorSalaBookings.overCapacity", { max: venueCapacityMax ?? "" })}
                           </span>
                         </div>
                       )}
@@ -693,12 +701,12 @@ export function VenueBookingsClient({
                         <div className="flex items-center gap-2 rounded-lg border border-yellow-500/40 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-500">
                           <AlertTriangle className="h-4 w-4 shrink-0" />
                           <span>
-                            Ai deja <strong>{b.sameDayBookingsCount}</strong>{" "}
+                            {t("vendorSalaBookings.sameDayPrefix")}{" "}
+                            <strong>{b.sameDayBookingsCount}</strong>{" "}
                             {b.sameDayBookingsCount === 1
-                              ? "rezervare confirmată"
-                              : "rezervări confirmate"}{" "}
-                            pe data aceasta. Acceptă doar dacă sala permite
-                            evenimente multiple simultan.
+                              ? t("vendorSalaBookings.confirmedBookingSingular")
+                              : t("vendorSalaBookings.confirmedBookingPlural")}{" "}
+                            {t("vendorSalaBookings.sameDaySuffix")}
                           </span>
                         </div>
                       )}
@@ -708,7 +716,7 @@ export function VenueBookingsClient({
                         <div className="rounded-lg border border-border/30 bg-muted/20 p-3">
                           <p className="mb-1 flex items-center gap-1 text-[10px] uppercase tracking-wider text-muted-foreground">
                             <MessageSquare className="h-3 w-3" />
-                            Mesaj client
+                            {t("vendorSalaBookings.clientMessage")}
                           </p>
                           <p className="text-sm">{b.message}</p>
                         </div>
@@ -720,8 +728,10 @@ export function VenueBookingsClient({
                           <p className="mb-2 flex items-center gap-1 text-[10px] uppercase tracking-wider text-purple-300">
                             <Music className="h-3 w-3" />
                             {b.linkedArtists.length}{" "}
-                            {b.linkedArtists.length === 1 ? "artist confirmat" : "artiști confirmați"}{" "}
-                            pentru același eveniment
+                            {b.linkedArtists.length === 1
+                              ? t("vendorSalaBookings.artistConfirmedSingular")
+                              : t("vendorSalaBookings.artistConfirmedPlural")}{" "}
+                            {t("vendorSalaBookings.forSameEvent")}
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {b.linkedArtists.map((a) => (
@@ -743,14 +753,15 @@ export function VenueBookingsClient({
                       {b.artistReply && initialTab !== "noi" && (
                         <div className="rounded-lg border border-gold/20 bg-gold/5 p-3">
                           <p className="mb-1 text-[10px] uppercase tracking-wider text-gold">
-                            Răspunsul tău
+                            {t("vendorSalaBookings.yourReply")}
                           </p>
                           <p className="text-sm">{b.artistReply}</p>
                         </div>
                       )}
 
                       <p className="text-[10px] text-muted-foreground/60">
-                        Primită {new Date(b.createdAt).toLocaleString("ro-RO")}
+                        {t("vendorSalaBookings.receivedAt")}{" "}
+                        {new Date(b.createdAt).toLocaleString("ro-RO")}
                       </p>
                     </div>
 
@@ -766,7 +777,7 @@ export function VenueBookingsClient({
                           className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
                         >
                           <CheckCircle className="h-4 w-4" />
-                          Acceptă
+                          {t("vendorSalaBookings.accept")}
                         </Button>
                         <Button
                           variant="outline"
@@ -779,7 +790,7 @@ export function VenueBookingsClient({
                           className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
                         >
                           <XCircle className="h-4 w-4" />
-                          Refuză
+                          {t("vendorSalaBookings.reject")}
                         </Button>
                       </div>
                     )}
@@ -789,8 +800,8 @@ export function VenueBookingsClient({
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400">
                           <CheckCircle className="h-3 w-3" />
                           {b.status === "confirmed_by_client"
-                            ? "Confirmat ambele părți"
-                            : "Acceptată"}
+                            ? t("vendorSalaBookings.confirmedBothParties")
+                            : t("vendorSalaBookings.acceptedBadge")}
                         </span>
                         <Button
                           size="sm"
@@ -799,7 +810,7 @@ export function VenueBookingsClient({
                           className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
                         >
                           <CheckCircle className="h-4 w-4" />
-                          Finalizat
+                          {t("vendorSalaBookings.completed")}
                         </Button>
                         <Button
                           size="sm"
@@ -812,7 +823,7 @@ export function VenueBookingsClient({
                           className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
                         >
                           <Ban className="h-4 w-4" />
-                          Anulează
+                          {t("common.cancel")}
                         </Button>
                       </div>
                     )}
@@ -821,7 +832,7 @@ export function VenueBookingsClient({
                       <div className="flex flex-col gap-2">
                         <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/15 px-3 py-1 text-xs font-medium text-blue-400">
                           <CheckCircle className="h-3 w-3" />
-                          Finalizat
+                          {t("vendorSalaBookings.completed")}
                         </span>
                         <Button
                           size="sm"
@@ -834,7 +845,9 @@ export function VenueBookingsClient({
                           ) : (
                             <Star className="h-4 w-4" />
                           )}
-                          {reviewDone ? "Invitație trimisă" : "Cere recenzie"}
+                          {reviewDone
+                            ? t("vendorSalaBookings.reviewInviteDone")
+                            : t("vendorSalaBookings.requestReview")}
                         </Button>
                       </div>
                     )}
@@ -853,41 +866,37 @@ export function VenueBookingsClient({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmă acceptarea</DialogTitle>
+            <DialogTitle>{t("vendorSalaBookings.acceptDialogTitle")}</DialogTitle>
             <DialogDescription>
-              {acceptDialog && (
-                <>
-                  Confirmi rezervarea pentru{" "}
-                  <strong>
-                    {acceptDialog.eventType
+              {acceptDialog &&
+                t(
+                  acceptDialog.guestCount
+                    ? "vendorSalaBookings.acceptDialogDescriptionWithGuests"
+                    : "vendorSalaBookings.acceptDialogDescription",
+                  {
+                    type: acceptDialog.eventType
                       ? eventTypeLabel(normalizeEventType(acceptDialog.eventType))
-                      : "eveniment"}
-                  </strong>{" "}
-                  pe{" "}
-                  <strong>
-                    {new Date(acceptDialog.eventDate).toLocaleDateString("ro-RO", {
+                      : t("vendorSalaBookings.eventWord"),
+                    date: new Date(acceptDialog.eventDate).toLocaleDateString("ro-RO", {
                       day: "numeric",
                       month: "long",
                       year: "numeric",
-                    })}
-                  </strong>
-                  {acceptDialog.guestCount
-                    ? ` cu ${acceptDialog.guestCount} persoane?`
-                    : "?"}
-                </>
-              )}
+                    }),
+                    guests: acceptDialog.guestCount ?? 0,
+                  },
+                )}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
               <CalendarIcon className="mr-1.5 inline h-3.5 w-3.5 text-emerald-400" />
-              Calendar: ziua respectivă va fi marcată automat ca{" "}
-              <strong>Rezervat</strong> și nu va mai fi disponibilă pentru alți
-              clienți.
+              {t("vendorSalaBookings.calendarNotePrefix")}{" "}
+              <strong>{t("vendorSalaBookings.booked")}</strong>{" "}
+              {t("vendorSalaBookings.calendarNoteSuffix")}
             </div>
             <div>
               <Label htmlFor="accept-reply" className="text-xs">
-                Mesaj pentru client (opțional)
+                {t("vendorSalaBookings.messageForClient")}
               </Label>
               <Textarea
                 id="accept-reply"
@@ -895,7 +904,7 @@ export function VenueBookingsClient({
                 onChange={(e) => setAcceptReply(e.target.value)}
                 rows={3}
                 className="mt-1"
-                placeholder="Mulțumim pentru alegere! Ne vedem curând."
+                placeholder={t("vendorSalaBookings.acceptReplyPlaceholder")}
               />
             </div>
           </div>
@@ -905,7 +914,7 @@ export function VenueBookingsClient({
               onClick={() => setAcceptDialog(null)}
               disabled={busy === acceptDialog?.id}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={confirmAccept}
@@ -917,7 +926,7 @@ export function VenueBookingsClient({
               ) : (
                 <CheckCircle className="h-4 w-4" />
               )}
-              Confirmă
+              {t("vendorSalaBookings.confirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -930,21 +939,17 @@ export function VenueBookingsClient({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Marchează ca finalizat</DialogTitle>
+            <DialogTitle>{t("vendorSalaBookings.completeDialogTitle")}</DialogTitle>
             <DialogDescription>
-              {completeDialog && (
-                <>
-                  Confirmi că evenimentul pentru{" "}
-                  <strong>{completeDialog.clientName}</strong> (
-                  {new Date(completeDialog.eventDate).toLocaleDateString("ro-RO", {
+              {completeDialog &&
+                t("vendorSalaBookings.completeDialogDescription", {
+                  name: completeDialog.clientName,
+                  date: new Date(completeDialog.eventDate).toLocaleDateString("ro-RO", {
                     day: "numeric",
                     month: "long",
                     year: "numeric",
-                  })}
-                  ) a avut loc cu succes? După aceea vei putea cere clientului o
-                  recenzie.
-                </>
-              )}
+                  }),
+                })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -953,7 +958,7 @@ export function VenueBookingsClient({
               onClick={() => setCompleteDialog(null)}
               disabled={busy === completeDialog?.id}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={confirmComplete}
@@ -965,7 +970,7 @@ export function VenueBookingsClient({
               ) : (
                 <CheckCircle className="h-4 w-4" />
               )}
-              Da, a fost un succes
+              {t("vendorSalaBookings.completeConfirm")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -978,21 +983,19 @@ export function VenueBookingsClient({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Anulează rezervare confirmată</DialogTitle>
+            <DialogTitle>{t("vendorSalaBookings.cancelDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Ziua se va debloca în calendar și clientul va fi notificat prin
-              email. Această acțiune este vizibilă în istoric.
+              {t("vendorSalaBookings.cancelDialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-muted-foreground">
               <AlertTriangle className="mr-1.5 inline h-3.5 w-3.5 text-red-400" />
-              Anularea unei rezervări confirmate afectează încrederea clientului.
-              Folosește doar în caz de urgență (renovare, forță majoră).
+              {t("vendorSalaBookings.cancelWarning")}
             </div>
             <div>
               <Label htmlFor="cancel-reason" className="text-xs">
-                Motiv pentru client
+                {t("vendorSalaBookings.cancelReasonLabel")}
               </Label>
               <Textarea
                 id="cancel-reason"
@@ -1000,7 +1003,7 @@ export function VenueBookingsClient({
                 onChange={(e) => setCancelReason(e.target.value)}
                 rows={3}
                 className="mt-1"
-                placeholder="Ex: Ne pare rău, sala a suferit daune și nu poate găzdui evenimentul..."
+                placeholder={t("vendorSalaBookings.cancelReasonPlaceholder")}
               />
             </div>
           </div>
@@ -1010,7 +1013,7 @@ export function VenueBookingsClient({
               onClick={() => setCancelDialog(null)}
               disabled={busy === cancelDialog?.id}
             >
-              Înapoi
+              {t("common.back")}
             </Button>
             <Button
               onClick={confirmVendorCancel}
@@ -1023,7 +1026,7 @@ export function VenueBookingsClient({
               ) : (
                 <Ban className="h-4 w-4" />
               )}
-              Anulează rezervarea
+              {t("vendorSalaBookings.cancelBooking")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1036,14 +1039,14 @@ export function VenueBookingsClient({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Refuză rezervarea</DialogTitle>
+            <DialogTitle>{t("vendorSalaBookings.declineDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Calendarul nu va fi modificat — ziua rămâne disponibilă pentru alți clienți.
+              {t("vendorSalaBookings.declineDialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Motiv</Label>
+              <Label className="text-xs">{t("vendorSalaBookings.reasonLabel")}</Label>
               <Select
                 value={declineReason}
                 onValueChange={(v) => setDeclineReason(v ?? DECLINE_REASONS[0])}
@@ -1054,7 +1057,7 @@ export function VenueBookingsClient({
                 <SelectContent>
                   {DECLINE_REASONS.map((r) => (
                     <SelectItem key={r} value={r}>
-                      {r}
+                      {t(r)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1062,7 +1065,7 @@ export function VenueBookingsClient({
             </div>
             <div>
               <Label htmlFor="decline-msg" className="text-xs">
-                Mesaj suplimentar (opțional)
+                {t("vendorSalaBookings.extraMessage")}
               </Label>
               <Textarea
                 id="decline-msg"
@@ -1070,7 +1073,7 @@ export function VenueBookingsClient({
                 onChange={(e) => setDeclineMessage(e.target.value)}
                 rows={3}
                 className="mt-1"
-                placeholder="Detalii suplimentare pentru client..."
+                placeholder={t("vendorSalaBookings.extraMessagePlaceholder")}
               />
             </div>
           </div>
@@ -1080,7 +1083,7 @@ export function VenueBookingsClient({
               onClick={() => setDeclineDialog(null)}
               disabled={busy === declineDialog?.id}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={confirmDecline}
@@ -1093,7 +1096,7 @@ export function VenueBookingsClient({
               ) : (
                 <XCircle className="h-4 w-4" />
               )}
-              Refuză
+              {t("vendorSalaBookings.reject")}
             </Button>
           </DialogFooter>
         </DialogContent>

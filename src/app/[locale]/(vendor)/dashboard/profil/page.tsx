@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Save, Eye, Sparkles, Loader2, Search, Camera, Upload, ChevronDown, X } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 type ProfileData = {
   nameRo: string;
@@ -79,6 +80,7 @@ const EMPTY: ProfileData = {
 };
 
 export default function VendorProfilePage() {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [artistId, setArtistId] = useState<number | null>(null);
@@ -110,9 +112,7 @@ export default function VendorProfilePage() {
         }
 
         if (!json.artist) {
-          toast.error(
-            "Nu ai încă un profil de artist — completează onboarding-ul.",
-          );
+          toast.error(t("vendor.profilePage.noArtistProfile"));
           setLoading(false);
           return;
         }
@@ -145,7 +145,7 @@ export default function VendorProfilePage() {
           seoDescRo: (a.seoDescRo as string) ?? "",
         });
       } catch {
-        if (!cancelled) toast.error("Nu am putut încărca profilul");
+        if (!cancelled) toast.error(t("vendor.profilePage.toastLoadError"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -163,11 +163,11 @@ export default function VendorProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Selectează o imagine validă");
+      toast.error(t("vendor.profilePage.toastInvalidImage"));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Imaginea nu poate depăși 10MB");
+      toast.error(t("vendor.profilePage.toastImageTooBig"));
       return;
     }
     setUploadingPhoto(true);
@@ -182,12 +182,12 @@ export default function VendorProfilePage() {
       }
       const { url } = await res.json();
       update({ photoUrl: url });
-      toast.success("Poza de profil încărcată! Nu uita să salvezi.");
+      toast.success(t("vendor.profilePage.toastPhotoUploaded"));
     } catch (err) {
       const msg =
         err instanceof Error && err.message
           ? err.message
-          : "Nu s-a putut încărca imaginea";
+          : t("vendor.profilePage.toastPhotoUploadError");
       toast.error(msg);
     } finally {
       setUploadingPhoto(false);
@@ -199,7 +199,7 @@ export default function VendorProfilePage() {
     setArtistCategoryIds((prev) => {
       if (prev.includes(catId)) return prev.filter((id) => id !== catId);
       if (prev.length >= 3) {
-        toast.error("Poți selecta maximum 3 categorii");
+        toast.error(t("vendor.profilePage.toastMaxCategories"));
         return prev;
       }
       return [...prev, catId];
@@ -208,7 +208,7 @@ export default function VendorProfilePage() {
 
   async function handleSave() {
     if (!artistId) {
-      toast.error("Profil indisponibil");
+      toast.error(t("vendor.profilePage.toastProfileUnavailable"));
       return;
     }
     setSaving(true);
@@ -250,10 +250,10 @@ export default function VendorProfilePage() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Save failed");
       }
-      toast.success("Profilul a fost salvat!");
+      toast.success(t("vendor.profilePage.toastSaved"));
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Eroare la salvarea profilului",
+        e instanceof Error ? e.message : t("vendor.profilePage.toastSaveError"),
       );
     } finally {
       setSaving(false);
@@ -275,15 +275,15 @@ export default function VendorProfilePage() {
       if (!res.ok) throw new Error();
       const result = await res.json();
       update({ descriptionRo: result.result });
-      toast.success("Descriere îmbunătățită cu AI!");
+      toast.success(t("vendor.profilePage.toastAiImproved"));
     } catch {
-      toast.error("AI indisponibil");
+      toast.error(t("vendor.profilePage.toastAiUnavailable"));
     }
   }
 
   async function handleAIGenerate() {
     if (!data.nameRo.trim()) {
-      toast.error("Completează mai întâi numele artistic");
+      toast.error(t("vendor.profilePage.toastNeedName"));
       return;
     }
     setGeneratingAI(true);
@@ -310,9 +310,9 @@ export default function VendorProfilePage() {
       if (!res.ok) throw new Error();
       const result = await res.json();
       update({ descriptionRo: result.result });
-      toast.success("Descriere generată cu AI!");
+      toast.success(t("vendor.profilePage.toastAiGenerated"));
     } catch {
-      toast.error("AI indisponibil — încearcă din nou");
+      toast.error(t("vendor.profilePage.toastAiRetry"));
     } finally {
       setGeneratingAI(false);
     }
@@ -339,7 +339,7 @@ export default function VendorProfilePage() {
     const seoDesc = descBase.length > 155 ? descBase.substring(0, 152) + "..." : descBase;
 
     update({ seoTitleRo: seoTitle, seoDescRo: seoDesc });
-    toast.success("SEO generat automat!");
+    toast.success(t("vendor.profilePage.toastSeoGenerated"));
   }
 
   if (loading) {
@@ -354,38 +354,38 @@ export default function VendorProfilePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Profilul Meu</h1>
-          <p className="text-sm text-muted-foreground">Editează informațiile și portofoliul tău</p>
+          <h1 className="font-heading text-2xl font-bold">{t("vendor.profilePage.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("vendor.profilePage.subtitle")}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> Preview</Button>
+          <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> {t("vendor.profilePage.preview")}</Button>
           <Button onClick={handleSave} disabled={saving || !artistId} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvează
+            {t("common.save")}
           </Button>
         </div>
       </div>
 
       <Tabs defaultValue="info">
         <TabsList className="h-auto w-full flex-wrap justify-start gap-1 p-1">
-          <TabsTrigger value="info">Informații</TabsTrigger>
-          <TabsTrigger value="description">Descriere</TabsTrigger>
-          <TabsTrigger value="gallery">Galerie</TabsTrigger>
-          <TabsTrigger value="packages">Pachete</TabsTrigger>
+          <TabsTrigger value="info">{t("vendor.profilePage.tabInfo")}</TabsTrigger>
+          <TabsTrigger value="description">{t("artist.description")}</TabsTrigger>
+          <TabsTrigger value="gallery">{t("artist.gallery")}</TabsTrigger>
+          <TabsTrigger value="packages">{t("artist.packages")}</TabsTrigger>
           <TabsTrigger value="seo">SEO</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="mt-6 space-y-6">
           {/* Profile Photo */}
           <Card>
-            <CardHeader><CardTitle>Poza de Profil</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("vendor.profilePage.photoTitle")}</CardTitle></CardHeader>
             <CardContent>
               <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
                 <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-gold/30 bg-muted sm:h-28 sm:w-28">
                   {data.photoUrl ? (
                     <Image
                       src={data.photoUrl}
-                      alt="Profil"
+                      alt={t("vendor.profile")}
                       fill
                       sizes="112px"
                       className="object-cover"
@@ -398,7 +398,7 @@ export default function VendorProfilePage() {
                 </div>
                 <div className="w-full space-y-2 sm:w-auto">
                   <p className="text-sm text-muted-foreground">
-                    Aceasta este poza principală care apare pe cardul tău și în profil.
+                    {t("vendor.profilePage.photoHint")}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <label className="cursor-pointer">
@@ -415,7 +415,7 @@ export default function VendorProfilePage() {
                         ) : (
                           <Upload className="h-4 w-4" />
                         )}
-                        {data.photoUrl ? "Schimbă poza" : "Încarcă poza"}
+                        {data.photoUrl ? t("vendor.profilePage.changePhoto") : t("vendor.profilePage.uploadPhoto")}
                       </span>
                     </label>
                     {data.photoUrl && (
@@ -425,7 +425,7 @@ export default function VendorProfilePage() {
                         className="text-destructive"
                         onClick={() => update({ photoUrl: "" })}
                       >
-                        Șterge
+                        {t("common.delete")}
                       </Button>
                     )}
                   </div>
@@ -435,17 +435,17 @@ export default function VendorProfilePage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Informații de bază</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("vendor.profilePage.basicInfo")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <div><Label>Nume artistic</Label><Input value={data.nameRo} onChange={(e) => update({ nameRo: e.target.value })} /></div>
-                <div><Label>Locație</Label><Input value={data.location} onChange={(e) => update({ location: e.target.value })} /></div>
+                <div><Label>{t("vendor.profilePage.stageName")}</Label><Input value={data.nameRo} onChange={(e) => update({ nameRo: e.target.value })} /></div>
+                <div><Label>{t("venue.location")}</Label><Input value={data.location} onChange={(e) => update({ location: e.target.value })} /></div>
               </div>
               {/* Slug — public URL. Manual edit is allowed; server records a
                   redirect from the previous slug so the old link keeps
                   working. */}
               <div>
-                <Label>Adresă URL (slug)</Label>
+                <Label>{t("vendor.profilePage.slugLabel")}</Label>
                 <div className="mt-1 flex items-center gap-2">
                   <span className="shrink-0 select-none text-xs text-muted-foreground">
                     epetrecere.md/artisti/
@@ -464,18 +464,15 @@ export default function VendorProfilePage() {
                   />
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Doar litere mici, cifre și liniuțe. Linkurile vechi vor
-                  redirecționa automat la cel nou.
+                  {t("vendor.profilePage.slugHint")}
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div><Label>Telefon</Label><Input value={data.phone} onChange={(e) => update({ phone: e.target.value })} /></div>
-                <div><Label>Email</Label><Input value={data.email} onChange={(e) => update({ email: e.target.value })} /></div>
+                <div><Label>{t("form.phone")}</Label><Input value={data.phone} onChange={(e) => update({ phone: e.target.value })} /></div>
+                <div><Label>{t("form.email")}</Label><Input value={data.email} onChange={(e) => update({ email: e.target.value })} /></div>
               </div>
               <p className="text-xs text-muted-foreground">
-                Telefon și email sunt vizibile doar administratorilor. Clienții te pot
-                contacta prin chatul direct și formularul de rezervare. Prețurile se
-                gestionează din tab-ul <strong>Tarife</strong>.
+                {t("vendor.profilePage.contactVisibilityHint")} <strong>{t("dashboard.rates")}</strong>.
               </p>
             </CardContent>
           </Card>
@@ -483,9 +480,9 @@ export default function VendorProfilePage() {
           {/* Categories */}
           <Card>
             <CardHeader>
-              <CardTitle>Categorii</CardTitle>
+              <CardTitle>{t("categories.title")}</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Selectează categoriile în care activezi (maximum 3)
+                {t("vendor.profilePage.categoriesHint")}
               </p>
             </CardHeader>
             <CardContent>
@@ -512,7 +509,7 @@ export default function VendorProfilePage() {
                       className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
                     >
                       <ChevronDown className="h-3.5 w-3.5" />
-                      Adaugă categorie
+                      {t("vendor.profilePage.addCategory")}
                     </PopoverTrigger>
                     <PopoverContent className="w-56 p-2" align="start">
                       <div className="max-h-60 space-y-0.5 overflow-y-auto">
@@ -534,7 +531,7 @@ export default function VendorProfilePage() {
                 )}
               </div>
               {artistCategoryIds.length === 0 && (
-                <p className="mt-2 text-sm text-amber-600">Alege cel puțin o categorie.</p>
+                <p className="mt-2 text-sm text-amber-600">{t("vendor.profilePage.pickCategory")}</p>
               )}
             </CardContent>
           </Card>
@@ -544,7 +541,7 @@ export default function VendorProfilePage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle>Descriere</CardTitle>
+                <CardTitle>{t("artist.description")}</CardTitle>
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
@@ -558,31 +555,31 @@ export default function VendorProfilePage() {
                     ) : (
                       <Sparkles className="h-3.5 w-3.5 text-gold" />
                     )}
-                    Generează cu AI
+                    {t("vendor.profilePage.generateAi")}
                   </Button>
                   <Button variant="outline" size="sm" className="gap-1" onClick={handleAIImprove}>
-                    <Sparkles className="h-3.5 w-3.5 text-gold" /> Îmbunătățește cu AI
+                    <Sparkles className="h-3.5 w-3.5 text-gold" /> {t("vendor.profilePage.improveAi")}
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>Descriere (RO)</Label><RichEditor content={data.descriptionRo} onChange={(html) => update({ descriptionRo: html })} /></div>
-              <div><Label>Descriere (RU)</Label><RichEditor content={data.descriptionRu} onChange={(html) => update({ descriptionRu: html })} /></div>
-              <div><Label>Descriere (EN)</Label><RichEditor content={data.descriptionEn} onChange={(html) => update({ descriptionEn: html })} /></div>
+              <div><Label>{t("vendor.profilePage.descriptionRo")}</Label><RichEditor content={data.descriptionRo} onChange={(html) => update({ descriptionRo: html })} /></div>
+              <div><Label>{t("vendor.profilePage.descriptionRu")}</Label><RichEditor content={data.descriptionRu} onChange={(html) => update({ descriptionRu: html })} /></div>
+              <div><Label>{t("vendor.profilePage.descriptionEn")}</Label><RichEditor content={data.descriptionEn} onChange={(html) => update({ descriptionEn: html })} /></div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="gallery" className="mt-6 space-y-6">
           <Card>
-            <CardHeader><CardTitle>Galerie Foto</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("vendor.profilePage.photoGallery")}</CardTitle></CardHeader>
             <CardContent>
               <GalleryManager artistId={artistId} />
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Videoclipuri</CardTitle></CardHeader>
+            <CardHeader><CardTitle>{t("vendor.videos")}</CardTitle></CardHeader>
             <CardContent>
               <VideoManager artistId={artistId} />
             </CardContent>
@@ -592,7 +589,7 @@ export default function VendorProfilePage() {
         <TabsContent value="packages" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle>Pachete Servicii</CardTitle>
+              <CardTitle>{t("vendor.profilePage.servicePackages")}</CardTitle>
             </CardHeader>
             <CardContent>
               <PackagesManager artistId={artistId} />
@@ -606,7 +603,7 @@ export default function VendorProfilePage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Search className="h-5 w-5" />
-                  SEO — Optimizare pentru Motoarele de Căutare
+                  {t("vendor.profilePage.seoTitle")}
                 </CardTitle>
                 <Button
                   variant="outline"
@@ -615,38 +612,38 @@ export default function VendorProfilePage() {
                   onClick={handleAutoGenerateSEO}
                 >
                   <Sparkles className="h-3.5 w-3.5 text-gold" />
-                  Auto-generează SEO
+                  {t("vendor.profilePage.autoGenerateSeo")}
                 </Button>
               </div>
               <p className="text-sm text-muted-foreground">
-                Controlează cum apare profilul tău în rezultatele Google.
+                {t("vendor.profilePage.seoHint")}
               </p>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <Label>
-                  Meta Title{" "}
+                  {t("vendor.profilePage.metaTitle")}{" "}
                   <span className="text-xs text-muted-foreground">
-                    ({data.seoTitleRo.length}/60 caractere)
+                    {t("vendor.profilePage.metaTitleCounter", { count: data.seoTitleRo.length })}
                   </span>
                 </Label>
                 <Input
                   value={data.seoTitleRo}
                   onChange={(e) => update({ seoTitleRo: e.target.value })}
                   maxLength={60}
-                  placeholder="ex: DJ Andrei — DJ pentru Nunți | ePetrecere.md"
+                  placeholder={t("vendor.profilePage.metaTitlePlaceholder")}
                 />
                 {data.seoTitleRo.length > 60 && (
                   <p className="mt-1 text-xs text-destructive">
-                    Titlul depășește 60 de caractere și poate fi trunchiat în Google.
+                    {t("vendor.profilePage.metaTitleTooLong")}
                   </p>
                 )}
               </div>
               <div>
                 <Label>
-                  Meta Description{" "}
+                  {t("vendor.profilePage.metaDescription")}{" "}
                   <span className="text-xs text-muted-foreground">
-                    ({data.seoDescRo.length}/155 caractere)
+                    {t("vendor.profilePage.metaDescriptionCounter", { count: data.seoDescRo.length })}
                   </span>
                 </Label>
                 <Textarea
@@ -654,26 +651,26 @@ export default function VendorProfilePage() {
                   onChange={(e) => update({ seoDescRo: e.target.value })}
                   maxLength={155}
                   rows={3}
-                  placeholder="ex: Rezervă DJ Andrei pentru nunta ta. DJ profesionist din Chișinău. Solicită preț pe ePetrecere.md"
+                  placeholder={t("vendor.profilePage.metaDescriptionPlaceholder")}
                 />
                 {data.seoDescRo.length > 155 && (
                   <p className="mt-1 text-xs text-destructive">
-                    Descrierea depășește 155 de caractere și poate fi trunchiată în Google.
+                    {t("vendor.profilePage.metaDescriptionTooLong")}
                   </p>
                 )}
               </div>
               {/* Live preview of how it looks in search results */}
               {(data.seoTitleRo || data.seoDescRo) && (
                 <div className="rounded-lg border bg-muted/30 p-4">
-                  <p className="mb-1 text-xs font-medium text-muted-foreground">Previzualizare Google</p>
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">{t("vendor.profilePage.googlePreview")}</p>
                   <p className="text-base text-blue-600 hover:underline">
-                    {data.seoTitleRo || "Titlu pagină"}
+                    {data.seoTitleRo || t("vendor.profilePage.pageTitleFallback")}
                   </p>
                   <p className="text-xs text-green-700">
                     epetrecere.md/artisti/...
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {data.seoDescRo || "Descrierea paginii va apărea aici..."}
+                    {data.seoDescRo || t("vendor.profilePage.pageDescFallback")}
                   </p>
                 </div>
               )}

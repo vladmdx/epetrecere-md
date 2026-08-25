@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Upload, X, Star, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 type ImageRow = {
   id: number;
@@ -35,6 +36,7 @@ type ImageRow = {
 const MAX_FILES = 20;
 
 export function GalleryManager({ artistId }: { artistId: number | null }) {
+  const { t } = useLocale();
   const [images, setImages] = useState<ImageRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -50,7 +52,7 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
       const rows = (await res.json()) as ImageRow[];
       setImages(rows);
     } catch {
-      toast.error("Nu am putut încărca galeria");
+      toast.error(t("vendor.gallery.toastLoadError"));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
   async function handleFiles(files: FileList) {
     if (!artistId) return;
     if (images.length + files.length > MAX_FILES) {
-      toast.error(`Maxim ${MAX_FILES} imagini`);
+      toast.error(t("vendor.gallery.toastMaxFiles", { max: MAX_FILES }));
       return;
     }
 
@@ -73,7 +75,7 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
       for (const file of Array.from(files)) {
         if (!file.type.startsWith("image/")) continue;
         if (file.size > 10 * 1024 * 1024) {
-          toast.error(`${file.name} depășește 10MB`);
+          toast.error(t("vendor.gallery.toastTooBig", { name: file.name }));
           continue;
         }
 
@@ -108,10 +110,10 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
         }
       }
       await reload();
-      toast.success("Imagini adăugate");
+      toast.success(t("vendor.gallery.toastAdded"));
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Eroare la încărcare",
+        e instanceof Error ? e.message : t("vendor.gallery.toastUploadError"),
       );
     } finally {
       setUploading(false);
@@ -127,7 +129,7 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
       if (!res.ok) throw new Error("delete failed");
       await reload();
     } catch {
-      toast.error("Nu am putut șterge imaginea");
+      toast.error(t("vendor.gallery.toastDeleteError"));
     }
   }
 
@@ -141,14 +143,14 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
       if (!res.ok) throw new Error("put failed");
       await reload();
     } catch {
-      toast.error("Nu am putut marca copertă");
+      toast.error(t("vendor.gallery.toastCoverError"));
     }
   }
 
   if (!artistId) {
     return (
       <p className="text-sm text-muted-foreground">
-        Salvează profilul înainte de a adăuga imagini.
+        {t("vendor.gallery.saveProfileFirst")}
       </p>
     );
   }
@@ -176,10 +178,10 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
           <Upload className="h-8 w-8 text-muted-foreground" />
         )}
         <p className="mt-2 text-sm font-medium">
-          {uploading ? "Se încarcă..." : "Click pentru a încărca imagini"}
+          {uploading ? t("common.loading") : t("vendor.gallery.clickToUpload")}
         </p>
         <p className="text-xs text-muted-foreground">
-          JPG/PNG/WebP · max 10MB · max {MAX_FILES} fișiere
+          {t("vendor.gallery.formatsHint", { max: MAX_FILES })}
         </p>
         <input
           ref={inputRef}
@@ -211,7 +213,7 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
               />
               {img.isCover && (
                 <span className="absolute left-1 top-1 rounded bg-gold px-1.5 py-0.5 text-[10px] font-semibold text-[#0D0D0D]">
-                  Copertă
+                  {t("vendor.gallery.cover")}
                 </span>
               )}
               <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/50 opacity-0 transition-opacity group-hover:opacity-100">
@@ -222,7 +224,7 @@ export function GalleryManager({ artistId }: { artistId: number | null }) {
                     className="gap-1"
                     onClick={() => setCover(img.id)}
                   >
-                    <Star className="h-3 w-3" /> Copertă
+                    <Star className="h-3 w-3" /> {t("vendor.gallery.cover")}
                   </Button>
                 )}
                 <Button

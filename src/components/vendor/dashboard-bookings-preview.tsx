@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
 import type { BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
+import { useLocale } from "@/hooks/use-locale";
 
 type BookingRequest = {
   id: number;
@@ -49,10 +50,10 @@ type BookingRequest = {
   priceOffers: BookingPriceOffer[] | null;
 };
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: "În așteptare", color: "bg-warning/10 text-warning border-warning/30" },
-  accepted: { label: "Așteaptă confirmare client", color: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
-  confirmed_by_client: { label: "Confirmat", color: "bg-success/10 text-success border-success/30" },
+const statusConfig: Record<string, { labelKey: string; color: string }> = {
+  pending: { labelKey: "vendorBookingsPreview.statusPending", color: "bg-warning/10 text-warning border-warning/30" },
+  accepted: { labelKey: "vendorBookingsPreview.statusAccepted", color: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
+  confirmed_by_client: { labelKey: "vendorBookingsPreview.statusConfirmed", color: "bg-success/10 text-success border-success/30" },
 };
 
 const PREVIEW_LIMIT = 5;
@@ -62,6 +63,7 @@ interface Props {
 }
 
 export function DashboardBookingsPreview({ artistId }: Props) {
+  const { t } = useLocale();
   const { isLoaded } = useUser();
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,14 +108,14 @@ export function DashboardBookingsPreview({ artistId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "accept",
-          reply: acceptReply.trim() || "Cererea a fost acceptată!",
+          reply: acceptReply.trim() || t("vendorBookingsPreview.defaultAcceptReply"),
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut accepta");
+        toast.error(t("vendorBookingsPreview.acceptFailed"));
         return;
       }
-      toast.success("Acceptat!");
+      toast.success(t("vendorBookingsPreview.acceptSuccess"));
       setAcceptDialog(null);
       setAcceptReply("");
       await refresh();
@@ -131,14 +133,14 @@ export function DashboardBookingsPreview({ artistId }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "reject",
-          reply: rejectReply.trim() || "Ne pare rău, nu sunt disponibil.",
+          reply: rejectReply.trim() || t("vendorBookingsPreview.defaultRejectReply"),
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut respinge");
+        toast.error(t("vendorBookingsPreview.rejectFailed"));
         return;
       }
-      toast.success("Respins");
+      toast.success(t("vendorBookingsPreview.rejectSuccess"));
       setRejectDialog(null);
       setRejectReply("");
       await refresh();
@@ -151,7 +153,7 @@ export function DashboardBookingsPreview({ artistId }: Props) {
     if (!proposeDialog) return;
     const amt = Number(proposeAmount);
     if (!Number.isFinite(amt) || amt <= 0) {
-      toast.error("Introdu o sumă validă.");
+      toast.error(t("vendorBookingsPreview.invalidAmount"));
       return;
     }
     setBusy(proposeDialog.id);
@@ -166,10 +168,10 @@ export function DashboardBookingsPreview({ artistId }: Props) {
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut trimite oferta");
+        toast.error(t("vendorBookingsPreview.offerFailed"));
         return;
       }
-      toast.success("Ofertă trimisă");
+      toast.success(t("vendorBookingsPreview.offerSuccess"));
       setProposeDialog(null);
       setProposeAmount("");
       setProposeMessage("");
@@ -183,7 +185,7 @@ export function DashboardBookingsPreview({ artistId }: Props) {
     const cfg = statusConfig[b.status];
     // A missing or unrecognised type keeps the neutral "Eveniment" caption.
     const eventTypeKey = normalizeEventType(b.eventType);
-    const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment";
+    const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : t("vendorBookingsPreview.eventFallback");
     const isPending = b.status === "pending";
     const lastOffer = b.priceOffers && b.priceOffers.length > 0 ? b.priceOffers[b.priceOffers.length - 1] : null;
     const lastOfferIsFromClient = lastOffer?.from === "client";
@@ -208,24 +210,24 @@ export function DashboardBookingsPreview({ artistId }: Props) {
             <span className="font-medium text-sm">{b.clientName}</span>
             {waitingForClient ? (
               <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/40 bg-amber-500/10">
-                ⏳ Așteptăm răspunsul clientului
+                {t("vendorBookingsPreview.waitingForClient")}
               </Badge>
             ) : (
-              <Badge variant="outline" className={cn("text-[10px]", cfg?.color)}>{cfg?.label}</Badge>
+              <Badge variant="outline" className={cn("text-[10px]", cfg?.color)}>{cfg ? t(cfg.labelKey) : null}</Badge>
             )}
             {displayPrice !== null && displayPrice !== undefined && displayPrice > 0 && (
               <Badge variant="outline" className="text-[10px] gap-0.5 text-gold border-gold/30">
                 <Euro className="h-3 w-3" /> {displayPrice}€
                 {lastOffer && (
                   <span className="ml-0.5 opacity-70">
-                    ({lastOffer.from === "client" ? "client" : "tu"})
+                    ({lastOffer.from === "client" ? t("vendorBookingsPreview.offerFromClient") : t("vendorBookingsPreview.offerFromYou")})
                   </span>
                 )}
               </Badge>
             )}
             {lastOfferIsFromClient && isPending && (
               <Badge variant="outline" className="text-[10px] gap-0.5 text-blue-400 border-blue-500/30 bg-blue-500/5">
-                💰 Contraofertă client
+                {t("vendorBookingsPreview.clientCounteroffer")}
               </Badge>
             )}
           </div>
@@ -262,10 +264,16 @@ export function DashboardBookingsPreview({ artistId }: Props) {
                 onClick={() => setAcceptDialog(b)}
                 disabled={busy === b.id}
                 className="h-8 gap-1 bg-green-600 hover:bg-green-700 text-white text-xs"
-                title={lastOfferIsFromClient ? `Acceptă la ${lastOffer?.amount}€` : "Acceptă"}
+                title={
+                  lastOfferIsFromClient
+                    ? t("vendorBookingsPreview.acceptAtAmount", { amount: lastOffer?.amount ?? "" })
+                    : t("vendorBookingsPreview.accept")
+                }
               >
                 <CheckCircle className="h-3.5 w-3.5" />
-                {lastOfferIsFromClient ? `Acceptă ${lastOffer?.amount}€` : "Acceptă"}
+                {lastOfferIsFromClient
+                  ? t("vendorBookingsPreview.acceptAmount", { amount: lastOffer?.amount ?? "" })
+                  : t("vendorBookingsPreview.accept")}
               </Button>
               <Button
                 size="sm"
@@ -276,7 +284,7 @@ export function DashboardBookingsPreview({ artistId }: Props) {
                 }}
                 disabled={busy === b.id}
                 className="h-8 gap-1 text-xs"
-                title="Propune preț"
+                title={t("vendorBookingsPreview.proposePrice")}
               >
                 <HandCoins className="h-3.5 w-3.5" />
               </Button>
@@ -286,7 +294,7 @@ export function DashboardBookingsPreview({ artistId }: Props) {
                 onClick={() => setRejectDialog(b)}
                 disabled={busy === b.id}
                 className="h-8 gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
-                title="Refuză"
+                title={t("vendorBookingsPreview.reject")}
               >
                 <XCircle className="h-3.5 w-3.5" />
               </Button>
@@ -294,13 +302,13 @@ export function DashboardBookingsPreview({ artistId }: Props) {
           ) : waitingForClient ? (
             <Link href="/dashboard/rezervari">
               <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
-                <MessageSquare className="h-3.5 w-3.5" /> Detalii
+                <MessageSquare className="h-3.5 w-3.5" /> {t("vendorBookingsPreview.details")}
               </Button>
             </Link>
           ) : (
             <Link href="/dashboard/rezervari">
               <Button size="sm" variant="outline" className="h-8 gap-1 text-xs">
-                <MessageSquare className="h-3.5 w-3.5" /> Detalii
+                <MessageSquare className="h-3.5 w-3.5" /> {t("vendorBookingsPreview.details")}
               </Button>
             </Link>
           )}
@@ -330,11 +338,11 @@ export function DashboardBookingsPreview({ artistId }: Props) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-heading">
-              Cereri noi ({activeBookings.length})
+              {t("vendorBookingsPreview.newRequests", { count: activeBookings.length })}
             </CardTitle>
             {activeBookings.length > PREVIEW_LIMIT && (
               <Link href="/dashboard/rezervari" className="text-xs text-gold hover:underline flex items-center gap-1">
-                Vezi toate <ArrowRight className="h-3 w-3" />
+                {t("common.viewAll")} <ArrowRight className="h-3 w-3" />
               </Link>
             )}
           </CardHeader>
@@ -342,7 +350,7 @@ export function DashboardBookingsPreview({ artistId }: Props) {
             {activeBookings.slice(0, PREVIEW_LIMIT).map(renderRow)}
             {activeBookings.length > PREVIEW_LIMIT && (
               <Link href="/dashboard/rezervari" className="block w-full text-center text-xs text-gold hover:underline pt-2">
-                Vezi toate ({activeBookings.length})
+                {t("vendorBookingsPreview.viewAllCount", { count: activeBookings.length })}
               </Link>
             )}
           </CardContent>
@@ -354,11 +362,11 @@ export function DashboardBookingsPreview({ artistId }: Props) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base font-heading">
-              Rezervări active ({acceptedBookings.length})
+              {t("vendorBookingsPreview.activeBookings", { count: acceptedBookings.length })}
             </CardTitle>
             {acceptedBookings.length > PREVIEW_LIMIT && (
               <Link href="/dashboard/rezervari" className="text-xs text-gold hover:underline flex items-center gap-1">
-                Vezi toate <ArrowRight className="h-3 w-3" />
+                {t("common.viewAll")} <ArrowRight className="h-3 w-3" />
               </Link>
             )}
           </CardHeader>
@@ -366,7 +374,7 @@ export function DashboardBookingsPreview({ artistId }: Props) {
             {acceptedBookings.slice(0, PREVIEW_LIMIT).map(renderRow)}
             {acceptedBookings.length > PREVIEW_LIMIT && (
               <Link href="/dashboard/rezervari" className="block w-full text-center text-xs text-gold hover:underline pt-2">
-                Vezi toate ({acceptedBookings.length})
+                {t("vendorBookingsPreview.viewAllCount", { count: acceptedBookings.length })}
               </Link>
             )}
           </CardContent>
@@ -377,22 +385,22 @@ export function DashboardBookingsPreview({ artistId }: Props) {
       <Dialog open={!!acceptDialog} onOpenChange={(o) => !o && setAcceptDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Acceptă cererea</DialogTitle>
+            <DialogTitle>{t("vendorBookingsPreview.acceptDialogTitle")}</DialogTitle>
           </DialogHeader>
           <div>
-            <Label>Mesaj pentru client (opțional)</Label>
+            <Label>{t("vendorBookingsPreview.messageForClient")}</Label>
             <Textarea
               value={acceptReply}
               onChange={(e) => setAcceptReply(e.target.value)}
               rows={3}
-              placeholder="Cererea a fost acceptată!"
+              placeholder={t("vendorBookingsPreview.defaultAcceptReply")}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAcceptDialog(null)}>Anulează</Button>
+            <Button variant="outline" onClick={() => setAcceptDialog(null)}>{t("common.cancel")}</Button>
             <Button onClick={confirmAccept} disabled={busy === acceptDialog?.id} className="bg-green-600 hover:bg-green-700 text-white gap-1">
               {busy === acceptDialog?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
-              Acceptă
+              {t("vendorBookingsPreview.accept")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -402,22 +410,22 @@ export function DashboardBookingsPreview({ artistId }: Props) {
       <Dialog open={!!rejectDialog} onOpenChange={(o) => !o && setRejectDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Refuză cererea</DialogTitle>
+            <DialogTitle>{t("vendorBookingsPreview.rejectDialogTitle")}</DialogTitle>
           </DialogHeader>
           <div>
-            <Label>Mesaj pentru client (opțional)</Label>
+            <Label>{t("vendorBookingsPreview.messageForClient")}</Label>
             <Textarea
               value={rejectReply}
               onChange={(e) => setRejectReply(e.target.value)}
               rows={3}
-              placeholder="Ne pare rău, nu sunt disponibil."
+              placeholder={t("vendorBookingsPreview.defaultRejectReply")}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectDialog(null)}>Anulează</Button>
+            <Button variant="outline" onClick={() => setRejectDialog(null)}>{t("common.cancel")}</Button>
             <Button onClick={confirmReject} disabled={busy === rejectDialog?.id} className="bg-destructive hover:bg-destructive/90 text-white gap-1">
               {busy === rejectDialog?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <XCircle className="h-4 w-4" />}
-              Refuză
+              {t("vendorBookingsPreview.reject")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -427,34 +435,34 @@ export function DashboardBookingsPreview({ artistId }: Props) {
       <Dialog open={!!proposeDialog} onOpenChange={(o) => !o && setProposeDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Propune un preț</DialogTitle>
+            <DialogTitle>{t("vendorBookingsPreview.proposeDialogTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>Preț (€) *</Label>
+              <Label>{t("vendorBookingsPreview.priceLabel")}</Label>
               <Input
                 type="number"
                 value={proposeAmount}
                 onChange={(e) => setProposeAmount(e.target.value)}
-                placeholder="ex: 200"
+                placeholder={t("vendorBookingsPreview.pricePlaceholder")}
                 autoFocus
               />
             </div>
             <div>
-              <Label>Mesaj (opțional)</Label>
+              <Label>{t("vendorBookingsPreview.messageOptional")}</Label>
               <Textarea
                 value={proposeMessage}
                 onChange={(e) => setProposeMessage(e.target.value)}
-                placeholder="Adaugă un mesaj pentru client..."
+                placeholder={t("vendorBookingsPreview.messagePlaceholder")}
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProposeDialog(null)}>Anulează</Button>
+            <Button variant="outline" onClick={() => setProposeDialog(null)}>{t("common.cancel")}</Button>
             <Button onClick={confirmPropose} disabled={busy === proposeDialog?.id} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1">
               {busy === proposeDialog?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <HandCoins className="h-4 w-4" />}
-              Trimite oferta
+              {t("vendorBookingsPreview.sendOffer")}
             </Button>
           </DialogFooter>
         </DialogContent>

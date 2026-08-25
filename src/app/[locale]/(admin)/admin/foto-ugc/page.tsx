@@ -18,6 +18,7 @@ import {
   EyeOff,
   ImageIcon,
 } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 import { toast } from "sonner";
 
 interface AdminPhotoRow {
@@ -43,6 +44,7 @@ interface AdminPhotoRow {
 }
 
 export default function AdminUgcPhotosPage() {
+  const { t } = useLocale();
   const [rows, setRows] = useState<AdminPhotoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"pending" | "approved" | "all">("pending");
@@ -57,7 +59,7 @@ export default function AdminUgcPhotosPage() {
       const data = await res.json();
       setRows(data.photos ?? []);
     } catch {
-      toast.error("Nu am putut încărca fotografiile.");
+      toast.error(t("adminUi.ugc.toastLoadError"));
     } finally {
       setLoading(false);
     }
@@ -75,23 +77,23 @@ export default function AdminUgcPhotosPage() {
       body: JSON.stringify({ isApproved: true, isPublic: makePublic }),
     });
     if (!res.ok) {
-      toast.error("Nu am putut aproba.");
+      toast.error(t("adminUi.ugc.toastApproveError"));
       return;
     }
-    toast.success(makePublic ? "Aprobat și publicat." : "Aprobat.");
+    toast.success(makePublic ? t("adminUi.ugc.toastApprovedPublic") : t("adminUi.ugc.toastApproved"));
     setRows((prev) => prev.filter((r) => r.photo.id !== row.photo.id));
   }
 
   async function reject(row: AdminPhotoRow) {
-    if (!confirm("Sigur vrei să ștergi această fotografie?")) return;
+    if (!confirm(t("adminUi.ugc.confirmDelete"))) return;
     const res = await fetch(`/api/admin/event-photos/${row.photo.id}`, {
       method: "DELETE",
     });
     if (!res.ok) {
-      toast.error("Nu am putut șterge.");
+      toast.error(t("adminUi.ugc.toastDeleteError"));
       return;
     }
-    toast.success("Fotografie ștearsă.");
+    toast.success(t("adminUi.ugc.toastDeleted"));
     setRows((prev) => prev.filter((r) => r.photo.id !== row.photo.id));
   }
 
@@ -102,7 +104,7 @@ export default function AdminUgcPhotosPage() {
       body: JSON.stringify({ isPublic: !row.photo.isPublic }),
     });
     if (!res.ok) {
-      toast.error("Nu am putut actualiza.");
+      toast.error(t("adminUi.ugc.toastUpdateError"));
       return;
     }
     setRows((prev) =>
@@ -117,9 +119,9 @@ export default function AdminUgcPhotosPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Fotografii UGC</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("adminUi.ugc.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Moderare fotografii încărcate de clienți pe planurile de eveniment.
+          {t("adminUi.ugc.subtitle")}
         </p>
       </div>
 
@@ -135,10 +137,10 @@ export default function AdminUgcPhotosPage() {
             onClick={() => setFilter(f)}
           >
             {f === "pending"
-              ? "În așteptare"
+              ? t("adminUi.ugc.filterPending")
               : f === "approved"
-                ? "Aprobate"
-                : "Toate"}
+                ? t("adminUi.ugc.filterApproved")
+                : t("common.all")}
           </Button>
         ))}
       </div>
@@ -151,7 +153,7 @@ export default function AdminUgcPhotosPage() {
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-muted-foreground">
             <ImageIcon className="mb-3 h-10 w-10" />
-            <p>Nicio fotografie {filter === "pending" ? "de verificat" : ""}.</p>
+            <p>{filter === "pending" ? t("adminUi.ugc.emptyPending") : t("adminUi.ugc.empty")}</p>
           </CardContent>
         </Card>
       ) : (
@@ -161,7 +163,7 @@ export default function AdminUgcPhotosPage() {
               { }
               <img
                 src={row.photo.url}
-                alt={row.photo.caption || "Event photo"}
+                alt={row.photo.caption || t("adminUi.ugc.photoAlt")}
                 className="aspect-video w-full object-cover"
                 loading="lazy"
               />
@@ -180,10 +182,10 @@ export default function AdminUgcPhotosPage() {
                     ) : (
                       <ShieldAlert className="mr-1 h-3 w-3" />
                     )}
-                    {row.photo.isApproved ? "Aprobat" : "În verificare"}
+                    {row.photo.isApproved ? t("adminUi.ugc.badgeApproved") : t("adminUi.ugc.badgeReview")}
                   </Badge>
                   <Badge variant="outline">
-                    {row.photo.isPublic ? "Public" : "Privat"}
+                    {row.photo.isPublic ? t("adminUi.ugc.badgePublic") : t("adminUi.ugc.badgePrivate")}
                   </Badge>
                 </div>
 
@@ -194,27 +196,27 @@ export default function AdminUgcPhotosPage() {
                 <div className="space-y-1 text-xs text-muted-foreground">
                   {row.planTitle && (
                     <p>
-                      <span className="font-medium text-foreground">Plan:</span>{" "}
+                      <span className="font-medium text-foreground">{t("adminUi.ugc.planLabel")}</span>{" "}
                       {row.planTitle}
                       {row.planEventType && ` · ${row.planEventType}`}
                     </p>
                   )}
                   {row.uploaderName && (
                     <p>
-                      <span className="font-medium text-foreground">De la:</span>{" "}
+                      <span className="font-medium text-foreground">{t("adminUi.ugc.fromLabel")}</span>{" "}
                       {row.uploaderName}
                       {row.uploaderEmail && ` · ${row.uploaderEmail}`}
                     </p>
                   )}
                   {row.artistNameRo && (
                     <p>
-                      <span className="font-medium text-foreground">Tag artist:</span>{" "}
+                      <span className="font-medium text-foreground">{t("adminUi.ugc.tagArtist")}</span>{" "}
                       {row.artistNameRo}
                     </p>
                   )}
                   {row.venueNameRo && (
                     <p>
-                      <span className="font-medium text-foreground">Tag sală:</span>{" "}
+                      <span className="font-medium text-foreground">{t("adminUi.ugc.tagVenue")}</span>{" "}
                       {row.venueNameRo}
                     </p>
                   )}
@@ -230,14 +232,14 @@ export default function AdminUgcPhotosPage() {
                         onClick={() => approve(row, true)}
                       >
                         <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-                        Aprobă + public
+                        {t("adminUi.ugc.approvePublic")}
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => approve(row, false)}
                       >
-                        Doar aprobă
+                        {t("adminUi.ugc.approveOnly")}
                       </Button>
                     </>
                   ) : (
@@ -248,11 +250,11 @@ export default function AdminUgcPhotosPage() {
                     >
                       {row.photo.isPublic ? (
                         <>
-                          <EyeOff className="mr-1 h-3.5 w-3.5" /> Ascunde
+                          <EyeOff className="mr-1 h-3.5 w-3.5" /> {t("adminUi.ugc.hide")}
                         </>
                       ) : (
                         <>
-                          <Eye className="mr-1 h-3.5 w-3.5" /> Fă public
+                          <Eye className="mr-1 h-3.5 w-3.5" /> {t("adminUi.ugc.makePublic")}
                         </>
                       )}
                     </Button>
@@ -263,7 +265,7 @@ export default function AdminUgcPhotosPage() {
                     className="text-destructive"
                     onClick={() => reject(row)}
                   >
-                    <Trash2 className="mr-1 h-3.5 w-3.5" /> Șterge
+                    <Trash2 className="mr-1 h-3.5 w-3.5" /> {t("common.delete")}
                   </Button>
                 </div>
               </CardContent>

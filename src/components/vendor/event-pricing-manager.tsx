@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { formatDuration } from "@/lib/pricing/resolve";
 import { ALL_EVENT_TYPES, eventTypeLabel, type EventTypeKey } from "@/lib/events/normalize";
 import { formatPrice } from "@/lib/format/price";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Row {
   id: number;
@@ -64,6 +65,7 @@ const EMPTY: Draft = {
 const ORDER = new Map<string, number>(ALL_EVENT_TYPES.map((k, i) => [k, i]));
 
 export function EventPricingManager({ artistId }: { artistId: number }) {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
@@ -89,7 +91,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
           ),
       );
     } catch {
-      toast.error("Nu s-au putut încărca prețurile per eveniment");
+      toast.error(t("vendor.eventPricing.toastLoadError"));
     } finally {
       setLoading(false);
     }
@@ -102,7 +104,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
   function parse(d: Draft) {
     const price = Number(d.price);
     if (!Number.isFinite(price) || price <= 0) {
-      toast.error("Prețul trebuie să fie un număr pozitiv");
+      toast.error(t("vendor.eventPricing.toastPricePositive"));
       return null;
     }
     const hours = d.hours === "" ? 0 : Number(d.hours.replace(",", "."));
@@ -111,11 +113,11 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
       !Number.isFinite(hours) || hours < 0 || hours > 24 ||
       !Number.isFinite(minutes) || minutes < 0 || minutes > 59
     ) {
-      toast.error("Durata medie trebuie completată corect (ore 0–24, minute 0–59)");
+      toast.error(t("vendor.eventPricing.toastDurationInvalid"));
       return null;
     }
     if (hours === 0 && minutes === 0) {
-      toast.error("Completează durata medie a evenimentului");
+      toast.error(t("vendor.eventPricing.toastDurationRequired"));
       return null;
     }
     // Normalise into whole hours + 0–59 minutes; the API caps minutes at 59.
@@ -131,7 +133,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
   function defaultName(eventType: string | null): string {
     return eventType
       ? eventTypeLabel(eventType as EventTypeKey)
-      : "Orice eveniment";
+      : t("artist.profile.anyEvent");
   }
 
   async function create() {
@@ -155,12 +157,12 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Preț adăugat");
+      toast.success(t("vendor.eventPricing.toastAdded"));
       setDraft(EMPTY);
       setAdding(false);
       await load();
     } catch {
-      toast.error("Nu s-a putut salva prețul");
+      toast.error(t("vendor.eventPricing.toastSaveError"));
     } finally {
       setSaving(false);
     }
@@ -184,25 +186,25 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Preț actualizat");
+      toast.success(t("vendor.eventPricing.toastUpdated"));
       setEditingId(null);
       await load();
     } catch {
-      toast.error("Nu s-a putut salva modificarea");
+      toast.error(t("vendor.eventPricing.toastSaveChangeError"));
     } finally {
       setSaving(false);
     }
   }
 
   async function remove(id: number) {
-    if (!confirm("Sigur ștergi acest preț?")) return;
+    if (!confirm(t("vendor.eventPricing.confirmDelete"))) return;
     try {
       const res = await fetch(`/api/artist-packages/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
-      toast.success("Preț șters");
+      toast.success(t("vendor.eventPricing.toastDeleted"));
       await load();
     } catch {
-      toast.error("Nu s-a putut șterge");
+      toast.error(t("vendor.eventPricing.toastDeleteError"));
     }
   }
 
@@ -227,7 +229,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
     <div className="space-y-3 rounded-lg border border-gold/30 bg-gold/5 p-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div className="col-span-2 sm:col-span-1">
-          <Label className="text-xs">Tip eveniment *</Label>
+          <Label className="text-xs">{t("vendor.eventPricing.eventTypeLabel")}</Label>
           <select
             value={d.eventType}
             onChange={(e) => setD({ ...d, eventType: e.target.value })}
@@ -238,11 +240,11 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
                 {eventTypeLabel(k)}
               </option>
             ))}
-            <option value="">Orice eveniment</option>
+            <option value="">{t("artist.profile.anyEvent")}</option>
           </select>
         </div>
         <div>
-          <Label className="text-xs">Preț fix (€) *</Label>
+          <Label className="text-xs">{t("vendor.eventPricing.fixedPriceLabel")}</Label>
           <Input
             type="number"
             min="1"
@@ -253,7 +255,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
           />
         </div>
         <div>
-          <Label className="text-xs">Durată medie — ore *</Label>
+          <Label className="text-xs">{t("vendor.eventPricing.avgHoursLabel")}</Label>
           <Input
             type="number"
             min="0"
@@ -265,7 +267,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
           />
         </div>
         <div>
-          <Label className="text-xs">…și minute</Label>
+          <Label className="text-xs">{t("vendor.eventPricing.avgMinutesLabel")}</Label>
           <Input
             type="number"
             min="0"
@@ -279,11 +281,11 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
         </div>
       </div>
       <div>
-        <Label className="text-xs">Nume afișat (opțional)</Label>
+        <Label className="text-xs">{t("vendor.eventPricing.displayNameLabel")}</Label>
         <Input
           value={d.nameRo}
           onChange={(e) => setD({ ...d, nameRo: e.target.value })}
-          placeholder="Ex: Pachet nuntă complet"
+          placeholder={t("vendor.eventPricing.displayNamePlaceholder")}
           className="mt-1"
           maxLength={120}
         />
@@ -300,10 +302,10 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
           ) : (
             <Check className="h-3.5 w-3.5" />
           )}
-          Salvează
+          {t("common.save")}
         </Button>
         <Button size="sm" variant="outline" onClick={onCancel} disabled={saving}>
-          <X className="h-3.5 w-3.5" /> Anulează
+          <X className="h-3.5 w-3.5" /> {t("common.cancel")}
         </Button>
       </div>
     </div>
@@ -323,11 +325,11 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
         <div className="flex items-center gap-2">
           <CalendarHeart className="h-4 w-4 text-rose-400" />
           <h3 className="font-heading text-base font-bold text-rose-400">
-            Preț per eveniment
+            {t("vendor.eventPricing.title")}
           </h3>
           {rows.length === 0 && (
             <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
-              Opțional
+              {t("vendor.eventPricing.optionalBadge")}
             </span>
           )}
         </div>
@@ -343,16 +345,13 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
             className="gap-1.5"
           >
             <Plus className="h-3.5 w-3.5" />
-            Adaugă preț
+            {t("vendor.eventPricing.addPrice")}
           </Button>
         )}
       </div>
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-        Un preț fix pentru tot evenimentul, separat pe tip: de exemplu 800 € la
-        nuntă și 500 € la botez. Durata medie spune clientului cât stai, dar nu
-        se facturează pe oră — pentru tarif orar folosește secțiunile de mai
-        jos.
+        {t("vendor.eventPricing.intro")}
       </p>
 
       {adding && <div className="mt-4">{form(draft, setDraft, create, () => setAdding(false))}</div>}
@@ -384,7 +383,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
                     <p className="font-heading text-base font-bold">
                       {row.eventType
                         ? eventTypeLabel(row.eventType as EventTypeKey)
-                        : "Orice eveniment"}
+                        : t("artist.profile.anyEvent")}
                       {row.price != null && (
                         <span className="ml-2 text-gold">
                           {formatPrice(row.price)}
@@ -392,7 +391,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {totalMin > 0 && <>~{formatDuration(totalMin)} în medie</>}
+                      {totalMin > 0 && <>~{formatDuration(totalMin)} {t("vendor.eventPricing.onAverage")}</>}
                       {row.nameRo && totalMin > 0 && <span> · </span>}
                       {row.nameRo}
                     </p>
@@ -406,7 +405,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
                     className="gap-1 text-muted-foreground hover:text-foreground"
                   >
                     <Pencil className="h-3.5 w-3.5" />
-                    Editează
+                    {t("common.edit")}
                   </Button>
                   <Button
                     size="sm"

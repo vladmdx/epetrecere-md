@@ -31,6 +31,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Category {
   id: number;
@@ -56,13 +57,14 @@ const typeColors: Record<string, string> = {
   venue: "bg-success/10 text-success",
 };
 
-const typeLabels: Record<string, string> = {
-  artist: "Artist",
-  service: "Serviciu",
-  venue: "Locație",
+const typeLabelKeys: Record<string, string> = {
+  artist: "admin.categoriesPage.typeArtist",
+  service: "admin.categoriesPage.typeService",
+  venue: "admin.categoriesPage.typeVenue",
 };
 
 function SortableCategoryCard({ cat, onEdit }: { cat: Category; onEdit: (cat: Category) => void }) {
+  const { t } = useLocale();
   const {
     attributes,
     listeners,
@@ -103,7 +105,7 @@ function SortableCategoryCard({ cat, onEdit }: { cat: Category; onEdit: (cat: Ca
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium">{cat.nameRo}</span>
               <Badge variant="secondary" className={`text-xs ${typeColors[cat.type] || ""}`}>
-                {typeLabels[cat.type] || cat.type}
+                {typeLabelKeys[cat.type] ? t(typeLabelKeys[cat.type]) : cat.type}
               </Badge>
               {cat.badge && (
                 <Badge className="bg-gold/20 text-gold border-gold/40 text-[10px]">
@@ -113,7 +115,9 @@ function SortableCategoryCard({ cat, onEdit }: { cat: Category; onEdit: (cat: Ca
             </div>
             <p className="text-xs text-muted-foreground">
               /{cat.slug}
-              {cat.priceFrom ? ` · de la ${cat.priceFrom}€` : ""}
+              {cat.priceFrom
+                ? ` · ${t("admin.categoriesPage.priceFrom", { price: cat.priceFrom })}`
+                : ""}
             </p>
           </div>
           <Button
@@ -122,7 +126,7 @@ function SortableCategoryCard({ cat, onEdit }: { cat: Category; onEdit: (cat: Ca
             onClick={() => onEdit(cat)}
             className="gap-1 shrink-0"
           >
-            <Pencil className="h-3.5 w-3.5" /> Editează
+            <Pencil className="h-3.5 w-3.5" /> {t("admin.categoriesPage.edit")}
           </Button>
           <Switch checked={cat.isActive} disabled />
         </CardContent>
@@ -132,6 +136,7 @@ function SortableCategoryCard({ cat, onEdit }: { cat: Category; onEdit: (cat: Ca
 }
 
 export default function CategoriesPage() {
+  const { t } = useLocale();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Category | null>(null);
@@ -158,7 +163,7 @@ export default function CategoriesPage() {
         setCategories(Array.isArray(data) ? data : []);
       }
     } catch {
-      toast.error("Nu s-au putut încărca categoriile");
+      toast.error(t("admin.categoriesPage.loadError"));
     }
   }
 
@@ -200,12 +205,12 @@ export default function CategoriesPage() {
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Upload eșuat");
+        toast.error(err.error || t("admin.categoriesPage.uploadFailed"));
         return;
       }
       const data = await res.json();
       setImageUrl(data.url);
-      toast.success("Imagine încărcată");
+      toast.success(t("admin.categoriesPage.imageUploaded"));
     } finally {
       setUploading(false);
     }
@@ -230,10 +235,10 @@ export default function CategoriesPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut salva");
+        toast.error(err.error || t("admin.categoriesPage.saveError"));
         return;
       }
-      toast.success("Categorie actualizată");
+      toast.success(t("admin.categoriesPage.updated"));
       await loadCategories();
       closeEdit();
     } finally {
@@ -258,9 +263,9 @@ export default function CategoriesPage() {
         body: JSON.stringify({ items }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Ordinea categoriilor a fost salvată");
+      toast.success(t("admin.categoriesPage.orderSaved"));
     } catch {
-      toast.error("Nu s-a putut salva ordinea");
+      toast.error(t("admin.categoriesPage.orderError"));
     }
   }
 
@@ -276,9 +281,11 @@ export default function CategoriesPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Categorii</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("admin.categoriesPage.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            {categories.length} categorii · Trageți pentru a reordona · Editează pentru a schimba imaginea sau eticheta
+            {t("admin.categoriesPage.subtitle", { count: categories.length })}
           </p>
         </div>
       </div>
@@ -286,7 +293,7 @@ export default function CategoriesPage() {
       {categories.length === 0 ? (
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            Nu există categorii.
+            {t("admin.categoriesPage.empty")}
           </CardContent>
         </Card>
       ) : (
@@ -305,12 +312,16 @@ export default function CategoriesPage() {
       <Dialog open={!!editing} onOpenChange={(o) => !o && closeEdit()}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>Editează categoria — {editing?.nameRo}</DialogTitle>
+            <DialogTitle>
+              {t("admin.categoriesPage.dialogTitle", { name: editing?.nameRo ?? "" })}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-5">
             {/* Image */}
             <div>
-              <Label className="mb-2 block">Imagine de fundal</Label>
+              <Label className="mb-2 block">
+                {t("admin.categoriesPage.backgroundImage")}
+              </Label>
               <div className="flex flex-col gap-3">
                 {imageUrl ? (
                   <div className="relative aspect-[4/3] overflow-hidden rounded-lg border border-border/40">
@@ -319,7 +330,7 @@ export default function CategoriesPage() {
                       type="button"
                       onClick={() => setImageUrl("")}
                       className="absolute right-2 top-2 rounded-full bg-black/70 p-1.5 text-white hover:bg-black"
-                      aria-label="Elimină imaginea"
+                      aria-label={t("admin.categoriesPage.removeImage")}
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -328,7 +339,9 @@ export default function CategoriesPage() {
                   <div className="flex aspect-[4/3] items-center justify-center rounded-lg border-2 border-dashed border-border/40 bg-muted/30 text-muted-foreground">
                     <div className="text-center">
                       <ImageIcon className="mx-auto mb-1 h-8 w-8 opacity-40" />
-                      <p className="text-xs">Niciun fișier selectat</p>
+                      <p className="text-xs">
+                        {t("admin.categoriesPage.noFileSelected")}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -356,10 +369,12 @@ export default function CategoriesPage() {
                     ) : (
                       <Upload className="h-3.5 w-3.5" />
                     )}
-                    {imageUrl ? "Schimbă fișierul" : "Încarcă fișier"}
+                    {imageUrl
+                      ? t("admin.categoriesPage.changeFile")
+                      : t("admin.categoriesPage.uploadFile")}
                   </Button>
                   <Input
-                    placeholder="sau lipește URL-ul direct"
+                    placeholder={t("admin.categoriesPage.pasteUrl")}
                     value={imageUrl}
                     onChange={(e) => setImageUrl(e.target.value)}
                     className="flex-1"
@@ -372,46 +387,45 @@ export default function CategoriesPage() {
                 readers. Falls back to the category name when empty. */}
             <div>
               <Label htmlFor="imageAlt" className="mb-2 block">
-                Tag alt al imaginii (SEO + accesibilitate)
+                {t("admin.categoriesPage.altLabel")}
               </Label>
               <Input
                 id="imageAlt"
-                placeholder={`ex: "DJ profesional la nuntă în Chișinău"`}
+                placeholder={t("admin.categoriesPage.altPlaceholder")}
                 value={imageAlt}
                 onChange={(e) => setImageAlt(e.target.value)}
                 maxLength={200}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Descrie imaginea în câteva cuvinte. E folosit de Google și de cititoarele de ecran.
-                Lasă gol pentru a folosi numele categoriei automat.
+                {t("admin.categoriesPage.altHint")}
               </p>
             </div>
 
             {/* Badge */}
             <div>
               <Label htmlFor="badge" className="mb-2 block">
-                Etichetă (badge afișat pe card)
+                {t("admin.categoriesPage.badgeLabel")}
               </Label>
               <Input
                 id="badge"
-                placeholder='ex: "Nou", "Popular", "Hot"'
+                placeholder={t("admin.categoriesPage.badgePlaceholder")}
                 value={badge}
                 onChange={(e) => setBadge(e.target.value)}
                 maxLength={40}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Lasă gol pentru a elimina eticheta. Apare ca pill peste imaginea de pe homepage și pe pagina de categorii.
+                {t("admin.categoriesPage.badgeHint")}
               </p>
             </div>
 
             {/* Short description — shown above the artist grid as hero text. */}
             <div>
               <Label htmlFor="shortDesc" className="mb-2 block">
-                Descriere scurtă (1-2 fraze, sub titlu)
+                {t("admin.categoriesPage.shortDescLabel")}
               </Label>
               <textarea
                 id="shortDesc"
-                placeholder="ex: Cei mai buni DJ-i din Moldova pentru nuntă, cumătrie și corporate."
+                placeholder={t("admin.categoriesPage.shortDescPlaceholder")}
                 value={shortDesc}
                 onChange={(e) => setShortDesc(e.target.value)}
                 maxLength={500}
@@ -419,37 +433,37 @@ export default function CategoriesPage() {
                 className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               />
               <p className="mt-1 text-[10px] text-muted-foreground">
-                {shortDesc.length}/500 caractere · Apare imediat sub titlul paginii
+                {t("admin.categoriesPage.shortDescCounter", { count: shortDesc.length })}
               </p>
             </div>
 
             {/* SEO — title + description rendered on /categorie/[slug]. */}
             <div className="rounded-lg border border-border/40 bg-muted/20 p-4 space-y-3">
               <p className="text-xs font-semibold uppercase tracking-wider text-gold">
-                SEO (Google)
+                {t("admin.categoriesPage.seoSection")}
               </p>
               <div>
                 <Label htmlFor="seoTitle" className="mb-2 block">
-                  Meta titlu (max 60 caractere)
+                  {t("admin.categoriesPage.seoTitleLabel")}
                 </Label>
                 <Input
                   id="seoTitle"
-                  placeholder="ex: DJ pentru evenimente — Chișinău, Moldova"
+                  placeholder={t("admin.categoriesPage.seoTitlePlaceholder")}
                   value={seoTitle}
                   onChange={(e) => setSeoTitle(e.target.value)}
                   maxLength={70}
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {seoTitle.length}/60 caractere · Lasă gol pentru titlu automat
+                  {t("admin.categoriesPage.seoTitleCounter", { count: seoTitle.length })}
                 </p>
               </div>
               <div>
                 <Label htmlFor="seoDesc" className="mb-2 block">
-                  Meta descriere (max 160 caractere)
+                  {t("admin.categoriesPage.seoDescLabel")}
                 </Label>
                 <textarea
                   id="seoDesc"
-                  placeholder="ex: Găsește cei mai buni DJ-i pentru nuntă, cumătrie și corporate. Profile verificate, prețuri transparente."
+                  placeholder={t("admin.categoriesPage.seoDescPlaceholder")}
                   value={seoDesc}
                   onChange={(e) => setSeoDesc(e.target.value)}
                   maxLength={200}
@@ -457,14 +471,14 @@ export default function CategoriesPage() {
                   className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  {seoDesc.length}/160 caractere · Lasă gol pentru descriere automată
+                  {t("admin.categoriesPage.seoDescCounter", { count: seoDesc.length })}
                 </p>
               </div>
               {/* SERP preview */}
               {(seoTitle || seoDesc) && (
                 <div className="rounded-md border border-border/40 bg-background p-3 text-left">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                    Previzualizare Google
+                    {t("admin.categoriesPage.googlePreview")}
                   </p>
                   <p className="text-blue-500 text-base font-medium leading-tight truncate">
                     {seoTitle || `${editing?.nameRo} — ePetrecere.md`}
@@ -473,7 +487,10 @@ export default function CategoriesPage() {
                     epetrecere.md › categorie › {editing?.slug}
                   </p>
                   <p className="text-muted-foreground text-xs mt-0.5 line-clamp-2">
-                    {seoDesc || `Descoperă ${editing?.nameRo?.toLowerCase()} pentru evenimente în Moldova`}
+                    {seoDesc ||
+                      t("admin.categoriesPage.serpDescFallback", {
+                        name: editing?.nameRo?.toLowerCase() ?? "",
+                      })}
                   </p>
                 </div>
               )}
@@ -482,11 +499,11 @@ export default function CategoriesPage() {
             {/* SEO body — long content rendered below the listing. */}
             <div>
               <Label htmlFor="seoBody" className="mb-2 block">
-                Text SEO (apare sub lista de artiști)
+                {t("admin.categoriesPage.seoBodyLabel")}
               </Label>
               <textarea
                 id="seoBody"
-                placeholder="Conținut SEO optimizat pentru Moldova / Chișinău. Folosește paragrafe separate prin linie goală. Poți menționa orașe, tipuri de evenimente, prețuri etc."
+                placeholder={t("admin.categoriesPage.seoBodyPlaceholder")}
                 value={seoBody}
                 onChange={(e) => setSeoBody(e.target.value)}
                 maxLength={8000}
@@ -494,13 +511,13 @@ export default function CategoriesPage() {
                 className="flex w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring font-mono"
               />
               <p className="mt-1 text-[10px] text-muted-foreground">
-                {seoBody.length}/8000 caractere · Text optimizat pentru Google. Paragrafele sunt separate prin linie goală.
+                {t("admin.categoriesPage.seoBodyCounter", { count: seoBody.length })}
               </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={closeEdit}>
-              Anulează
+              {t("admin.categoriesPage.cancel")}
             </Button>
             <Button
               onClick={saveEdit}
@@ -508,7 +525,7 @@ export default function CategoriesPage() {
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-1.5"
             >
               {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-              Salvează
+              {t("admin.categoriesPage.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

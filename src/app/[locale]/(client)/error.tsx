@@ -7,6 +7,7 @@
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 import Link from "next/link";
+import { useLocale } from "@/hooks/use-locale";
 
 export default function ClientCabinetError({
   error,
@@ -15,19 +16,20 @@ export default function ClientCabinetError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const { t } = useLocale();
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center">
       <AlertTriangle className="h-12 w-12 text-warning" />
       <div>
         <h2 className="font-heading text-xl font-bold">
-          Ceva nu a mers în cabinetul tău
+          {t("cabinet.error.title")}
         </h2>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">
-          Încearcă să reîncarci pagina. Dacă eroarea persistă, revino peste câteva minute.
+          {t("cabinet.error.body")}
         </p>
         {error.digest && (
           <p className="mt-2 text-[10px] font-mono text-muted-foreground/60">
-            Cod: {error.digest}
+            {t("cabinet.error.codeLabel")} {error.digest}
           </p>
         )}
       </div>
@@ -36,13 +38,13 @@ export default function ClientCabinetError({
           onClick={reset}
           className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
         >
-          Încearcă din nou
+          {t("cabinet.error.retry")}
         </Button>
         <Link
           href="/cabinet"
           className="inline-flex items-center gap-2 rounded-lg border border-border/40 px-4 py-2 text-sm hover:bg-muted"
         >
-          Înapoi la cabinet
+          {t("cabinet.backToCabinet")}
         </Link>
       </div>
     </div>

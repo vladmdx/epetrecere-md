@@ -4,7 +4,7 @@ import { getCategoryBySlug } from "@/lib/db/queries/categories";
 import { getArtists } from "@/lib/db/queries/artists";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
-import { getLocalized } from "@/i18n";
+import { getLocalized, t } from "@/i18n";
 import { CategoryPageClient } from "./client";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 
@@ -74,11 +74,12 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const result = await getArtists(filters);
 
   const breadcrumbs = [
-    { name: locale === "ru" ? "Главная" : locale === "en" ? "Home" : "Acasă", url: "/" },
+    { name: t("nav.home", locale), url: "/" },
     {
-      name: category.type === "service"
-        ? locale === "ru" ? "Услуги" : locale === "en" ? "Services" : "Servicii"
-        : locale === "ru" ? "Артисты" : locale === "en" ? "Artists" : "Artiști",
+      name:
+        category.type === "service"
+          ? t("nav.services", locale)
+          : t("nav.artists", locale),
       url: category.type === "service" ? "/servicii" : "/artisti",
     },
     { name: localizedName, url: `/categorie/${slug}` },

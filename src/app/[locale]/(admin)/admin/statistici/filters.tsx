@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/hooks/use-locale";
 import type { DateBasis, VendorFilter } from "@/lib/db/queries/admin-stats";
 
 export interface FilterState {
@@ -39,10 +40,10 @@ export interface FilterState {
 }
 
 /** Ranges an admin actually asks for, rather than a generic date picker. */
-const PRESETS: { key: string; label: string; days: number }[] = [
-  { key: "30", label: "30 zile", days: 30 },
-  { key: "90", label: "90 zile", days: 90 },
-  { key: "365", label: "12 luni", days: 365 },
+const PRESETS: { key: string; labelKey: string; days: number }[] = [
+  { key: "30", labelKey: "admin.stats.filters.days30", days: 30 },
+  { key: "90", labelKey: "admin.stats.filters.days90", days: 90 },
+  { key: "365", labelKey: "admin.stats.filters.months12", days: 365 },
 ];
 
 function iso(d: Date): string {
@@ -56,6 +57,7 @@ export function StatsFilters({
   value: FilterState;
   categories: { id: number; name: string }[];
 }) {
+  const { t } = useLocale();
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
@@ -122,7 +124,7 @@ export function StatsFilters({
                 }}
                 className="rounded-md border border-border px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:border-gold/50 hover:text-foreground"
               >
-                {p.label}
+                {t(p.labelKey)}
               </button>
             ))}
           </div>
@@ -137,9 +139,9 @@ export function StatsFilters({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Toți furnizorii</SelectItem>
-          <SelectItem value="artist">Doar artiști</SelectItem>
-          <SelectItem value="venue">Doar săli</SelectItem>
+          <SelectItem value="all">{t("admin.stats.filters.allVendors")}</SelectItem>
+          <SelectItem value="artist">{t("admin.stats.filters.onlyArtists")}</SelectItem>
+          <SelectItem value="venue">{t("admin.stats.filters.onlyVenues")}</SelectItem>
         </SelectContent>
       </Select>
 
@@ -148,10 +150,10 @@ export function StatsFilters({
         onValueChange={(v) => push({ categorie: v === "all" ? null : v })}
       >
         <SelectTrigger className="h-9 w-[168px] text-xs">
-          <SelectValue placeholder="Toate categoriile" />
+          <SelectValue placeholder={t("admin.stats.filters.allCategories")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">Toate categoriile</SelectItem>
+          <SelectItem value="all">{t("admin.stats.filters.allCategories")}</SelectItem>
           {categories.map((c) => (
             <SelectItem key={c.id} value={String(c.id)}>
               {c.name}
@@ -168,8 +170,8 @@ export function StatsFilters({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="created">După data cererii</SelectItem>
-          <SelectItem value="event">După data evenimentului</SelectItem>
+          <SelectItem value="created">{t("admin.stats.filters.byRequestDate")}</SelectItem>
+          <SelectItem value="event">{t("admin.stats.filters.byEventDate")}</SelectItem>
         </SelectContent>
       </Select>
 
@@ -180,7 +182,7 @@ export function StatsFilters({
         onClick={() => startTransition(() => router.push("/admin/statistici"))}
       >
         <RotateCcw className="h-3.5 w-3.5" />
-        Resetează
+        {t("admin.stats.filters.reset")}
       </Button>
 
       {pending && <Loader2 className="h-4 w-4 animate-spin text-gold" />}

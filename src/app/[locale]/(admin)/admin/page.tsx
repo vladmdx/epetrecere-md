@@ -6,8 +6,16 @@ import { eq, gte, desc, count } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { redirect } from "next/navigation";
 import Link from "next/link";
+import { t } from "@/i18n";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const admin = await requireAdmin();
   if (!admin.ok) redirect("/sign-in");
 
@@ -44,18 +52,20 @@ export default async function AdminDashboard() {
     .limit(5);
 
   const stats = [
-    { label: "Leads luna asta", value: String(newLeadsResult?.value ?? 0), icon: TrendingUp, color: "text-gold" },
-    { label: "Rezervări luna asta", value: String(bookingsResult?.value ?? 0), icon: CalendarDays, color: "text-info" },
-    { label: "Solicitări recente", value: String(recentRequests.length), icon: Users, color: "text-success" },
-    { label: "Artiști activi", value: String(activeArtistsResult?.value ?? 0), icon: Music, color: "text-gold" },
+    { label: t("admin.home.leadsThisMonth", locale), value: String(newLeadsResult?.value ?? 0), icon: TrendingUp, color: "text-gold" },
+    { label: t("admin.home.bookingsThisMonth", locale), value: String(bookingsResult?.value ?? 0), icon: CalendarDays, color: "text-info" },
+    { label: t("admin.home.recentRequests", locale), value: String(recentRequests.length), icon: Users, color: "text-success" },
+    { label: t("admin.home.activeArtists", locale), value: String(activeArtistsResult?.value ?? 0), icon: Music, color: "text-gold" },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Dashboard</h1>
+        <h1 className="font-heading text-2xl font-bold">
+          {t("admin.home.title", locale)}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Bine ai venit în panoul de administrare ePetrecere.md
+          {t("admin.home.welcome", locale)}
         </p>
       </div>
 
@@ -77,12 +87,12 @@ export default async function AdminDashboard() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Ultimele Solicitări</CardTitle>
+          <CardTitle>{t("admin.home.latestRequests", locale)}</CardTitle>
         </CardHeader>
         <CardContent>
           {recentRequests.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nu există solicitări momentan.
+              {t("admin.home.noRequests", locale)}
             </p>
           ) : (
             <div className="space-y-3">
@@ -91,7 +101,8 @@ export default async function AdminDashboard() {
                   <div>
                     <p className="text-sm font-medium">{req.clientName}</p>
                     <p className="text-xs text-muted-foreground">
-                      {req.eventType || "Eveniment"} · {req.eventDate || "Dată nespecificată"}
+                      {req.eventType || t("admin.home.eventFallback", locale)} ·{" "}
+                      {req.eventDate || t("admin.home.dateFallback", locale)}
                     </p>
                   </div>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -104,7 +115,7 @@ export default async function AdminDashboard() {
                 </div>
               ))}
               <Link href="/admin/cereri-oferte" className="text-xs text-gold hover:underline">
-                Vezi toate solicitările →
+                {t("admin.home.seeAllRequests", locale)}
               </Link>
             </div>
           )}

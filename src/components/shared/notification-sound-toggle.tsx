@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { Switch } from "@/components/ui/switch";
+import { useLocale } from "@/hooks/use-locale";
 import { Volume2, VolumeX } from "lucide-react";
 import {
   isSoundEnabled,
@@ -15,6 +16,7 @@ import {
 } from "@/lib/notifications/sound";
 
 export function NotificationSoundToggle() {
+  const { t } = useLocale();
   const [enabled, setEnabled] = useState(true);
   const [hydrated, setHydrated] = useState(false);
 
@@ -45,17 +47,16 @@ export function NotificationSoundToggle() {
           <VolumeX className="h-5 w-5 text-muted-foreground" />
         )}
         <div>
-          <p className="text-sm font-medium">Sunet la notificări și mesaje</p>
+          <p className="text-sm font-medium">{t("notifPrefs.sound.title")}</p>
           <p className="text-xs text-muted-foreground">
-            Joacă un ton scurt când primești o notificare sau un mesaj nou.
-            Standard: pornit. Click pe comutator pentru a auzi un preview.
+            {t("notifPrefs.sound.hint")}
           </p>
         </div>
       </div>
       <Switch
         checked={enabled}
         onCheckedChange={update}
-        aria-label="Sunet la notificări și mesaje"
+        aria-label={t("notifPrefs.sound.title")}
       />
     </div>
   );

@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 export interface CrmItem {
   id: string;
@@ -42,12 +43,12 @@ export interface CrmItem {
 }
 
 const columns = [
-  { id: "new", label: "Noi", color: "bg-info" },
-  { id: "contacted", label: "Contactați", color: "bg-warning" },
-  { id: "proposal_sent", label: "Propunere", color: "bg-gold" },
-  { id: "negotiation", label: "Negociere", color: "bg-purple-500" },
-  { id: "accepted", label: "Acceptați", color: "bg-success" },
-  { id: "confirmed", label: "Confirmați", color: "bg-success" },
+  { id: "new", labelKey: "admin.kanban.stageNew", color: "bg-info" },
+  { id: "contacted", labelKey: "admin.kanban.stageContacted", color: "bg-warning" },
+  { id: "proposal_sent", labelKey: "admin.kanban.stageProposal", color: "bg-gold" },
+  { id: "negotiation", labelKey: "admin.kanban.stageNegotiation", color: "bg-purple-500" },
+  { id: "accepted", labelKey: "admin.kanban.stageAccepted", color: "bg-success" },
+  { id: "confirmed", labelKey: "admin.kanban.stageConfirmed", color: "bg-success" },
 ];
 
 const typeIconMap = {
@@ -137,6 +138,7 @@ interface KanbanBoardProps {
 }
 
 export function KanbanBoard({ items, onItemsChange, loading }: KanbanBoardProps) {
+  const { t } = useLocale();
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -174,13 +176,13 @@ export function KanbanBoard({ items, onItemsChange, loading }: KanbanBoardProps)
         body: JSON.stringify({ id: itemId, status: targetColumn.id }),
       });
       if (!res.ok) throw new Error();
-      toast.success(`${currentItem.name} → ${targetColumn.label}`);
+      toast.success(`${currentItem.name} → ${t(targetColumn.labelKey)}`);
     } catch {
       // Revert on failure
       onItemsChange(
         items.map((l) => (l.id === itemId ? { ...l, status: currentItem.status } : l)),
       );
-      toast.error("Eroare la actualizare status");
+      toast.error(t("admin.kanban.statusError"));
     }
   }
 
@@ -194,7 +196,12 @@ export function KanbanBoard({ items, onItemsChange, loading }: KanbanBoardProps)
     .filter(s => items.some(l => l.status === s))
     .map(s => ({
       id: s,
-      label: s === "completed" ? "Finalizate" : s === "lost" ? "Pierdute" : "Follow-up",
+      labelKey:
+        s === "completed"
+          ? "admin.kanban.stageCompleted"
+          : s === "lost"
+            ? "admin.kanban.stageLost"
+            : "admin.kanban.stageFollowUp",
       color: s === "completed" ? "bg-success" : s === "lost" ? "bg-destructive" : "bg-warning",
     }));
 
@@ -220,7 +227,7 @@ export function KanbanBoard({ items, onItemsChange, loading }: KanbanBoardProps)
             >
               <div className="flex items-center gap-2 border-b border-border/40 p-3">
                 <span className={cn("h-2.5 w-2.5 rounded-full", col.color)} />
-                <span className="text-sm font-bold">{col.label}</span>
+                <span className="text-sm font-bold">{t(col.labelKey)}</span>
                 <Badge variant="secondary" className="ml-auto text-xs">
                   {colItems.length}
                 </Badge>
@@ -232,7 +239,7 @@ export function KanbanBoard({ items, onItemsChange, loading }: KanbanBoardProps)
                   ))}
                   {colItems.length === 0 && (
                     <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border/40 text-xs text-muted-foreground">
-                      Trage aici
+                      {t("admin.kanban.dropHere")}
                     </div>
                   )}
                 </div>

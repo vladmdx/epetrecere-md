@@ -209,7 +209,7 @@ export function MatchingQuizClient() {
                       {m.name}
                     </h3>
                     <Badge className="bg-gold/15 text-gold">
-                      {m.matchScore}% match
+                      {t("quiz.matchScore", { score: m.matchScore })}
                     </Badge>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

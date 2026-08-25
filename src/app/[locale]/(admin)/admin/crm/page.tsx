@@ -20,27 +20,29 @@ const KanbanBoard = dynamic(
 import type { CrmItem } from "./kanban";
 import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
+import { useLocale } from "@/hooks/use-locale";
 import { toast } from "sonner";
 
-const statusConfig: Record<string, { label: string; color: string; icon: typeof Clock }> = {
-  new: { label: "Nou", color: "bg-info/10 text-info border-info/30", icon: AlertCircle },
-  contacted: { label: "Contactat", color: "bg-warning/10 text-warning border-warning/30", icon: Phone },
-  proposal_sent: { label: "Propunere", color: "bg-gold/10 text-gold border-gold/30", icon: Mail },
-  negotiation: { label: "Negociere", color: "bg-purple-500/10 text-purple-500 border-purple-500/30", icon: MessageSquare },
-  accepted: { label: "Acceptat", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
-  confirmed: { label: "Confirmat", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
-  completed: { label: "Finalizat", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
-  lost: { label: "Pierdut", color: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
-  follow_up: { label: "Follow-up", color: "bg-warning/10 text-warning border-warning/30", icon: Clock },
+const statusConfig: Record<string, { labelKey: string; color: string; icon: typeof Clock }> = {
+  new: { labelKey: "adminUi.status.new", color: "bg-info/10 text-info border-info/30", icon: AlertCircle },
+  contacted: { labelKey: "adminUi.status.contacted", color: "bg-warning/10 text-warning border-warning/30", icon: Phone },
+  proposal_sent: { labelKey: "adminUi.status.proposalShort", color: "bg-gold/10 text-gold border-gold/30", icon: Mail },
+  negotiation: { labelKey: "adminUi.status.negotiation", color: "bg-purple-500/10 text-purple-500 border-purple-500/30", icon: MessageSquare },
+  accepted: { labelKey: "adminUi.status.accepted", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
+  confirmed: { labelKey: "adminUi.status.confirmed", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
+  completed: { labelKey: "adminUi.status.completed", color: "bg-success/10 text-success border-success/30", icon: CheckCircle },
+  lost: { labelKey: "adminUi.status.lost", color: "bg-destructive/10 text-destructive border-destructive/30", icon: XCircle },
+  follow_up: { labelKey: "adminUi.status.followUp", color: "bg-warning/10 text-warning border-warning/30", icon: Clock },
 };
 
 const typeConfig = {
-  lead: { label: "Lead", color: "bg-blue-500/10 text-blue-400 border-blue-500/30", icon: User },
-  booking: { label: "Rezervare", color: "bg-purple-500/10 text-purple-400 border-purple-500/30", icon: Ticket },
-  offer: { label: "Ofertă", color: "bg-gold/10 text-gold border-gold/30", icon: Music },
+  lead: { labelKey: "adminUi.crm.typeLead", pluralKey: "adminUi.crm.typeLeadPlural", color: "bg-blue-500/10 text-blue-400 border-blue-500/30", icon: User },
+  booking: { labelKey: "adminUi.crm.typeBooking", pluralKey: "adminUi.crm.typeBookingPlural", color: "bg-purple-500/10 text-purple-400 border-purple-500/30", icon: Ticket },
+  offer: { labelKey: "adminUi.crm.typeOffer", pluralKey: "adminUi.crm.typeOfferPlural", color: "bg-gold/10 text-gold border-gold/30", icon: Music },
 } as const;
 
 export default function CRMPage() {
+  const { t } = useLocale();
   const [items, setItems] = useState<CrmItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -52,7 +54,7 @@ export default function CRMPage() {
     fetch("/api/crm/items")
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(data => { setItems(Array.isArray(data) ? data : []); })
-      .catch(() => toast.error("Nu s-au putut încărca solicitările"))
+      .catch(() => toast.error(t("adminUi.crm.toastLoadError")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -69,12 +71,14 @@ export default function CRMPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">CRM — Solicitări</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("adminUi.crm.title")}</h1>
           <p className="text-sm text-muted-foreground">
-            {items.length} solicitări totale ·
-            {" "}{items.filter(i => i.type === "lead").length} leads,
-            {" "}{items.filter(i => i.type === "booking").length} rezervări,
-            {" "}{items.filter(i => i.type === "offer").length} oferte
+            {t("adminUi.crm.counts", {
+              total: items.length,
+              leads: items.filter(i => i.type === "lead").length,
+              bookings: items.filter(i => i.type === "booking").length,
+              offers: items.filter(i => i.type === "offer").length,
+            })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -89,9 +93,9 @@ export default function CRMPage() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a"); a.href = url; a.download = `crm-${new Date().toISOString().split("T")[0]}.csv`; a.click();
             URL.revokeObjectURL(url);
-            toast.success("CSV exportat");
+            toast.success(t("adminUi.crm.toastCsvExported"));
           }}>
-            <Download className="h-4 w-4" /> Export CSV
+            <Download className="h-4 w-4" /> {t("adminUi.crm.exportCsv")}
           </Button>
           <div className="flex gap-1 rounded-lg border border-border/40 p-1">
             <Button variant={view === "kanban" ? "default" : "ghost"} size="sm" className={view === "kanban" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""} onClick={() => setView("kanban")}>
@@ -115,21 +119,21 @@ export default function CRMPage() {
             className={typeFilter === "all" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
             onClick={() => setTypeFilter("all")}
           >
-            Toate tipurile ({items.length})
+            {t("adminUi.crm.allTypes")} ({items.length})
           </Button>
-          {(["lead", "booking", "offer"] as const).map((t) => {
-            const cfg = typeConfig[t];
-            const count = items.filter((i) => i.type === t).length;
+          {(["lead", "booking", "offer"] as const).map((typeKey) => {
+            const cfg = typeConfig[typeKey];
+            const count = items.filter((i) => i.type === typeKey).length;
             return (
               <Button
-                key={t}
-                variant={typeFilter === t ? "default" : "outline"}
+                key={typeKey}
+                variant={typeFilter === typeKey ? "default" : "outline"}
                 size="sm"
-                className={typeFilter === t ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
-                onClick={() => setTypeFilter(t)}
+                className={typeFilter === typeKey ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
+                onClick={() => setTypeFilter(typeKey)}
               >
                 <cfg.icon className="h-3.5 w-3.5 mr-1" />
-                {cfg.label}e ({count})
+                {t(cfg.pluralKey)} ({count})
               </Button>
             );
           })}
@@ -143,7 +147,7 @@ export default function CRMPage() {
             className={statusFilter === "all" ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
             onClick={() => setStatusFilter("all")}
           >
-            Toate statusurile
+            {t("adminUi.crm.allStatuses")}
           </Button>
           {Object.entries(statusConfig).map(([key, cfg]) => {
             const count = items.filter((l) => l.status === key && (typeFilter === "all" || l.type === typeFilter)).length;
@@ -156,7 +160,7 @@ export default function CRMPage() {
                 className={statusFilter === key ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark" : ""}
                 onClick={() => setStatusFilter(key)}
               >
-                {cfg.label} ({count})
+                {t(cfg.labelKey)} ({count})
               </Button>
             );
           })}
@@ -168,7 +172,7 @@ export default function CRMPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Caută după nume, telefon, email..."
+            placeholder={t("adminUi.crm.searchPlaceholder")}
             className="pl-9"
           />
         </div>
@@ -215,10 +219,10 @@ export default function CRMPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium truncate">{item.name}</span>
                           <Badge variant="outline" className={cn("text-xs", tcfg.color)}>
-                            {tcfg.label}
+                            {t(tcfg.labelKey)}
                           </Badge>
                           <Badge variant="outline" className={cn("text-xs", cfg.color)}>
-                            {cfg.label}
+                            {t(cfg.labelKey)}
                           </Badge>
                           {item.eventType && (
                             <Badge variant="secondary" className="text-xs">
@@ -235,7 +239,7 @@ export default function CRMPage() {
                           <span className="flex items-center gap-1"><Phone className="h-3 w-3" /> {item.phone}</span>
                           {item.email && <span className="flex items-center gap-1"><Mail className="h-3 w-3" /> {item.email}</span>}
                           {item.eventDate && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {item.eventDate}</span>}
-                          {item.guestCount && <span className="flex items-center gap-1"><User className="h-3 w-3" /> {item.guestCount} invitați</span>}
+                          {item.guestCount && <span className="flex items-center gap-1"><User className="h-3 w-3" /> {item.guestCount} {t("common.guests")}</span>}
                           {item.budget && <span className="flex items-center gap-1"><DollarSign className="h-3 w-3" /> {item.budget}€</span>}
                         </div>
                         {item.message && (
@@ -255,7 +259,7 @@ export default function CRMPage() {
 
             {filtered.length === 0 && (
               <div className="py-12 text-center text-muted-foreground">
-                {items.length === 0 ? "Nu sunt solicitări încă" : "Nu s-au găsit solicitări"}
+                {items.length === 0 ? t("adminUi.crm.emptyNone") : t("adminUi.crm.emptyFiltered")}
               </div>
             )}
           </div>

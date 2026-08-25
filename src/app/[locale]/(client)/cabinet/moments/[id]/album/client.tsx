@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Printer, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Photo {
   id: number;
@@ -33,6 +34,7 @@ interface Plan {
 const PHOTOS_PER_PAGE = 9;
 
 export function AlbumClient({ planId }: { planId: number }) {
+  const { t } = useLocale();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,7 @@ export function AlbumClient({ planId }: { planId: number }) {
           setPhotos(approved);
         }
       } catch {
-        toast.error("Nu am putut încărca albumul");
+        toast.error(t("cabinet.album.loadError"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -120,13 +122,13 @@ export function AlbumClient({ planId }: { planId: number }) {
     return (
       <div className="mx-auto max-w-xl px-4 py-20 text-center">
         <p className="text-sm text-muted-foreground">
-          Nu există încă poze aprobate pentru album.
+          {t("cabinet.album.emptyText")}
         </p>
         <Link
           href={`/cabinet/moments/${planId}`}
           className="mt-4 inline-block text-sm text-gold hover:underline"
         >
-          ← Înapoi la galerie
+          {t("cabinet.album.backToGalleryArrow")}
         </Link>
       </div>
     );
@@ -139,7 +141,7 @@ export function AlbumClient({ planId }: { planId: number }) {
           href={`/cabinet/moments/${planId}`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold"
         >
-          <ArrowLeft className="h-3 w-3" /> Înapoi la galerie
+          <ArrowLeft className="h-3 w-3" /> {t("cabinet.album.backToGallery")}
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -149,19 +151,18 @@ export function AlbumClient({ planId }: { planId: number }) {
               onChange={(e) => setFavoritesOnly(e.target.checked)}
               className="h-3.5 w-3.5 accent-gold"
             />
-            Doar favorite (⭐)
+            {t("cabinet.album.favoritesOnly")}
           </label>
           <button
             onClick={() => window.print()}
             className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
-            <Printer className="h-4 w-4" /> Tipărește / Salvează PDF
+            <Printer className="h-4 w-4" /> {t("cabinet.album.print")}
           </button>
         </div>
       </div>
       <p className="print-hide mb-4 text-xs text-muted-foreground">
-        {filtered.length} poze · {pages.length + 2} pagini A4. Folosește
-        File → Print → Save as PDF, format A4 portrait.
+        {t("cabinet.album.pagesHint", { photos: filtered.length, pages: pages.length + 2 })}
       </p>
 
       {/* COVER */}
@@ -190,7 +191,7 @@ export function AlbumClient({ planId }: { planId: number }) {
           )}
           <div className="my-10 h-px w-32 mx-auto" style={{ background: "#C9A84C" }} />
           <p className="text-sm" style={{ color: "#4A4A52" }}>
-            {filtered.length} amintiri colectate de invitați
+            {t("cabinet.album.memoriesCollected", { count: filtered.length })}
           </p>
           <p
             className="mt-12 text-[10px] uppercase tracking-[4px]"
@@ -211,7 +212,7 @@ export function AlbumClient({ planId }: { planId: number }) {
           <header className="mb-3 flex items-center justify-between text-[10px] uppercase tracking-[3px] text-black/50">
             <span>{plan?.title}</span>
             <span>
-              Pagina {pi + 1} / {pages.length}
+              {t("cabinet.album.pageOf", { current: pi + 1, total: pages.length })}
             </span>
           </header>
           <div className="grid grid-cols-3 gap-2">
@@ -251,13 +252,13 @@ export function AlbumClient({ planId }: { planId: number }) {
             className="text-[10px] font-semibold uppercase tracking-[6px]"
             style={{ color: "#C9A84C" }}
           >
-            Mulțumiri
+            {t("cabinet.album.thanksEyebrow")}
           </p>
           <h2
             className="mt-4 font-heading text-3xl font-bold"
             style={{ color: "#0D0D0D" }}
           >
-            Mulțumim invitaților care au împărtășit aceste momente
+            {t("cabinet.album.thanksTitle")}
           </h2>
           <div
             className="my-8 h-px w-32 mx-auto"
@@ -274,7 +275,7 @@ export function AlbumClient({ planId }: { planId: number }) {
           </div>
         ) : (
           <p className="text-center text-sm text-black/60">
-            (Pozele anonime nu au fost atribuite)
+            {t("cabinet.album.anonymousNote")}
           </p>
         )}
         <p

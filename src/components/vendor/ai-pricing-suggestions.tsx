@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2, TrendingUp, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Suggestion {
   title: string;
@@ -31,6 +32,7 @@ interface AiResult {
 }
 
 export function AiPricingSuggestions() {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<AiResult | null>(null);
 
@@ -44,7 +46,7 @@ export function AiPricingSuggestions() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "AI indisponibil");
+        toast.error(err.error || t("vendorAiPricing.unavailable"));
         return;
       }
       const result = (await res.json()) as AiResult;
@@ -67,11 +69,10 @@ export function AiPricingSuggestions() {
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
               <Sparkles className="h-4 w-4 text-gold" />
-              Sugestii pricing cu AI
+              {t("vendorAiPricing.title")}
             </CardTitle>
             <p className="mt-1 text-xs text-muted-foreground">
-              Claude analizează prețurile tale față de medianele pieței din
-              Moldova și propune ajustări + multiplicatori sezonieri.
+              {t("vendorAiPricing.description")}
             </p>
           </div>
           <Button
@@ -85,7 +86,7 @@ export function AiPricingSuggestions() {
             ) : (
               <Sparkles className="h-3.5 w-3.5" />
             )}
-            {data ? "Reanalizează" : "Analizează"}
+            {data ? t("vendorAiPricing.reanalyze") : t("vendorAiPricing.analyze")}
           </Button>
         </div>
       </CardHeader>
@@ -95,7 +96,7 @@ export function AiPricingSuggestions() {
           <div className="flex items-start gap-2 rounded-lg border border-gold/30 bg-gold/5 p-3">
             <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-gold" />
             <div>
-              <p className="text-sm font-semibold text-gold">Verdict</p>
+              <p className="text-sm font-semibold text-gold">{t("vendorAiPricing.verdict")}</p>
               <p className="mt-0.5 text-sm">{data.verdictScurt}</p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {data.marketSummary}
@@ -106,26 +107,26 @@ export function AiPricingSuggestions() {
           {/* Seasonal multipliers */}
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Multiplicatori sezonieri recomandați
+              {t("vendorAiPricing.multipliersTitle")}
             </p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <MultiplierBadge
-                label="Weekend"
+                label={t("vendorAiPricing.weekend")}
                 value={formatMultiplier(data.seasonalMultipliers.weekend)}
                 positive={data.seasonalMultipliers.weekend > 1}
               />
               <MultiplierBadge
-                label="Vară (iun–aug)"
+                label={t("vendorAiPricing.summer")}
                 value={formatMultiplier(data.seasonalMultipliers.summer)}
                 positive={data.seasonalMultipliers.summer > 1}
               />
               <MultiplierBadge
-                label="Decembrie"
+                label={t("vendorAiPricing.december")}
                 value={formatMultiplier(data.seasonalMultipliers.december)}
                 positive={data.seasonalMultipliers.december > 1}
               />
               <MultiplierBadge
-                label="Revelion"
+                label={t("vendorAiPricing.newYear")}
                 value={formatMultiplier(data.seasonalMultipliers.newYear)}
                 positive={data.seasonalMultipliers.newYear > 1}
               />
@@ -135,7 +136,7 @@ export function AiPricingSuggestions() {
           {/* Suggestions */}
           <div>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Sugestii
+              {t("vendorAiPricing.suggestionsTitle")}
             </p>
             <div className="space-y-2">
               {data.suggestions.map((s, i) => (

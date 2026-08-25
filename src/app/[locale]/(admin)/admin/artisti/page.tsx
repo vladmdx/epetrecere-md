@@ -24,6 +24,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BulkActionsBar } from "@/components/admin/bulk-actions-bar";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Artist {
   id: number; nameRo: string; slug: string; priceFrom: number | null;
@@ -43,6 +44,7 @@ function SortableArtistCard({
   selected: boolean;
   onToggleSelect: () => void;
 }) {
+  const { t } = useLocale();
   const {
     attributes,
     listeners,
@@ -73,7 +75,7 @@ function SortableArtistCard({
               {...attributes}
               {...listeners}
               className="cursor-grab active:cursor-grabbing touch-none"
-              aria-label="Trage pentru reordonare"
+              aria-label={t("adminUi.artists.dragHandle")}
             >
               <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
             </button>
@@ -82,7 +84,7 @@ function SortableArtistCard({
               type="checkbox"
               checked={selected}
               onChange={onToggleSelect}
-              aria-label={`Selectează ${artist.nameRo}`}
+              aria-label={t("adminUi.artists.selectOne", { name: artist.nameRo })}
               className="h-4 w-4 shrink-0 cursor-pointer accent-gold"
             />
           )}
@@ -91,19 +93,19 @@ function SortableArtistCard({
             <div className="flex items-center gap-2">
               <span className="font-medium">{artist.nameRo}</span>
               {artist.isVerified && <BadgeCheck className="h-4 w-4 text-gold" />}
-              {artist.isFeatured && <Badge className="bg-gold/10 text-gold border-gold/30 text-xs">Featured</Badge>}
-              {!artist.isActive && <Badge variant="secondary" className="text-xs">Draft</Badge>}
+              {artist.isFeatured && <Badge className="bg-gold/10 text-gold border-gold/30 text-xs">{t("adminUi.artists.badgeFeatured")}</Badge>}
+              {!artist.isActive && <Badge variant="secondary" className="text-xs">{t("adminUi.artists.badgeDraft")}</Badge>}
             </div>
             <div className="flex items-center gap-3 text-xs text-muted-foreground mt-0.5">
               {artist.location && <span>{artist.location}</span>}
-              {artist.priceFrom && <span>de la {artist.priceFrom}€</span>}
+              {artist.priceFrom && <span>{t("common.from")} {artist.priceFrom}€</span>}
               {artist.ratingAvg ? <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-gold text-gold" /> {artist.ratingAvg}</span> : null}
             </div>
           </div>
           {!reorderMode && (
             <>
-              <Link href={`/artisti/${artist.slug}`} target="_blank"><Button variant="ghost" size="icon" aria-label="Vezi profil public"><Eye className="h-4 w-4" /></Button></Link>
-              <Link href={`/admin/artisti/${artist.id}`}><Button variant="ghost" size="icon" aria-label="Editează artist"><Edit className="h-4 w-4" /></Button></Link>
+              <Link href={`/artisti/${artist.slug}`} target="_blank"><Button variant="ghost" size="icon" aria-label={t("adminUi.artists.viewPublic")}><Eye className="h-4 w-4" /></Button></Link>
+              <Link href={`/admin/artisti/${artist.id}`}><Button variant="ghost" size="icon" aria-label={t("adminUi.artists.editArtist")}><Edit className="h-4 w-4" /></Button></Link>
             </>
           )}
         </CardContent>
@@ -128,6 +130,7 @@ async function loadAllArtists(): Promise<Artist[]> {
 }
 
 export default function AdminArtistsPage() {
+  const { t } = useLocale();
   const [artists, setArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -143,7 +146,7 @@ export default function AdminArtistsPage() {
       const fresh = await loadAllArtists();
       setArtists(fresh);
     } catch {
-      toast.error("Nu s-au putut reîncărca artiștii");
+      toast.error(t("adminUi.artists.toastReloadError"));
     }
   }
 
@@ -153,7 +156,7 @@ export default function AdminArtistsPage() {
         const all = await loadAllArtists();
         setArtists(all);
       } catch {
-        toast.error("Nu s-au putut încărca artiștii");
+        toast.error(t("adminUi.artists.toastLoadError"));
       } finally {
         setLoading(false);
       }
@@ -193,9 +196,9 @@ export default function AdminArtistsPage() {
         body: JSON.stringify({ items }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Ordinea artiștilor a fost salvată");
+      toast.success(t("adminUi.artists.toastOrderSaved"));
     } catch {
-      toast.error("Nu s-a putut salva ordinea");
+      toast.error(t("adminUi.artists.toastOrderError"));
     }
   }
 
@@ -203,8 +206,8 @@ export default function AdminArtistsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Artiști</h1>
-          <p className="text-sm text-muted-foreground">{artists.length} artiști în baza de date</p>
+          <h1 className="font-heading text-2xl font-bold">{t("adminUi.artists.title")}</h1>
+          <p className="text-sm text-muted-foreground">{t("adminUi.artists.countInDb", { count: artists.length })}</p>
         </div>
         <div className="flex gap-2">
           <Button
@@ -212,22 +215,22 @@ export default function AdminArtistsPage() {
             className={reorderMode ? "bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2" : "gap-2"}
             onClick={() => setReorderMode(!reorderMode)}
           >
-            <ArrowUpDown className="h-4 w-4" /> {reorderMode ? "Gata" : "Reordonează"}
+            <ArrowUpDown className="h-4 w-4" /> {reorderMode ? t("adminUi.artists.done") : t("adminUi.artists.reorder")}
           </Button>
-          <Link href="/admin/import"><Button variant="outline" className="gap-2"><Sparkles className="h-4 w-4" /> Import</Button></Link>
-          <Link href="/admin/artisti/new"><Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"><Plus className="h-4 w-4" /> Adaugă Artist</Button></Link>
+          <Link href="/admin/import"><Button variant="outline" className="gap-2"><Sparkles className="h-4 w-4" /> {t("adminUi.artists.import")}</Button></Link>
+          <Link href="/admin/artisti/new"><Button className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"><Plus className="h-4 w-4" /> {t("adminUi.artists.addArtist")}</Button></Link>
         </div>
       </div>
 
       {!reorderMode && (
         <div className="relative max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Caută artiști..." className="pl-9" />
+          <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("adminUi.artists.searchPlaceholder")} className="pl-9" />
         </div>
       )}
 
       {reorderMode && (
-        <p className="text-sm text-muted-foreground">Trageți artiștii pentru a schimba ordinea de afișare pe site.</p>
+        <p className="text-sm text-muted-foreground">{t("adminUi.artists.reorderHint")}</p>
       )}
 
       {loading ? (
@@ -245,7 +248,7 @@ export default function AdminArtistsPage() {
                   onToggleSelect={() => toggleSelect(artist.id)}
                 />
               ))}
-              {filtered.length === 0 && <p className="py-8 text-center text-muted-foreground">Nu s-au găsit artiști</p>}
+              {filtered.length === 0 && <p className="py-8 text-center text-muted-foreground">{t("adminUi.artists.noneFound")}</p>}
             </div>
           </SortableContext>
         </DndContext>

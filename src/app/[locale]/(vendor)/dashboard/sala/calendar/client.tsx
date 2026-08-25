@@ -38,6 +38,7 @@ import {
   normalizeEventType,
   type EventTypeKey,
 } from "@/lib/events/normalize";
+import { useLocale } from "@/hooks/use-locale";
 
 interface CalendarEvent {
   date: string;
@@ -74,12 +75,9 @@ interface Props {
 /** Spec 2.8: calendar window capped at 18 months ahead of today. */
 const MAX_FUTURE_MONTHS = 18;
 
-const MONTHS_RO = [
-  "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-  "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie",
-];
-
-const WEEKDAYS_RO = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
+/** Month and weekday captions come from the shared `calendar.months` /
+ *  `calendar.days` arrays so every locale gets its own spelling. */
+const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6];
 
 /** Colour per event type, keyed by the canonical key — the labels themselves
  *  come from lib/events/normalize. A type with no entry here keeps the old
@@ -105,12 +103,12 @@ function eventTypeVisual(raw: string | null | undefined) {
   return style ? { ...style, label: eventTypeLabel(key) } : undefined;
 }
 
-const TENTATIVE_STYLE = { label: "Tentativ", bg: "bg-yellow-500/25 border-yellow-500/60", text: "text-yellow-400" };
+const TENTATIVE_STYLE = { bg: "bg-yellow-500/25 border-yellow-500/60", text: "text-yellow-400" };
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string }> = {
-  available: { label: "Disponibil", bg: "bg-emerald-500/20 border-emerald-500/50" },
-  tentative: { label: "Tentativ", bg: "bg-yellow-500/20 border-yellow-500/50" },
-  blocked: { label: "Blocat", bg: "bg-slate-500/25 border-slate-500/60" },
+const STATUS_CONFIG: Record<string, { labelKey: string; bg: string }> = {
+  available: { labelKey: "common.available", bg: "bg-emerald-500/20 border-emerald-500/50" },
+  tentative: { labelKey: "common.tentative", bg: "bg-yellow-500/20 border-yellow-500/50" },
+  blocked: { labelKey: "common.blocked", bg: "bg-slate-500/25 border-slate-500/60" },
 };
 
 function toDateStr(y: number, m: number, d: number): string {
@@ -144,6 +142,7 @@ export function VenueCalendarClient({
   icalUrl,
   googleConnected,
 }: Props) {
+  const { t } = useLocale();
   const router = useRouter();
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [showIcalSheet, setShowIcalSheet] = useState(false);
@@ -271,7 +270,7 @@ export function VenueCalendarClient({
     let y = minPast.year;
     let m = minPast.month;
     while (y < maxFuture.year || (y === maxFuture.year && m <= maxFuture.month)) {
-      out.push({ year: y, month: m, label: `${MONTHS_RO[m]} ${y}` });
+      out.push({ year: y, month: m, label: `${t(`calendar.months.${m}`)} ${y}` });
       m += 1;
       if (m > 11) {
         m = 0;
@@ -279,7 +278,7 @@ export function VenueCalendarClient({
       }
     }
     return out;
-  }, [minPast, maxFuture]);
+  }, [minPast, maxFuture, t]);
 
   function goToday() {
     const ts = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
@@ -289,9 +288,9 @@ export function VenueCalendarClient({
   async function copyIcalUrl() {
     try {
       await navigator.clipboard.writeText(icalUrl);
-      toast.success("Link iCal copiat — lipește-l în Google/Apple/Outlook Calendar");
+      toast.success(t("vendorSalaCalendar.icalCopied"));
     } catch {
-      toast.error("Nu s-a putut copia — selectează manual.");
+      toast.error(t("vendorSalaCalendar.copyFailed"));
     }
   }
 
@@ -318,10 +317,10 @@ export function VenueCalendarClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut salva");
+        toast.error(err.error || t("vendorSalaCalendar.saveFailed"));
         return;
       }
-      toast.success("Calendar actualizat");
+      toast.success(t("vendorSalaCalendar.calendarUpdated"));
       setDayDialog(null);
       setNote("");
       setNewStatus("available");
@@ -345,7 +344,7 @@ export function VenueCalendarClient({
         );
       });
       if (dates.length === 0) {
-        toast.error("Toate zilele din interval au rezervări confirmate — nu pot fi modificate");
+        toast.error(t("vendorSalaCalendar.rangeAllBooked"));
         return;
       }
       const res = await fetch("/api/calendar", {
@@ -361,14 +360,14 @@ export function VenueCalendarClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut salva");
+        toast.error(err.error || t("vendorSalaCalendar.saveFailed"));
         return;
       }
       const skipped = all.length - dates.length;
       toast.success(
         skipped > 0
-          ? `${dates.length} zile actualizate · ${skipped} sărite (au rezervări)`
-          : `${dates.length} zile actualizate`,
+          ? t("vendorSalaCalendar.daysUpdatedSkipped", { count: dates.length, skipped })
+          : t("vendorSalaCalendar.daysUpdated", { count: dates.length }),
       );
       setRangeDialog(null);
       setRangeNote("");
@@ -384,12 +383,12 @@ export function VenueCalendarClient({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Calendar & Disponibilitate</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("vendorSalaCalendar.title")}</h1>
           <p className="text-muted-foreground">
-            Gestionează disponibilitatea sălii <strong>{venueName}</strong>
+            {t("vendorSalaCalendar.subtitle")} <strong>{venueName}</strong>
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            💡 <strong>Sfat:</strong> Apasă și trage peste mai multe zile pentru a le seta rapid (ex: vacanță, renovare)
+            💡 <strong>{t("vendorSalaCalendar.tipLabel")}</strong> {t("vendorSalaCalendar.tipText")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -397,7 +396,7 @@ export function VenueCalendarClient({
           <div
             className="inline-flex rounded-lg border border-border/50 p-0.5"
             role="tablist"
-            aria-label="Vizualizare calendar"
+            aria-label={t("vendorSalaCalendar.viewToggleLabel")}
           >
             <button
               type="button"
@@ -412,7 +411,7 @@ export function VenueCalendarClient({
               )}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
-              Calendar
+              {t("dashboard.calendar")}
             </button>
             <button
               type="button"
@@ -427,13 +426,13 @@ export function VenueCalendarClient({
               )}
             >
               <List className="h-3.5 w-3.5" />
-              Listă
+              {t("vendorSalaCalendar.viewList")}
             </button>
           </div>
 
           {/* Month dropdown jumper — spec 2.4.5 */}
           <select
-            aria-label="Sari la o lună"
+            aria-label={t("vendorSalaCalendar.jumpToMonth")}
             value={`${monthYear}-${monthIndex}`}
             onChange={(e) => {
               const [y, m] = e.target.value.split("-").map(Number);
@@ -449,14 +448,14 @@ export function VenueCalendarClient({
           </select>
 
           <Button variant="outline" size="sm" onClick={goToday}>
-            Azi
+            {t("vendorSalaCalendar.today")}
           </Button>
           <Button
             variant="outline"
             size="icon"
             onClick={() => navigateMonth(-1)}
             disabled={!canGoPrev}
-            aria-label="Luna precedentă"
+            aria-label={t("vendorSalaCalendar.prevMonth")}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -465,7 +464,7 @@ export function VenueCalendarClient({
             size="icon"
             onClick={() => navigateMonth(1)}
             disabled={!canGoNext}
-            aria-label="Luna următoare"
+            aria-label={t("calendar.nextMonth")}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -478,15 +477,14 @@ export function VenueCalendarClient({
           <div className="flex items-center gap-2 text-muted-foreground">
             <LinkIcon className="h-3.5 w-3.5 text-gold" />
             <span>
-              <strong className="text-foreground">Sincronizare calendar:</strong>{" "}
-              Conectează Google Calendar ca să importi zilele ocupate, sau copiază
-              linkul iCal ca să te abonezi din Google/Apple/Outlook.
+              <strong className="text-foreground">{t("vendorSalaCalendar.syncLabel")}</strong>{" "}
+              {t("vendorSalaCalendar.syncDescription")}
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {googleConnected ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-1 text-[11px] font-medium text-emerald-400">
-                <Check className="h-3 w-3" /> Google Calendar conectat
+                <Check className="h-3 w-3" /> {t("vendorSalaCalendar.googleConnected")}
               </span>
             ) : (
               <Button
@@ -495,7 +493,7 @@ export function VenueCalendarClient({
                 onClick={connectGoogle}
                 className="h-7 text-xs"
               >
-                <ExternalLink className="mr-1 h-3 w-3" /> Conectează Google Calendar
+                <ExternalLink className="mr-1 h-3 w-3" /> {t("vendorSalaCalendar.connectGoogle")}
               </Button>
             )}
             <Button
@@ -504,7 +502,7 @@ export function VenueCalendarClient({
               onClick={() => setShowIcalSheet(true)}
               className="h-7 text-xs"
             >
-              <LinkIcon className="mr-1 h-3 w-3" /> Link iCal
+              <LinkIcon className="mr-1 h-3 w-3" /> {t("vendorSalaCalendar.icalLink")}
             </Button>
           </div>
         </CardContent>
@@ -513,15 +511,15 @@ export function VenueCalendarClient({
       {/* Legend */}
       <Card>
         <CardContent className="flex flex-wrap gap-4 p-4 text-xs">
-          <LegendChip color="bg-emerald-500/40" label="Disponibil" />
+          <LegendChip color="bg-emerald-500/40" label={t("common.available")} />
           {ALL_EVENT_TYPES.map((k) => {
             const style = EVENT_TYPE_STYLE[k];
             return style ? (
               <LegendChip key={k} color={style.chip} label={eventTypeLabel(k)} />
             ) : null;
           })}
-          <LegendChip color="bg-yellow-500/40" label="Tentativ (pending)" />
-          <LegendChip color="bg-slate-500/50" label="Blocat" />
+          <LegendChip color="bg-yellow-500/40" label={t("vendorSalaCalendar.legendTentative")} />
+          <LegendChip color="bg-slate-500/50" label={t("common.blocked")} />
         </CardContent>
       </Card>
 
@@ -530,13 +528,13 @@ export function VenueCalendarClient({
       <Card>
         <CardContent className="p-5">
           <h2 className="mb-4 text-center font-heading text-xl font-semibold">
-            {MONTHS_RO[monthIndex]} {monthYear}
+            {t(`calendar.months.${monthIndex}`)} {monthYear}
           </h2>
 
           <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wider text-muted-foreground">
-            {WEEKDAYS_RO.map((d) => (
+            {WEEKDAY_INDEXES.map((d) => (
               <div key={d} className="pb-2 font-medium">
-                {d}
+                {t(`calendar.days.${d}`)}
               </div>
             ))}
           </div>
@@ -564,12 +562,12 @@ export function VenueCalendarClient({
                   labelText = cfg.label;
                 } else {
                   cellClass = "bg-red-500/20 border-red-500/50";
-                  labelText = "Rezervat";
+                  labelText = t("vendorSalaCalendar.booked");
                 }
               } else if (pending) {
                 // Pending = Tentativ (yellow) per spec
                 cellClass = TENTATIVE_STYLE.bg;
-                labelText = TENTATIVE_STYLE.label;
+                labelText = t("common.tentative");
               } else if (event?.status) {
                 const cfg = STATUS_CONFIG[event.status];
                 if (cfg) cellClass = cfg.bg;
@@ -649,7 +647,7 @@ export function VenueCalendarClient({
         <Card>
           <CardContent className="p-5">
             <h2 className="mb-4 font-heading text-xl font-semibold">
-              {MONTHS_RO[monthIndex]} {monthYear} — Zile cu status
+              {t(`calendar.months.${monthIndex}`)} {monthYear} — {t("vendorSalaCalendar.daysWithStatus")}
             </h2>
             <ListView
               monthYear={monthYear}
@@ -674,11 +672,9 @@ export function VenueCalendarClient({
       <Dialog open={showIcalSheet} onOpenChange={setShowIcalSheet}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Link iCal pentru sala ta</DialogTitle>
+            <DialogTitle>{t("vendorSalaCalendar.icalDialogTitle")}</DialogTitle>
             <DialogDescription>
-              Copiază linkul de mai jos și adaugă-l la Google Calendar (Alte calendare
-              → De la URL), Apple Calendar (File → New Calendar Subscription) sau
-              Outlook. Noile rezervări acceptate apar automat — sincronizare la cerere.
+              {t("vendorSalaCalendar.icalDialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -689,16 +685,15 @@ export function VenueCalendarClient({
               onClick={copyIcalUrl}
               className="w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
-              <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiază link
+              <Copy className="mr-1.5 h-3.5 w-3.5" /> {t("vendorSalaCalendar.copyLink")}
             </Button>
             <p className="text-xs text-muted-foreground">
-              ⚠️ Acest link este privat — nu îl publica. Oricine are linkul vede
-              rezervările tale confirmate.
+              {t("vendorSalaCalendar.icalPrivateWarning")}
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowIcalSheet(false)}>
-              Închide
+              {t("common.close")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -720,8 +715,13 @@ export function VenueCalendarClient({
             </DialogTitle>
             <DialogDescription>
               {dayBookings.length > 0
-                ? `${dayBookings.length} ${dayBookings.length === 1 ? "rezervare" : "rezervări"} în această zi`
-                : "Gestionează statusul zilei pentru sala ta"}
+                ? t(
+                    dayBookings.length === 1
+                      ? "vendorSalaCalendar.bookingsOnDaySingular"
+                      : "vendorSalaCalendar.bookingsOnDayPlural",
+                    { count: dayBookings.length },
+                  )
+                : t("vendorSalaCalendar.dayDialogDescription")}
             </DialogDescription>
           </DialogHeader>
 
@@ -748,9 +748,13 @@ export function VenueCalendarClient({
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
                           {cfg && (
                             <span className={cn("font-medium", cfg.text)}>
-                              {isPending && typeKey
-                                ? `Tentativ · ${eventTypeLabel(typeKey)}`
-                                : cfg.label}
+                              {isPending
+                                ? typeKey
+                                  ? t("vendorSalaCalendar.tentativeWithType", {
+                                      type: eventTypeLabel(typeKey),
+                                    })
+                                  : t("common.tentative")
+                                : eventTypeVisual(b.eventType)?.label}
                             </span>
                           )}
                           {b.startTime && (
@@ -763,7 +767,7 @@ export function VenueCalendarClient({
                           {b.guestCount && (
                             <span className="inline-flex items-center gap-1">
                               <Users className="h-3 w-3" />
-                              {b.guestCount} pers.
+                              {b.guestCount} {t("vendorSalaCalendar.personsShort")}
                             </span>
                           )}
                           {b.agreedPrice && <span>{b.agreedPrice}€</span>}
@@ -778,10 +782,10 @@ export function VenueCalendarClient({
                         )}
                       >
                         {b.status === "pending"
-                          ? "În așteptare"
+                          ? t("vendorSalaCalendar.statusPending")
                           : b.status === "confirmed_by_client"
-                            ? "Confirmat"
-                            : "Acceptat"}
+                            ? t("vendorSalaCalendar.statusConfirmed")
+                            : t("vendorSalaCalendar.statusAccepted")}
                       </span>
                     </div>
                   </div>
@@ -791,7 +795,7 @@ export function VenueCalendarClient({
                 href="/dashboard/sala/rezervari"
                 className="block text-center text-xs text-gold hover:underline"
               >
-                Vezi toate rezervările →
+                {t("vendorSalaCalendar.seeAllBookings")}
               </Link>
             </div>
           )}
@@ -800,22 +804,22 @@ export function VenueCalendarClient({
           {dayBookings.length === 0 && (
             <div className="space-y-3">
               <div>
-                <Label className="text-xs">Status</Label>
+                <Label className="text-xs">{t("vendorSalaCalendar.statusLabel")}</Label>
                 <div className="mt-1 grid grid-cols-3 gap-2">
                   {(["available", "tentative", "blocked"] as const).map((s) => {
                     const cfg = {
                       available: {
-                        label: "Disponibil",
+                        labelKey: "common.available",
                         Icon: Check,
                         bg: "bg-emerald-500/10 border-emerald-500/40 text-emerald-400",
                       },
                       tentative: {
-                        label: "Tentativ",
+                        labelKey: "common.tentative",
                         Icon: Clock,
                         bg: "bg-yellow-500/10 border-yellow-500/40 text-yellow-400",
                       },
                       blocked: {
-                        label: "Blocat",
+                        labelKey: "common.blocked",
                         Icon: Ban,
                         bg: "bg-slate-500/10 border-slate-500/40 text-slate-400",
                       },
@@ -834,7 +838,7 @@ export function VenueCalendarClient({
                         )}
                       >
                         <cfg.Icon className="h-4 w-4" />
-                        {cfg.label}
+                        {t(cfg.labelKey)}
                       </button>
                     );
                   })}
@@ -842,7 +846,7 @@ export function VenueCalendarClient({
               </div>
               <div>
                 <Label htmlFor="note" className="text-xs">
-                  Notă (opțional)
+                  {t("vendorSalaCalendar.noteOptional")}
                 </Label>
                 <Textarea
                   id="note"
@@ -852,8 +856,8 @@ export function VenueCalendarClient({
                   className="mt-1"
                   placeholder={
                     newStatus === "blocked"
-                      ? "Ex: renovare, vacanță..."
-                      : "Notiță personală pentru această zi"
+                      ? t("vendorSalaCalendar.notePlaceholderBlocked")
+                      : t("vendorSalaCalendar.notePlaceholderDay")
                   }
                 />
               </div>
@@ -866,7 +870,7 @@ export function VenueCalendarClient({
               onClick={() => setDayDialog(null)}
               disabled={saving}
             >
-              Închide
+              {t("common.close")}
             </Button>
             {dayBookings.length === 0 && (
               <Button
@@ -879,7 +883,7 @@ export function VenueCalendarClient({
                 ) : (
                   <CalendarIcon className="h-4 w-4" />
                 )}
-                Salvează
+                {t("common.save")}
               </Button>
             )}
           </DialogFooter>
@@ -890,35 +894,42 @@ export function VenueCalendarClient({
       <Dialog open={!!rangeDialog} onOpenChange={(v) => !v && setRangeDialog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Setare interval</DialogTitle>
+            <DialogTitle>{t("vendorSalaCalendar.rangeDialogTitle")}</DialogTitle>
             <DialogDescription>
               {rangeDialog
-                ? `Setează status pentru ${enumerateRange(rangeDialog.start, rangeDialog.end).length} zile: ${new Date(
-                    rangeDialog.start,
-                  ).toLocaleDateString("ro-RO", { day: "numeric", month: "short" })} – ${new Date(
-                    rangeDialog.end,
-                  ).toLocaleDateString("ro-RO", { day: "numeric", month: "short", year: "numeric" })}`
+                ? t("vendorSalaCalendar.rangeDialogDescription", {
+                    count: enumerateRange(rangeDialog.start, rangeDialog.end).length,
+                    from: new Date(rangeDialog.start).toLocaleDateString("ro-RO", {
+                      day: "numeric",
+                      month: "short",
+                    }),
+                    to: new Date(rangeDialog.end).toLocaleDateString("ro-RO", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    }),
+                  })
                 : ""}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Status pentru întregul interval</Label>
+              <Label className="text-xs">{t("vendorSalaCalendar.rangeStatusLabel")}</Label>
               <div className="mt-1 grid grid-cols-3 gap-2">
                 {(["available", "tentative", "blocked"] as const).map((s) => {
                   const cfg = {
                     available: {
-                      label: "Disponibil",
+                      labelKey: "common.available",
                       Icon: Check,
                       bg: "bg-emerald-500/10 border-emerald-500/40 text-emerald-400",
                     },
                     tentative: {
-                      label: "Tentativ",
+                      labelKey: "common.tentative",
                       Icon: Clock,
                       bg: "bg-yellow-500/10 border-yellow-500/40 text-yellow-400",
                     },
                     blocked: {
-                      label: "Blocat",
+                      labelKey: "common.blocked",
                       Icon: Ban,
                       bg: "bg-slate-500/10 border-slate-500/40 text-slate-400",
                     },
@@ -937,7 +948,7 @@ export function VenueCalendarClient({
                       )}
                     >
                       <cfg.Icon className="h-4 w-4" />
-                      {cfg.label}
+                      {t(cfg.labelKey)}
                     </button>
                   );
                 })}
@@ -945,7 +956,7 @@ export function VenueCalendarClient({
             </div>
             <div>
               <Label htmlFor="range-note" className="text-xs">
-                Notă (opțional)
+                {t("vendorSalaCalendar.noteOptional")}
               </Label>
               <Textarea
                 id="range-note"
@@ -955,13 +966,13 @@ export function VenueCalendarClient({
                 className="mt-1"
                 placeholder={
                   rangeStatus === "blocked"
-                    ? "Ex: renovare, vacanță..."
-                    : "Aplicat la toate zilele din interval"
+                    ? t("vendorSalaCalendar.notePlaceholderBlocked")
+                    : t("vendorSalaCalendar.notePlaceholderRange")
                 }
               />
             </div>
             <p className="text-xs text-muted-foreground">
-              ℹ️ Zilele cu rezervări confirmate nu vor fi modificate.
+              {t("vendorSalaCalendar.rangeConfirmedNote")}
             </p>
           </div>
           <DialogFooter>
@@ -970,7 +981,7 @@ export function VenueCalendarClient({
               onClick={() => setRangeDialog(null)}
               disabled={saving}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={saveRangeStatus}
@@ -982,7 +993,7 @@ export function VenueCalendarClient({
               ) : (
                 <CalendarIcon className="h-4 w-4" />
               )}
-              Aplică interval
+              {t("vendorSalaCalendar.applyRange")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1014,6 +1025,7 @@ function ListView({
   bookingsByDate: Map<string, Booking[]>;
   onRowClick: (dateStr: string) => void;
 }) {
+  const { t } = useLocale();
   const monthStart = new Date(monthYear, monthIndex, 1);
   const monthEnd = new Date(monthYear, monthIndex + 1, 0);
   const days: Array<{
@@ -1041,7 +1053,7 @@ function ListView({
       const cfg = eventTypeVisual(confirmed.eventType);
       days.push({
         dateStr,
-        statusLabel: cfg?.label || "Rezervat",
+        statusLabel: cfg?.label || t("vendorSalaCalendar.booked"),
         statusClass: cfg?.text || "text-red-400",
         eventType: confirmed.eventType,
         client: confirmed.clientName,
@@ -1054,7 +1066,9 @@ function ListView({
       const pendingKey = normalizeEventType(pending.eventType);
       days.push({
         dateStr,
-        statusLabel: `Tentativ${pendingKey ? ` · ${eventTypeLabel(pendingKey)}` : ""}`,
+        statusLabel: pendingKey
+          ? t("vendorSalaCalendar.tentativeWithType", { type: eventTypeLabel(pendingKey) })
+          : t("common.tentative"),
         statusClass: "text-yellow-400",
         eventType: pending.eventType,
         client: pending.clientName,
@@ -1067,7 +1081,7 @@ function ListView({
       const s = STATUS_CONFIG[event.status];
       days.push({
         dateStr,
-        statusLabel: s?.label || event.status,
+        statusLabel: s ? t(s.labelKey) : event.status,
         statusClass:
           event.status === "blocked"
             ? "text-slate-400"
@@ -1089,10 +1103,10 @@ function ListView({
     return (
       <div className="rounded-lg border border-dashed border-border/40 py-10 text-center">
         <p className="text-sm text-muted-foreground">
-          Nicio zi cu status pentru această lună.
+          {t("vendorSalaCalendar.listEmptyTitle")}
         </p>
         <p className="mt-1 text-xs text-muted-foreground/70">
-          Treci în vizualizarea Calendar pentru a seta zile disponibile sau blocate.
+          {t("vendorSalaCalendar.listEmptyHint")}
         </p>
       </div>
     );
@@ -1103,12 +1117,12 @@ function ListView({
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border/30 text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <th className="pb-2 pr-3">Dată</th>
-            <th className="pb-2 pr-3">Status / Eveniment</th>
-            <th className="pb-2 pr-3">Client</th>
-            <th className="pb-2 pr-3 text-right">Nr. pers</th>
-            <th className="pb-2 pr-3 text-right">Preț</th>
-            <th className="pb-2 text-right">Acțiuni</th>
+            <th className="pb-2 pr-3">{t("vendorSalaCalendar.colDate")}</th>
+            <th className="pb-2 pr-3">{t("vendorSalaCalendar.colStatusEvent")}</th>
+            <th className="pb-2 pr-3">{t("vendorSalaCalendar.colClient")}</th>
+            <th className="pb-2 pr-3 text-right">{t("vendorSalaCalendar.colGuests")}</th>
+            <th className="pb-2 pr-3 text-right">{t("vendorSalaCalendar.colPrice")}</th>
+            <th className="pb-2 text-right">{t("vendorSalaCalendar.colActions")}</th>
           </tr>
         </thead>
         <tbody>
@@ -1147,7 +1161,7 @@ function ListView({
                     onClick={() => onRowClick(d.dateStr)}
                     className="text-xs text-gold hover:underline"
                   >
-                    {d.kind === "booking" ? "Detalii" : "Editează"} →
+                    {d.kind === "booking" ? t("vendorSalaCalendar.rowDetails") : t("common.edit")} →
                   </button>
                 </td>
               </tr>

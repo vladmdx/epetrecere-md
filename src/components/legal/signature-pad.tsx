@@ -148,16 +148,11 @@ export function SignaturePad({
     onChange?.({ dataUrl: null, isValid: false });
   }
 
-  const tt = (k: string, fallback: string) => {
-    const v = t(`legal.${k}`);
-    return v === `legal.${k}` ? fallback : v;
-  };
-
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
         <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {tt("drawSignature", "Semnează aici")}
+          {t("legal.drawSignature")}
         </label>
         {hasInk && (
           <button
@@ -166,7 +161,7 @@ export function SignaturePad({
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
           >
             <Eraser className="h-3.5 w-3.5" />
-            {tt("clearSignature", "Șterge")}
+            {t("legal.clearSignature")}
           </button>
         )}
       </div>
@@ -180,12 +175,12 @@ export function SignaturePad({
           onPointerUp={end}
           onPointerLeave={end}
           onPointerCancel={end}
-          aria-label={tt("drawSignature", "Semnează aici")}
+          aria-label={t("legal.drawSignature")}
         />
         {!hasInk && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 text-sm text-[#9A9A8C]">
             <PenLine className="h-4 w-4" />
-            {tt("drawHint", "Desenează semnătura cu mouse-ul sau cu degetul")}
+            {t("legal.drawHint")}
           </div>
         )}
         {/* Signature baseline, like on paper */}
@@ -194,7 +189,7 @@ export function SignaturePad({
 
       {hasInk && !isSubstantial() && (
         <p className="mt-1 text-xs text-amber-500">
-          {tt("signatureTooSmall", "Semnătura e prea scurtă — desenează-o complet.")}
+          {t("legal.signatureTooSmall")}
         </p>
       )}
     </div>

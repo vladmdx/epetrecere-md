@@ -40,22 +40,22 @@ interface Vendor {
   createdAt: string;
 }
 
-const statusLabels: Record<string, { label: string; cls: string }> = {
-  pending: { label: "În așteptare", cls: "bg-warning/15 text-warning" },
-  accepted: { label: "Acceptat — confirmă", cls: "bg-gold/15 text-gold" },
+const statusLabels: Record<string, { labelKey: string; cls: string }> = {
+  pending: { labelKey: "cabinet.vendors.status.pending", cls: "bg-warning/15 text-warning" },
+  accepted: { labelKey: "cabinet.vendors.status.accepted", cls: "bg-gold/15 text-gold" },
   confirmed_by_client: {
-    label: "Confirmat",
+    labelKey: "cabinet.vendors.status.confirmed",
     cls: "bg-success/15 text-success",
   },
-  rejected: { label: "Refuzat", cls: "bg-destructive/15 text-destructive" },
-  cancelled: { label: "Anulat", cls: "bg-muted text-muted-foreground" },
-  new: { label: "Cerere trimisă", cls: "bg-muted text-muted-foreground" },
-  seen: { label: "Văzut", cls: "bg-muted text-muted-foreground" },
-  processed: { label: "Procesat", cls: "bg-success/15 text-success" },
+  rejected: { labelKey: "cabinet.vendors.status.rejected", cls: "bg-destructive/15 text-destructive" },
+  cancelled: { labelKey: "cabinet.vendors.status.cancelled", cls: "bg-muted text-muted-foreground" },
+  new: { labelKey: "cabinet.vendors.status.new", cls: "bg-muted text-muted-foreground" },
+  seen: { labelKey: "cabinet.vendors.status.seen", cls: "bg-muted text-muted-foreground" },
+  processed: { labelKey: "cabinet.vendors.status.processed", cls: "bg-success/15 text-success" },
 };
 
 export function FurnizoriClient() {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const { isLoaded, isSignedIn } = useUser();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,13 +81,13 @@ export function FurnizoriClient() {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center lg:px-8">
         <h1 className="font-heading text-2xl font-bold">
-          Autentifică-te pentru a vedea furnizorii tăi
+          {t("cabinet.vendors.signInTitle")}
         </h1>
         <Link
           href="/sign-in?redirect_url=/cabinet/furnizori"
           className="mt-6 inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
-          Autentifică-te
+          {t("cabinet.vendors.signInCta")}
         </Link>
       </div>
     );
@@ -106,47 +106,47 @@ export function FurnizoriClient() {
         href="/cabinet"
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold"
       >
-        <ArrowLeft className="h-3 w-3" /> Înapoi la cabinet
+        <ArrowLeft className="h-3 w-3" /> {t("cabinet.vendors.backToCabinet")}
       </Link>
 
       <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-medium uppercase tracking-[3px] text-gold">
-            Echipa ta
+            {t("cabinet.vendors.eyebrow")}
           </p>
           <h1 className="font-heading text-2xl font-bold md:text-3xl">
-            Furnizorii mei
+            {t("cabinet.vendors.title")}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Toți artiștii și sălile cu care ai luat legătura pentru eveniment.
+            {t("cabinet.vendors.subtitle")}
           </p>
         </div>
         <Link
           href="/artisti"
           className="inline-flex items-center gap-2 rounded-lg border border-gold/40 bg-gold/5 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/10"
         >
-          <Plus className="h-4 w-4" /> Adaugă furnizor
+          <Plus className="h-4 w-4" /> {t("cabinet.vendors.addVendor")}
         </Link>
       </div>
 
       {vendors.length > 0 && (
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          <StatBox label="Total furnizori" value={vendors.length} />
-          <StatBox label="Confirmați" value={confirmedCount} accent />
-          <StatBox label="În așteptare" value={pendingCount} />
+          <StatBox label={t("cabinet.vendors.statTotal")} value={vendors.length} />
+          <StatBox label={t("cabinet.vendors.statConfirmed")} value={confirmedCount} accent />
+          <StatBox label={t("cabinet.vendors.statPending")} value={pendingCount} />
         </div>
       )}
 
       {vendors.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-border/40 p-12 text-center">
           <p className="text-sm text-muted-foreground">
-            Nu ai contactat niciun furnizor încă.
+            {t("cabinet.vendors.emptyText")}
           </p>
           <Link
             href="/artisti"
             className="mt-4 inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
-            Explorează catalogul
+            {t("cabinet.vendors.exploreCatalog")}
           </Link>
         </div>
       ) : (
@@ -175,7 +175,7 @@ export function FurnizoriClient() {
                     ) : (
                       <Building2 className="h-3 w-3" />
                     )}
-                    {v.kind === "artist" ? "Artist" : "Sală"}
+                    {v.kind === "artist" ? t("cabinet.vendors.kindArtist") : t("cabinet.vendors.kindVenue")}
                   </span>
                   {v.videoUrl && (
                     <a
@@ -184,7 +184,7 @@ export function FurnizoriClient() {
                       rel="noopener noreferrer"
                       className="absolute bottom-3 right-3 inline-flex items-center gap-1.5 rounded-full bg-gold px-3 py-1.5 text-xs font-semibold text-[#0D0D0D] shadow-lg hover:bg-gold-dark"
                     >
-                      <PlayCircle className="h-4 w-4" /> Video
+                      <PlayCircle className="h-4 w-4" /> {t("cabinet.vendors.video")}
                     </a>
                   )}
                 </div>
@@ -203,7 +203,7 @@ export function FurnizoriClient() {
                           {name}
                         </h3>
                         <Badge className={`text-xs ${status.cls}`}>
-                          {status.label}
+                          {t(status.labelKey)}
                         </Badge>
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
@@ -224,14 +224,14 @@ export function FurnizoriClient() {
                         rel="noopener"
                         className="inline-flex items-center gap-1 rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium hover:bg-muted"
                       >
-                        <ExternalLink className="h-3 w-3" /> Profil
+                        <ExternalLink className="h-3 w-3" /> {t("cabinet.vendors.profile")}
                       </Link>
                     )}
                     <Link
                       href="/cabinet?tab=conversations"
                       className="inline-flex items-center gap-1 rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium hover:bg-muted"
                     >
-                      <MessageSquare className="h-3 w-3" /> Mesaje
+                      <MessageSquare className="h-3 w-3" /> {t("cabinet.vendors.messages")}
                     </Link>
                   </div>
                 </CardContent>

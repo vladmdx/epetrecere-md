@@ -23,14 +23,15 @@ import {
   ArrowRight,
   Trash2,
 } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  wedding: "Nuntă",
-  baptism: "Botez",
-  cumatrie: "Cumătrie",
-  birthday: "Zi de naștere",
-  corporate: "Corporate",
-  other: "Alt tip",
+const EVENT_TYPE_LABEL_KEYS: Record<string, string> = {
+  wedding: "cabinet.planner.eventTypes.wedding",
+  baptism: "cabinet.planner.eventTypes.baptism",
+  cumatrie: "cabinet.planner.eventTypes.cumatrie",
+  birthday: "cabinet.planner.eventTypes.birthday",
+  corporate: "cabinet.planner.eventTypes.corporate",
+  other: "cabinet.planner.eventTypes.other",
 };
 
 interface PlanListItem {
@@ -50,6 +51,7 @@ function startFreshWizard() {
 }
 
 export default function PlannerIndexPage() {
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState<PlanListItem[]>([]);
@@ -75,11 +77,7 @@ export default function PlannerIndexPage() {
   // The Setări-tab delete still works; this just adds a mobile-friendly
   // entry point without changing any server-side behavior.
   async function handleDelete(planId: number, planTitle: string) {
-    if (
-      !confirm(
-        `Ștergi definitiv planul "${planTitle}"? Acțiunea nu poate fi anulată.`,
-      )
-    ) {
+    if (!confirm(t("cabinet.planner.deleteConfirm", { title: planTitle }))) {
       return;
     }
     setDeletingId(planId);
@@ -88,13 +86,13 @@ export default function PlannerIndexPage() {
         method: "DELETE",
       });
       if (!res.ok) {
-        toast.error("Nu am putut șterge planul.");
+        toast.error(t("cabinet.planner.deleteFailed"));
         return;
       }
       setPlans((prev) => prev.filter((p) => p.id !== planId));
-      toast.success("Planul a fost șters.");
+      toast.success(t("cabinet.planner.deleted"));
     } catch {
-      toast.error("Eroare la ștergere.");
+      toast.error(t("cabinet.planner.deleteError"));
     } finally {
       setDeletingId(null);
     }
@@ -112,15 +110,15 @@ export default function PlannerIndexPage() {
     return (
       <div className="mx-auto max-w-md py-20 text-center">
         <Heart className="mx-auto mb-4 h-12 w-12 text-gold/40" />
-        <h1 className="font-heading text-xl font-bold">Planifică evenimentul</h1>
+        <h1 className="font-heading text-xl font-bold">{t("cabinet.planner.signInTitle")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Autentifică-te pentru a crea planul tău de eveniment.
+          {t("cabinet.planner.signInText")}
         </p>
         <Link
           href="/sign-in"
           className="mt-4 inline-block rounded-xl bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
-          Autentificare
+          {t("cabinet.planner.signInCta")}
         </Link>
       </div>
     );
@@ -132,16 +130,14 @@ export default function PlannerIndexPage() {
       <div className="mx-auto max-w-md py-20 text-center">
         <Sparkles className="mx-auto mb-4 h-12 w-12 text-gold/60" />
         <h1 className="font-heading text-xl font-bold">
-          Începe planificarea evenimentului
+          {t("cabinet.planner.emptyTitle")}
         </h1>
         <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">
-          Treci prin cei 7 pași — alegi tipul evenimentului, data, sala,
-          artiștii și bugetul, apoi primești imediat o listă de furnizori
-          liberi pentru data ta.
+          {t("cabinet.planner.emptyText")}
         </p>
         <Link href="/planifica" onClick={startFreshWizard}>
           <Button className="mt-6 gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
-            <Plus className="h-4 w-4" /> Planifică Eveniment
+            <Plus className="h-4 w-4" /> {t("cabinet.planner.planEvent")}
           </Button>
         </Link>
       </div>
@@ -153,14 +149,16 @@ export default function PlannerIndexPage() {
     <div className="mx-auto max-w-5xl">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Evenimentele mele</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("cabinet.planner.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {plans.length} plan{plans.length === 1 ? "" : "uri"} active
+            {plans.length === 1
+              ? t("cabinet.planner.activePlanOne", { count: plans.length })
+              : t("cabinet.planner.activePlanMany", { count: plans.length })}
           </p>
         </div>
         <Link href="/planifica" onClick={startFreshWizard}>
           <Button className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
-            <Plus className="h-4 w-4" /> Planifică Eveniment
+            <Plus className="h-4 w-4" /> {t("cabinet.planner.planEvent")}
           </Button>
         </Link>
       </div>
@@ -168,7 +166,9 @@ export default function PlannerIndexPage() {
       <div className="grid gap-3 md:grid-cols-2">
         {plans.map((p) => {
           const eventLabel = p.eventType
-            ? EVENT_TYPE_LABELS[p.eventType] ?? p.eventType
+            ? EVENT_TYPE_LABEL_KEYS[p.eventType]
+              ? t(EVENT_TYPE_LABEL_KEYS[p.eventType])
+              : p.eventType
             : null;
           const isDeleting = deletingId === p.id;
           return (
@@ -214,7 +214,7 @@ export default function PlannerIndexPage() {
                   {p.guestCountTarget && (
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />
-                      {p.guestCountTarget} invitați
+                      {t("cabinet.planner.guestCount", { count: p.guestCountTarget })}
                     </span>
                   )}
                 </div>
@@ -223,7 +223,7 @@ export default function PlannerIndexPage() {
                 type="button"
                 onClick={() => void handleDelete(p.id, p.title)}
                 disabled={isDeleting}
-                aria-label="Șterge planul"
+                aria-label={t("cabinet.planner.deletePlanAria")}
                 className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50"
               >
                 {isDeleting ? (

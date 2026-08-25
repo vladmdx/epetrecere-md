@@ -11,20 +11,22 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, Building2, Search, User } from "lucide-react";
 import { formatAmount } from "@/lib/format/price";
+import { useLocale } from "@/hooks/use-locale";
 import type { VendorRow } from "@/lib/db/queries/admin-stats";
 
 type SortKey = "name" | "requests" | "orders" | "gmv" | "commissionBilled" | "commissionPaid";
 
-const COLUMNS: { key: SortKey; label: string; numeric: boolean }[] = [
-  { key: "name", label: "Furnizor", numeric: false },
-  { key: "requests", label: "Solicitări", numeric: true },
-  { key: "orders", label: "Comenzi", numeric: true },
-  { key: "gmv", label: "Venit furnizor", numeric: true },
-  { key: "commissionBilled", label: "Comision datorat", numeric: true },
-  { key: "commissionPaid", label: "Comision achitat", numeric: true },
+const COLUMNS: { key: SortKey; labelKey: string; numeric: boolean }[] = [
+  { key: "name", labelKey: "admin.stats.table.vendor", numeric: false },
+  { key: "requests", labelKey: "admin.stats.table.requests", numeric: true },
+  { key: "orders", labelKey: "admin.stats.table.orders", numeric: true },
+  { key: "gmv", labelKey: "admin.stats.table.gmv", numeric: true },
+  { key: "commissionBilled", labelKey: "admin.stats.table.commissionDue", numeric: true },
+  { key: "commissionPaid", labelKey: "admin.stats.table.commissionPaid", numeric: true },
 ];
 
 export function VendorTable({ rows }: { rows: VendorRow[] }) {
+  const { t } = useLocale();
   const [sort, setSort] = useState<SortKey>("gmv");
   const [desc, setDesc] = useState(true);
   const [q, setQ] = useState("");
@@ -72,9 +74,9 @@ export function VendorTable({ rows }: { rows: VendorRow[] }) {
     <div className="rounded-xl border border-border bg-card">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
         <div>
-          <h3 className="text-sm font-semibold">Pe furnizor</h3>
+          <h3 className="text-sm font-semibold">{t("admin.stats.table.title")}</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Cine de la ce artist sau sală a rezervat și cât are de achitat.
+            {t("admin.stats.table.subtitle")}
           </p>
         </div>
         <label className="flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs">
@@ -82,8 +84,8 @@ export function VendorTable({ rows }: { rows: VendorRow[] }) {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Caută furnizor"
-            aria-label="Caută furnizor"
+            placeholder={t("admin.stats.table.search")}
+            aria-label={t("admin.stats.table.search")}
             className="w-36 bg-transparent outline-none placeholder:text-muted-foreground"
           />
         </label>
@@ -91,7 +93,7 @@ export function VendorTable({ rows }: { rows: VendorRow[] }) {
 
       {view.length === 0 ? (
         <p className="p-8 text-center text-xs text-muted-foreground">
-          Niciun furnizor cu activitate în perioada selectată.
+          {t("admin.stats.table.empty")}
         </p>
       ) : (
         <div className="overflow-x-auto">
@@ -110,7 +112,7 @@ export function VendorTable({ rows }: { rows: VendorRow[] }) {
                       onClick={() => toggle(c.key)}
                       className={`inline-flex items-center gap-1 hover:text-foreground ${sort === c.key ? "text-foreground" : ""}`}
                     >
-                      {c.label}
+                      {t(c.labelKey)}
                       {sort === c.key &&
                         (desc ? (
                           <ArrowDown className="h-3 w-3" />
@@ -156,7 +158,9 @@ export function VendorTable({ rows }: { rows: VendorRow[] }) {
             </tbody>
             <tfoot>
               <tr className="border-t border-border text-xs font-semibold">
-                <td className="px-4 py-2.5">Total ({view.length})</td>
+                <td className="px-4 py-2.5">
+                  {t("admin.stats.table.total", { count: view.length })}
+                </td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{totals.requests}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{totals.orders}</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{formatAmount(totals.gmv)}</td>

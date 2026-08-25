@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   entity: "artist" | "venue";
@@ -31,6 +32,7 @@ export function BulkActionsBar({
   onClear,
   onComplete,
 }: Props) {
+  const { t } = useLocale();
   const [busy, setBusy] = useState<Action | null>(null);
   if (selectedIds.length === 0) return null;
 
@@ -38,7 +40,13 @@ export function BulkActionsBar({
     if (
       action === "delete" &&
       !confirm(
-        `Ștergi ${selectedIds.length} ${entity === "artist" ? "artiști" : "săli"}? Acțiunea e IREVERSIBILĂ.`,
+        t("admin.bulk.deleteConfirm", {
+          count: selectedIds.length,
+          entity:
+            entity === "artist"
+              ? t("admin.bulk.entityArtists")
+              : t("admin.bulk.entityVenues"),
+        }),
       )
     ) {
       return;
@@ -52,11 +60,11 @@ export function BulkActionsBar({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut executa");
+        toast.error(err.error || t("admin.bulk.actionError"));
         return;
       }
       const data = await res.json();
-      toast.success(`${data.affected} înregistrări actualizate`);
+      toast.success(t("admin.bulk.updated", { count: data.affected }));
       onComplete();
       onClear();
     } finally {
@@ -68,7 +76,7 @@ export function BulkActionsBar({
     <div className="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 px-4">
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-gold/30 bg-card/95 px-4 py-3 shadow-2xl backdrop-blur-md">
         <span className="text-sm font-medium">
-          {selectedIds.length} selectate
+          {t("admin.bulk.selected", { count: selectedIds.length })}
         </span>
         <span className="mx-1 h-4 w-px bg-border/50" />
         <button
@@ -81,7 +89,7 @@ export function BulkActionsBar({
           ) : (
             <CheckCircle2 className="h-3 w-3" />
           )}
-          Activează
+          {t("admin.bulk.activate")}
         </button>
         <button
           onClick={() => run("deactivate")}
@@ -93,7 +101,7 @@ export function BulkActionsBar({
           ) : (
             <XCircle className="h-3 w-3" />
           )}
-          Dezactivează
+          {t("admin.bulk.deactivate")}
         </button>
         <button
           onClick={() => run("feature")}
@@ -105,7 +113,7 @@ export function BulkActionsBar({
           ) : (
             <Star className="h-3 w-3" />
           )}
-          Featured
+          {t("admin.bulk.feature")}
         </button>
         <button
           onClick={() => run("unfeature")}
@@ -117,7 +125,7 @@ export function BulkActionsBar({
           ) : (
             <StarOff className="h-3 w-3" />
           )}
-          Scoate featured
+          {t("admin.bulk.unfeature")}
         </button>
         <button
           onClick={() => run("delete")}
@@ -129,12 +137,12 @@ export function BulkActionsBar({
           ) : (
             <Trash2 className="h-3 w-3" />
           )}
-          Șterge
+          {t("admin.bulk.delete")}
         </button>
         <span className="mx-1 h-4 w-px bg-border/50" />
         <button
           onClick={onClear}
-          aria-label="Deselectează"
+          aria-label={t("admin.bulk.deselect")}
           className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
         >
           <X className="h-3.5 w-3.5" />

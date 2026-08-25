@@ -283,14 +283,14 @@ export function ArtistsListClient({
                   inputMode="numeric"
                   value={priceMin}
                   onChange={(event) => setPriceMin(event.target.value.replace(/\D/g, ""))}
-                  placeholder="Min €"
+                  placeholder={t("catalogFilters.priceMin")}
                   className="h-9 rounded-lg border border-white/10 bg-black/18 px-2.5 text-xs outline-none focus:border-[#e6b84d]/60"
                 />
                 <input
                   inputMode="numeric"
                   value={priceMax}
                   onChange={(event) => setPriceMax(event.target.value.replace(/\D/g, ""))}
-                  placeholder="Max €"
+                  placeholder={t("catalogFilters.priceMax")}
                   className="h-9 rounded-lg border border-white/10 bg-black/18 px-2.5 text-xs outline-none focus:border-[#e6b84d]/60"
                 />
               </div>

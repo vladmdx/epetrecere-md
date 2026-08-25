@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, X, Heart } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   slug: string;
@@ -20,13 +21,14 @@ interface Result {
 }
 
 export function CheckInClient({ slug: _slug, token }: Props) {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
-      setError("Link invalid — lipsește token-ul de check-in.");
+      setError(t("invite.check.missingToken"));
       setLoading(false);
       return;
     }
@@ -40,16 +42,20 @@ export function CheckInClient({ slug: _slug, token }: Props) {
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          setError(err.error || "Eroare la check-in");
+          setError(err.error || t("invite.check.failed"));
           return;
         }
         setResult(await res.json());
       } catch {
-        setError("Eroare de conexiune. Încearcă din nou.");
+        setError(t("invite.check.connectionError"));
       } finally {
         setLoading(false);
       }
     })();
+    // `t` is deliberately out of the dependency list: this effect POSTs the
+    // check-in, and re-running it on a translator identity change would
+    // register the guest twice.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   return (
@@ -59,7 +65,7 @@ export function CheckInClient({ slug: _slug, token }: Props) {
           <>
             <Loader2 className="mx-auto h-12 w-12 animate-spin text-gold" />
             <p className="mt-4 text-muted-foreground">
-              Se verifică check-in-ul…
+              {t("invite.check.verifying")}
             </p>
           </>
         )}
@@ -70,12 +76,11 @@ export function CheckInClient({ slug: _slug, token }: Props) {
               <X className="h-8 w-8" />
             </div>
             <h1 className="mt-4 font-heading text-2xl font-bold">
-              Check-in eșuat
+              {t("invite.check.failedTitle")}
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">{error}</p>
             <p className="mt-4 text-xs text-muted-foreground/60">
-              Dacă problema persistă, roagă gazda să te adauge manual pe
-              lista de check-in.
+              {t("invite.check.persistHint")}
             </p>
           </>
         )}
@@ -86,32 +91,34 @@ export function CheckInClient({ slug: _slug, token }: Props) {
               <CheckCircle2 className="h-12 w-12" />
             </div>
             <h1 className="mt-5 font-heading text-3xl font-bold">
-              Bun venit!
+              {t("invite.check.welcome")}
             </h1>
             <p className="mt-3 font-accent text-2xl italic text-gold">
               {result.guest.name}
             </p>
             {result.guest.plusOne && result.guest.plusOneName && (
               <p className="mt-1 text-sm text-muted-foreground">
-                cu {result.guest.plusOneName}
+                {t("invite.check.withCompanion", {
+                  name: result.guest.plusOneName,
+                })}
               </p>
             )}
 
             <div className="mt-6 rounded-xl bg-muted/30 p-4">
               {result.alreadyCheckedIn ? (
                 <p className="text-sm text-muted-foreground">
-                  Ai fost deja marcat prezent la{" "}
+                  {t("invite.check.alreadyPresent")}{" "}
                   <strong className="text-foreground">
                     {new Date(result.checkedInAt).toLocaleTimeString("ro-RO", {
                       hour: "2-digit",
                       minute: "2-digit",
                     })}
                   </strong>
-                  . Distracție plăcută!
+                  {t("invite.check.alreadyPresentSuffix")}
                 </p>
               ) : (
                 <p className="text-sm">
-                  Check-in confirmat la{" "}
+                  {t("invite.check.confirmedAt")}{" "}
                   <strong className="text-gold">
                     {new Date(result.checkedInAt).toLocaleTimeString("ro-RO", {
                       hour: "2-digit",
@@ -124,7 +131,7 @@ export function CheckInClient({ slug: _slug, token }: Props) {
 
             <div className="mt-6 flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
               <Heart className="h-3 w-3 text-gold" />
-              <span>Petrecere frumoasă de la ePetrecere.md</span>
+              <span>{t("invite.check.footer")}</span>
             </div>
           </>
         )}

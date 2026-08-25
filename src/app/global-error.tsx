@@ -2,6 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
+import { useLocale } from "@/hooks/use-locale";
 
 export default function GlobalError({
   error,
@@ -10,6 +11,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // global-error replaces the root layout, so it renders outside
+  // LocaleProvider — `useLocale` falls back to the default locale here.
+  const { t } = useLocale();
+
   useEffect(() => {
     Sentry.captureException(error);
   }, [error]);
@@ -21,17 +26,16 @@ export default function GlobalError({
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#c9a84c]/15 text-3xl text-[#c9a84c]">
             !
           </div>
-          <h1 className="text-2xl font-bold">A apărut o eroare</h1>
+          <h1 className="text-2xl font-bold">{t("publicError.title")}</h1>
           <p className="max-w-md text-[#b0b0c0]">
-            Ne cerem scuze pentru inconveniență. Încearcă din nou sau revino
-            peste câteva momente.
+            {t("publicError.globalDescription")}
           </p>
           <button
             type="button"
             onClick={reset}
             className="rounded-xl bg-[#c9a84c] px-5 py-3 font-semibold text-[#0d0d0d] transition hover:bg-[#a08839]"
           >
-            Încearcă din nou
+            {t("publicError.retry")}
           </button>
         </main>
       </body>

@@ -21,6 +21,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Photo {
   id: number;
@@ -38,25 +39,26 @@ interface Plan {
 
 type Layout = "grid" | "polaroid" | "magazine";
 
-const LAYOUTS: Array<{ key: Layout; label: string; description: string }> = [
+const LAYOUTS: Array<{ key: Layout; labelKey: string; descriptionKey: string }> = [
   {
     key: "grid",
-    label: "Grid clasic",
-    description: "Pătrate egale, ramă subțire — curat și liniștit.",
+    labelKey: "cabinet.collage.layouts.grid.label",
+    descriptionKey: "cabinet.collage.layouts.grid.description",
   },
   {
     key: "polaroid",
-    label: "Perete polaroid",
-    description: "Fotografii în ramă de polaroid, înclinate aleator — vibe nostalgic.",
+    labelKey: "cabinet.collage.layouts.polaroid.label",
+    descriptionKey: "cabinet.collage.layouts.polaroid.description",
   },
   {
     key: "magazine",
-    label: "Magazine",
-    description: "Imagini mari și mici alternate — coperta de revistă.",
+    labelKey: "cabinet.collage.layouts.magazine.label",
+    descriptionKey: "cabinet.collage.layouts.magazine.description",
   },
 ];
 
 export function ColajClient({ planId }: { planId: number }) {
+  const { t } = useLocale();
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,7 +133,7 @@ export function ColajClient({ planId }: { planId: number }) {
           href={`/cabinet/moments/${planId}`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-gold"
         >
-          <ArrowLeft className="h-3 w-3" /> Înapoi la galerie
+          <ArrowLeft className="h-3 w-3" /> {t("cabinet.collage.backToGallery")}
         </Link>
         <div className="flex flex-wrap items-center gap-2">
           <select
@@ -141,7 +143,7 @@ export function ColajClient({ planId }: { planId: number }) {
           >
             {LAYOUTS.map((l) => (
               <option key={l.key} value={l.key}>
-                {l.label}
+                {t(l.labelKey)}
               </option>
             ))}
           </select>
@@ -150,26 +152,27 @@ export function ColajClient({ planId }: { planId: number }) {
             disabled={photos.length === 0}
             className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-50"
           >
-            <Printer className="h-4 w-4" /> Tipărește / Salvează PDF
+            <Printer className="h-4 w-4" /> {t("cabinet.collage.print")}
           </button>
         </div>
       </div>
 
       <p className="print-hide mb-4 text-xs text-muted-foreground">
-        {LAYOUTS.find((l) => l.key === layout)?.description}{" "}
+        {(() => {
+          const active = LAYOUTS.find((l) => l.key === layout);
+          return active ? t(active.descriptionKey) : null;
+        })()}{" "}
         <span className="ml-1 text-gold">
-          Folosește browserul: File &rarr; Print &rarr; Save as PDF pentru o
-          variantă tipăribilă.
+          {t("cabinet.collage.printHint")}
         </span>
       </p>
 
       {photos.length === 0 ? (
         <div className="print-hide rounded-2xl border border-dashed border-border/40 p-10 text-center">
           <ImageIcon className="mx-auto h-10 w-10 text-muted-foreground/40" />
-          <p className="mt-3 font-medium">Nu există încă poze pentru colaj</p>
+          <p className="mt-3 font-medium">{t("cabinet.collage.emptyTitle")}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Invită oaspeții să scaneze QR-ul. Colajul apare automat aici după
-            primele uploaduri.
+            {t("cabinet.collage.emptyText")}
           </p>
         </div>
       ) : (
@@ -270,7 +273,7 @@ export function ColajClient({ planId }: { planId: number }) {
               a discreet branding cue when they share the PDF. */}
           <footer className="mt-6 pt-4 text-center text-[10px] uppercase tracking-[3px] text-muted-foreground print:text-[9px]">
             <Sparkles className="inline h-3 w-3 text-gold" />{" "}
-            {photos.length} amintiri · ePetrecere.md
+            {t("cabinet.collage.memoriesCredit", { count: photos.length })}
           </footer>
         </article>
       )}

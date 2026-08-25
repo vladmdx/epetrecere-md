@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
 
@@ -73,7 +74,7 @@ const EVENT_TYPE_BORDER: Record<string, string> = {
  */
 function computeLeadScore(b: BookingRequest): {
   tier: "hot" | "warm" | "cold";
-  label: string;
+  labelKey: string;
   emoji: string;
   className: string;
 } {
@@ -102,7 +103,7 @@ function computeLeadScore(b: BookingRequest): {
   if (score >= 6) {
     return {
       tier: "hot",
-      label: "Hot",
+      labelKey: "vendor.bookingsPage.leadTier.hot",
       emoji: "🔥",
       className: "bg-red-500/15 text-red-400 border-red-500/40",
     };
@@ -110,26 +111,26 @@ function computeLeadScore(b: BookingRequest): {
   if (score >= 3) {
     return {
       tier: "warm",
-      label: "Warm",
+      labelKey: "vendor.bookingsPage.leadTier.warm",
       emoji: "🌡️",
       className: "bg-yellow-500/15 text-yellow-400 border-yellow-500/40",
     };
   }
   return {
     tier: "cold",
-    label: "Cold",
+    labelKey: "vendor.bookingsPage.leadTier.cold",
     emoji: "❄️",
     className: "bg-blue-500/15 text-blue-400 border-blue-500/40",
   };
 }
 
-const statusConfig: Record<string, { label: string; color: string }> = {
-  pending: { label: "În așteptare", color: "bg-warning/10 text-warning border-warning/30" },
-  accepted: { label: "Așteaptă confirmare client", color: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
-  confirmed_by_client: { label: "Confirmat ambele părți", color: "bg-success/10 text-success border-success/30" },
-  rejected: { label: "Refuzat", color: "bg-destructive/10 text-destructive border-destructive/30" },
-  cancelled: { label: "Anulat", color: "bg-muted text-muted-foreground border-border" },
-  completed: { label: "Finalizat", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" },
+const statusConfig: Record<string, { labelKey: string; color: string }> = {
+  pending: { labelKey: "vendor.bookingsPage.status.pending", color: "bg-warning/10 text-warning border-warning/30" },
+  accepted: { labelKey: "vendor.bookingsPage.status.accepted", color: "bg-amber-500/10 text-amber-500 border-amber-500/30" },
+  confirmed_by_client: { labelKey: "vendor.bookingsPage.status.confirmedByClient", color: "bg-success/10 text-success border-success/30" },
+  rejected: { labelKey: "vendor.bookingsPage.status.rejected", color: "bg-destructive/10 text-destructive border-destructive/30" },
+  cancelled: { labelKey: "vendor.bookingsPage.status.cancelled", color: "bg-muted text-muted-foreground border-border" },
+  completed: { labelKey: "vendor.bookingsPage.status.completed", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" },
 };
 
 function formatDate(d: string | null): string {
@@ -140,6 +141,7 @@ function formatDate(d: string | null): string {
 
 export default function VendorBookingsPage() {
   const { user, isLoaded } = useUser();
+  const { t } = useLocale();
   // Deep-link support: the partner dashboard sends users here with
   // ?expand=<bookingId> when they click "Deschide cererea" or a row in
   // the recent-requests list. We pre-open that booking on mount and
@@ -184,7 +186,7 @@ export default function VendorBookingsPage() {
       try {
         const email = user?.primaryEmailAddress?.emailAddress;
         if (!email) {
-          setError("Nu s-a putut determina contul de artist. Autentificați-vă din nou.");
+          setError(t("vendor.bookingsPage.errorNoArtistAccount"));
           setLoading(false);
           return;
         }
@@ -193,11 +195,11 @@ export default function VendorBookingsPage() {
         if (data.artistId) {
           setArtistId(data.artistId);
         } else {
-          setError("Contul dvs. nu este asociat cu un profil de artist.");
+          setError(t("vendor.bookingsPage.errorNotArtist"));
           setLoading(false);
         }
       } catch {
-        setError("Eroare la încărcarea profilului de artist. Încercați din nou.");
+        setError(t("vendor.bookingsPage.errorLoadProfile"));
         setLoading(false);
       }
     })();
@@ -239,10 +241,10 @@ export default function VendorBookingsPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut trimite invitația");
+        toast.error(err.error || t("vendor.bookingsPage.toastReviewInviteError"));
         return;
       }
-      toast.success("Email trimis — clientul primește invitația pentru recenzie");
+      toast.success(t("vendor.bookingsPage.toastReviewInviteSent"));
       setReviewRequested((prev) => new Set(prev).add(bookingId));
     } finally {
       setBusy(null);
@@ -263,10 +265,10 @@ export default function VendorBookingsPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut anula");
+        toast.error(err.error || t("vendor.bookingsPage.toastCancelError"));
         return;
       }
-      toast.success("Rezervare anulată. Clientul a fost notificat.");
+      toast.success(t("vendor.bookingsPage.toastCancelled"));
       setCancelDialog(null);
       setCancelReason("");
       await refreshBookings();
@@ -284,14 +286,14 @@ export default function VendorBookingsPage() {
         body: JSON.stringify({ action: "complete" }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut finaliza rezervarea");
+        toast.error(t("vendor.bookingsPage.toastCompleteError"));
         return;
       }
-      toast.success("Rezervare marcată ca finalizată!");
+      toast.success(t("vendor.bookingsPage.toastCompleted"));
       const r = await fetch(`/api/booking-requests?artist_id=${artistId}`);
       if (r.ok) setBookings(await r.json());
     } catch {
-      toast.error("Eroare la finalizarea rezervării");
+      toast.error(t("vendor.bookingsPage.toastCompleteFailed"));
     } finally {
       setBusy(null);
     }
@@ -314,19 +316,19 @@ export default function VendorBookingsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "accept",
-          reply: acceptReply.trim() || "Cererea a fost acceptată!",
+          reply: acceptReply.trim() || t("vendor.bookingsPage.defaultAcceptReply"),
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut accepta rezervarea");
+        toast.error(t("vendor.bookingsPage.toastAcceptError"));
         return;
       }
-      toast.success("Rezervare acceptată!");
+      toast.success(t("vendor.bookingsPage.toastAccepted"));
       setAcceptDialog(null);
       setAcceptReply("");
       await refreshBookings();
     } catch {
-      toast.error("Eroare la acceptare");
+      toast.error(t("vendor.bookingsPage.toastAcceptFailed"));
     } finally {
       setBusy(null);
     }
@@ -342,20 +344,19 @@ export default function VendorBookingsPage() {
         body: JSON.stringify({
           action: "reject",
           reply:
-            rejectReply.trim() ||
-            "Ne pare rău, nu sunt disponibil la data respectivă.",
+            rejectReply.trim() || t("vendor.bookingsPage.defaultRejectReply"),
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut respinge rezervarea");
+        toast.error(t("vendor.bookingsPage.toastRejectError"));
         return;
       }
-      toast.success("Rezervare respinsă");
+      toast.success(t("vendor.bookingsPage.toastRejected"));
       setRejectDialog(null);
       setRejectReply("");
       await refreshBookings();
     } catch {
-      toast.error("Eroare la respingere");
+      toast.error(t("vendor.bookingsPage.toastRejectFailed"));
     } finally {
       setBusy(null);
     }
@@ -365,7 +366,7 @@ export default function VendorBookingsPage() {
     if (!proposeDialog) return;
     const amt = Number(proposeAmount);
     if (!Number.isFinite(amt) || amt <= 0) {
-      toast.error("Introdu o sumă validă.");
+      toast.error(t("vendor.bookingsPage.toastInvalidAmount"));
       return;
     }
     setBusy(proposeDialog.id);
@@ -380,16 +381,16 @@ export default function VendorBookingsPage() {
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut trimite oferta");
+        toast.error(t("vendor.bookingsPage.toastOfferError"));
         return;
       }
-      toast.success("Ofertă trimisă clientului");
+      toast.success(t("vendor.bookingsPage.toastOfferSent"));
       setProposeDialog(null);
       setProposeAmount("");
       setProposeMessage("");
       await refreshBookings();
     } catch {
-      toast.error("Eroare la trimitere");
+      toast.error(t("booking.card.sendError"));
     } finally {
       setBusy(null);
     }
@@ -439,7 +440,7 @@ export default function VendorBookingsPage() {
     if (!messageDialog) return;
     const msg = messageText.trim();
     if (!msg) {
-      toast.error("Scrie un mesaj înainte să trimiți.");
+      toast.error(t("vendor.bookingsPage.toastEmptyMessage"));
       return;
     }
     setMessageSending(true);
@@ -453,10 +454,10 @@ export default function VendorBookingsPage() {
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut trimite mesajul");
+        toast.error(t("vendor.bookingsPage.toastMessageError"));
         return;
       }
-      toast.success("Mesaj trimis");
+      toast.success(t("vendor.bookingsPage.toastMessageSent"));
       setMessageText("");
       // Refresh history in-place so the just-sent message appears instantly.
       const r = await fetch(
@@ -470,7 +471,7 @@ export default function VendorBookingsPage() {
         }));
       }
     } catch {
-      toast.error("Eroare la trimitere");
+      toast.error(t("booking.card.sendError"));
     } finally {
       setMessageSending(false);
     }
@@ -500,13 +501,13 @@ export default function VendorBookingsPage() {
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut trimite mesajul");
+        toast.error(t("vendor.bookingsPage.toastMessageError"));
         return;
       }
       setNewMsg((prev) => ({ ...prev, [bookingId]: "" }));
       await loadChat(bookingId);
     } catch {
-      toast.error("Eroare la trimiterea mesajului");
+      toast.error(t("vendor.bookingsPage.toastMessageFailed"));
     }
   }
 
@@ -560,23 +561,23 @@ export default function VendorBookingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Rezervări</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("vendor.bookings")}</h1>
         <p className="text-sm text-muted-foreground">
-          {bookings.length} {bookings.length === 1 ? "rezervare" : "rezervări"}
+          {t(bookings.length === 1 ? "vendor.bookingsPage.countOne" : "vendor.bookingsPage.countMany", { count: bookings.length })}
         </p>
       </div>
 
       {bookings.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            Nu aveți încă nicio rezervare.
+            {t("vendor.bookingsPage.emptyAll")}
           </CardContent>
         </Card>
       ) : (
         <Tabs defaultValue="active">
           <TabsList>
             <TabsTrigger value="active" className="gap-1.5">
-              Active
+              {t("vendor.bookingsPage.tabActive")}
               {activeBookings.length > 0 && (
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-gold/20 px-1 text-[10px] font-bold text-gold">
                   {activeBookings.length}
@@ -584,7 +585,7 @@ export default function VendorBookingsPage() {
               )}
             </TabsTrigger>
             <TabsTrigger value="accepted" className="gap-1.5">
-              Acceptate
+              {t("vendor.bookingsPage.tabAccepted")}
               {acceptedBookings.length > 0 && (
                 <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500/20 px-1 text-[10px] font-bold text-emerald-400">
                   {acceptedBookings.length}
@@ -592,7 +593,7 @@ export default function VendorBookingsPage() {
               )}
             </TabsTrigger>
             <TabsTrigger value="past">
-              Trecute ({pastBookings.length})
+              {t("vendor.bookingsPage.tabPast", { count: pastBookings.length })}
             </TabsTrigger>
           </TabsList>
 
@@ -605,10 +606,10 @@ export default function VendorBookingsPage() {
                   : pastBookings;
             const emptyMessage =
               tabKey === "active"
-                ? "Nu aveți cereri noi de aprobat."
+                ? t("vendor.bookingsPage.emptyActive")
                 : tabKey === "accepted"
-                  ? "Nu aveți rezervări acceptate."
-                  : "Nu aveți rezervări trecute.";
+                  ? t("vendor.bookingsPage.emptyAccepted")
+                  : t("vendor.bookingsPage.emptyPast");
             return (
               <TabsContent key={tabKey} value={tabKey} className="mt-4">
                 {list.length === 0 ? (
@@ -641,7 +642,7 @@ export default function VendorBookingsPage() {
               const dateBookings = groups.get(dateKey) ?? [];
               const headerLabel =
                 dateKey === "fără-dată"
-                  ? "Fără dată stabilită"
+                  ? t("vendor.bookingsPage.noDateSet")
                   : new Date(dateKey + "T00:00:00").toLocaleDateString("ro-MD", {
                       weekday: "long",
                       day: "numeric",
@@ -655,8 +656,7 @@ export default function VendorBookingsPage() {
                       {headerLabel}
                     </h3>
                     <span className="text-xs text-muted-foreground">
-                      {dateBookings.length} cere
-                      {dateBookings.length === 1 ? "re" : "ri"}
+                      {t(dateBookings.length === 1 ? "vendor.bookingsPage.requestCountOne" : "vendor.bookingsPage.requestCountMany", { count: dateBookings.length })}
                     </span>
                   </div>
                   {dateBookings.map((booking) => {
@@ -694,14 +694,14 @@ export default function VendorBookingsPage() {
                               "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold",
                               leadScore.className,
                             )}
-                            title={`Lead Score: ${leadScore.label}`}
+                            title={t("vendor.bookingsPage.leadScoreTitle", { label: t(leadScore.labelKey) })}
                           >
                             <span aria-hidden>{leadScore.emoji}</span>
-                            {leadScore.label}
+                            {t(leadScore.labelKey)}
                           </span>
                         )}
                         <span className="font-heading font-bold">
-                          {eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment"}
+                          {eventTypeKey ? eventTypeLabel(eventTypeKey) : t("vendor.bookingsPage.eventFallback")}
                         </span>
                         {(() => {
                           const offers = booking.priceOffers ?? [];
@@ -711,18 +711,18 @@ export default function VendorBookingsPage() {
                           if (waitingForClient) {
                             return (
                               <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/40 bg-amber-500/10">
-                                ⏳ Așteptăm răspunsul clientului
+                                {t("vendor.bookingsPage.waitingClientBadge")}
                               </Badge>
                             );
                           }
                           if (clientCounter) {
                             return (
                               <Badge variant="outline" className="text-xs text-blue-400 border-blue-500/40 bg-blue-500/10">
-                                💰 Contraofertă client
+                                {t("vendor.bookingsPage.clientCounterBadge")}
                               </Badge>
                             );
                           }
-                          return <Badge variant="outline" className={cn("text-xs", cfg.color)}>{cfg.label}</Badge>;
+                          return <Badge variant="outline" className={cn("text-xs", cfg.color)}>{t(cfg.labelKey)}</Badge>;
                         })()}
                         {(() => {
                           const offers = booking.priceOffers ?? [];
@@ -735,7 +735,7 @@ export default function VendorBookingsPage() {
                               {displayPrice}€
                               {lastOffer && (
                                 <span className="opacity-70 font-normal">
-                                  ({lastOffer.from === "artist" ? "tu" : "client"})
+                                  ({lastOffer.from === "artist" ? t("vendor.bookingsPage.youLower") : t("vendor.bookingsPage.clientLower")})
                                 </span>
                               )}
                             </span>
@@ -751,7 +751,7 @@ export default function VendorBookingsPage() {
                           </span>
                         )}
                         <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" /> {booking.clientName}</span>
-                        {booking.guestCount != null && <span>{booking.guestCount} invitați</span>}
+                        {booking.guestCount != null && <span>{booking.guestCount} {t("common.guests")}</span>}
                       </div>
                       {booking.linkedVenue && (
                         <a
@@ -760,7 +760,7 @@ export default function VendorBookingsPage() {
                           rel="noopener"
                           className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-xs text-blue-300 hover:bg-blue-500/20"
                         >
-                          📍 Eveniment la{" "}
+                          {t("vendor.bookingsPage.eventAt")}{" "}
                           <strong className="underline">
                             {booking.linkedVenue.nameRo}
                           </strong>
@@ -776,7 +776,7 @@ export default function VendorBookingsPage() {
 
                     <div className="flex shrink-0 flex-col items-end gap-2">
                       <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Primită</p>
+                        <p className="text-xs text-muted-foreground">{t("vendor.bookingsPage.receivedLabel")}</p>
                         <p className="text-xs text-muted-foreground">{formatDate(booking.createdAt)}</p>
                       </div>
                       {booking.status === "completed" && (
@@ -791,7 +791,7 @@ export default function VendorBookingsPage() {
                           ) : (
                             <Star className="h-4 w-4" />
                           )}
-                          {reviewDone ? "Invitație trimisă" : "Cere recenzie"}
+                          {reviewDone ? t("vendor.bookingsPage.reviewSent") : t("vendor.bookingsPage.requestReview")}
                         </Button>
                       )}
                     </div>
@@ -809,7 +809,7 @@ export default function VendorBookingsPage() {
                         {offers.length > 0 && (
                           <div className="rounded-md border border-border/30 bg-background/40 p-2">
                             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                              Istoric oferte
+                              {t("vendor.bookingsPage.offerHistory")}
                             </p>
                             <div className="space-y-1">
                               {offers.map((o, i) => (
@@ -826,7 +826,7 @@ export default function VendorBookingsPage() {
                                     )}
                                   />
                                   <span className="text-muted-foreground">
-                                    {o.from === "artist" ? "Tu" : "Client"}:
+                                    {o.from === "artist" ? t("vendor.bookingsPage.you") : t("vendor.bookingsPage.client")}:
                                   </span>
                                   <span className="font-bold text-gold">
                                     {o.amount}€
@@ -845,7 +845,7 @@ export default function VendorBookingsPage() {
                         {waitingForClient ? (
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-xs text-amber-500 italic">
-                              ⏳ Ai trimis oferta de {lastOffer?.amount}€ — așteptăm răspunsul clientului. Poți doar să trimiți un mesaj sau să retragi oferta cu un nou preț.
+                              {t("vendor.bookingsPage.waitingClientHint", { amount: lastOffer?.amount ?? "" })}
                             </p>
                             <Button
                               size="sm"
@@ -855,7 +855,7 @@ export default function VendorBookingsPage() {
                               className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10"
                             >
                               <MessageSquare className="h-3.5 w-3.5" />
-                              Trimite mesaj
+                              {t("vendor.bookingsPage.sendMessage")}
                             </Button>
                           </div>
                         ) : (
@@ -870,7 +870,7 @@ export default function VendorBookingsPage() {
                               className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
                             >
                               <CheckCircle className="h-3.5 w-3.5" />
-                              {lastOffer?.from === "client" ? `Acceptă ${lastOffer.amount}€` : "Acceptă"}
+                              {lastOffer?.from === "client" ? t("vendor.bookingsPage.acceptAmount", { amount: lastOffer.amount }) : t("vendor.bookingsPage.accept")}
                             </Button>
                             <Button
                               size="sm"
@@ -886,7 +886,7 @@ export default function VendorBookingsPage() {
                               className="gap-1.5"
                             >
                               <ArrowLeftRight className="h-3.5 w-3.5" />
-                              Propune preț
+                              {t("vendor.bookingsPage.proposePrice")}
                             </Button>
                             <Button
                               size="sm"
@@ -896,7 +896,7 @@ export default function VendorBookingsPage() {
                               className="gap-1.5 border-gold/40 text-gold hover:bg-gold/10"
                             >
                               <MessageSquare className="h-3.5 w-3.5" />
-                              Trimite mesaj
+                              {t("vendor.bookingsPage.sendMessage")}
                             </Button>
                             <Button
                               size="sm"
@@ -909,7 +909,7 @@ export default function VendorBookingsPage() {
                               className="gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10"
                             >
                               <XCircle className="h-3.5 w-3.5" />
-                              Refuză
+                              {t("vendor.bookingsPage.reject")}
                             </Button>
                           </div>
                         )}
@@ -927,7 +927,9 @@ export default function VendorBookingsPage() {
                         className="gap-1"
                       >
                         <MessageSquare className="h-3.5 w-3.5" />
-                        {isExpanded ? "Ascunde chat" : `Chat (${chatMessages.length || "deschide"})`}
+                        {isExpanded
+                          ? t("vendor.bookingsPage.hideChat")
+                          : t("vendor.bookingsPage.chatCount", { count: chatMessages.length || t("vendor.bookingsPage.chatOpen") })}
                       </Button>
                       <Button
                         size="sm"
@@ -935,7 +937,7 @@ export default function VendorBookingsPage() {
                         onClick={() => handleComplete(booking.id)}
                         className="gap-1 bg-emerald-600 text-white hover:bg-emerald-700"
                       >
-                        <CheckCircle className="h-3.5 w-3.5" /> Finalizat
+                        <CheckCircle className="h-3.5 w-3.5" /> {t("vendor.bookingsPage.status.completed")}
                       </Button>
                       <Button
                         size="sm"
@@ -947,7 +949,7 @@ export default function VendorBookingsPage() {
                         }}
                         className="gap-1 border-red-500/40 text-red-400 hover:bg-red-500/10"
                       >
-                        <Ban className="h-3.5 w-3.5" /> Anulează
+                        <Ban className="h-3.5 w-3.5" /> {t("common.cancel")}
                       </Button>
                       </div>
 
@@ -955,7 +957,7 @@ export default function VendorBookingsPage() {
                         <div className="space-y-2 rounded-lg border border-border/40 bg-background/50 p-3">
                           <div className="max-h-64 space-y-2 overflow-y-auto">
                             {chatMessages.length === 0 ? (
-                              <p className="py-4 text-center text-xs text-muted-foreground">Niciun mesaj încă.</p>
+                              <p className="py-4 text-center text-xs text-muted-foreground">{t("vendor.bookingsPage.noMessagesYet")}</p>
                             ) : (
                               chatMessages.map((m) => (
                                 <div
@@ -980,12 +982,12 @@ export default function VendorBookingsPage() {
                               type="text"
                               value={newMsg[booking.id] || ""}
                               onChange={(e) => setNewMsg((p) => ({ ...p, [booking.id]: e.target.value }))}
-                              placeholder="Scrie un mesaj..."
+                              placeholder={t("aiChat.placeholder")}
                               className="flex-1 rounded-md border border-border/40 bg-background px-3 py-1.5 text-sm"
                               onKeyDown={(e) => { if (e.key === "Enter") sendMessage(booking.id); }}
                             />
                             <Button size="sm" onClick={() => sendMessage(booking.id)} className="gap-1">
-                              <Send className="h-3.5 w-3.5" /> Trimite
+                              <Send className="h-3.5 w-3.5" /> {t("common.submit")}
                             </Button>
                           </div>
                         </div>
@@ -1015,28 +1017,28 @@ export default function VendorBookingsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirmă acceptarea</DialogTitle>
+            <DialogTitle>{t("vendor.bookingsPage.confirmAcceptTitle")}</DialogTitle>
           </DialogHeader>
           {acceptDialog && (
             <div className="space-y-3 py-2">
               <div className="rounded-lg border border-border/40 bg-background/60 p-3 text-sm">
                 <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5">
-                  <span className="text-muted-foreground">Client:</span>
+                  <span className="text-muted-foreground">{t("vendor.bookingsPage.clientLabel")}</span>
                   <span className="font-medium">{acceptDialog.clientName}</span>
 
-                  <span className="text-muted-foreground">Eveniment:</span>
+                  <span className="text-muted-foreground">{t("vendor.bookingsPage.eventLabel")}</span>
                   <span>
                     {acceptDialog.eventType
                       ? eventTypeLabel(normalizeEventType(acceptDialog.eventType))
                       : "—"}
                   </span>
 
-                  <span className="text-muted-foreground">Data:</span>
+                  <span className="text-muted-foreground">{t("booking.card.dateLabel")}</span>
                   <span>{formatDate(acceptDialog.eventDate)}</span>
 
                   {acceptDialog.startTime && acceptDialog.endTime && (
                     <>
-                      <span className="text-muted-foreground">Interval:</span>
+                      <span className="text-muted-foreground">{t("vendor.bookingsPage.intervalLabel")}</span>
                       <span className="font-medium text-gold">
                         {acceptDialog.startTime}–{acceptDialog.endTime}
                       </span>
@@ -1045,7 +1047,7 @@ export default function VendorBookingsPage() {
 
                   {acceptDialog.guestCount != null && (
                     <>
-                      <span className="text-muted-foreground">Invitați:</span>
+                      <span className="text-muted-foreground">{t("booking.card.guestsLabel")}</span>
                       <span>{acceptDialog.guestCount}</span>
                     </>
                   )}
@@ -1053,7 +1055,7 @@ export default function VendorBookingsPage() {
                   {acceptDialog.agreedPrice != null &&
                     acceptDialog.agreedPrice > 0 && (
                       <>
-                        <span className="text-muted-foreground">Preț:</span>
+                        <span className="text-muted-foreground">{t("vendor.bookingsPage.priceLabel")}</span>
                         <span className="font-heading text-base font-bold text-gold">
                           {acceptDialog.agreedPrice}€
                         </span>
@@ -1069,14 +1071,14 @@ export default function VendorBookingsPage() {
               </div>
 
               <div>
-                <Label htmlFor="accept-reply">Mesaj pentru client</Label>
+                <Label htmlFor="accept-reply">{t("vendor.bookingsPage.messageForClient")}</Label>
                 <Textarea
                   id="accept-reply"
                   value={acceptReply}
                   onChange={(e) => setAcceptReply(e.target.value)}
                   rows={3}
                   className="mt-1"
-                  placeholder="Mulțumesc pentru rezervare! Accept cu plăcere."
+                  placeholder={t("vendor.bookingsPage.acceptReplyPlaceholder")}
                 />
               </div>
             </div>
@@ -1087,7 +1089,7 @@ export default function VendorBookingsPage() {
               onClick={() => setAcceptDialog(null)}
               disabled={busy === acceptDialog?.id}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={confirmAccept}
@@ -1099,7 +1101,7 @@ export default function VendorBookingsPage() {
               ) : (
                 <CheckCircle className="h-4 w-4" />
               )}
-              Confirmă acceptarea
+              {t("vendor.bookingsPage.confirmAcceptTitle")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1112,20 +1114,20 @@ export default function VendorBookingsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Propune un alt preț</DialogTitle>
+            <DialogTitle>{t("vendor.bookingsPage.proposeTitle")}</DialogTitle>
           </DialogHeader>
           {proposeDialog && (
             <div className="space-y-4 py-2">
               <div className="rounded-lg border border-border/40 bg-background/60 p-3 text-xs text-muted-foreground">
-                Preț cerut de client:{" "}
+                {t("vendor.bookingsPage.priceRequestedByClient")}{" "}
                 <span className="font-bold text-gold">
                   {proposeDialog.agreedPrice
                     ? `${proposeDialog.agreedPrice}€`
-                    : "neprecizat"}
+                    : t("vendor.bookingsPage.unspecifiedPrice")}
                 </span>
                 {proposeDialog.startTime && proposeDialog.endTime && (
                   <>
-                    {" · "}Interval:{" "}
+                    {" · "}{t("vendor.bookingsPage.intervalLabel")}{" "}
                     <span className="font-medium text-foreground">
                       {proposeDialog.startTime}–{proposeDialog.endTime}
                     </span>
@@ -1133,7 +1135,7 @@ export default function VendorBookingsPage() {
                 )}
               </div>
               <div>
-                <Label htmlFor="propose-amount">Sumă propusă (€)</Label>
+                <Label htmlFor="propose-amount">{t("vendor.bookingsPage.proposedAmount")}</Label>
                 <Input
                   id="propose-amount"
                   type="number"
@@ -1141,18 +1143,18 @@ export default function VendorBookingsPage() {
                   value={proposeAmount}
                   onChange={(e) => setProposeAmount(e.target.value)}
                   className="mt-1"
-                  placeholder="Ex: 250"
+                  placeholder={t("vendor.bookingsPage.proposedAmountPlaceholder")}
                 />
               </div>
               <div>
-                <Label htmlFor="propose-msg">Mesaj (opțional)</Label>
+                <Label htmlFor="propose-msg">{t("booking.card.messageOptional")}</Label>
                 <Textarea
                   id="propose-msg"
                   value={proposeMessage}
                   onChange={(e) => setProposeMessage(e.target.value)}
                   rows={2}
                   className="mt-1"
-                  placeholder="Ex: Prețul include 2 ore + echipament."
+                  placeholder={t("vendor.bookingsPage.proposeMessagePlaceholder")}
                 />
               </div>
             </div>
@@ -1163,7 +1165,7 @@ export default function VendorBookingsPage() {
               onClick={() => setProposeDialog(null)}
               disabled={busy === proposeDialog?.id}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={confirmPropose}
@@ -1175,7 +1177,7 @@ export default function VendorBookingsPage() {
               ) : (
                 <ArrowLeftRight className="h-4 w-4" />
               )}
-              Trimite oferta
+              {t("vendor.bookingsPage.sendOffer")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1189,7 +1191,7 @@ export default function VendorBookingsPage() {
         <DialogContent className="max-h-[90dvh] max-w-lg overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Mesaj către {messageDialog?.clientName ?? "client"}
+              {t("vendor.bookingsPage.messageTo", { name: messageDialog?.clientName ?? t("vendor.bookingsPage.clientLower") })}
             </DialogTitle>
           </DialogHeader>
           {messageDialog && (
@@ -1221,7 +1223,7 @@ export default function VendorBookingsPage() {
               <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-border/30 bg-background/30 p-2 sm:max-h-64">
                 {(chats[messageDialog.id] || []).length === 0 ? (
                   <p className="py-6 text-center text-xs text-muted-foreground">
-                    Niciun mesaj încă. Scrie primul mesaj clientului.
+                    {t("vendor.bookingsPage.noMessagesYetLong")}
                   </p>
                 ) : (
                   (chats[messageDialog.id] || []).map((m) => (
@@ -1254,14 +1256,14 @@ export default function VendorBookingsPage() {
 
               {/* Composer */}
               <div>
-                <Label htmlFor="msg-compose">Scrie un mesaj</Label>
+                <Label htmlFor="msg-compose">{t("vendor.bookingsPage.composeLabel")}</Label>
                 <Textarea
                   id="msg-compose"
                   value={messageText}
                   onChange={(e) => setMessageText(e.target.value)}
                   rows={3}
                   className="mt-1"
-                  placeholder="Ex: Bună! Aș putea afla mai multe despre eveniment…"
+                  placeholder={t("vendor.bookingsPage.composePlaceholder")}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                       e.preventDefault();
@@ -1270,7 +1272,7 @@ export default function VendorBookingsPage() {
                   }}
                 />
                 <p className="mt-1 text-[10px] text-muted-foreground">
-                  Apasă ⌘/Ctrl + Enter pentru a trimite
+                  {t("vendor.bookingsPage.sendShortcutHint")}
                 </p>
               </div>
             </div>
@@ -1281,7 +1283,7 @@ export default function VendorBookingsPage() {
               onClick={() => setMessageDialog(null)}
               disabled={messageSending}
             >
-              Închide
+              {t("common.close")}
             </Button>
             <Button
               onClick={sendMessageFromDialog}
@@ -1293,7 +1295,7 @@ export default function VendorBookingsPage() {
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Trimite
+              {t("common.submit")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1306,24 +1308,24 @@ export default function VendorBookingsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Anulează rezervare confirmată</DialogTitle>
+            <DialogTitle>{t("vendor.bookingsPage.cancelConfirmedTitle")}</DialogTitle>
           </DialogHeader>
           {cancelDialog && (
             <div className="space-y-3 py-2">
               <div className="rounded-lg border border-red-500/30 bg-red-500/5 p-3 text-xs text-muted-foreground">
-                Ziua <strong>{formatDate(cancelDialog.eventDate)}</strong> se va
-                debloca în calendarul tău și clientul va fi notificat prin email.
-                Folosește doar în caz de urgență (boală, forță majoră).
+                {t("vendor.bookingsPage.cancelWarnBefore")}{" "}
+                <strong>{formatDate(cancelDialog.eventDate)}</strong>{" "}
+                {t("vendor.bookingsPage.cancelWarnAfter")}
               </div>
               <div>
-                <Label htmlFor="artist-cancel-reason">Motiv pentru client</Label>
+                <Label htmlFor="artist-cancel-reason">{t("vendor.bookingsPage.reasonForClient")}</Label>
                 <Textarea
                   id="artist-cancel-reason"
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
                   rows={3}
                   className="mt-1"
-                  placeholder="Ne pare rău, am o urgență și nu pot ajunge..."
+                  placeholder={t("vendor.bookingsPage.cancelReasonPlaceholder")}
                 />
               </div>
             </div>
@@ -1334,7 +1336,7 @@ export default function VendorBookingsPage() {
               onClick={() => setCancelDialog(null)}
               disabled={busy === cancelDialog?.id}
             >
-              Înapoi
+              {t("common.back")}
             </Button>
             <Button
               onClick={confirmVendorCancel}
@@ -1347,7 +1349,7 @@ export default function VendorBookingsPage() {
               ) : (
                 <Ban className="h-4 w-4" />
               )}
-              Anulează rezervarea
+              {t("vendor.bookingsPage.cancelBooking")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1360,26 +1362,26 @@ export default function VendorBookingsPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Refuză rezervarea</DialogTitle>
+            <DialogTitle>{t("vendor.bookingsPage.rejectBooking")}</DialogTitle>
           </DialogHeader>
           {rejectDialog && (
             <div className="space-y-3 py-2">
               <p className="text-sm text-muted-foreground">
-                Clientul{" "}
+                {t("vendor.bookingsPage.rejectNoticeBefore")}{" "}
                 <span className="font-medium text-foreground">
                   {rejectDialog.clientName}
                 </span>{" "}
-                va fi notificat că cererea a fost refuzată.
+                {t("vendor.bookingsPage.rejectNoticeAfter")}
               </p>
               <div>
-                <Label htmlFor="reject-reply">Motiv pentru client</Label>
+                <Label htmlFor="reject-reply">{t("vendor.bookingsPage.reasonForClient")}</Label>
                 <Textarea
                   id="reject-reply"
                   value={rejectReply}
                   onChange={(e) => setRejectReply(e.target.value)}
                   rows={3}
                   className="mt-1"
-                  placeholder="Ne pare rău, nu sunt disponibil la data respectivă."
+                  placeholder={t("vendor.bookingsPage.defaultRejectReply")}
                 />
               </div>
             </div>
@@ -1390,7 +1392,7 @@ export default function VendorBookingsPage() {
               onClick={() => setRejectDialog(null)}
               disabled={busy === rejectDialog?.id}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={confirmReject}
@@ -1402,7 +1404,7 @@ export default function VendorBookingsPage() {
               ) : (
                 <XCircle className="h-4 w-4" />
               )}
-              Refuză rezervarea
+              {t("vendor.bookingsPage.rejectBooking")}
             </Button>
           </DialogFooter>
         </DialogContent>

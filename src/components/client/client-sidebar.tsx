@@ -189,6 +189,7 @@ function NavBody({
 }
 
 export function ClientSidebar() {
+  const { t } = useLocale();
   const pathname = usePathname();
   const [activePlans, setActivePlans] = useState<PlanSummary[]>([]);
   const [archivedCount, setArchivedCount] = useState(0);
@@ -234,7 +235,7 @@ export function ClientSidebar() {
       <button
         type="button"
         onClick={() => setMobileOpen(true)}
-        aria-label="Deschide meniul"
+        aria-label={t("header.openMenu")}
         className="fixed left-3 top-3 z-40 flex h-10 w-10 items-center justify-center rounded-lg border border-border/40 bg-background/90 backdrop-blur-sm text-foreground shadow-sm lg:hidden"
       >
         <Menu className="h-5 w-5" />
@@ -263,7 +264,7 @@ export function ClientSidebar() {
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
-                aria-label="Închide meniul"
+                aria-label={t("header.closeMenu")}
                 className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent/50"
               >
                 <X className="h-4 w-4" />

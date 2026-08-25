@@ -36,6 +36,7 @@ import { ReferralCard } from "@/components/shared/referral-card";
 import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
 import { NotificationSoundToggle } from "@/components/shared/notification-sound-toggle";
 import { TimezoneSelector } from "@/components/shared/timezone-selector";
+import { useLocale } from "@/hooks/use-locale";
 
 type ArtistSettings = {
   kind: "artist";
@@ -65,6 +66,7 @@ const DEFAULT_AUTO_REPLY =
   "Mulțumim pentru cerere! Am primit-o și revin cu un răspuns în cel mai scurt timp posibil.";
 
 export default function VendorSettingsPage() {
+  const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState<Loaded>({ kind: "none" });
@@ -120,7 +122,7 @@ export default function VendorSettingsPage() {
         }
       } catch {
         if (!cancelled) {
-          toast.error("Nu am putut încărca setările");
+          toast.error(t("vendor.settings.errLoad"));
           setLoading(false);
         }
       }
@@ -132,7 +134,7 @@ export default function VendorSettingsPage() {
 
   async function handleSave() {
     if (state.kind === "none") {
-      toast.error("Profil indisponibil");
+      toast.error(t("vendor.settings.errNoProfile"));
       return;
     }
     setSaving(true);
@@ -173,10 +175,10 @@ export default function VendorSettingsPage() {
           throw new Error(err.error || "Save failed");
         }
       }
-      toast.success("Setările au fost salvate!");
+      toast.success(t("vendor.settings.saved"));
     } catch (e) {
       toast.error(
-        e instanceof Error ? e.message : "Eroare la salvarea setărilor",
+        e instanceof Error ? e.message : t("vendor.settings.errSave"),
       );
     } finally {
       setSaving(false);
@@ -195,17 +197,19 @@ export default function VendorSettingsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Setări</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("vendor.settings.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Configurează comportamentul contului tău
+            {t("vendor.settings.subtitleNone")}
           </p>
         </div>
         <Card>
           <CardContent className="flex flex-col items-center py-16 text-center text-muted-foreground">
             <SettingsIcon className="mb-3 h-10 w-10" />
-            <p>Nu ai încă un profil de artist sau sală.</p>
+            <p>{t("vendor.settings.emptyTitle")}</p>
             <p className="mt-1 text-xs">
-              Completează onboarding-ul pentru a accesa setările.
+              {t("vendor.settings.emptyHint")}
             </p>
           </CardContent>
         </Card>
@@ -217,11 +221,13 @@ export default function VendorSettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Setări</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("vendor.settings.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {state.kind === "artist"
-              ? "Calendar, buffer, răspuns automat"
-              : "Calendar disponibilitate"}
+              ? t("vendor.settings.subtitleArtist")
+              : t("vendor.settings.subtitleVenue")}
           </p>
         </div>
         <Button
@@ -234,20 +240,20 @@ export default function VendorSettingsPage() {
           ) : (
             <Save className="h-4 w-4" />
           )}
-          Salvează
+          {t("common.save")}
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Calendar</CardTitle>
+          <CardTitle>{t("vendor.calendar")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <Label>Calendar activ</Label>
+              <Label>{t("vendor.settings.calendarEnabled")}</Label>
               <p className="text-xs text-muted-foreground">
-                Afișează calendarul de disponibilitate pe profilul public.
+                {t("vendor.settings.calendarEnabledHint")}
               </p>
             </div>
             <Switch
@@ -269,11 +275,9 @@ export default function VendorSettingsPage() {
           {(state.kind === "artist" || state.kind === "venue") && (
             <div className="flex items-center justify-between">
               <div>
-                <Label>Buffer între evenimente</Label>
+                <Label>{t("vendor.settings.buffer")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Pauză minimă între două rezervări consecutive. Dacă un
-                  eveniment se termină la 16:00 și ai 15 min buffer, clienții
-                  văd următorul slot disponibil de la 16:15.
+                  {t("vendor.settings.bufferHint")}
                 </p>
               </div>
               <select
@@ -304,19 +308,17 @@ export default function VendorSettingsPage() {
       {state.kind === "artist" && (
         <Card>
           <CardHeader>
-            <CardTitle>Locație și deplasare</CardTitle>
+            <CardTitle>{t("vendor.settings.travelTitle")}</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Stabilește orașul de bază și distanța maximă la care te deplasezi.
-              Clienții care planifică evenimente în afara razei tale nu te vor
-              vedea în rezultate.
+              {t("vendor.settings.travelHint")}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
-                <Label>Orașul de bază</Label>
+                <Label>{t("vendor.settings.baseCity")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Punctul de pornire pentru calculul distanței.
+                  {t("vendor.settings.baseCityHint")}
                 </p>
               </div>
               <select
@@ -339,9 +341,9 @@ export default function VendorSettingsPage() {
             </div>
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
-                <Label>Distanța maximă de deplasare</Label>
+                <Label>{t("vendor.settings.maxDistance")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Cât de departe ești dispus să mergi pentru un eveniment.
+                  {t("vendor.settings.maxDistanceHint")}
                 </p>
               </div>
               <select
@@ -364,10 +366,9 @@ export default function VendorSettingsPage() {
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label>Plată suplimentară pentru deplasare</Label>
+                <Label>{t("vendor.settings.travelFee")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Activează dacă percepi o sumă fixă pentru evenimente în afara
-                  orașului de bază.
+                  {t("vendor.settings.travelFeeHint")}
                 </p>
               </div>
               <Switch
@@ -383,7 +384,9 @@ export default function VendorSettingsPage() {
             </div>
             {state.travelSurchargeEnabled && (
               <div className="flex items-center justify-between gap-4">
-                <Label className="flex-1">Sumă deplasare (€)</Label>
+                <Label className="flex-1">
+                  {t("vendor.settings.travelAmount")}
+                </Label>
                 <Input
                   type="number"
                   min={0}
@@ -402,7 +405,7 @@ export default function VendorSettingsPage() {
                     )
                   }
                   className="w-32"
-                  placeholder="ex: 100"
+                  placeholder={t("vendor.settings.travelAmountPlaceholder")}
                 />
               </div>
             )}
@@ -416,19 +419,17 @@ export default function VendorSettingsPage() {
       {state.kind === "artist" && (
         <Card>
           <CardHeader>
-            <CardTitle>Preț public</CardTitle>
+            <CardTitle>{t("vendor.settings.publicPrice")}</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Controlează cum este afișat tariful tău pe profilul public.
+              {t("vendor.settings.publicPriceHint")}
             </p>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <Label>Nu indica prețul public</Label>
+                <Label>{t("vendor.settings.hidePrice")}</Label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Clientul va vedea „Preț la cerere” și va trebui să-ți scrie
-                  pentru ofertă personalizată. Util când tariful depinde de
-                  durata, locația sau tipul evenimentului.
+                  {t("vendor.settings.hidePriceHint")}
                 </p>
               </div>
               <Switch
@@ -453,18 +454,17 @@ export default function VendorSettingsPage() {
       {state.kind === "artist" && (
         <Card>
           <CardHeader>
-            <CardTitle>Răspuns automat</CardTitle>
+            <CardTitle>{t("vendor.settings.autoReply")}</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Trimite instant un email clientului când lasă o cerere, ca să
-              știe că ai primit-o.
+              {t("vendor.settings.autoReplyHint")}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Activează răspunsul automat</Label>
+                <Label>{t("vendor.settings.autoReplyEnable")}</Label>
                 <p className="text-xs text-muted-foreground">
-                  Doar clienții care lasă email vor primi mesajul.
+                  {t("vendor.settings.autoReplyEnableHint")}
                 </p>
               </div>
               <Switch
@@ -480,7 +480,7 @@ export default function VendorSettingsPage() {
             </div>
             {state.autoReplyEnabled && (
               <div>
-                <Label>Mesajul tău</Label>
+                <Label>{t("vendor.settings.autoReplyMessage")}</Label>
                 <textarea
                   value={state.autoReplyMessage}
                   onChange={(e) =>
@@ -493,11 +493,10 @@ export default function VendorSettingsPage() {
                   rows={5}
                   maxLength={500}
                   className="mt-2 w-full rounded-md border border-border/40 bg-background px-3 py-2 text-sm"
-                  placeholder="Ex: Mulțumim pentru cerere! Revin în maxim 2 ore..."
+                  placeholder={t("vendor.settings.autoReplyPlaceholder")}
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Max. 500 caractere. Mesajul este inserat într-un email cu
-                  branding ePetrecere.
+                  {t("vendor.settings.autoReplyLimit")}
                 </p>
               </div>
             )}
@@ -511,11 +510,10 @@ export default function VendorSettingsPage() {
       <div className="space-y-4 rounded-xl border border-border/40 bg-card p-5">
         <div>
           <h2 className="font-heading text-lg font-bold">
-            Notificări & fus orar
+            {t("vendor.settings.notificationsTitle")}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Controlează pe ce canal primești fiecare tip de notificare și
-            formatează orele conform fusului tău.
+            {t("vendor.settings.notificationsHint")}
           </p>
         </div>
         <TimezoneSelector />

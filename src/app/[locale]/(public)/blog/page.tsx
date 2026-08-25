@@ -66,7 +66,7 @@ export default async function BlogListingPage({
   const [featured, ...remaining] = posts;
   const crumbs = breadcrumbJsonLd([
     { name: t("nav.home", locale), url: "/" },
-    { name: "Blog", url: "/blog" },
+    { name: t("nav.blog", locale), url: "/blog" },
   ]);
 
   return (

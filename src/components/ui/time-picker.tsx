@@ -16,6 +16,7 @@ import {
 import { createPortal } from "react-dom";
 import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 export interface TimePickerProps {
   value: string; // "HH:MM" 24-hour, or "" for empty
@@ -85,6 +86,7 @@ export function TimePicker({
   wholeDayBlocked,
   workingHours,
 }: TimePickerProps) {
+  const { t } = useLocale();
   const parsed = parseTime(value);
   const [open, setOpen] = useState(false);
   const [typing, setTyping] = useState(value);
@@ -320,7 +322,7 @@ export function TimePicker({
             "flex-1 select-none font-mono text-sm",
             displayValue ? "text-foreground" : "text-muted-foreground/60",
           )}
-          aria-label="Selector oră"
+          aria-label={t("timePicker.ariaLabel")}
         >
           {displayValue || placeholder}
         </span>
@@ -343,7 +345,7 @@ export function TimePicker({
             <div className="flex items-center justify-between border-b border-border/40 bg-gradient-to-r from-gold/5 to-transparent px-3 py-2.5 text-xs">
               <span className="flex items-center gap-1.5 text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                Alege ora
+                {t("timePicker.chooseTime")}
               </span>
               <span className="rounded-md bg-gold/10 px-2 py-0.5 font-mono text-sm font-bold text-gold">
                 {displayValue || "--:--"}
@@ -351,7 +353,7 @@ export function TimePicker({
             </div>
             <div className="grid grid-cols-2 divide-x divide-border/30">
               <TimeColumn
-                label="Oră"
+                label={t("timePicker.hour")}
                 items={hours}
                 active={parsed?.h}
                 format={pad2}
@@ -360,7 +362,7 @@ export function TimePicker({
                 disabledItems={fullyBookedHours}
               />
               <TimeColumn
-                label="Min"
+                label={t("timePicker.minute")}
                 items={minutes}
                 active={parsed?.m}
                 format={pad2}
@@ -415,22 +417,23 @@ export function TimePicker({
             </div>
             {(bookedRanges?.length ?? 0) > 0 && !wholeDayBlocked && (
               <div className="border-t border-border/30 bg-amber-500/5 px-3 py-1.5 text-[10px] text-amber-600 dark:text-amber-400">
-                Intervale indisponibile: {bookedRanges?.map((r) => `${r.startTime}–${r.endTime}`).join(", ")}
+                {t("timePicker.unavailableRanges")}{" "}
+                {bookedRanges?.map((r) => `${r.startTime}–${r.endTime}`).join(", ")}
               </div>
             )}
             {wholeDayBlocked && (
               <div className="border-t border-border/30 bg-red-500/5 px-3 py-1.5 text-[10px] text-red-600 dark:text-red-400">
-                Această zi este complet indisponibilă.
+                {t("timePicker.dayFullyBlocked")}
               </div>
             )}
             {!wholeDayBlocked && wsWindow.offDay && (
               <div className="border-t border-border/30 bg-red-500/5 px-3 py-1.5 text-[10px] text-red-600 dark:text-red-400">
-                Această zi nu este zi de lucru.
+                {t("timePicker.dayOff")}
               </div>
             )}
             {!wholeDayBlocked && !wsWindow.offDay && workingHours && (
               <div className="border-t border-border/30 bg-emerald-500/5 px-3 py-1.5 text-[10px] text-emerald-600 dark:text-emerald-400">
-                Program: {workingHours.start}–{workingHours.end}
+                {t("calendar.scheduleLabel")} {workingHours.start}–{workingHours.end}
               </div>
             )}
           </div>,

@@ -23,6 +23,7 @@ import {
   PackageOpen,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 // M1 #3 — Vendor packages CRUD page.
 // Lists all packages (including hidden) for the signed-in artist and provides
@@ -69,6 +70,7 @@ const emptyForm: FormState = {
 };
 
 export default function VendorPackagesPage() {
+  const { t } = useLocale();
   const { user, isLoaded } = useUser();
   const [artistId, setArtistId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -108,7 +110,7 @@ export default function VendorPackagesPage() {
         const data = await r.json();
         setPkgs(Array.isArray(data) ? data : []);
       } catch {
-        toast.error("Nu s-au putut încărca pachetele");
+        toast.error(t("vendor.packagesPage.loadError"));
       } finally {
         setLoading(false);
       }
@@ -138,7 +140,7 @@ export default function VendorPackagesPage() {
 
   async function handleSave() {
     if (!form.nameRo.trim()) {
-      toast.error("Numele pachetului (RO) este obligatoriu.");
+      toast.error(t("vendor.packagesPage.nameRequired"));
       return;
     }
     if (artistId == null) return;
@@ -170,7 +172,7 @@ export default function VendorPackagesPage() {
         if (!res.ok) throw new Error();
         const updated = await res.json();
         setPkgs((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
-        toast.success("Pachet actualizat.");
+        toast.success(t("vendor.packagesPage.updated"));
       } else {
         const res = await fetch(`/api/artist-packages`, {
           method: "POST",
@@ -180,25 +182,25 @@ export default function VendorPackagesPage() {
         if (!res.ok) throw new Error();
         const created = await res.json();
         setPkgs((prev) => [...prev, created]);
-        toast.success("Pachet creat.");
+        toast.success(t("vendor.packagesPage.created"));
       }
       setOpen(false);
     } catch {
-      toast.error("Nu am putut salva pachetul.");
+      toast.error(t("vendor.packagesPage.saveError"));
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id: number) {
-    if (!confirm("Sigur ștergi acest pachet?")) return;
+    if (!confirm(t("vendor.packagesPage.deleteConfirm"))) return;
     const res = await fetch(`/api/artist-packages/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      toast.error("Nu am putut șterge pachetul.");
+      toast.error(t("vendor.packagesPage.deleteError"));
       return;
     }
     setPkgs((prev) => prev.filter((p) => p.id !== id));
-    toast.success("Pachet șters.");
+    toast.success(t("vendor.packagesPage.deleted"));
   }
 
   async function toggleVisibility(p: Pkg) {
@@ -208,7 +210,7 @@ export default function VendorPackagesPage() {
       body: JSON.stringify({ isVisible: !p.isVisible }),
     });
     if (!res.ok) {
-      toast.error("Nu am putut actualiza vizibilitatea.");
+      toast.error(t("vendor.packagesPage.visibilityError"));
       return;
     }
     const updated = await res.json();
@@ -227,7 +229,7 @@ export default function VendorPackagesPage() {
     return (
       <Card>
         <CardContent className="py-12 text-center text-sm text-muted-foreground">
-          Nu ești asociat cu niciun profil de artist. Completează onboarding-ul pentru a putea crea pachete.
+          {t("vendor.packagesPage.noArtistProfile")}
         </CardContent>
       </Card>
     );
@@ -237,13 +239,17 @@ export default function VendorPackagesPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Pachete</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("artist.packages")}</h1>
           <p className="text-sm text-muted-foreground">
-            {pkgs.length} {pkgs.length === 1 ? "pachet" : "pachete"} — apar pe profilul tău public în tab-ul &ldquo;Pachete&rdquo;.
+            {pkgs.length}{" "}
+            {pkgs.length === 1
+              ? t("vendor.packagesPage.unitOne")
+              : t("vendor.packagesPage.unitMany")}{" "}
+            {t("vendor.packagesPage.profileHint")}
           </p>
         </div>
         <Button onClick={openCreate} className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
-          <Plus className="h-4 w-4" /> Pachet nou
+          <Plus className="h-4 w-4" /> {t("vendor.packagesPage.newPackage")}
         </Button>
       </div>
 
@@ -251,9 +257,9 @@ export default function VendorPackagesPage() {
         <Card>
           <CardContent className="flex flex-col items-center gap-3 py-16 text-center text-muted-foreground">
             <PackageOpen className="h-10 w-10 text-muted-foreground/60" />
-            <p>Nu ai pachete încă.</p>
+            <p>{t("vendor.packagesPage.empty")}</p>
             <Button size="sm" variant="outline" onClick={openCreate} className="gap-1">
-              <Plus className="h-4 w-4" /> Creează primul pachet
+              <Plus className="h-4 w-4" /> {t("vendor.packagesPage.createFirst")}
             </Button>
           </CardContent>
         </Card>
@@ -279,7 +285,7 @@ export default function VendorPackagesPage() {
                         : "border-border/40 text-muted-foreground"
                     }
                   >
-                    {p.isVisible ? "Vizibil" : "Ascuns"}
+                    {p.isVisible ? t("vendor.packagesPage.visible") : t("vendor.packagesPage.hidden")}
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between gap-2">
@@ -297,7 +303,7 @@ export default function VendorPackagesPage() {
                       variant="ghost"
                       onClick={() => toggleVisibility(p)}
                       className="h-8 w-8 p-0"
-                      aria-label={p.isVisible ? "Ascunde" : "Publică"}
+                      aria-label={p.isVisible ? t("vendor.packagesPage.hide") : t("vendor.packagesPage.publish")}
                     >
                       {p.isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </Button>
@@ -306,7 +312,7 @@ export default function VendorPackagesPage() {
                       variant="ghost"
                       onClick={() => openEdit(p)}
                       className="h-8 w-8 p-0"
-                      aria-label="Editează"
+                      aria-label={t("common.edit")}
                     >
                       <Pencil className="h-4 w-4" />
                     </Button>
@@ -315,7 +321,7 @@ export default function VendorPackagesPage() {
                       variant="ghost"
                       onClick={() => handleDelete(p.id)}
                       className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                      aria-label="Șterge"
+                      aria-label={t("common.delete")}
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -330,28 +336,32 @@ export default function VendorPackagesPage() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{form.id ? "Editează pachet" : "Pachet nou"}</DialogTitle>
+            <DialogTitle>
+              {form.id
+                ? t("vendor.packagesPage.editPackage")
+                : t("vendor.packagesPage.newPackage")}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             <div className="grid gap-2">
-              <label className="text-xs font-medium uppercase text-muted-foreground">Nume (RO) *</label>
+              <label className="text-xs font-medium uppercase text-muted-foreground">{t("vendor.packagesPage.nameRoLabel")}</label>
               <Input
                 value={form.nameRo}
                 onChange={(e) => setForm((f) => ({ ...f, nameRo: e.target.value }))}
-                placeholder="ex. Pachet Premium Nuntă"
+                placeholder={t("vendor.packagesPage.namePlaceholder")}
               />
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-xs font-medium uppercase text-muted-foreground">Nume (RU)</label>
+                <label className="text-xs font-medium uppercase text-muted-foreground">{t("vendor.packagesPage.nameRuLabel")}</label>
                 <Input
                   value={form.nameRu}
                   onChange={(e) => setForm((f) => ({ ...f, nameRu: e.target.value }))}
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-xs font-medium uppercase text-muted-foreground">Nume (EN)</label>
+                <label className="text-xs font-medium uppercase text-muted-foreground">{t("vendor.packagesPage.nameEnLabel")}</label>
                 <Input
                   value={form.nameEn}
                   onChange={(e) => setForm((f) => ({ ...f, nameEn: e.target.value }))}
@@ -359,18 +369,18 @@ export default function VendorPackagesPage() {
               </div>
             </div>
             <div className="grid gap-2">
-              <label className="text-xs font-medium uppercase text-muted-foreground">Descriere (RO)</label>
+              <label className="text-xs font-medium uppercase text-muted-foreground">{t("vendor.packagesPage.descriptionRoLabel")}</label>
               <textarea
                 value={form.descriptionRo}
                 onChange={(e) => setForm((f) => ({ ...f, descriptionRo: e.target.value }))}
                 rows={3}
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                placeholder="Ce include pachetul..."
+                placeholder={t("vendor.packagesPage.descriptionPlaceholder")}
               />
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="grid gap-2">
-                <label className="text-xs font-medium uppercase text-muted-foreground">Preț (€)</label>
+                <label className="text-xs font-medium uppercase text-muted-foreground">{t("vendor.packagesPage.priceLabel")}</label>
                 <Input
                   type="number"
                   min={0}
@@ -379,7 +389,7 @@ export default function VendorPackagesPage() {
                 />
               </div>
               <div className="grid gap-2">
-                <label className="text-xs font-medium uppercase text-muted-foreground">Durată (ore)</label>
+                <label className="text-xs font-medium uppercase text-muted-foreground">{t("calendar.field.duration")}</label>
                 <Input
                   type="number"
                   min={0}
@@ -396,16 +406,16 @@ export default function VendorPackagesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, isVisible: e.target.checked }))}
                 className="h-4 w-4 rounded border-input"
               />
-              Publică pachetul pe profilul public
+              {t("vendor.packagesPage.publishOnProfile")}
             </label>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button onClick={handleSave} disabled={saving} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Salvează"}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

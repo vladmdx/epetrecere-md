@@ -44,9 +44,9 @@ export default async function DrinksCalculatorPage({
   const { locale: rawLocale } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Calculatoare", url: "/calculatoare" },
-    { name: "Băuturi", url: "/calculatoare/alcool" },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("tools.calculators", locale), url: "/calculatoare" },
+    { name: t("tools.drinksCalculator", locale), url: "/calculatoare/alcool" },
   ];
   return (
     <>

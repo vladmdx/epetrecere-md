@@ -19,7 +19,6 @@ import { SignaturePad, type SignatureValue } from "./signature-pad";
 import { useLocale } from "@/hooks/use-locale";
 import {
   LEGAL_DOCUMENTS,
-  LEGAL_PACK_VERSION,
   PARTNER_REQUIRED_DOCS,
   VENUE_REQUIRED_DOCS,
   legalTitle,
@@ -109,14 +108,10 @@ export function ESignature({
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
         <div>
           <p className="font-semibold">
-            {t("legal.signTitle") !== "legal.signTitle"
-              ? t("legal.signTitle")
-              : "Acceptarea contractului"}
+            {t("legal.signTitle")}
           </p>
           <p className="text-sm text-muted-foreground">
-            {t("legal.signIntro") !== "legal.signIntro"
-              ? t("legal.signIntro")
-              : "Citește și acceptă documentele. Numele complet introdus mai jos are valoare de semnătură electronică."}
+            {t("legal.signIntro")}
           </p>
         </div>
       </div>
@@ -127,12 +122,8 @@ export function ESignature({
         className="mb-3 text-xs font-medium text-gold hover:underline"
       >
         {ticked.size === docs.length
-          ? t("legal.untickAll") !== "legal.untickAll"
-            ? t("legal.untickAll")
-            : "Deselectează tot"
-          : t("legal.tickAll") !== "legal.tickAll"
-            ? t("legal.tickAll")
-            : "Bifează tot"}
+          ? t("legal.untickAll")
+          : t("legal.tickAll")}
       </button>
 
       <ul className="space-y-2">
@@ -156,7 +147,7 @@ export function ESignature({
                 />
                 <span className="flex-1 text-sm">
                   <span className="text-muted-foreground">
-                    {t("legal.iAccept") !== "legal.iAccept" ? t("legal.iAccept") : "Am citit și accept"}{" "}
+                    {t("legal.iAccept")}{" "}
                   </span>
                   <Link
                     href={`/legal/${d.slug}`}
@@ -177,9 +168,7 @@ export function ESignature({
 
       <div className="mt-4">
         <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-          {t("legal.fullName") !== "legal.fullName"
-            ? t("legal.fullName")
-            : "Nume și prenume (semnătură electronică)"}
+          {t("legal.fullName")}
         </label>
         <input
           value={name}
@@ -192,9 +181,7 @@ export function ESignature({
         />
         {!nameOk && name.length > 0 && (
           <p className="mt-1 text-xs text-amber-500">
-            {t("legal.nameHint") !== "legal.nameHint"
-              ? t("legal.nameHint")
-              : "Introdu numele complet (nume și prenume)."}
+            {t("legal.nameHint")}
           </p>
         )}
       </div>
@@ -209,17 +196,13 @@ export function ESignature({
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        {t("legal.fixationNote") !== "legal.fixationNote"
-          ? t("legal.fixationNote")
-          : `La acceptare se înregistrează versiunea documentelor (Legal Pack v${LEGAL_PACK_VERSION}), data și ora, adresa IP și dispozitivul, conform Anexei 2 din Acord.`}
+        {t("legal.fixationNote")}
       </p>
 
       {valid && (
         <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-green-500">
           <Check className="h-3.5 w-3.5" />
-          {t("legal.readyToSign") !== "legal.readyToSign"
-            ? t("legal.readyToSign")
-            : "Gata de semnare"}
+          {t("legal.readyToSign")}
         </p>
       )}
     </div>

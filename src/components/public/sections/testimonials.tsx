@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Star, ChevronLeft, ChevronRight, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useBackgroundVideo } from "@/hooks/use-background-video";
+import { useLocale } from "@/hooks/use-locale";
 import { cn } from "@/lib/utils";
 
 const POSTER = "/images/backgrounds/club-blue.jpg";
@@ -17,6 +18,7 @@ interface Testimonial {
 }
 
 export function TestimonialsSection() {
+  const { t } = useLocale();
   const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
   const [current, setCurrent] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -52,7 +54,7 @@ export function TestimonialsSection() {
   // Don't render until loaded; hide if no testimonials
   if (!loaded || testimonials.length === 0) return null;
 
-  const t = testimonials[current];
+  const item = testimonials[current];
 
   return (
     <section className="py-20 relative">
@@ -69,28 +71,28 @@ export function TestimonialsSection() {
       </div>
       <div className="relative z-10 mx-auto max-w-4xl px-4 lg:px-8">
         <div className="mb-12 text-center">
-          <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">Testimoniale</p>
-          <h2 className="font-heading text-3xl font-bold md:text-4xl">Ce spun clienții noștri</h2>
+          <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">{t("testimonials.eyebrow")}</p>
+          <h2 className="font-heading text-3xl font-bold md:text-4xl">{t("testimonials.title")}</h2>
         </div>
 
         <div className="relative">
           <div className="rounded-2xl border border-border/40 bg-card p-8 text-center md:p-12">
             <Quote className="mx-auto mb-6 h-10 w-10 text-gold/30" />
             <p className="text-lg text-muted-foreground md:text-xl leading-relaxed">
-              &ldquo;{t.text}&rdquo;
+              &ldquo;{item.text}&rdquo;
             </p>
             <div className="mt-6 flex justify-center gap-0.5">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Star key={i} className={cn("h-4 w-4", i < t.rating ? "fill-gold text-gold" : "text-muted")} />
+                <Star key={i} className={cn("h-4 w-4", i < item.rating ? "fill-gold text-gold" : "text-muted")} />
               ))}
             </div>
-            <p className="mt-3 font-heading font-bold">{t.authorName}</p>
-            <p className="text-sm text-gold">{t.eventType || "Eveniment"}</p>
+            <p className="mt-3 font-heading font-bold">{item.authorName}</p>
+            <p className="text-sm text-gold">{item.eventType || t("testimonials.eventFallback")}</p>
           </div>
 
           {/* Navigation */}
           <div className="mt-6 flex items-center justify-center gap-4">
-            <Button variant="ghost" size="icon" aria-label="Testimonial precedent" onClick={() => setCurrent((c) => (c - 1 + testimonials.length) % testimonials.length)}>
+            <Button variant="ghost" size="icon" aria-label={t("testimonials.prev")} onClick={() => setCurrent((c) => (c - 1 + testimonials.length) % testimonials.length)}>
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div className="flex gap-2">
@@ -98,13 +100,13 @@ export function TestimonialsSection() {
                 <button
                   key={i}
                   onClick={() => setCurrent(i)}
-                  aria-label={`Mergi la testimonial ${i + 1}`}
+                  aria-label={t("testimonials.goTo", { n: i + 1 })}
                   aria-current={i === current ? "true" : undefined}
                   className={cn("h-2 w-2 rounded-full transition-all", i === current ? "w-6 bg-gold" : "bg-muted-foreground/30")}
                 />
               ))}
             </div>
-            <Button variant="ghost" size="icon" aria-label="Testimonial următor" onClick={() => setCurrent((c) => (c + 1) % testimonials.length)}>
+            <Button variant="ghost" size="icon" aria-label={t("testimonials.next")} onClick={() => setCurrent((c) => (c + 1) % testimonials.length)}>
               <ChevronRight className="h-5 w-5" />
             </Button>
           </div>

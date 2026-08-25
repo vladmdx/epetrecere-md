@@ -20,6 +20,27 @@ import {
   Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
+import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
+
+/** Dates were pinned to ro-RO regardless of the language being browsed. */
+const INTL_TAG: Record<string, string> = {
+  ro: "ro-RO",
+  ru: "ru-RU",
+  en: "en-GB",
+};
+
+/** Counted nouns — Russian needs three forms, a flat dictionary holds one. */
+const CLIENT_NOUN: AllForms = {
+  ro: { one: "client", few: "clienți", many: "clienți" },
+  ru: { one: "клиент", few: "клиента", many: "клиентов" },
+  en: { one: "client", other: "clients" },
+};
+const INVITE_NOUN: AllForms = {
+  ro: { one: "invitație", few: "invitații", many: "invitații" },
+  ru: { one: "приглашение", few: "приглашения", many: "приглашений" },
+  en: { one: "invitation", other: "invitations" },
+};
 
 interface Review {
   id: number;
@@ -59,6 +80,8 @@ export function VenueReviewsClient({
   reviews,
   reviewableBookings,
 }: Props) {
+  const { t, locale } = useLocale();
+  const intlTag = INTL_TAG[locale] ?? "ro-RO";
   const [reviewsState, setReviewsState] = useState<Review[]>(reviews);
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -126,7 +149,7 @@ export function VenueReviewsClient({
         body: JSON.stringify({ reply: replyText.trim() }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut salva răspunsul");
+        toast.error(t("vendor.venueReviews.errSaveReply"));
         return;
       }
       setReviewsState((prev) =>
@@ -138,9 +161,9 @@ export function VenueReviewsClient({
       );
       setReplyingTo(null);
       setReplyText("");
-      toast.success("Răspunsul a fost salvat!");
+      toast.success(t("vendor.venueReviews.replySaved"));
     } catch {
-      toast.error("Eroare la salvarea răspunsului");
+      toast.error(t("vendor.venueReviews.errReply"));
     } finally {
       setSubmitting(false);
     }
@@ -186,11 +209,11 @@ export function VenueReviewsClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut trimite");
+        toast.error(err.error || t("vendor.venueReviews.errSend"));
         return;
       }
       setRequestedIds((prev) => new Set(prev).add(bookingId));
-      toast.success("Email trimis clientului");
+      toast.success(t("vendor.venueReviews.emailSent"));
     } finally {
       setRequestingId(null);
     }
@@ -204,14 +227,14 @@ export function VenueReviewsClient({
       (b) => b.clientEmail && !requestedIds.has(b.id),
     );
     if (pending.length === 0) {
-      toast.info("Nu există clienți eligibili cu email");
+      toast.info(t("vendor.venueReviews.noEligible"));
       return;
     }
     if (
       !confirm(
-        `Trimit email cu invitație pentru recenzie la ${pending.length} ${
-          pending.length === 1 ? "client" : "clienți"
-        }?`,
+        t("vendor.venueReviews.confirmBulk", {
+          clients: plural(pending.length, locale, CLIENT_NOUN),
+        }),
       )
     ) {
       return;
@@ -238,11 +261,17 @@ export function VenueReviewsClient({
         }
       }
       if (fail === 0) {
-        toast.success(`${ok} invitații trimise`);
+        toast.success(
+          t("vendor.venueReviews.bulkAllSent", {
+            invites: plural(ok, locale, INVITE_NOUN),
+          }),
+        );
       } else if (ok === 0) {
-        toast.error(`${fail} eșuate — verifică în consolă`);
+        toast.error(t("vendor.venueReviews.bulkAllFailed", { n: fail }));
       } else {
-        toast.success(`${ok} trimise · ${fail} eșuate`);
+        toast.success(
+          t("vendor.venueReviews.bulkPartial", { ok, fail }),
+        );
       }
     } finally {
       setBulkRequesting(false);
@@ -255,9 +284,11 @@ export function VenueReviewsClient({
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Recenzii</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("vendor.reviews")}
+          </h1>
           <p className="text-muted-foreground">
-            Recenzii pentru <strong>{entityName}</strong>
+            {t("vendor.venueReviews.forEntity")} <strong>{entityName}</strong>
           </p>
         </div>
         <Link
@@ -266,7 +297,8 @@ export function VenueReviewsClient({
           rel="noopener"
           className="inline-flex items-center gap-1 text-xs text-gold hover:underline"
         >
-          <ExternalLink className="h-3 w-3" /> Vezi pe profilul public
+          <ExternalLink className="h-3 w-3" />{" "}
+          {t("vendor.venueReviews.viewPublic")}
         </Link>
       </div>
 
@@ -281,9 +313,8 @@ export function VenueReviewsClient({
               <StarRatingDisplay rating={stats.avg} />
             </div>
             <p className="text-xs text-muted-foreground">
-              Rating mediu ·{" "}
-              <strong>{stats.count}</strong>{" "}
-              {stats.count === 1 ? "recenzie" : "recenzii"}
+              {t("vendor.venueReviews.avgRating")} ·{" "}
+              <strong>{plural(stats.count, locale, NOUNS.reviews)}</strong>
             </p>
           </CardContent>
         </Card>
@@ -292,7 +323,9 @@ export function VenueReviewsClient({
             <MessageSquare className="h-8 w-8 text-gold" />
             <div>
               <p className="text-2xl font-bold">{stats.count}</p>
-              <p className="text-xs text-muted-foreground">Total recenzii</p>
+              <p className="text-xs text-muted-foreground">
+                {t("vendor.venueReviews.totalReviews")}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -301,7 +334,9 @@ export function VenueReviewsClient({
             <TrendingUp className="h-8 w-8 text-success" />
             <div>
               <p className="text-2xl font-bold">{stats.unanswered}</p>
-              <p className="text-xs text-muted-foreground">Fără răspuns</p>
+              <p className="text-xs text-muted-foreground">
+                {t("vendor.venueReviews.unanswered")}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -314,7 +349,7 @@ export function VenueReviewsClient({
           <Card>
             <CardContent className="space-y-3 p-5">
               <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Distribuție pe stele
+                {t("vendor.venueReviews.distribution")}
               </h2>
               <div className="space-y-2">
                 {stats.dist.slice().reverse().map((d) => {
@@ -345,9 +380,9 @@ export function VenueReviewsClient({
           <Card>
             <CardContent className="space-y-3 p-5">
               <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Trend ultimele 12 luni
+                {t("vendor.venueReviews.trend12m")}
               </h2>
-              <TrendSparkline trend={stats.trend} />
+              <TrendSparkline trend={stats.trend} t={t} />
             </CardContent>
           </Card>
         </div>
@@ -360,11 +395,10 @@ export function VenueReviewsClient({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-heading text-lg font-semibold">
-                  Cere recenzie
+                  {t("vendor.venueReviews.askTitle")}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  Trimite un email clientului ca să lase o recenzie pentru
-                  evenimentul trecut.
+                  {t("vendor.venueReviews.askHint")}
                 </p>
               </div>
               {reviewableBookings.some(
@@ -381,11 +415,11 @@ export function VenueReviewsClient({
                   ) : (
                     <Send className="h-3.5 w-3.5" />
                   )}
-                  Cere de la toți ({
-                    reviewableBookings.filter(
+                  {t("vendor.venueReviews.askAll", {
+                    n: reviewableBookings.filter(
                       (b) => b.clientEmail && !requestedIds.has(b.id),
-                    ).length
-                  })
+                    ).length,
+                  })}
                 </Button>
               )}
             </div>
@@ -400,8 +434,9 @@ export function VenueReviewsClient({
                     <div className="min-w-0 flex-1">
                       <p className="font-medium">{b.clientName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {b.eventType || "Eveniment"} ·{" "}
-                        {new Date(b.eventDate).toLocaleDateString("ro-RO", {
+                        {b.eventType || t("vendor.venueReviews.eventFallback")}{" "}
+                        ·{" "}
+                        {new Date(b.eventDate).toLocaleDateString(intlTag, {
                           day: "numeric",
                           month: "short",
                           year: "numeric",
@@ -425,7 +460,9 @@ export function VenueReviewsClient({
                       ) : (
                         <Mail className="h-3.5 w-3.5" />
                       )}
-                      {requested ? "Trimis" : "Cere recenzie"}
+                      {requested
+                        ? t("vendor.venueReviews.sent")
+                        : t("vendor.venueReviews.askTitle")}
                     </Button>
                   </div>
                 );
@@ -439,7 +476,7 @@ export function VenueReviewsClient({
       {reviewsState.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
-            Nu aveți încă nicio recenzie.
+            {t("vendor.venueReviews.empty")}
           </CardContent>
         </Card>
       ) : (
@@ -453,13 +490,15 @@ export function VenueReviewsClient({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Caută în autor, text, răspuns..."
+                  placeholder={t("vendor.venueReviews.searchPlaceholder")}
                   className="h-8 w-full rounded-md border border-border/50 bg-background pl-9 pr-2 text-xs"
                 />
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-muted-foreground">Stele:</span>
+                <span className="text-muted-foreground">
+                  {t("vendor.venueReviews.starsFilter")}
+                </span>
                 <button
                   onClick={() => setFilterStars(null)}
                   className={cn(
@@ -469,7 +508,7 @@ export function VenueReviewsClient({
                       : "text-muted-foreground hover:bg-muted",
                   )}
                 >
-                  Toate
+                  {t("common.all")}
                 </button>
                 {[5, 4, 3, 2, 1].map((s) => (
                   <button
@@ -488,7 +527,9 @@ export function VenueReviewsClient({
                 ))}
               </div>
               <div className="flex items-center gap-1 text-xs">
-                <span className="text-muted-foreground">Răspuns:</span>
+                <span className="text-muted-foreground">
+                  {t("vendor.venueReviews.replyFilter")}
+                </span>
                 {(["all", "yes", "no"] as const).map((v) => (
                   <button
                     key={v}
@@ -500,7 +541,11 @@ export function VenueReviewsClient({
                         : "text-muted-foreground hover:bg-muted",
                     )}
                   >
-                    {v === "all" ? "Toate" : v === "yes" ? "Da" : "Nu"}
+                    {v === "all"
+                      ? t("common.all")
+                      : v === "yes"
+                        ? t("common.yes")
+                        : t("common.no")}
                   </button>
                 ))}
               </div>
@@ -509,7 +554,7 @@ export function VenueReviewsClient({
                   onClick={resetFilters}
                   className="text-xs text-gold hover:underline"
                 >
-                  Resetează
+                  {t("vendor.venueReviews.reset")}
                 </button>
               )}
               <span className="ml-auto text-xs text-muted-foreground">
@@ -521,12 +566,12 @@ export function VenueReviewsClient({
           {filteredReviews.length === 0 && (
             <Card>
               <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                Nicio recenzie pentru filtrul curent.{" "}
+                {t("vendor.venueReviews.noneForFilter")}{" "}
                 <button
                   onClick={resetFilters}
                   className="text-gold hover:underline"
                 >
-                  Resetează
+                  {t("vendor.venueReviews.reset")}
                 </button>
               </CardContent>
             </Card>
@@ -540,12 +585,14 @@ export function VenueReviewsClient({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium">{review.authorName}</span>
                       <span className="text-xs text-muted-foreground">
-                        {review.eventType || "Eveniment"} ·{" "}
-                        {new Date(review.createdAt).toLocaleDateString("ro-RO")}
+                        {review.eventType ||
+                          t("vendor.venueReviews.eventFallback")}{" "}
+                        ·{" "}
+                        {new Date(review.createdAt).toLocaleDateString(intlTag)}
                       </span>
                       {!review.isApproved && (
                         <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-500">
-                          În aprobare
+                          {t("vendor.venueReviews.pendingApproval")}
                         </span>
                       )}
                     </div>
@@ -571,7 +618,9 @@ export function VenueReviewsClient({
 
                 {review.reply && (
                   <div className="mt-3 rounded-lg bg-accent/50 p-3">
-                    <p className="mb-1 text-xs font-medium">Răspunsul tău:</p>
+                    <p className="mb-1 text-xs font-medium">
+                      {t("vendor.venueReviews.yourReply")}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       {review.reply}
                     </p>
@@ -585,7 +634,7 @@ export function VenueReviewsClient({
                         <Textarea
                           value={replyText}
                           onChange={(e) => setReplyText(e.target.value)}
-                          placeholder="Scrie răspunsul tău..."
+                          placeholder={t("vendor.venueReviews.replyPlaceholder")}
                           rows={2}
                         />
                         <div className="flex gap-2">
@@ -598,7 +647,7 @@ export function VenueReviewsClient({
                             {submitting ? (
                               <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                             ) : null}
-                            Trimite
+                            {t("common.submit")}
                           </Button>
                           <Button
                             size="sm"
@@ -608,7 +657,7 @@ export function VenueReviewsClient({
                               setReplyText("");
                             }}
                           >
-                            Anulează
+                            {t("common.cancel")}
                           </Button>
                         </div>
                       </div>
@@ -619,7 +668,8 @@ export function VenueReviewsClient({
                         className="mt-3 gap-1"
                         onClick={() => setReplyingTo(review.id)}
                       >
-                        <MessageSquare className="h-3.5 w-3.5" /> Răspunde
+                        <MessageSquare className="h-3.5 w-3.5" />{" "}
+                        {t("vendor.venueReviews.reply")}
                       </Button>
                     )}
                   </>
@@ -639,6 +689,7 @@ export function VenueReviewsClient({
  * "4 stele pline + 1 pe jumătate" presentation.
  */
 function StarRatingDisplay({ rating }: { rating: number }) {
+  const { t } = useLocale();
   const stars: React.ReactNode[] = [];
   for (let i = 1; i <= 5; i++) {
     const diff = rating - (i - 1);
@@ -663,7 +714,9 @@ function StarRatingDisplay({ rating }: { rating: number }) {
   return (
     <span
       className="inline-flex items-center gap-0.5"
-      aria-label={`${rating.toFixed(1)} din 5 stele`}
+      aria-label={t("vendor.venueReviews.ratingAria", {
+        rating: rating.toFixed(1),
+      })}
     >
       {stars}
     </span>
@@ -673,8 +726,10 @@ function StarRatingDisplay({ rating }: { rating: number }) {
 /** Lightweight SVG sparkline of monthly avg rating over the last 12 months. */
 function TrendSparkline({
   trend,
+  t,
 }: {
   trend: Array<{ month: string; avg: number | null; count: number }>;
+  t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
   const w = 320;
   const h = 90;
@@ -751,7 +806,7 @@ function TrendSparkline({
       </svg>
       {!hasAny && (
         <p className="text-center text-xs text-muted-foreground">
-          Fără date suficiente pentru trend
+          {t("vendor.venueReviews.noTrendData")}
         </p>
       )}
       <div className="flex justify-between text-[10px] text-muted-foreground">

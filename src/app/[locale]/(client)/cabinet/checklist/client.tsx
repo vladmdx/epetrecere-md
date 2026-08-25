@@ -6,10 +6,12 @@ import { WEDDING_CHECKLIST } from "@/lib/wedding-checklist";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
+import { useLocale } from "@/hooks/use-locale";
 
 const STORAGE_KEY = "epetrecere-wedding-checklist";
 
 export function ChecklistClient() {
+  const { t } = useLocale();
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
 
@@ -43,7 +45,7 @@ export function ChecklistClient() {
   }
 
   function reset() {
-    if (confirm("Sigur vrei să resetezi întregul checklist?")) {
+    if (confirm(t("cabinet.checklist.resetConfirm"))) {
       setChecked(new Set());
     }
   }
@@ -59,14 +61,13 @@ export function ChecklistClient() {
     <div className="mx-auto max-w-4xl px-4 py-12 lg:px-8">
       <header className="text-center">
         <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">
-          Planificare nuntă
+          {t("cabinet.checklist.eyebrow")}
         </p>
         <h1 className="font-heading text-3xl font-bold md:text-4xl">
-          Checklist 12 luni
+          {t("cabinet.checklist.title")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground md:text-base">
-          Un ghid pas cu pas pentru planificarea nunții tale. Bifează ce ai
-          făcut — progresul se salvează automat în browser.
+          {t("cabinet.checklist.intro")}
         </p>
       </header>
 
@@ -76,7 +77,7 @@ export function ChecklistClient() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                Progres general
+                {t("cabinet.checklist.overallProgress")}
               </p>
               <p className="mt-1 font-accent text-3xl font-bold">
                 {checkedCount} / {totalItems}
@@ -86,7 +87,7 @@ export function ChecklistClient() {
               <p className="font-accent text-2xl font-semibold text-gold">
                 {progress.toFixed(0)}%
               </p>
-              <p className="text-xs text-muted-foreground">complet</p>
+              <p className="text-xs text-muted-foreground">{t("cabinet.checklist.completeLabel")}</p>
             </div>
           </div>
           <Progress value={progress} className="mt-4 h-2" />
@@ -97,7 +98,7 @@ export function ChecklistClient() {
               onClick={reset}
               className="gap-1"
             >
-              <RotateCcw className="h-3 w-3" /> Resetează
+              <RotateCcw className="h-3 w-3" /> {t("catalog.reset")}
             </Button>
           </div>
         </CardContent>

@@ -41,6 +41,7 @@ import { cn } from "@/lib/utils";
 import { MenuScanner } from "@/components/vendor/menu-scanner";
 import { Sparkles } from "lucide-react";
 import { formatPrice, currencySymbol } from "@/lib/format/price";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Category {
   id: number;
@@ -83,12 +84,12 @@ interface Props {
 }
 
 const ICON_OPTIONS = [
-  { value: "salad", label: "🥗 Salată / Aperitiv", Icon: Salad },
-  { value: "beef", label: "🍖 Fel principal", Icon: Beef },
-  { value: "cake", label: "🍰 Desert", Icon: Cake },
-  { value: "wine", label: "🍷 Băuturi alcoolice", Icon: Wine },
-  { value: "coffee", label: "🥤 Băuturi non-alcoolice", Icon: Coffee },
-  { value: "utensils", label: "🍽 Altele", Icon: UtensilsCrossed },
+  { value: "salad", labelKey: "vendorMenu.iconSalad", Icon: Salad },
+  { value: "beef", labelKey: "vendorMenu.iconBeef", Icon: Beef },
+  { value: "cake", labelKey: "vendorMenu.iconCake", Icon: Cake },
+  { value: "wine", labelKey: "vendorMenu.iconWine", Icon: Wine },
+  { value: "coffee", labelKey: "vendorMenu.iconCoffee", Icon: Coffee },
+  { value: "utensils", labelKey: "vendorMenu.iconUtensils", Icon: UtensilsCrossed },
 ];
 
 function iconComponent(icon: string | null) {
@@ -105,6 +106,7 @@ export function VenueMenuClient({
   initialItems,
   initialPackages,
 }: Props) {
+  const { t } = useLocale();
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [items, setItems] = useState<Item[]>(initialItems);
@@ -119,9 +121,7 @@ export function VenueMenuClient({
 
   async function translateAll() {
     if (
-      !confirm(
-        "Trimit tot meniul la Claude pentru traducere în RU + EN. Cele care au deja traduceri vor fi ignorate. Continui?",
-      )
+      !confirm(t("vendorMenu.translateConfirm"))
     ) {
       return;
     }
@@ -134,7 +134,7 @@ export function VenueMenuClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Traducere eșuată");
+        toast.error(err.error || t("vendorMenu.translateFailed"));
         return;
       }
       const data = (await res.json()) as {
@@ -145,10 +145,15 @@ export function VenueMenuClient({
         message?: string;
       };
       if (data.translated === 0) {
-        toast.success(data.message || "Tot meniul are deja traduceri");
+        toast.success(data.message || t("vendorMenu.alreadyTranslated"));
       } else {
         toast.success(
-          `Traduse ${data.translated} nume (${data.categories} categorii · ${data.items} produse · ${data.packages} pachete)`,
+          t("vendorMenu.translatedCount", {
+            count: data.translated,
+            categories: data.categories,
+            items: data.items,
+            packages: data.packages,
+          }),
         );
       }
       router.refresh();
@@ -159,11 +164,11 @@ export function VenueMenuClient({
 
   async function uploadMenuPdf(file: File) {
     if (file.type !== "application/pdf") {
-      toast.error("Doar fișiere PDF sunt acceptate");
+      toast.error(t("vendorMenu.onlyPdf"));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Fișierul e prea mare (max 10MB)");
+      toast.error(t("vendorMenu.fileTooLarge"));
       return;
     }
     setUploadingPdf(true);
@@ -174,7 +179,7 @@ export function VenueMenuClient({
       const upRes = await fetch("/api/upload", { method: "POST", body: fd });
       if (!upRes.ok) {
         const err = await upRes.json().catch(() => ({}));
-        toast.error(err.error || "Upload eșuat");
+        toast.error(err.error || t("vendorMenu.uploadFailed"));
         return;
       }
       const upData = (await upRes.json()) as { url: string };
@@ -186,18 +191,18 @@ export function VenueMenuClient({
         body: JSON.stringify({ menuPdfUrl: upData.url }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut salva pe sală");
+        toast.error(t("vendorMenu.savePdfFailed"));
         return;
       }
       setMenuPdfUrl(upData.url);
-      toast.success("Meniu PDF încărcat");
+      toast.success(t("vendorMenu.pdfUploaded"));
     } finally {
       setUploadingPdf(false);
     }
   }
 
   async function removeMenuPdf() {
-    if (!confirm("Sigur ștergi meniul PDF?")) return;
+    if (!confirm(t("vendorMenu.deletePdfConfirm"))) return;
     setUploadingPdf(true);
     try {
       const res = await fetch(`/api/venues/${venueId}`, {
@@ -206,11 +211,11 @@ export function VenueMenuClient({
         body: JSON.stringify({ menuPdfUrl: "" }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut șterge");
+        toast.error(t("vendorMenu.deleteFailed"));
         return;
       }
       setMenuPdfUrl(null);
-      toast.success("Meniu PDF șters");
+      toast.success(t("vendorMenu.pdfDeleted"));
     } finally {
       setUploadingPdf(false);
     }
@@ -247,7 +252,7 @@ export function VenueMenuClient({
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || "Eroare");
+      throw new Error(err.error || t("vendorMenu.genericError"));
     }
     return res.json();
   }
@@ -268,7 +273,7 @@ export function VenueMenuClient({
 
   async function saveCategory() {
     if (!catName.trim()) {
-      toast.error("Numele este obligatoriu");
+      toast.error(t("vendorMenu.nameRequired"));
       return;
     }
     setBusy(true);
@@ -293,24 +298,24 @@ export function VenueMenuClient({
         });
         setCategories((prev) => [...prev, res.category]);
       }
-      toast.success("Salvat");
+      toast.success(t("vendorMenu.saved"));
       setCatDialogOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("vendorMenu.genericError"));
     } finally {
       setBusy(false);
     }
   }
 
   async function deleteCategory(c: Category) {
-    if (!confirm(`Ștergi categoria "${c.nameRo}" și toate preparatele din ea?`)) return;
+    if (!confirm(t("vendorMenu.deleteCategoryConfirm", { name: c.nameRo }))) return;
     try {
       await api({ action: "delete_category", venueId, id: c.id });
       setCategories((prev) => prev.filter((x) => x.id !== c.id));
       setItems((prev) => prev.filter((i) => i.categoryId !== c.id));
-      toast.success("Categorie ștearsă");
+      toast.success(t("vendorMenu.categoryDeleted"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("vendorMenu.genericError"));
     }
   }
 
@@ -360,23 +365,23 @@ export function VenueMenuClient({
         });
         setItems((prev) => [...prev, res.item]);
       }
-      toast.success("Salvat");
+      toast.success(t("vendorMenu.saved"));
       setItemDialogOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("vendorMenu.genericError"));
     } finally {
       setBusy(false);
     }
   }
 
   async function deleteItem(i: Item) {
-    if (!confirm(`Ștergi "${i.nameRo}"?`)) return;
+    if (!confirm(t("vendorMenu.deleteItemConfirm", { name: i.nameRo }))) return;
     try {
       await api({ action: "delete_item", venueId, id: i.id });
       setItems((prev) => prev.filter((x) => x.id !== i.id));
-      toast.success("Șters");
+      toast.success(t("vendorMenu.deleted"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("vendorMenu.genericError"));
     }
   }
 
@@ -404,7 +409,7 @@ export function VenueMenuClient({
     if (!pkgName.trim() || !pkgPrice) return;
     const priceNum = Number(pkgPrice);
     if (!Number.isFinite(priceNum) || priceNum < 0) {
-      toast.error("Preț invalid");
+      toast.error(t("vendorMenu.invalidPrice"));
       return;
     }
     setBusy(true);
@@ -436,23 +441,23 @@ export function VenueMenuClient({
         });
         setPackages((prev) => [...prev, res.package]);
       }
-      toast.success("Salvat");
+      toast.success(t("vendorMenu.saved"));
       setPkgDialogOpen(false);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("vendorMenu.genericError"));
     } finally {
       setBusy(false);
     }
   }
 
   async function deletePackage(p: Package) {
-    if (!confirm(`Ștergi pachetul "${p.nameRo}"?`)) return;
+    if (!confirm(t("vendorMenu.deletePackageConfirm", { name: p.nameRo }))) return;
     try {
       await api({ action: "delete_package", venueId, id: p.id });
       setPackages((prev) => prev.filter((x) => x.id !== p.id));
-      toast.success("Șters");
+      toast.success(t("vendorMenu.deleted"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("vendorMenu.genericError"));
     }
   }
 
@@ -475,9 +480,13 @@ export function VenueMenuClient({
                 : x.isRecommended,
         })),
       );
-      toast.success(!p.isRecommended ? "Marcat ca recomandat" : "Nu mai e recomandat");
+      toast.success(
+        !p.isRecommended
+          ? t("vendorMenu.markedRecommended")
+          : t("vendorMenu.unmarkedRecommended"),
+      );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare");
+      toast.error(err instanceof Error ? err.message : t("vendorMenu.genericError"));
     }
   }
 
@@ -485,10 +494,10 @@ export function VenueMenuClient({
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Meniu Digital</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("vendorMenu.title")}</h1>
           <p className="text-muted-foreground">
-            Gestionează meniul pentru <strong>{venueName}</strong>. Va apărea pe
-            profilul public al sălii.
+            {t("vendorMenu.subtitlePrefix")} <strong>{venueName}</strong>{". "}
+            {t("vendorMenu.subtitleSuffix")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -498,14 +507,14 @@ export function VenueMenuClient({
               onClick={translateAll}
               disabled={translating}
               className="gap-2"
-              title="Traduce toate numele categoriilor, produselor și pachetelor în Rusă și Engleză"
+              title={t("vendorMenu.translateTitle")}
             >
               {translating ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <span className="text-sm">🌐</span>
               )}
-              Traduce RU + EN
+              {t("vendorMenu.translateButton")}
             </Button>
           )}
           <Button
@@ -517,7 +526,7 @@ export function VenueMenuClient({
             )}
           >
             <Sparkles className="h-4 w-4" />
-            {showScanner ? "Închide scanarea" : "Scanează meniul cu AI"}
+            {showScanner ? t("vendorMenu.closeScanner") : t("vendorMenu.openScanner")}
           </Button>
         </div>
       </div>
@@ -544,9 +553,9 @@ export function VenueMenuClient({
                   <FileText className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-medium">Meniu PDF încărcat</p>
+                  <p className="font-medium">{t("vendorMenu.pdfUploaded")}</p>
                   <p className="text-xs text-muted-foreground">
-                    Apare ca buton „Descarcă meniu PDF” pe profilul public.
+                    {t("vendorMenu.pdfPublicHint")}
                   </p>
                 </div>
               </div>
@@ -557,7 +566,7 @@ export function VenueMenuClient({
                   rel="noopener"
                   className="rounded-md border border-border/60 px-3 py-1.5 text-xs hover:bg-muted"
                 >
-                  Deschide PDF
+                  {t("vendorMenu.openPdf")}
                 </a>
                 <button
                   type="button"
@@ -565,7 +574,7 @@ export function VenueMenuClient({
                   disabled={uploadingPdf}
                   className="rounded-md border border-red-500/40 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/10"
                 >
-                  {uploadingPdf ? "..." : "Șterge"}
+                  {uploadingPdf ? "..." : t("common.delete")}
                 </button>
               </div>
             </div>
@@ -576,9 +585,9 @@ export function VenueMenuClient({
                   <FileText className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="font-medium">Încarcă meniu PDF (opțional)</p>
+                  <p className="font-medium">{t("vendorMenu.uploadPdfTitle")}</p>
                   <p className="text-xs text-muted-foreground">
-                    Alternativă rapidă: încarcă PDF-ul existent în loc de meniu digital item-by-item. Ambele opțiuni pot coexista.
+                    {t("vendorMenu.uploadPdfHint")}
                   </p>
                 </div>
               </div>
@@ -590,10 +599,10 @@ export function VenueMenuClient({
               >
                 {uploadingPdf ? (
                   <span className="inline-flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Încarcă...
+                    <Loader2 className="h-3 w-3 animate-spin" /> {t("vendorMenu.uploading")}
                   </span>
                 ) : (
-                  "Alege PDF"
+                  t("vendorMenu.choosePdf")
                 )}
                 <input
                   type="file"
@@ -616,24 +625,23 @@ export function VenueMenuClient({
       <div>
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="font-heading text-xl font-semibold">Pachete</h2>
+            <h2 className="font-heading text-xl font-semibold">{t("vendorMenu.packagesHeading")}</h2>
             <p className="text-xs text-muted-foreground">
-              Oferte complete per persoană (Standard / Premium / Lux)
+              {t("vendorMenu.packagesHint")}
             </p>
           </div>
           <Button
             onClick={openAddPackage}
             className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
-            <Plus className="h-4 w-4" /> Pachet nou
+            <Plus className="h-4 w-4" /> {t("vendorMenu.newPackage")}
           </Button>
         </div>
         {packages.length === 0 ? (
           <Card>
             <CardContent className="py-10 text-center">
               <p className="text-sm text-muted-foreground">
-                Niciun pachet încă. Adaugă primul pachet pentru a-ți prezenta
-                oferta clienților.
+                {t("vendorMenu.noPackages")}
               </p>
             </CardContent>
           </Card>
@@ -649,7 +657,7 @@ export function VenueMenuClient({
               >
                 {p.isRecommended && (
                   <div className="absolute -top-2 right-4 rounded-full bg-gold px-3 py-0.5 text-[10px] font-bold text-[#0D0D0D]">
-                    RECOMANDAT
+                    {t("venue.detail.recommended")}
                   </div>
                 )}
                 <CardContent className="p-5">
@@ -664,7 +672,7 @@ export function VenueMenuClient({
                             ? "text-gold"
                             : "text-muted-foreground hover:text-gold",
                         )}
-                        aria-label="Toggle recomandat"
+                        aria-label={t("vendorMenu.toggleRecommended")}
                       >
                         <Star
                           className={cn(
@@ -676,14 +684,14 @@ export function VenueMenuClient({
                       <button
                         onClick={() => openEditPackage(p)}
                         className="rounded-md p-1.5 text-muted-foreground hover:text-gold"
-                        aria-label="Editează"
+                        aria-label={t("common.edit")}
                       >
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
                       <button
                         onClick={() => deletePackage(p)}
                         className="rounded-md p-1.5 text-muted-foreground hover:text-red-500"
-                        aria-label="Șterge"
+                        aria-label={t("common.delete")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -694,18 +702,18 @@ export function VenueMenuClient({
                       {p.pricePerPerson}
                     </span>
                     <span className="text-sm text-muted-foreground">
-                      {currencySymbol(p.currency)} / persoană
+                      {currencySymbol(p.currency)} {t("vendorMenu.perPerson")}
                     </span>
                   </div>
                   {p.minGuests && (
                     <p className="mb-2 text-xs text-muted-foreground">
-                      Min. {p.minGuests} persoane
+                      {t("vendorMenu.minGuests", { count: p.minGuests })}
                     </p>
                   )}
                   {p.includes && (
                     <div className="mb-2">
                       <p className="text-xs font-medium uppercase tracking-wider text-emerald-500">
-                        Include
+                        {t("venue.detail.included")}
                       </p>
                       <p className="mt-0.5 whitespace-pre-wrap text-sm">
                         {p.includes}
@@ -715,7 +723,7 @@ export function VenueMenuClient({
                   {p.excludes && (
                     <div>
                       <p className="text-xs font-medium uppercase tracking-wider text-red-400">
-                        Nu include
+                        {t("venue.detail.notIncluded")}
                       </p>
                       <p className="mt-0.5 whitespace-pre-wrap text-sm text-muted-foreground">
                         {p.excludes}
@@ -733,9 +741,9 @@ export function VenueMenuClient({
       <div>
         <div className="mb-3 flex items-center justify-between">
           <div>
-            <h2 className="font-heading text-xl font-semibold">Categorii & Preparate</h2>
+            <h2 className="font-heading text-xl font-semibold">{t("vendorMenu.categoriesHeading")}</h2>
             <p className="text-xs text-muted-foreground">
-              Ex: Aperitive, Preparate Calde, Deserturi, Băuturi
+              {t("vendorMenu.categoriesHint")}
             </p>
           </div>
           <Button
@@ -743,7 +751,7 @@ export function VenueMenuClient({
             variant="outline"
             className="gap-1.5"
           >
-            <Plus className="h-4 w-4" /> Categorie nouă
+            <Plus className="h-4 w-4" /> {t("vendorMenu.newCategory")}
           </Button>
         </div>
 
@@ -752,7 +760,7 @@ export function VenueMenuClient({
             <CardContent className="py-10 text-center">
               <UtensilsCrossed className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">
-                Nicio categorie încă. Adaugă prima categorie (ex: Aperitive) și apoi adaugă preparatele în ea.
+                {t("vendorMenu.noCategories")}
               </p>
             </CardContent>
           </Card>
@@ -781,7 +789,7 @@ export function VenueMenuClient({
                           onClick={() => openAddItem(c.id)}
                           className="gap-1 h-7 text-xs"
                         >
-                          <Plus className="h-3 w-3" /> Preparat
+                          <Plus className="h-3 w-3" /> {t("vendorMenu.dish")}
                         </Button>
                         <button
                           onClick={() => openEditCategory(c)}
@@ -799,7 +807,7 @@ export function VenueMenuClient({
                     </div>
                     {catItems.length === 0 ? (
                       <p className="rounded-lg border border-dashed border-border/30 py-3 text-center text-xs text-muted-foreground">
-                        Niciun preparat. Adaugă primul.
+                        {t("vendorMenu.noDishes")}
                       </p>
                     ) : (
                       <ul className="space-y-1.5">
@@ -854,22 +862,22 @@ export function VenueMenuClient({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingCat ? "Editează categorie" : "Categorie nouă"}
+              {editingCat ? t("vendorMenu.editCategory") : t("vendorMenu.newCategory")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Nume categorie</Label>
+              <Label className="text-xs">{t("vendorMenu.categoryNameLabel")}</Label>
               <Input
                 className="mt-1"
                 value={catName}
                 onChange={(e) => setCatName(e.target.value)}
-                placeholder="Ex: Aperitive reci"
+                placeholder={t("vendorMenu.categoryNamePlaceholder")}
                 autoFocus
               />
             </div>
             <div>
-              <Label className="text-xs">Iconiță</Label>
+              <Label className="text-xs">{t("vendorMenu.iconLabel")}</Label>
               <Select value={catIcon} onValueChange={(v) => setCatIcon(v ?? "utensils")}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
@@ -877,7 +885,7 @@ export function VenueMenuClient({
                 <SelectContent>
                   {ICON_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {t(o.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -890,7 +898,7 @@ export function VenueMenuClient({
               onClick={() => setCatDialogOpen(false)}
               disabled={busy}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={saveCategory}
@@ -898,7 +906,7 @@ export function VenueMenuClient({
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Salvează
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -909,39 +917,39 @@ export function VenueMenuClient({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingItem ? "Editează preparat" : "Preparat nou"}
+              {editingItem ? t("vendorMenu.editItem") : t("vendorMenu.newItem")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Nume</Label>
+              <Label className="text-xs">{t("vendorMenu.itemNameLabel")}</Label>
               <Input
                 className="mt-1"
                 value={itemName}
                 onChange={(e) => setItemName(e.target.value)}
-                placeholder="Ex: Salată Caesar"
+                placeholder={t("vendorMenu.itemNamePlaceholder")}
                 autoFocus
               />
             </div>
             <div>
-              <Label className="text-xs">Descriere (opțional)</Label>
+              <Label className="text-xs">{t("vendorMenu.descriptionLabel")}</Label>
               <Textarea
                 className="mt-1"
                 value={itemDesc}
                 onChange={(e) => setItemDesc(e.target.value)}
                 rows={2}
-                placeholder="Salată romană, pui, parmezan, sos Caesar..."
+                placeholder={t("vendorMenu.descriptionPlaceholder")}
               />
             </div>
             <div>
-              <Label className="text-xs">Preț per persoană (€)</Label>
+              <Label className="text-xs">{t("vendorMenu.itemPriceLabel")}</Label>
               <Input
                 className="mt-1"
                 type="number"
                 min="0"
                 value={itemPriceEur}
                 onChange={(e) => setItemPriceEur(e.target.value)}
-                placeholder="Ex: 12"
+                placeholder={t("vendorMenu.itemPricePlaceholder")}
               />
             </div>
           </div>
@@ -951,7 +959,7 @@ export function VenueMenuClient({
               onClick={() => setItemDialogOpen(false)}
               disabled={busy}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={saveItem}
@@ -959,7 +967,7 @@ export function VenueMenuClient({
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Salvează
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -970,23 +978,23 @@ export function VenueMenuClient({
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {editingPkg ? "Editează pachet" : "Pachet nou"}
+              {editingPkg ? t("vendorMenu.editPackage") : t("vendorMenu.newPackage")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Nume pachet</Label>
+              <Label className="text-xs">{t("vendorMenu.packageNameLabel")}</Label>
               <Input
                 className="mt-1"
                 value={pkgName}
                 onChange={(e) => setPkgName(e.target.value)}
-                placeholder="Ex: Pachet Standard"
+                placeholder={t("vendorMenu.packageNamePlaceholder")}
                 autoFocus
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <Label className="text-xs">Preț / persoană (€)</Label>
+                <Label className="text-xs">{t("vendorMenu.packagePriceLabel")}</Label>
                 <Input
                   className="mt-1"
                   type="number"
@@ -997,7 +1005,7 @@ export function VenueMenuClient({
                 />
               </div>
               <div>
-                <Label className="text-xs">Minim persoane</Label>
+                <Label className="text-xs">{t("vendorMenu.minGuestsLabel")}</Label>
                 <Input
                   className="mt-1"
                   type="number"
@@ -1009,23 +1017,23 @@ export function VenueMenuClient({
               </div>
             </div>
             <div>
-              <Label className="text-xs">Ce include</Label>
+              <Label className="text-xs">{t("vendorMenu.includesLabel")}</Label>
               <Textarea
                 className="mt-1"
                 value={pkgIncludes}
                 onChange={(e) => setPkgIncludes(e.target.value)}
                 rows={4}
-                placeholder="3 aperitive, 2 preparate calde, 1 desert, apă + sucuri nelimitate, vin de casă"
+                placeholder={t("vendorMenu.includesPlaceholder")}
               />
             </div>
             <div>
-              <Label className="text-xs">Ce NU include (opțional)</Label>
+              <Label className="text-xs">{t("vendorMenu.excludesLabel")}</Label>
               <Textarea
                 className="mt-1"
                 value={pkgExcludes}
                 onChange={(e) => setPkgExcludes(e.target.value)}
                 rows={2}
-                placeholder="băuturi tari, tort"
+                placeholder={t("vendorMenu.excludesPlaceholder")}
               />
             </div>
           </div>
@@ -1035,7 +1043,7 @@ export function VenueMenuClient({
               onClick={() => setPkgDialogOpen(false)}
               disabled={busy}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               onClick={savePackage}
@@ -1043,7 +1051,7 @@ export function VenueMenuClient({
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-              Salvează
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

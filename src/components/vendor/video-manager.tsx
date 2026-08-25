@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 type VideoRow = {
   id: number;
@@ -34,6 +35,7 @@ function embedUrl(row: VideoRow): string {
 }
 
 export function VideoManager({ artistId }: { artistId: number | null }) {
+  const { t } = useLocale();
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -50,7 +52,7 @@ export function VideoManager({ artistId }: { artistId: number | null }) {
       const rows = (await res.json()) as VideoRow[];
       setVideos(rows);
     } catch {
-      toast.error("Nu am putut încărca videoclipurile");
+      toast.error(t("vendor.videoManager.toastLoadError"));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export function VideoManager({ artistId }: { artistId: number | null }) {
   async function add() {
     if (!artistId) return;
     if (!url.trim()) {
-      toast.error("Introdu un URL");
+      toast.error(t("vendor.videoManager.toastNeedUrl"));
       return;
     }
     setSubmitting(true);
@@ -85,9 +87,9 @@ export function VideoManager({ artistId }: { artistId: number | null }) {
       setUrl("");
       setTitle("");
       await reload();
-      toast.success("Video adăugat");
+      toast.success(t("vendor.videoManager.toastAdded"));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Eroare");
+      toast.error(e instanceof Error ? e.message : t("moments.errGeneric"));
     } finally {
       setSubmitting(false);
     }
@@ -101,14 +103,14 @@ export function VideoManager({ artistId }: { artistId: number | null }) {
       if (!res.ok) throw new Error("delete failed");
       await reload();
     } catch {
-      toast.error("Nu am putut șterge");
+      toast.error(t("vendor.videoManager.toastDeleteError"));
     }
   }
 
   if (!artistId) {
     return (
       <p className="text-sm text-muted-foreground">
-        Salvează profilul înainte de a adăuga videoclipuri.
+        {t("vendor.videoManager.saveProfileFirst")}
       </p>
     );
   }
@@ -124,7 +126,7 @@ export function VideoManager({ artistId }: { artistId: number | null }) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-border/40 p-4">
-        <Label>Adaugă video (YouTube sau Vimeo)</Label>
+        <Label>{t("vendor.videoManager.addVideoLabel")}</Label>
         <div className="mt-2 grid gap-2 sm:grid-cols-[2fr_1fr_auto]">
           <Input
             placeholder="https://youtube.com/watch?v=..."
@@ -132,7 +134,7 @@ export function VideoManager({ artistId }: { artistId: number | null }) {
             onChange={(e) => setUrl(e.target.value)}
           />
           <Input
-            placeholder="Titlu (opțional)"
+            placeholder={t("vendor.videoManager.titlePlaceholder")}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
@@ -142,7 +144,7 @@ export function VideoManager({ artistId }: { artistId: number | null }) {
             ) : (
               <Plus className="h-4 w-4" />
             )}
-            Adaugă
+            {t("common.add")}
           </Button>
         </div>
       </div>

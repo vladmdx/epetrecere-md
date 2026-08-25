@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
+import { useLocale } from "@/hooks/use-locale";
 
 interface LinkedBooking {
   id: number;
@@ -73,9 +74,14 @@ function formatTime(iso: string) {
   return d.toLocaleDateString("ro-RO", { day: "2-digit", month: "short" });
 }
 
-function formatBookingBadge(b: LinkedBooking): string {
+function formatBookingBadge(
+  b: LinkedBooking,
+  t: (key: string) => string,
+): string {
   const eventTypeKey = normalizeEventType(b.eventType);
-  const label = eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment";
+  const label = eventTypeKey
+    ? eventTypeLabel(eventTypeKey)
+    : t("vendor.venueMessages.eventFallback");
   if (!b.eventDate) return `Re: ${label}`;
   const d = new Date(b.eventDate + "T00:00:00");
   return `Re: ${label} ${d.toLocaleDateString("ro-RO", {
@@ -85,6 +91,7 @@ function formatBookingBadge(b: LinkedBooking): string {
 }
 
 export default function VenueMessagesPage() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const initialConv = searchParams.get("conversation");
 
@@ -143,11 +150,11 @@ export default function VenueMessagesPage() {
       "application/pdf",
     ];
     if (!allowed.includes(file.type)) {
-      toast.error("Doar imagini sau PDF");
+      toast.error(t("vendor.venueMessages.onlyImagesOrPdf"));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("Fișier prea mare (max 10MB)");
+      toast.error(t("vendor.venueMessages.fileTooLarge"));
       return;
     }
     setUploading(true);
@@ -158,7 +165,7 @@ export default function VenueMessagesPage() {
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Upload eșuat");
+        toast.error(err.error || t("moments.errUploadFailed"));
         return;
       }
       const data = (await res.json()) as { url: string };
@@ -188,7 +195,7 @@ export default function VenueMessagesPage() {
         }),
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut trimite mesajul");
+        toast.error(t("vendor.venueMessages.sendFailed"));
         return;
       }
       const inserted = (await res.json()) as ChatMessage;
@@ -197,10 +204,10 @@ export default function VenueMessagesPage() {
       const preview =
         text ||
         (pendingAttachment?.mime.startsWith("image/")
-          ? "📷 Imagine"
+          ? t("vendor.venueMessages.previewImage")
           : pendingAttachment?.mime === "application/pdf"
-            ? "📎 PDF"
-            : "📎 Atașament");
+            ? t("vendor.venueMessages.previewPdf")
+            : t("vendor.venueMessages.previewAttachment"));
       setConversations((prev) =>
         prev.map((c) =>
           c.id === selectedId
@@ -257,7 +264,7 @@ export default function VenueMessagesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="font-heading text-2xl font-bold">Mesaje</h1>
+      <h1 className="font-heading text-2xl font-bold">{t("dashboard.messages")}</h1>
 
       <div className="grid h-[calc(100vh-14rem)] gap-4 lg:grid-cols-[22rem_1fr]">
         {/* Thread list — hidden on mobile when a chat is open */}
@@ -273,7 +280,7 @@ export default function VenueMessagesPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Caută clienți, mesaje, evenimente..."
+              placeholder={t("vendor.venueMessages.searchPlaceholder")}
               className="pl-9"
             />
           </div>
@@ -286,8 +293,8 @@ export default function VenueMessagesPage() {
             ) : filteredConversations.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 {search
-                  ? "Nicio conversație pentru filtrul curent."
-                  : "Nu ai conversații încă. Clienții îți vor apărea aici când deschid chat-ul pe profilul tău."}
+                  ? t("vendor.venueMessages.noneForFilter")
+                  : t("vendor.venueMessages.emptyInbox")}
               </p>
             ) : (
               filteredConversations.map((thread) => {
@@ -310,7 +317,7 @@ export default function VenueMessagesPage() {
                       <div className="flex items-center justify-between gap-2">
                         <span className="truncate text-sm font-medium">
                           {thread.clientName ||
-                            `Client #${thread.clientUserId.slice(0, 8)}`}
+                            `${t("auth.roleClient")} #${thread.clientUserId.slice(0, 8)}`}
                         </span>
                         <span className="shrink-0 text-xs text-muted-foreground">
                           {formatTime(thread.lastMessageAt)}
@@ -319,7 +326,7 @@ export default function VenueMessagesPage() {
                       {thread.linkedBooking && (
                         <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
                           <CalendarIcon className="h-2.5 w-2.5" />
-                          {formatBookingBadge(thread.linkedBooking)}
+                          {formatBookingBadge(thread.linkedBooking, t)}
                         </span>
                       )}
                       {thread.lastMessagePreview && (
@@ -353,7 +360,7 @@ export default function VenueMessagesPage() {
                 {/* Back button — mobile only */}
                 <button
                   type="button"
-                  aria-label="Înapoi la listă"
+                  aria-label={t("vendor.venueMessages.backToList")}
                   onClick={() => setSelectedId(null)}
                   className="rounded-md p-1.5 text-muted-foreground hover:bg-muted lg:hidden"
                 >
@@ -361,13 +368,13 @@ export default function VenueMessagesPage() {
                 </button>
                 <div className="min-w-0 flex-1">
                   <p className="font-medium">
-                    {selected.clientName || "Client"}
+                    {selected.clientName || t("auth.roleClient")}
                   </p>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     {selected.linkedBooking && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-blue-500/10 px-2 py-0.5 text-[10px] font-medium text-blue-400">
                         <CalendarIcon className="h-2.5 w-2.5" />
-                        {formatBookingBadge(selected.linkedBooking)}
+                        {formatBookingBadge(selected.linkedBooking, t)}
                       </span>
                     )}
                   </div>
@@ -380,7 +387,7 @@ export default function VenueMessagesPage() {
               >
                 {messages.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">
-                    Niciun mesaj încă.
+                    {t("vendor.venueMessages.noMessages")}
                   </p>
                 ) : (
                   messages.map((msg) => (
@@ -409,7 +416,7 @@ export default function VenueMessagesPage() {
                   </span>
                   <button
                     type="button"
-                    aria-label="Anulează atașament"
+                    aria-label={t("vendor.venueMessages.cancelAttachment")}
                     onClick={() => setPendingAttachment(null)}
                     className="rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
                   >
@@ -425,7 +432,7 @@ export default function VenueMessagesPage() {
                   size="icon"
                   onClick={() => fileRef.current?.click()}
                   disabled={uploading || sending}
-                  aria-label="Atașează fișier"
+                  aria-label={t("vendor.venueMessages.attachFile")}
                   className="shrink-0"
                 >
                   {uploading ? (
@@ -448,7 +455,7 @@ export default function VenueMessagesPage() {
                 <Input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Scrie un mesaj..."
+                  placeholder={t("chat.inputPlaceholder")}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -463,7 +470,7 @@ export default function VenueMessagesPage() {
                     sending ||
                     (!draft.trim() && !pendingAttachment)
                   }
-                  aria-label="Trimite mesaj"
+                  aria-label={t("chat.send")}
                   className="shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                   size="icon"
                 >
@@ -477,7 +484,7 @@ export default function VenueMessagesPage() {
             </>
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-              Selectează o conversație.
+              {t("vendor.venueMessages.selectConversation")}
             </div>
           )}
         </Card>
@@ -488,6 +495,7 @@ export default function VenueMessagesPage() {
 
 /** Renders a single chat bubble with optional inline attachment. */
 function MessageBubble({ msg, mine }: { msg: ChatMessage; mine: boolean }) {
+  const { t } = useLocale();
   const isImage = !!msg.attachmentMime?.startsWith("image/");
   return (
     <div className={cn("flex", mine ? "justify-end" : "justify-start")}>
@@ -511,7 +519,7 @@ function MessageBubble({ msg, mine }: { msg: ChatMessage; mine: boolean }) {
               >
                 <img
                   src={msg.attachmentUrl}
-                  alt={msg.attachmentName ?? "Imagine"}
+                  alt={msg.attachmentName ?? t("vendor.venueMessages.imageAlt")}
                   className="max-h-72 rounded-lg object-cover"
                 />
               </a>
@@ -529,7 +537,7 @@ function MessageBubble({ msg, mine }: { msg: ChatMessage; mine: boolean }) {
               >
                 <FileText className="h-3.5 w-3.5" />
                 <span className="max-w-40 truncate">
-                  {msg.attachmentName ?? "Atașament"}
+                  {msg.attachmentName ?? t("vendor.venueMessages.attachment")}
                 </span>
                 <Download className="h-3 w-3 opacity-60" />
               </a>

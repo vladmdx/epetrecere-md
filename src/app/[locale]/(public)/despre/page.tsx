@@ -57,8 +57,8 @@ export default async function AboutPage({
         dangerouslySetInnerHTML={{
           __html: safeJsonLd([
             breadcrumbJsonLd([
-              { name: "Acasă", url: "https://epetrecere.md" },
-              { name: "Despre Noi", url: "https://epetrecere.md/despre" },
+              { name: t("nav.home", locale), url: "https://epetrecere.md" },
+              { name: t("nav.about", locale), url: "https://epetrecere.md/despre" },
             ]),
             organizationJsonLd(),
           ]),

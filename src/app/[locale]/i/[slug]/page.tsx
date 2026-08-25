@@ -4,32 +4,41 @@ import { db } from "@/lib/db";
 import { invitations, invitationGuests } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { generateMeta } from "@/lib/seo/generate-meta";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import { PublicInvitationView } from "./view";
 
 interface PageProps {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
   searchParams: Promise<{ rsvp?: string }>;
 }
 
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { locale: raw, slug } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const [inv] = await db
     .select()
     .from(invitations)
     .where(eq(invitations.slug, slug))
     .limit(1);
-  if (!inv) return generateMeta({ title: "Invitație", path: `/i/${slug}` });
+  if (!inv)
+    return generateMeta({
+      title: t("invite.fallbackTitle", locale),
+      path: `/i/${slug}`,
+      locale,
+    });
 
   const title =
-    inv.coupleNames || inv.hostName || "Ești invitat la un eveniment";
+    inv.coupleNames || inv.hostName || t("invite.meta.defaultTitle", locale);
   return generateMeta({
     title,
     description:
       inv.message ||
       `${title}${inv.eventDate ? ` · ${inv.eventDate}` : ""}${inv.ceremonyLocation ? ` · ${inv.ceremonyLocation}` : ""}`,
     path: `/i/${slug}`,
+    locale,
   });
 }
 

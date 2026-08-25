@@ -16,8 +16,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Calendar as CalendarIcon, Check, Copy } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 export function IcalSubscribeCard() {
+  const { t } = useLocale();
   const [path, setPath] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -45,10 +47,10 @@ export function IcalSubscribeCard() {
     try {
       await navigator.clipboard.writeText(fullUrl);
       setCopied(true);
-      toast.success("Link copiat!");
+      toast.success(t("referral.linkCopied"));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Nu am putut copia linkul.");
+      toast.error(t("vendor.icalCard.copyFailed"));
     }
   }
 
@@ -56,15 +58,13 @@ export function IcalSubscribeCard() {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <CalendarIcon className="h-4 w-4 text-gold" /> Sincronizează cu
-          calendarul tău
+          <CalendarIcon className="h-4 w-4 text-gold" />{" "}
+          {t("vendor.icalCard.title")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-xs text-muted-foreground">
-          Abonează-te la acest link în Google Calendar, Apple Calendar sau
-          Outlook și toate rezervările tale confirmate vor apărea automat.
-          Linkul este personal — nu-l da nimănui.
+          {t("vendor.icalCard.description")}
         </p>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input readOnly value={fullUrl} className="flex-1 font-mono text-xs" />
@@ -74,7 +74,7 @@ export function IcalSubscribeCard() {
             ) : (
               <Copy className="h-4 w-4" />
             )}
-            {copied ? "Copiat" : "Copiază"}
+            {copied ? t("vendor.icalCard.copied") : t("vendor.icalCard.copy")}
           </Button>
         </div>
       </CardContent>

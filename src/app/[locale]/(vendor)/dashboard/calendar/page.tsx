@@ -32,22 +32,49 @@ import {
   type EventTypeKey,
 } from "@/lib/events/normalize";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
+import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
 
-const DAYS = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"];
-const MONTHS = [
-  "Ianuarie",
-  "Februarie",
-  "Martie",
-  "Aprilie",
-  "Mai",
-  "Iunie",
-  "Iulie",
-  "August",
-  "Septembrie",
-  "Octombrie",
-  "Noiembrie",
-  "Decembrie",
+/** Monday-first, matching the grid layout. Labels come from the dictionary. */
+const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
+const MONTH_KEYS = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec",
+] as const;
+
+/** The recurring-block note is persisted, so it stays Romanian no matter
+ *  which language the partner is browsing in — the column is content, not UI. */
+const DAYS_RO = [
+  "Luni",
+  "Marți",
+  "Miercuri",
+  "Joi",
+  "Vineri",
+  "Sâmbătă",
+  "Duminică",
 ];
+
+/** Counted nouns need three Russian forms, which a flat dictionary can't hold. */
+const MONTH_NOUN: AllForms = {
+  ro: { one: "lună", few: "luni", many: "luni" },
+  ru: { one: "месяц", few: "месяца", many: "месяцев" },
+  en: { one: "month", other: "months" },
+};
+const BOOKING_NOUN: AllForms = {
+  ro: { one: "rezervare", few: "rezervări", many: "rezervări" },
+  ru: { one: "бронирование", few: "бронирования", many: "бронирований" },
+  en: { one: "booking", other: "bookings" },
+};
 
 /** F-S6 — Event type colors, keyed by the canonical event type. Keep colors
  *  distinct from status colors so owners can see both at a glance (status =
@@ -106,25 +133,25 @@ const EVENT_TYPE_STYLES: Record<
 
 const statusColors: Record<
   string,
-  { label: string; color: string; bg: string }
+  { labelKey: string; color: string; bg: string }
 > = {
   available: {
-    label: "Disponibil",
+    labelKey: "common.available",
     color: "text-success",
     bg: "bg-success/15 border-success/30",
   },
   booked: {
-    label: "Ocupat",
+    labelKey: "common.booked",
     color: "text-destructive",
     bg: "bg-destructive/15 border-destructive/30",
   },
   tentative: {
-    label: "Tentativ",
+    labelKey: "common.tentative",
     color: "text-warning",
     bg: "bg-warning/15 border-warning/30",
   },
   blocked: {
-    label: "Blocat",
+    labelKey: "common.blocked",
     color: "text-muted-foreground",
     bg: "bg-muted border-muted-foreground/20",
   },
@@ -155,6 +182,11 @@ interface Entity {
 }
 
 export default function VendorCalendarPage() {
+  const { t, locale } = useLocale();
+  const DAYS = DAY_KEYS.map((k) => t(`date.weekday.${k}`));
+  const DAYS_SHORT = DAY_KEYS.map((k) => t(`date.weekdayShort.${k}`));
+  const MONTHS = MONTH_KEYS.map((k) => t(`date.monthCap.${k}`));
+
   // F-S6 — resolve the current owner's entity (venue or artist) on mount so
   // the calendar can be used by both roles instead of hardcoding artistId=1.
   const [entity, setEntity] = useState<Entity | null>(null);
@@ -174,7 +206,7 @@ export default function VendorCalendarPage() {
   const [_selectedEndTime, setSelectedEndTime] = useState("22:00");
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState<WorkDay[]>(
-    DAYS.map((_, i) => ({
+    DAY_KEYS.map((_, i) => ({
       dayOfWeek: i,
       startTime: i < 5 ? "10:00" : "12:00",
       endTime: i < 5 ? "22:00" : "23:00",
@@ -470,16 +502,16 @@ export default function VendorCalendarPage() {
   async function submitManualBooking() {
     if (!entity || entity.type !== "artist" || !selectedDate) return;
     if (manualPackageId == null) {
-      toast.error("Alege durata (pachetul).");
+      toast.error(t("vendor.calPage.errPickPackage"));
       return;
     }
     if (!/^\d{2}:\d{2}$/.test(manualStartTime)) {
-      toast.error("Setează ora de început.");
+      toast.error(t("vendor.calPage.errStartTime"));
       return;
     }
     const priceNum = manualPrice === "" ? null : Number(manualPrice);
     if (priceNum != null && (!Number.isFinite(priceNum) || priceNum < 0)) {
-      toast.error("Preț invalid.");
+      toast.error(t("vendor.calPage.errPrice"));
       return;
     }
     setManualSaving(true);
@@ -499,36 +531,36 @@ export default function VendorCalendarPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut adăuga rezervarea");
+        toast.error(err.error || t("vendor.calPage.errAddBooking"));
         return;
       }
-      toast.success("Rezervare adăugată");
+      toast.success(t("vendor.calPage.bookingAdded"));
       setManualDialog(false);
       setManualNote("");
       setManualPackageId(null);
       setManualPrice("");
       await Promise.all([refreshDayBookings(), loadEvents()]);
     } catch {
-      toast.error("Eroare la salvare");
+      toast.error(t("vendor.calPage.errSave"));
     } finally {
       setManualSaving(false);
     }
   }
 
   async function deleteManualBooking(id: number) {
-    if (!confirm("Sigur ștergi această rezervare manuală?")) return;
+    if (!confirm(t("vendor.calPage.confirmDeleteManual"))) return;
     try {
       const res = await fetch(`/api/artist-bookings?id=${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
-        toast.error("Nu s-a putut șterge rezervarea");
+        toast.error(t("vendor.calPage.errDeleteBooking"));
         return;
       }
-      toast.success("Rezervare ștearsă");
+      toast.success(t("vendor.calPage.bookingDeleted"));
       await refreshDayBookings();
     } catch {
-      toast.error("Eroare la ștergere");
+      toast.error(t("vendor.calPage.errDelete"));
     }
   }
 
@@ -553,10 +585,10 @@ export default function VendorCalendarPage() {
       });
       if (!res.ok) throw new Error("save failed");
       await loadEvents();
-      toast.success("Ziua actualizată!");
+      toast.success(t("vendor.calPage.dayUpdated"));
       setSelectedDate(null);
     } catch {
-      toast.error("Eroare la salvare");
+      toast.error(t("vendor.calPage.errSave"));
     } finally {
       setSaving(false);
     }
@@ -578,9 +610,9 @@ export default function VendorCalendarPage() {
       });
       await loadEvents();
       setSelectedDate(null);
-      toast.success("Ziua marcată disponibilă");
+      toast.success(t("vendor.calPage.dayMarkedAvailable"));
     } catch {
-      toast.error("Eroare la ștergere");
+      toast.error(t("vendor.calPage.errDelete"));
     } finally {
       setSaving(false);
     }
@@ -595,9 +627,9 @@ export default function VendorCalendarPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ artistId: entity.id, schedule }),
       });
-      toast.success("Graficul de lucru salvat!");
+      toast.success(t("vendor.calPage.scheduleSaved"));
     } catch {
-      toast.error("Eroare la salvare");
+      toast.error(t("vendor.calPage.errSave"));
     } finally {
       setSaving(false);
     }
@@ -608,7 +640,7 @@ export default function VendorCalendarPage() {
     if (!entity) return;
     const offDays = schedule.filter((d) => !d.isWorking).map((d) => d.dayOfWeek);
     if (offDays.length === 0) {
-      toast.error("Toate zilele sunt lucrătoare — nu e nimic de blocat.");
+      toast.error(t("vendor.calPage.errAllWorking"));
       return;
     }
     setApplyingSchedule(true);
@@ -627,7 +659,7 @@ export default function VendorCalendarPage() {
         }
       }
       if (dates.length === 0) {
-        toast.error("Nu s-au găsit zile de blocat.");
+        toast.error(t("vendor.calPage.errNoDaysFound"));
         return;
       }
       const res = await fetch("/api/calendar", {
@@ -643,9 +675,11 @@ export default function VendorCalendarPage() {
       });
       if (!res.ok) throw new Error();
       await loadEvents();
-      toast.success(`${dates.length} zile libere blocate pe calendar (3 luni)`);
+      toast.success(
+        t("vendor.calPage.toastScheduleApplied", { n: dates.length }),
+      );
     } catch {
-      toast.error("Eroare la aplicarea graficului");
+      toast.error(t("vendor.calPage.errApplySchedule"));
     } finally {
       setApplyingSchedule(false);
     }
@@ -654,15 +688,15 @@ export default function VendorCalendarPage() {
   /** Block a date range (vacation / unavailable period) */
   async function blockPeriod() {
     if (!entity || !blockFrom || !blockTo) {
-      toast.error("Selectează data de început și sfârșit");
+      toast.error(t("vendor.calPage.errPickRange"));
       return;
     }
     if (blockFrom < todayStr) {
-      toast.error("Nu poți bloca zile din trecut");
+      toast.error(t("vendor.calPage.errPastDays"));
       return;
     }
     if (blockFrom > blockTo) {
-      toast.error("Data de început trebuie să fie înainte de data de sfârșit");
+      toast.error(t("vendor.calPage.errRangeOrder"));
       return;
     }
     setBlockingPeriod(true);
@@ -676,7 +710,7 @@ export default function VendorCalendarPage() {
         );
       }
       if (dates.length > 180) {
-        toast.error("Perioada nu poate depăși 180 de zile");
+        toast.error(t("vendor.calPage.errRangeTooLong"));
         return;
       }
       const res = await fetch("/api/calendar", {
@@ -692,11 +726,11 @@ export default function VendorCalendarPage() {
       });
       if (!res.ok) throw new Error();
       await loadEvents();
-      toast.success(`${dates.length} zile blocate!`);
+      toast.success(t("vendor.calPage.toastDaysBlocked", { n: dates.length }));
       setBlockFrom("");
       setBlockTo("");
     } catch {
-      toast.error("Eroare la blocarea perioadei");
+      toast.error(t("vendor.calPage.errBlockPeriod"));
     } finally {
       setBlockingPeriod(false);
     }
@@ -710,7 +744,7 @@ export default function VendorCalendarPage() {
 
   async function blockWeekdays() {
     if (!entity || blockedWeekdays.length === 0) {
-      toast.error("Selectează cel puțin o zi din săptămână");
+      toast.error(t("vendor.calPage.errPickWeekday"));
       return;
     }
     setBlockingWeekdays(true);
@@ -736,17 +770,21 @@ export default function VendorCalendarPage() {
           entity_id: entity.id,
           dates,
           status: "blocked",
-          note: `Zi blocată recurent (${blockedWeekdays.map((d) => DAYS[d]).join(", ")})`,
+          note: `Zi blocată recurent (${blockedWeekdays.map((d) => DAYS_RO[d]).join(", ")})`,
         }),
       });
       if (!res.ok) throw new Error();
       await loadEvents();
       toast.success(
-        `${dates.length} zile blocate (fiecare ${blockedWeekdays.map((d) => DAYS[d]).join(", ")} pe ${blockWeekdayMonths} luni)`,
+        t("vendor.calPage.toastWeekdaysBlocked", {
+          n: dates.length,
+          days: blockedWeekdays.map((d) => DAYS[d]).join(", "),
+          months: plural(blockWeekdayMonths, locale, MONTH_NOUN),
+        }),
       );
       setBlockedWeekdays([]);
     } catch {
-      toast.error("Eroare la blocarea zilelor");
+      toast.error(t("vendor.calPage.errBlockWeekdays"));
     } finally {
       setBlockingWeekdays(false);
     }
@@ -763,8 +801,7 @@ export default function VendorCalendarPage() {
   if (!entity) {
     return (
       <div className="rounded-xl border border-border/40 bg-card p-6 text-sm text-muted-foreground">
-        Nu am găsit un profil de artist sau sală asociat contului tău.
-        Finalizează mai întâi onboarding-ul.
+        {t("vendor.calPage.noEntity")}
       </div>
     );
   }
@@ -773,20 +810,24 @@ export default function VendorCalendarPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Calendar & Program</h1>
+          <h1 className="font-heading text-2xl font-bold">
+            {t("vendor.calPage.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
             {entity.type === "venue"
-              ? `Gestionează disponibilitatea pentru ${entity.name}`
-              : `Gestionează disponibilitatea și graficul de lucru pentru ${entity.name}`}
+              ? t("vendor.calPage.subtitleVenue", { name: entity.name })
+              : t("vendor.calPage.subtitleArtist", { name: entity.name })}
           </p>
         </div>
       </div>
 
       <Tabs defaultValue="calendar">
         <TabsList>
-          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          <TabsTrigger value="calendar">{t("vendor.calendar")}</TabsTrigger>
           {entity.type === "artist" && (
-            <TabsTrigger value="schedule">Grafic de Lucru</TabsTrigger>
+            <TabsTrigger value="schedule">
+              {t("vendor.calPage.tabSchedule")}
+            </TabsTrigger>
           )}
         </TabsList>
 
@@ -808,7 +849,7 @@ export default function VendorCalendarPage() {
                           : "bg-muted-foreground",
                   )}
                 />
-                {cfg.label}
+                {t(cfg.labelKey)}
               </span>
             ))}
           </div>
@@ -816,7 +857,7 @@ export default function VendorCalendarPage() {
           {/* F-S6 — Event-type legend */}
           <div className="flex flex-wrap gap-3 rounded-lg border border-border/40 bg-card/50 p-3">
             <span className="text-xs font-medium text-muted-foreground">
-              Tip eveniment:
+              {t("vendor.calPage.eventTypeLegend")}
             </span>
             {ALL_EVENT_TYPES.map((key) => (
               <span key={key} className="flex items-center gap-1.5 text-xs">
@@ -826,7 +867,7 @@ export default function VendorCalendarPage() {
                     EVENT_TYPE_STYLES[key].dot,
                   )}
                 />
-                {eventTypeLabel(key)}
+                {eventTypeLabel(key, locale)}
               </span>
             ))}
           </div>
@@ -839,7 +880,7 @@ export default function VendorCalendarPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Luna precedentă"
+                    aria-label={t("vendor.calPage.prevMonth")}
                     onClick={() =>
                       setCurrentMonth((c) =>
                         c.month === 0
@@ -856,7 +897,7 @@ export default function VendorCalendarPage() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    aria-label="Luna următoare"
+                    aria-label={t("calendar.nextMonth")}
                     onClick={() =>
                       setCurrentMonth((c) =>
                         c.month === 11
@@ -871,12 +912,12 @@ export default function VendorCalendarPage() {
               </CardHeader>
               <CardContent>
                 <div className="mb-2 grid grid-cols-7 text-center">
-                  {DAYS.map((d) => (
+                  {DAYS_SHORT.map((d, i) => (
                     <div
-                      key={d}
+                      key={DAY_KEYS[i]}
                       className="py-2 text-xs font-medium text-muted-foreground"
                     >
-                      {d.substring(0, 2)}
+                      {d}
                     </div>
                   ))}
                 </div>
@@ -940,17 +981,21 @@ export default function VendorCalendarPage() {
                         )}
                         title={
                           isPast
-                            ? "Zilele trecute nu pot fi modificate"
+                            ? t("vendor.calPage.tipPast")
                             : isBlocked
-                              ? "Zi blocată — apasă pentru a debloca"
+                              ? t("vendor.calPage.tipBlocked")
                               : isBooked
-                                ? "Zi ocupată"
+                                ? t("vendor.calPage.tipBooked")
                                 : isTentative
-                                  ? "Zi tentativă"
+                                  ? t("vendor.calPage.tipTentative")
                                   : isAvailable
-                                    ? "Zi disponibilă"
+                                    ? t("vendor.calPage.tipAvailable")
                                     : bookingsForDay.length > 0
-                                      ? `${bookingsForDay.length} ${bookingsForDay.length === 1 ? "rezervare" : "rezervări"}`
+                                      ? plural(
+                                          bookingsForDay.length,
+                                          locale,
+                                          BOOKING_NOUN,
+                                        )
                                       : undefined
                         }
                       >
@@ -1007,7 +1052,9 @@ export default function VendorCalendarPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">
-                  {selectedDate ? `Detalii: ${selectedDate}` : "Selectează o zi"}
+                  {selectedDate
+                    ? t("vendor.calPage.detailsFor", { date: selectedDate })
+                    : t("vendor.calPage.pickADay")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -1018,7 +1065,9 @@ export default function VendorCalendarPage() {
                       <div className="rounded-lg border border-border/40 bg-background/40 p-3">
                         <div className="mb-2 flex items-center justify-between gap-2">
                           <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                            Rezervări pe {selectedDate}
+                            {t("vendor.calPage.bookingsOn", {
+                              date: selectedDate,
+                            })}
                             {!dayBookingsLoading && (
                               <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[10px] font-bold text-gold">
                                 {dayBookings.length}
@@ -1037,34 +1086,34 @@ export default function VendorCalendarPage() {
                             }}
                             className="gap-1 border-gold/40 text-gold hover:bg-gold/10"
                           >
-                            + Adaugă rezervare
+                            {t("vendor.calPage.addBooking")}
                           </Button>
                         </div>
                         {dayBookingsLoading ? (
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            Se încarcă…
+                            {t("vendor.calPage.loading")}
                           </div>
                         ) : dayBookings.length === 0 ? (
                           <p className="text-xs text-muted-foreground">
-                            Nicio rezervare pe această zi.
+                            {t("vendor.calPage.noBookingsToday")}
                           </p>
                         ) : (
                           <ul className="space-y-2">
                             {dayBookings.map((b) => {
                               const statusLabel =
                                 b.status === "pending"
-                                  ? "În așteptare"
+                                  ? t("vendor.calPage.stPending")
                                   : b.status === "accepted"
-                                    ? "Acceptată"
+                                    ? t("vendor.calPage.stAccepted")
                                     : b.status === "confirmed_by_client"
-                                      ? "Confirmată"
+                                      ? t("vendor.calPage.stConfirmed")
                                       : b.status === "rejected"
-                                        ? "Refuzată"
+                                        ? t("vendor.calPage.stRejected")
                                         : b.status === "cancelled"
-                                          ? "Anulată"
+                                          ? t("vendor.calPage.stCancelled")
                                           : b.status === "completed"
-                                            ? "Finalizată"
+                                            ? t("vendor.calPage.stCompleted")
                                             : b.status;
                               const statusColor =
                                 b.status === "pending"
@@ -1085,7 +1134,7 @@ export default function VendorCalendarPage() {
                                       {b.clientName}
                                       {b.source === "manual" && (
                                         <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase text-muted-foreground">
-                                          Manual
+                                          {t("vendor.calPage.manualBadge")}
                                         </span>
                                       )}
                                     </span>
@@ -1103,7 +1152,7 @@ export default function VendorCalendarPage() {
                                           type="button"
                                           onClick={() => deleteManualBooking(b.id)}
                                           className="rounded p-0.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                          title="Șterge rezervarea manuală"
+                                          title={t("vendor.calPage.deleteManual")}
                                         >
                                           <X className="h-3 w-3" />
                                         </button>
@@ -1121,11 +1170,19 @@ export default function VendorCalendarPage() {
                                         📋{" "}
                                         {eventTypeLabel(
                                           normalizeEventType(b.eventType),
+                                          locale,
                                         )}
                                       </span>
                                     )}
                                     {b.guestCount != null && (
-                                      <span>👥 {b.guestCount} invitați</span>
+                                      <span>
+                                        👥{" "}
+                                        {plural(
+                                          b.guestCount,
+                                          locale,
+                                          NOUNS.guests,
+                                        )}
+                                      </span>
                                     )}
                                     {b.agreedPrice != null && (
                                       <span className="font-bold text-gold">
@@ -1161,7 +1218,7 @@ export default function VendorCalendarPage() {
                         ) : (
                           <X className="h-4 w-4" />
                         )}
-                        Deblochează ziua
+                        {t("vendor.calPage.unblockDay")}
                       </Button>
                     ) : (
                       <Button
@@ -1183,14 +1240,13 @@ export default function VendorCalendarPage() {
                         ) : (
                           <X className="h-4 w-4" />
                         )}
-                        Blochează ziua
+                        {t("vendor.calPage.blockDay")}
                       </Button>
                     )}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    Click pe o zi din calendar pentru a vedea rezervările și
-                    pentru a adăuga altele noi.
+                    {t("vendor.calPage.emptyPanel")}
                   </p>
                 )}
               </CardContent>
@@ -1205,9 +1261,9 @@ export default function VendorCalendarPage() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle>Grafic de Lucru Săptămânal</CardTitle>
+                    <CardTitle>{t("vendor.calPage.weeklyTitle")}</CardTitle>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Setează zilele și orele în care ești disponibil
+                      {t("vendor.calPage.weeklySubtitle")}
                     </p>
                   </div>
                   <Button
@@ -1220,7 +1276,7 @@ export default function VendorCalendarPage() {
                     ) : (
                       <Save className="h-4 w-4" />
                     )}{" "}
-                    Salvează
+                    {t("common.save")}
                   </Button>
                 </div>
               </CardHeader>
@@ -1262,7 +1318,7 @@ export default function VendorCalendarPage() {
                       </>
                     ) : (
                       <span className="text-sm text-destructive/70 font-medium">
-                        Zi liberă
+                        {t("vendor.calPage.dayOff")}
                       </span>
                     )}
                   </div>
@@ -1272,14 +1328,16 @@ export default function VendorCalendarPage() {
                   <div className="rounded-lg border border-dashed border-gold/40 bg-gold/5 p-4">
                     <div className="flex items-center justify-between gap-4">
                       <div>
-                        <p className="text-sm font-medium">Aplică zilele libere pe calendar</p>
+                        <p className="text-sm font-medium">
+                          {t("vendor.calPage.applyDaysOffTitle")}
+                        </p>
                         <p className="text-xs text-muted-foreground">
-                          Marchează automat{" "}
-                          {schedule
-                            .filter((d) => !d.isWorking)
-                            .map((d) => DAYS[d.dayOfWeek])
-                            .join(", ")}{" "}
-                          ca „blocate” pe următoarele 3 luni
+                          {t("vendor.calPage.applyDaysOffHint", {
+                            days: schedule
+                              .filter((d) => !d.isWorking)
+                              .map((d) => DAYS[d.dayOfWeek])
+                              .join(", "),
+                          })}
                         </p>
                       </div>
                       <Button
@@ -1293,7 +1351,7 @@ export default function VendorCalendarPage() {
                         ) : (
                           <CalendarIcon className="h-4 w-4" />
                         )}
-                        Aplică
+                        {t("vendor.calPage.apply")}
                       </Button>
                     </div>
                   </div>
@@ -1304,9 +1362,9 @@ export default function VendorCalendarPage() {
             {/* Block specific weekdays */}
             <Card>
               <CardHeader>
-                <CardTitle>Blochează Zile din Săptămână</CardTitle>
+                <CardTitle>{t("vendor.calPage.blockWeekdaysTitle")}</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Selectează zilele săptămânii care să fie marcate ca indisponibile recurent
+                  {t("vendor.calPage.blockWeekdaysSubtitle")}
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -1329,7 +1387,7 @@ export default function VendorCalendarPage() {
                 </div>
                 <div className="flex flex-wrap items-end gap-3">
                   <div>
-                    <Label>Pe câte luni înainte</Label>
+                    <Label>{t("vendor.calPage.howManyMonths")}</Label>
                     <div className="mt-1 flex gap-2">
                       {[1, 2, 3, 6].map((m) => (
                         <button
@@ -1343,7 +1401,7 @@ export default function VendorCalendarPage() {
                               : "border-border/40 hover:bg-accent",
                           )}
                         >
-                          {m} {m === 1 ? "lună" : "luni"}
+                          {plural(m, locale, MONTH_NOUN)}
                         </button>
                       ))}
                     </div>
@@ -1359,14 +1417,18 @@ export default function VendorCalendarPage() {
                     ) : (
                       <CalendarIcon className="h-4 w-4" />
                     )}
-                    Blochează zilele
+                    {t("vendor.calPage.blockDaysButton")}
                   </Button>
                 </div>
                 {blockedWeekdays.length > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Fiecare <strong>{blockedWeekdays.map((d) => DAYS[d]).join(", ")}</strong> va fi
-                    marcat(ă) ca blocat(ă) pe următoarele {blockWeekdayMonths}{" "}
-                    {blockWeekdayMonths === 1 ? "lună" : "luni"}
+                    {t("vendor.calPage.weekdayPreviewBefore")}{" "}
+                    <strong>
+                      {blockedWeekdays.map((d) => DAYS[d]).join(", ")}
+                    </strong>{" "}
+                    {t("vendor.calPage.weekdayPreviewAfter", {
+                      months: plural(blockWeekdayMonths, locale, MONTH_NOUN),
+                    })}
                   </p>
                 )}
               </CardContent>
@@ -1375,15 +1437,15 @@ export default function VendorCalendarPage() {
             {/* Block period */}
             <Card>
               <CardHeader>
-                <CardTitle>Blochează Perioadă</CardTitle>
+                <CardTitle>{t("vendor.calPage.blockPeriodTitle")}</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Marchează o perioadă ca indisponibilă (vacanță, concediu, etc.)
+                  {t("vendor.calPage.blockPeriodSubtitle")}
                 </p>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap items-end gap-3">
                   <div className="flex-1 min-w-[140px]">
-                    <Label>De la</Label>
+                    <Label>{t("vendor.calPage.from")}</Label>
                     <Input
                       type="date"
                       value={blockFrom}
@@ -1392,7 +1454,7 @@ export default function VendorCalendarPage() {
                     />
                   </div>
                   <div className="flex-1 min-w-[140px]">
-                    <Label>Până la</Label>
+                    <Label>{t("vendor.calPage.to")}</Label>
                     <Input
                       type="date"
                       value={blockTo}
@@ -1411,12 +1473,19 @@ export default function VendorCalendarPage() {
                     ) : (
                       <X className="h-4 w-4" />
                     )}
-                    Blochează
+                    {t("vendor.calPage.block")}
                   </Button>
                 </div>
                 {blockFrom && blockTo && blockFrom <= blockTo && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    {Math.ceil((new Date(blockTo).getTime() - new Date(blockFrom).getTime()) / 86400000) + 1} zile vor fi marcate ca blocate
+                    {t("vendor.calPage.rangePreview", {
+                      n:
+                        Math.ceil(
+                          (new Date(blockTo).getTime() -
+                            new Date(blockFrom).getTime()) /
+                            86400000,
+                        ) + 1,
+                    })}
                   </p>
                 )}
               </CardContent>
@@ -1429,18 +1498,22 @@ export default function VendorCalendarPage() {
       <Dialog open={manualDialog} onOpenChange={setManualDialog}>
         <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Adaugă rezervare manuală</DialogTitle>
+            <DialogTitle>{t("vendor.calPage.manualTitle")}</DialogTitle>
           </DialogHeader>
           {selectedDate && (
             <div className="space-y-3 py-2">
               <div className="rounded-md border border-border/40 bg-background/60 px-3 py-2 text-xs">
-                <span className="text-muted-foreground">Ziua:</span>{" "}
+                <span className="text-muted-foreground">
+                  {t("vendor.calPage.dayLabel")}
+                </span>{" "}
                 <span className="font-medium">{selectedDate}</span>
               </div>
 
               {/* Start time */}
               <div>
-                <Label className="text-xs">Ora de început *</Label>
+                <Label className="text-xs">
+                  {t("vendor.calPage.startTimeLabel")}
+                </Label>
                 <div className="mt-1">
                   <TimePicker
                     value={manualStartTime}
@@ -1465,10 +1538,12 @@ export default function VendorCalendarPage() {
 
               {/* Duration — pick a package */}
               <div>
-                <Label className="text-xs">Durata (pachet) *</Label>
+                <Label className="text-xs">
+                  {t("vendor.calPage.durationLabel")}
+                </Label>
                 {packages.length === 0 ? (
                   <p className="mt-1 rounded-md border border-dashed border-border/40 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
-                    Nu ai pachete definite. Adaugă tarife la{" "}
+                    {t("vendor.calPage.noPackages")}{" "}
                     <a
                       href="/dashboard/tarife"
                       className="text-gold underline"
@@ -1517,20 +1592,24 @@ export default function VendorCalendarPage() {
 
               {/* Price (auto-filled, editable) */}
               <div>
-                <Label className="text-xs">Preț (€)</Label>
+                <Label className="text-xs">
+                  {t("vendor.calPage.priceLabel")}
+                </Label>
                 <Input
                   type="number"
                   min="0"
                   value={manualPrice}
                   onChange={(e) => setManualPrice(e.target.value)}
-                  placeholder="Preluat automat din pachet"
+                  placeholder={t("vendor.calPage.pricePlaceholder")}
                   className="mt-1"
                 />
               </div>
 
               {/* Event type — drives the dot color on the calendar grid */}
               <div>
-                <Label className="text-xs">Tip eveniment</Label>
+                <Label className="text-xs">
+                  {t("vendor.calPage.eventTypeLabel")}
+                </Label>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {ALL_EVENT_TYPES.map((key) => {
                     const selected = manualEventType === key;
@@ -1552,7 +1631,7 @@ export default function VendorCalendarPage() {
                             EVENT_TYPE_STYLES[key].dot,
                           )}
                         />
-                        {eventTypeLabel(key)}
+                        {eventTypeLabel(key, locale)}
                       </button>
                     );
                   })}
@@ -1562,7 +1641,7 @@ export default function VendorCalendarPage() {
               {/* Note */}
               <div>
                 <Label className="text-xs">
-                  Note (ex: Nuntă Popescu, Restaurant Codru)
+                  {t("vendor.calPage.noteLabel")}
                 </Label>
                 <Textarea
                   value={manualNote}
@@ -1570,7 +1649,7 @@ export default function VendorCalendarPage() {
                   rows={2}
                   maxLength={500}
                   className="mt-1"
-                  placeholder="Detalii despre rezervare…"
+                  placeholder={t("vendor.calPage.notePlaceholder")}
                 />
               </div>
 
@@ -1588,7 +1667,7 @@ export default function VendorCalendarPage() {
                 const endStr = `${String(eh).padStart(2, "0")}:${String(em).padStart(2, "0")}`;
                 return (
                   <div className="rounded-md border border-gold/30 bg-gold/5 px-3 py-2 text-xs">
-                    Interval:{" "}
+                    {t("vendor.calPage.intervalLabel")}{" "}
                     <strong>{manualStartTime}</strong>
                     {" – "}
                     <strong>{endStr}</strong>
@@ -1611,7 +1690,7 @@ export default function VendorCalendarPage() {
               onClick={() => setManualDialog(false)}
               disabled={manualSaving}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             {/* Save stays enabled — submitManualBooking surfaces a
                 specific toast for each missing field. The earlier
@@ -1628,7 +1707,7 @@ export default function VendorCalendarPage() {
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Salvează
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>

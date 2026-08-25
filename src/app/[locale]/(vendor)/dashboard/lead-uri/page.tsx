@@ -19,6 +19,7 @@ import {
   Eye,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 // M3 #8 — Vendor "Lead-uri noi" dashboard.
 // Lists matches produced by the lead engine, with credit balance + unlock /
@@ -54,6 +55,7 @@ interface Credits {
 }
 
 export default function LeadMatchesPage() {
+  const { t } = useLocale();
   const [matches, setMatches] = useState<LeadMatch[]>([]);
   const [_credits, setCredits] = useState<Credits | null>(null);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,7 @@ export default function LeadMatchesPage() {
       setMatches(data.matches ?? []);
       setCredits(data.credits ?? null);
     } catch {
-      toast.error("Nu s-au putut încărca lead-urile.");
+      toast.error(t("vendor.leadsPage.loadError"));
     } finally {
       setLoading(false);
     }
@@ -86,16 +88,20 @@ export default function LeadMatchesPage() {
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 402) {
-          toast.error("Credite insuficiente. Contactează administratorul pentru top-up.");
+          toast.error(t("vendor.leadsPage.noCredits"));
         } else {
-          toast.error(data.error || "Unlock eșuat.");
+          toast.error(data.error || t("vendor.leadsPage.unlockFailed"));
         }
         return;
       }
-      toast.success(data.alreadyUnlocked ? "Deja deblocat" : "Lead deblocat!");
+      toast.success(
+        data.alreadyUnlocked
+          ? t("vendor.leadsPage.alreadyUnlocked")
+          : t("vendor.leadsPage.unlocked"),
+      );
       await load();
     } catch {
-      toast.error("Eroare la deblocare.");
+      toast.error(t("vendor.leadsPage.unlockError"));
     } finally {
       setUnlocking(null);
     }
@@ -109,10 +115,10 @@ export default function LeadMatchesPage() {
         body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Status actualizat.");
+      toast.success(t("vendor.leadsPage.statusUpdated"));
       await load();
     } catch {
-      toast.error("Nu s-a putut schimba statusul.");
+      toast.error(t("vendor.leadsPage.statusError"));
     }
   }
 
@@ -128,9 +134,9 @@ export default function LeadMatchesPage() {
     <div className="mx-auto max-w-6xl p-6">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="font-heading text-2xl font-bold">Lead-uri noi</h1>
+          <h1 className="font-heading text-2xl font-bold">{t("vendor.leadsPage.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Clienți care caută vendori potriviți — contactele sunt disponibile gratuit.
+            {t("vendor.leadsPage.subtitle")}
           </p>
         </div>
       </div>
@@ -138,11 +144,11 @@ export default function LeadMatchesPage() {
       {/* Filters */}
       <div className="mb-4 flex flex-wrap gap-2">
         {([
-          ["all", "Toate", matches.length],
-          ["new", "Noi", matches.filter((m) => m.status === "matched" || m.status === "seen").length],
-          ["unlocked", "Deblocate", matches.filter((m) => m.status === "unlocked" || m.status === "contacted").length],
-          ["won", "Câștigate", matches.filter((m) => m.status === "won").length],
-        ] as const).map(([key, label, count]) => (
+          ["all", "common.all", matches.length],
+          ["new", "vendor.leadsPage.filterNew", matches.filter((m) => m.status === "matched" || m.status === "seen").length],
+          ["unlocked", "vendor.leadsPage.filterUnlocked", matches.filter((m) => m.status === "unlocked" || m.status === "contacted").length],
+          ["won", "vendor.leadsPage.filterWon", matches.filter((m) => m.status === "won").length],
+        ] as const).map(([key, labelKey, count]) => (
           <button
             key={key}
             onClick={() => setFilter(key)}
@@ -153,24 +159,23 @@ export default function LeadMatchesPage() {
                 : "border-border/40 hover:border-gold/30",
             )}
           >
-            {label} <span className="ml-1 text-muted-foreground">({count})</span>
+            {t(labelKey)} <span className="ml-1 text-muted-foreground">({count})</span>
           </button>
         ))}
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground">
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Se încarcă…
+          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> {t("vendor.leadsPage.loading")}
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/40 bg-card py-16 text-center">
           <Flame className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
           <p className="text-muted-foreground">
-            Niciun lead în această categorie încă.
+            {t("vendor.leadsPage.empty")}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Lead-uri noi vor apărea automat când clienți care potrivesc profilul tău completează
-            planificatorul sau formularul de solicitare.
+            {t("vendor.leadsPage.emptyHint")}
           </p>
         </div>
       ) : (
@@ -199,13 +204,14 @@ function LeadMatchCard({
   onUnlock?: () => void;
   onStatus: (status: "contacted" | "won" | "lost") => void;
 }) {
-  const statusConfig: Record<LeadMatch["status"], { label: string; variant: string }> = {
-    matched: { label: "Nou", variant: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
-    seen: { label: "Văzut", variant: "bg-muted text-muted-foreground border-border/40" },
-    unlocked: { label: "Deblocat", variant: "bg-gold/10 text-gold border-gold/30" },
-    contacted: { label: "Contactat", variant: "bg-purple-500/10 text-purple-500 border-purple-500/30" },
-    won: { label: "Câștigat", variant: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" },
-    lost: { label: "Pierdut", variant: "bg-red-500/10 text-red-500 border-red-500/30" },
+  const { t } = useLocale();
+  const statusConfig: Record<LeadMatch["status"], { labelKey: string; variant: string }> = {
+    matched: { labelKey: "vendor.leadsPage.statusNew", variant: "bg-blue-500/10 text-blue-500 border-blue-500/30" },
+    seen: { labelKey: "vendor.leadsPage.statusSeen", variant: "bg-muted text-muted-foreground border-border/40" },
+    unlocked: { labelKey: "vendor.leadsPage.statusUnlocked", variant: "bg-gold/10 text-gold border-gold/30" },
+    contacted: { labelKey: "vendor.leadsPage.statusContacted", variant: "bg-purple-500/10 text-purple-500 border-purple-500/30" },
+    won: { labelKey: "vendor.leadsPage.statusWon", variant: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" },
+    lost: { labelKey: "vendor.leadsPage.statusLost", variant: "bg-red-500/10 text-red-500 border-red-500/30" },
   };
   const cfg = statusConfig[match.status];
 
@@ -214,10 +220,11 @@ function LeadMatchCard({
       {/* Header */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Badge className={cn("border", cfg.variant)}>{cfg.label}</Badge>
+          <Badge className={cn("border", cfg.variant)}>{t(cfg.labelKey)}</Badge>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <TrendingUp className="h-3.5 w-3.5" />
-            Scor: <span className="font-semibold text-foreground">{match.score}</span>
+            {t("vendor.leadsPage.score")}{" "}
+            <span className="font-semibold text-foreground">{match.score}</span>
           </div>
         </div>
         <span className="text-xs text-muted-foreground">
@@ -253,7 +260,7 @@ function LeadMatchCard({
         {match.lead.guestCount && (
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <Users className="h-3.5 w-3.5" />
-            {match.lead.guestCount} invitați
+            {match.lead.guestCount} {t("common.guests")}
           </div>
         )}
       </div>
@@ -261,7 +268,8 @@ function LeadMatchCard({
       {match.lead.budget && (
         <div className="mb-3 inline-flex items-center gap-1 rounded-lg bg-muted px-2 py-1 text-xs">
           <Wallet className="h-3 w-3 text-gold" />
-          Buget: <span className="font-semibold">{match.lead.budget}€</span>
+          {t("vendor.leadsPage.budget")}{" "}
+          <span className="font-semibold">{match.lead.budget}€</span>
         </div>
       )}
 
@@ -310,15 +318,15 @@ function LeadMatchCard({
       <div className="flex flex-wrap gap-2">
         {(match.status === "matched" || match.status === "seen" || match.status === "unlocked") ? (
           <Button size="sm" variant="outline" onClick={() => onStatus("contacted")} className="gap-1">
-            <Eye className="h-3.5 w-3.5" /> Marchează contactat
+            <Eye className="h-3.5 w-3.5" /> {t("vendor.leadsPage.markContacted")}
           </Button>
         ) : match.status === "contacted" ? (
           <>
             <Button size="sm" onClick={() => onStatus("won")} className="gap-1 bg-emerald-500 text-white hover:bg-emerald-600">
-              <CheckCircle2 className="h-3.5 w-3.5" /> Câștigat
+              <CheckCircle2 className="h-3.5 w-3.5" /> {t("vendor.leadsPage.statusWon")}
             </Button>
             <Button size="sm" variant="outline" onClick={() => onStatus("lost")} className="gap-1">
-              <XCircle className="h-3.5 w-3.5" /> Pierdut
+              <XCircle className="h-3.5 w-3.5" /> {t("vendor.leadsPage.statusLost")}
             </Button>
           </>
         ) : null}

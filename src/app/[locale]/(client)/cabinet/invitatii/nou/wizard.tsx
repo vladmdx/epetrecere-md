@@ -24,6 +24,7 @@ import { Progress } from "@/components/ui/progress";
 import { INVITATION_DESIGN_LIST, type InvitationDesignId } from "@/lib/invitations/templates";
 import { TimePicker } from "@/components/ui/time-picker";
 import { Calendar as CalendarIcon, Phone as PhoneIcon, MessageCircle, Mail } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Guest {
   name: string;
@@ -34,17 +35,17 @@ interface Guest {
 }
 
 const EVENT_TYPES = [
-  { value: "wedding", label: "Nuntă", icon: Heart },
-  { value: "birthday", label: "Aniversare", icon: Cake },
-  { value: "baptism", label: "Botez / Cumătrie", icon: Baby },
-  { value: "corporate", label: "Corporate", icon: Briefcase },
+  { value: "wedding", labelKey: "cabinet.inviteWizard.types.wedding", icon: Heart },
+  { value: "birthday", labelKey: "cabinet.inviteWizard.types.birthday", icon: Cake },
+  { value: "baptism", labelKey: "cabinet.inviteWizard.types.baptism", icon: Baby },
+  { value: "corporate", labelKey: "cabinet.inviteWizard.types.corporate", icon: Briefcase },
 ] as const;
 
-const STEPS = [
-  "Alege template",
-  "Detalii eveniment",
-  "Lista de invitați",
-  "Revizuire & publicare",
+const STEP_KEYS = [
+  "cabinet.inviteWizard.steps.template",
+  "cabinet.inviteWizard.steps.details",
+  "cabinet.inviteWizard.steps.guests",
+  "cabinet.inviteWizard.steps.review",
 ];
 
 function ThemedDateInput({
@@ -76,6 +77,7 @@ function ThemedDateInput({
 }
 
 export function InvitationWizard() {
+  const { t } = useLocale();
   const router = useRouter();
   const { isLoaded, isSignedIn } = useUser();
   const [step, setStep] = useState(0);
@@ -114,9 +116,7 @@ export function InvitationWizard() {
       (newGuest.phone && newGuest.phone.trim().length > 0) ||
       (newGuest.whatsapp && newGuest.whatsapp.trim().length > 0);
     if (!hasContact) {
-      alert(
-        "Adaugă cel puțin un contact (email, telefon sau WhatsApp) pentru ca invitatul să poată confirma prezența.",
-      );
+      alert(t("cabinet.inviteWizard.contactRequiredAlert"));
       return;
     }
     setData((d) => ({ ...d, guests: [...d.guests, { ...newGuest }] }));
@@ -164,20 +164,20 @@ export function InvitationWizard() {
       });
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error || "Eroare la salvare");
+        alert(err.error || t("cabinet.inviteWizard.saveError"));
         return;
       }
       const created = await res.json();
       router.push(`/cabinet/invitatii/${created.id}`);
     } catch {
-      alert("Eroare de rețea");
+      alert(t("cabinet.inviteWizard.networkError"));
     } finally {
       setSaving(false);
     }
   }
 
   function next() {
-    if (step < STEPS.length - 1) setStep(step + 1);
+    if (step < STEP_KEYS.length - 1) setStep(step + 1);
     else void handleSubmit();
   }
 
@@ -196,12 +196,12 @@ export function InvitationWizard() {
   if (!isSignedIn) {
     return (
       <div className="mx-auto max-w-2xl px-4 py-20 text-center lg:px-8">
-        <h1 className="font-heading text-2xl font-bold">Autentifică-te</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("cabinet.inviteWizard.signInTitle")}</h1>
         <Link
           href="/sign-in?redirect_url=/cabinet/invitatii/nou"
           className="mt-4 inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
         >
-          Conectează-te
+          {t("cabinet.inviteWizard.signInCta")}
         </Link>
       </div>
     );
@@ -211,14 +211,14 @@ export function InvitationWizard() {
     <div className="mx-auto max-w-3xl px-4 py-12 lg:px-8">
       <div className="text-center">
         <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">
-          Pas {step + 1} din {STEPS.length}
+          {t("cabinet.inviteWizard.stepCounter", { current: step + 1, total: STEP_KEYS.length })}
         </p>
         <h1 className="font-heading text-2xl font-bold md:text-3xl">
-          {STEPS[step]}
+          {t(STEP_KEYS[step])}
         </h1>
       </div>
       <Progress
-        value={((step + 1) / STEPS.length) * 100}
+        value={((step + 1) / STEP_KEYS.length) * 100}
         className="mt-6 h-1.5"
       />
 
@@ -227,7 +227,7 @@ export function InvitationWizard() {
         {step === 0 && (
           <div className="space-y-6">
             <div>
-              <Label className="mb-3 block">Tipul evenimentului</Label>
+              <Label className="mb-3 block">{t("cabinet.inviteWizard.eventTypeLabel")}</Label>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {EVENT_TYPES.map((et) => {
                   const Icon = et.icon;
@@ -248,7 +248,7 @@ export function InvitationWizard() {
                     >
                       <Icon className="mx-auto h-5 w-5 text-gold" />
                       <div className="mt-1 text-sm font-medium">
-                        {et.label}
+                        {t(et.labelKey)}
                       </div>
                     </button>
                   );
@@ -257,7 +257,7 @@ export function InvitationWizard() {
             </div>
 
             <div>
-              <Label className="mb-3 block">Design invitație</Label>
+              <Label className="mb-3 block">{t("cabinet.inviteWizard.designLabel")}</Label>
               <div className="grid gap-3 sm:grid-cols-2">
                 {INVITATION_DESIGN_LIST.map((d) => {
                   const active = data.designId === d.id;
@@ -289,7 +289,7 @@ export function InvitationWizard() {
                           className="text-center text-xs uppercase tracking-widest"
                           style={{ color: d.preview.accent }}
                         >
-                          Ești invitat
+                          {t("cabinet.inviteWizard.previewInvited")}
                         </div>
                         <div
                           className="mt-1 text-center text-xl font-bold"
@@ -297,7 +297,7 @@ export function InvitationWizard() {
                             fontFamily: d.fontHeading ? `"${d.fontHeading}", serif` : undefined,
                           }}
                         >
-                          Ana & Ion
+                          {t("cabinet.inviteWizard.previewNames")}
                         </div>
                       </div>
                       <div className="flex items-center justify-between bg-card p-3">
@@ -320,28 +320,28 @@ export function InvitationWizard() {
           <div className="space-y-4">
             {data.eventType === "wedding" ? (
               <div>
-                <Label>Numele mirilor</Label>
+                <Label>{t("cabinet.inviteWizard.coupleNamesLabel")}</Label>
                 <Input
                   value={data.coupleNames}
                   onChange={(e) => update("coupleNames", e.target.value)}
-                  placeholder="Ana & Ion"
+                  placeholder={t("cabinet.inviteWizard.previewNames")}
                   className="mt-2"
                 />
               </div>
             ) : (
               <div>
-                <Label>Numele sărbătoritului / gazdei</Label>
+                <Label>{t("cabinet.inviteWizard.hostNameLabel")}</Label>
                 <Input
                   value={data.hostName}
                   onChange={(e) => update("hostName", e.target.value)}
-                  placeholder="Maria"
+                  placeholder={t("cabinet.inviteWizard.hostNamePlaceholder")}
                   className="mt-2"
                 />
               </div>
             )}
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>Data evenimentului</Label>
+                <Label>{t("cabinet.inviteWizard.eventDateLabel")}</Label>
                 <div className="mt-2">
                   <ThemedDateInput
                     value={data.eventDate}
@@ -350,7 +350,7 @@ export function InvitationWizard() {
                 </div>
               </div>
               <div>
-                <Label>Termen limită RSVP</Label>
+                <Label>{t("cabinet.inviteWizard.rsvpDeadlineLabel")}</Label>
                 <div className="mt-2">
                   <ThemedDateInput
                     value={data.rsvpDeadline}
@@ -361,7 +361,7 @@ export function InvitationWizard() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <Label>Ora cununiei / ceremoniei</Label>
+                <Label>{t("cabinet.inviteWizard.ceremonyTimeLabel")}</Label>
                 <div className="mt-2">
                   <TimePicker
                     value={data.ceremonyTime}
@@ -370,7 +370,7 @@ export function InvitationWizard() {
                 </div>
               </div>
               <div>
-                <Label>Ora petrecerii</Label>
+                <Label>{t("cabinet.inviteWizard.receptionTimeLabel")}</Label>
                 <div className="mt-2">
                   <TimePicker
                     value={data.receptionTime}
@@ -380,39 +380,39 @@ export function InvitationWizard() {
               </div>
             </div>
             <div>
-              <Label>Locația ceremoniei</Label>
+              <Label>{t("cabinet.inviteWizard.ceremonyLocationLabel")}</Label>
               <Input
                 value={data.ceremonyLocation}
                 onChange={(e) => update("ceremonyLocation", e.target.value)}
-                placeholder="Biserica Sf. Nicolae, Chișinău"
+                placeholder={t("cabinet.inviteWizard.ceremonyLocationPlaceholder")}
                 className="mt-2"
               />
             </div>
             <div>
-              <Label>Locația petrecerii</Label>
+              <Label>{t("cabinet.inviteWizard.receptionLocationLabel")}</Label>
               <Input
                 value={data.receptionLocation}
                 onChange={(e) => update("receptionLocation", e.target.value)}
-                placeholder="Restaurant Andys, Chișinău"
+                placeholder={t("cabinet.inviteWizard.receptionLocationPlaceholder")}
                 className="mt-2"
               />
             </div>
             <div>
-              <Label>Mesaj pentru invitați (opțional)</Label>
+              <Label>{t("cabinet.inviteWizard.messageLabel")}</Label>
               <Textarea
                 value={data.message}
                 onChange={(e) => update("message", e.target.value)}
-                placeholder="Cu drag vă invităm să ne fiți alături..."
+                placeholder={t("cabinet.inviteWizard.messagePlaceholder")}
                 rows={3}
                 className="mt-2"
               />
             </div>
             <div>
-              <Label>Cod vestimentar (opțional)</Label>
+              <Label>{t("cabinet.inviteWizard.dressCodeLabel")}</Label>
               <Input
                 value={data.dressCode}
                 onChange={(e) => update("dressCode", e.target.value)}
-                placeholder="Ținută elegantă"
+                placeholder={t("cabinet.inviteWizard.dressCodePlaceholder")}
                 className="mt-2"
               />
             </div>
@@ -423,13 +423,12 @@ export function InvitationWizard() {
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Adaugă invitații acum sau mai târziu. Fiecare invitat primește un
-              link RSVP unic.
+              {t("cabinet.inviteWizard.guestsIntro")}
             </p>
             <div className="rounded-xl border border-border/40 bg-card p-4">
               <div className="grid gap-3">
                 <Input
-                  placeholder="Nume și prenume *"
+                  placeholder={t("cabinet.inviteWizard.guestNamePlaceholder")}
                   value={newGuest.name}
                   onChange={(e) =>
                     setNewGuest({ ...newGuest, name: e.target.value })
@@ -439,7 +438,7 @@ export function InvitationWizard() {
                   <div className="relative">
                     <Mail className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      placeholder="Email"
+                      placeholder={t("cabinet.inviteWizard.emailPlaceholder")}
                       type="email"
                       value={newGuest.email || ""}
                       onChange={(e) =>
@@ -451,7 +450,7 @@ export function InvitationWizard() {
                   <div className="relative">
                     <PhoneIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                     <Input
-                      placeholder="Telefon"
+                      placeholder={t("cabinet.inviteWizard.phonePlaceholder")}
                       value={newGuest.phone || ""}
                       onChange={(e) =>
                         setNewGuest({ ...newGuest, phone: e.target.value })
@@ -462,7 +461,7 @@ export function InvitationWizard() {
                   <div className="relative">
                     <MessageCircle className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-green-500" />
                     <Input
-                      placeholder="WhatsApp"
+                      placeholder={t("cabinet.inviteWizard.whatsappPlaceholder")}
                       value={newGuest.whatsapp || ""}
                       onChange={(e) =>
                         setNewGuest({ ...newGuest, whatsapp: e.target.value })
@@ -472,7 +471,7 @@ export function InvitationWizard() {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Cel puțin un contact (email, telefon sau WhatsApp) este obligatoriu pentru ca invitatul să poată confirma prezența.
+                  {t("cabinet.inviteWizard.contactRequiredHint")}
                 </p>
                 <Button
                   type="button"
@@ -480,14 +479,14 @@ export function InvitationWizard() {
                   disabled={!newGuest.name.trim()}
                   className="w-full gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark sm:w-auto sm:ml-auto"
                 >
-                  <Plus className="h-4 w-4" /> Adaugă invitat
+                  <Plus className="h-4 w-4" /> {t("cabinet.inviteWizard.addGuest")}
                 </Button>
               </div>
             </div>
             {data.guests.length > 0 && (
               <div className="rounded-xl border border-border/40 bg-card">
                 <div className="border-b border-border/40 p-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  {data.guests.length} invitați
+                  {t("cabinet.inviteWizard.guestCount", { count: data.guests.length })}
                 </div>
                 <ul className="divide-y divide-border/40">
                   {data.guests.map((g, i) => (
@@ -534,7 +533,7 @@ export function InvitationWizard() {
                 onChange={(e) => update("allowPlusOne", e.target.checked)}
                 className="h-4 w-4 accent-gold"
               />
-              Permite invitaților să aducă un însoțitor (+1)
+              {t("cabinet.inviteWizard.allowPlusOne")}
             </label>
           </div>
         )}
@@ -543,39 +542,43 @@ export function InvitationWizard() {
         {step === 3 && (
           <div className="space-y-4">
             <div className="rounded-xl border border-border/40 bg-card p-5">
-              <h3 className="font-heading font-bold">Rezumat invitație</h3>
+              <h3 className="font-heading font-bold">{t("cabinet.inviteWizard.summaryTitle")}</h3>
               <dl className="mt-4 grid gap-2 text-sm">
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Tip:</dt>
+                  <dt className="text-muted-foreground">{t("cabinet.inviteWizard.summaryType")}</dt>
                   <dd className="font-medium">
-                    {EVENT_TYPES.find((e) => e.value === data.eventType)?.label}
+                    {(() => {
+                      const et = EVENT_TYPES.find((e) => e.value === data.eventType);
+                      return et ? t(et.labelKey) : null;
+                    })()}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Nume:</dt>
+                  <dt className="text-muted-foreground">{t("cabinet.inviteWizard.summaryName")}</dt>
                   <dd className="font-medium">
                     {data.coupleNames || data.hostName || "—"}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Data:</dt>
+                  <dt className="text-muted-foreground">{t("cabinet.inviteWizard.summaryDate")}</dt>
                   <dd className="font-medium">{data.eventDate || "—"}</dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Locație:</dt>
+                  <dt className="text-muted-foreground">{t("cabinet.inviteWizard.summaryLocation")}</dt>
                   <dd className="font-medium">
                     {data.ceremonyLocation || "—"}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt className="text-muted-foreground">Invitați:</dt>
+                  <dt className="text-muted-foreground">{t("cabinet.inviteWizard.summaryGuests")}</dt>
                   <dd className="font-medium">{data.guests.length}</dd>
                 </div>
               </dl>
             </div>
             <div className="rounded-xl border border-gold/20 bg-gold/5 p-4 text-sm text-muted-foreground">
-              După creare, invitația va fi salvată ca <strong>ciornă</strong>.
-              O poți edita, previzualiza și publica oricând din panoul tău.
+              {t("cabinet.inviteWizard.draftNoteBefore")}{" "}
+              <strong>{t("cabinet.inviteWizard.draftWord")}</strong>
+              {t("cabinet.inviteWizard.draftNoteAfter")}
             </div>
           </div>
         )}
@@ -588,7 +591,7 @@ export function InvitationWizard() {
           disabled={step === 0 || saving}
           className="gap-2"
         >
-          <ArrowLeft className="h-4 w-4" /> Înapoi
+          <ArrowLeft className="h-4 w-4" /> {t("cabinet.inviteWizard.back")}
         </Button>
         <Button
           onClick={next}
@@ -597,13 +600,13 @@ export function InvitationWizard() {
         >
           {saving ? (
             <Loader2 className="h-4 w-4 animate-spin" />
-          ) : step === STEPS.length - 1 ? (
+          ) : step === STEP_KEYS.length - 1 ? (
             <>
-              <Check className="h-4 w-4" /> Creează invitația
+              <Check className="h-4 w-4" /> {t("cabinet.inviteWizard.create")}
             </>
           ) : (
             <>
-              Continuă <ArrowRight className="h-4 w-4" />
+              {t("cabinet.inviteWizard.continue")} <ArrowRight className="h-4 w-4" />
             </>
           )}
         </Button>

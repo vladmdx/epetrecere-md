@@ -19,6 +19,7 @@ import { Plus, Trash2, Clock, Loader2, RefreshCw, Sparkles } from "lucide-react"
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { CATEGORY_LABELS } from "@/lib/planner/templates";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 export interface ChecklistItem {
   id: number;
@@ -45,13 +46,15 @@ const PRIORITY_COLOR: Record<ChecklistItem["priority"], string> = {
   low: "border-emerald-500/40 bg-emerald-500/5 text-emerald-500",
 };
 
-const PRIORITY_LABEL: Record<ChecklistItem["priority"], string> = {
-  high: "Urgent",
-  medium: "Mediu",
-  low: "Relaxat",
+/** Translation keys, not copy — the label is resolved at render time. */
+const PRIORITY_LABEL_KEY: Record<ChecklistItem["priority"], string> = {
+  high: "planner.checklist.priorityHigh",
+  medium: "planner.checklist.priorityMedium",
+  low: "planner.checklist.priorityLow",
 };
 
 export function ChecklistView({ planId, eventDate, eventType, items, onChange }: Props) {
+  const { t } = useLocale();
   const [newTitle, setNewTitle] = useState("");
   const [newCategory, setNewCategory] = useState<string>("logistics");
   const [newPriority, setNewPriority] = useState<ChecklistItem["priority"]>("medium");
@@ -60,10 +63,12 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
 
   // A missing or unrecognised type keeps the neutral "Eveniment" caption.
   const eventTypeKey = normalizeEventType(eventType);
-  const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : "Eveniment";
+  const eventLabel = eventTypeKey
+    ? eventTypeLabel(eventTypeKey)
+    : t("planner.checklist.eventFallback");
 
   async function regenerateFromTemplate() {
-    if (!confirm(`Vrei să regenerezi checklist-ul cu template pentru ${eventLabel}? Aceasta va șterge elementele existente și le va înlocui cu template-ul standard.`)) {
+    if (!confirm(t("planner.checklist.regenerateConfirm", { event: eventLabel }))) {
       return;
     }
     setRegenerating(true);
@@ -74,9 +79,9 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
       if (!res.ok) throw new Error();
       const data = await res.json();
       onChange(data.items || []);
-      toast.success(`Checklist pentru ${eventLabel} a fost regenerat!`);
+      toast.success(t("planner.checklist.regenerateSuccess", { event: eventLabel }));
     } catch {
-      toast.error("Nu s-a putut regenera checklist-ul");
+      toast.error(t("planner.checklist.regenerateError"));
     } finally {
       setRegenerating(false);
     }
@@ -121,7 +126,7 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
       body: JSON.stringify({ done: !item.done }),
     });
     if (!res.ok) {
-      toast.error("Nu am putut actualiza.");
+      toast.error(t("planner.checklist.updateError"));
       onChange(items);
     }
   }
@@ -133,7 +138,7 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
       method: "DELETE",
     });
     if (!res.ok) {
-      toast.error("Nu am putut șterge.");
+      toast.error(t("planner.checklist.deleteError"));
       onChange(prev);
     }
   }
@@ -152,7 +157,7 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
         }),
       });
       if (!res.ok) {
-        toast.error("Eroare la adăugare.");
+        toast.error(t("planner.checklist.addError"));
         return;
       }
       const data = await res.json();
@@ -173,7 +178,7 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
           </div>
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              Checklist personalizat pentru
+              {t("planner.checklist.customFor")}
             </p>
             <p className="font-heading font-bold">{eventLabel}</p>
           </div>
@@ -190,16 +195,20 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
           ) : (
             <RefreshCw className="h-3.5 w-3.5" />
           )}
-          Regenerează din template
+          {t("planner.checklist.regenerate")}
         </Button>
       </div>
 
       {/* Progress bar */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
         <div className="flex items-center justify-between text-sm">
-          <span className="font-medium">Progres</span>
+          <span className="font-medium">{t("planner.checklist.progress")}</span>
           <span className="text-muted-foreground">
-            {doneCount} din {items.length} completate ({progress}%)
+            {t("planner.checklist.progressCount", {
+              done: doneCount,
+              total: items.length,
+              percent: progress,
+            })}
           </span>
         </div>
         <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
@@ -213,13 +222,13 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
       {/* Add new item */}
       <div className="rounded-xl border border-border/40 bg-card p-4">
         <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">
-          Adaugă sarcină
+          {t("planner.checklist.addTask")}
         </p>
         <div className="flex flex-wrap gap-2">
           <Input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="Ex: Cumpără verighetele"
+            placeholder={t("planner.checklist.addPlaceholder")}
             onKeyDown={(e) => e.key === "Enter" && addItem()}
             className="min-w-[220px] flex-1"
           />
@@ -243,9 +252,9 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="high">Urgent</SelectItem>
-              <SelectItem value="medium">Mediu</SelectItem>
-              <SelectItem value="low">Relaxat</SelectItem>
+              <SelectItem value="high">{t("planner.checklist.priorityHigh")}</SelectItem>
+              <SelectItem value="medium">{t("planner.checklist.priorityMedium")}</SelectItem>
+              <SelectItem value="low">{t("planner.checklist.priorityLow")}</SelectItem>
             </SelectContent>
           </Select>
           <Button
@@ -254,14 +263,14 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
             className="gap-1 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             {adding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-            Adaugă
+            {t("common.add")}
           </Button>
         </div>
       </div>
 
       {/* Grouped lists */}
       {grouped.length === 0 ? (
-        <p className="py-8 text-center text-muted-foreground">Checklist gol.</p>
+        <p className="py-8 text-center text-muted-foreground">{t("planner.checklist.empty")}</p>
       ) : (
         grouped.map(({ category, label, items: list }) => (
           <div key={category} className="rounded-xl border border-border/40 bg-card p-4">
@@ -300,7 +309,7 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
                             PRIORITY_COLOR[item.priority],
                           )}
                         >
-                          {PRIORITY_LABEL[item.priority]}
+                          {t(PRIORITY_LABEL_KEY[item.priority])}
                         </span>
                         {item.dueDaysBefore !== null && (
                           <span
@@ -312,8 +321,10 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
                             )}
                           >
                             <Clock className="h-2.5 w-2.5" />
-                            {item.dueDaysBefore}z înainte
-                            {isOverdue && " · întârziat"}
+                            {t("planner.checklist.daysBefore", {
+                              days: item.dueDaysBefore,
+                            })}
+                            {isOverdue && ` · ${t("planner.checklist.overdue")}`}
                           </span>
                         )}
                       </div>
@@ -321,7 +332,7 @@ export function ChecklistView({ planId, eventDate, eventType, items, onChange }:
                     <button
                       onClick={() => deleteItem(item)}
                       className="text-muted-foreground transition-colors hover:text-red-500"
-                      aria-label="Șterge"
+                      aria-label={t("common.delete")}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>

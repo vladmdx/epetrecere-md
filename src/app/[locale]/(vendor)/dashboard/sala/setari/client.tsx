@@ -38,6 +38,7 @@ import { WhatsAppPhoneInput } from "@/components/shared/whatsapp-phone-input";
 import { ReferralCard } from "@/components/shared/referral-card";
 import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
 import { TimezoneSelector } from "@/components/shared/timezone-selector";
+import { useLocale } from "@/hooks/use-locale";
 
 interface VenueSettings {
   id: number;
@@ -47,9 +48,6 @@ interface VenueSettings {
   autoReplyMessage: string | null;
   bufferHours: number | null;
 }
-
-const DEFAULT_AUTO_REPLY =
-  "Mulțumim pentru interesul pentru sala noastră! Vă răspundem în 24h cu disponibilitatea exactă și oferta personalizată.";
 
 type DigestFrequency = "instant" | "daily" | "weekly";
 
@@ -72,6 +70,8 @@ export function VenueSettingsClient({
   icalUrl: string;
   notificationDigestFrequency: string;
 }) {
+  const { t } = useLocale();
+  const defaultAutoReply = t("vendor.venueSettings.defaultAutoReply");
   const [state, setState] = useState<VenueSettings>(venue);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -100,10 +100,10 @@ export function VenueSettingsClient({
       });
       if (!res.ok) {
         setLanguage(prev);
-        toast.error("Nu s-a putut salva limba");
+        toast.error(t("vendor.venueSettings.toastLanguageError"));
         return;
       }
-      toast.success("Limbă salvată");
+      toast.success(t("vendor.venueSettings.toastLanguageSaved"));
     } finally {
       setSavingLanguage(false);
     }
@@ -115,7 +115,7 @@ export function VenueSettingsClient({
       const res = await fetch("/api/me/data-export");
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Export eșuat");
+        toast.error(err.error || t("vendor.venueSettings.toastExportFailed"));
         return;
       }
       // Stream → Blob → download
@@ -128,7 +128,7 @@ export function VenueSettingsClient({
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      toast.success("Datele tale au fost descărcate");
+      toast.success(t("vendor.venueSettings.toastExportDone"));
     } finally {
       setExporting(false);
     }
@@ -136,7 +136,7 @@ export function VenueSettingsClient({
 
   async function deleteAccount() {
     if (deleteConfirmText !== "ȘTERGE") {
-      toast.error("Tipărește ȘTERGE pentru confirmare");
+      toast.error(t("vendor.venueSettings.toastTypeDelete"));
       return;
     }
     setDeleting(true);
@@ -144,10 +144,10 @@ export function VenueSettingsClient({
       const res = await fetch("/api/me/delete-account", { method: "DELETE" });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Ștergere eșuată");
+        toast.error(err.error || t("vendor.venueSettings.toastDeleteFailed"));
         return;
       }
-      toast.success("Contul a fost șters. Te redirecționăm...");
+      toast.success(t("vendor.venueSettings.toastAccountDeleted"));
       setTimeout(() => {
         window.location.href = "/";
       }, 1500);
@@ -169,10 +169,10 @@ export function VenueSettingsClient({
       if (!res.ok) {
         setDigestFrequency(prev);
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut salva");
+        toast.error(err.error || t("vendor.venueSettings.toastSaveError"));
         return;
       }
-      toast.success("Frecvență salvată");
+      toast.success(t("vendor.venueSettings.toastFrequencySaved"));
     } finally {
       setSavingDigest(false);
     }
@@ -182,10 +182,10 @@ export function VenueSettingsClient({
     try {
       await navigator.clipboard.writeText(icalUrl);
       setCopied(true);
-      toast.success("Link copiat!");
+      toast.success(t("referral.linkCopied"));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Nu am putut copia");
+      toast.error(t("vendor.venueSettings.toastCopyError"));
     }
   }
 
@@ -204,10 +204,10 @@ export function VenueSettingsClient({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut salva");
+        toast.error(err.error || t("vendor.venueSettings.toastSaveError"));
         return;
       }
-      toast.success("Setări salvate");
+      toast.success(t("vendor.venueSettings.toastSettingsSaved"));
     } finally {
       setSaving(false);
     }
@@ -216,9 +216,9 @@ export function VenueSettingsClient({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="font-heading text-2xl font-bold">Setări</h1>
+        <h1 className="font-heading text-2xl font-bold">{t("dashboard.settings")}</h1>
         <p className="text-muted-foreground">
-          Configurează comportamentul sălii <strong>{venue.nameRo}</strong>
+          {t("vendor.venueSettings.configureVenue")} <strong>{venue.nameRo}</strong>
         </p>
       </div>
 
@@ -227,20 +227,20 @@ export function VenueSettingsClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Mail className="h-4 w-4 text-gold" />
-            Cont
+            {t("vendor.venueSettings.account")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium">Email</p>
+              <p className="text-sm font-medium">{t("form.email")}</p>
               <p className="text-xs text-muted-foreground">{userEmail || "—"}</p>
             </div>
             <Link
               href="/user-profile"
               className="text-xs text-gold hover:underline"
             >
-              Modifică în Clerk →
+              {t("vendor.venueSettings.editInClerk")}
             </Link>
           </div>
 
@@ -248,10 +248,10 @@ export function VenueSettingsClient({
           <div className="flex items-center justify-between gap-3 rounded-lg bg-muted/30 p-3">
             <div className="min-w-0 flex-1">
               <Label className="flex items-center gap-1.5 text-sm font-medium">
-                <Globe className="h-3.5 w-3.5 text-gold" /> Limba interfeței
+                <Globe className="h-3.5 w-3.5 text-gold" /> {t("vendor.venueSettings.interfaceLanguage")}
               </Label>
               <p className="mt-1 text-xs text-muted-foreground">
-                Afectează emailurile, dashboard-ul și notificările.
+                {t("vendor.venueSettings.languageHint")}
               </p>
             </div>
             <div className="flex gap-1 rounded-lg border border-border/40 p-0.5">
@@ -287,18 +287,17 @@ export function VenueSettingsClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <CalendarDays className="h-4 w-4 text-gold" />
-            Calendar
+            {t("vendor.calendar")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
             <div className="min-w-0 flex-1">
               <Label className="cursor-pointer">
-                Afișează calendar pe profilul public
+                {t("vendor.venueSettings.showCalendar")}
               </Label>
               <p className="mt-1 text-xs text-muted-foreground">
-                Vizitatorii site-ului vor vedea ce zile sunt libere/ocupate pe
-                profilul tău.
+                {t("vendor.venueSettings.showCalendarHint")}
               </p>
             </div>
             <Switch
@@ -311,9 +310,9 @@ export function VenueSettingsClient({
 
           <div>
             <Label htmlFor="buffer-hours">
-              Ore buffer între evenimente
+              {t("vendor.venueSettings.bufferHours")}
               <span className="ml-2 text-xs text-muted-foreground">
-                (pentru curățenie / reorganizare)
+                {t("vendor.venueSettings.bufferHoursHint")}
               </span>
             </Label>
             <Input
@@ -339,13 +338,10 @@ export function VenueSettingsClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <CalendarDays className="h-4 w-4 text-gold" />
-            Sincronizare Google / Apple Calendar
+            {t("vendor.venueSettings.icalTitle")}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Copiază link-ul de mai jos și adaugă-l ca „calendar abonat” în
-            Google Calendar, Apple Calendar sau Outlook. Rezervările confirmate
-            și zilele blocate vor apărea automat — update la fiecare câteva
-            minute.
+            {t("vendor.venueSettings.icalHint")}
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -361,7 +357,7 @@ export function VenueSettingsClient({
               size="icon"
               variant="outline"
               className="shrink-0"
-             aria-label="Confirmă">
+             aria-label={t("vendor.venueSettings.copyAriaLabel")}>
               {copied ? (
                 <Check className="h-4 w-4 text-emerald-400" />
               ) : (
@@ -371,12 +367,12 @@ export function VenueSettingsClient({
           </div>
           <details className="rounded-lg bg-muted/20 p-3 text-xs">
             <summary className="cursor-pointer font-medium">
-              Cum adaug link-ul în Google Calendar?
+              {t("vendor.venueSettings.icalHowTitle")}
             </summary>
             <ol className="mt-2 space-y-1 pl-4 text-muted-foreground">
-              <li>1. Deschide Google Calendar pe desktop</li>
-              <li>2. În stânga: „Alte calendare” → „+” → „De la URL”</li>
-              <li>3. Lipește link-ul și apasă „Adaugă calendarul”</li>
+              <li>{t("vendor.venueSettings.icalStep1")}</li>
+              <li>{t("vendor.venueSettings.icalStep2")}</li>
+              <li>{t("vendor.venueSettings.icalStep3")}</li>
             </ol>
           </details>
         </CardContent>
@@ -387,19 +383,18 @@ export function VenueSettingsClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <MessageCircle className="h-4 w-4 text-gold" />
-            Răspuns automat
+            {t("vendor.venueSettings.autoReplyTitle")}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            Trimite un email instant clientului când lasă o solicitare de
-            rezervare.
+            {t("vendor.venueSettings.autoReplyHint")}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3">
             <div>
-              <Label className="cursor-pointer">Activează auto-reply</Label>
+              <Label className="cursor-pointer">{t("vendor.venueSettings.enableAutoReply")}</Label>
               <p className="mt-1 text-xs text-muted-foreground">
-                Clientul primește email imediat după trimiterea cererii.
+                {t("vendor.venueSettings.enableAutoReplyHint")}
               </p>
             </div>
             <Switch
@@ -409,7 +404,7 @@ export function VenueSettingsClient({
                   ...state,
                   autoReplyEnabled: v,
                   autoReplyMessage:
-                    v && !state.autoReplyMessage ? DEFAULT_AUTO_REPLY : state.autoReplyMessage,
+                    v && !state.autoReplyMessage ? defaultAutoReply : state.autoReplyMessage,
                 })
               }
             />
@@ -418,7 +413,7 @@ export function VenueSettingsClient({
           {state.autoReplyEnabled && (
             <div>
               <Label htmlFor="auto-reply-msg" className="text-xs">
-                Mesajul trimis (max 500 caractere)
+                {t("vendor.venueSettings.autoReplyMessageLabel")}
               </Label>
               <Textarea
                 id="auto-reply-msg"
@@ -429,11 +424,10 @@ export function VenueSettingsClient({
                 }
                 maxLength={500}
                 rows={4}
-                placeholder={DEFAULT_AUTO_REPLY}
+                placeholder={defaultAutoReply}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                {(state.autoReplyMessage?.length ?? 0)} / 500 caractere.
-                Mesajul este inserat într-un email cu branding ePetrecere.
+                {t("vendor.venueSettings.autoReplyCounter", { count: state.autoReplyMessage?.length ?? 0 })}
               </p>
             </div>
           )}
@@ -445,22 +439,21 @@ export function VenueSettingsClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Bell className="h-4 w-4 text-gold" />
-            Notificări
+            {t("notifications.title")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Notificările email sunt trimise automat la solicitări noi, mesaje,
-            recenzii și plăți. Controlează mai jos cât de des le primești.
+            {t("vendor.venueSettings.notifIntro")}
           </p>
 
           {/* Push (browser / PWA) */}
           <div className="rounded-lg bg-muted/30 p-3">
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Notificări instant pe dispozitiv
+              {t("vendor.venueSettings.pushTitle")}
             </Label>
             <p className="mt-1 mb-2 text-xs text-muted-foreground">
-              Primești un ping direct în browser / pe telefon (dacă ai instalat aplicația) când ai o solicitare nouă sau un mesaj.
+              {t("vendor.venueSettings.pushHint")}
             </p>
             <PushSubscribeButton />
           </div>
@@ -471,9 +464,7 @@ export function VenueSettingsClient({
               <MessageCircle className="h-3.5 w-3.5" /> WhatsApp
             </Label>
             <p className="mt-1 mb-3 text-xs text-muted-foreground">
-              Pentru clienții din Moldova, WhatsApp e cel mai rapid canal.
-              Setează-ți numărul aici pentru a primi notificări critice
-              (booking-uri noi, confirmări) direct pe WhatsApp.
+              {t("vendor.venueSettings.whatsappHint")}
             </p>
             <WhatsAppPhoneInput initialValue={userPhone} />
           </div>
@@ -483,25 +474,25 @@ export function VenueSettingsClient({
 
           <div>
             <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              Frecvență digest email
+              {t("vendor.venueSettings.digestTitle")}
             </Label>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {(
                 [
                   {
                     value: "instant" as const,
-                    title: "Instant",
-                    desc: "Un email pentru fiecare eveniment, imediat.",
+                    title: t("vendor.venueSettings.digestInstant"),
+                    desc: t("vendor.venueSettings.digestInstantDesc"),
                   },
                   {
                     value: "daily" as const,
-                    title: "Zilnic",
-                    desc: "Rezumat zilnic al tuturor evenimentelor.",
+                    title: t("vendor.venueSettings.digestDaily"),
+                    desc: t("vendor.venueSettings.digestDailyDesc"),
                   },
                   {
                     value: "weekly" as const,
-                    title: "Săptămânal",
-                    desc: "Rezumat săptămânal — mai puține emailuri.",
+                    title: t("vendor.venueSettings.digestWeekly"),
+                    desc: t("vendor.venueSettings.digestWeeklyDesc"),
                   },
                 ]
               ).map((opt) => {
@@ -540,8 +531,7 @@ export function VenueSettingsClient({
               })}
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
-              ℹ️ Notificările critice (ex: booking confirmat) sunt trimise
-              mereu instant, indiferent de frecvență.
+              {t("vendor.venueSettings.digestNote")}
             </p>
           </div>
         </CardContent>
@@ -558,7 +548,7 @@ export function VenueSettingsClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Crown className="h-4 w-4 text-gold" />
-            Plan curent
+            {t("vendor.venueSettings.currentPlan")}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -568,19 +558,15 @@ export function VenueSettingsClient({
             </div>
             <div className="min-w-0 flex-1">
               <p className="font-heading text-base font-bold text-gold">
-                Premium activ
+                {t("vendor.venueSettings.premiumActive")}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Cât suntem în faza de lansare, toate sălile au acces gratuit la
-                toate funcționalitățile Premium: imagini galerie nelimitate,
-                analytics detaliat, virtual tour 360°, meniu digital, AI
-                Assistant, traducere automată RO/RU/EN, featured în listing top
-                și prioritate în suport.
+                {t("vendor.venueSettings.premiumBlurb")}
               </p>
             </div>
           </div>
           <p className="text-[11px] text-muted-foreground">
-            Te vom anunța din timp când introducem planurile plătite.
+            {t("vendor.venueSettings.paidPlansNote")}
           </p>
         </CardContent>
       </Card>
@@ -590,20 +576,18 @@ export function VenueSettingsClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Shield className="h-4 w-4 text-gold" />
-            Date & Confidențialitate
+            {t("vendor.venueSettings.gdprTitle")}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            În conformitate cu GDPR, ai dreptul la portabilitatea datelor
-            (Art. 20) și ștergere (Art. 17).
+            {t("vendor.venueSettings.gdprHint")}
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/40 p-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Exportă datele mele</p>
+              <p className="text-sm font-medium">{t("vendor.venueSettings.exportTitle")}</p>
               <p className="text-xs text-muted-foreground">
-                Descarcă un fișier JSON cu profilul tău, toate rezervările,
-                recenziile, mesajele și planurile de eveniment.
+                {t("vendor.venueSettings.exportHint")}
               </p>
             </div>
             <Button
@@ -618,16 +602,15 @@ export function VenueSettingsClient({
               ) : (
                 <Download className="h-3.5 w-3.5" />
               )}
-              Descarcă JSON
+              {t("vendor.venueSettings.downloadJson")}
             </Button>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/5 p-3">
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-red-400">Șterge contul</p>
+              <p className="text-sm font-medium text-red-400">{t("vendor.venueSettings.deleteAccount")}</p>
               <p className="text-xs text-muted-foreground">
-                Elimină contul, sala publicată și toate datele asociate.
-                Leads păstrate de vendori sunt anonimizate.{" "}
-                <strong className="text-red-400">Ireversibil.</strong>
+                {t("vendor.venueSettings.deleteAccountHint")}{" "}
+                <strong className="text-red-400">{t("vendor.venueSettings.irreversible")}</strong>
               </p>
             </div>
             <Button
@@ -640,7 +623,7 @@ export function VenueSettingsClient({
               className="gap-1.5 border-red-500/40 text-red-400 hover:bg-red-500/10"
             >
               <AlertTriangle className="h-3.5 w-3.5" />
-              Șterge contul
+              {t("vendor.venueSettings.deleteAccount")}
             </Button>
           </div>
         </CardContent>
@@ -651,28 +634,27 @@ export function VenueSettingsClient({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="text-red-400">
-              Ștergi contul definitiv?
+              {t("vendor.venueSettings.deleteDialogTitle")}
             </DialogTitle>
             <DialogDescription>
-              Vei pierde accesul la contul{" "}
-              <strong className="text-foreground">{userEmail}</strong>, sala{" "}
-              <strong className="text-foreground">{venue.nameRo}</strong> și
-              toate datele asociate: recenzii, mesaje, planuri eveniment,
-              galerie. Acțiunea este <strong>ireversibilă</strong>.
+              {t("vendor.venueSettings.deleteWarnAccount")}{" "}
+              <strong className="text-foreground">{userEmail}</strong>{t("vendor.venueSettings.deleteWarnVenue")}{" "}
+              <strong className="text-foreground">{venue.nameRo}</strong>{" "}
+              {t("vendor.venueSettings.deleteWarnRest")} <strong>{t("vendor.venueSettings.irreversibleWord")}</strong>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-300">
-              Recomandăm să descarci întâi o copie a datelor tale (butonul{" "}
-              <em>Descarcă JSON</em>).
+              {t("vendor.venueSettings.backupHint")}{" "}
+              <em>{t("vendor.venueSettings.downloadJson")}</em>).
             </div>
             <div>
               <Label htmlFor="delete-confirm" className="text-xs">
-                Pentru confirmare, tipărește{" "}
+                {t("vendor.venueSettings.confirmTypeBefore")}{" "}
                 <code className="rounded bg-muted px-1 py-0.5 text-foreground">
                   ȘTERGE
                 </code>{" "}
-                mai jos:
+                {t("vendor.venueSettings.confirmTypeAfter")}
               </Label>
               <Input
                 id="delete-confirm"
@@ -690,7 +672,7 @@ export function VenueSettingsClient({
               onClick={() => setDeleteDialog(false)}
               disabled={deleting}
             >
-              Anulează
+              {t("common.cancel")}
             </Button>
             <Button
               variant="outline"
@@ -703,7 +685,7 @@ export function VenueSettingsClient({
               ) : (
                 <AlertTriangle className="h-4 w-4" />
               )}
-              Șterge definitiv
+              {t("vendor.venueSettings.deletePermanently")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -721,7 +703,7 @@ export function VenueSettingsClient({
           ) : (
             <Save className="h-4 w-4" />
           )}
-          Salvează setările
+          {t("vendor.venueSettings.saveSettings")}
         </Button>
       </div>
     </div>
