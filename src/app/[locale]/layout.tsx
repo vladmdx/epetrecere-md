@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import "@/lib/env"; // Validate env vars at startup
 import { Cormorant_Garamond, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/shared/theme-provider";
@@ -112,7 +113,17 @@ export default async function RootLayout({
   params: Promise<{ locale: string }>;
 }>) {
   const { locale: raw } = await params;
-  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
+  // The segment must be one of the three languages, or nothing at all.
+  //
+  // Falling back to Romanian instead looked harmless and was not: this
+  // segment sits at the root, so ANY unmatched first path element resolved
+  // to it and rendered the homepage with a 200. Clerk's `auth.protect()`
+  // rewrites a signed-out visitor to an internal `/clerk_<id>` path expecting
+  // it to 404 — under the fallback it served the homepage instead, so /admin
+  // and /dashboard answered 200 to anonymous callers rather than turning
+  // them away, and every such URL was a soft 404 for crawlers.
+  if (!isLocale(raw)) notFound();
+  const locale = raw;
 
   return (
     <html

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { signInPath } from "@/lib/i18n/server-redirect";
 
 export default async function ClientLayout({
   children,
@@ -13,7 +14,7 @@ export default async function ClientLayout({
 }) {
   const { userId } = await auth();
   if (!userId) {
-    redirect("/sign-in");
+    redirect(await signInPath());
   }
 
   // Partners (artists / venue owners) get bounced to /dashboard. Visiting

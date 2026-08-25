@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
 import { VendorLayoutChrome } from "@/components/vendor/vendor-layout-chrome";
+import { signInPath } from "@/lib/i18n/server-redirect";
 
 export default async function VendorLayout({
   children,
@@ -12,7 +13,7 @@ export default async function VendorLayout({
 }) {
   const { userId: clerkId } = await auth();
   if (!clerkId) {
-    redirect("/sign-in");
+    redirect(await signInPath());
   }
 
   const [appUser] = await db

@@ -11,6 +11,9 @@ import {
 
 const isProtectedRoute = createRouteMatcher(["/admin(.*)", "/dashboard(.*)"]);
 
+/** The same two trees, tested against the path with any locale prefix removed. */
+const PROTECTED_PATHS = /^\/(admin|dashboard)(\/|$)/;
+
 /**
  * DB-backed slug redirects (AD-29, spec 4.7).
  *
@@ -310,8 +313,26 @@ export default clerkMiddleware(async (auth, req) => {
   // layout/page/API level via requireAdmin() and individual auth()
   // checks; this middleware gate catches the anonymous-access case
   // early so unauthenticated requests never reach server components.
-  if (isProtectedRoute(req)) {
-    await auth.protect();
+  // Match the locale-stripped path: createRouteMatcher sees the raw URL, so
+  // "/admin(.*)" never matched /ru/admin and the middleware gate covered only
+  // the Romanian addresses. The pages' own requireAdmin() caught the rest,
+  // but a guard that works in one language out of three is not a guard.
+  if (isProtectedRoute(req) || PROTECTED_PATHS.test(pathname)) {
+    // Redirect rather than `auth.protect()`. That helper answers a signed-out
+    // visitor by rewriting to an internal `/clerk_<id>` path and RETURNING a
+    // response — which this code awaited and then threw away, carrying on to
+    // its own rewrite. It also expects that internal path to 404, which stops
+    // being true the moment a `[locale]` segment sits at the root and matches
+    // anything. Sending them to sign-in is explicit, survives both, and is
+    // what /cabinet already did.
+    const { userId } = await auth();
+    if (!userId) {
+      const url = req.nextUrl.clone();
+      url.pathname = localizePath("/sign-in", locale);
+      url.search = "";
+      url.searchParams.set("redirect_url", rawPathname);
+      return NextResponse.redirect(url);
+    }
   }
 
   // Every page lives under the `[locale]` segment, so the locale is a build

@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { signInPath } from "@/lib/i18n/server-redirect";
 
 export default async function AdminDashboard({
   params,
@@ -17,7 +18,7 @@ export default async function AdminDashboard({
   const { locale: raw } = await params;
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const admin = await requireAdmin();
-  if (!admin.ok) redirect("/sign-in");
+  if (!admin.ok) redirect(await signInPath());
 
   // Real stats from DB
   const now = new Date();

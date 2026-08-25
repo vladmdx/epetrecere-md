@@ -23,6 +23,7 @@ import { CommissionPanel } from "@/components/vendor/commission-panel";
 import { formatAmount } from "@/lib/format/price";
 import { DEFAULT_LOCALE, isLocale, type AppLocale } from "@/lib/i18n/routing";
 import { t } from "@/i18n";
+import { signInPath } from "@/lib/i18n/server-redirect";
 
 export const dynamic = "force-dynamic";
 
@@ -34,14 +35,14 @@ export default async function VendorFinancialPage({
   const { locale: raw } = await params;
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const { userId: clerkId } = await auth();
-  if (!clerkId) redirect("/sign-in");
+  if (!clerkId) redirect(await signInPath());
 
   const [appUser] = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
-  if (!appUser) redirect("/sign-in");
+  if (!appUser) redirect(await signInPath());
 
   const [artist] = await db
     .select({
