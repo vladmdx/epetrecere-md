@@ -155,6 +155,27 @@ const LEGACY_CITY_SLUGS = new Set([
  * fall back to Romanian. Public catalogue pages are excluded on purpose —
  * they are the indexed canonicals.
  */
+/**
+ * Paths served from outside the `[locale]` segment. They must reach Next
+ * exactly as requested — a locale prefix would point at nothing.
+ */
+const NON_LOCALIZED_PREFIXES = ["/api", "/_next", "/trpc", "/monitoring"];
+const NON_LOCALIZED_EXACT = new Set([
+  "/sitemap.xml",
+  "/robots.txt",
+  "/manifest.webmanifest",
+  "/favicon.ico",
+  "/icon",
+]);
+
+function isNonLocalizedPath(pathname: string): boolean {
+  if (NON_LOCALIZED_EXACT.has(pathname)) return true;
+  if (/\.[a-z0-9]+$/i.test(pathname)) return true; // any static asset
+  return NON_LOCALIZED_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
+}
+
 const LOCALE_COOKIE_ROUTES = [
   "/sign-in",
   "/sign-up",
@@ -305,7 +326,12 @@ export default clerkMiddleware(async (auth, req) => {
   const headers = new Headers(req.headers);
   headers.set(LOCALE_HEADER, locale);
 
-  if (!hasPrefix) {
+  // Only PAGES live under `[locale]`. Route handlers, the sitemap, robots
+  // and the icon stayed at the root of src/app, so rewriting them onto
+  // `/ro/...` sends them to a route that does not exist — which is exactly
+  // what happened when the segment landed: every API endpoint, the sitemap
+  // and robots.txt went 404 in production.
+  if (!hasPrefix && !isNonLocalizedPath(pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = `/${DEFAULT_LOCALE}${pathname === "/" ? "" : pathname}`;
     return NextResponse.rewrite(url, { request: { headers } });
