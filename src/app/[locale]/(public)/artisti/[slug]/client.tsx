@@ -177,7 +177,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
         {
           id: -1,
           name: "Essential",
-          description: "Program artistic personalizat pentru momentele principale ale evenimentului.",
+          description: t("artist.profile.fallbackPkg.essential"),
           price: null,
           durationHours: 2,
           isReal: false,
@@ -185,7 +185,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
         {
           id: -2,
           name: "Signature",
-          description: "Show complet, repertoriu adaptat invitaților și coordonare cu echipa tehnică.",
+          description: t("artist.profile.fallbackPkg.signature"),
           price: null,
           durationHours: 4,
           isReal: false,
@@ -193,7 +193,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
         {
           id: -3,
           name: "Full Event",
-          description: "Prezență extinsă și program construit în jurul întregului eveniment.",
+          description: t("artist.profile.fallbackPkg.fullEvent"),
           price: null,
           durationHours: 6,
           isReal: false,
@@ -237,7 +237,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
     <div className="mx-auto max-w-[1480px] px-4 py-8 lg:px-8">
       {/* Breadcrumb */}
       <nav className="mb-7 text-xs text-white/42">
-        <Link href="/" className="hover:text-gold">Acasă</Link>
+        <Link href="/" className="hover:text-gold">{t("nav.home")}</Link>
         <span className="mx-2">/</span>
         <Link href="/artisti" className="hover:text-gold">{t("nav.artists")}</Link>
         <span className="mx-2">/</span>
@@ -254,7 +254,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               onClick={() => profilePhotoUrl && setAvatarOpen(true)}
               disabled={!profilePhotoUrl}
               className="group relative flex aspect-[4/5] w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#e6b84d]/55 bg-[#11151d] shadow-[0_18px_48px_rgba(0,0,0,.35)] transition-all hover:shadow-[0_18px_50px_rgba(201,168,76,.2)] disabled:cursor-default"
-              aria-label={`Vezi poza mare a lui ${name}`}
+              aria-label={t("artist.profile.viewLargePhoto", { name })}
             >
               {profilePhotoUrl ? (
                 <>
@@ -273,18 +273,18 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             </button>
             <div className="flex-1">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.28em] text-[#e6b84d]">
-                Artist pentru evenimente
+                {t("artist.profile.eyebrow")}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-heading text-3xl font-semibold tracking-tight text-[#fbf7ee] md:text-5xl">{name}</h1>
                 {artist.isVerified && (
                   <Badge className="bg-gold/10 text-gold border-gold/30 gap-1">
-                    <BadgeCheck className="h-3 w-3" /> Verificat
+                    <BadgeCheck className="h-3 w-3" /> {t("common.verified")}
                   </Badge>
                 )}
                 {artist.isPremium && (
                   <Badge className="bg-amber-500/10 text-amber-500 border-amber-500/30 gap-1">
-                    <Crown className="h-3 w-3" /> Premium
+                    <Crown className="h-3 w-3" /> {t("common.premium")}
                   </Badge>
                 )}
                 {/* Wishlist back on the public artist page — got dropped
@@ -297,7 +297,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               </div>
 
               <p className="mt-3 text-base font-medium text-[#e6b84d]">
-                Muzică live • show premium • program personalizat
+                {t("artist.profile.tagline")}
               </p>
 
               <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/58">
@@ -309,7 +309,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 {artist.ratingAvg ? (
                   <span className="flex items-center gap-1">
                     <Star className="h-3.5 w-3.5 fill-gold text-gold" />
-                    {artist.ratingAvg.toFixed(1)} ({artist.ratingCount} recenzii)
+                    {artist.ratingAvg.toFixed(1)} ({artist.ratingCount} {t("artist.profile.reviewsWord")})
                   </span>
                 ) : null}
                 {/* Price display has 4 states:
@@ -319,7 +319,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                     4. No price set + not hidden → nothing */}
                 {artist.priceHidden ? (
                   <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-xs font-medium text-gold/90">
-                    Preț la cerere
+                    {t("artist.profile.priceOnRequest")}
                   </span>
                 ) : artist.priceFrom ? (
                   canSeeContact ? (
@@ -331,7 +331,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                       href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
                       className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-xs font-medium text-gold/90 hover:text-gold"
                     >
-                      <Lock className="h-3 w-3" /> Preț la autentificare
+                      <Lock className="h-3 w-3" /> {t("common.priceOnLogin")}
                     </a>
                   )
                 ) : null}
@@ -344,10 +344,10 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               )}
 
               <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-xl border border-white/8 bg-[#0d1119]">
-                <ArtistFact icon={CalendarDays} label="Evenimente" value="Private și corporate" />
-                <ArtistFact icon={Clock3} label="Program" value="Personalizat" />
-                <ArtistFact icon={Languages} label="Limbi" value="RO / RU" />
-                <ArtistFact icon={Mic2} label="Format" value="Live & interactiv" />
+                <ArtistFact icon={CalendarDays} label={t("artist.profile.fact.eventsLabel")} value={t("artist.profile.fact.eventsValue")} />
+                <ArtistFact icon={Clock3} label={t("artist.profile.fact.programLabel")} value={t("artist.profile.fact.programValue")} />
+                <ArtistFact icon={Languages} label={t("artist.profile.fact.languagesLabel")} value="RO / RU" />
+                <ArtistFact icon={Mic2} label={t("artist.profile.fact.formatLabel")} value={t("artist.profile.fact.formatValue")} />
               </div>
             </div>
           </div>
@@ -366,7 +366,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               <TabsTrigger value="reviews">{t("artist.reviews")} ({artist.reviews.length})</TabsTrigger>
               {ugcPhotos.length > 0 && (
                 <TabsTrigger value="moments" className="gap-1.5">
-                  <Camera className="h-3.5 w-3.5" /> Momente reale ({ugcPhotos.length})
+                  <Camera className="h-3.5 w-3.5" /> {t("artist.profile.realMoments")} ({ugcPhotos.length})
                 </TabsTrigger>
               )}
             </TabsList>
@@ -377,7 +377,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                   <p>{description}</p>
                 </div>
               ) : (
-                <p className="text-muted-foreground">Nu există descriere momentan.</p>
+                <p className="text-muted-foreground">{t("artist.profile.noDescription")}</p>
               )}
               {/* Phone number hidden from public view — only visible in admin panel */}
               {artist.instagram && canSeeContact && (
@@ -406,7 +406,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 }))}
               />
               {portfolio.length === 0 && (
-                <p className="text-muted-foreground">Nu există imagini momentan.</p>
+                <p className="text-muted-foreground">{t("artist.profile.noImages")}</p>
               )}
             </TabsContent>
 
@@ -430,7 +430,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
-                          🎬 {video.title || "Video"}
+                          🎬 {video.title || t("artist.profile.videoFallback")}
                         </div>
                       )}
                     </div>
@@ -475,7 +475,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                             }
                             className="flex w-full items-center justify-center gap-2 rounded-lg bg-gold/10 px-4 py-2 text-sm font-medium text-gold ring-1 ring-gold/30 hover:bg-gold/20"
                           >
-                            Solicită pachetul prin planul tău
+                            {t("artist.profile.requestPackageViaPlan")}
                           </Link>
                         </div>
                       </div>
@@ -488,7 +488,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             {ugcPhotos.length > 0 && (
               <TabsContent value="moments" className="mt-4">
                 <p className="mb-4 text-sm text-muted-foreground">
-                  Fotografii încărcate de clienți reali care au lucrat cu acest artist.
+                  {t("artist.profile.ugcIntro")}
                 </p>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                   {ugcPhotos.map((p) => (
@@ -499,7 +499,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                       { }
                       <img
                         src={p.url}
-                        alt={p.caption || "Moment real de la eveniment"}
+                        alt={p.caption || t("artist.profile.realMomentAlt")}
                         loading="lazy"
                         className="aspect-square w-full object-cover"
                       />
@@ -547,7 +547,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                               { }
                               <img
                                 src={url}
-                                alt={`Fotografie recenzie ${i + 1}`}
+                                alt={t("artist.profile.reviewPhotoAlt", { index: i + 1 })}
                                 className="h-full w-full object-cover"
                                 loading="lazy"
                               />
@@ -557,14 +557,14 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                       )}
                       {review.reply && (
                         <div className="mt-3 rounded bg-accent/50 p-3 text-xs text-muted-foreground">
-                          <span className="font-medium">Răspuns:</span> {review.reply}
+                          <span className="font-medium">{t("artist.profile.replyLabel")}</span> {review.reply}
                         </div>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="mt-4 text-muted-foreground">Fii primul care lasă o recenzie!</p>
+                <p className="mt-4 text-muted-foreground">{t("artist.profile.beFirstReview")}</p>
               )}
             </TabsContent>
           </Tabs>
@@ -572,12 +572,12 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
           {allMoments.length > 0 && (
           <section id="momente" className="mt-10 scroll-mt-24">
             <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">
-              Portofoliu
+              {t("artist.profile.portfolioEyebrow")}
             </p>
             <div className="mt-2 flex items-end justify-between gap-4">
-              <h2 className="font-heading text-2xl font-semibold">Momente din evenimente</h2>
+              <h2 className="font-heading text-2xl font-semibold">{t("artist.profile.momentsTitle")}</h2>
               <span className="text-xs text-white/38">
-                {allMoments.length} {allMoments.length === 1 ? "fotografie" : "fotografii"}
+                {allMoments.length} {allMoments.length === 1 ? t("artist.profile.photoSingular") : t("artist.profile.photoPlural")}
               </span>
             </div>
             <div
@@ -594,13 +594,13 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 >
                   <img
                     src={url}
-                    alt={`${name} — moment din eveniment ${index + 1}`}
+                    alt={t("artist.profile.momentAlt", { name, index: index + 1 })}
                     loading="lazy"
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent opacity-70" />
                   <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 text-[10px] text-white/72">
-                    <Camera className="h-3 w-3 text-[#e6b84d]" /> Moment real
+                    <Camera className="h-3 w-3 text-[#e6b84d]" /> {t("artist.profile.realMomentBadge")}
                   </span>
                 </a>
               ))}
@@ -610,8 +610,8 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
 
           {artist.videos.length > 0 && (
             <section className="mt-10">
-              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">Vezi artistul live</p>
-              <h2 className="mt-2 font-heading text-2xl font-semibold">Showreel &amp; video</h2>
+              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("artist.profile.videoEyebrow")}</p>
+              <h2 className="mt-2 font-heading text-2xl font-semibold">{t("artist.profile.showreelTitle")}</h2>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
                 {artist.videos.slice(0, 4).map((video) => (
                   <div key={video.id} className="aspect-video overflow-hidden rounded-xl border border-white/10 bg-[#0d1119]">
@@ -622,11 +622,11 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                         src={`https://www.youtube.com/embed/${video.videoId.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]+)/)?.[1] || video.videoId}`}
                         className="h-full w-full"
                         allowFullScreen
-                        title={video.title || `Video ${name}`}
+                        title={video.title || t("artist.profile.videoTitle", { name })}
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center text-sm text-white/45">
-                        {video.title || "Video"}
+                        {video.title || t("artist.profile.videoFallback")}
                       </div>
                     )}
                   </div>
@@ -638,10 +638,10 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
           {eventPrices.length > 0 && (
             <section id="preturi-eveniment" className="mt-10 scroll-mt-24">
               <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">
-                Preț fix
+                {t("artist.profile.fixedPriceEyebrow")}
               </p>
               <h2 className="mt-2 font-heading text-2xl font-semibold">
-                Prețuri per eveniment
+                {t("artist.profile.perEventTitle")}
               </h2>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {eventPrices.map((ep) => (
@@ -652,7 +652,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                     <p className="text-[10px] font-semibold uppercase tracking-[.18em] text-white/45">
                       {ep.eventType
                         ? eventTypeLabel(ep.eventType as EventTypeKey, locale)
-                        : "Orice eveniment"}
+                        : t("artist.profile.anyEvent")}
                     </p>
                     <h3 className="mt-1.5 font-heading text-lg font-semibold">{ep.name}</h3>
                     {ep.description && (
@@ -661,7 +661,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                     {ep.minutes > 0 && (
                       <p className="mt-3 flex items-center gap-2 text-[11px] text-white/58">
                         <Clock3 className="h-3.5 w-3.5 text-[#e6b84d]" />
-                        ~{formatDuration(ep.minutes)} în medie
+                        {t("artist.profile.avgDuration", { duration: formatDuration(ep.minutes) })}
                       </p>
                     )}
                     <p className="mt-4 font-heading text-xl font-semibold text-[#e6b84d]">
@@ -675,7 +675,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                       }
                       className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e6b84d]/45 bg-[#e6b84d]/8 text-xs font-semibold text-[#e6b84d] hover:bg-[#e6b84d]/15"
                     >
-                      Solicită <ArrowRight className="h-3.5 w-3.5" />
+                      {t("artist.profile.request")} <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                   </article>
                 ))}
@@ -684,8 +684,8 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
           )}
 
           <section id="pachete" className="mt-10 scroll-mt-24">
-            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">Alege experiența</p>
-            <h2 className="mt-2 font-heading text-2xl font-semibold">Pachete disponibile</h2>
+            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("artist.profile.packagesEyebrow")}</p>
+            <h2 className="mt-2 font-heading text-2xl font-semibold">{t("artist.profile.packagesTitle")}</h2>
             <div className="mt-5 grid gap-3 md:grid-cols-3">
               {profilePackages.map((pkg, index) => (
                 <article
@@ -698,18 +698,18 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 >
                   {index === 1 && (
                     <span className="absolute right-4 top-4 rounded-full bg-[#e6b84d] px-2.5 py-1 text-[9px] font-bold text-[#07101d]">
-                      RECOMANDAT
+                      {t("artist.profile.recommendedBadge")}
                     </span>
                   )}
                   <Sparkles className="h-5 w-5 text-[#e6b84d]" />
                   <h3 className="mt-4 font-heading text-lg font-semibold">{pkg.name}</h3>
                   <p className="mt-2 min-h-14 text-xs leading-5 text-white/48">{pkg.description}</p>
                   <div className="mt-4 space-y-2 text-[11px] text-white/58">
-                    <p className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#e6b84d]" /> Repertoriu personalizat</p>
-                    <p className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-[#e6b84d]" /> {pkg.durationHours || 2} ore de program</p>
+                    <p className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#e6b84d]" /> {t("artist.profile.customRepertoire")}</p>
+                    <p className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-[#e6b84d]" /> {pkg.durationHours || 2} {t("artist.profile.programHours")}</p>
                   </div>
                   <p className="mt-5 font-heading text-lg font-semibold text-[#e6b84d]">
-                    {pkg.price ? `${pkg.price}€` : "Preț la cerere"}
+                    {pkg.price ? `${pkg.price}€` : t("artist.profile.priceOnRequest")}
                   </p>
                   <Link
                     href={
@@ -719,7 +719,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                     }
                     className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e6b84d]/45 bg-[#e6b84d]/8 text-xs font-semibold text-[#e6b84d] hover:bg-[#e6b84d]/15"
                   >
-                    Solicită pachetul <ArrowRight className="h-3.5 w-3.5" />
+                    {t("artist.profile.requestPackage")} <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </article>
               ))}
@@ -727,9 +727,9 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
           </section>
 
           <section id="recenzii" className="mt-10 scroll-mt-24">
-            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">Feedback verificat</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("artist.profile.reviewsEyebrow")}</p>
             <h2 className="mt-2 font-heading text-2xl font-semibold">
-              Recenzii de la clienți ({artist.reviews.length})
+              {t("artist.profile.clientReviews")} ({artist.reviews.length})
             </h2>
             {artist.reviews.length > 0 ? (
               <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -750,7 +750,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               </div>
             ) : (
               <p className="mt-5 rounded-xl border border-white/8 bg-white/[.02] p-5 text-sm text-white/48">
-                Fii primul care lasă o recenzie pentru acest artist.
+                {t("artist.profile.beFirstReviewArtist")}
               </p>
             )}
             <div className="mt-5">
@@ -770,13 +770,13 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 rezervare buttons (existing UX) */}
           <div className="space-y-3 rounded-2xl border border-[#e6b84d]/55 bg-[linear-gradient(180deg,#161922,#0b1017)] p-5 shadow-[0_24px_60px_rgba(0,0,0,.34)] lg:sticky lg:top-20">
             <div className="border-b border-white/8 pb-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-[#e6b84d]">Rezervă artistul</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-[#e6b84d]">{t("artist.profile.bookEyebrow")}</p>
               <h2 className="mt-2 font-heading text-xl font-semibold text-[#fbf7ee]">
-                Adaugă {name} la eveniment
+                {t("artist.profile.addToEvent", { name })}
               </h2>
               <div className="mt-3 flex items-center gap-2 text-xs text-white/48">
                 <CalendarDays className="h-3.5 w-3.5 text-[#e6b84d]" />
-                Alege data și solicită disponibilitatea
+                {t("artist.profile.pickDate")}
               </div>
               {artist.priceFrom && canSeeContact && !artist.priceHidden && (
                 <p className="mt-4 font-heading text-2xl font-semibold text-[#e6b84d]">
@@ -791,18 +791,17 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
               >
                 <Lock className="h-5 w-5 text-gold" />
                 <span className="font-heading font-bold text-gold">
-                  Înregistrează-te pentru rezervare
+                  {t("artist.profile.signUpToBook")}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  După autentificare poți vedea disponibilitatea, prețul și
-                  poți trimite cerere de rezervare.
+                  {t("artist.profile.signUpBody")}
                 </span>
               </a>
             ) : artist.priceHidden ? (
               <>
                 <RequestPriceForm artistId={artist.id} />
                 <p className="text-center text-[11px] text-muted-foreground">
-                  Acest artist nu publică tariful — solicită ofertă personalizată.
+                  {t("artist.profile.priceHiddenNote")}
                 </p>
               </>
             ) : (
@@ -816,8 +815,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                   presetEventPlanId={eventPlanId ?? null}
                 />
                 <p className="text-center text-[11px] text-muted-foreground">
-                  Rezervările se fac doar din panoul evenimentului tău —
-                  ai nevoie de un plan de eveniment activ.
+                  {t("artist.profile.planRequiredNote")}
                 </p>
               </>
             )}
@@ -830,10 +828,10 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             {/* Share buttons */}
             <div className="rounded-xl border border-border/40 bg-card p-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Partajează
+                {t("artist.profile.share")}
               </p>
               <ShareButtons
-                title={`${name} — rezervă pentru evenimentul tău pe ePetrecere.md`}
+                title={t("artist.profile.shareTitle", { name })}
                 compact
               />
             </div>
@@ -856,7 +854,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             type="button"
             onClick={() => setAvatarOpen(false)}
             className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
-            aria-label="Închide"
+            aria-label={t("common.close")}
           >
             <X className="h-6 w-6" />
           </button>
@@ -877,11 +875,11 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
         <section className="mt-16 border-t border-white/8 pt-10">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">Descoperă mai multe</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("artist.profile.similarEyebrow")}</p>
               <h2 className="mt-2 font-heading text-2xl font-semibold">{t("artist.similar")}</h2>
             </div>
             <Link href="/artisti" className="inline-flex items-center gap-2 text-xs font-semibold text-[#e6b84d] hover:text-[#f1d684]">
-              Vezi toți artiștii <ArrowRight className="h-4 w-4" />
+              {t("artist.profile.seeAllArtists")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -915,18 +913,18 @@ function ArtistFact({
 }
 
 function ReviewForm() {
+  const { t } = useLocale();
   return (
     <div className="rounded-xl border border-border/40 bg-card p-5">
-      <h3 className="font-heading text-base font-bold">Recenzii verificate</h3>
+      <h3 className="font-heading text-base font-bold">{t("artist.profile.verifiedReviews")}</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Recenzia poate fi trimisă după un eveniment confirmat, direct din
-        cabinetul clientului. Astfel, feedbackul public provine din rezervări reale.
+        {t("artist.profile.verifiedReviewsBody")}
       </p>
       <Link
         href="/cabinet/recenzii"
         className="mt-4 inline-flex items-center gap-2 rounded-md bg-gold px-5 py-2.5 text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark"
       >
-        Vezi rezervările eligibile <ArrowRight className="h-4 w-4" />
+        {t("artist.profile.seeEligibleBookings")} <ArrowRight className="h-4 w-4" />
       </Link>
     </div>
   );

@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Bot, Send, Loader2, User, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Message {
   role: "user" | "assistant";
@@ -18,6 +19,7 @@ interface AIChatProps {
 }
 
 export function AIChat({ context }: AIChatProps) {
+  const { t } = useLocale();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -69,7 +71,7 @@ export function AIChat({ context }: AIChatProps) {
         ...newMessages,
         {
           role: "assistant",
-          content: "Serviciul AI nu este disponibil momentan. Verifică configurația ANTHROPIC_API_KEY.",
+          content: t("aiChat.unavailable"),
           timestamp: new Date().toISOString(),
         },
       ]);
@@ -95,7 +97,9 @@ export function AIChat({ context }: AIChatProps) {
         <div>
           <h3 className="font-heading text-sm font-bold">AI Assistant</h3>
           <p className="text-xs text-muted-foreground">
-            {context === "admin" ? "Asistent pentru administrare" : "Asistentul tău personal"}
+            {context === "admin"
+              ? t("aiChat.subtitleAdmin")
+              : t("aiChat.subtitleVendor")}
           </p>
         </div>
       </div>
@@ -106,34 +110,31 @@ export function AIChat({ context }: AIChatProps) {
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
             <Bot className="h-12 w-12 text-gold/30" />
             <div>
-              <p className="font-medium text-muted-foreground">Bine ai venit!</p>
+              <p className="font-medium text-muted-foreground">{t("aiChat.welcome")}</p>
               <p className="mt-1 text-sm text-muted-foreground/70">
                 {context === "admin"
-                  ? "Întreabă-mă orice despre artiști, leads, SEO sau conținut."
-                  : "Te pot ajuta cu calendarul, profilul sau descrierile tale."}
+                  ? t("aiChat.hintAdmin")
+                  : t("aiChat.hintVendor")}
               </p>
             </div>
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {(context === "admin"
-                ? [
-                    "Câți artiști activi avem?",
-                    "Generează descriere SEO",
-                    "Scrie articol blog",
-                  ]
-                : [
-                    "Îmbunătățește-mi descrierea",
-                    "Ce rezervări am luna viitoare?",
-                    "Ajută-mă cu profilul",
-                  ]
-              ).map((suggestion) => (
-                <button
-                  key={suggestion}
-                  onClick={() => setInput(suggestion)}
-                  className="rounded-lg border border-border/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-gold/30 hover:text-gold"
-                >
-                  {suggestion}
-                </button>
-              ))}
+              {[1, 2, 3]
+                .map((n) =>
+                  t(
+                    context === "admin"
+                      ? `aiChat.suggestAdmin${n}`
+                      : `aiChat.suggestVendor${n}`,
+                  ),
+                )
+                .map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setInput(suggestion)}
+                    className="rounded-lg border border-border/40 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-gold/30 hover:text-gold"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
             </div>
           </div>
         )}
@@ -190,14 +191,14 @@ export function AIChat({ context }: AIChatProps) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Scrie un mesaj..."
+            placeholder={t("aiChat.placeholder")}
             rows={1}
             className="min-h-[40px] max-h-[120px] resize-none"
           />
           <Button
             onClick={handleSend}
             disabled={!input.trim() || loading}
-            aria-label="Trimite mesaj"
+            aria-label={t("aiChat.send")}
             className="bg-gold text-[#0D0D0D] hover:bg-gold-dark shrink-0"
             size="icon"
           >

@@ -6,11 +6,11 @@ import { getArtists } from "@/lib/db/queries/artists";
 import { getCategoryBySlug, getAllCategories } from "@/lib/db/queries/categories";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
-import { getCityBySlug, CITIES } from "@/lib/seo/cities";
+import { getCityBySlug, getCityLocalizedName, CITIES } from "@/lib/seo/cities";
 import { cityNameAfterIn } from "@/lib/seo/city-grammar";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { plural } from "@/lib/i18n/plural";
-import { getLocalized } from "@/i18n";
+import { getLocalized, t } from "@/i18n";
 import { ArtistCard } from "@/components/public/artist-card";
 
 // M2 — City × Category SEO landing page.
@@ -87,10 +87,18 @@ export async function generateStaticParams() {
 }
 
 export default async function CityCategoryPage({ params, searchParams }: Props) {
-  const { city: citySlug, category: categorySlug } = await params;
+  const { locale: rawLocale, city: citySlug, category: categorySlug } =
+    await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const city = getCityBySlug(citySlug);
   const category = await getCategoryBySlug(categorySlug);
   if (!city || !category) notFound();
+
+  // Category and city names are data — the sentence around them is the copy.
+  const catName = getLocalized(category, "name", locale);
+  const catNameLower = catName.toLowerCase();
+  const cityName = getCityLocalizedName(city, locale);
+  const cityAfterIn = cityNameAfterIn(city, locale);
 
   const sp = await searchParams;
   const page = sp.page ? Number(sp.page) : 1;
@@ -110,16 +118,16 @@ export default async function CityCategoryPage({ params, searchParams }: Props) 
     : artistsList.map((a) => ({ ...a, priceFrom: null, phone: null, email: null, instagram: null }));
 
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Artiști", url: "/artisti" },
-    { name: city.nameRo, url: `/artisti/in/${citySlug}` },
-    { name: category.nameRo, url: `/artisti/in/${citySlug}/${categorySlug}` },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("nav.artists", locale), url: "/artisti" },
+    { name: cityName, url: `/artisti/in/${citySlug}` },
+    { name: catName, url: `/artisti/in/${citySlug}/${categorySlug}` },
   ];
 
   const itemList = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: `${category.nameRo} în ${city.nameRo}`,
+    name: t("cityCategory.heading", locale, { category: catName, city: cityAfterIn }),
     numberOfItems: total,
     itemListElement: safeArtists.slice(0, 10).map((a, i) => ({
       "@type": "ListItem",
@@ -142,23 +150,33 @@ export default async function CityCategoryPage({ params, searchParams }: Props) 
 
       <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">Acasă</Link>
+          <Link href="/" className="hover:text-gold">{t("nav.home", locale)}</Link>
           <span className="mx-2">/</span>
-          <Link href="/artisti" className="hover:text-gold">Artiști</Link>
+          <Link href="/artisti" className="hover:text-gold">{t("nav.artists", locale)}</Link>
           <span className="mx-2">/</span>
-          <Link href={`/artisti/in/${citySlug}`} className="hover:text-gold">{city.nameRo}</Link>
+          <Link href={`/artisti/in/${citySlug}`} className="hover:text-gold">{cityName}</Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">{category.nameRo}</span>
+          <span className="text-foreground">{catName}</span>
         </nav>
 
         <header className="mb-8">
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            {category.nameRo} în {city.nameRo}
+            {t("cityCategory.heading", locale, {
+              category: catName,
+              city: cityAfterIn,
+            })}
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground md:text-base">
             {total > 0
-              ? `${total} ${category.nameRo.toLowerCase()} profesioniști în ${city.nameRo}. Compară prețuri, citește recenzii și rezervă direct online pentru nuntă, botez, cumătrie sau eveniment corporate.`
-              : `Momentan nu avem ${category.nameRo.toLowerCase()} listați în ${city.nameRo}. Explorează alte categorii sau orașe.`}
+              ? t("cityCategory.intro", locale, {
+                  total,
+                  category: catNameLower,
+                  city: cityAfterIn,
+                })
+              : t("cityCategory.empty", locale, {
+                  category: catNameLower,
+                  city: cityAfterIn,
+                })}
           </p>
         </header>
 
@@ -166,15 +184,18 @@ export default async function CityCategoryPage({ params, searchParams }: Props) 
           <div className="space-y-4">
             <div className="rounded-xl border border-dashed border-border/40 bg-card py-16 text-center">
               <p className="text-muted-foreground">
-                Niciun {category.nameRo.toLowerCase()} disponibil în {city.nameRo}.
+                {t("cityCategory.none", locale, {
+                  category: catNameLower,
+                  city: cityAfterIn,
+                })}
               </p>
               <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm">
                 <a href={`/categorie/${categorySlug}`} className="text-gold hover:underline">
-                  Vezi toți {category.nameRo.toLowerCase()} →
+                  {t("cityCategory.viewAllCategory", locale, { category: catNameLower })}
                 </a>
                 <span className="text-muted-foreground">·</span>
                 <a href={`/artisti/in/${citySlug}`} className="text-gold hover:underline">
-                  Vezi toți artiștii din {city.nameRo} →
+                  {t("cityCategory.viewAllCity", locale, { city: cityName })}
                 </a>
               </div>
             </div>

@@ -20,6 +20,9 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { Camera, Upload, Check, Loader2, Image as ImageIcon, Lock, Clock, Eye, Sparkles, SkipForward, Trophy } from "lucide-react";
 import { applyVintage } from "@/lib/moments/vintage-filter";
+import { useLocale } from "@/hooks/use-locale";
+import { plural, type AllForms } from "@/lib/i18n/plural";
+import type { Locale } from "@/types";
 
 interface Photo {
   id: number;
@@ -83,17 +86,41 @@ function getOrCreateDeviceId(slug: string): string {
   }
 }
 
+/** Countdown units. They live here rather than in the message dictionary
+ *  because Russian needs three plural forms per unit, which a flat
+ *  key/value dictionary cannot express — `plural()` picks the form. */
+const COUNTDOWN_UNITS = {
+  days: {
+    ro: { one: "zi", few: "zile", many: "zile" },
+    ru: { one: "день", few: "дня", many: "дней" },
+    en: { one: "day", other: "days" },
+  },
+  hours: {
+    ro: { one: "oră", few: "ore", many: "ore" },
+    ru: { one: "час", few: "часа", many: "часов" },
+    en: { one: "hour", other: "hours" },
+  },
+} satisfies Record<string, AllForms>;
+
 /** ms → friendly countdown like "2 zile 3 ore", "47 min", "12 sec". */
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return "0 sec";
+function formatCountdown(
+  ms: number,
+  locale: Locale,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
+  const minLabel = t("moments.unitMin");
+  const secLabel = t("moments.unitSec");
+  if (ms <= 0) return `0 ${secLabel}`;
   const sec = Math.floor(ms / 1000);
   const min = Math.floor(sec / 60);
   const hr = Math.floor(min / 60);
   const day = Math.floor(hr / 24);
-  if (day > 0) return `${day} ${day === 1 ? "zi" : "zile"} ${hr % 24} ${hr % 24 === 1 ? "oră" : "ore"}`;
-  if (hr > 0) return `${hr} ${hr === 1 ? "oră" : "ore"} ${min % 60} min`;
-  if (min > 0) return `${min} min`;
-  return `${sec} sec`;
+  const days = (n: number) => plural(n, locale, COUNTDOWN_UNITS.days);
+  const hours = (n: number) => plural(n, locale, COUNTDOWN_UNITS.hours);
+  if (day > 0) return `${days(day)} ${hours(hr % 24)}`;
+  if (hr > 0) return `${hours(hr)} ${min % 60} ${minLabel}`;
+  if (min > 0) return `${min} ${minLabel}`;
+  return `${sec} ${secLabel}`;
 }
 
 export function MomentsUploadClient({
@@ -108,6 +135,7 @@ export function MomentsUploadClient({
   prompts,
   tables,
 }: Props) {
+  const { t, locale } = useLocale();
   const deviceId = useMemo(() => getOrCreateDeviceId(slug), [slug]);
 
   /** Phase 5/C3 — table identifier from the QR code. Each table card
@@ -277,13 +305,11 @@ export function MomentsUploadClient({
     e.preventDefault();
     setError(null);
     if (!guestName.trim() || files.length === 0) {
-      setError("Scrie numele tău și alege cel puțin o poză.");
+      setError(t("moments.errNameAndPhoto"));
       return;
     }
     if (limitReached) {
-      setError(
-        `Ai folosit toate cele ${shotLimit} cadre alocate pe acest dispozitiv.`,
-      );
+      setError(t("moments.errAllShotsUsed", { count: shotLimit ?? 0 }));
       return;
     }
     // Cap the batch by remaining shots so the user doesn't waste a
@@ -309,7 +335,7 @@ export function MomentsUploadClient({
         const upRes = await fetch("/api/upload", { method: "POST", body: fd });
         if (!upRes.ok) {
           const j = await upRes.json().catch(() => ({}));
-          throw new Error(j.error || "Upload eșuat");
+          throw new Error(j.error || t("moments.errUploadFailed"));
         }
         const { url } = await upRes.json();
 
@@ -332,7 +358,7 @@ export function MomentsUploadClient({
         });
         if (!saveRes.ok) {
           const j = await saveRes.json().catch(() => ({}));
-          throw new Error(j.error || "Salvare eșuată");
+          throw new Error(j.error || t("moments.errSaveFailed"));
         }
         const { id } = await saveRes.json();
         newPhotos.push({
@@ -365,7 +391,7 @@ export function MomentsUploadClient({
       setDone(true);
       setTimeout(() => setDone(false), 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Eroare");
+      setError(err instanceof Error ? err.message : t("moments.errGeneric"));
     } finally {
       setUploading(false);
     }
@@ -391,15 +417,14 @@ export function MomentsUploadClient({
           </p>
         )}
         <p className="mt-3 text-sm text-muted-foreground">
-          Împărtășește momentele tale.{" "}
+          {t("moments.shareYours")}{" "}
           {state.revealed
-            ? "Pozele apar live în galerie."
-            : "Galeria se deschide la finalul evenimentului."}
+            ? t("moments.liveGalleryNote")
+            : t("moments.galleryOpensAtEnd")}
         </p>
         {vintage && (
           <p className="mt-2 inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-medium text-gold">
-            <Sparkles className="h-3 w-3" /> Filtru polaroid activ — pozele
-            tale primesc automat un ton vintage cald
+            <Sparkles className="h-3 w-3" /> {t("moments.vintageActive")}
           </p>
         )}
         {tableLabel && (
@@ -415,16 +440,18 @@ export function MomentsUploadClient({
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-gold/30 bg-gold/5 p-4">
           <Clock className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
           <div className="min-w-0">
-            <p className="font-medium">Filmul se deschide în {formatCountdown(opensIn)}</p>
+            <p className="font-medium">
+              {t("moments.filmOpensIn", { time: formatCountdown(opensIn, locale, t) })}
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Te așteptăm{" "}
+              {t("moments.waitingFor")}{" "}
               {new Date(openAt).toLocaleString("ro-RO", {
                 day: "numeric",
                 month: "long",
                 hour: "2-digit",
                 minute: "2-digit",
               })}{" "}
-              — atunci poți începe să încarci poze.
+              {t("moments.thenYouCanUpload")}
             </p>
           </div>
         </div>
@@ -433,9 +460,9 @@ export function MomentsUploadClient({
         <div className="mt-6 flex items-start gap-3 rounded-2xl border border-border/40 bg-card p-4">
           <Lock className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
           <div className="min-w-0">
-            <p className="font-medium">Filmul s-a închis</p>
+            <p className="font-medium">{t("moments.filmClosed")}</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Mulțumim pentru participare! Pozele tale sunt în galerie.
+              {t("moments.filmClosedHint")}
             </p>
           </div>
         </div>
@@ -450,11 +477,10 @@ export function MomentsUploadClient({
               <Trophy className="mt-0.5 h-6 w-6 shrink-0 text-gold" />
               <div className="min-w-0 flex-1">
                 <p className="font-heading text-lg font-bold">
-                  Toate misiunile completate! 🎉
+                  {t("moments.allPromptsDone")}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Mulțumim — ai răspuns la toate {promptsTotal} provocările!
-                  Mai poți încărca poze libere mai jos.
+                  {t("moments.allPromptsDoneHint", { count: promptsTotal })}
                 </p>
               </div>
             </div>
@@ -462,7 +488,10 @@ export function MomentsUploadClient({
             <>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-medium uppercase tracking-wider text-gold">
-                  Provocare {promptsCompleted + 1}/{promptsTotal}
+                  {t("moments.promptProgress", {
+                    current: promptsCompleted + 1,
+                    total: promptsTotal,
+                  })}
                 </p>
                 <div className="flex h-1.5 w-24 overflow-hidden rounded-full bg-gold/20">
                   <div
@@ -481,8 +510,7 @@ export function MomentsUploadClient({
                 onClick={() => setSkipped((prev) => [...prev, currentPrompt])}
                 className="mt-3 inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-gold"
               >
-                <SkipForward className="h-3 w-3" /> Sari peste această
-                provocare
+                <SkipForward className="h-3 w-3" /> {t("moments.skipPrompt")}
               </button>
             </>
           ) : null}
@@ -506,10 +534,13 @@ export function MomentsUploadClient({
             >
               <span className="font-medium">
                 {limitReached
-                  ? "Toate cadrele tale au fost folosite"
-                  : `Ai ${remainingShots} ${
-                      remainingShots === 1 ? "cadru" : "cadre"
-                    } rămase`}
+                  ? t("moments.allShotsUsed")
+                  : t(
+                      remainingShots === 1
+                        ? "moments.shotsLeftOne"
+                        : "moments.shotsLeftMany",
+                      { count: remainingShots ?? 0 },
+                    )}
               </span>
               <span className="text-[11px] opacity-75">
                 {state.deviceUsed ?? 0}/{shotLimit}
@@ -518,25 +549,25 @@ export function MomentsUploadClient({
           )}
 
           <label className="block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Numele tău
+            {t("moments.yourName")}
           </label>
           <input
             type="text"
             value={guestName}
             onChange={(e) => setGuestName(e.target.value)}
-            placeholder="Ion Popescu"
+            placeholder={t("moments.namePlaceholder")}
             className="mt-1 w-full rounded-lg border border-border/40 bg-background px-3 py-2.5 text-sm focus:border-gold focus:outline-none"
             required
             disabled={limitReached}
           />
 
           <label className="mt-4 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
-            Mesaj (opțional)
+            {t("moments.message")}
           </label>
           <textarea
             value={guestMessage}
             onChange={(e) => setGuestMessage(e.target.value)}
-            placeholder="Ce nuntă frumoasă! 💍"
+            placeholder={t("moments.messagePlaceholder")}
             rows={2}
             className="mt-1 w-full rounded-lg border border-border/40 bg-background px-3 py-2.5 text-sm focus:border-gold focus:outline-none"
             disabled={limitReached}
@@ -553,11 +584,11 @@ export function MomentsUploadClient({
             <Camera className="h-10 w-10 text-gold" />
             <span className="font-medium">
               {files.length > 0
-                ? `${files.length} poze selectate`
-                : "Atinge pentru a alege poze"}
+                ? t("moments.photosSelected", { count: files.length })
+                : t("moments.tapToPick")}
             </span>
             <span className="text-xs text-muted-foreground">
-              JPG, PNG, WEBP · max 10MB per poză
+              {t("moments.fileHint")}
             </span>
           </label>
           <input
@@ -588,15 +619,15 @@ export function MomentsUploadClient({
           >
             {uploading ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Se încarcă...
+                <Loader2 className="h-4 w-4 animate-spin" /> {t("common.loading")}
               </>
             ) : done ? (
               <>
-                <Check className="h-4 w-4" /> Mulțumim!
+                <Check className="h-4 w-4" /> {t("moments.thanks")}
               </>
             ) : (
               <>
-                <Upload className="h-4 w-4" /> Trimite poze
+                <Upload className="h-4 w-4" /> {t("moments.sendPhotos")}
               </>
             )}
           </button>
@@ -605,7 +636,7 @@ export function MomentsUploadClient({
               decide whether to wait or upload now. */}
           {closeAt && (
             <p className="mt-3 text-center text-[11px] text-muted-foreground">
-              Filmul se închide în {formatCountdown(closesIn)}
+              {t("moments.filmClosesIn", { time: formatCountdown(closesIn, locale, t) })}
             </p>
           )}
         </form>
@@ -619,10 +650,10 @@ export function MomentsUploadClient({
         <section className="mt-8 rounded-2xl border border-border/40 bg-card p-5 text-center">
           <Eye className="mx-auto h-8 w-8 text-gold/70" />
           <p className="mt-3 font-medium">
-            Galeria se deschide{" "}
+            {t("moments.galleryOpens")}{" "}
             {revealAt
-              ? `în ${formatCountdown(revealsIn)}`
-              : "la finalul evenimentului"}
+              ? t("moments.inTime", { time: formatCountdown(revealsIn, locale, t) })
+              : t("moments.atEventEnd")}
           </p>
           {revealAt && (
             <p className="mt-1 text-xs text-muted-foreground">
@@ -636,10 +667,13 @@ export function MomentsUploadClient({
           )}
           <p className="mt-3 text-xs text-muted-foreground">
             {state.totalPhotos > 0
-              ? `${state.totalPhotos} ${
-                  state.totalPhotos === 1 ? "cadru a fost încărcat" : "cadre au fost încărcate"
-                } până acum. Toți le vom vedea împreună la dezvăluire.`
-              : "Fii primul care încarcă o amintire — totul rămâne ascuns până la dezvăluire."}
+              ? t(
+                  state.totalPhotos === 1
+                    ? "moments.uploadedSoFarOne"
+                    : "moments.uploadedSoFarMany",
+                  { count: state.totalPhotos },
+                )
+              : t("moments.beFirst")}
           </p>
         </section>
       )}
@@ -648,7 +682,7 @@ export function MomentsUploadClient({
         <section className="mt-8">
           <div className="mb-3 flex items-center gap-2 text-sm font-medium">
             <ImageIcon className="h-4 w-4 text-gold" />
-            Galerie live ({state.totalPhotos})
+            {t("moments.liveGallery", { count: state.totalPhotos })}
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {state.photos.map((p) => {
@@ -684,7 +718,12 @@ export function MomentsUploadClient({
                               ? "bg-gold/20 ring-1 ring-gold/50"
                               : "bg-muted hover:bg-muted/80"
                           }`}
-                          aria-label={`${active ? "Retrage" : "Adaugă"} reacția ${emoji}`}
+                          aria-label={t(
+                            active
+                              ? "moments.removeReaction"
+                              : "moments.addReaction",
+                            { emoji },
+                          )}
                         >
                           <span className="leading-none">{emoji}</span>
                           {count > 0 && (

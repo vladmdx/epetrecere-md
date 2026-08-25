@@ -1,5 +1,6 @@
 import { metaForPath } from "@/lib/seo/page-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { DarNuntaClient } from "./client";
 
@@ -36,11 +37,17 @@ export async function generateMetadata({
   }, locale);
 }
 
-export default function DarNuntaPage() {
+export default async function DarNuntaPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Calculatoare", url: "/calculatoare" },
-    { name: "Dar de nuntă", url: "/calculatoare/dar-nunta" },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("tools.calculators", locale), url: "/calculatoare" },
+    { name: t("calc.gift.breadcrumb", locale), url: "/calculatoare/dar-nunta" },
   ];
 
   return (

@@ -4,6 +4,7 @@ import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { VenuesListClient } from "./client";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: rawLocale } = await params;
@@ -67,15 +68,15 @@ export default async function VenuesPage({ params, searchParams }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: safeJsonLd(breadcrumbJsonLd([
-            { name: locale === "ru" ? "Главная" : locale === "en" ? "Home" : "Acasă", url: "https://epetrecere.md" },
-            { name: locale === "ru" ? "Залы" : locale === "en" ? "Venues" : "Săli", url: "https://epetrecere.md/sali" },
+            { name: t("nav.home", locale), url: "https://epetrecere.md" },
+            { name: t("venuesPage.breadcrumb", locale), url: "https://epetrecere.md/sali" },
           ])),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: safeJsonLd(itemListJsonLd(jsonLdItems, locale === "ru" ? "Залы для событий" : locale === "en" ? "Event Venues" : "Săli pentru Evenimente")),
+          __html: safeJsonLd(itemListJsonLd(jsonLdItems, t("venuesPage.itemListName", locale))),
         }}
       />
       <VenuesListClient

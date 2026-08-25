@@ -5,9 +5,10 @@ import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
-import { getCityBySlug } from "@/lib/seo/cities";
+import { getCityBySlug, getCityLocalizedName } from "@/lib/seo/cities";
 import { cityNameAfterIn } from "@/lib/seo/city-grammar";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import { NOUNS, plural } from "@/lib/i18n/plural";
 import { ArtistCard } from "@/components/public/artist-card";
 
@@ -76,9 +77,15 @@ export async function generateStaticParams() {
 }
 
 export default async function ArtistsByCityPage({ params, searchParams }: Props) {
-  const { city: citySlug } = await params;
+  const { locale: rawLocale, city: citySlug } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const city = getCityBySlug(citySlug);
   if (!city) notFound();
+
+  // The nominative reads on its own (breadcrumb, list name); the declined form
+  // is the one a sentence needs after "în" / "в" / "in".
+  const cityName = getCityLocalizedName(city, locale);
+  const cityIn = cityNameAfterIn(city, locale);
 
   const sp = await searchParams;
   const page = sp.page ? Number(sp.page) : 1;
@@ -99,16 +106,16 @@ export default async function ArtistsByCityPage({ params, searchParams }: Props)
     : artistsList.map((a) => ({ ...a, priceFrom: null, phone: null, email: null, instagram: null }));
 
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Artiști", url: "/artisti" },
-    { name: city.nameRo, url: `/artisti/in/${citySlug}` },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("nav.artists", locale), url: "/artisti" },
+    { name: cityName, url: `/artisti/in/${citySlug}` },
   ];
 
   // ItemList JSON-LD helps Google surface rich results for the listing.
   const itemList = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: `Artiști în ${city.nameRo}`,
+    name: t("artistsCity.listName", locale, { city: cityIn }),
     numberOfItems: total,
     itemListElement: safeArtists.slice(0, 10).map((a, i) => ({
       "@type": "ListItem",
@@ -131,34 +138,37 @@ export default async function ArtistsByCityPage({ params, searchParams }: Props)
 
       <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">Acasă</Link>
+          <Link href="/" className="hover:text-gold">{t("nav.home", locale)}</Link>
           <span className="mx-2">/</span>
-          <Link href="/artisti" className="hover:text-gold">Artiști</Link>
+          <Link href="/artisti" className="hover:text-gold">{t("nav.artists", locale)}</Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">{city.nameRo}</span>
+          <span className="text-foreground">{cityName}</span>
         </nav>
 
         <header className="mb-8">
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            Artiști pentru evenimente în {city.nameRo}
+            {t("artistsCity.heading", locale, { city: cityIn })}
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground md:text-base">
             {total > 0
-              ? `${total} artiști și trupe profesioniste disponibile în ${city.nameRo} pentru nuntă, botez, cumătrie, aniversare și evenimente corporate. Compară prețuri, citește recenzii și rezervă direct online.`
-              : `Momentan nu avem artiști listați în ${city.nameRo}. Explorează lista completă de artiști sau contactează-ne pentru recomandări personalizate.`}
+              ? t("artistsCity.intro", locale, {
+                  count: plural(total, locale, NOUNS.artists),
+                  city: cityIn,
+                })
+              : t("artistsCity.empty", locale, { city: cityIn })}
           </p>
         </header>
 
         {safeArtists.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border/40 bg-card py-16 text-center">
             <p className="text-muted-foreground">
-              Niciun artist disponibil în {city.nameRo} momentan.
+              {t("artistsCity.none", locale, { city: cityIn })}
             </p>
             <Link
               href="/artisti"
               className="mt-4 inline-block text-sm text-gold hover:underline"
             >
-              Vezi toți artiștii →
+              {t("catalog.viewAllArtists", locale)} →
             </Link>
           </div>
         ) : (

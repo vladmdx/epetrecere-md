@@ -5,10 +5,11 @@ import { auth } from "@clerk/nextjs/server";
 import { getVenues } from "@/lib/db/queries/venues";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
-import { getCityBySlug, CITIES } from "@/lib/seo/cities";
+import { getCityBySlug, getCityLocalizedName, CITIES } from "@/lib/seo/cities";
 import { cityNameAfterIn } from "@/lib/seo/city-grammar";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { plural } from "@/lib/i18n/plural";
+import { t } from "@/i18n";
 import { VenueCard } from "@/components/public/venue-card";
 
 // M2 — SEO landing page for venues in a specific Moldovan city.
@@ -68,9 +69,15 @@ export async function generateStaticParams() {
 }
 
 export default async function VenuesByCityPage({ params, searchParams }: Props) {
-  const { city: citySlug } = await params;
+  const { locale: rawLocale, city: citySlug } = await params;
   const city = getCityBySlug(citySlug);
   if (!city) notFound();
+
+  // Same split as generateMetadata: the plain name labels the city, the
+  // declined form is what a sentence after "în" / "в" needs.
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
+  const cityName = getCityLocalizedName(city, locale);
+  const cityIn = cityNameAfterIn(city, locale);
 
   const sp = await searchParams;
   const page = sp.page ? Number(sp.page) : 1;
@@ -89,15 +96,15 @@ export default async function VenuesByCityPage({ params, searchParams }: Props) 
     : items.map((v) => ({ ...v, pricePerPerson: null }));
 
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Săli", url: "/sali" },
-    { name: city.nameRo, url: `/sali/in/${citySlug}` },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("venues.breadcrumb", locale), url: "/sali" },
+    { name: cityName, url: `/sali/in/${citySlug}` },
   ];
 
   const itemList = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: `Săli pentru evenimente în ${city.nameRo}`,
+    name: t("venues.city.itemListName", locale, { city: cityIn }),
     numberOfItems: total,
     itemListElement: safeVenues.slice(0, 10).map((v, i) => ({
       "@type": "ListItem",
@@ -120,31 +127,31 @@ export default async function VenuesByCityPage({ params, searchParams }: Props) 
 
       <div className="mx-auto max-w-7xl px-4 py-8 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">Acasă</Link>
+          <Link href="/" className="hover:text-gold">{t("nav.home", locale)}</Link>
           <span className="mx-2">/</span>
-          <Link href="/sali" className="hover:text-gold">Săli</Link>
+          <Link href="/sali" className="hover:text-gold">{t("venues.breadcrumb", locale)}</Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">{city.nameRo}</span>
+          <span className="text-foreground">{cityName}</span>
         </nav>
 
         <header className="mb-8">
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            Săli și restaurante pentru evenimente în {city.nameRo}
+            {t("venues.city.h1", locale, { city: cityIn })}
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground md:text-base">
             {total > 0
-              ? `${total} săli și restaurante disponibile în ${city.nameRo} pentru nuntă, botez, cumătrie sau eveniment corporate. Verifică disponibilitatea, capacitatea și prețul pe persoană direct pe pagina fiecărei locații.`
-              : `Nu avem săli listate în ${city.nameRo} momentan. Contactează-ne pentru recomandări.`}
+              ? t("venues.city.intro", locale, { count: total, city: cityIn })
+              : t("venues.city.noneListed", locale, { city: cityIn })}
           </p>
         </header>
 
         {safeVenues.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border/40 bg-card py-16 text-center">
             <p className="text-muted-foreground">
-              Nicio sală disponibilă în {city.nameRo} momentan.
+              {t("venues.city.empty", locale, { city: cityIn })}
             </p>
             <Link href="/sali" className="mt-4 inline-block text-sm text-gold hover:underline">
-              Vezi toate sălile →
+              {t("venues.city.viewAll", locale)}
             </Link>
           </div>
         ) : (

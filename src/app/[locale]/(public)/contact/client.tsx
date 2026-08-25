@@ -19,7 +19,7 @@ export function ContactPageClient() {
       <div className="mb-10 text-center">
         <h1 className="font-heading text-3xl font-bold md:text-4xl">{t("nav.contact")}</h1>
         <p className="mt-2 text-muted-foreground">
-          Contactează-ne pentru orice întrebare legată de serviciile noastre
+          {t("contactPage.subtitle")}
         </p>
       </div>
 
@@ -31,8 +31,8 @@ export function ContactPageClient() {
               <MapPin className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-heading font-bold">Adresă</h3>
-              <p className="text-sm text-muted-foreground">Chișinău, Republica Moldova</p>
+              <h3 className="font-heading font-bold">{t("contactPage.address")}</h3>
+              <p className="text-sm text-muted-foreground">{t("contactPage.addressValue")}</p>
             </div>
           </div>
 
@@ -65,9 +65,9 @@ export function ContactPageClient() {
               <Clock className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-heading font-bold">Program</h3>
-              <p className="text-sm text-muted-foreground">Luni — Vineri: 09:00 – 18:00</p>
-              <p className="text-sm text-muted-foreground">Sâmbătă: 10:00 – 14:00</p>
+              <h3 className="font-heading font-bold">{t("contactPage.hours")}</h3>
+              <p className="text-sm text-muted-foreground">{t("contactPage.hoursWeekdays")}</p>
+              <p className="text-sm text-muted-foreground">{t("contactPage.hoursSaturday")}</p>
             </div>
           </div>
         </div>
@@ -76,9 +76,9 @@ export function ContactPageClient() {
         {submitted ? (
           <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-border/40 bg-card p-12 text-center">
             <CheckCircle className="h-12 w-12 text-green-500" />
-            <h3 className="font-heading text-lg font-bold">Mesajul a fost trimis!</h3>
+            <h3 className="font-heading text-lg font-bold">{t("contactPage.sentTitle")}</h3>
             <p className="text-sm text-muted-foreground">
-              Te vom contacta in cel mai scurt timp posibil.
+              {t("contactPage.sentBody")}
             </p>
           </div>
         ) : (
@@ -107,7 +107,7 @@ export function ContactPageClient() {
                 }
                 setSubmitted(true);
               } catch {
-                setFormError("Nu am putut trimite mesajul. Încercați din nou sau contactați-ne telefonic.");
+                setFormError(t("contactPage.sendFailed"));
               } finally {
                 setSubmitting(false);
               }
@@ -120,7 +120,7 @@ export function ContactPageClient() {
               </div>
               <div>
                 <Label htmlFor="phone">{t("form.phone")} *</Label>
-                <Input id="phone" name="phone" type="tel" required pattern="^(\+?373|0)\s?\d{2}\s?\d{3}\s?\d{3}$" title="Format: +373 XX XXX XXX sau 0XX XXX XXX" />
+                <Input id="phone" name="phone" type="tel" required pattern="^(\+?373|0)\s?\d{2}\s?\d{3}\s?\d{3}$" title={t("contactPage.phoneFormat")} />
               </div>
             </div>
             <div>

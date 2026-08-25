@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { venues, venueImages } from "@/lib/db/schema";
 import { Star, MapPin, Users, ArrowLeft, X, Check } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
+import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { ClearCompareButton } from "./clear-button";
 import { NotSpecified } from "@/components/public/not-specified";
@@ -47,22 +48,27 @@ export async function generateMetadata({
 }
 
 interface Props {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ ids?: string }>;
 }
 
-const FACILITY_LIST = [
-  "Parcare",
-  "Aer condiționat",
-  "Sunet profesional",
-  "Proiector",
-  "Ring de dans",
-  "Terasa",
-  "Grădină",
-  "Cameră miri",
-  "Wi-Fi gratuit",
+// The Romanian value is what the `facilities` column stores, so it stays the
+// lookup key; the second entry is only how the row is labelled.
+const FACILITY_LIST: Array<{ value: string; key: string }> = [
+  { value: "Parcare", key: "compare.facility.parking" },
+  { value: "Aer condiționat", key: "compare.facility.airConditioning" },
+  { value: "Sunet profesional", key: "compare.facility.professionalSound" },
+  { value: "Proiector", key: "compare.facility.projector" },
+  { value: "Ring de dans", key: "compare.facility.danceFloor" },
+  { value: "Terasa", key: "compare.facility.terrace" },
+  { value: "Grădină", key: "compare.facility.garden" },
+  { value: "Cameră miri", key: "compare.facility.bridalSuite" },
+  { value: "Wi-Fi gratuit", key: "compare.facility.freeWifi" },
 ];
 
-export default async function VenueComparePage({ searchParams }: Props) {
+export default async function VenueComparePage({ params, searchParams }: Props) {
+  const { locale: rawLocale } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const sp = await searchParams;
   const ids = (sp.ids || "")
     .split(",")
@@ -73,13 +79,15 @@ export default async function VenueComparePage({ searchParams }: Props) {
   if (ids.length < 2) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center lg:px-8">
-        <h1 className="font-heading text-2xl font-bold">Compară săli</h1>
+        <h1 className="font-heading text-2xl font-bold">
+          {t("compare.title", locale)}
+        </h1>
         <p className="mt-2 text-muted-foreground">
-          Alege 2 sau 3 săli de pe pagina{" "}
+          {t("compare.emptyIntro", locale)}{" "}
           <Link href="/sali" className="text-gold hover:underline">
-            Săli
+            {t("compare.venuesLink", locale)}
           </Link>{" "}
-          cu butonul „Compară” pentru a le vedea side-by-side aici.
+          {t("compare.emptyOutro", locale)}
         </p>
       </div>
     );
@@ -136,7 +144,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
     render: (v: (typeof rows)[number]) => React.ReactNode;
   }> = [
     {
-      label: "Oraș",
+      label: t("compare.row.city", locale),
       render: (v) =>
         v.city ? (
           <span className="inline-flex items-center gap-1">
@@ -148,24 +156,24 @@ export default async function VenueComparePage({ searchParams }: Props) {
         ),
     },
     {
-      label: "Capacitate",
+      label: t("catalog.capacity", locale),
       render: (v) =>
         v.capacityMax ? (
           <span className="inline-flex items-center gap-1">
             <Users className="h-3.5 w-3.5 text-muted-foreground" />
             {v.capacityMin ? `${v.capacityMin}–` : ""}
-            {v.capacityMax} persoane
+            {v.capacityMax} {t("compare.people", locale)}
           </span>
         ) : (
           <NotSpecified />
         ),
     },
     {
-      label: "Preț / persoană",
-      render: (v) => (v.pricePerPerson ? `${formatPrice(v.pricePerPerson, null, "ro")}` : <NotSpecified />),
+      label: t("compare.row.pricePerPerson", locale),
+      render: (v) => (v.pricePerPerson ? `${formatPrice(v.pricePerPerson, null, locale)}` : <NotSpecified />),
     },
     {
-      label: "Rating",
+      label: t("catalog.rating", locale),
       render: (v) =>
         v.ratingAvg ? (
           <span className="inline-flex items-center gap-1">
@@ -180,7 +188,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
         ),
     },
     {
-      label: "Tur virtual 360°",
+      label: t("compare.row.virtualTour", locale),
       render: (v) =>
         v.virtualTourUrl ? (
           <Check className="h-4 w-4 text-emerald-500" />
@@ -189,7 +197,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
         ),
     },
     {
-      label: "Meniu disponibil",
+      label: t("compare.row.menuAvailable", locale),
       render: (v) =>
         v.menuUrl || v.menuPdfUrl ? (
           <Check className="h-4 w-4 text-emerald-500" />
@@ -198,10 +206,10 @@ export default async function VenueComparePage({ searchParams }: Props) {
         ),
     },
     ...FACILITY_LIST.map((fac) => ({
-      label: fac,
+      label: t(fac.key, locale),
       render: (v: (typeof rows)[number]) => {
         const list = Array.isArray(v.facilities) ? v.facilities : [];
-        return list.includes(fac) ? (
+        return list.includes(fac.value) ? (
           <Check className="h-4 w-4 text-emerald-500" />
         ) : (
           <X className="h-4 w-4 text-muted-foreground/40" />
@@ -209,7 +217,7 @@ export default async function VenueComparePage({ searchParams }: Props) {
       },
     })),
     {
-      label: "Descriere",
+      label: t("compare.row.description", locale),
       render: (v) =>
         v.descriptionRo ? (
           <p className="line-clamp-6 text-xs text-muted-foreground">
@@ -229,10 +237,10 @@ export default async function VenueComparePage({ searchParams }: Props) {
             href="/sali"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
           >
-            <ArrowLeft className="h-3 w-3" /> Înapoi la săli
+            <ArrowLeft className="h-3 w-3" /> {t("compare.backToVenues", locale)}
           </Link>
           <h1 className="mt-2 font-heading text-2xl font-bold">
-            Comparație — {ordered.length} săli
+            {t("compare.heading", locale, { count: ordered.length })}
           </h1>
         </div>
         <ClearCompareButton />

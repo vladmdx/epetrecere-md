@@ -45,9 +45,9 @@ export function HeroSearch() {
   const [guests, setGuests] = useState("");
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: "venues", label: t("search.tab_venues") ?? "Locații" },
-    { key: "artists", label: t("search.tab_artists") ?? "Artiști" },
-    { key: "services", label: t("search.tab_services") ?? "Servicii" },
+    { key: "venues", label: t("search.tab_venues") },
+    { key: "artists", label: t("search.tab_artists") },
+    { key: "services", label: t("search.tab_services") },
   ];
 
   /**
@@ -118,27 +118,27 @@ export function HeroSearch() {
         onSubmit={handleSubmit}
         className="flex flex-col gap-3 lg:flex-row lg:items-end"
       >
-        <Field label={t("search.what") ?? "Ce cauți?"}>
+        <Field label={t("search.what")}>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder={t("search.what_ph") ?? "Ex: sală, DJ, formație..."}
+            placeholder={t("search.what_ph")}
             className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-gold/50 focus:bg-white/[0.06]"
           />
         </Field>
 
-        <Field label={t("search.location") ?? "Locația"} icon={MapPin}>
+        <Field label={t("search.location")} icon={MapPin}>
           <input
             value={city}
             onChange={(e) => setCity(e.target.value)}
-            placeholder={t("search.location_ph") ?? "Oraș sau regiune"}
+            placeholder={t("search.location_ph")}
             className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] pl-9 pr-3 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-gold/50 focus:bg-white/[0.06]"
           />
         </Field>
 
         <div className="flex-1">
           <label className="mb-1.5 block text-left text-[11px] font-medium uppercase tracking-wider text-white/50">
-            {t("search.date_label") ?? "Data evenimentului"}
+            {t("search.date_label")}
           </label>
           <CustomCalendar
             value={date}
@@ -148,12 +148,12 @@ export function HeroSearch() {
           />
         </div>
 
-        <Field label={t("search.guests") ?? "Invitați"} icon={Users}>
+        <Field label={t("search.guests")} icon={Users}>
           <input
             inputMode="numeric"
             value={guests}
             onChange={(e) => setGuests(e.target.value.replace(/\D/g, "").slice(0, 5))}
-            placeholder={t("search.guests_ph") ?? "Nr. invitați"}
+            placeholder={t("search.guests_ph")}
             className="h-11 w-full rounded-xl border border-white/10 bg-white/[0.04] pl-9 pr-3 text-sm text-white placeholder:text-white/40 outline-none transition-colors focus:border-gold/50 focus:bg-white/[0.06]"
           />
         </Field>
@@ -163,7 +163,7 @@ export function HeroSearch() {
           className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-gold px-6 text-sm font-semibold text-[#0D0D0D] transition-colors hover:bg-gold-dark lg:w-auto"
         >
           <Search className="h-4 w-4" />
-          {t("search.search_button") ?? "Caută"}
+          {t("search.search_button")}
         </button>
       </form>
     </div>

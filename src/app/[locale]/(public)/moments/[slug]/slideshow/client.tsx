@@ -21,6 +21,7 @@
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import { Music, VolumeX, Volume2, Play } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Photo {
   id: number;
@@ -36,18 +37,24 @@ interface MomentsState {
   revealAt: string | null;
 }
 
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
 /** ms → "2 zile 3 ore" / "47 min" / "12 sec". Mirrors the guest UI
  *  formatter so the room sees the same phrasing across screens. */
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return "se dezvăluie acum";
+function formatCountdown(ms: number, t: Translate): string {
+  if (ms <= 0) return t("moments.slideshow.revealingNow");
   const sec = Math.floor(ms / 1000);
   const min = Math.floor(sec / 60);
   const hr = Math.floor(min / 60);
   const day = Math.floor(hr / 24);
-  if (day > 0) return `${day} ${day === 1 ? "zi" : "zile"} ${hr % 24} ${hr % 24 === 1 ? "oră" : "ore"}`;
-  if (hr > 0) return `${hr} ${hr === 1 ? "oră" : "ore"} ${min % 60} min`;
-  if (min > 0) return `${min} min ${sec % 60} sec`;
-  return `${sec} sec`;
+  const dayUnit = t(day === 1 ? "moments.unit.day" : "moments.unit.days");
+  const hrUnit = (n: number) => t(n === 1 ? "moments.unit.hour" : "moments.unit.hours");
+  const minUnit = t("moments.unit.min");
+  const secUnit = t("moments.unit.sec");
+  if (day > 0) return `${day} ${dayUnit} ${hr % 24} ${hrUnit(hr % 24)}`;
+  if (hr > 0) return `${hr} ${hrUnit(hr)} ${min % 60} ${minUnit}`;
+  if (min > 0) return `${min} ${minUnit} ${sec % 60} ${secUnit}`;
+  return `${sec} ${secUnit}`;
 }
 
 export function SlideshowClient({
@@ -59,6 +66,7 @@ export function SlideshowClient({
   title: string;
   musicUrl: string | null;
 }) {
+  const { t } = useLocale();
   const [state, setState] = useState<MomentsState>({
     photos: [],
     totalPhotos: 0,
@@ -209,12 +217,12 @@ export function SlideshowClient({
             {title}
           </p>
           <h1 className="mt-6 font-heading text-5xl font-bold text-gold drop-shadow-[0_0_30px_rgba(201,168,76,0.35)] md:text-7xl">
-            Galeria se dezvăluie în
+            {t("moments.slideshow.revealsIn")}
           </h1>
           <p className="mt-6 font-heading text-6xl font-bold tabular-nums md:text-8xl">
             {state.revealAt
-              ? formatCountdown(revealsIn)
-              : "așteaptăm finalul evenimentului"}
+              ? formatCountdown(revealsIn, t)
+              : t("moments.slideshow.awaitingEnd")}
           </p>
           {state.revealAt && (
             <p className="mt-4 text-base text-white/60 md:text-lg">
@@ -230,7 +238,7 @@ export function SlideshowClient({
           {/* Live count of submissions — keeps the room engaged. */}
           <div className="mt-10 rounded-2xl border border-gold/30 bg-black/40 px-8 py-4 backdrop-blur">
             <p className="text-xs uppercase tracking-[4px] text-white/50">
-              cadre primite
+              {t("moments.slideshow.framesReceived")}
             </p>
             <p className="mt-1 font-heading text-5xl font-bold text-gold md:text-6xl">
               {state.totalPhotos}
@@ -238,8 +246,7 @@ export function SlideshowClient({
           </div>
 
           <p className="mt-10 max-w-xl text-base text-white/70 md:text-lg">
-            Scanează codul QR și trimite amintirile tale. Le vom vedea
-            împreună la dezvăluire.
+            {t("moments.slideshow.qrInvite")}
           </p>
         </div>
       )}
@@ -278,10 +285,10 @@ export function SlideshowClient({
             {title}
           </p>
           <p className="mt-4 font-heading text-4xl font-bold">
-            În așteptarea primelor poze...
+            {t("moments.slideshow.waitingFirstPhotos")}
           </p>
           <p className="mt-2 text-sm text-white/50">
-            Scanează QR-ul și trimite momentele tale
+            {t("moments.slideshow.scanAndSend")}
           </p>
         </div>
       )}
@@ -292,11 +299,11 @@ export function SlideshowClient({
       {qrUrl && (
         <div className="absolute right-8 top-8 flex flex-col items-center gap-2 rounded-2xl bg-white/95 p-3 shadow-2xl backdrop-blur">
           { }
-          <img src={qrUrl} alt="Scan pentru upload poze" className="h-32 w-32" />
+          <img src={qrUrl} alt={t("moments.slideshow.qrAlt")} className="h-32 w-32" />
           <p className="text-center text-[11px] font-semibold text-black">
-            📸 Scanează
+            📸 {t("moments.slideshow.scan")}
             <br />
-            trimite poze
+            {t("moments.slideshow.sendPhotos")}
           </p>
         </div>
       )}
@@ -321,14 +328,14 @@ export function SlideshowClient({
               type="button"
               onClick={toggleMute}
               className="absolute bottom-8 left-8 flex items-center gap-2 rounded-full bg-black/60 px-4 py-2 text-xs text-white/90 backdrop-blur hover:bg-black/80"
-              aria-label={muted ? "Activează sunetul" : "Oprește sunetul"}
+              aria-label={muted ? t("moments.slideshow.unmute") : t("moments.slideshow.mute")}
             >
               {muted ? (
                 <VolumeX className="h-4 w-4" />
               ) : (
                 <Volume2 className="h-4 w-4" />
               )}
-              <span>{muted ? "Fără sunet" : "Muzică"}</span>
+              <span>{muted ? t("moments.slideshow.noSound") : t("moments.slideshow.music")}</span>
             </button>
           )}
           {/* Autoplay-blocked overlay — Chrome and Safari refuse
@@ -343,7 +350,7 @@ export function SlideshowClient({
               >
                 <Play className="h-5 w-5 fill-current" />
                 <Music className="h-5 w-5" />
-                Pornește muzica
+                {t("moments.slideshow.startMusic")}
               </button>
             </div>
           )}

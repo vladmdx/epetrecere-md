@@ -4,6 +4,8 @@ import { metaForPath } from "@/lib/seo/page-meta";
 import { ServiceIcon } from "@/components/public/service-icon";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { getSupplyCounts } from "@/lib/db/queries/supply-counts";
+import { t } from "@/i18n";
+import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
 
 const SERVICES_PATH = "/servicii";
 
@@ -22,24 +24,24 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
 }
 
 const serviceGroups = [
-  { slug: "moderatori", name: "Moderatori / MC", desc: "Profesioniști care conduc ceremonia și petrecerea cu stil.", image: "/images/categories/moderatori.jpg" },
-  { slug: "dj", name: "DJ", desc: "Muzică pentru orice gust și atmosferă.", image: "/images/categories/dj.jpg" },
-  { slug: "cantareti", name: "Cântăreți", desc: "Voci excepționale pentru momentele speciale.", image: "/images/categories/cantareti.jpg" },
-  { slug: "formatii", name: "Formații & Grupuri", desc: "Muzică live pentru o petrecere de neuitat.", image: "/images/categories/formatii.jpg" },
-  { slug: "fotografi", name: "Fotografi", desc: "Capturăm cele mai frumoase momente.", image: "/images/categories/fotografi.jpg" },
-  { slug: "videografi", name: "Videografi", desc: "Filmări profesionale pentru amintiri veșnice.", image: "/images/categories/videografi.jpg" },
-  { slug: "decor", name: "Decor & Floristică", desc: "Transformăm spațiul în vis.", image: "/images/categories/decor.jpg" },
-  { slug: "animatori", name: "Animatori", desc: "Distracție garantată pentru toate vârstele.", image: "/images/categories/animatori.jpg" },
-  { slug: "sali", name: "Săli & Restaurante", desc: "Locația perfectă pentru evenimentul tău.", image: "/images/categories/sali.jpg", href: "/sali" },
-  { slug: "echipament-tehnic", name: "Echipament Tehnic", desc: "Sunet, lumini și scenă profesionale.", image: "/images/categories/echipament.jpg" },
-  { slug: "show-program", name: "Show Program", desc: "Spectacole de foc, circ și magie.", image: "/images/categories/show-program.jpg" },
+  { slug: "moderatori", nameKey: "services.groups.moderatori.name", descKey: "services.groups.moderatori.desc", image: "/images/categories/moderatori.jpg" },
+  { slug: "dj", nameKey: "home.categories.dj", descKey: "services.groups.dj.desc", image: "/images/categories/dj.jpg" },
+  { slug: "cantareti", nameKey: "services.groups.cantareti.name", descKey: "services.groups.cantareti.desc", image: "/images/categories/cantareti.jpg" },
+  { slug: "formatii", nameKey: "services.groups.formatii.name", descKey: "services.groups.formatii.desc", image: "/images/categories/formatii.jpg" },
+  { slug: "fotografi", nameKey: "services.groups.fotografi.name", descKey: "services.groups.fotografi.desc", image: "/images/categories/fotografi.jpg" },
+  { slug: "videografi", nameKey: "services.groups.videografi.name", descKey: "services.groups.videografi.desc", image: "/images/categories/videografi.jpg" },
+  { slug: "decor", nameKey: "home.categories.decor", descKey: "services.groups.decor.desc", image: "/images/categories/decor.jpg" },
+  { slug: "animatori", nameKey: "services.groups.animatori.name", descKey: "services.groups.animatori.desc", image: "/images/categories/animatori.jpg" },
+  { slug: "sali", nameKey: "nav.venues", descKey: "services.groups.sali.desc", image: "/images/categories/sali.jpg", href: "/sali" },
+  { slug: "echipament-tehnic", nameKey: "services.groups.echipamentTehnic.name", descKey: "services.groups.echipamentTehnic.desc", image: "/images/categories/echipament.jpg" },
+  { slug: "show-program", nameKey: "services.groups.showProgram.name", descKey: "services.groups.showProgram.desc", image: "/images/categories/show-program.jpg" },
 ] as const;
 
 const popular = [
-  { slug: "dj", name: "DJ pentru petreceri", note: "Cel mai solicitat", image: "/images/backgrounds/party-dance.jpg" },
-  { slug: "foto-video", name: "Foto & Video premium", note: "Top alegere", image: "/images/categories/foto-video.jpg" },
-  { slug: "decor", name: "Decor & Floristică", note: "Tendință în creștere", image: "/images/blog-decor.jpg" },
-  { slug: "sali", name: "Săli & Restaurante", note: "Locații de top", image: "/images/venues/hall-4.jpg", href: "/sali" },
+  { slug: "dj", nameKey: "services.popular.dj.name", noteKey: "services.popular.dj.note", image: "/images/backgrounds/party-dance.jpg" },
+  { slug: "foto-video", nameKey: "services.popular.fotoVideo.name", noteKey: "services.popular.fotoVideo.note", image: "/images/categories/foto-video.jpg" },
+  { slug: "decor", nameKey: "home.categories.decor", noteKey: "services.popular.decor.note", image: "/images/blog-decor.jpg" },
+  { slug: "sali", nameKey: "nav.venues", noteKey: "services.popular.sali.note", image: "/images/venues/hall-4.jpg", href: "/sali" },
 ] as const;
 
 // `slug` only picks the icon; the destination is spelled out per entry
@@ -51,13 +53,13 @@ const popular = [
 // src/lib/wizard/service-mapping.ts) -- put the pill back the day one is
 // added in the admin panel.
 const filters = [
-  { label: "Toate", slug: "sparkles", href: SERVICES_PATH },
-  { label: "Muzică", slug: "cantareti", href: "/categorie/cantareti" },
-  { label: "Foto & Video", slug: "fotografi", href: "/categorie/fotografi" },
-  { label: "Decor", slug: "decor", href: "/categorie/decor" },
-  { label: "Locații", slug: "sali", href: "/sali" },
-  { label: "Tehnic", slug: "echipament-tehnic", href: "/categorie/echipament-tehnic" },
-  { label: "Entertainment", slug: "show-program", href: "/categorie/show-program" },
+  { labelKey: "common.all", slug: "sparkles", href: SERVICES_PATH },
+  { labelKey: "services.filters.music", slug: "cantareti", href: "/categorie/cantareti" },
+  { labelKey: "services.filters.photoVideo", slug: "fotografi", href: "/categorie/fotografi" },
+  { labelKey: "services.filters.decor", slug: "decor", href: "/categorie/decor" },
+  { labelKey: "nav.locations", slug: "sali", href: "/sali" },
+  { labelKey: "services.filters.technical", slug: "echipament-tehnic", href: "/categorie/echipament-tehnic" },
+  { labelKey: "services.filters.entertainment", slug: "show-program", href: "/categorie/show-program" },
 ] as const;
 
 /**
@@ -66,46 +68,61 @@ const filters = [
  * on a marketplace that had ten. Whatever the catalogue holds, the page now
  * says so.
  */
+// Plural forms live next to `plural()` rather than in the dictionary because
+// agreement is a rule, not a phrase: RO needs "de" from 20 up and RU has
+// three endings. `NOUNS` has no "professional" entry, so it is spelled here.
+const PROFESSIONALS: AllForms = {
+  ro: { one: "profesionist", few: "profesioniști", many: "profesioniști" },
+  ru: { one: "профессионал", few: "профессионала", many: "профессионалов" },
+  en: { one: "professional", other: "professionals" },
+};
+
 function supplyLabel(
   slug: string,
   supply: Awaited<ReturnType<typeof getSupplyCounts>>,
+  locale: string,
 ): string | null {
   const n = slug === "sali" ? supply.activeVenues : supply.bySlug[slug];
   // No count rather than a count of zero: omitting the line says nothing,
   // while "0 profesioniști" on ten cards advertises the gap. The point of
   // this helper is that whatever it prints is true — not that it prints.
   if (!n) return null;
-  if (slug === "sali") return n === 1 ? "1 locație" : `${n} locații`;
-  return n === 1 ? "1 profesionist" : `${n} profesioniști`;
+  return plural(n, locale, slug === "sali" ? NOUNS.venues : PROFESSIONALS);
 }
 
-export default async function ServicesPage() {
+export default async function ServicesPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: rawLocale } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const supply = await getSupplyCounts();
   return (
     <div className="-mt-16 min-h-screen bg-[#020814] text-[#f6f0e5]">
       <section className="relative isolate overflow-hidden border-b border-[#e6b84d]/15 pt-16">
         <img
           src="/images/redesign/services-hero.webp"
-          alt="Servicii pentru nunți și evenimente în Chișinău și Moldova"
+          alt={t("services.hero.imageAlt", locale)}
           className="absolute inset-0 -z-20 h-full w-full object-cover"
         />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(180deg,rgba(2,8,20,.46),rgba(2,8,20,.84)_65%,#020814)]" />
         <div className="mx-auto max-w-7xl px-4 pb-9 pt-7 lg:px-8">
           <nav className="mb-7 text-xs text-white/55">
-            <Link href="/" className="hover:text-[#e6b84d]">Acasă</Link>
+            <Link href="/" className="hover:text-[#e6b84d]">{t("nav.home", locale)}</Link>
             <span className="mx-2">/</span>
-            <span>Servicii</span>
+            <span>{t("nav.services", locale)}</span>
           </nav>
 
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs font-semibold uppercase tracking-[.36em] text-[#e6b84d]">
-              Ce oferim
+              {t("services.hero.eyebrow", locale)}
             </p>
             <h1 className="mt-3 font-heading text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl">
-              Servicii pentru evenimente
+              {t("services.hero.title", locale)}
             </h1>
             <p className="mt-3 text-base text-white/68">
-              Tot ce ai nevoie pentru un eveniment perfect, într-un singur loc
+              {t("services.hero.subtitle", locale)}
             </p>
           </div>
 
@@ -117,7 +134,7 @@ export default async function ServicesPage() {
               const isCurrent = filter.href === SERVICES_PATH;
               return (
                 <Link
-                  key={filter.label}
+                  key={filter.labelKey}
                   href={filter.href}
                   aria-current={isCurrent ? "page" : undefined}
                   className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs transition-colors ${
@@ -127,7 +144,7 @@ export default async function ServicesPage() {
                   }`}
                 >
                   <ServiceIcon slug={filter.slug} className="h-4 w-4" />
-                  {filter.label}
+                  {t(filter.labelKey, locale)}
                 </Link>
               );
             })}
@@ -145,7 +162,7 @@ export default async function ServicesPage() {
             >
               <img
                 src={service.image}
-                alt={`${service.name} pentru evenimente în Moldova`}
+                alt={t("services.card.imageAlt", locale, { name: t(service.nameKey, locale) })}
                 className="absolute inset-0 h-full w-full object-cover opacity-24 transition duration-500 group-hover:scale-105 group-hover:opacity-34"
                 loading="lazy"
               />
@@ -156,15 +173,15 @@ export default async function ServicesPage() {
                 </span>
                 <div className="min-w-0">
                   <h2 className="font-heading text-lg font-semibold text-white">
-                    {service.name}
+                    {t(service.nameKey, locale)}
                   </h2>
                   <p className="mt-1 text-xs leading-relaxed text-white/62">
-                    {service.desc}
+                    {t(service.descKey, locale)}
                   </p>
                 </div>
               </div>
               <div className="relative mt-4 flex items-center justify-between border-t border-white/9 pt-2.5 text-[11px] text-white/58">
-                <span>{supplyLabel(service.slug, supply) ?? ""}</span>
+                <span>{supplyLabel(service.slug, supply, locale) ?? ""}</span>
                 <ArrowRight className="h-4 w-4 text-[#e6b84d] transition-transform group-hover:translate-x-1" />
               </div>
             </Link>
@@ -179,21 +196,21 @@ export default async function ServicesPage() {
             </div>
             <div className="flex-1">
               <h2 className="font-heading text-2xl font-semibold text-[#edc767]">
-                Nu știi de ce servicii ai nevoie?
+                {t("services.cta.title", locale)}
               </h2>
               <p className="mt-1 max-w-2xl text-sm leading-relaxed text-white/62">
-                Răspunde la câteva întrebări despre evenimentul tău și îți recomandăm cele mai potrivite servicii, adaptate bugetului și stilului tău.
+                {t("services.cta.desc", locale)}
               </p>
             </div>
             <Link
               href="/planifica"
               className="inline-flex min-h-12 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#f0cd71,#d5a43d)] px-7 text-sm font-semibold text-[#07101d] shadow-[0_8px_28px_rgba(224,177,64,.2)] hover:brightness-105"
             >
-              Primește recomandări personalizate
+              {t("services.cta.button", locale)}
             </Link>
             <span className="absolute bottom-2 right-8 hidden items-center gap-1 text-[11px] text-white/55 lg:flex">
               <CheckCircle2 className="h-3.5 w-3.5 text-[#e6b84d]" />
-              Gratuit, rapid și fără obligații
+              {t("services.cta.free", locale)}
             </span>
           </div>
         </section>
@@ -202,36 +219,36 @@ export default async function ServicesPage() {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-heading text-xl font-semibold">
               <span className="mr-2 text-[#e6b84d]">✦</span>
-              Servicii populare
+              {t("services.popular.title", locale)}
             </h2>
             <Link href="/categorii" className="inline-flex items-center gap-2 text-xs text-white/70 hover:text-[#e6b84d]">
-              Vezi toate serviciile <ArrowRight className="h-4 w-4" />
+              {t("services.popular.viewAll", locale)} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
             {popular.map((item) => (
               <Link
-                key={item.name}
+                key={item.slug}
                 href={"href" in item ? item.href : `/categorie/${item.slug}`}
                 className="group relative min-h-28 overflow-hidden rounded-xl border border-[#e6b84d]/30"
               >
                 <img
                   src={item.image}
-                  alt={`${item.name} pentru nunți și evenimente în Moldova`}
+                  alt={t("services.popular.imageAlt", locale, { name: t(item.nameKey, locale) })}
                   className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
                   loading="lazy"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#020814] via-[#020814]/72 to-black/20" />
                 <span className="absolute left-3 top-3 rounded-full border border-[#e6b84d]/50 bg-[#0a101b]/78 px-2 py-1 text-[9px] font-medium text-[#efc456] backdrop-blur">
-                  {item.note}
+                  {t(item.noteKey, locale)}
                 </span>
                 <div className="absolute inset-x-0 bottom-0 flex items-end gap-3 p-3">
                   <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#e6b84d]/55 bg-black/38 text-[#e6b84d]">
                     <ServiceIcon slug={item.slug} className="h-5 w-5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-heading text-base font-semibold text-white">{item.name}</h3>
-                    <p className="text-[10px] text-white/58">{supplyLabel(item.slug, supply) ?? item.note}</p>
+                    <h3 className="truncate font-heading text-base font-semibold text-white">{t(item.nameKey, locale)}</h3>
+                    <p className="text-[10px] text-white/58">{supplyLabel(item.slug, supply, locale) ?? t(item.noteKey, locale)}</p>
                   </div>
                   <ArrowRight className="h-4 w-4 text-[#e6b84d]" />
                 </div>

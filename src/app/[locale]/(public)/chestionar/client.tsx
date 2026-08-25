@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/format/price";
+import { useLocale } from "@/hooks/use-locale";
 import { ALL_EVENT_TYPES, EVENT_TYPE_EMOJI, eventTypeLabel } from "@/lib/events/normalize";
 
 interface QuizAnswers {
@@ -43,30 +44,34 @@ interface MatchResult {
 // faults: it offered the label "Cumătrie" under the value `baptism`, and it
 // emitted `anniversary` and `graduation`, which no other part of the product
 // recognises as event types.
-const EVENT_TYPES = ALL_EVENT_TYPES.map((k) => ({
-  value: k,
-  label: eventTypeLabel(k),
-  emoji: EVENT_TYPE_EMOJI[k],
-}));
+// Built inside the component so the labels follow the reader's language —
+// eventTypeLabel defaults to Romanian when no locale is passed.
+function eventTypes(locale: string) {
+  return ALL_EVENT_TYPES.map((k) => ({
+    value: k,
+    label: eventTypeLabel(k, locale),
+    emoji: EVENT_TYPE_EMOJI[k],
+  }));
+}
 
 const STYLES = [
-  { value: "elegant", label: "Elegant & clasic", desc: "Rafinament și simplitate" },
-  { value: "modern", label: "Modern & trendy", desc: "Minimalism actual" },
-  { value: "rustic", label: "Rustic & tradițional", desc: "Autentic moldovenesc" },
-  { value: "glamour", label: "Glamour & luxos", desc: "Spectaculos și opulent" },
-  { value: "boho", label: "Boho & natural", desc: "Relaxat și organic" },
-  { value: "themed", label: "Tematic", desc: "Concept personalizat" },
+  { value: "elegant", label: "quiz.styles.elegant", desc: "quiz.styles.elegantDesc" },
+  { value: "modern", label: "quiz.styles.modern", desc: "quiz.styles.modernDesc" },
+  { value: "rustic", label: "quiz.styles.rustic", desc: "quiz.styles.rusticDesc" },
+  { value: "glamour", label: "quiz.styles.glamour", desc: "quiz.styles.glamourDesc" },
+  { value: "boho", label: "quiz.styles.boho", desc: "quiz.styles.bohoDesc" },
+  { value: "themed", label: "quiz.styles.themed", desc: "quiz.styles.themedDesc" },
 ];
 
 const SERVICES = [
-  { value: "singer", label: "Cântăreț / Interpret" },
-  { value: "band", label: "Formație muzicală" },
-  { value: "dj", label: "DJ" },
-  { value: "mc", label: "Moderator" },
-  { value: "photographer", label: "Foto-Video" },
-  { value: "show", label: "Show-program / Dansatori" },
-  { value: "decor", label: "Decor & Floristică" },
-  { value: "animators", label: "Animatori copii" },
+  { value: "singer", label: "quiz.services.singer" },
+  { value: "band", label: "quiz.services.band" },
+  { value: "dj", label: "quiz.services.dj" },
+  { value: "mc", label: "quiz.services.mc" },
+  { value: "photographer", label: "quiz.services.photographer" },
+  { value: "show", label: "quiz.services.show" },
+  { value: "decor", label: "quiz.services.decor" },
+  { value: "animators", label: "quiz.services.animators" },
 ];
 
 const CITIES = [
@@ -81,15 +86,16 @@ const CITIES = [
 ];
 
 const STEPS = [
-  "Tipul evenimentului",
-  "Numărul invitaților",
-  "Bugetul aproximativ",
-  "Locația",
-  "Stilul dorit",
-  "Ce servicii cauți",
+  "quiz.steps.eventType",
+  "quiz.steps.guestCount",
+  "quiz.steps.budget",
+  "quiz.steps.location",
+  "quiz.steps.style",
+  "quiz.steps.services",
 ];
 
 export function MatchingQuizClient() {
+  const { t, locale } = useLocale();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<QuizAnswers>({
     eventType: "",
@@ -134,7 +140,7 @@ export function MatchingQuizClient() {
       setResults(data.matches);
     } catch (err) {
       console.error(err);
-      alert("A apărut o eroare. Încearcă din nou.");
+      alert(t("quiz.submitError"));
     } finally {
       setLoading(false);
     }
@@ -169,13 +175,13 @@ export function MatchingQuizClient() {
           <Sparkles className="mx-auto h-10 w-10 text-gold" />
           <h1 className="mt-3 font-heading text-2xl font-bold md:text-3xl">
             {results.length > 0
-              ? `Am găsit ${results.length} furnizori potriviți pentru tine`
-              : "Niciun furnizor găsit"}
+              ? t("quiz.resultsTitle", { count: results.length })
+              : t("quiz.emptyTitle")}
           </h1>
           <p className="mt-2 text-muted-foreground">
             {results.length > 0
-              ? "Sortați după scorul de potrivire cu răspunsurile tale."
-              : "Încearcă să ajustezi criteriile (buget, oraș sau servicii)."}
+              ? t("quiz.resultsHint")
+              : t("quiz.emptyHint")}
           </p>
         </div>
 
@@ -220,7 +226,7 @@ export function MatchingQuizClient() {
                     ) : null}
                     {m.priceFrom && (
                       <span className="text-foreground">
-                        de la {formatPrice(m.priceFrom)}
+                        {t("home.common.from", { price: formatPrice(m.priceFrom) ?? "" })}
                       </span>
                     )}
                   </div>
@@ -251,13 +257,13 @@ export function MatchingQuizClient() {
               });
             }}
           >
-            Începe din nou
+            {t("quiz.startOver")}
           </Button>
           <Link
             href="/artisti"
             className="inline-flex items-center justify-center rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
-            Vezi toți artiștii
+            {t("quiz.seeAllArtists")}
           </Link>
         </div>
       </div>
@@ -269,13 +275,14 @@ export function MatchingQuizClient() {
     <div className="mx-auto max-w-2xl px-4 py-12 lg:px-8">
       <div className="text-center">
         <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">
-          Chestionar rapid
+          {t("quiz.eyebrow")}
         </p>
         <h1 className="font-heading text-2xl font-bold md:text-3xl">
-          Găsim împreună furnizorii perfecți
+          {t("quiz.title")}
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Pas {step + 1} din {STEPS.length} · {STEPS[step]}
+          {t("quiz.stepOf", { current: step + 1, total: STEPS.length })} ·{" "}
+          {t(STEPS[step])}
         </p>
       </div>
 
@@ -287,7 +294,7 @@ export function MatchingQuizClient() {
       <div className="mt-10 min-h-[300px]">
         {step === 0 && (
           <div className="grid gap-3 sm:grid-cols-2">
-            {EVENT_TYPES.map((e) => (
+            {eventTypes(locale).map((e) => (
               <button
                 key={e.value}
                 type="button"
@@ -310,10 +317,10 @@ export function MatchingQuizClient() {
         {step === 1 && (
           <div className="space-y-3">
             {[
-              { v: 30, l: "Sub 50 invitați", d: "Intim" },
-              { v: 100, l: "50–150 invitați", d: "Mediu" },
-              { v: 200, l: "150–300 invitați", d: "Mare" },
-              { v: 400, l: "Peste 300 invitați", d: "Foarte mare" },
+              { v: 30, l: "quiz.guests.under50", d: "quiz.guests.under50Desc" },
+              { v: 100, l: "quiz.guests.to150", d: "quiz.guests.to150Desc" },
+              { v: 200, l: "quiz.guests.to300", d: "quiz.guests.to300Desc" },
+              { v: 400, l: "quiz.guests.over300", d: "quiz.guests.over300Desc" },
             ].map((o) => (
               <button
                 key={o.v}
@@ -328,8 +335,8 @@ export function MatchingQuizClient() {
                 }`}
               >
                 <div>
-                  <div className="font-medium">{o.l}</div>
-                  <div className="text-xs text-muted-foreground">{o.d}</div>
+                  <div className="font-medium">{t(o.l)}</div>
+                  <div className="text-xs text-muted-foreground">{t(o.d)}</div>
                 </div>
                 {answers.guestCount === o.v && (
                   <Check className="h-5 w-5 text-gold" />
@@ -342,11 +349,11 @@ export function MatchingQuizClient() {
         {step === 2 && (
           <div className="space-y-3">
             {[
-              { v: 1000, l: "Sub 1.500€" },
-              { v: 3000, l: "1.500€ – 5.000€" },
-              { v: 8000, l: "5.000€ – 12.000€" },
-              { v: 15000, l: "12.000€ – 25.000€" },
-              { v: 35000, l: "Peste 25.000€" },
+              { v: 1000, l: "quiz.budget.under1500" },
+              { v: 3000, l: "quiz.budget.to5000" },
+              { v: 8000, l: "quiz.budget.to12000" },
+              { v: 15000, l: "quiz.budget.to25000" },
+              { v: 35000, l: "quiz.budget.over25000" },
             ].map((o) => (
               <button
                 key={o.v}
@@ -358,7 +365,7 @@ export function MatchingQuizClient() {
                     : "border-border/40 bg-card hover:border-gold/30"
                 }`}
               >
-                <div className="font-medium">{o.l}</div>
+                <div className="font-medium">{t(o.l)}</div>
                 {answers.budget === o.v && (
                   <Check className="h-5 w-5 text-gold" />
                 )}
@@ -400,9 +407,9 @@ export function MatchingQuizClient() {
                     : "border-border/40 bg-card hover:border-gold/30"
                 }`}
               >
-                <div className="font-medium">{s.label}</div>
+                <div className="font-medium">{t(s.label)}</div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {s.desc}
+                  {t(s.desc)}
                 </div>
               </button>
             ))}
@@ -424,7 +431,7 @@ export function MatchingQuizClient() {
                       : "border-border/40 bg-card hover:border-gold/30"
                   }`}
                 >
-                  <span className="font-medium">{s.label}</span>
+                  <span className="font-medium">{t(s.label)}</span>
                   {active && <Check className="h-5 w-5 text-gold" />}
                 </button>
               );
@@ -440,7 +447,7 @@ export function MatchingQuizClient() {
           disabled={step === 0 || loading}
           className="gap-2"
         >
-          <ArrowLeft className="h-4 w-4" /> Înapoi
+          <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </Button>
         <Button
           onClick={next}
@@ -451,11 +458,11 @@ export function MatchingQuizClient() {
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : step === STEPS.length - 1 ? (
             <>
-              <Sparkles className="h-4 w-4" /> Găsește furnizori
+              <Sparkles className="h-4 w-4" /> {t("quiz.findVendors")}
             </>
           ) : (
             <>
-              Continuă <ArrowRight className="h-4 w-4" />
+              {t("common.next")} <ArrowRight className="h-4 w-4" />
             </>
           )}
         </Button>

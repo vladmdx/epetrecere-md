@@ -34,6 +34,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLocalizedRouter } from "@/components/shared/locale-link";
+import { useLocale } from "@/hooks/use-locale";
 
 interface PlanListItem {
   id: number;
@@ -71,6 +72,7 @@ export function AddToEventButton({
   presetEventPlanId,
 }: Props) {
   const router = useLocalizedRouter();
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -307,20 +309,19 @@ export function AddToEventButton({
           <CalendarDays className="h-4 w-4" />
         )}
         {presetEventPlanId
-          ? "Rezervă pentru evenimentul tău"
+          ? t("addToEvent.bookForEvent")
           : artistId
-            ? "Adaugă artistul la un eveniment"
-            : "Adaugă sala la un eveniment"}
+            ? t("addToEvent.addArtist")
+            : t("addToEvent.addVenue")}
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Alege evenimentul</DialogTitle>
+            <DialogTitle>{t("addToEvent.dialogTitle")}</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Alege evenimentul tău. Evenimentele unde partenerul este deja
-            ocupat sunt marcate corespunzător.
+            {t("addToEvent.dialogDescription")}
           </p>
           <div className="mt-2 space-y-2">
             {sortedPlans.map((p) => {
@@ -331,7 +332,7 @@ export function AddToEventButton({
                     "ro-MD",
                     { day: "numeric", month: "long", year: "numeric" },
                   )
-                : "Fără dată stabilită";
+                : t("addToEvent.noDate");
               return (
                 <button
                   key={p.id}
@@ -366,8 +367,7 @@ export function AddToEventButton({
                     </p>
                     {isConflicted && (
                       <p className="mt-1 text-xs font-medium text-red-400">
-                        Ocupat — partenerul are deja o rezervare în această
-                        zi.
+                        {t("addToEvent.busy")}
                       </p>
                     )}
                   </div>
@@ -381,11 +381,10 @@ export function AddToEventButton({
               className="w-full gap-2"
               onClick={newEvent}
             >
-              <Plus className="h-4 w-4" /> Eveniment nou
+              <Plus className="h-4 w-4" /> {t("addToEvent.newEvent")}
             </Button>
             <p className="mt-2 text-[11px] text-muted-foreground">
-              Creezi evenimentul în câteva secunde — apoi îți trimitem
-              cererea către acest partener automat.
+              {t("addToEvent.newEventHint")}
             </p>
           </div>
         </DialogContent>

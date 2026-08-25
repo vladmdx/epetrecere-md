@@ -12,69 +12,8 @@ import {
   saveConsent,
 } from "@/lib/privacy/consent";
 
-const copy = {
-  ro: {
-    title: "Preferințe de confidențialitate",
-    description:
-      "Folosim elemente esențiale pentru funcționare. Analytics și marketing sunt dezactivate până când alegi.",
-    policy: "Politica Cookies",
-    customize: "Personalizează",
-    reject: "Refuz opționale",
-    accept: "Accept toate",
-    save: "Salvează alegerea",
-    necessary: "Necesare",
-    necessaryDesc: "Autentificare, securitate și funcții de bază. Mereu active.",
-    preferences: "Preferințe",
-    preferencesDesc: "Limba, aspectul și setările tale.",
-    analytics: "Analytics",
-    analyticsDesc: "Măsurare agregată a utilizării și performanței.",
-    marketing: "Marketing",
-    marketingDesc: "Atribuire campanii și conținut promoțional personalizat.",
-    settings: "Setări cookies",
-  },
-  ru: {
-    title: "Настройки конфиденциальности",
-    description:
-      "Необходимые элементы обеспечивают работу сайта. Аналитика и маркетинг отключены, пока вы не сделаете выбор.",
-    policy: "Политика cookies",
-    customize: "Настроить",
-    reject: "Отклонить необязательные",
-    accept: "Принять все",
-    save: "Сохранить выбор",
-    necessary: "Необходимые",
-    necessaryDesc: "Вход, безопасность и базовые функции. Всегда активны.",
-    preferences: "Предпочтения",
-    preferencesDesc: "Язык, оформление и ваши настройки.",
-    analytics: "Аналитика",
-    analyticsDesc: "Сводная статистика использования и производительности.",
-    marketing: "Маркетинг",
-    marketingDesc: "Атрибуция кампаний и персонализированный контент.",
-    settings: "Настройки cookies",
-  },
-  en: {
-    title: "Privacy preferences",
-    description:
-      "Essential storage keeps the site working. Analytics and marketing stay off until you choose.",
-    policy: "Cookie Policy",
-    customize: "Customize",
-    reject: "Reject optional",
-    accept: "Accept all",
-    save: "Save choices",
-    necessary: "Necessary",
-    necessaryDesc: "Authentication, security and core features. Always active.",
-    preferences: "Preferences",
-    preferencesDesc: "Language, appearance and your settings.",
-    analytics: "Analytics",
-    analyticsDesc: "Aggregated usage and performance measurement.",
-    marketing: "Marketing",
-    marketingDesc: "Campaign attribution and personalized promotional content.",
-    settings: "Cookie settings",
-  },
-} as const;
-
 export function CookieConsent() {
-  const { locale } = useLocale();
-  const labels = copy[locale];
+  const { t } = useLocale();
   const [show, setShow] = useState(false);
   const [customize, setCustomize] = useState(false);
   const [preferences, setPreferences] = useState(false);
@@ -132,11 +71,11 @@ export function CookieConsent() {
           <Cookie className="h-5 w-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 className="font-heading text-lg font-semibold">{labels.title}</h2>
+          <h2 className="font-heading text-lg font-semibold">{t("cookies.title")}</h2>
           <p className="mt-1 text-xs leading-5 text-white/62 sm:text-sm">
-            {labels.description}{" "}
+            {t("cookies.description")}{" "}
             <Link href="/cookies" className="text-gold underline underline-offset-2">
-              {labels.policy}
+              {t("cookies.policy")}
             </Link>
           </p>
         </div>
@@ -145,27 +84,27 @@ export function CookieConsent() {
       {customize && (
         <div className="mt-4 grid gap-2 sm:grid-cols-2">
           <ConsentRow
-            label={labels.necessary}
-            description={labels.necessaryDesc}
+            label={t("cookies.necessary")}
+            description={t("cookies.necessaryDesc")}
             checked
             disabled
             onChange={() => {}}
           />
           <ConsentRow
-            label={labels.preferences}
-            description={labels.preferencesDesc}
+            label={t("cookies.preferences")}
+            description={t("cookies.preferencesDesc")}
             checked={preferences}
             onChange={setPreferences}
           />
           <ConsentRow
-            label={labels.analytics}
-            description={labels.analyticsDesc}
+            label={t("cookies.analytics")}
+            description={t("cookies.analyticsDesc")}
             checked={analytics}
             onChange={setAnalytics}
           />
           <ConsentRow
-            label={labels.marketing}
-            description={labels.marketingDesc}
+            label={t("cookies.marketing")}
+            description={t("cookies.marketingDesc")}
             checked={marketing}
             onChange={setMarketing}
           />
@@ -181,7 +120,7 @@ export function CookieConsent() {
             className="text-white/72 hover:bg-white/8 hover:text-white"
           >
             <Settings2 className="mr-2 h-4 w-4" />
-            {labels.customize}
+            {t("cookies.customize")}
           </Button>
         )}
         <Button
@@ -190,7 +129,7 @@ export function CookieConsent() {
           onClick={() => persist({ preferences: false, analytics: false, marketing: false })}
           className="border-white/16 bg-transparent text-white/78 hover:bg-white/8 hover:text-white"
         >
-          {labels.reject}
+          {t("cookies.reject")}
         </Button>
         <Button
           size="sm"
@@ -202,7 +141,7 @@ export function CookieConsent() {
           className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
         >
           <ShieldCheck className="mr-2 h-4 w-4" />
-          {customize ? labels.save : labels.accept}
+          {customize ? t("cookies.save") : t("cookies.accept")}
         </Button>
       </div>
     </div>
@@ -240,11 +179,11 @@ function ConsentRow({
 }
 
 export function CookieSettingsButton() {
-  const { locale } = useLocale();
+  const { t } = useLocale();
   return (
     <Button type="button" variant="outline" onClick={openConsentSettings}>
       <Settings2 className="mr-2 h-4 w-4" />
-      {copy[locale].settings}
+      {t("cookies.settings")}
     </Button>
   );
 }

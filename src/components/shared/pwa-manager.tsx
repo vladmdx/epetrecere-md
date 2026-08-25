@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import { Sparkles, X } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 const DISMISS_KEY = "pwa-install-dismissed-until";
 const SHOW_AFTER_VISITS_KEY = "pwa-install-visits";
@@ -26,6 +27,7 @@ type BIPEvent = Event & {
 };
 
 export function PwaManager() {
+  const { t } = useLocale();
   const [deferred, setDeferred] = useState<BIPEvent | null>(null);
   const [visible, setVisible] = useState(false);
 
@@ -107,7 +109,7 @@ export function PwaManager() {
   return (
     <div
       role="dialog"
-      aria-label="Instalează ePetrecere ca aplicație"
+      aria-label={t("pwa.install.ariaLabel")}
       className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-md rounded-2xl border border-gold/30 bg-card/95 p-4 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom sm:left-auto"
     >
       <div className="flex items-start gap-3">
@@ -116,30 +118,29 @@ export function PwaManager() {
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-heading font-semibold">
-            Instalează ePetrecere pe telefon
+            {t("pwa.install.title")}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Acces rapid din ecranul principal — ca o aplicație. Notificări
-            când primești răspuns de la artiști sau săli.
+            {t("pwa.install.desc")}
           </p>
           <div className="mt-3 flex gap-2">
             <button
               onClick={install}
               className="inline-flex items-center gap-1.5 rounded-lg bg-gold px-3 py-1.5 text-xs font-semibold text-[#0D0D0D] hover:bg-gold-dark"
             >
-              Instalează
+              {t("pwa.install.confirm")}
             </button>
             <button
               onClick={dismiss}
               className="rounded-lg px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
             >
-              Mai târziu
+              {t("pwa.install.later")}
             </button>
           </div>
         </div>
         <button
           onClick={dismiss}
-          aria-label="Închide"
+          aria-label={t("common.close")}
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
           <X className="h-4 w-4" />

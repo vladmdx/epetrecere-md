@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { Bell, BellOff, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -36,6 +37,7 @@ type State =
   | "not-subscribed";
 
 export function PushSubscribeButton() {
+  const { t } = useLocale();
   const [state, setState] = useState<State>("loading");
   const [busy, setBusy] = useState(false);
 
@@ -67,7 +69,7 @@ export function PushSubscribeButton() {
   async function subscribe() {
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!publicKey) {
-      toast.error("Server push nu e configurat");
+      toast.error(t("push.notConfigured"));
       return;
     }
     setBusy(true);
@@ -93,10 +95,10 @@ export function PushSubscribeButton() {
       });
       if (!res.ok) throw new Error();
       setState("subscribed");
-      toast.success("Notificări activate 🔔");
+      toast.success(t("push.enabled"));
     } catch (err) {
       console.error(err);
-      toast.error("Nu am putut activa notificările");
+      toast.error(t("push.enableFailed"));
     } finally {
       setBusy(false);
     }
@@ -115,9 +117,9 @@ export function PushSubscribeButton() {
         await sub.unsubscribe();
       }
       setState("not-subscribed");
-      toast.success("Notificări dezactivate");
+      toast.success(t("push.disabled"));
     } catch {
-      toast.error("Eroare la dezactivare");
+      toast.error(t("push.disableError"));
     } finally {
       setBusy(false);
     }
@@ -130,7 +132,7 @@ export function PushSubscribeButton() {
         className="inline-flex items-center gap-2 rounded-lg border border-border/40 px-3 py-2 text-sm text-muted-foreground"
       >
         <Loader2 className="h-4 w-4 animate-spin" />
-        Verific…
+        {t("push.checking")}
       </button>
     );
   }
@@ -138,7 +140,7 @@ export function PushSubscribeButton() {
   if (state === "unsupported") {
     return (
       <div className="rounded-lg border border-border/40 bg-muted/30 p-3 text-xs text-muted-foreground">
-        Browser-ul tău nu suportă notificări push.
+        {t("push.unsupported")}
       </div>
     );
   }
@@ -146,10 +148,9 @@ export function PushSubscribeButton() {
   if (state === "denied") {
     return (
       <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-xs">
-        <p className="font-medium text-amber-500">Notificări blocate</p>
+        <p className="font-medium text-amber-500">{t("push.blockedTitle")}</p>
         <p className="mt-1 text-muted-foreground">
-          Le-ai blocat din setările browserului. Deschide setările site-ului
-          (🔒 lângă URL) și re-permite notificările.
+          {t("push.blockedBody")}
         </p>
       </div>
     );
@@ -167,7 +168,7 @@ export function PushSubscribeButton() {
         ) : (
           <Bell className="h-4 w-4" />
         )}
-        Notificări active — apasă pentru a dezactiva
+        {t("push.activeToggle")}
       </button>
     );
   }
@@ -183,7 +184,7 @@ export function PushSubscribeButton() {
       ) : (
         <BellOff className="h-4 w-4" />
       )}
-      Activează notificări
+      {t("push.enable")}
     </button>
   );
 }

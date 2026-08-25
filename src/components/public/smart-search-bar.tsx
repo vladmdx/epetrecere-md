@@ -15,6 +15,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   /** Suggestion chips shown below the input to hint what works. */
@@ -22,17 +23,20 @@ interface Props {
   className?: string;
 }
 
-const DEFAULT_EXAMPLES = [
-  "DJ pentru nuntă în Chișinău",
-  "sală 150 invitați",
-  "moderator cumătrie sub 400€",
-  "fotograf 20 iulie",
+const DEFAULT_EXAMPLE_KEYS = [
+  "search.smart.exDj",
+  "search.smart.exVenue",
+  "search.smart.exHost",
+  "search.smart.exPhotographer",
 ];
 
 export function SmartSearchBar({
-  placeholderExamples = DEFAULT_EXAMPLES,
+  placeholderExamples,
   className,
 }: Props) {
+  const { t } = useLocale();
+  const examples =
+    placeholderExamples ?? DEFAULT_EXAMPLE_KEYS.map((key) => t(key));
   const router = useRouter();
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
@@ -65,8 +69,7 @@ export function SmartSearchBar({
     } catch {
       setResult({
         url: "/artisti",
-        explanation:
-          "Nu am putut interpreta — foloseste filtrele standard în listare.",
+        explanation: t("search.smart.fallback"),
       });
     } finally {
       setLoading(false);
@@ -84,22 +87,22 @@ export function SmartSearchBar({
           type="text"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Caută cu cuvinte tale — ex: DJ nuntă Chișinău sub 500€"
+          placeholder={t("search.smart.placeholder")}
           className="flex-1 bg-transparent px-1 py-2 text-sm text-white placeholder:text-white/40 outline-none"
           disabled={loading}
         />
         <button
           type="submit"
           disabled={loading || q.trim().length < 3}
-          aria-label="Caută"
+          aria-label={t("common.search")}
           className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-gold px-4 text-sm font-semibold text-[#0D0D0D] transition-colors hover:bg-gold-dark disabled:opacity-60"
         >
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
             <>
-              <span className="hidden sm:inline">Caută cu AI</span>
-              <span className="sm:hidden">Caută</span>
+              <span className="hidden sm:inline">{t("search.smart.submit")}</span>
+              <span className="sm:hidden">{t("common.search")}</span>
               <ArrowRight className="h-3.5 w-3.5" />
             </>
           )}
@@ -109,8 +112,10 @@ export function SmartSearchBar({
       {/* Example chips — clickable */}
       {!result && !loading && (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <span className="text-xs text-muted-foreground/70">De exemplu:</span>
-          {placeholderExamples.map((ex) => (
+          <span className="text-xs text-muted-foreground/70">
+            {t("search.smart.examplesLabel")}
+          </span>
+          {examples.map((ex) => (
             <button
               key={ex}
               type="button"
@@ -134,13 +139,13 @@ export function SmartSearchBar({
           <div className="flex-1">
             <p className="text-gold/90">{result.explanation}</p>
             <p className="mt-0.5 text-muted-foreground">
-              Te redirectez automat… sau apasă{" "}
+              {t("search.smart.redirecting")}{" "}
               <button
                 type="button"
                 onClick={() => router.push(result.url)}
                 className="font-medium text-gold hover:underline"
               >
-                acum
+                {t("search.smart.now")}
               </button>
               .
             </p>

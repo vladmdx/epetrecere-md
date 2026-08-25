@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 import { cn } from "@/lib/utils";
 
 // ── Price filter pills ──
@@ -21,13 +22,14 @@ const priceRanges = [
 ];
 
 export function PriceFilter({ currentMin, currentMax, onChange }: PriceFilterProps) {
+  const { t } = useLocale();
   const isActive = (min?: string, max?: string) =>
     currentMin === min && currentMax === max;
 
   return (
     <div className="flex flex-wrap gap-1.5">
       <span className="flex items-center text-xs font-medium text-muted-foreground mr-1">
-        Preț:
+        {t("filterBar.price")}
       </span>
       {priceRanges.map((range) => (
         <Button
@@ -39,7 +41,7 @@ export function PriceFilter({ currentMin, currentMax, onChange }: PriceFilterPro
             isActive(range.min, range.max) && "bg-gold text-[#0D0D0D] hover:bg-gold-dark border-gold",
           )}
           aria-pressed={isActive(range.min, range.max)}
-          aria-label={`Filtru preț: ${range.label}`}
+          aria-label={t("filterBar.priceAria", { value: range.label })}
           onClick={() =>
             isActive(range.min, range.max)
               ? onChange(undefined, undefined)
@@ -62,12 +64,13 @@ interface CategoryFilterProps {
 }
 
 export function CategoryFilter({ categories, currentId, onChange }: CategoryFilterProps) {
+  const { t } = useLocale();
   if (!categories.length) return null;
 
   return (
     <div className="flex flex-wrap gap-1.5">
       <span className="flex items-center text-xs font-medium text-muted-foreground mr-1">
-        Categorie:
+        {t("filterBar.category")}
       </span>
       {categories.map((cat) => (
         <Button
@@ -79,7 +82,7 @@ export function CategoryFilter({ categories, currentId, onChange }: CategoryFilt
             currentId === String(cat.id) && "bg-gold text-[#0D0D0D] hover:bg-gold-dark border-gold",
           )}
           aria-pressed={currentId === String(cat.id)}
-          aria-label={`Filtru categorie: ${cat.nameRo}`}
+          aria-label={t("filterBar.categoryAria", { value: cat.nameRo })}
           onClick={() =>
             currentId === String(cat.id) ? onChange(undefined) : onChange(String(cat.id))
           }
@@ -100,12 +103,13 @@ interface CityFilterProps {
 }
 
 export function CityFilter({ cities, currentCity, onChange }: CityFilterProps) {
+  const { t } = useLocale();
   if (!cities.length) return null;
 
   return (
     <div className="flex flex-wrap gap-1.5">
       <span className="flex items-center text-xs font-medium text-muted-foreground mr-1">
-        Oraș:
+        {t("filterBar.city")}
       </span>
       {cities.map((city) => (
         <Button
@@ -117,7 +121,7 @@ export function CityFilter({ cities, currentCity, onChange }: CityFilterProps) {
             currentCity === city && "bg-gold text-[#0D0D0D] hover:bg-gold-dark border-gold",
           )}
           aria-pressed={currentCity === city}
-          aria-label={`Filtru oraș: ${city}`}
+          aria-label={t("filterBar.cityAria", { value: city })}
           onClick={() => (currentCity === city ? onChange(undefined) : onChange(city))}
         >
           {city}
@@ -143,10 +147,11 @@ const capacityOptions = [
 ];
 
 export function CapacityFilter({ currentMin, onChange }: CapacityFilterProps) {
+  const { t } = useLocale();
   return (
     <div className="flex flex-wrap gap-1.5">
       <span className="flex items-center text-xs font-medium text-muted-foreground mr-1">
-        Capacitate:
+        {t("filterBar.capacity")}
       </span>
       {capacityOptions.map((opt) => (
         <Button
@@ -158,7 +163,7 @@ export function CapacityFilter({ currentMin, onChange }: CapacityFilterProps) {
             currentMin === opt.min && "bg-gold text-[#0D0D0D] hover:bg-gold-dark border-gold",
           )}
           aria-pressed={currentMin === opt.min}
-          aria-label={`Filtru capacitate: ${opt.label}`}
+          aria-label={t("filterBar.capacityAria", { value: opt.label })}
           onClick={() => (currentMin === opt.min ? onChange(undefined) : onChange(opt.min))}
         >
           {opt.label}
@@ -176,10 +181,11 @@ interface ActiveFiltersProps {
 }
 
 export function ActiveFiltersReset({ hasFilters, onReset }: ActiveFiltersProps) {
+  const { t } = useLocale();
   if (!hasFilters) return null;
   return (
     <Button variant="ghost" size="sm" onClick={onReset} className="h-7 text-xs text-muted-foreground gap-1">
-      <X className="h-3 w-3" /> Resetează filtrele
+      <X className="h-3 w-3" /> {t("filterBar.resetAll")}
     </Button>
   );
 }

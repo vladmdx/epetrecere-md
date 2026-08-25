@@ -1,5 +1,6 @@
 import Link from "@/components/shared/locale-link";
 import { metaForPath } from "@/lib/seo/page-meta";
+import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { BudgetCalculatorClient } from "./client";
@@ -37,11 +38,17 @@ export async function generateMetadata({
   }, locale);
 }
 
-export default function BudgetCalculatorPage() {
+export default async function BudgetCalculatorPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Calculatoare", url: "/calculatoare" },
-    { name: "Buget", url: "/calculatoare/buget" },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("tools.calculators", locale), url: "/calculatoare" },
+    { name: t("budgetCalc.breadcrumb", locale), url: "/calculatoare/buget" },
   ];
 
   return (
@@ -52,19 +59,18 @@ export default function BudgetCalculatorPage() {
       />
       <div className="mx-auto max-w-4xl px-4 py-10 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">Acasă</Link>
+          <Link href="/" className="hover:text-gold">{t("nav.home", locale)}</Link>
           <span className="mx-2">/</span>
-          <Link href="/calculatoare" className="hover:text-gold">Calculatoare</Link>
+          <Link href="/calculatoare" className="hover:text-gold">{t("tools.calculators", locale)}</Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">Buget</span>
+          <span className="text-foreground">{t("budgetCalc.breadcrumb", locale)}</span>
         </nav>
         <header className="mb-8">
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            Calculator buget eveniment
+            {t("budgetCalc.pageTitle", locale)}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
-            Alege tipul evenimentului, numărul de invitați, prețul pe persoană la sală și serviciile
-            de care ai nevoie. Îți calculăm instant bugetul total cu un interval realistic.
+            {t("budgetCalc.pageIntro", locale)}
           </p>
         </header>
         <BudgetCalculatorClient />

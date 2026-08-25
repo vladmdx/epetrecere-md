@@ -30,7 +30,8 @@
     "guests": "guests",
     "viewAll": "View all",
     "readMore": "Read more",
-    "notSpecified": "Not specified"
+    "notSpecified": "Not specified",
+    "priceOnLogin": "Price on login"
   },
   "nav": {
     "home": "Home",
@@ -89,12 +90,26 @@
     "location_ph": "City or region",
     "date_label": "Event date",
     "guests": "Guests",
-    "guests_ph": "No. of guests"
+    "guests_ph": "No. of guests",
+    "smart": {
+      "placeholder": "Search with your words — e.g. DJ wedding Chișinău under 500€",
+      "submit": "Search with AI",
+      "examplesLabel": "For example:",
+      "redirecting": "Redirecting automatically… or click",
+      "now": "now",
+      "fallback": "Could not interpret that — use the standard filters in the listing.",
+      "exDj": "DJ for a wedding in Chișinău",
+      "exVenue": "venue for 150 guests",
+      "exHost": "host for a Cumătrie under 400€",
+      "exPhotographer": "photographer 20 July"
+    }
   },
   "categories": {
     "title": "Categories",
     "subtitle": "Find the perfect service",
-    "view_all": "View all categories"
+    "view_all": "View all categories",
+    "allTitle": "All categories",
+    "chooseDesc": "Choose the category of artists or services for your event."
   },
   "event_types": {
     "wedding": "Wedding",
@@ -118,14 +133,146 @@
     "similar": "Similar Artists",
     "calendar_unavailable": "Calendar not updated. Send a request to check availability.",
     "send_request": "Send Request",
-    "duration_hours": "hours"
+    "duration_hours": "hours",
+    "profile": {
+      "viewLargePhoto": "See large photo of {name}",
+      "eyebrow": "Event artist",
+      "tagline": "Live music • premium show • personalized program",
+      "reviewsWord": "reviews",
+      "priceOnRequest": "Price on request",
+      "fact": {
+        "eventsLabel": "Events",
+        "eventsValue": "Private and corporate",
+        "programLabel": "Program",
+        "programValue": "Customized",
+        "languagesLabel": "Languages",
+        "formatLabel": "Format",
+        "formatValue": "Live & interactive"
+      },
+      "realMoments": "Real moments",
+      "noDescription": "No description available.",
+      "noImages": "No images available.",
+      "videoFallback": "Video",
+      "videoTitle": "Video {name}",
+      "requestPackageViaPlan": "Request package through your plan",
+      "ugcIntro": "Photos uploaded by real clients who worked with this artist.",
+      "realMomentAlt": "Real moment from the event",
+      "reviewPhotoAlt": "Review photo {index}",
+      "replyLabel": "Answer:",
+      "beFirstReview": "Be the first to leave a review!",
+      "portfolioEyebrow": "Portfolio",
+      "momentsTitle": "Moments from events",
+      "photoSingular": "photo",
+      "photoPlural": "photos",
+      "momentAlt": "{name} — event moment {index}",
+      "realMomentBadge": "Real moment",
+      "videoEyebrow": "See the artist live",
+      "showreelTitle": "Showreel & video",
+      "fixedPriceEyebrow": "Fixed price",
+      "perEventTitle": "Per-event prices",
+      "anyEvent": "Any event",
+      "avgDuration": "~{duration} on average",
+      "request": "Request",
+      "packagesEyebrow": "Choose experience",
+      "packagesTitle": "Available packages",
+      "recommendedBadge": "RECOMMENDED",
+      "customRepertoire": "Customized repertoire",
+      "programHours": "program hours",
+      "requestPackage": "Request package",
+      "reviewsEyebrow": "Verified feedback",
+      "clientReviews": "Customer reviews",
+      "beFirstReviewArtist": "Be the first to leave a review for this artist.",
+      "bookEyebrow": "Book artist",
+      "addToEvent": "Add {name} to your event",
+      "pickDate": "Choose a date and request availability",
+      "signUpToBook": "Sign up to book",
+      "signUpBody": "After login, you can see availability, price, and send booking requests.",
+      "priceHiddenNote": "This artist does not publish the rate — request a personalized offer.",
+      "planRequiredNote": "Reservations can only be made from your event panel — an active event plan is required.",
+      "share": "Share",
+      "shareTitle": "{name} — book for your event on ePetrecere.md",
+      "similarEyebrow": "Discover more",
+      "seeAllArtists": "See all artists",
+      "verifiedReviews": "Verified reviews",
+      "verifiedReviewsBody": "Reviews can be sent after a confirmed event, directly from the client cabinet. This way, public feedback comes from real bookings.",
+      "seeEligibleBookings": "See eligible bookings",
+      "fallbackPkg": {
+        "essential": "Custom artistic program for the main moments of the event.",
+        "signature": "Full show, repertoire adapted to guests and coordination with the technical team.",
+        "fullEvent": "Extended attendance and schedule built around the entire event."
+      }
+    }
   },
   "venue": {
     "capacity": "Capacity",
     "price_per_person": "Price/person",
     "facilities": "Facilities",
     "menu": "Menu",
-    "location": "Location"
+    "location": "Location",
+    "detail": {
+      "eyebrow": "Event location",
+      "verified": "Verified location",
+      "new": "New",
+      "workingHours": "Operating hours",
+      "heroAlt": "{name} — exterior view",
+      "viewGallery": "See gallery ({count})",
+      "galleryAlt": "{name} — gallery {index}",
+      "tabAbout": "About location",
+      "tabPackages": "Packages",
+      "tabReviews": "Reviews ({count})",
+      "tabLocation": "Location",
+      "descriptionFallback": "{name} is a venue created for memorable events, with flexible spaces and services tailored to each concept.",
+      "onRequest": "On request",
+      "factLocality": "Locality",
+      "moldova": "Moldova",
+      "factSchedule": "Opening hours",
+      "flexible": "Flexible",
+      "factSpaceType": "Space type",
+      "eventHall": "Event hall",
+      "facilityParking": "Parking",
+      "facilityCeremony": "Ceremony area",
+      "facilityStage": "Stage and sound",
+      "facilityMenu": "Custom menu",
+      "facilityAc": "Air conditioning",
+      "facilityWifi": "Wi-Fi",
+      "mapTitle": "Location — {name}",
+      "packagesEyebrow": "Flexible options",
+      "packagesTitle": "Packages & menu",
+      "recommended": "RECOMMENDED",
+      "perPerson": "person",
+      "minGuests": "Min. {count} people",
+      "included": "Included",
+      "notIncluded": "Not included",
+      "menuOnSite": "See menu on site",
+      "menuPdf": "Download menu PDF",
+      "virtualTour": "360° Virtual tour",
+      "virtualTourTitle": "Virtual tour — {name}",
+      "reviewsEyebrow": "Real experiences",
+      "reviewPhotoAlt": "Review photo {index}",
+      "noReviews": "Be the first to share experience at this location.",
+      "bookEyebrow": "Book venue",
+      "bookTitle": "Plan the event at {name}",
+      "bookHint": "Confirm date and number of guests",
+      "priceOnLogin": "Price on login",
+      "customOffer": "Personalized offer for your event",
+      "share": "Share",
+      "shareTitle": "{name} — event hall on ePetrecere.md",
+      "moreEyebrow": "Discover more",
+      "similar": "Similar locations",
+      "allVenues": "See all halls",
+      "genericElegant": "Customized menu, full service, and organization consulting.",
+      "genericSignature": "Complete concept for wedding or private event, tailored to the number of guests.",
+      "genericCorporate": "Flexible configuration, equipment and services for meetings and galas.",
+      "priceOnRequest": "Price on request",
+      "verifiedReviews": "Verified reviews",
+      "verifiedReviewsHint": "Reviews can be sent after a confirmed event, directly from the client cabinet. This way, public feedback comes from real bookings.",
+      "eligibleBookings": "See eligible bookings"
+    },
+    "card": {
+      "available": "Available",
+      "featured": "Recommended",
+      "newVenue": "New location"
+    }
   },
   "form": {
     "name": "Name",
@@ -139,7 +286,13 @@
     "message": "Message",
     "gdpr_consent": "I agree to the processing of personal data according to the Privacy Policy",
     "submit_success": "Event created! Redirecting to bookings…",
-    "required": "Required field"
+    "required": "Required field",
+    "errorRetry": "An error occurred. Please try again.",
+    "namePlaceholder": "Your name",
+    "selectType": "Select type",
+    "locationPlaceholder": "City, location",
+    "guestsPlaceholder": "e.g. 150",
+    "messagePlaceholder": "Additional event details..."
   },
   "wizard": {
     "title": "Plan Your Event",
@@ -165,7 +318,108 @@
     "required_radius": "Choose a venue search radius — this field is required.",
     "required_services": "Choose at least one service category.",
     "required_name": "Enter the event name (e.g. Ana & Ion’s Wedding).",
-    "required_generic": "Fill in the required fields to continue."
+    "required_generic": "Fill in the required fields to continue.",
+    "steps": {
+      "eventType": "Event type",
+      "date": "Date & Location",
+      "extras": "Preferences",
+      "confirm": "Confirmation"
+    },
+    "stepOf": "Step {step} of {total}",
+    "toastNameRequired": "Enter the event name (e.g., Ana & Ion Wedding).",
+    "toastError": "An error occurred. Please try again.",
+    "seeResults": "See results",
+    "signInForResults": "Log in for results",
+    "eventType": {
+      "title": "Choose the type",
+      "accent": "of your event",
+      "desc": "Select the category that best describes the event you want to plan."
+    },
+    "date": {
+      "title": "Choose",
+      "accent": "the event date and location",
+      "desc": "Tell us when and where the event will take place to recommend suitable options.",
+      "cityHint": "Chișinău + Top 5 cities are first, the rest in alphabetical order.",
+      "startTime": "Start time",
+      "duration": "Duration (hours)",
+      "interval": "Event interval:",
+      "asideBefore": "You can edit",
+      "asideAccent": "the date and location",
+      "asideAfter": "later, at any step."
+    },
+    "guests": {
+      "question": "How many guests do you expect?",
+      "exact": "Or enter the exact number:"
+    },
+    "venue": {
+      "question": "Do you need a hall or restaurant?",
+      "yes": "Yes, I need a hall",
+      "yesDesc": "We will show available halls for your date",
+      "no": "No, I already have a venue",
+      "noDesc": "I have a reserved hall or outdoor event",
+      "existingLabel": "Do you already have a reserved hall? (optional)",
+      "existingPlaceholder": "ex: Restaurant Pegas, Albișoara Street 20/1",
+      "existingHint": "This info will be visible to invited artists so they know the location and can plan their travel.",
+      "radiusLabel": "Search radius",
+      "radiusHint": "How far from {city} are you willing to travel for a venue? Venues do not affect the artists' budget.",
+      "radiusFallbackCity": "the selected city",
+      "radius0": "City only",
+      "radius0Sub": "Venues in the event city",
+      "radius25": "Up to 25 km",
+      "radius25Sub": "City + nearby suburbs",
+      "radius50": "Up to 50 km",
+      "radius50Sub": "Extended county",
+      "radius100": "Up to 100 km",
+      "radius100Sub": "Nearby destination",
+      "radiusAll": "All Moldova",
+      "radiusAllSub": "No distance limit"
+    },
+    "services": {
+      "title": "Choose",
+      "accent": "the services you want",
+      "desc": "Select one or more service categories that suit you. Later we will show only relevant options for your event.",
+      "multiHint": "You can select multiple services",
+      "multiHintSub": "You will receive personalized recommendations based on your choices.",
+      "none": "No suitable categories for this event type."
+    },
+    "extras": {
+      "title": "Additional features for your event",
+      "desc": "Choose what you want to use in the event panel. You can activate any of them later in event settings.",
+      "checklistTitle": "Checklist",
+      "checklistDesc": "Preparation steps list (venue booking, invitations, outfit, cake, etc.) pre-filled by event type.",
+      "guestsTitle": "Guest list",
+      "guestsDesc": "Import, RSVP, seating allocation — all guest data in one place.",
+      "momentsTitle": "Photo Moments — gallery with QR",
+      "momentsDesc": "Guests scan a QR and instantly upload photos. See them live on the projector. No account, no app. Can be activated separately in Utilities.",
+      "seatingTitle": "Table seating",
+      "seatingDesc": "Seat guests at tables — drag & drop, graphical view. Available only when you have a guest list."
+    },
+    "summary": {
+      "desc": "Check your event details.",
+      "date": "Date",
+      "location": "Location",
+      "interval": "Interval",
+      "venueYes": "I need a hall",
+      "venueNo": "I already have a location",
+      "radiusCityOnly": "{city} (city only)",
+      "radiusAll": "{city} — all Moldova",
+      "radiusKm": "{city}, {km} km",
+      "categories": "Categories",
+      "authTitle": "Authentication required",
+      "authDesc": "To see prices and available artists for your date, you need to create an account. It takes less than a minute.",
+      "nameLabel": "Event name",
+      "nameHint": "This name will be the title of your event plan."
+    },
+    "namePlaceholder": {
+      "wedding": "Ex: Ana & Ion's Wedding",
+      "cununie": "Ex: Ana & Ion's Church Wedding",
+      "baptism": "Ex: Gabi's Baptism",
+      "cumatrie": "Ex: Mihai's Cumătrie",
+      "corporate": "Ex: Company Party",
+      "birthday": "Ex: Maria's Birthday",
+      "kidsBirthday": "Ex: Sofia's Birthday — 5 years",
+      "concert": "Ex: Live Concert"
+    }
   },
   "process": {
     "title": "How It Works",
@@ -272,7 +526,42 @@
     "tomorrow": "Tomorrow",
     "nextSaturday": "Next Saturday",
     "placeholder": "Choose a date",
-    "selectDate": "Select a date"
+    "selectDate": "Select a date",
+    "availability": "Availability",
+    "prevMonth": "Previous month",
+    "nextMonth": "Next month",
+    "legendFree": "Free",
+    "legendPartial": "Partial",
+    "legendBooked": "Busy",
+    "busyLabel": "Busy:",
+    "dayOff": "This day is not a working day",
+    "scheduleLabel": "Schedule:",
+    "unavailableIntervals": "Unavailable interval(s):",
+    "fullyBooked": "This day is fully booked.",
+    "nonWorkingDay": "Non-working day",
+    "unavailable": "Unavailable",
+    "bookThisDate": "Book this date",
+    "field": {
+      "name": "Name",
+      "namePlaceholder": "Your name",
+      "phone": "Phone",
+      "email": "Email",
+      "eventType": "Event type",
+      "selectType": "Select type",
+      "startTime": "Start time",
+      "hour": "Time",
+      "duration": "Duration (hours)",
+      "hours": "Hours",
+      "message": "Message",
+      "messagePlaceholder": "Event details..."
+    },
+    "hourSingular": "hour",
+    "hourPlural": "hours",
+    "durationExceedsHours": "Duration exceeds working hours ({start}–{end}). Please choose a shorter duration.",
+    "bookingRequestSent": "Booking request sent!",
+    "genericError": "An error occurred. Please try again.",
+    "requestSentFor": "✓ Request for {date} was sent!",
+    "contactSoon": "You will be contacted soon."
   },
   "home": {
     "features": {
@@ -387,7 +676,8 @@
     "reset": "Reset",
     "foundArtists": "artists found",
     "foundVenues": "venues found",
-    "map": "Map"
+    "map": "Map",
+    "viewAllArtists": "See all artists"
   },
   "tools": {
     "organization": "Organization",
@@ -404,7 +694,15 @@
     "budgetCalculator": "Budget Calculator",
     "guestCalculator": "Guests and Tables",
     "drinksCalculator": "Drinks",
-    "menuCalculator": "Menu"
+    "menuCalculator": "Menu",
+    "landing": {
+      "breadcrumb": "Tools",
+      "free": "Free tool",
+      "other": "View other tools",
+      "note": "Free · No active event required · New account in 1 minute",
+      "start": "Start for free",
+      "cta": "Create an account in 1 minute and use {tool} without limits. The tool works even without an active event."
+    }
   },
   "dashboard": {
     "myPanel": "My Dashboard",
@@ -428,7 +726,12 @@
     "analytics": "Analytics",
     "settings": "Settings",
     "viewProfile": "View profile",
-    "viewSite": "View site"
+    "viewSite": "View site",
+    "media": "Media",
+    "mediaDescription": "Manage the photos and videos on your profile.",
+    "noArtistProfile": "You do not have an artist profile yet.",
+    "photoGallery": "Photo gallery",
+    "videos": "Videos"
   },
   "legal": {
     "signTitle": "Contract acceptance",
@@ -444,7 +747,13 @@
     "drawSignature": "Sign here",
     "clearSignature": "Clear",
     "drawHint": "Draw your signature with the mouse or your finger",
-    "signatureTooSmall": "The signature is too short — please draw it fully."
+    "signatureTooSmall": "The signature is too short — please draw it fully.",
+    "packet": {
+      "title": "The complete legal package",
+      "body": "The partner and venue agreements, the marketplace rules, the fees and the review, anti-fraud and quality policies are available in Romanian and Russian at"
+    },
+    "indexTitle": "Legal documents",
+    "availableIn": "available in Romanian, Russian and English."
   },
   "pricing": {
     "metaTitle": "Vendor pricing",
@@ -521,7 +830,16 @@
     "Vin roșu": "Red wine",
     "Vodkă": "Vodka",
     "Zeamă / supă": "Zeamă / soup",
-    "Șampanie": "Champagne"
+    "Șampanie": "Champagne",
+    "Nuntă": "Wedding",
+    "Cununie": "Wedding ceremony",
+    "Botez": "Baptism",
+    "Cumătrie": "Cumătrie",
+    "Aniversare": "Birthday",
+    "Aniversare copii": "Kids birthday",
+    "Corporate": "Corporate",
+    "Concert / Petrecere": "Concert / Party",
+    "Alt tip": "Other type"
   },
   "a11y": {
     "addFavorite": "Add to favourites",
@@ -534,7 +852,32 @@
     "q1": "What does an average wedding cost in Moldova?",
     "q2": "How do I find a good DJ?",
     "q3": "How does the platform fee work?",
-    "q4": "How many guests fit in a mid-size venue?"
+    "q4": "How many guests fit in a mid-size venue?",
+    "errorGeneric": "Sorry, something went wrong.",
+    "errorNetwork": "I'm having a connection problem. Try again in a few seconds.",
+    "openLabel": "Open AI assistant",
+    "title": "ePetrecere Assistant",
+    "subtitle": "I respond in Romanian, Russian, or English",
+    "newConversation": "New conversation",
+    "reset": "Reset",
+    "closeLabel": "Close assistant",
+    "typing": "Typing…",
+    "inputPlaceholder": "Write a message…",
+    "sendLabel": "Send message",
+    "subtitleAdmin": "Administration assistant",
+    "subtitleVendor": "Your personal assistant",
+    "welcome": "Welcome!",
+    "hintAdmin": "Ask me anything about artists, leads, SEO, or content.",
+    "hintVendor": "I can help with calendar, profile, or your descriptions.",
+    "suggestAdmin1": "How many active artists do we have?",
+    "suggestAdmin2": "Generate SEO description",
+    "suggestAdmin3": "Write blog article",
+    "suggestVendor1": "Improve my description",
+    "suggestVendor2": "What bookings do I have next month?",
+    "suggestVendor3": "Help me with the profile",
+    "placeholder": "Write a message...",
+    "send": "Send message",
+    "unavailable": "The AI service is unavailable right now. Check the ANTHROPIC_API_KEY configuration."
   },
   "ui": {
     "aiPowered": "AI powered",
@@ -546,5 +889,1139 @@
     "empty": "No venue has a known address yet.",
     "loading": "Loading the map…",
     "failed": "The map could not load."
+  },
+  "publicError": {
+    "title": "An error occurred",
+    "description": "We apologize for the inconvenience. Please try again or come back later.",
+    "retry": "Try again"
+  },
+  "venues": {
+    "breadcrumb": "Halls",
+    "city": {
+      "h1": "Halls and restaurants for events in {city}",
+      "itemListName": "Event halls in {city}",
+      "intro": "{count} halls and restaurants available in {city} for weddings, baptisms, godparent celebrations, or corporate events. Check availability, capacity, and price per person directly on each venue's page.",
+      "noneListed": "No venues listed in {city} at the moment. Contact us for recommendations.",
+      "empty": "No halls available in {city} at the moment.",
+      "viewAll": "See all halls →"
+    },
+    "list": {
+      "breadcrumb": "Venues",
+      "title": "Venues for your event",
+      "description": "Discover restaurants, wedding halls and premium venues across Moldova.",
+      "allMoldova": "All Moldova",
+      "anyCapacity": "Any capacity",
+      "eventDate": "Event date",
+      "filter": "Filter results",
+      "locality": "Location",
+      "allLocations": "All locations",
+      "apply": "Apply filters",
+      "unsure": "Not sure which venue to choose?",
+      "ctaDesc": "Tell us your guest count and event style, and we will suggest suitable venues.",
+      "recommendations": "Get recommendations",
+      "heroAlt": "Elegant event venue in the Republic of Moldova",
+      "newLabel": "New",
+      "upTo": "up to"
+    }
+  },
+  "compare": {
+    "artists": {
+      "title": "Compare artists",
+      "emptyBefore": "Choose 2 or 3 artists from the page",
+      "emptyAfter": "with the \"Compare\" button to see them side-by-side here.",
+      "back": "Back to artists",
+      "heading": "Comparison — {count} artists"
+    },
+    "row": {
+      "priceFrom": "Price from",
+      "rating": "Rating",
+      "city": "City",
+      "pricePerPerson": "Price / person",
+      "virtualTour": "360° Virtual tour",
+      "menuAvailable": "Menu available",
+      "description": "Description"
+    },
+    "maxReached": "You can compare up to {max} items — delete one before adding more.",
+    "selectedHint": "{count} selected · press \"Compare\" in the list below",
+    "added": "Added to comparison",
+    "inCompare": "In comparison",
+    "compare": "Compare",
+    "title": "Compare venues",
+    "emptyIntro": "Choose 2 or 3 halls from the page",
+    "venuesLink": "Halls",
+    "emptyOutro": "with the \"Compare\" button to see them side-by-side here.",
+    "backToVenues": "Back to halls",
+    "heading": "Comparison — {count} venues",
+    "people": "people",
+    "facility": {
+      "parking": "Parking",
+      "airConditioning": "Air conditioning",
+      "professionalSound": "Professional sound",
+      "projector": "Projector",
+      "danceFloor": "Dance floor",
+      "terrace": "Terrace",
+      "garden": "Garden",
+      "bridalSuite": "Bridal suite",
+      "freeWifi": "Free Wi-Fi"
+    },
+    "bar": {
+      "venues": "{count} halls in comparison",
+      "artists": "{count} artists in comparison",
+      "clear": "Clear selection",
+      "cta": "Compare now"
+    }
+  },
+  "blog": {
+    "post": {
+      "back": "Back to blog",
+      "planCta": "Start planning",
+      "sidebarCta": "Turn inspiration into a clear plan for your event.",
+      "contentUnavailable": "Article content is currently unavailable."
+    },
+    "eyebrow": "ePetrecere inspiration",
+    "title": "Ideas that turn plans into memorable moments",
+    "description": "Practical guides, trends and recommendations for weddings, baptisms, birthdays and corporate events in Moldova.",
+    "featured": "Featured article",
+    "read": "Read article",
+    "latest": "Latest",
+    "ideas": "Advice and ideas",
+    "articles": "articles",
+    "emptyTitle": "The first articles are being prepared",
+    "emptyDescription": "Come back soon for new planning guides and ideas."
+  },
+  "header": {
+    "signIn": "Authentication",
+    "signUp": "Registration",
+    "myAccount": "My account",
+    "venueDashboard": "Hall Dashboard",
+    "partnerDashboard": "Partner Dashboard",
+    "myCabinet": "My Cabinet",
+    "adminPanel": "Admin Panel",
+    "signOut": "Logout",
+    "closeMenu": "Close menu",
+    "openMenu": "Open menu"
+  },
+  "artists": {
+    "listTitle": "Event Artists"
+  },
+  "timezone": {
+    "label": "Time zone",
+    "updated": "Time zone updated",
+    "saveFailed": "Failed to save the time zone",
+    "hint": "Affects time formatting in emails and reminders. Dashboard uses browser timezone.",
+    "customPlaceholder": "ex: Asia/Tokyo",
+    "enterCustom": "Enter a custom zone",
+    "pickFromList": "Choose from list"
+  },
+  "reviewPhotos": {
+    "maxReached": "Maximum {max} photos",
+    "imagesOnly": "{file}: images only",
+    "tooLarge": "{file}: too large (max 10MB)",
+    "uploadFailed": "upload failed",
+    "networkError": "{file}: network error",
+    "addedOne": "{count} photo added",
+    "addedMany": "{count} photos added",
+    "photoAlt": "Photo {index}",
+    "remove": "Delete photo",
+    "add": "Add photo",
+    "hint": "Add up to {max} photos (JPG/PNG, max 10MB each). Help other clients see the real result!"
+  },
+  "moments": {
+    "unitMin": "min",
+    "unitSec": "sec",
+    "errNameAndPhoto": "Write your name and select at least one photo.",
+    "errAllShotsUsed": "You have used all {count} frames allocated on this device.",
+    "errUploadFailed": "Upload failed",
+    "errSaveFailed": "Save failed",
+    "errGeneric": "Error",
+    "shareYours": "Share your moments.",
+    "liveGalleryNote": "Photos appear live in the gallery.",
+    "galleryOpensAtEnd": "Gallery opens at the end of the event.",
+    "vintageActive": "Polaroid filter active — your photos automatically get a warm vintage tone",
+    "filmOpensIn": "Film opens in {time}",
+    "waitingFor": "We are waiting for you",
+    "thenYouCanUpload": "— then you can start uploading photos.",
+    "filmClosed": "Film closed",
+    "filmClosedHint": "Thank you for participating! Your photos are in the gallery.",
+    "allPromptsDone": "All missions completed! 🎉",
+    "allPromptsDoneHint": "Thank you — you answered all {count} challenges! You can still upload free photos below.",
+    "promptProgress": "Challenge {current}/{total}",
+    "skipPrompt": "Skip this challenge",
+    "allShotsUsed": "All your frames have been used",
+    "shotsLeftOne": "You have {count} frame left",
+    "shotsLeftMany": "You have {count} frames left",
+    "yourName": "Your name",
+    "namePlaceholder": "Ion Popescu",
+    "message": "Message (optional)",
+    "messagePlaceholder": "What a beautiful wedding! 💍",
+    "photosSelected": "{count} selected photos",
+    "tapToPick": "Tap to select photos",
+    "fileHint": "JPG, PNG, WEBP · max 10MB per photo",
+    "thanks": "Thank you!",
+    "sendPhotos": "Send photos",
+    "filmClosesIn": "Film closes in {time}",
+    "galleryOpens": "Gallery is opening",
+    "inTime": "in {time}",
+    "atEventEnd": "at the end of the event",
+    "uploadedSoFarOne": "{count} frame has been uploaded so far. We will all see them together at the reveal.",
+    "uploadedSoFarMany": "{count} frames have been uploaded so far. We will all see them together at the reveal.",
+    "beFirst": "Be the first to upload a memory — everything stays hidden until revealed.",
+    "liveGallery": "Live gallery ({count})",
+    "removeReaction": "Remove reaction {emoji}",
+    "addReaction": "Add reaction {emoji}",
+    "slideshow": {
+      "revealingNow": "revealing now",
+      "revealsIn": "Gallery reveals in",
+      "awaitingEnd": "waiting for event to end",
+      "framesReceived": "frames received",
+      "qrInvite": "Scan the QR code and send your memories. We will see them together at the reveal.",
+      "waitingFirstPhotos": "Waiting for first photos...",
+      "scanAndSend": "Scan the QR and send your moments",
+      "qrAlt": "Scan to upload photos",
+      "scan": "Scan",
+      "sendPhotos": "send photos",
+      "unmute": "Enable sound",
+      "mute": "Mute",
+      "noSound": "No sound",
+      "music": "Music",
+      "startMusic": "Play music"
+    },
+    "unit": {
+      "day": "day",
+      "days": "days",
+      "hour": "hour",
+      "hours": "hours",
+      "min": "min",
+      "sec": "sec"
+    }
+  },
+  "services": {
+    "hero": {
+      "imageAlt": "Services for weddings and events in Chișinău and Moldova",
+      "eyebrow": "What we offer",
+      "title": "Services for events",
+      "subtitle": "Everything you need for a perfect event, all in one place"
+    },
+    "filters": {
+      "music": "Music",
+      "photoVideo": "Photo & Video",
+      "decor": "Decor",
+      "technical": "Technical",
+      "entertainment": "Entertainment"
+    },
+    "groups": {
+      "moderatori": {
+        "name": "Moderators / MC",
+        "desc": "Professionals who lead the ceremony and party with style."
+      },
+      "dj": {
+        "desc": "Music for every taste and atmosphere."
+      },
+      "cantareti": {
+        "name": "Singers",
+        "desc": "Exceptional voices for special moments."
+      },
+      "formatii": {
+        "name": "Bands & Groups",
+        "desc": "Live music for an unforgettable party."
+      },
+      "fotografi": {
+        "name": "Photographers",
+        "desc": "We capture the most beautiful moments."
+      },
+      "videografi": {
+        "name": "Videographers",
+        "desc": "Professional filming for everlasting memories."
+      },
+      "decor": {
+        "desc": "We transform space into a dream."
+      },
+      "animatori": {
+        "name": "Animators",
+        "desc": "Fun guaranteed for all ages."
+      },
+      "sali": {
+        "desc": "The perfect location for your event."
+      },
+      "echipamentTehnic": {
+        "name": "Technical equipment",
+        "desc": "Professional sound, lighting, and stage."
+      },
+      "showProgram": {
+        "name": "Show Program",
+        "desc": "Fire shows, circus and magic."
+      }
+    },
+    "card": {
+      "imageAlt": "{name} for events in Moldova"
+    },
+    "cta": {
+      "title": "Not sure what services you need?",
+      "desc": "Answer a few questions about your event and we will recommend the most suitable services, tailored to your budget and style.",
+      "button": "Get personalized recommendations",
+      "free": "Free, fast, and no obligations"
+    },
+    "popular": {
+      "title": "Popular services",
+      "viewAll": "See all services",
+      "imageAlt": "{name} for weddings and events in Moldova",
+      "dj": {
+        "name": "Party DJ",
+        "note": "Most requested"
+      },
+      "fotoVideo": {
+        "name": "Premium Photo & Video",
+        "note": "Top choice"
+      },
+      "decor": {
+        "note": "Growing trend"
+      },
+      "sali": {
+        "note": "Top locations"
+      }
+    }
+  },
+  "venuesPage": {
+    "breadcrumb": "Venues",
+    "itemListName": "Event Venues"
+  },
+  "realWeddings": {
+    "breadcrumb": "Real weddings",
+    "detail": {
+      "backToGallery": "Back to gallery",
+      "vendorsHere": "Suppliers of this event",
+      "ctaTitle": "Inspired by their story?",
+      "ctaDesc": "Start planning your own wedding with our tools and suppliers.",
+      "ctaButton": "Plan your wedding"
+    },
+    "title": "Real weddings in Moldova",
+    "description": "True stories from couples who planned their wedding on ePetrecere.md. Inspiration, ideas and verified suppliers from the community.",
+    "emptyTitle": "First stories are on the way",
+    "emptyDescription": "Soon you will see photos and stories from real weddings here.",
+    "planCta": "Plan your own wedding",
+    "photoCount": "{count} photos"
+  },
+  "pwa": {
+    "install": {
+      "ariaLabel": "Install ePetrecere as an app",
+      "title": "Install ePetrecere on your phone",
+      "desc": "Quick access from the main screen — like an app. Notifications when you receive responses from artists or venues.",
+      "confirm": "Install",
+      "later": "Later"
+    }
+  },
+  "appearance": {
+    "title": "Appearance",
+    "font": "Font",
+    "fontHint": "Choose the font used across the entire site (Google Fonts)",
+    "fontDefault": "Default (DM Sans)",
+    "fontSampleTitle": "Example text with chosen font",
+    "fontSampleBody": "Services for events in the Republic of Moldova.",
+    "textSize": "Text size",
+    "textSizeHint": "Adjust text size from -20% to +30%",
+    "textSizeSample": "This is an example text. The preference applies site-wide and is saved locally."
+  },
+  "notifPrefs": {
+    "title": "Notification type",
+    "hint": "Choose the channel to receive each type. In-app notifications (bell in header) always show — toggles below control only email + push.",
+    "loading": "Loading preferences...",
+    "saveError": "Failed to save preference",
+    "footnote": "ℹ️ Disabling a row does not affect critical notifications (booking confirmed, cancellation) — those always arrive instantly via email.",
+    "rows": {
+      "bookingRequests": {
+        "label": "New requests",
+        "sub": "New booking request, conflicts on the same date"
+      },
+      "bookingUpdates": {
+        "label": "Booking updates",
+        "sub": "Accepted, confirmed by the client, cancelled, completed"
+      },
+      "messages": {
+        "sub": "Chat with clients + other conversations"
+      },
+      "reviews": {
+        "sub": "New review received, or a request to write one"
+      },
+      "reminders": {
+        "label": "Reminders",
+        "sub": "Upcoming events, RSVPs, follow-ups"
+      }
+    }
+  },
+  "privacy": {
+    "legalPack": {
+      "title": "The complete legal pack",
+      "body": "The partner and venue agreements, the marketplace rules, the fees and the review, anti-fraud and quality policies are available in Romanian and Russian at"
+    }
+  },
+  "catalogSeo": {
+    "artists": {
+      "title": "How to choose event artists in Moldova in 2026",
+      "p1Pre": "Compare ",
+      "p1Strong": "event artists in Chișinău and Moldova",
+      "p1Post": " by portfolio, style, experience and reviews. A quote should define performance length, equipment, travel and overtime.",
+      "p2": "For a wedding, review the full repertoire and coordination with the host and technical team. For a corporate event, request a program that fits the audience.",
+      "faq": {
+        "q1": "When should a wedding artist be booked?",
+        "a1": "For popular 2026 dates, start 6 - 12 months ahead.",
+        "q2": "What should the contract include?",
+        "a2": "Date, hours, duration, equipment, travel, deposit, cancellation and overtime.",
+        "q3": "How should offers be compared?",
+        "a3": "Compare the same duration and services, then review recent work and technical requirements."
+      }
+    },
+    "venues": {
+      "title": "How to choose a wedding venue in Chișinău and Moldova",
+      "p1Pre": "Compare a ",
+      "p1Strong": "wedding venue in Chișinău",
+      "p1Post": " by comfortable capacity, complete menu, access, parking, acoustics and weather backup.",
+      "p2": "Request a written quote covering menu, drinks, service charge, overtime and included services. Add guest and supplier transport for venues outside the city.",
+      "faq": {
+        "q1": "When should a venue be booked?",
+        "a1": "For an in-season Saturday in 2026, start 9 - 14 months ahead.",
+        "q2": "How can real capacity be checked?",
+        "a2": "Request a floor plan with tables, stage, dance floor and circulation.",
+        "q3": "Which extra costs should be checked?",
+        "a3": "Service charge, supplier meals, cleaning, overtime, outside drinks and venue fees."
+      }
+    }
+  },
+  "calc": {
+    "nav": {
+      "calculators": "Calculators"
+    },
+    "menu": {
+      "breadcrumb": "Menu",
+      "title": "Event menu calculator",
+      "subtitle": "Find out how many kilograms of food you need per dish — from cold cuts and salads to cake and late-night snacks.",
+      "details": "Details",
+      "eventType": "Event type",
+      "includeSoup": "Include broth / soup (traditional Moldovan wedding dish)",
+      "includeLateNight": "Include night snack (kebab, skewers)",
+      "breakdown": "Dish details",
+      "dish": "Dish type",
+      "gramsPerGuest": "g/guest",
+      "totalKg": "Total kg",
+      "cost": "Cost",
+      "disclaimer": "Prices are indicative, for wholesale purchase (Moldova 2026). If you work with a venue that provides the whole menu, check its per-person price.",
+      "totalFood": "Total food",
+      "estimatedCost": "Estimated cost: {amount}"
+    },
+    "wedding": {
+      "breadcrumb": "Wedding cost",
+      "title": "Wedding cost calculator Moldova",
+      "subtitle": "Complete budget estimate for your wedding with categories specific to Moldovan traditions. Adjust values in each category to see the impact on the total.",
+      "cat": {
+        "venue": {
+          "label": "Hall & rental",
+          "desc": "Hall rental + extra fees (air conditioning, generator)"
+        },
+        "menu": {
+          "label": "Menu & service",
+          "desc": "Cost of food + drinks + service (per guest)"
+        },
+        "brideDress": {
+          "label": "Wedding dress",
+          "desc": "Dress + accessories + fittings + dry cleaning"
+        },
+        "groomSuit": {
+          "label": "Groom's suit",
+          "desc": "Suit + shoes + shirt + accessories"
+        },
+        "rings": {
+          "label": "Wedding & engagement rings",
+          "desc": "Wedding rings + engagement ring"
+        },
+        "photoVideo": {
+          "label": "Photo & Video",
+          "desc": "Photographer + videographer + album + editing"
+        },
+        "music": {
+          "label": "Music & MC",
+          "desc": "Band / DJ + host + sound system"
+        },
+        "decor": {
+          "label": "Decor & Floristics",
+          "desc": "Floral arrangements + venue decor + bouquets"
+        },
+        "makeup": {
+          "label": "Makeup & hairstyle",
+          "desc": "Makeup + bride's hairstyle (+ optional godmothers)"
+        },
+        "transport": {
+          "label": "Transport & limousine",
+          "desc": "Limousine or decorated car + guest minibus"
+        },
+        "cake": {
+          "label": "Wedding cake",
+          "desc": "Cake + candy bar sweets"
+        },
+        "invitations": {
+          "label": "Invitations & stationery",
+          "desc": "Invitations + save-the-date + printed menu"
+        },
+        "honeymoon": {
+          "label": "Honeymoon",
+          "desc": "Post-wedding vacation (optional)"
+        }
+      },
+      "perGuestUnit": "€ / guest",
+      "typicalRange": "Typical interval: {min} – {max}",
+      "typicalRangePerGuest": "Typical interval: {min} – {max} / guest",
+      "reset": "Reset values",
+      "totalEstimate": "Total estimated",
+      "perGuestSummary": "{amount} / guest · {guests} guests",
+      "typicalMin": "Typical minimum:",
+      "typicalMax": "Typical maximum:",
+      "top5": "Top 5 categories",
+      "ctaIntro": "Done calculating? Find the right suppliers for your wedding.",
+      "ctaQuiz": "Supplier questionnaire",
+      "ctaPlan": "Plan event"
+    },
+    "index": {
+      "title": "Event calculators",
+      "description": "Plan your budget, quantities and logistics before contacting vendors. Estimates use Moldova benchmarks updated for 2026.",
+      "open": "Open calculator",
+      "ctaTitle": "Finished calculating? Find the right vendors.",
+      "ctaDesc": "Use the planner to get personalized results in less than a minute.",
+      "cta": "Plan your event",
+      "faqTitle": "Frequently asked questions",
+      "cards": {
+        "darNunta": {
+          "title": "Wedding Gift Calculator",
+          "desc": "Estimate a suitable gift based on relationship, venue type and city.",
+          "h1": "Minimum, typical and generous",
+          "h2": "Adults and children",
+          "h3": "Relationship and region"
+        },
+        "nunta": {
+          "title": "Wedding Cost Calculator",
+          "desc": "A full estimate for venue, attire, rings, photo, video, music and decor.",
+          "h1": "13 cost categories",
+          "h2": "Cost per guest",
+          "h3": "Largest categories"
+        },
+        "buget": {
+          "title": "Event Budget Calculator",
+          "desc": "Estimate the total cost of a wedding, baptism or family celebration.",
+          "h1": "Over 12 categories",
+          "h2": "Minimum and maximum",
+          "h3": "Cost per person"
+        },
+        "invitati": {
+          "title": "Guests and Tables",
+          "desc": "Calculate tables, serving staff and parking spaces for your guest count.",
+          "h1": "Tables and seats",
+          "h2": "No-show rate",
+          "h3": "Staff and parking"
+        },
+        "alcool": {
+          "title": "Drinks Calculator",
+          "desc": "Calculate wine, spirits, sparkling wine, beer and water.",
+          "h1": "Moldova benchmarks",
+          "h2": "Estimated total cost",
+          "h3": "Duration adjustment"
+        },
+        "meniu": {
+          "title": "Menu Calculator",
+          "desc": "Calculate starters, main course, cake, fruit and late-night food.",
+          "h1": "Grams per guest",
+          "h2": "Total kilograms",
+          "h3": "Estimated cost"
+        }
+      },
+      "faq": {
+        "q1": "Are the estimates guaranteed prices?",
+        "a1": "No. They are planning benchmarks. The vendor's written quote is the final price.",
+        "q2": "Are the calculators adapted for Moldova?",
+        "a2": "Yes. Their formulas and ranges reflect events in Moldova and were updated for 2026.",
+        "q3": "Is an account required?",
+        "a3": "The calculators are public, while an account lets you save results and continue planning."
+      }
+    },
+    "gift": {
+      "breadcrumb": "Wedding gift",
+      "crumb": "Wedding gift",
+      "title": "How much to give at a wedding?",
+      "intro": "Specific calculator for Moldova. The amount should cover your plate cost and leave something for the newlyweds. Use estimates as a guide — not fixed rules.",
+      "relTitle": "Relationship with newlyweds",
+      "venueTitle": "Hall / restaurant type",
+      "cityTitle": "Where is the wedding",
+      "attendeesTitle": "How many of you",
+      "adults": "Adults",
+      "children": "Children",
+      "rel": {
+        "colleague": {
+          "label": "Colleague / acquaintance",
+          "desc": "Professional relationship or casual acquaintance"
+        },
+        "friend": {
+          "label": "Close friend",
+          "desc": "You see each other regularly, know the families"
+        },
+        "close_friend": {
+          "label": "Very close friend",
+          "desc": "Years-long friendship, like family"
+        },
+        "cousin": {
+          "label": "Relative (cousin, aunt, etc.)",
+          "desc": "Extended family member"
+        },
+        "sibling": {
+          "label": "Close relative (brother, uncle)",
+          "desc": "Close family"
+        },
+        "nas": {
+          "label": "Godparent / cumătru",
+          "desc": "Ceremonial role — the amount is much higher"
+        }
+      },
+      "venue": {
+        "modest": "Canteen / modest hall",
+        "standard": "Standard restaurant",
+        "premium": "Premium restaurant",
+        "luxury": "Luxury hall / 5★ hotel"
+      },
+      "city": {
+        "chisinau": "Chișinău / Bălți",
+        "regional": "District center",
+        "rural": "Village / commune"
+      },
+      "perPerson": "≈{amount}€ / person",
+      "suggestion": "Our suggestion",
+      "typicalNote": "Typical amount for your situation. Your plate costs approximately",
+      "min": "Minimum",
+      "minNote": "plate only",
+      "typical": "Typical",
+      "typicalTag": "recommended",
+      "generous": "Generous",
+      "generousNote": "big gift",
+      "basis": "Based on: {venue} ({plate} / plate) × {guests} guests × \"{rel}\" multiplier × {city} area.",
+      "nasNote": "If you are a godparent (naș) or cumătru, the actual amount is often much higher — it also includes ceremonial expenses (candle, cake, gifts).",
+      "cta": "Planning your own wedding?"
+    },
+    "drinks": {
+      "title": "Event drinks calculator",
+      "intro": "Find out exactly how many bottles of wine, vodka, cognac, champagne, beer, and water you need to buy based on event type, guest count, and party duration.",
+      "eventDetails": "Event details",
+      "eventType": "Event type",
+      "drinkersRatio": "% guests consuming alcohol",
+      "duration": "Event duration (hours)",
+      "breakdown": "Drink details",
+      "colDrink": "Drink",
+      "colTotalMl": "Total ml",
+      "colBottles": "Bottles",
+      "colCost": "Cost",
+      "totalBottles": "Total bottles",
+      "estimatedCost": "Estimated cost: {amount}"
+    },
+    "eventType": {
+      "wedding": "Wedding",
+      "cununie": "Wedding ceremony",
+      "baptism": "Baptism",
+      "cumatrie": "Cumătrie",
+      "birthday": "Birthday",
+      "kids_birthday": "Kids birthday",
+      "corporate": "Corporate",
+      "concert": "Concert / Party",
+      "other": "Other type"
+    },
+    "guests": {
+      "method": {
+        "attendance": "Actual attendance = guests × (1 − absence rate)",
+        "bathrooms": "Bathrooms: minimum 2, then 1 per 50 guests (sanitary norm)",
+        "parking": "Parking: 1 spot per 3 guests (assumes partial ride-sharing)",
+        "tables": "Tables = ceil(needed seats / seats per table) + main table",
+        "waiters": "Waiters: 1 per 15 guests for served dinner"
+      },
+      "stats": {
+        "bathrooms": "Bathrooms required",
+        "emptySeats": "Free seats at the last table",
+        "expected": "Estimated confirmed guests",
+        "parking": "Parking spots",
+        "tables": "Tables needed",
+        "waiters": "Recommended waiters"
+      },
+      "breadcrumb": "Guests",
+      "detailsTitle": "Details",
+      "expectedAttendance": "Estimated attendance",
+      "headTableSeats": "Seats at the main table (bride and groom)",
+      "methodTitle": "How do we calculate?",
+      "noShowHint": "Average in Moldova: 8–12% do not confirm attendance at the last moment.",
+      "noShowRate": "Absence rate (%)",
+      "outOf": "out of {count}",
+      "pageIntro": "Find out how many tables, bathrooms, waiters, and parking spots you need for a comfortable and well-organized event.",
+      "pageTitle": "Guests & tables calculator",
+      "seats10": "10 seats (standard)",
+      "seats12": "12 seats",
+      "seats6": "6 seats",
+      "seats8": "8 seats",
+      "seatsPerTable": "Seats at the table",
+      "totalGuests": "Total number of guests"
+    },
+    "guestCount": "Number of guests"
+  },
+  "terms": {
+    "breadcrumb": "Terms",
+    "title": "Terms and Conditions",
+    "updated": "Last update: January 1, 2026",
+    "s1": {
+      "title": "1. About the service",
+      "body": "ePetrecere.md is a marketplace connecting clients planning events with service providers (artists, halls, photographers, etc.) from Moldova. We are not party to contracts between clients and providers."
+    },
+    "s2": {
+      "title": "2. Account and eligibility",
+      "body": "You must be at least 18 years old to create an account. You are responsible for keeping your credentials secure."
+    },
+    "s3": {
+      "title": "3. User conduct",
+      "body": "Posting illegal, misleading, offensive content or using the platform for spam is prohibited. Fake reviews are forbidden and will be removed."
+    },
+    "s4": {
+      "title": "4. Responsibilities",
+      "body": "We do not guarantee availability, quality, or legality of listed providers' services. We encourage clients to verify each provider independently and sign a written contract."
+    },
+    "s5": {
+      "title": "5. Intellectual property",
+      "body": "The ePetrecere brand, logo, and design are protected. User-generated content remains the authors', but you grant us a non-exclusive license to display it on the platform."
+    },
+    "s6": {
+      "title": "6. Changes",
+      "body": "We may update these terms. The current version is always available at /termeni. Continuing use means acceptance."
+    },
+    "s7": {
+      "title": "7. The platform operator",
+      "body": "The platform operator is Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.), IDNO 1026023123354, with its registered office at MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova.",
+      "docs": "The complete contractual documents — the General Terms, the partner and venue agreements, the privacy, cookie, review and anti-fraud policies — are published at"
+    },
+    "s8": {
+      "title": "8. Contact"
+    },
+    "questions": "Questions?"
+  },
+  "push": {
+    "notConfigured": "Server push is not configured",
+    "enabled": "Notifications enabled 🔔",
+    "enableFailed": "Could not enable notifications",
+    "disabled": "Notifications disabled",
+    "disableError": "Error on deactivation",
+    "checking": "Verifying…",
+    "unsupported": "Your browser does not support push notifications.",
+    "blockedTitle": "Notifications blocked",
+    "blockedBody": "You blocked them in your browser settings. Open site settings (🔒 next to URL) and re-allow notifications.",
+    "activeToggle": "Notifications active — click to disable",
+    "enable": "Enable notifications"
+  },
+  "booking": {
+    "card": {
+      "sendError": "Error sending",
+      "sentTo": "Request sent to {name}!",
+      "requestSent": "Request sent",
+      "limitReached": "Limit reached (5)",
+      "requestBooking": "Request booking",
+      "eventDetails": "Event details",
+      "dateLabel": "Date:",
+      "typeLabel": "Type:",
+      "guestsLabel": "Guests:",
+      "nameLabel": "Name:",
+      "phoneLabel": "Phone:",
+      "messageOptional": "Message (optional)",
+      "messagePlaceholder": "Other event details...",
+      "viewProfile": "See profile",
+      "sendRequest": "Send request"
+    }
+  },
+  "referral": {
+    "titleShort": "Invite & win",
+    "title": "Invite & earn credit",
+    "intro": {
+      "p1": "For each friend who publishes their profile, you receive",
+      "p2": ". For their first accepted booking on the platform you receive another",
+      "p3": ". The credit is redeemable against a future subscription (Stripe)."
+    },
+    "creditEarned": "Accumulated credit",
+    "invitedOne": "{count} person invited",
+    "invitedMany": "{count} people invited",
+    "uniqueLink": "Your unique link",
+    "copyLink": "Copy link",
+    "share": "Share",
+    "yourCode": "Your code:",
+    "invitedPeople": "Invited people",
+    "userFallback": "User",
+    "milestone": {
+      "signup": "Registered",
+      "onboarded": "Profile published",
+      "firstBooking": "First booking"
+    },
+    "awaitingFirstBooking": "Waiting for first booking",
+    "emptyState": "You haven't invited anyone yet. Share the link with friends who need event services!",
+    "footnote": "ℹ️ Credit accumulates automatically when the invited person publishes their profile or receives a booking. Stripe payments will follow.",
+    "linkCopied": "Link copied!",
+    "copyFailed": "Failed to copy",
+    "shareTitle": "ePetrecere.md Invitation",
+    "shareText": "I used ePetrecere.md for my event and it really helped. Try it too — use my link: {url}"
+  },
+  "artistsCity": {
+    "heading": "Event artists in {city}",
+    "listName": "Artists in {city}",
+    "intro": "{count} and professional bands available in {city} for weddings, baptisms, godparent celebrations, anniversaries, and corporate events. Compare prices, read reviews, and book directly online.",
+    "empty": "Currently we have no artists listed in {city}. Explore the full list of artists or contact us for personalized recommendations.",
+    "none": "No artists available in {city} at the moment."
+  },
+  "packages": {
+    "eyebrow": "For providers",
+    "title": "List your services on ePetrecere.md",
+    "subtitle": "Three simple packages — start free and upgrade anytime. No booking fees, pay only the subscription.",
+    "popular": "Popular",
+    "compare": "See the full comparison",
+    "free": "Free",
+    "forever": "forever",
+    "perMonth": "per month",
+    "basic": {
+      "f1": "Public profile",
+      "f2": "5 photos",
+      "f3": "1 service package",
+      "f4": "Quote requests",
+      "cta": "Start for free"
+    },
+    "pro": {
+      "f1": "Unlimited gallery",
+      "f2": "Synced calendar",
+      "f3": "Auto response",
+      "f4": "Priority in search",
+      "cta": "Apply for Pro"
+    },
+    "premium": {
+      "f1": "Featured on the homepage",
+      "f2": "AI Assistant included",
+      "f3": "Account manager",
+      "f4": "Monthly reports",
+      "cta": "I want Premium"
+    }
+  },
+  "upload": {
+    "maxFiles": "Maximum {max} images",
+    "tooLarge": "{name} exceeds 10MB",
+    "added": "{count} images added",
+    "uploading": "Uploading...",
+    "dragHere": "Drag images here",
+    "hint": "or click to select (max 10MB/img, {max} total)",
+    "setCoverAria": "Set as main image",
+    "setCoverTitle": "Set as cover",
+    "deleteAria": "Delete image"
+  },
+  "share": {
+    "action": "Share",
+    "on": "Share on {network}",
+    "copied": "Link copied",
+    "copy": "Copy link",
+    "copiedShort": "Copied!"
+  },
+  "quiz": {
+    "eyebrow": "Quick questionnaire",
+    "title": "Let's find the perfect suppliers together",
+    "stepOf": "Step {current} of {total}",
+    "steps": {
+      "eventType": "Event type",
+      "guestCount": "Number of guests",
+      "budget": "Approximate budget",
+      "location": "Location",
+      "style": "Preferred style",
+      "services": "Which services you need"
+    },
+    "styles": {
+      "elegant": "Elegant & classic",
+      "elegantDesc": "Refinement and simplicity",
+      "modern": "Modern & trendy",
+      "modernDesc": "Current minimalism",
+      "rustic": "Rustic & traditional",
+      "rusticDesc": "Authentically Moldovan",
+      "glamour": "Glamour & luxurious",
+      "glamourDesc": "Spectacular and opulent",
+      "boho": "Boho & natural",
+      "bohoDesc": "Relaxed and organic",
+      "themed": "Themed",
+      "themedDesc": "Custom concept"
+    },
+    "services": {
+      "singer": "Singer / Performer",
+      "band": "Musical band",
+      "dj": "DJ",
+      "mc": "Moderator",
+      "photographer": "Photo-Video",
+      "show": "Show program / Dancers",
+      "decor": "Decor & Floristics",
+      "animators": "Children's entertainers"
+    },
+    "guests": {
+      "under50": "Under 50 guests",
+      "under50Desc": "Intimate",
+      "to150": "50–150 guests",
+      "to150Desc": "Medium",
+      "to300": "150–300 guests",
+      "to300Desc": "Large",
+      "over300": "Over 300 guests",
+      "over300Desc": "Very large"
+    },
+    "budget": {
+      "under1500": "Under 1,500€",
+      "to5000": "1,500€ – 5,000€",
+      "to12000": "5,000€ – 12,000€",
+      "to25000": "12,000€ – 25,000€",
+      "over25000": "Over 25,000€"
+    },
+    "submitError": "An error occurred. Please try again.",
+    "resultsTitle": "We found {count} suitable providers for you",
+    "emptyTitle": "No providers found",
+    "resultsHint": "Sorted by match score with your answers.",
+    "emptyHint": "Try adjusting the criteria (budget, city, or services).",
+    "startOver": "Start again",
+    "seeAllArtists": "See all artists",
+    "findVendors": "Find suppliers"
+  },
+  "catalogFilters": {
+    "title": "Filter results",
+    "price": "Price",
+    "location": "Location",
+    "allMoldova": "All Moldova",
+    "minRating": "Minimum rating",
+    "apply": "Apply filters",
+    "close": "Close filters",
+    "category": "Category",
+    "allCategories": "All categories",
+    "allLocations": "All locations"
+  },
+  "categoryPage": {
+    "heroAlt": "Event professionals in Moldova",
+    "premium": "Premium category",
+    "fallbackDesc": "Discover suitable event professionals in a modern selection with easy filters.",
+    "searchIn": "Search in",
+    "found": "found",
+    "entityVendors": "vendors",
+    "entityArtists": "artists",
+    "ctaTitle": "Want recommendations suited to your event?",
+    "ctaDesc": "Tell us what you are organizing and the planner will prepare a personalized selection.",
+    "ctaButton": "Plan the event"
+  },
+  "artistsPage": {
+    "heroAlt": "Artist performing at an event in Moldova",
+    "title": "Artists for your event",
+    "description": "Discover professional artists, bands and hosts for events across Moldova.",
+    "searchPlaceholder": "Search artists, bands and hosts...",
+    "popularSearches": "Popular searches:",
+    "ctaTitle": "Not sure who fits?",
+    "ctaDesc": "Tell us about your event and we will suggest suitable artists.",
+    "ctaButton": "Get recommendations"
+  },
+  "cookies": {
+    "title": "Privacy preferences",
+    "description": "Essential storage keeps the site working. Analytics and marketing stay off until you choose.",
+    "policy": "Cookie Policy",
+    "customize": "Customize",
+    "reject": "Reject optional",
+    "accept": "Accept all",
+    "save": "Save choices",
+    "necessary": "Necessary",
+    "necessaryDesc": "Authentication, security and core features. Always active.",
+    "preferences": "Preferences",
+    "preferencesDesc": "Language, appearance and your settings.",
+    "analytics": "Analytics",
+    "analyticsDesc": "Aggregated usage and performance measurement.",
+    "marketing": "Marketing",
+    "marketingDesc": "Campaign attribution and personalized promotional content.",
+    "settings": "Cookie settings"
+  },
+  "budgetCalc": {
+    "eventDetails": "Event details",
+    "eventType": "Event type",
+    "guestCount": "Number of guests",
+    "pricePerPerson": "Hall price / person (€)",
+    "pricePerPersonHint": "Enter 0 if you already have the location booked.",
+    "venueRental": "Hall rental (€, optional)",
+    "services": "Desired services",
+    "estimatedBudget": "Estimated budget",
+    "range": "Range:",
+    "emptyBreakdown": "Select services to see details.",
+    "findVendors": "Find vendors for this budget",
+    "breadcrumb": "Budget",
+    "pageTitle": "Event budget calculator",
+    "pageIntro": "Choose the event type, number of guests, price per person at the venue, and the services you need. We instantly calculate the total budget with a realistic range."
+  },
+  "contactPage": {
+    "subtitle": "Contact us for any questions regarding our services",
+    "address": "Address",
+    "addressValue": "Chișinău, Republic of Moldova",
+    "hours": "Opening hours",
+    "hoursWeekdays": "Mon — Fri: 09:00 – 18:00",
+    "hoursSaturday": "Saturday: 10:00 – 14:00",
+    "sentTitle": "Message sent!",
+    "sentBody": "We will contact you as soon as possible.",
+    "sendFailed": "Could not send the message. Please try again or contact us by phone.",
+    "phoneFormat": "Format: +373 XX XXX XXX or 0XX XXX XXX"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "unreadCount": "{count} unread",
+    "markAll": "Mark all",
+    "empty": "No notifications yet.",
+    "justNow": "now",
+    "minutesAgo": "{n}m",
+    "hoursAgo": "{n}h",
+    "daysAgo": "{n}d"
+  },
+  "filterBar": {
+    "price": "Price:",
+    "category": "Category:",
+    "city": "City:",
+    "capacity": "Capacity:",
+    "priceAria": "Price filter: {value}",
+    "categoryAria": "Category filter: {value}",
+    "cityAria": "City filter: {value}",
+    "capacityAria": "Capacity filter: {value}",
+    "resetAll": "Reset filters"
+  },
+  "partners": {
+    "title": "Our partners"
+  },
+  "chat": {
+    "signInArtist": "Chat with the artist (sign in)",
+    "signInVenue": "Chat with the venue (sign in)",
+    "header": "Chat",
+    "close": "Close chat",
+    "emptyArtist": "Write the first message — the artist will get a notification.",
+    "emptyVenue": "Write the first message — the venue team will get a notification.",
+    "inputPlaceholder": "Write a message...",
+    "send": "Send message",
+    "direct": "Direct chat",
+    "sendFailed": "The message could not be sent."
+  },
+  "about": {
+    "title": "Moldova's No. 1 Event Platform",
+    "subtitle": "ePetrecere.md connects event organizers with the best artists, halls and service providers in the Republic of Moldova.",
+    "features": {
+      "artists": {
+        "title": "500+ artists",
+        "desc": "The largest database of artists and event service providers in Moldova."
+      },
+      "calendar": {
+        "title": "Live calendar",
+        "desc": "Check artists and venues availability in real time."
+      },
+      "verified": {
+        "title": "Verified",
+        "desc": "All artists are verified and rated by real clients."
+      },
+      "ai": {
+        "desc": "AI assistant for planning the perfect event."
+      }
+    },
+    "mission": {
+      "title": "Our mission",
+      "body": "We aim to make event planning accessible, transparent, and enjoyable. Through modern technology and a careful selection of professionals, we turn every event into a memorable experience."
+    }
+  },
+  "requestForm": {
+    "requestPrice": "Request Price",
+    "priceSubtitle": "Leave your contact details and we will get back to you with a personalized offer.",
+    "priceSent": "Request sent! We will contact you shortly.",
+    "sendRequest": "Send the request",
+    "requestBooking": "Request Booking",
+    "bookingSubtitle": "Fill in event details and we will confirm availability.",
+    "errorNoDate": "Select the event date to send the request.",
+    "errorNoName": "Enter name.",
+    "errorNoPhone": "Enter phone number.",
+    "sentLinkedToPlan": "Your request was sent and linked to your plan!",
+    "sentSeeInMyBookings": "Your booking request was sent! You can see it in My Bookings.",
+    "sentWeWillContact": "Your booking request was sent! We will contact you shortly.",
+    "capacityWarning": "Exceeds the maximum capacity ({max} seats)",
+    "sendBookingRequest": "Send booking request"
+  },
+  "results": {
+    "loadError": "Could not load results. Try again.",
+    "title": "Your results",
+    "subtitle": "Only artists and venues available for your date. Send booking requests directly from here (max 5 artists per category).",
+    "editPlan": "Edit scheduling",
+    "guestsChip": "{count} guests",
+    "budgetChip": "Budget {amount}€",
+    "withVenue": "With venue",
+    "planCreated": "Your plan was created automatically. Sent requests will appear in the tab",
+    "bookingsTab": "Artist reservations",
+    "viewInCrm": "View in CRM",
+    "openPlan": "Open plan",
+    "venuesTitle": "Available halls",
+    "venuesSubtitle": "Free halls on {date} for at least {guests} guests",
+    "venuesEmpty": "No venues available for the selected filters. Try changing the date or number of guests.",
+    "artistsSubtitle": "{count} free artists · {used}/{max} requests sent",
+    "artistsEmpty": "No artists available in this category for the selected date.",
+    "noCategories": "You have not selected any category. Please go back and choose at least one.",
+    "helpTitle": "Can't find what you're looking for?",
+    "helpDesc": "Send us the event details and we will help find the perfect match.",
+    "helpCta": "Contact us"
+  },
+  "utilitati": {
+    "eyebrow": "Tools",
+    "title": "Tools for your event",
+    "description": "Organize a wedding, baptism, family celebration or corporate event in Moldova with free online tools.",
+    "online": "Online tools",
+    "calculators": "Calculators",
+    "all": "View all",
+    "open": "Open",
+    "calc": {
+      "buget": {
+        "title": "Budget Calculator",
+        "desc": "Estimate the total event budget."
+      },
+      "invitati": {
+        "title": "Guests and Tables",
+        "desc": "Calculate tables, staff and parking."
+      },
+      "darNunta": {
+        "title": "Wedding Gift Calculator",
+        "desc": "Estimate a suitable wedding gift in Moldova."
+      },
+      "nunta": {
+        "title": "Wedding Cost Calculator",
+        "desc": "Get a full 2026 wedding cost estimate."
+      },
+      "alcool": {
+        "title": "Drinks Calculator",
+        "desc": "Calculate wine, spirits and water."
+      },
+      "meniu": {
+        "title": "Menu Calculator",
+        "desc": "Plan realistic food and dessert quantities."
+      }
+    }
+  },
+  "cityCategory": {
+    "heading": "{category} in {city}",
+    "intro": "{total} {category} professionals in {city}. Compare prices, read reviews, and book directly online for weddings, baptisms, cumătrie or corporate events.",
+    "empty": "Currently we have no {category} listed in {city}. Explore other categories or cities.",
+    "none": "No {category} available in {city}.",
+    "viewAllCategory": "See all {category} →",
+    "viewAllCity": "See all artists from {city} →"
+  },
+  "addToEvent": {
+    "bookForEvent": "Book for your event",
+    "addArtist": "Add artist to an event",
+    "addVenue": "Add hall to an event",
+    "dialogTitle": "Choose event",
+    "dialogDescription": "Choose your event. Events where the partner is already busy are marked accordingly.",
+    "noDate": "No date set",
+    "busy": "Busy — partner already has a booking on this day.",
+    "newEvent": "New event",
+    "newEventHint": "Create the event in seconds — then we automatically send your request to this partner."
+  },
+  "gallery": {
+    "openImage": "Open image {index}",
+    "image": "Image {index}",
+    "ariaLabel": "Image gallery",
+    "close": "Close gallery",
+    "prevImage": "Previous image",
+    "nextImage": "Next image",
+    "noPhotos": "No photos available.",
+    "photo": "Photo {index}",
+    "prevPhoto": "Previous",
+    "nextPhoto": "Next"
   }
 }

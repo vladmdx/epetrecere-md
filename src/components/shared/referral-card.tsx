@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Milestone {
   eventType: string;
@@ -43,13 +44,14 @@ interface ReferralData {
   referred: ReferredUser[];
 }
 
-const MILESTONE_LABELS: Record<string, { label: string; emoji: string }> = {
-  signup: { label: "S-a înregistrat", emoji: "👋" },
-  onboarded: { label: "Profil publicat", emoji: "✅" },
-  first_booking: { label: "Prima rezervare", emoji: "🎉" },
+const MILESTONE_LABELS: Record<string, { labelKey: string; emoji: string }> = {
+  signup: { labelKey: "referral.milestone.signup", emoji: "👋" },
+  onboarded: { labelKey: "referral.milestone.onboarded", emoji: "✅" },
+  first_booking: { labelKey: "referral.milestone.firstBooking", emoji: "🎉" },
 };
 
 export function ReferralCard() {
+  const { t } = useLocale();
   const [data, setData] = useState<ReferralData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -70,20 +72,21 @@ export function ReferralCard() {
     try {
       await navigator.clipboard.writeText(data.shareUrl);
       setCopied(true);
-      toast.success("Link copiat!");
+      toast.success(t("referral.linkCopied"));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Nu s-a putut copia");
+      toast.error(t("referral.copyFailed"));
     }
   }
 
   async function webShare() {
     if (!data) return;
-    const text = `Am folosit ePetrecere.md pentru evenimentul meu și chiar m-a ajutat. Încearcă-l și tu — folosește linkul meu: ${data.shareUrl}`;
+    const text = t("referral.shareText", { url: data.shareUrl });
+    const title = t("referral.shareTitle");
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "Invitație ePetrecere.md",
+          title,
           text,
           url: data.shareUrl,
         });
@@ -93,7 +96,7 @@ export function ReferralCard() {
     } else {
       // Fallback: open mail client
       window.location.href = `mailto:?subject=${encodeURIComponent(
-        "Invitație ePetrecere.md",
+        title,
       )}&body=${encodeURIComponent(text)}`;
     }
   }
@@ -104,7 +107,7 @@ export function ReferralCard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Gift className="h-4 w-4 text-gold" />
-            Invită & câștigi
+            {t("referral.titleShort")}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex justify-center py-8">
@@ -121,14 +124,14 @@ export function ReferralCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <Gift className="h-4 w-4 text-gold" />
-          Invită & câștigi credit
+          {t("referral.title")}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
-          Pentru fiecare prieten care își publică profilul primești{" "}
-          <strong className="text-foreground">5€</strong>. Pentru prima lor
-          rezervare acceptată pe platformă primești încă{" "}
-          <strong className="text-foreground">20€</strong>. Creditul e
-          redeemable împotriva abonamentului viitor (Stripe).
+          {t("referral.intro.p1")}{" "}
+          <strong className="text-foreground">5€</strong>
+          {t("referral.intro.p2")}{" "}
+          <strong className="text-foreground">20€</strong>
+          {t("referral.intro.p3")}
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -136,7 +139,7 @@ export function ReferralCard() {
         <div className="flex items-center justify-between rounded-lg border border-gold/40 bg-gold/10 p-3">
           <div>
             <p className="text-xs uppercase tracking-wider text-muted-foreground">
-              Credit acumulat
+              {t("referral.creditEarned")}
             </p>
             <p className="font-heading text-2xl font-bold text-gold">
               {data.creditEur.toFixed(2)}€
@@ -144,8 +147,9 @@ export function ReferralCard() {
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">
-              {data.referred.length}{" "}
-              {data.referred.length === 1 ? "persoană" : "persoane"} invitate
+              {data.referred.length === 1
+                ? t("referral.invitedOne", { count: data.referred.length })
+                : t("referral.invitedMany", { count: data.referred.length })}
             </p>
           </div>
         </div>
@@ -153,7 +157,7 @@ export function ReferralCard() {
         {/* Share link */}
         <div>
           <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-            Linkul tău unic
+            {t("referral.uniqueLink")}
           </label>
           <div className="mt-1 flex gap-2">
             <Input
@@ -166,7 +170,7 @@ export function ReferralCard() {
               onClick={copyLink}
               variant="outline"
               size="icon"
-              aria-label="Copiază link"
+              aria-label={t("referral.copyLink")}
               className="shrink-0"
             >
               {copied ? (
@@ -179,11 +183,11 @@ export function ReferralCard() {
               onClick={webShare}
               className="shrink-0 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
-              <Share2 className="h-4 w-4" /> Share
+              <Share2 className="h-4 w-4" /> {t("referral.share")}
             </Button>
           </div>
           <p className="mt-1 text-[10px] text-muted-foreground">
-            Codul tău: <code className="font-mono">{data.code}</code>
+            {t("referral.yourCode")} <code className="font-mono">{data.code}</code>
           </p>
         </div>
 
@@ -191,7 +195,7 @@ export function ReferralCard() {
         {data.referred.length > 0 && (
           <div>
             <label className="text-[10px] uppercase tracking-wider text-muted-foreground">
-              Persoane invitate ({data.referred.length})
+              {t("referral.invitedPeople")} ({data.referred.length})
             </label>
             <ul className="mt-2 space-y-2">
               {data.referred.map((u) => (
@@ -204,14 +208,13 @@ export function ReferralCard() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">
-                      {u.name || u.email || "Utilizator"}
+                      {u.name || u.email || t("referral.userFallback")}
                     </p>
                     <div className="mt-0.5 flex flex-wrap gap-1">
                       {u.milestones.map((m) => {
-                        const cfg = MILESTONE_LABELS[m.eventType] ?? {
-                          label: m.eventType,
-                          emoji: "•",
-                        };
+                        const cfg = MILESTONE_LABELS[m.eventType];
+                        const label = cfg ? t(cfg.labelKey) : m.eventType;
+                        const emoji = cfg?.emoji ?? "•";
                         return (
                           <span
                             key={m.eventType}
@@ -219,7 +222,7 @@ export function ReferralCard() {
                             title={new Date(m.createdAt).toLocaleString("ro-RO")}
                           >
                             <CheckCircle2 className="h-2.5 w-2.5" />
-                            {cfg.emoji} {cfg.label}
+                            {emoji} {label}
                           </span>
                         );
                       })}
@@ -228,7 +231,7 @@ export function ReferralCard() {
                       ) && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
                           <Clock className="h-2.5 w-2.5" />
-                          Așteaptă prima rezervare
+                          {t("referral.awaitingFirstBooking")}
                         </span>
                       )}
                     </div>
@@ -246,14 +249,12 @@ export function ReferralCard() {
 
         {data.referred.length === 0 && (
           <div className="rounded-lg border border-dashed border-border/40 p-4 text-center text-xs text-muted-foreground">
-            Încă n-ai invitat pe nimeni. Distribuie linkul prietenilor care au
-            nevoie de servicii pentru evenimente!
+            {t("referral.emptyState")}
           </div>
         )}
 
         <p className="text-[10px] text-muted-foreground">
-          ℹ️ Creditul se acumulează automat când persoana invitată își
-          publică profilul sau primește o rezervare. Plățile Stripe urmează.
+          {t("referral.footnote")}
         </p>
       </CardContent>
     </Card>

@@ -1,5 +1,6 @@
 import { metaForPath } from "@/lib/seo/page-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 
 export async function generateMetadata({
   params,
@@ -33,10 +34,16 @@ export async function generateMetadata({
   );
 }
 
-export default function HowItWorksPage() {
+export default async function HowItWorksPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   return (
     <main
-      aria-label="Cum funcționează"
+      aria-label={t("nav.how_it_works", locale)}
       className="-mt-16 min-h-[calc(100vh-4rem)] bg-[#05080d] pt-16"
     />
   );

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import LocaleLink, { useLocalizePath } from "@/components/shared/locale-link";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 // M0b #10 — Persistent pre-booking chat widget.
 // Uses a React Portal so the modal escapes any sticky/overflow parent.
@@ -39,6 +40,7 @@ export function ChatWidget({
   artistSlug,
   slugPrefix = "artisti",
 }: Props) {
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -50,7 +52,6 @@ export function ChatWidget({
   const [mounted, setMounted] = useState(false);
   const localize = useLocalizePath();
   const isVenueChat = Boolean(venueId);
-  const chatTargetLabel = isVenueChat ? "locația" : "artistul";
 
   useEffect(() => {
     setMounted(true);
@@ -94,14 +95,14 @@ export function ChatWidget({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || "Mesajul nu a putut fi trimis.");
+        throw new Error(body.error || t("chat.sendFailed"));
       }
       const inserted = await res.json();
       setMessages((prev) => [...prev, inserted]);
       setDraft("");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Mesajul nu a putut fi trimis.",
+        error instanceof Error ? error.message : t("chat.sendFailed"),
       );
     } finally {
       setSending(false);
@@ -124,7 +125,8 @@ export function ChatWidget({
         href={`/sign-in?redirect_url=${encodeURIComponent(localize(`/${slugPrefix}/${artistSlug}`))}`}
         className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2.5 text-sm font-medium text-gold hover:bg-gold/20"
       >
-        <Lock className="h-4 w-4" /> Chat cu {chatTargetLabel} (autentifică-te)
+        <Lock className="h-4 w-4" />{" "}
+        {t(isVenueChat ? "chat.signInVenue" : "chat.signInArtist")}
       </LocaleLink>
     );
   }
@@ -142,7 +144,7 @@ export function ChatWidget({
             <header className="flex items-center justify-between border-b border-border/40 bg-background/60 px-4 py-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Chat
+                  {t("chat.header")}
                 </p>
                 <p className="font-heading text-sm font-bold">{artistName}</p>
               </div>
@@ -150,7 +152,7 @@ export function ChatWidget({
                 type="button"
                 onClick={() => setOpen(false)}
                 className="rounded-full p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
-                aria-label="Închide chat"
+                aria-label={t("chat.close")}
               >
                 <X className="h-4 w-4" />
               </button>
@@ -166,7 +168,7 @@ export function ChatWidget({
                 </div>
               ) : messages.length === 0 ? (
                 <p className="py-8 text-center text-xs text-muted-foreground">
-                  Scrie primul mesaj — {isVenueChat ? "echipa locației" : "artistul"} va primi notificare.
+                  {t(isVenueChat ? "chat.emptyVenue" : "chat.emptyArtist")}
                 </p>
               ) : (
                 messages.map((m) => (
@@ -201,14 +203,14 @@ export function ChatWidget({
                     send();
                   }
                 }}
-                placeholder="Scrie un mesaj..."
+                placeholder={t("chat.inputPlaceholder")}
                 className="flex-1 rounded-full border border-border/40 bg-background px-4 py-2 text-sm focus:border-gold/50 focus:outline-none"
                 disabled={!conversationId || sending}
               />
               <Button
                 type="button"
                 size="icon"
-                aria-label="Trimite mesaj"
+                aria-label={t("chat.send")}
                 onClick={send}
                 disabled={!draft.trim() || !conversationId || sending}
                 className="shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
@@ -234,7 +236,7 @@ export function ChatWidget({
         variant="outline"
         className="w-full gap-2 border-gold/40 text-gold hover:bg-gold/10 hover:text-gold"
       >
-        <MessageCircle className="h-4 w-4" /> Chat direct
+        <MessageCircle className="h-4 w-4" /> {t("chat.direct")}
       </Button>
       {chatModal}
     </>

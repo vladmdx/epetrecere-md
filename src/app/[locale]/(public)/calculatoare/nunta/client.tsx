@@ -20,13 +20,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { useLocale } from "@/hooks/use-locale";
 
 // Moldovan wedding cost categories, with typical min/max ranges (EUR) for 2025.
 interface Category {
   id: string;
-  label: string;
+  labelKey: string;
   icon: typeof Heart;
-  description: string;
+  descKey: string;
   min: number;
   max: number;
   defaultValue: number;
@@ -36,18 +37,18 @@ interface Category {
 const CATEGORIES: Category[] = [
   {
     id: "venue",
-    label: "Sală & închiriere",
+    labelKey: "calc.wedding.cat.venue.label",
     icon: Heart,
-    description: "Chirie sală + taxe suplimentare (aer condiționat, generator)",
+    descKey: "calc.wedding.cat.venue.desc",
     min: 500,
     max: 5000,
     defaultValue: 1500,
   },
   {
     id: "menu",
-    label: "Meniu & servire",
+    labelKey: "calc.wedding.cat.menu.label",
     icon: Utensils,
-    description: "Cost mâncare + băuturi + servire (pe invitat)",
+    descKey: "calc.wedding.cat.menu.desc",
     min: 25,
     max: 80,
     defaultValue: 45,
@@ -55,99 +56,99 @@ const CATEGORIES: Category[] = [
   },
   {
     id: "bride_dress",
-    label: "Rochia miresei",
+    labelKey: "calc.wedding.cat.brideDress.label",
     icon: Sparkles,
-    description: "Rochie + accesorii + probe + curățătorie",
+    descKey: "calc.wedding.cat.brideDress.desc",
     min: 300,
     max: 3000,
     defaultValue: 900,
   },
   {
     id: "groom_suit",
-    label: "Costum mire",
+    labelKey: "calc.wedding.cat.groomSuit.label",
     icon: Gem,
-    description: "Costum + pantofi + cămașă + accesorii",
+    descKey: "calc.wedding.cat.groomSuit.desc",
     min: 150,
     max: 1200,
     defaultValue: 400,
   },
   {
     id: "rings",
-    label: "Verighete & inele",
+    labelKey: "calc.wedding.cat.rings.label",
     icon: Gem,
-    description: "Verighete + inel de logodnă",
+    descKey: "calc.wedding.cat.rings.desc",
     min: 200,
     max: 3000,
     defaultValue: 700,
   },
   {
     id: "photo_video",
-    label: "Foto & Video",
+    labelKey: "calc.wedding.cat.photoVideo.label",
     icon: Camera,
-    description: "Fotograf + videograf + album + editare",
+    descKey: "calc.wedding.cat.photoVideo.desc",
     min: 400,
     max: 3500,
     defaultValue: 1200,
   },
   {
     id: "music",
-    label: "Muzică & MC",
+    labelKey: "calc.wedding.cat.music.label",
     icon: Music,
-    description: "Formație / DJ + moderator + sonorizare",
+    descKey: "calc.wedding.cat.music.desc",
     min: 300,
     max: 3000,
     defaultValue: 1000,
   },
   {
     id: "decor",
-    label: "Decor & Floristică",
+    labelKey: "calc.wedding.cat.decor.label",
     icon: Flower2,
-    description: "Aranjamente florale + decor sală + buchete",
+    descKey: "calc.wedding.cat.decor.desc",
     min: 200,
     max: 2500,
     defaultValue: 800,
   },
   {
     id: "makeup",
-    label: "Machiaj & coafură",
+    labelKey: "calc.wedding.cat.makeup.label",
     icon: Sparkles,
-    description: "Machiaj + coafură mireasă (+ cumătre opțional)",
+    descKey: "calc.wedding.cat.makeup.desc",
     min: 80,
     max: 500,
     defaultValue: 180,
   },
   {
     id: "transport",
-    label: "Transport & limuzină",
+    labelKey: "calc.wedding.cat.transport.label",
     icon: Car,
-    description: "Limuzină sau mașină decorată + microbuz invitați",
+    descKey: "calc.wedding.cat.transport.desc",
     min: 100,
     max: 800,
     defaultValue: 250,
   },
   {
     id: "cake",
-    label: "Tort de nuntă",
+    labelKey: "calc.wedding.cat.cake.label",
     icon: Heart,
-    description: "Tort + dulciuri candy bar",
+    descKey: "calc.wedding.cat.cake.desc",
     min: 100,
     max: 600,
     defaultValue: 250,
   },
   {
     id: "invitations",
-    label: "Invitații & papetărie",
+    labelKey: "calc.wedding.cat.invitations.label",
     icon: Sparkles,
-    description: "Invitații + save-the-date + meniu tipărit",
+    descKey: "calc.wedding.cat.invitations.desc",
     min: 50,
     max: 500,
     defaultValue: 150,
   },
   {
     id: "honeymoon",
-    label: "Lună de miere",
+    labelKey: "calc.wedding.cat.honeymoon.label",
     icon: Plane,
-    description: "Vacanță postnupțială (opțional)",
+    descKey: "calc.wedding.cat.honeymoon.desc",
     min: 0,
     max: 5000,
     defaultValue: 1200,
@@ -163,6 +164,7 @@ function formatEUR(n: number): string {
 }
 
 export function WeddingCostCalculatorClient() {
+  const { t } = useLocale();
   const [guestCount, setGuestCount] = useState(120);
   const [values, setValues] = useState<Record<string, number>>(
     Object.fromEntries(CATEGORIES.map((c) => [c.id, c.defaultValue])),
@@ -204,7 +206,7 @@ export function WeddingCostCalculatorClient() {
           <div className="flex items-center gap-3">
             <Users className="h-5 w-5 text-gold" />
             <div className="flex-1">
-              <Label htmlFor="guests">Număr invitați</Label>
+              <Label htmlFor="guests">{t("calc.guestCount")}</Label>
               <Input
                 id="guests"
                 type="number"
@@ -234,13 +236,13 @@ export function WeddingCostCalculatorClient() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center justify-between gap-2">
-                      <h3 className="font-medium">{r.label}</h3>
+                      <h3 className="font-medium">{t(r.labelKey)}</h3>
                       <span className="font-accent text-sm font-semibold text-gold">
                         {formatEUR(r.total)}
                       </span>
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {r.description}
+                      {t(r.descKey)}
                     </p>
                     <div className="mt-3 flex items-center gap-3">
                       <Input
@@ -261,14 +263,18 @@ export function WeddingCostCalculatorClient() {
                       />
                       {r.perGuest && (
                         <span className="text-xs text-muted-foreground">
-                          € / invitat
+                          {t("calc.wedding.perGuestUnit")}
                         </span>
                       )}
                       <Progress value={pct} className="h-1.5 flex-1" />
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Interval tipic: {formatEUR(r.min)} – {formatEUR(r.max)}
-                      {r.perGuest ? " / invitat" : ""}
+                      {t(
+                        r.perGuest
+                          ? "calc.wedding.typicalRangePerGuest"
+                          : "calc.wedding.typicalRange",
+                        { min: formatEUR(r.min), max: formatEUR(r.max) },
+                      )}
                     </p>
                   </div>
                 </div>
@@ -278,7 +284,7 @@ export function WeddingCostCalculatorClient() {
         </div>
 
         <Button variant="outline" onClick={reset} className="gap-2">
-          <RotateCcw className="h-4 w-4" /> Resetează valorile
+          <RotateCcw className="h-4 w-4" /> {t("calc.wedding.reset")}
         </Button>
       </div>
 
@@ -286,23 +292,26 @@ export function WeddingCostCalculatorClient() {
       <aside className="space-y-4 lg:sticky lg:top-20 lg:h-fit">
         <div className="rounded-2xl border border-gold/30 bg-gradient-to-b from-gold/10 to-transparent p-6">
           <p className="text-xs font-medium uppercase tracking-widest text-gold">
-            Total estimat
+            {t("calc.wedding.totalEstimate")}
           </p>
           <p className="mt-2 font-accent text-4xl font-bold">
             {formatEUR(grandTotal)}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
-            {formatEUR(costPerGuest)} / invitat · {guestCount} invitați
+            {t("calc.wedding.perGuestSummary", {
+              amount: formatEUR(costPerGuest),
+              guests: guestCount,
+            })}
           </p>
           <div className="mt-4 space-y-1 text-xs text-muted-foreground">
             <div className="flex justify-between">
-              <span>Minim tipic:</span>
+              <span>{t("calc.wedding.typicalMin")}</span>
               <span className="font-medium text-foreground">
                 {formatEUR(totalMin)}
               </span>
             </div>
             <div className="flex justify-between">
-              <span>Maxim tipic:</span>
+              <span>{t("calc.wedding.typicalMax")}</span>
               <span className="font-medium text-foreground">
                 {formatEUR(totalMax)}
               </span>
@@ -311,7 +320,7 @@ export function WeddingCostCalculatorClient() {
         </div>
 
         <div className="rounded-2xl border border-border/40 bg-card p-5">
-          <h3 className="font-heading text-sm font-bold">Top 5 categorii</h3>
+          <h3 className="font-heading text-sm font-bold">{t("calc.wedding.top5")}</h3>
           <ul className="mt-3 space-y-2 text-xs">
             {[...rows]
               .sort((a, b) => b.total - a.total)
@@ -321,7 +330,7 @@ export function WeddingCostCalculatorClient() {
                 return (
                   <li key={r.id}>
                     <div className="flex items-center justify-between">
-                      <span>{r.label}</span>
+                      <span>{t(r.labelKey)}</span>
                       <span className="font-medium text-foreground">
                         {pct.toFixed(0)}%
                       </span>
@@ -335,19 +344,19 @@ export function WeddingCostCalculatorClient() {
 
         <div className="rounded-2xl border border-border/40 bg-card p-5">
           <p className="text-sm text-muted-foreground">
-            Gata cu calculele? Găsește furnizorii potriviți pentru nunta ta.
+            {t("calc.wedding.ctaIntro")}
           </p>
           <Link
             href="/chestionar"
             className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-gold px-4 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
-            Chestionar furnizori <ArrowRight className="h-4 w-4" />
+            {t("calc.wedding.ctaQuiz")} <ArrowRight className="h-4 w-4" />
           </Link>
           <Link
             href="/planifica"
             className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background px-4 py-2 text-sm font-medium hover:bg-muted"
           >
-            Planifică eveniment <ArrowRight className="h-4 w-4" />
+            {t("calc.wedding.ctaPlan")} <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </aside>

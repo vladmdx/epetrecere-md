@@ -1,6 +1,7 @@
 import Link from "@/components/shared/locale-link";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { DrinksCalculatorClient } from "./client";
 
@@ -35,7 +36,13 @@ export async function generateMetadata({
   }, locale);
 }
 
-export default function DrinksCalculatorPage() {
+export default async function DrinksCalculatorPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: rawLocale } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const breadcrumbs = [
     { name: "Acasă", url: "/" },
     { name: "Calculatoare", url: "/calculatoare" },
@@ -49,19 +56,18 @@ export default function DrinksCalculatorPage() {
       />
       <div className="mx-auto max-w-4xl px-4 py-10 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">Acasă</Link>
+          <Link href="/" className="hover:text-gold">{t("nav.home", locale)}</Link>
           <span className="mx-2">/</span>
-          <Link href="/calculatoare" className="hover:text-gold">Calculatoare</Link>
+          <Link href="/calculatoare" className="hover:text-gold">{t("tools.calculators", locale)}</Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">Băuturi</span>
+          <span className="text-foreground">{t("tools.drinksCalculator", locale)}</span>
         </nav>
         <header className="mb-8">
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            Calculator băuturi pentru eveniment
+            {t("calc.drinks.title", locale)}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
-            Află exact câte sticle de vin, vodcă, coniac, șampanie, bere și apă trebuie să cumperi
-            în funcție de tipul evenimentului, numărul de invitați și durata petrecerii.
+            {t("calc.drinks.intro", locale)}
           </p>
         </header>
         <DrinksCalculatorClient />

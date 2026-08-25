@@ -25,22 +25,19 @@ interface CalendarDay {
   endTime?: string | null;
 }
 
-const DAYS_RO = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
-const MONTHS_RO = [
-  "Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-  "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie",
-];
-
-// Derived from the canonical list so a new event type appears here on its
-// own; the previous hand-written six also spelled cumătrie differently from
-// the rest of the product.
-const EVENT_TYPES = ALL_EVENT_TYPES.map((k) => ({
-  value: k,
-  label: `${EVENT_TYPE_EMOJI[k]} ${eventTypeLabel(k)}`,
-}));
-
 export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDateSelect }: CalendarWidgetProps) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
+  // Weekday and month names live in the dictionary (calendar.days /
+  // calendar.months) so the grid reads in the visitor's language.
+  const DAYS = Array.from({ length: 7 }, (_, i) => t(`calendar.days.${i}`));
+  const MONTHS = Array.from({ length: 12 }, (_, i) => t(`calendar.months.${i}`));
+  // Derived from the canonical list so a new event type appears here on its
+  // own; the previous hand-written six also spelled cumătrie differently from
+  // the rest of the product.
+  const EVENT_TYPES = ALL_EVENT_TYPES.map((k) => ({
+    value: k,
+    label: `${EVENT_TYPE_EMOJI[k]} ${eventTypeLabel(k, locale)}`,
+  }));
   const { user, isSignedIn: _isSignedIn } = useUser();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
@@ -233,7 +230,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
 
   function formatSelectedDate(dateStr: string) {
     const d = new Date(dateStr + "T00:00:00");
-    return `${d.getDate()} ${MONTHS_RO[d.getMonth()]} ${d.getFullYear()}`;
+    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
   }
 
   async function handleBookingSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -253,7 +250,10 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
         const weEffective = weH === 0 ? 24 : weH;
         if (endH > weEffective) {
           alert(
-            `Durata depășește orele de lucru (${workingHours.start}–${workingHours.end}). Te rugăm să alegi o durată mai mică.`,
+            t("calendar.durationExceedsHours", {
+              start: workingHours.start,
+              end: workingHours.end,
+            }),
           );
           return;
         }
@@ -303,11 +303,11 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
       });
       if (entityType === "venue" && !leadRes.ok) throw new Error();
 
-      toast.success("Cererea de rezervare a fost trimisă!");
+      toast.success(t("calendar.bookingRequestSent"));
       setSubmitted(true);
       setShowForm(false);
     } catch {
-      toast.error("A apărut o eroare. Încercați din nou.");
+      toast.error(t("calendar.genericError"));
     } finally {
       setSubmitting(false);
     }
@@ -322,25 +322,25 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
       {/* Header */}
       <div className="mb-1 flex items-center gap-2 text-sm font-heading font-bold">
         <CalendarDays className="h-4 w-4 text-gold" />
-        <span>Disponibilitate</span>
+        <span>{t("calendar.availability")}</span>
       </div>
 
       {/* Month nav */}
       <div className="mb-3 flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={prev} disabled={loading} className="h-7 w-7" aria-label="Luna anterioară">
+        <Button variant="ghost" size="icon" onClick={prev} disabled={loading} className="h-7 w-7" aria-label={t("calendar.prevMonth")}>
           <ChevronLeft className="h-3.5 w-3.5" />
         </Button>
         <h3 className="text-xs font-semibold text-muted-foreground" aria-live="polite">
-          {MONTHS_RO[month]} {year}
+          {MONTHS[month]} {year}
         </h3>
-        <Button variant="ghost" size="icon" onClick={next} disabled={loading} className="h-7 w-7" aria-label="Luna următoare">
+        <Button variant="ghost" size="icon" onClick={next} disabled={loading} className="h-7 w-7" aria-label={t("calendar.nextMonth")}>
           <ChevronRight className="h-3.5 w-3.5" />
         </Button>
       </div>
 
       {/* Day names */}
       <div className="mb-1 grid grid-cols-7 text-center text-[10px] font-medium uppercase tracking-wider text-gold/50">
-        {DAYS_RO.map((d) => (
+        {DAYS.map((d) => (
           <div key={d}>{d}</div>
         ))}
       </div>
@@ -398,13 +398,13 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
       {/* Legend */}
       <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-success" /> Liber
+          <span className="h-2 w-2 rounded-full bg-success" /> {t("calendar.legendFree")}
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-warning" /> Parțial
+          <span className="h-2 w-2 rounded-full bg-warning" /> {t("calendar.legendPartial")}
         </span>
         <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-destructive" /> Ocupat
+          <span className="h-2 w-2 rounded-full bg-destructive" /> {t("calendar.legendBooked")}
         </span>
       </div>
 
@@ -416,27 +416,27 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
           </p>
           {getDayStatus(selectedDate).bookedSlots.length > 0 && (
             <p className="text-[10px] text-warning text-center mt-1">
-              Ocupat: {getDayStatus(selectedDate).bookedSlots.join(", ")}
+              {t("calendar.busyLabel")} {getDayStatus(selectedDate).bookedSlots.join(", ")}
             </p>
           )}
           {workingHours === null && (
             <p className="text-[10px] text-destructive text-center mt-1">
-              Această zi nu este zi de lucru
+              {t("calendar.dayOff")}
             </p>
           )}
           {workingHours && (
             <p className="text-[10px] text-emerald-500 text-center mt-1">
-              Program: {workingHours.start}–{workingHours.end}
+              {t("calendar.scheduleLabel")} {workingHours.start}–{workingHours.end}
             </p>
           )}
           {bookedRanges.length > 0 && !wholeDayBlocked && (
             <p className="text-[10px] text-amber-500 text-center mt-1">
-              Interval(e) indisponibil(e): {bookedRanges.map((r) => `${r.startTime}–${r.endTime}`).join(", ")}
+              {t("calendar.unavailableIntervals")} {bookedRanges.map((r) => `${r.startTime}–${r.endTime}`).join(", ")}
             </p>
           )}
           {wholeDayBlocked && (
             <p className="text-[10px] text-red-500 text-center mt-1">
-              Această zi este complet rezervată.
+              {t("calendar.fullyBooked")}
             </p>
           )}
 
@@ -448,19 +448,19 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
             >
               <CalendarDays className="mr-1.5 h-3.5 w-3.5" />
               {workingHours === null
-                ? "Zi nelucrătoare"
+                ? t("calendar.nonWorkingDay")
                 : wholeDayBlocked
-                  ? "Indisponibil"
-                  : "Rezervă această dată"}
+                  ? t("calendar.unavailable")
+                  : t("calendar.bookThisDate")}
             </Button>
           ) : (
             <form onSubmit={handleBookingSubmit} className="mt-3 space-y-3">
-              <MiniField icon={User} label="Nume" required>
+              <MiniField icon={User} label={t("calendar.field.name")} required>
                 <input name="name" required defaultValue={userName}
-                  className="form-input !h-9 !text-xs" placeholder="Numele dvs." />
+                  className="form-input !h-9 !text-xs" placeholder={t("calendar.field.namePlaceholder")} />
               </MiniField>
 
-              <MiniField icon={Phone} label="Telefon" required>
+              <MiniField icon={Phone} label={t("calendar.field.phone")} required>
                 <div className="flex gap-1.5">
                   <span className="flex h-9 w-16 items-center justify-center rounded-lg border border-border/40 bg-accent/30 text-[11px] text-muted-foreground shrink-0">
                     +373
@@ -470,15 +470,15 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
                 </div>
               </MiniField>
 
-              <MiniField icon={Mail} label="Email">
+              <MiniField icon={Mail} label={t("calendar.field.email")}>
                 <input name="email" type="email" defaultValue={userEmail}
                   className="form-input !h-9 !text-xs" placeholder="email@exemplu.md" />
               </MiniField>
 
-              <MiniField icon={Sparkles} label="Tip Eveniment">
+              <MiniField icon={Sparkles} label={t("calendar.field.eventType")}>
                 <select name="eventType"
                   className="form-input !h-9 !text-xs appearance-none cursor-pointer">
-                  <option value="">Selectează tipul</option>
+                  <option value="">{t("calendar.field.selectType")}</option>
                   {EVENT_TYPES.map(et => (
                     <option key={et.value} value={et.value}>{et.label}</option>
                   ))}
@@ -486,7 +486,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
               </MiniField>
 
               <div className="grid grid-cols-2 gap-2">
-                <MiniField icon={Clock} label="Ora de început" required>
+                <MiniField icon={Clock} label={t("calendar.field.startTime")} required>
                   <select
                     name="startTime"
                     required
@@ -499,7 +499,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
                     disabled={availableStartHours.length === 0}
                   >
                     <option value="">
-                      {availableStartHours.length === 0 ? "Indisponibil" : "Ora"}
+                      {availableStartHours.length === 0 ? t("calendar.unavailable") : t("calendar.field.hour")}
                     </option>
                     {availableStartHours
                       .filter((h) => !isHourBooked(h))
@@ -513,7 +513,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
                       ))}
                   </select>
                 </MiniField>
-                <MiniField icon={Clock} label="Durată (ore)" required>
+                <MiniField icon={Clock} label={t("calendar.field.duration")} required>
                   <select
                     name="duration"
                     required
@@ -522,11 +522,11 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
                     className="form-input !h-9 !text-xs appearance-none cursor-pointer"
                     disabled={!selectedStartTime || maxDuration === 0}
                   >
-                    <option value="">Ore</option>
+                    <option value="">{t("calendar.field.hours")}</option>
                     {Array.from({ length: maxDuration }, (_, i) => i + 1).map(
                       (h) => (
                         <option key={h} value={h}>
-                          {h} {h === 1 ? "oră" : "ore"}
+                          {h} {h === 1 ? t("calendar.hourSingular") : t("calendar.hourPlural")}
                         </option>
                       ),
                     )}
@@ -534,10 +534,10 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
                 </MiniField>
               </div>
 
-              <MiniField icon={MessageSquare} label="Mesaj">
+              <MiniField icon={MessageSquare} label={t("calendar.field.message")}>
                 <textarea name="message" rows={2}
                   className="form-input !text-xs min-h-[50px] resize-none py-2"
-                  placeholder="Detalii despre eveniment..." />
+                  placeholder={t("calendar.field.messagePlaceholder")} />
               </MiniField>
 
               <div className="flex items-start gap-2 pt-1">
@@ -554,7 +554,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
                   onClick={() => setShowForm(false)}
                   className="flex-1 h-9 text-xs rounded-lg"
                 >
-                  Anulează
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -564,7 +564,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
                   {submitting ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   ) : (
-                    <><Send className="mr-1.5 h-3.5 w-3.5" /> Trimite</>
+                    <><Send className="mr-1.5 h-3.5 w-3.5" /> {t("common.submit")}</>
                   )}
                 </Button>
               </div>
@@ -577,10 +577,10 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
       {submitted && selectedDate && (
         <div className="mt-3 rounded-lg bg-success/10 border border-success/20 p-3 text-center">
           <p className="text-xs text-success font-medium">
-            ✓ Cererea pentru {formatSelectedDate(selectedDate)} a fost trimisă!
+            {t("calendar.requestSentFor", { date: formatSelectedDate(selectedDate) })}
           </p>
           <p className="text-[10px] text-muted-foreground mt-1">
-            Veți fi contactat în curând.
+            {t("calendar.contactSoon")}
           </p>
         </div>
       )}

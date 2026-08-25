@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { Check, Copy, Share2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   /** Full URL to share. If omitted, uses window.location.href. */
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export function ShareButtons({ url, title, compact = false, className }: Props) {
+  const { t } = useLocale();
   const [currentUrl, setCurrentUrl] = useState(url || "");
   const [copied, setCopied] = useState(false);
 
@@ -106,14 +108,14 @@ export function ShareButtons({ url, title, compact = false, className }: Props) 
         <button
           type="button"
           onClick={nativeShare}
-          aria-label="Partajează"
+          aria-label={t("share.action")}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors hover:border-gold/60 hover:text-gold",
             compact && "px-2.5 py-1",
           )}
         >
           <Share2 className="h-3.5 w-3.5" />
-          {!compact && "Partajează"}
+          {!compact && t("share.action")}
         </button>
       )}
       {services.map((s) => (
@@ -122,7 +124,7 @@ export function ShareButtons({ url, title, compact = false, className }: Props) 
           href={s.href}
           target="_blank"
           rel="noopener noreferrer"
-          aria-label={`Partajează pe ${s.name}`}
+          aria-label={t("share.on", { network: s.name })}
           className={cn(
             "inline-flex items-center gap-1.5 rounded-full border border-border/60 px-3 py-1.5 text-xs font-medium transition-colors text-muted-foreground",
             s.color,
@@ -136,7 +138,7 @@ export function ShareButtons({ url, title, compact = false, className }: Props) 
       <button
         type="button"
         onClick={copyLink}
-        aria-label={copied ? "Link copiat" : "Copiază link"}
+        aria-label={copied ? t("share.copied") : t("share.copy")}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
           copied
@@ -146,7 +148,7 @@ export function ShareButtons({ url, title, compact = false, className }: Props) 
         )}
       >
         {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-        {!compact && (copied ? "Copiat!" : "Copiază link")}
+        {!compact && (copied ? t("share.copiedShort") : t("share.copy"))}
       </button>
     </div>
   );

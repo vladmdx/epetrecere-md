@@ -6,7 +6,7 @@ import { ArrowLeft, Calendar, Tag } from "lucide-react";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
-import { getLocalized } from "@/i18n";
+import { getLocalized, t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { findEditorialPost2026 } from "@/lib/blog/editorial-posts-2026";
 import { generateMeta } from "@/lib/seo/generate-meta";
@@ -68,11 +68,6 @@ export default async function BlogPostPage({ params }: Props) {
         : editorial.coverAltRo
     : title;
   const faq = editorial?.faq[locale] || [];
-  const labels = {
-    ro: { home: "Acasă", back: "Înapoi la blog", plan: "Planifică", cta: "Transformă inspirația într-un plan clar pentru evenimentul tău." },
-    ru: { home: "Главная", back: "Вернуться в блог", plan: "Планировать", cta: "Превратите вдохновение в четкий план вашего события." },
-    en: { home: "Home", back: "Back to blog", plan: "Start planning", cta: "Turn inspiration into a clear plan for your event." },
-  }[locale];
   const dateLocale = locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-RO";
   const publishedDate = post.publishedAt || post.createdAt;
   const jsonLd = articleJsonLd({
@@ -88,7 +83,7 @@ export default async function BlogPostPage({ params }: Props) {
     category: post.category || undefined,
   });
   const crumbs = breadcrumbJsonLd([
-    { name: labels.home, url: "/" },
+    { name: t("nav.home", locale), url: "/" },
     { name: "Blog", url: "/blog" },
     { name: title, url: `/blog/${slug}` },
   ]);
@@ -132,7 +127,7 @@ export default async function BlogPostPage({ params }: Props) {
             className="inline-flex items-center gap-2 text-xs text-white/52 transition hover:text-gold"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            {labels.back}
+            {t("blog.post.back", locale)}
           </Link>
           <div className="mt-10 flex flex-wrap items-center gap-3 text-[11px]">
             {post.category && (
@@ -170,7 +165,7 @@ export default async function BlogPostPage({ params }: Props) {
             />
           ) : (
             <div className="rounded-xl border border-white/8 bg-white/[.025] p-6 text-sm text-white/52">
-              Conținutul articolului nu este disponibil momentan.
+              {t("blog.post.contentUnavailable", locale)}
             </div>
           )}
         </div>
@@ -181,13 +176,13 @@ export default async function BlogPostPage({ params }: Props) {
               ePetrecere.md
             </p>
             <p className="mt-3 text-xs leading-5 text-white/48">
-              {labels.cta}
+              {t("blog.post.sidebarCta", locale)}
             </p>
             <Link
               href="/planifica"
               className="mt-4 inline-flex w-full items-center justify-center rounded-lg bg-gold px-3 py-2.5 text-xs font-semibold text-[#0b0d12] hover:bg-gold-dark"
             >
-              {labels.plan}
+              {t("blog.post.planCta", locale)}
             </Link>
           </div>
         </aside>

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "@/components/shared/locale-link";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 
 export async function generateMetadata({
   params,
@@ -35,81 +36,64 @@ export async function generateMetadata({
   });
 }
 
-export default function TermsPage() {
+export default async function TermsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: rawLocale } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 lg:px-8">
       <nav className="mb-4 text-xs text-muted-foreground">
-        <Link href="/" className="hover:text-gold">Acasă</Link>
+        <Link href="/" className="hover:text-gold">{t("nav.home", locale)}</Link>
         <span className="mx-2">/</span>
-        <span className="text-foreground">Termeni</span>
+        <span className="text-foreground">{t("terms.breadcrumb", locale)}</span>
       </nav>
 
       <h1 className="font-heading text-3xl font-bold md:text-4xl">
-        Termeni și Condiții
+        {t("terms.title", locale)}
       </h1>
-      <p className="mt-2 text-sm text-muted-foreground">Ultima actualizare: 1 ianuarie 2026</p>
+      <p className="mt-2 text-sm text-muted-foreground">{t("terms.updated", locale)}</p>
 
       <div className="mt-8 space-y-6 text-sm leading-relaxed text-muted-foreground">
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">1. Despre serviciu</h2>
-          <p className="mt-2">
-            ePetrecere.md este un marketplace care pune în legătură clienții
-            care planifică evenimente cu furnizorii de servicii (artiști,
-            săli, fotografi, etc.) din Moldova. Nu suntem parte la contractele
-            dintre clienți și furnizori.
-          </p>
+          <h2 className="font-heading text-xl font-semibold text-foreground">{t("terms.s1.title", locale)}</h2>
+          <p className="mt-2">{t("terms.s1.body", locale)}</p>
         </section>
 
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">2. Cont și eligibilitate</h2>
-          <p className="mt-2">
-            Trebuie să ai cel puțin 18 ani pentru a crea un cont. Ești
-            responsabil pentru păstrarea credențialelor în siguranță.
-          </p>
+          <h2 className="font-heading text-xl font-semibold text-foreground">{t("terms.s2.title", locale)}</h2>
+          <p className="mt-2">{t("terms.s2.body", locale)}</p>
         </section>
 
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">3. Conduita utilizatorilor</h2>
-          <p className="mt-2">
-            Este interzis să postezi conținut ilegal, înșelător, jignitor
-            sau să folosești platforma pentru spam. Recenziile false sunt
-            interzise și vor fi șterse.
-          </p>
+          <h2 className="font-heading text-xl font-semibold text-foreground">{t("terms.s3.title", locale)}</h2>
+          <p className="mt-2">{t("terms.s3.body", locale)}</p>
         </section>
 
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">4. Responsabilități</h2>
-          <p className="mt-2">
-            Nu garantăm disponibilitatea, calitatea sau legalitatea
-            serviciilor furnizorilor listați. Încurajăm clienții să verifice
-            fiecare furnizor independent și să semneze un contract scris.
-          </p>
+          <h2 className="font-heading text-xl font-semibold text-foreground">{t("terms.s4.title", locale)}</h2>
+          <p className="mt-2">{t("terms.s4.body", locale)}</p>
         </section>
 
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">5. Proprietate intelectuală</h2>
-          <p className="mt-2">
-            Brand-ul ePetrecere, logoul și designul sunt protejate. Conținutul
-            generat de utilizatori rămâne al autorilor, dar ne acordați o
-            licență non-exclusivă pentru afișare pe platformă.
-          </p>
+          <h2 className="font-heading text-xl font-semibold text-foreground">{t("terms.s5.title", locale)}</h2>
+          <p className="mt-2">{t("terms.s5.body", locale)}</p>
         </section>
 
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">6. Modificări</h2>
-          <p className="mt-2">
-            Putem actualiza acești termeni. Versiunea curentă este mereu
-            accesibilă la /termeni. Continuarea utilizării înseamnă acceptare.
-          </p>
+          <h2 className="font-heading text-xl font-semibold text-foreground">{t("terms.s6.title", locale)}</h2>
+          <p className="mt-2">{t("terms.s6.body", locale)}</p>
         </section>
 
+
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">7. Operatorul platformei</h2>
+          <h2 className="font-heading text-xl font-semibold text-foreground">{t("terms.s7.title", locale)}</h2>
           <p className="mt-2">
-            Operatorul platformei este Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.), IDNO 1026023123354, cu sediul în MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova.{" "}
-            Documentele contractuale complete — Termenii Generali, acordurile
-            cu partenerii și cu locațiile, politicile de confidențialitate,
-            cookie, recenzii și anti-fraudă — sunt publicate la{" "}
+            {t("terms.s7.body", locale)}{" "}
+            {t("terms.s7.docs", locale)}{" "}
             <a href="/legal" className="text-gold underline">
               /legal
             </a>
@@ -118,9 +102,9 @@ export default function TermsPage() {
         </section>
 
         <section>
-          <h2 className="font-heading text-xl font-semibold text-foreground">8. Contact</h2>
+          <h2 className="font-heading text-xl font-semibold text-foreground">{t("terms.s8.title", locale)}</h2>
           <p className="mt-2">
-            Întrebări?{" "}
+            {t("terms.questions", locale)}{" "}
             <a href="mailto:legal@epetrecere.md" className="text-gold underline">
               legal@epetrecere.md
             </a>
@@ -129,11 +113,10 @@ export default function TermsPage() {
       </div>
     
       <div className="mt-8 rounded-xl border border-gold/30 bg-gold/5 p-4 text-sm">
-        <p className="font-semibold">Pachetul legal complet</p>
+        <p className="font-semibold">{t("legal.packet.title", locale)}</p>
         <p className="mt-1 text-muted-foreground">
-          Acordurile pentru parteneri și locații, regulile marketplace, tarifele și
-          politicile de recenzii, anti-fraudă și calitate sunt disponibile în română și
-          rusă la <Link href="/legal" className="text-gold hover:underline">Documente legale</Link>.
+          {t("legal.packet.body", locale)}{" "}
+          <Link href="/legal" className="text-gold hover:underline">{t("legal.docsTitle", locale)}</Link>.
         </p>
       </div>
     </div>

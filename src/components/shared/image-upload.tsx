@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Upload, X, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
+import { useLocale } from "@/hooks/use-locale";
 
 interface UploadedImage {
   id: string;
@@ -21,12 +22,13 @@ interface ImageUploadProps {
 }
 
 export function ImageUpload({ images, onChange, maxFiles = 20, folder: _folder = "artists" }: ImageUploadProps) {
+  const { t } = useLocale();
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleFiles(files: FileList) {
     if (images.length + files.length > maxFiles) {
-      toast.error(`Maximum ${maxFiles} imagini`);
+      toast.error(t("upload.maxFiles", { max: maxFiles }));
       return;
     }
 
@@ -36,7 +38,7 @@ export function ImageUpload({ images, onChange, maxFiles = 20, folder: _folder =
     for (const file of Array.from(files)) {
       if (!file.type.startsWith("image/")) continue;
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name} depășește 10MB`);
+        toast.error(t("upload.tooLarge", { name: file.name }));
         continue;
       }
 
@@ -55,7 +57,7 @@ export function ImageUpload({ images, onChange, maxFiles = 20, folder: _folder =
     setUploading(false);
 
     if (newImages.length) {
-      toast.success(`${newImages.length} imagini adăugate`);
+      toast.success(t("upload.added", { count: newImages.length }));
     }
   }
 
@@ -87,8 +89,12 @@ export function ImageUpload({ images, onChange, maxFiles = 20, folder: _folder =
       >
         <Upload className={cn("h-8 w-8", uploading ? "animate-pulse text-gold" : "text-muted-foreground")} />
         <div className="text-center">
-          <p className="text-sm font-medium">{uploading ? "Se uploadează..." : "Trage imaginile aici"}</p>
-          <p className="text-xs text-muted-foreground">sau click pentru a selecta (max 10MB/img, {maxFiles} total)</p>
+          <p className="text-sm font-medium">
+            {uploading ? t("upload.uploading") : t("upload.dragHere")}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {t("upload.hint", { max: maxFiles })}
+          </p>
         </div>
         <input
           ref={inputRef}
@@ -122,20 +128,20 @@ export function ImageUpload({ images, onChange, maxFiles = 20, folder: _folder =
                 <Button
                   size="icon"
                   variant="ghost"
-                  aria-label="Setează ca imagine principală"
+                  aria-label={t("upload.setCoverAria")}
                   className="h-8 w-8 text-white hover:bg-white/20"
                   onClick={() => setCover(img.id)}
-                  title="Setează ca cover"
+                  title={t("upload.setCoverTitle")}
                 >
                   <Star className={cn("h-4 w-4", img.isCover && "fill-gold text-gold")} />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
-                  aria-label="Șterge imaginea"
+                  aria-label={t("upload.deleteAria")}
                   className="h-8 w-8 text-white hover:bg-destructive/50"
                   onClick={() => removeImage(img.id)}
-                  title="Șterge"
+                  title={t("common.delete")}
                 >
                   <X className="h-4 w-4" />
                 </Button>

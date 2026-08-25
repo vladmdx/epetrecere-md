@@ -97,14 +97,14 @@ export function BookingArtistCard({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Eroare la trimitere");
+        throw new Error(err.error || t("booking.card.sendError"));
       }
-      toast.success(`Cerere trimisă către ${name}!`);
+      toast.success(t("booking.card.sentTo", { name }));
       setOpen(false);
       setMessage("");
       onBookingSent?.(artist.id);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Eroare la trimitere");
+      toast.error(err instanceof Error ? err.message : t("booking.card.sendError"));
     } finally {
       setSubmitting(false);
     }
@@ -112,10 +112,10 @@ export function BookingArtistCard({
 
   const disabled = alreadyBooked || categoryLimitReached;
   const buttonLabel = alreadyBooked
-    ? "Cerere trimisă"
+    ? t("booking.card.requestSent")
     : categoryLimitReached
-      ? "Limită atinsă (5)"
-      : "Solicită rezervare";
+      ? t("booking.card.limitReached")
+      : t("booking.card.requestBooking");
 
   const modal = open && mounted
     ? createPortal(
@@ -130,14 +130,14 @@ export function BookingArtistCard({
             <header className="flex items-center justify-between border-b border-border/40 px-5 py-4">
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Solicită rezervare
+                  {t("booking.card.requestBooking")}
                 </p>
                 <p className="font-heading text-lg font-bold">{name}</p>
               </div>
               <button
                 onClick={() => !submitting && setOpen(false)}
                 className="rounded-full p-1.5 text-muted-foreground hover:bg-accent"
-                aria-label="Închide"
+                aria-label={t("common.close")}
                 disabled={submitting}
               >
                 <X className="h-5 w-5" />
@@ -147,27 +147,27 @@ export function BookingArtistCard({
             <div className="space-y-4 px-5 py-4">
               {/* Event context (read-only) */}
               <div className="space-y-1 rounded-lg border border-border/40 bg-muted/30 p-3 text-sm">
-                <p className="text-xs font-semibold text-muted-foreground">Detalii eveniment</p>
-                <p><span className="text-muted-foreground">Data:</span> {new Date(eventContext.eventDate + "T00:00:00").toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" })}</p>
+                <p className="text-xs font-semibold text-muted-foreground">{t("booking.card.eventDetails")}</p>
+                <p><span className="text-muted-foreground">{t("booking.card.dateLabel")}</span> {new Date(eventContext.eventDate + "T00:00:00").toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" })}</p>
                 {eventContext.eventType && (
-                  <p><span className="text-muted-foreground">Tip:</span> {eventContext.eventType}</p>
+                  <p><span className="text-muted-foreground">{t("booking.card.typeLabel")}</span> {eventContext.eventType}</p>
                 )}
                 {eventContext.guestCount ? (
-                  <p><span className="text-muted-foreground">Invitați:</span> {eventContext.guestCount}</p>
+                  <p><span className="text-muted-foreground">{t("booking.card.guestsLabel")}</span> {eventContext.guestCount}</p>
                 ) : null}
-                <p><span className="text-muted-foreground">Nume:</span> {eventContext.clientName}</p>
-                <p><span className="text-muted-foreground">Telefon:</span> {eventContext.clientPhone}</p>
+                <p><span className="text-muted-foreground">{t("booking.card.nameLabel")}</span> {eventContext.clientName}</p>
+                <p><span className="text-muted-foreground">{t("booking.card.phoneLabel")}</span> {eventContext.clientPhone}</p>
               </div>
 
               {/* Optional message */}
               <div>
-                <Label htmlFor={`msg-${artist.id}`}>Mesaj (opțional)</Label>
+                <Label htmlFor={`msg-${artist.id}`}>{t("booking.card.messageOptional")}</Label>
                 <Textarea
                   id={`msg-${artist.id}`}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   rows={3}
-                  placeholder="Alte detalii despre eveniment..."
+                  placeholder={t("booking.card.messagePlaceholder")}
                   className="mt-1"
                   disabled={submitting}
                 />
@@ -180,7 +180,7 @@ export function BookingArtistCard({
                 target="_blank"
                 className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
               >
-                Vezi profil <ExternalLink className="h-3 w-3" />
+                {t("booking.card.viewProfile")} <ExternalLink className="h-3 w-3" />
               </Link>
               <div className="flex gap-2">
                 <Button
@@ -189,7 +189,7 @@ export function BookingArtistCard({
                   onClick={() => setOpen(false)}
                   disabled={submitting}
                 >
-                  Anulează
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   size="sm"
@@ -202,7 +202,7 @@ export function BookingArtistCard({
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                  Trimite cerere
+                  {t("booking.card.sendRequest")}
                 </Button>
               </div>
             </footer>
@@ -233,12 +233,12 @@ export function BookingArtistCard({
           <div className="absolute left-2 top-2 flex gap-1">
             {artist.isVerified && (
               <Badge className="bg-gold/90 text-[#0D0D0D] text-xs gap-1">
-                <BadgeCheck className="h-3 w-3" /> Verificat
+                <BadgeCheck className="h-3 w-3" /> {t("common.verified")}
               </Badge>
             )}
             {artist.isPremium && (
               <Badge className="bg-amber-600/90 text-white text-xs gap-1">
-                <Crown className="h-3 w-3" /> Premium
+                <Crown className="h-3 w-3" /> {t("common.premium")}
               </Badge>
             )}
           </div>
@@ -268,7 +268,7 @@ export function BookingArtistCard({
                 </p>
               ) : (
                 <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">
-                  <Lock className="h-3 w-3" /> Preț la autentificare
+                  <Lock className="h-3 w-3" /> {t("common.priceOnLogin")}
                 </span>
               )
             ) : null}

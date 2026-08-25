@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/hooks/use-locale";
 
 interface GalleryImage {
   url: string;
@@ -15,6 +16,7 @@ interface ImageGalleryProps {
 }
 
 export function ImageGallery({ images }: ImageGalleryProps) {
+  const { t } = useLocale();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Keyboard navigation for lightbox
@@ -50,12 +52,12 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             key={i}
             onClick={() => setLightboxIndex(i)}
             className="group relative aspect-[4/3] overflow-hidden rounded-lg bg-muted"
-            aria-label={img.alt || `Deschide imaginea ${i + 1}`}
+            aria-label={img.alt || t("gallery.openImage", { index: i + 1 })}
           >
             {img.url ? (
               <Image
                 src={img.url}
-                alt={img.alt || `Imagine ${i + 1}`}
+                alt={img.alt || t("gallery.image", { index: i + 1 })}
                 fill
                 sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                 className="object-cover transition-transform group-hover:scale-105"
@@ -75,14 +77,14 @@ export function ImageGallery({ images }: ImageGalleryProps) {
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90"
           role="dialog"
-          aria-label="Galerie imagini"
+          aria-label={t("gallery.ariaLabel")}
           aria-modal="true"
           onClick={(e) => { if (e.target === e.currentTarget) setLightboxIndex(null); }}
         >
           <Button
             variant="ghost"
             size="icon"
-            aria-label="Închide galeria"
+            aria-label={t("gallery.close")}
             onClick={() => setLightboxIndex(null)}
             className="absolute right-4 top-4 text-white hover:bg-white/10"
           >
@@ -93,7 +95,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Imagine precedentă"
+              aria-label={t("gallery.prevImage")}
               onClick={() => setLightboxIndex(lightboxIndex - 1)}
               className="absolute left-4 text-white hover:bg-white/10"
             >
@@ -109,7 +111,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             )}
             <div className="absolute bottom-8 flex flex-col items-center gap-1 text-white">
               <p className="text-sm opacity-70">
-                {images[lightboxIndex]?.alt || `Imagine ${lightboxIndex + 1}`}
+                {images[lightboxIndex]?.alt || t("gallery.image", { index: lightboxIndex + 1 })}
               </p>
               <p className="text-xs opacity-50">
                 {lightboxIndex + 1} / {images.length}
@@ -121,7 +123,7 @@ export function ImageGallery({ images }: ImageGalleryProps) {
             <Button
               variant="ghost"
               size="icon"
-              aria-label="Imagine următoare"
+              aria-label={t("gallery.nextImage")}
               onClick={() => setLightboxIndex(lightboxIndex + 1)}
               className="absolute right-4 text-white hover:bg-white/10"
             >

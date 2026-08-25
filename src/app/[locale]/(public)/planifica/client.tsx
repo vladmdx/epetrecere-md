@@ -151,13 +151,13 @@ const initialData: WizardData = {
 // revealed after login on the results page.
 // Budget step removed — budget is no longer part of event planning.
 const STEPS = [
-  { key: "event_type", label: "Tip eveniment", icon: PartyPopper },
-  { key: "date", label: "Data & Locația", icon: Calendar },
-  { key: "guests", label: "Invitați", icon: Users },
-  { key: "venue", label: "Sală", icon: Building2 },
-  { key: "services", label: "Servicii", icon: Wrench },
-  { key: "extras", label: "Preferințe", icon: ClipboardList },
-  { key: "summary", label: "Confirmare", icon: ClipboardCheck },
+  { key: "event_type", labelKey: "wizard.steps.eventType", icon: PartyPopper },
+  { key: "date", labelKey: "wizard.steps.date", icon: Calendar },
+  { key: "guests", labelKey: "wizard.step_guests", icon: Users },
+  { key: "venue", labelKey: "wizard.step_venue", icon: Building2 },
+  { key: "services", labelKey: "wizard.step_services", icon: Wrench },
+  { key: "extras", labelKey: "wizard.steps.extras", icon: ClipboardList },
+  { key: "summary", labelKey: "wizard.steps.confirm", icon: ClipboardCheck },
 ];
 
 const TOTAL_STEPS = STEPS.length; // 7
@@ -389,7 +389,7 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
     // The summary step only asks for the event title now — phone, email
     // and GDPR consent come from the user's account (collected at signup).
     if (!data.name.trim()) {
-      toast.error("Introduceți numele evenimentului (ex: Nunta Ana & Ion).");
+      toast.error(t("wizard.toastNameRequired"));
       return;
     }
 
@@ -473,7 +473,7 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
       toast.success(t("form.submit_success"));
       router.push("/planifica/rezultate");
     } catch {
-      toast.error("A apărut o eroare. Încercați din nou.");
+      toast.error(t("wizard.toastError"));
     } finally {
       setSubmitting(false);
     }
@@ -504,7 +504,7 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
                     {i + 1}
                   </span>
                   <span className="absolute -bottom-11 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-normal text-white/58">
-                    {s.label}
+                    {t(s.labelKey)}
                   </span>
                 </button>
                 {i < STEPS.length - 1 && (
@@ -584,11 +584,11 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : adminMode || isSignedIn ? (
                 <>
-                  <Send className="h-4 w-4" /> Vezi rezultatele
+                  <Send className="h-4 w-4" /> {t("wizard.seeResults")}
                 </>
               ) : (
                 <>
-                  <LogIn className="h-4 w-4" /> Autentifică-te pentru rezultate
+                  <LogIn className="h-4 w-4" /> {t("wizard.signInForResults")}
                 </>
               )}
             </Button>
@@ -620,11 +620,12 @@ function WizardStepHeading({
   accent?: string;
   description: string;
 }) {
+  const { t } = useLocale();
   return (
     <div className="mb-7 text-center">
       <div className="mb-4 flex items-center justify-center gap-4 text-xs font-semibold text-[#e6b84d]">
         <span className="h-px w-12 bg-gradient-to-r from-transparent to-[#e6b84d]/45" />
-        Pasul {step} din {TOTAL_STEPS}
+        {t("wizard.stepOf", { step, total: TOTAL_STEPS })}
         <span className="h-px w-12 bg-gradient-to-l from-transparent to-[#e6b84d]/45" />
       </div>
       <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl lg:text-5xl">
@@ -663,9 +664,9 @@ function StepEventType({ data, update, autoNext }: StepProps) {
     <div>
       <WizardStepHeading
         step={1}
-        title="Alege tipul"
-        accent="evenimentului tău"
-        description="Selectează categoria care descrie cel mai bine evenimentul pe care vrei să îl planifici."
+        title={t("wizard.eventType.title")}
+        accent={t("wizard.eventType.accent")}
+        description={t("wizard.eventType.desc")}
       />
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-12">
         {eventTypes.map((et, index) => {
@@ -762,9 +763,9 @@ function StepDate({ data, update }: StepProps) {
     <div>
       <WizardStepHeading
         step={2}
-        title="Alege"
-        accent="data și locația evenimentului"
-        description="Spune-ne când și unde va avea loc evenimentul pentru a-ți recomanda opțiuni potrivite."
+        title={t("wizard.date.title")}
+        accent={t("wizard.date.accent")}
+        description={t("wizard.date.desc")}
       />
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
@@ -798,12 +799,12 @@ function StepDate({ data, update }: StepProps) {
                 ))}
               </select>
               <p className="mt-1 text-[10px] text-white/42">
-                Chișinău + Top 5 orașe sunt primele, restul în ordine alfabetică.
+                {t("wizard.date.cityHint")}
               </p>
             </div>
 
             <div>
-              <Label className="text-white/82">Ora începerii *</Label>
+              <Label className="text-white/82">{t("wizard.date.startTime")} *</Label>
               <div className="mt-2 [&_button]:border-[#e6b84d]/28 [&_button]:bg-[#0b1019]">
                 <TimePicker
                   value={data.startTime}
@@ -813,7 +814,7 @@ function StepDate({ data, update }: StepProps) {
             </div>
 
             <div>
-              <Label className="text-white/82">Durata (ore) *</Label>
+              <Label className="text-white/82">{t("wizard.date.duration")} *</Label>
               <Input
                 type="number"
                 min={1}
@@ -847,7 +848,7 @@ function StepDate({ data, update }: StepProps) {
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e6b84d]/12 text-[#e6b84d]">
                 <Calendar className="h-4 w-4" />
               </span>
-              <span className="text-white/58">Interval eveniment:</span>
+              <span className="text-white/58">{t("wizard.date.interval")}</span>
               <span className="font-semibold text-[#e6b84d]">
                 {data.startTime} – {endTime}
               </span>
@@ -861,7 +862,9 @@ function StepDate({ data, update }: StepProps) {
             <Calendar className="h-7 w-7" />
           </div>
           <p className="mt-5 font-heading text-xl leading-tight text-white/82">
-            Poți modifica <span className="block text-[#e6b84d]">data și locația</span> mai târziu, în orice pas.
+            {t("wizard.date.asideBefore")}{" "}
+            <span className="block text-[#e6b84d]">{t("wizard.date.asideAccent")}</span>{" "}
+            {t("wizard.date.asideAfter")}
           </p>
         </aside>
       </div>
@@ -879,7 +882,7 @@ function StepGuests({ data, update, autoNext }: StepProps) {
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_guests")}</h2>
-      <p className="mb-8 text-muted-foreground">Câți invitați aștepți?</p>
+      <p className="mb-8 text-muted-foreground">{t("wizard.guests.question")}</p>
       <div className="space-y-6">
         <div className="flex flex-wrap gap-2">
           {guestPresets.map((n) => (
@@ -901,7 +904,7 @@ function StepGuests({ data, update, autoNext }: StepProps) {
           ))}
         </div>
         <div>
-          <Label>Sau introdu numărul exact:</Label>
+          <Label>{t("wizard.guests.exact")}</Label>
           <Input
             type="number"
             min={10}
@@ -919,12 +922,12 @@ function StepGuests({ data, update, autoNext }: StepProps) {
 // Venue question — simple yes/no. If "yes" the results page will show
 // available venues filtered by guestCount + city + date. If "no" we skip
 // venue listings on results and focus on artists.
-const VENUE_RADIUS_PRESETS: Array<{ value: number; label: string; sub?: string }> = [
-  { value: 0, label: "Doar în oraș", sub: "Venue-uri din orașul evenimentului" },
-  { value: 25, label: "Până la 25 km", sub: "Oraș + suburbiile apropiate" },
-  { value: 50, label: "Până la 50 km", sub: "Județul extins" },
-  { value: 100, label: "Până la 100 km", sub: "Destinație apropiată" },
-  { value: 999, label: "Toată Moldova", sub: "Fără limită de distanță" },
+const VENUE_RADIUS_PRESETS: Array<{ value: number; labelKey: string; subKey?: string }> = [
+  { value: 0, labelKey: "wizard.venue.radius0", subKey: "wizard.venue.radius0Sub" },
+  { value: 25, labelKey: "wizard.venue.radius25", subKey: "wizard.venue.radius25Sub" },
+  { value: 50, labelKey: "wizard.venue.radius50", subKey: "wizard.venue.radius50Sub" },
+  { value: 100, labelKey: "wizard.venue.radius100", subKey: "wizard.venue.radius100Sub" },
+  { value: 999, labelKey: "wizard.venue.radiusAll", subKey: "wizard.venue.radiusAllSub" },
 ];
 
 function StepVenue({ data, update }: StepProps) {
@@ -950,7 +953,7 @@ function StepVenue({ data, update }: StepProps) {
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_venue")}</h2>
-      <p className="mb-8 text-muted-foreground">Ai nevoie de o sală sau restaurant?</p>
+      <p className="mb-8 text-muted-foreground">{t("wizard.venue.question")}</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <button
           onClick={pickYes}
@@ -962,8 +965,8 @@ function StepVenue({ data, update }: StepProps) {
           )}
         >
           <Building2 className={cn("h-10 w-10", data.venueNeeded === "yes" ? "text-gold" : "text-muted-foreground")} />
-          <span className="text-sm font-medium">Da, am nevoie de sală</span>
-          <span className="text-xs text-muted-foreground">Vom afișa sălile disponibile pentru data ta</span>
+          <span className="text-sm font-medium">{t("wizard.venue.yes")}</span>
+          <span className="text-xs text-muted-foreground">{t("wizard.venue.yesDesc")}</span>
         </button>
         <button
           onClick={() => update({ venueNeeded: "no" })}
@@ -975,8 +978,8 @@ function StepVenue({ data, update }: StepProps) {
           )}
         >
           <Sparkles className={cn("h-10 w-10", data.venueNeeded === "no" ? "text-gold" : "text-muted-foreground")} />
-          <span className="text-sm font-medium">Nu, am deja o locație</span>
-          <span className="text-xs text-muted-foreground">Am sala rezervată sau eveniment outdoor</span>
+          <span className="text-sm font-medium">{t("wizard.venue.no")}</span>
+          <span className="text-xs text-muted-foreground">{t("wizard.venue.noDesc")}</span>
         </button>
       </div>
 
@@ -986,16 +989,15 @@ function StepVenue({ data, update }: StepProps) {
           fine — partners can always ask via chat. */}
       {data.venueNeeded === "no" && (
         <div className="mt-8 space-y-2">
-          <Label>Ai deja sala rezervată? (opțional)</Label>
+          <Label>{t("wizard.venue.existingLabel")}</Label>
           <Input
             value={data.existingVenue}
             onChange={(e) => update({ existingVenue: e.target.value })}
-            placeholder="Ex: Restaurant Pegas, Strada Albișoara 20/1"
+            placeholder={t("wizard.venue.existingPlaceholder")}
             maxLength={200}
           />
           <p className="text-xs text-muted-foreground">
-            Această info va fi vizibilă pentru artiștii pe care îi
-            inviți, ca să știe locația și să poată planifica deplasarea.
+            {t("wizard.venue.existingHint")}
           </p>
         </div>
       )}
@@ -1006,10 +1008,11 @@ function StepVenue({ data, update }: StepProps) {
           the UI honest (we don't have lat/lng on venue rows). */}
       {data.venueNeeded === "yes" && (
         <div className="mt-8 scroll-mt-20" ref={radiusSectionRef}>
-          <Label>Rază de căutare *</Label>
+          <Label>{t("wizard.venue.radiusLabel")} *</Label>
           <p className="mb-3 text-xs text-muted-foreground">
-            Cât de departe de {data.location || "orașul ales"} ești dispus să
-            mergi pentru sală? Sălile nu influențează bugetul artiștilor.
+            {t("wizard.venue.radiusHint", {
+              city: data.location || t("wizard.venue.radiusFallbackCity"),
+            })}
           </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {VENUE_RADIUS_PRESETS.map((opt) => (
@@ -1024,9 +1027,9 @@ function StepVenue({ data, update }: StepProps) {
                     : "border-border/40 hover:border-gold/30",
                 )}
               >
-                <p className="text-sm font-medium">{opt.label}</p>
-                {opt.sub && (
-                  <p className="text-[11px] text-muted-foreground">{opt.sub}</p>
+                <p className="text-sm font-medium">{t(opt.labelKey)}</p>
+                {opt.subKey && (
+                  <p className="text-[11px] text-muted-foreground">{t(opt.subKey)}</p>
                 )}
               </button>
             ))}
@@ -1049,7 +1052,7 @@ function StepVenue({ data, update }: StepProps) {
 //   2. Use the slug as the wizard service id (no aliasing layer needed)
 //   3. Filter by event type via CATEGORY_META.allowedEventTypes
 function StepServices({ data, update, allCategories }: StepProps & { allCategories: CategoryRow[] }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const [categories, setCategories] = useState<CategoryRow[]>(() =>
     allCategories.filter((c) => c.type === "artist" || c.type === "service"),
   );
@@ -1102,9 +1105,9 @@ function StepServices({ data, update, allCategories }: StepProps & { allCategori
     <div>
       <WizardStepHeading
         step={5}
-        title="Alege"
-        accent="serviciile dorite"
-        description="Selectează una sau mai multe categorii de servicii care ți se potrivesc. Mai târziu îți vom afișa doar opțiunile relevante pentru evenimentul tău."
+        title={t("wizard.services.title")}
+        accent={t("wizard.services.accent")}
+        description={t("wizard.services.desc")}
       />
 
       <div className="mb-5 ml-auto flex max-w-sm items-center gap-3 rounded-xl border border-[#e6b84d]/25 bg-[#0a101b]/68 px-4 py-3">
@@ -1112,9 +1115,9 @@ function StepServices({ data, update, allCategories }: StepProps & { allCategori
           <ServiceIcon slug="sparkles" className="h-5 w-5" />
         </span>
         <div>
-          <p className="text-xs font-semibold text-[#e8be56]">Poți selecta mai multe servicii</p>
+          <p className="text-xs font-semibold text-[#e8be56]">{t("wizard.services.multiHint")}</p>
           <p className="mt-0.5 text-[10px] leading-relaxed text-white/50">
-            Vei primi recomandări personalizate pe baza alegerilor tale.
+            {t("wizard.services.multiHintSub")}
           </p>
         </div>
       </div>
@@ -1132,7 +1135,7 @@ function StepServices({ data, update, allCategories }: StepProps & { allCategori
         </div>
       ) : visible.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">
-          Nu sunt categorii potrivite pentru acest tip de eveniment.
+          {t("wizard.services.none")}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
@@ -1182,6 +1185,7 @@ function ExtraToggle({
   on: boolean;
   onChange: (v: boolean) => void;
 }) {
+  const { t } = useLocale();
   return (
     <div className="flex items-center gap-1.5">
       <button
@@ -1194,7 +1198,7 @@ function ExtraToggle({
             : "bg-muted/40 text-muted-foreground hover:bg-muted",
         )}
       >
-        <Check className="mr-1 inline h-3.5 w-3.5" /> Da
+        <Check className="mr-1 inline h-3.5 w-3.5" /> {t("common.yes")}
       </button>
       <button
         type="button"
@@ -1206,13 +1210,14 @@ function ExtraToggle({
             : "bg-muted/40 text-muted-foreground hover:bg-muted",
         )}
       >
-        Nu
+        {t("common.no")}
       </button>
     </div>
   );
 }
 
 function StepExtras({ data, update }: StepProps) {
+  const { t } = useLocale();
   const options: Array<{
     key: "checklistEnabled" | "guestsEnabled" | "momentsEnabled";
     icon: typeof ClipboardList;
@@ -1222,31 +1227,30 @@ function StepExtras({ data, update }: StepProps) {
     {
       key: "checklistEnabled",
       icon: ClipboardList,
-      title: "Checklist",
-      desc: "Lista pașilor de pregătire (rezervare sală, invitații, costum, tort etc.) pre-populată după tipul evenimentului.",
+      title: t("wizard.extras.checklistTitle"),
+      desc: t("wizard.extras.checklistDesc"),
     },
     {
       key: "guestsEnabled",
       icon: Users,
-      title: "Listă invitați",
-      desc: "Importă, RSVP, alocare la mese — toate datele invitaților într-un singur loc.",
+      title: t("wizard.extras.guestsTitle"),
+      desc: t("wizard.extras.guestsDesc"),
     },
     {
       key: "momentsEnabled",
       icon: Camera,
-      title: "Photo Moments — galerie cu QR",
-      desc: "Invitații scanează un QR și încarcă instant poze. Vezi-le live pe proiector. Fără cont, fără aplicație. Le poți activa și separat din Utilități.",
+      title: t("wizard.extras.momentsTitle"),
+      desc: t("wizard.extras.momentsDesc"),
     },
   ];
 
   return (
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">
-        Funcții suplimentare pentru evenimentul tău
+        {t("wizard.extras.title")}
       </h2>
       <p className="mb-8 text-muted-foreground">
-        Alege ce vrei să folosești în panoul evenimentului. Poți activa
-        oricare dintre ele mai târziu, din setările evenimentului.
+        {t("wizard.extras.desc")}
       </p>
 
       <div className="space-y-3">
@@ -1311,10 +1315,9 @@ function StepExtras({ data, update }: StepProps) {
               <UtensilsCrossed className="h-5 w-5" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-heading font-bold">Așezare mese</p>
+              <p className="font-heading font-bold">{t("wizard.extras.seatingTitle")}</p>
               <p className="text-xs text-muted-foreground">
-                Așază invitații la mese — drag & drop, vizualizare grafică.
-                Disponibil doar când ai listă de invitați.
+                {t("wizard.extras.seatingDesc")}
               </p>
             </div>
             <ExtraToggle
@@ -1346,20 +1349,20 @@ function StepSummary({ data, update, isSignedIn, allCategories }: SummaryProps &
     <div>
       <h2 className="mb-2 font-heading text-2xl font-bold">{t("wizard.step_summary")}</h2>
       <p className="mb-8 text-muted-foreground">
-        Verifică detaliile evenimentului tău.
+        {t("wizard.summary.desc")}
       </p>
 
       {/* Summary */}
       <div className="mb-8 space-y-3 rounded-xl border border-border/40 bg-card p-6">
-        <SummaryRow label="Tip eveniment" value={t(`event_types.${data.eventType}`)} />
-        <SummaryRow label="Data" value={data.eventDate} />
-        <SummaryRow label="Locație" value={data.location} />
+        <SummaryRow label={t("wizard.steps.eventType")} value={t(`event_types.${data.eventType}`)} />
+        <SummaryRow label={t("wizard.summary.date")} value={data.eventDate} />
+        <SummaryRow label={t("wizard.summary.location")} value={data.location} />
         {/* The exact interval the user picked. This row used to print
             data.timeSlot, a three-bucket approximation of the start hour,
             so a 14:00–00:00 event came back as "după-amiază". */}
         {data.startTime && (
           <SummaryRow
-            label="Interval"
+            label={t("wizard.summary.interval")}
             value={
               computeEndTime(data.startTime, data.durationHours)
                 ? `${data.startTime} – ${computeEndTime(data.startTime, data.durationHours)} (${data.durationHours}h)`
@@ -1367,29 +1370,36 @@ function StepSummary({ data, update, isSignedIn, allCategories }: SummaryProps &
             }
           />
         )}
-        <SummaryRow label="Invitați" value={String(data.guestCount)} />
+        <SummaryRow label={t("wizard.step_guests")} value={String(data.guestCount)} />
         {data.venueNeeded && (
           <SummaryRow
-            label="Sală"
-            value={data.venueNeeded === "yes" ? "Am nevoie de sală" : "Am deja locație"}
+            label={t("wizard.step_venue")}
+            value={
+              data.venueNeeded === "yes"
+                ? t("wizard.summary.venueYes")
+                : t("wizard.summary.venueNo")
+            }
           />
         )}
         {/* The radius was asked for on step 3 and then never shown again. */}
         {data.venueNeeded === "yes" && data.venueRadiusKm != null && (
           <SummaryRow
-            label="Rază de căutare"
+            label={t("wizard.venue.radiusLabel")}
             value={
               data.venueRadiusKm === 0
-                ? `${data.location} (doar în oraș)`
+                ? t("wizard.summary.radiusCityOnly", { city: data.location })
                 : data.venueRadiusKm >= 999
-                  ? `${data.location} — toată Moldova`
-                  : `${data.location}, ${data.venueRadiusKm} km`
+                  ? t("wizard.summary.radiusAll", { city: data.location })
+                  : t("wizard.summary.radiusKm", {
+                      city: data.location,
+                      km: data.venueRadiusKm,
+                    })
             }
           />
         )}
         {data.services.length > 0 && (
           <SummaryRow
-            label="Categorii"
+            label={t("wizard.summary.categories")}
             value={data.services.map((s) => categoryNames[s] || s).join(", ")}
           />
         )}
@@ -1402,10 +1412,9 @@ function StepSummary({ data, update, isSignedIn, allCategories }: SummaryProps &
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-gold/30 bg-gold/5 p-4">
           <LogIn className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
           <div>
-            <p className="text-sm font-semibold">Autentificare obligatorie</p>
+            <p className="text-sm font-semibold">{t("wizard.summary.authTitle")}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Pentru a vedea prețurile și artiștii disponibili pentru data ta este necesară
-              crearea unui cont. Durează mai puțin de un minut.
+              {t("wizard.summary.authDesc")}
             </p>
           </div>
         </div>
@@ -1418,15 +1427,15 @@ function StepSummary({ data, update, isSignedIn, allCategories }: SummaryProps &
           (clicking the field shows an empty input, not text to delete). */}
       <div className="space-y-4">
         <div>
-          <Label>Nume eveniment *</Label>
+          <Label>{t("wizard.summary.nameLabel")} *</Label>
           <Input
             value={data.name}
             onChange={(e) => update({ name: e.target.value })}
-            placeholder={eventNamePlaceholder(data.eventType)}
+            placeholder={t(eventNamePlaceholderKey(data.eventType))}
             required
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Acest nume va fi titlul planului tău de eveniment.
+            {t("wizard.summary.nameHint")}
           </p>
         </div>
       </div>
@@ -1437,26 +1446,25 @@ function StepSummary({ data, update, isSignedIn, allCategories }: SummaryProps &
 /** Suggest an event-style placeholder based on the picked type. The user can
  *  always override; this just nudges them away from typing their own name
  *  ("Stratulat Nicolae") into a field that's meant to title the event. */
-function eventNamePlaceholder(eventType: string): string {
+function eventNamePlaceholderKey(eventType: string): string {
   switch (eventType) {
-    case "wedding":
-      return "Ex: Nunta Ana & Ion";
     case "cununie":
-      return "Ex: Cununia Ana & Ion";
+      return "wizard.namePlaceholder.cununie";
     case "baptism":
-      return "Ex: Botezul lui Gabi";
+      return "wizard.namePlaceholder.baptism";
     case "cumatrie":
-      return "Ex: Cumătria lui Mihai";
+      return "wizard.namePlaceholder.cumatrie";
     case "corporate":
-      return "Ex: Petrecerea companiei";
+      return "wizard.namePlaceholder.corporate";
     case "birthday":
-      return "Ex: Ziua de naștere a Mariei";
+      return "wizard.namePlaceholder.birthday";
     case "kids_birthday":
-      return "Ex: Aniversarea Sofiei — 5 ani";
+      return "wizard.namePlaceholder.kidsBirthday";
     case "concert":
-      return "Ex: Concert Live";
+      return "wizard.namePlaceholder.concert";
+    case "wedding":
     default:
-      return "Ex: Nunta Ana & Ion";
+      return "wizard.namePlaceholder.wedding";
   }
 }
 

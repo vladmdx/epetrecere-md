@@ -63,12 +63,12 @@ export function VenueCard({ venue, imageIndex, availableOn }: VenueCardProps) {
         {availableOn && (
           <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#06110d]/85 px-2 py-1 text-[9px] font-medium text-[#53df86] backdrop-blur">
             <span className="h-1.5 w-1.5 rounded-full bg-[#4fe47f]" />
-            Disponibilă
+            {t("venue.card.available")}
           </span>
         )}
         {venue.isFeatured && (
           <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-[#e6b84d]/92 px-2 py-1 text-[9px] font-semibold text-[#07101d]">
-            <BadgeCheck className="h-3 w-3" /> Recomandată
+            <BadgeCheck className="h-3 w-3" /> {t("venue.card.featured")}
           </span>
         )}
         <div className="absolute right-2 top-2 flex flex-col items-end gap-1.5">
@@ -105,7 +105,7 @@ export function VenueCard({ venue, imageIndex, availableOn }: VenueCardProps) {
                 <Star className="h-3 w-3 fill-[#e6b84d] text-[#e6b84d]" />
                 {venue.ratingAvg.toFixed(1)}
               </span>
-            ) : <span className="text-[#e6b84d]/70">Locație nouă</span>}
+            ) : <span className="text-[#e6b84d]/70">{t("venue.card.newVenue")}</span>}
           </div>
 
           {venue.pricePerPerson ? (
@@ -115,7 +115,7 @@ export function VenueCard({ venue, imageIndex, availableOn }: VenueCardProps) {
               </p>
             ) : (
               <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">
-                <Lock className="h-3 w-3" /> Preț la autentificare
+                <Lock className="h-3 w-3" /> {t("common.priceOnLogin")}
               </span>
             )
           ) : null}

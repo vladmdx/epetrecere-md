@@ -4,7 +4,7 @@ import { ArrowRight, Calendar, Sparkles, Tag } from "lucide-react";
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { blogPosts } from "@/lib/db/schema";
-import { getLocalized } from "@/i18n";
+import { getLocalized, t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { findEditorialPost2026 } from "@/lib/blog/editorial-posts-2026";
 import { metaForPath } from "@/lib/seo/page-meta";
@@ -56,29 +56,6 @@ export default async function BlogListingPage({
 }) {
   const { locale: rawLocale } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
-  const labels = {
-    ro: {
-      home: "Acasă", eyebrow: "Inspirație ePetrecere", title: "Idei care transformă planurile în momente memorabile",
-      description: "Ghiduri practice, tendințe și recomandări pentru nunți, cumetrii, aniversări și evenimente corporate în Republica Moldova.",
-      featured: "Articol recomandat", read: "Citește articolul", latest: "Cele mai noi", ideas: "Sfaturi și idei", articles: "articole",
-      emptyTitle: "Primele articole sunt în pregătire",
-      emptyDescription: "Revino în curând pentru ghiduri și idei noi de organizare.",
-    },
-    ru: {
-      home: "Главная", eyebrow: "Вдохновение ePetrecere", title: "Идеи, которые превращают планы в памятные события",
-      description: "Практические гиды, тенденции и рекомендации для свадеб, крестин, дней рождения и корпоративных событий в Молдове.",
-      featured: "Рекомендуем", read: "Читать статью", latest: "Новое", ideas: "Советы и идеи", articles: "статьи",
-      emptyTitle: "Первые статьи готовятся",
-      emptyDescription: "Скоро здесь появятся новые гиды и идеи для организации.",
-    },
-    en: {
-      home: "Home", eyebrow: "ePetrecere inspiration", title: "Ideas that turn plans into memorable moments",
-      description: "Practical guides, trends and recommendations for weddings, baptisms, birthdays and corporate events in Moldova.",
-      featured: "Featured article", read: "Read article", latest: "Latest", ideas: "Advice and ideas", articles: "articles",
-      emptyTitle: "The first articles are being prepared",
-      emptyDescription: "Come back soon for new planning guides and ideas.",
-    },
-  }[locale];
   const posts = await db
     .select()
     .from(blogPosts)
@@ -88,7 +65,7 @@ export default async function BlogListingPage({
 
   const [featured, ...remaining] = posts;
   const crumbs = breadcrumbJsonLd([
-    { name: labels.home, url: "/" },
+    { name: t("nav.home", locale), url: "/" },
     { name: "Blog", url: "/blog" },
   ]);
 
@@ -109,13 +86,13 @@ export default async function BlogListingPage({
         <div className="absolute inset-0 -z-10 bg-gradient-to-b from-transparent to-[#05080d]" />
         <div className="mx-auto max-w-7xl px-4 lg:px-8">
           <p className="text-xs font-semibold uppercase tracking-[.28em] text-gold">
-            {labels.eyebrow}
+            {t("blog.eyebrow", locale)}
           </p>
           <h1 className="mt-3 max-w-3xl font-heading text-4xl font-semibold tracking-tight sm:text-6xl">
-            {labels.title}
+            {t("blog.title", locale)}
           </h1>
           <p className="mt-5 max-w-2xl text-sm leading-7 text-white/62 sm:text-base">
-            {labels.description}
+            {t("blog.description", locale)}
           </p>
         </div>
       </section>
@@ -125,10 +102,10 @@ export default async function BlogListingPage({
           <div className="rounded-2xl border border-white/8 bg-white/[.025] px-6 py-24 text-center">
             <Sparkles className="mx-auto h-10 w-10 text-gold/55" />
             <h2 className="mt-5 font-heading text-2xl font-semibold">
-              {labels.emptyTitle}
+              {t("blog.emptyTitle", locale)}
             </h2>
             <p className="mx-auto mt-2 max-w-lg text-sm text-white/50">
-              {labels.emptyDescription}
+              {t("blog.emptyDescription", locale)}
             </p>
           </div>
         ) : (
@@ -162,7 +139,7 @@ export default async function BlogListingPage({
                 <div className="flex flex-col justify-center p-7 sm:p-10">
                   <div className="flex flex-wrap items-center gap-3 text-[11px] text-white/44">
                     <span className="rounded-full border border-gold/25 bg-gold/8 px-3 py-1 font-semibold uppercase tracking-wider text-gold">
-                      {labels.featured}
+                      {t("blog.featured", locale)}
                     </span>
                     {featured.category && (
                       <span className="flex items-center gap-1.5">
@@ -185,7 +162,7 @@ export default async function BlogListingPage({
                       {formatDate(featured.publishedAt || featured.createdAt, locale)}
                     </span>
                     <span className="flex items-center gap-2 font-semibold text-gold">
-                      {labels.read}
+                      {t("blog.read", locale)}
                       <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </span>
                   </div>
@@ -198,14 +175,14 @@ export default async function BlogListingPage({
                 <div className="mb-6 flex items-end justify-between">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-gold">
-                      {labels.latest}
+                      {t("blog.latest", locale)}
                     </p>
                     <h2 className="mt-2 font-heading text-3xl font-semibold">
-                      {labels.ideas}
+                      {t("blog.ideas", locale)}
                     </h2>
                   </div>
                   <p className="text-xs text-white/38">
-                    {remaining.length} {labels.articles}
+                    {remaining.length} {t("blog.articles", locale)}
                   </p>
                 </div>
 

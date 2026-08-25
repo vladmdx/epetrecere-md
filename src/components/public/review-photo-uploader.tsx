@@ -12,6 +12,7 @@ import { useRef, useState } from "react";
 import { Camera, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Props {
   value: string[];
@@ -26,6 +27,7 @@ export function ReviewPhotoUploader({
   max = 5,
   className,
 }: Props) {
+  const { t } = useLocale();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -34,7 +36,7 @@ export function ReviewPhotoUploader({
 
     const remaining = max - value.length;
     if (remaining <= 0) {
-      toast.error(`Maximum ${max} fotografii`);
+      toast.error(t("reviewPhotos.maxReached", { max }));
       return;
     }
 
@@ -44,11 +46,11 @@ export function ReviewPhotoUploader({
     const uploaded: string[] = [];
     for (const file of toUpload) {
       if (!file.type.startsWith("image/")) {
-        toast.error(`${file.name}: doar imagini`);
+        toast.error(t("reviewPhotos.imagesOnly", { file: file.name }));
         continue;
       }
       if (file.size > 10 * 1024 * 1024) {
-        toast.error(`${file.name}: prea mare (max 10MB)`);
+        toast.error(t("reviewPhotos.tooLarge", { file: file.name }));
         continue;
       }
       const fd = new FormData();
@@ -58,13 +60,15 @@ export function ReviewPhotoUploader({
         const res = await fetch("/api/upload", { method: "POST", body: fd });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          toast.error(`${file.name}: ${err.error || "upload eșuat"}`);
+          toast.error(
+            `${file.name}: ${err.error || t("reviewPhotos.uploadFailed")}`,
+          );
           continue;
         }
         const data = (await res.json()) as { url: string };
         uploaded.push(data.url);
       } catch {
-        toast.error(`${file.name}: eroare rețea`);
+        toast.error(t("reviewPhotos.networkError", { file: file.name }));
       }
     }
     setUploading(false);
@@ -72,7 +76,12 @@ export function ReviewPhotoUploader({
     if (uploaded.length > 0) {
       onChange([...value, ...uploaded]);
       toast.success(
-        `${uploaded.length} ${uploaded.length === 1 ? "fotografie adăugată" : "fotografii adăugate"}`,
+        t(
+          uploaded.length === 1
+            ? "reviewPhotos.addedOne"
+            : "reviewPhotos.addedMany",
+          { count: uploaded.length },
+        ),
       );
     }
 
@@ -97,13 +106,13 @@ export function ReviewPhotoUploader({
             { }
             <img
               src={url}
-              alt={`Fotografie ${i + 1}`}
+              alt={t("reviewPhotos.photoAlt", { index: i + 1 })}
               className="h-full w-full object-cover"
             />
             <button
               type="button"
               onClick={() => remove(i)}
-              aria-label="Șterge fotografia"
+              aria-label={t("reviewPhotos.remove")}
               className="absolute right-0.5 top-0.5 rounded-full bg-black/70 p-1 text-white hover:bg-red-500"
             >
               <X className="h-3 w-3" />
@@ -117,14 +126,14 @@ export function ReviewPhotoUploader({
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
             className="flex h-20 w-20 flex-col items-center justify-center gap-1 rounded-lg border-2 border-dashed border-border/60 text-muted-foreground transition-colors hover:border-gold/60 hover:text-gold disabled:opacity-60"
-            aria-label="Adaugă fotografie"
+            aria-label={t("reviewPhotos.add")}
           >
             {uploading ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
               <>
                 <Camera className="h-5 w-5" />
-                <span className="text-[10px]">Adaugă</span>
+                <span className="text-[10px]">{t("common.add")}</span>
               </>
             )}
           </button>
@@ -139,8 +148,7 @@ export function ReviewPhotoUploader({
         onChange={(e) => handleFiles(e.target.files)}
       />
       <p className="text-xs text-muted-foreground">
-        Adaugă până la {max} fotografii (JPG/PNG, max 10MB fiecare). Ajută alți
-        clienți să vadă rezultatul real!
+        {t("reviewPhotos.hint", { max })}
       </p>
     </div>
   );

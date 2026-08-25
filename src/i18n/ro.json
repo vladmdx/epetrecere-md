@@ -30,7 +30,8 @@
     "guests": "invitați",
     "viewAll": "Vezi toate",
     "readMore": "Citește mai mult",
-    "notSpecified": "Nespecificat"
+    "notSpecified": "Nespecificat",
+    "priceOnLogin": "Preț la autentificare"
   },
   "nav": {
     "home": "Acasă",
@@ -89,12 +90,26 @@
     "location_ph": "Oraș sau regiune",
     "date_label": "Data evenimentului",
     "guests": "Invitați",
-    "guests_ph": "Nr. invitați"
+    "guests_ph": "Nr. invitați",
+    "smart": {
+      "placeholder": "Caută cu cuvinte tale — ex: DJ nuntă Chișinău sub 500€",
+      "submit": "Caută cu AI",
+      "examplesLabel": "De exemplu:",
+      "redirecting": "Te redirectez automat… sau apasă",
+      "now": "acum",
+      "fallback": "Nu am putut interpreta — foloseste filtrele standard în listare.",
+      "exDj": "DJ pentru nuntă în Chișinău",
+      "exVenue": "sală 150 invitați",
+      "exHost": "moderator cumătrie sub 400€",
+      "exPhotographer": "fotograf 20 iulie"
+    }
   },
   "categories": {
     "title": "Categorii",
     "subtitle": "Găsește serviciul perfect",
-    "view_all": "Vezi toate categoriile"
+    "view_all": "Vezi toate categoriile",
+    "allTitle": "Toate Categoriile",
+    "chooseDesc": "Alege categoria de artiști sau servicii pentru evenimentul tău."
   },
   "event_types": {
     "wedding": "Nuntă",
@@ -118,14 +133,146 @@
     "similar": "Artiști Similari",
     "calendar_unavailable": "Calendarul nu este actualizat. Trimiteți o solicitare pentru a verifica disponibilitatea.",
     "send_request": "Trimite Solicitare",
-    "duration_hours": "ore"
+    "duration_hours": "ore",
+    "profile": {
+      "viewLargePhoto": "Vezi poza mare a lui {name}",
+      "eyebrow": "Artist pentru evenimente",
+      "tagline": "Muzică live • show premium • program personalizat",
+      "reviewsWord": "recenzii",
+      "priceOnRequest": "Preț la cerere",
+      "fact": {
+        "eventsLabel": "Evenimente",
+        "eventsValue": "Private și corporate",
+        "programLabel": "Program",
+        "programValue": "Personalizat",
+        "languagesLabel": "Limbi",
+        "formatLabel": "Format",
+        "formatValue": "Live & interactiv"
+      },
+      "realMoments": "Momente reale",
+      "noDescription": "Nu există descriere momentan.",
+      "noImages": "Nu există imagini momentan.",
+      "videoFallback": "Video",
+      "videoTitle": "Video {name}",
+      "requestPackageViaPlan": "Solicită pachetul prin planul tău",
+      "ugcIntro": "Fotografii încărcate de clienți reali care au lucrat cu acest artist.",
+      "realMomentAlt": "Moment real de la eveniment",
+      "reviewPhotoAlt": "Fotografie recenzie {index}",
+      "replyLabel": "Răspuns:",
+      "beFirstReview": "Fii primul care lasă o recenzie!",
+      "portfolioEyebrow": "Portofoliu",
+      "momentsTitle": "Momente din evenimente",
+      "photoSingular": "fotografie",
+      "photoPlural": "fotografii",
+      "momentAlt": "{name} — moment din eveniment {index}",
+      "realMomentBadge": "Moment real",
+      "videoEyebrow": "Vezi artistul live",
+      "showreelTitle": "Showreel & video",
+      "fixedPriceEyebrow": "Preț fix",
+      "perEventTitle": "Prețuri per eveniment",
+      "anyEvent": "Orice eveniment",
+      "avgDuration": "~{duration} în medie",
+      "request": "Solicită",
+      "packagesEyebrow": "Alege experiența",
+      "packagesTitle": "Pachete disponibile",
+      "recommendedBadge": "RECOMANDAT",
+      "customRepertoire": "Repertoriu personalizat",
+      "programHours": "ore de program",
+      "requestPackage": "Solicită pachetul",
+      "reviewsEyebrow": "Feedback verificat",
+      "clientReviews": "Recenzii de la clienți",
+      "beFirstReviewArtist": "Fii primul care lasă o recenzie pentru acest artist.",
+      "bookEyebrow": "Rezervă artistul",
+      "addToEvent": "Adaugă {name} la eveniment",
+      "pickDate": "Alege data și solicită disponibilitatea",
+      "signUpToBook": "Înregistrează-te pentru rezervare",
+      "signUpBody": "După autentificare poți vedea disponibilitatea, prețul și poți trimite cerere de rezervare.",
+      "priceHiddenNote": "Acest artist nu publică tariful — solicită ofertă personalizată.",
+      "planRequiredNote": "Rezervările se fac doar din panoul evenimentului tău — ai nevoie de un plan de eveniment activ.",
+      "share": "Partajează",
+      "shareTitle": "{name} — rezervă pentru evenimentul tău pe ePetrecere.md",
+      "similarEyebrow": "Descoperă mai multe",
+      "seeAllArtists": "Vezi toți artiștii",
+      "verifiedReviews": "Recenzii verificate",
+      "verifiedReviewsBody": "Recenzia poate fi trimisă după un eveniment confirmat, direct din cabinetul clientului. Astfel, feedbackul public provine din rezervări reale.",
+      "seeEligibleBookings": "Vezi rezervările eligibile",
+      "fallbackPkg": {
+        "essential": "Program artistic personalizat pentru momentele principale ale evenimentului.",
+        "signature": "Show complet, repertoriu adaptat invitaților și coordonare cu echipa tehnică.",
+        "fullEvent": "Prezență extinsă și program construit în jurul întregului eveniment."
+      }
+    }
   },
   "venue": {
     "capacity": "Capacitate",
     "price_per_person": "Preț/persoană",
     "facilities": "Facilități",
     "menu": "Meniu",
-    "location": "Locație"
+    "location": "Locație",
+    "detail": {
+      "eyebrow": "Locație pentru evenimente",
+      "verified": "Locație verificată",
+      "new": "Nou",
+      "workingHours": "Program funcționare",
+      "heroAlt": "{name} — vedere exterioară",
+      "viewGallery": "Vezi galeria ({count})",
+      "galleryAlt": "{name} — galerie {index}",
+      "tabAbout": "Despre locație",
+      "tabPackages": "Pachete",
+      "tabReviews": "Recenzii ({count})",
+      "tabLocation": "Localizare",
+      "descriptionFallback": "{name} este o locație creată pentru evenimente memorabile, cu spații flexibile și servicii adaptate fiecărui concept.",
+      "onRequest": "La cerere",
+      "factLocality": "Localitate",
+      "moldova": "Moldova",
+      "factSchedule": "Program",
+      "flexible": "Flexibil",
+      "factSpaceType": "Tip spațiu",
+      "eventHall": "Sală de evenimente",
+      "facilityParking": "Parcare",
+      "facilityCeremony": "Zonă pentru ceremonie",
+      "facilityStage": "Scenă și sonorizare",
+      "facilityMenu": "Meniu personalizat",
+      "facilityAc": "Aer condiționat",
+      "facilityWifi": "Wi-Fi",
+      "mapTitle": "Locație — {name}",
+      "packagesEyebrow": "Opțiuni flexibile",
+      "packagesTitle": "Pachete & meniu",
+      "recommended": "RECOMANDAT",
+      "perPerson": "persoană",
+      "minGuests": "Min. {count} persoane",
+      "included": "Include",
+      "notIncluded": "Nu include",
+      "menuOnSite": "Vezi meniul pe site",
+      "menuPdf": "Descarcă meniu PDF",
+      "virtualTour": "Tur virtual 360°",
+      "virtualTourTitle": "Tur virtual — {name}",
+      "reviewsEyebrow": "Experiențe reale",
+      "reviewPhotoAlt": "Fotografie recenzie {index}",
+      "noReviews": "Fii primul care împărtășește experiența la această locație.",
+      "bookEyebrow": "Rezervă locația",
+      "bookTitle": "Planifică evenimentul la {name}",
+      "bookHint": "Confirmă data și numărul de invitați",
+      "priceOnLogin": "Preț la autentificare",
+      "customOffer": "Ofertă personalizată pentru evenimentul tău",
+      "share": "Partajează",
+      "shareTitle": "{name} — sală evenimente pe ePetrecere.md",
+      "moreEyebrow": "Descoperă mai multe",
+      "similar": "Locații similare",
+      "allVenues": "Vezi toate sălile",
+      "genericElegant": "Meniu personalizat, servire completă și consultanță pentru organizare.",
+      "genericSignature": "Concept complet pentru nuntă sau eveniment privat, adaptat numărului de invitați.",
+      "genericCorporate": "Configurație flexibilă, tehnică și servicii pentru întâlniri și gale.",
+      "priceOnRequest": "Preț la cerere",
+      "verifiedReviews": "Recenzii verificate",
+      "verifiedReviewsHint": "Recenzia poate fi trimisă după un eveniment confirmat, direct din cabinetul clientului. Astfel, feedbackul public provine din rezervări reale.",
+      "eligibleBookings": "Vezi rezervările eligibile"
+    },
+    "card": {
+      "available": "Disponibilă",
+      "featured": "Recomandată",
+      "newVenue": "Locație nouă"
+    }
   },
   "form": {
     "name": "Nume",
@@ -139,7 +286,13 @@
     "message": "Mesaj",
     "gdpr_consent": "Sunt de acord cu prelucrarea datelor personale conform Politicii de Confidențialitate",
     "submit_success": "Eveniment creat! Te redirecționăm la rezervări…",
-    "required": "Câmp obligatoriu"
+    "required": "Câmp obligatoriu",
+    "errorRetry": "A apărut o eroare. Încercați din nou.",
+    "namePlaceholder": "Numele dvs.",
+    "selectType": "Selectează tipul",
+    "locationPlaceholder": "Orașul, locația",
+    "guestsPlaceholder": "ex: 150",
+    "messagePlaceholder": "Detalii suplimentare despre eveniment..."
   },
   "wizard": {
     "title": "Planifică-ți Evenimentul",
@@ -165,7 +318,108 @@
     "required_radius": "Alege raza de căutare a sălii — e obligatorie.",
     "required_services": "Alege cel puțin o categorie de servicii.",
     "required_name": "Introdu numele evenimentului (ex: Nunta Ana & Ion).",
-    "required_generic": "Completează câmpurile obligatorii ca să continui."
+    "required_generic": "Completează câmpurile obligatorii ca să continui.",
+    "steps": {
+      "eventType": "Tip eveniment",
+      "date": "Data & Locația",
+      "extras": "Preferințe",
+      "confirm": "Confirmare"
+    },
+    "stepOf": "Pasul {step} din {total}",
+    "toastNameRequired": "Introduceți numele evenimentului (ex: Nunta Ana & Ion).",
+    "toastError": "A apărut o eroare. Încercați din nou.",
+    "seeResults": "Vezi rezultatele",
+    "signInForResults": "Autentifică-te pentru rezultate",
+    "eventType": {
+      "title": "Alege tipul",
+      "accent": "evenimentului tău",
+      "desc": "Selectează categoria care descrie cel mai bine evenimentul pe care vrei să îl planifici."
+    },
+    "date": {
+      "title": "Alege",
+      "accent": "data și locația evenimentului",
+      "desc": "Spune-ne când și unde va avea loc evenimentul pentru a-ți recomanda opțiuni potrivite.",
+      "cityHint": "Chișinău + Top 5 orașe sunt primele, restul în ordine alfabetică.",
+      "startTime": "Ora începerii",
+      "duration": "Durata (ore)",
+      "interval": "Interval eveniment:",
+      "asideBefore": "Poți modifica",
+      "asideAccent": "data și locația",
+      "asideAfter": "mai târziu, în orice pas."
+    },
+    "guests": {
+      "question": "Câți invitați aștepți?",
+      "exact": "Sau introdu numărul exact:"
+    },
+    "venue": {
+      "question": "Ai nevoie de o sală sau restaurant?",
+      "yes": "Da, am nevoie de sală",
+      "yesDesc": "Vom afișa sălile disponibile pentru data ta",
+      "no": "Nu, am deja o locație",
+      "noDesc": "Am sala rezervată sau eveniment outdoor",
+      "existingLabel": "Ai deja sala rezervată? (opțional)",
+      "existingPlaceholder": "Ex: Restaurant Pegas, Strada Albișoara 20/1",
+      "existingHint": "Această info va fi vizibilă pentru artiștii pe care îi inviți, ca să știe locația și să poată planifica deplasarea.",
+      "radiusLabel": "Rază de căutare",
+      "radiusHint": "Cât de departe de {city} ești dispus să mergi pentru sală? Sălile nu influențează bugetul artiștilor.",
+      "radiusFallbackCity": "orașul ales",
+      "radius0": "Doar în oraș",
+      "radius0Sub": "Venue-uri din orașul evenimentului",
+      "radius25": "Până la 25 km",
+      "radius25Sub": "Oraș + suburbiile apropiate",
+      "radius50": "Până la 50 km",
+      "radius50Sub": "Județul extins",
+      "radius100": "Până la 100 km",
+      "radius100Sub": "Destinație apropiată",
+      "radiusAll": "Toată Moldova",
+      "radiusAllSub": "Fără limită de distanță"
+    },
+    "services": {
+      "title": "Alege",
+      "accent": "serviciile dorite",
+      "desc": "Selectează una sau mai multe categorii de servicii care ți se potrivesc. Mai târziu îți vom afișa doar opțiunile relevante pentru evenimentul tău.",
+      "multiHint": "Poți selecta mai multe servicii",
+      "multiHintSub": "Vei primi recomandări personalizate pe baza alegerilor tale.",
+      "none": "Nu sunt categorii potrivite pentru acest tip de eveniment."
+    },
+    "extras": {
+      "title": "Funcții suplimentare pentru evenimentul tău",
+      "desc": "Alege ce vrei să folosești în panoul evenimentului. Poți activa oricare dintre ele mai târziu, din setările evenimentului.",
+      "checklistTitle": "Checklist",
+      "checklistDesc": "Lista pașilor de pregătire (rezervare sală, invitații, costum, tort etc.) pre-populată după tipul evenimentului.",
+      "guestsTitle": "Listă invitați",
+      "guestsDesc": "Importă, RSVP, alocare la mese — toate datele invitaților într-un singur loc.",
+      "momentsTitle": "Photo Moments — galerie cu QR",
+      "momentsDesc": "Invitații scanează un QR și încarcă instant poze. Vezi-le live pe proiector. Fără cont, fără aplicație. Le poți activa și separat din Utilități.",
+      "seatingTitle": "Așezare mese",
+      "seatingDesc": "Așază invitații la mese — drag & drop, vizualizare grafică. Disponibil doar când ai listă de invitați."
+    },
+    "summary": {
+      "desc": "Verifică detaliile evenimentului tău.",
+      "date": "Data",
+      "location": "Locație",
+      "interval": "Interval",
+      "venueYes": "Am nevoie de sală",
+      "venueNo": "Am deja locație",
+      "radiusCityOnly": "{city} (doar în oraș)",
+      "radiusAll": "{city} — toată Moldova",
+      "radiusKm": "{city}, {km} km",
+      "categories": "Categorii",
+      "authTitle": "Autentificare obligatorie",
+      "authDesc": "Pentru a vedea prețurile și artiștii disponibili pentru data ta este necesară crearea unui cont. Durează mai puțin de un minut.",
+      "nameLabel": "Nume eveniment",
+      "nameHint": "Acest nume va fi titlul planului tău de eveniment."
+    },
+    "namePlaceholder": {
+      "wedding": "Ex: Nunta Ana & Ion",
+      "cununie": "Ex: Cununia Ana & Ion",
+      "baptism": "Ex: Botezul lui Gabi",
+      "cumatrie": "Ex: Cumătria lui Mihai",
+      "corporate": "Ex: Petrecerea companiei",
+      "birthday": "Ex: Ziua de naștere a Mariei",
+      "kidsBirthday": "Ex: Aniversarea Sofiei — 5 ani",
+      "concert": "Ex: Concert Live"
+    }
   },
   "process": {
     "title": "Cum Funcționează",
@@ -272,7 +526,42 @@
     "tomorrow": "Mâine",
     "nextSaturday": "Sâmbătă viitoare",
     "placeholder": "Alege data",
-    "selectDate": "Selectează data"
+    "selectDate": "Selectează data",
+    "availability": "Disponibilitate",
+    "prevMonth": "Luna anterioară",
+    "nextMonth": "Luna următoare",
+    "legendFree": "Liber",
+    "legendPartial": "Parțial",
+    "legendBooked": "Ocupat",
+    "busyLabel": "Ocupat:",
+    "dayOff": "Această zi nu este zi de lucru",
+    "scheduleLabel": "Program:",
+    "unavailableIntervals": "Interval(e) indisponibil(e):",
+    "fullyBooked": "Această zi este complet rezervată.",
+    "nonWorkingDay": "Zi nelucrătoare",
+    "unavailable": "Indisponibil",
+    "bookThisDate": "Rezervă această dată",
+    "field": {
+      "name": "Nume",
+      "namePlaceholder": "Numele dvs.",
+      "phone": "Telefon",
+      "email": "Email",
+      "eventType": "Tip Eveniment",
+      "selectType": "Selectează tipul",
+      "startTime": "Ora de început",
+      "hour": "Ora",
+      "duration": "Durată (ore)",
+      "hours": "Ore",
+      "message": "Mesaj",
+      "messagePlaceholder": "Detalii despre eveniment..."
+    },
+    "hourSingular": "oră",
+    "hourPlural": "ore",
+    "durationExceedsHours": "Durata depășește orele de lucru ({start}–{end}). Te rugăm să alegi o durată mai mică.",
+    "bookingRequestSent": "Cererea de rezervare a fost trimisă!",
+    "genericError": "A apărut o eroare. Încercați din nou.",
+    "requestSentFor": "✓ Cererea pentru {date} a fost trimisă!",
+    "contactSoon": "Veți fi contactat în curând."
   },
   "home": {
     "features": {
@@ -387,7 +676,8 @@
     "reset": "Resetează",
     "foundArtists": "artiști găsiți",
     "foundVenues": "locații găsite",
-    "map": "Hartă"
+    "map": "Hartă",
+    "viewAllArtists": "Vezi toți artiștii"
   },
   "tools": {
     "organization": "Organizare",
@@ -404,7 +694,15 @@
     "budgetCalculator": "Calculator Buget",
     "guestCalculator": "Invitați și Mese",
     "drinksCalculator": "Băuturi",
-    "menuCalculator": "Meniu"
+    "menuCalculator": "Meniu",
+    "landing": {
+      "breadcrumb": "Utilități",
+      "free": "Instrument gratuit",
+      "other": "Vezi alte instrumente",
+      "note": "Gratuit · Nu necesită eveniment activ · Cont nou în 1 minut",
+      "start": "Începe acum, gratuit",
+      "cta": "Creează-ți contul în 1 minut și folosește {tool} fără limită. Instrumentul rulează independent, chiar dacă nu ai încă un eveniment activ."
+    }
   },
   "dashboard": {
     "myPanel": "Panoul Meu",
@@ -428,7 +726,12 @@
     "analytics": "Analitice",
     "settings": "Setări",
     "viewProfile": "Vezi profil",
-    "viewSite": "Vezi site"
+    "viewSite": "Vezi site",
+    "media": "Media",
+    "mediaDescription": "Gestionează fotografiile și videoclipurile profilului tău.",
+    "noArtistProfile": "Nu ai încă un profil de artist.",
+    "photoGallery": "Galerie foto",
+    "videos": "Videoclipuri"
   },
   "legal": {
     "signTitle": "Acceptarea contractului",
@@ -444,7 +747,13 @@
     "drawSignature": "Semnează aici",
     "clearSignature": "Șterge",
     "drawHint": "Desenează semnătura cu mouse-ul sau cu degetul",
-    "signatureTooSmall": "Semnătura e prea scurtă — desenează-o complet."
+    "signatureTooSmall": "Semnătura e prea scurtă — desenează-o complet.",
+    "packet": {
+      "title": "Pachetul legal complet",
+      "body": "Acordurile pentru parteneri și locații, regulile marketplace, tarifele și politicile de recenzii, anti-fraudă și calitate sunt disponibile în română și rusă la"
+    },
+    "indexTitle": "Documente legale",
+    "availableIn": "disponibil în română, rusă și engleză."
   },
   "pricing": {
     "metaTitle": "Tarife pentru furnizori",
@@ -521,7 +830,16 @@
     "Vin roșu": "Vin roșu",
     "Vodkă": "Vodkă",
     "Zeamă / supă": "Zeamă / supă",
-    "Șampanie": "Șampanie"
+    "Șampanie": "Șampanie",
+    "Nuntă": "Nuntă",
+    "Cununie": "Cununie",
+    "Botez": "Botez",
+    "Cumătrie": "Cumătrie",
+    "Aniversare": "Aniversare",
+    "Aniversare copii": "Aniversare copii",
+    "Corporate": "Corporate",
+    "Concert / Petrecere": "Concert / Petrecere",
+    "Alt tip": "Alt tip"
   },
   "a11y": {
     "addFavorite": "Adaugă la favorite",
@@ -534,7 +852,32 @@
     "q1": "Cât costă o nuntă medie în Moldova?",
     "q2": "Cum găsesc un DJ bun?",
     "q3": "Cum funcționează comisionul platformei?",
-    "q4": "Câți invitați încap într-o sală mijlocie?"
+    "q4": "Câți invitați încap într-o sală mijlocie?",
+    "errorGeneric": "Îmi pare rău, ceva a mers prost.",
+    "errorNetwork": "Am o problemă de conexiune. Încearcă din nou în câteva secunde.",
+    "openLabel": "Deschide asistentul AI",
+    "title": "Asistent ePetrecere",
+    "subtitle": "Îți răspund în română, rusă sau engleză",
+    "newConversation": "Conversație nouă",
+    "reset": "Resetează",
+    "closeLabel": "Închide asistentul",
+    "typing": "Scriu…",
+    "inputPlaceholder": "Scrie un mesaj…",
+    "sendLabel": "Trimite mesaj",
+    "subtitleAdmin": "Asistent pentru administrare",
+    "subtitleVendor": "Asistentul tău personal",
+    "welcome": "Bine ai venit!",
+    "hintAdmin": "Întreabă-mă orice despre artiști, leads, SEO sau conținut.",
+    "hintVendor": "Te pot ajuta cu calendarul, profilul sau descrierile tale.",
+    "suggestAdmin1": "Câți artiști activi avem?",
+    "suggestAdmin2": "Generează descriere SEO",
+    "suggestAdmin3": "Scrie articol blog",
+    "suggestVendor1": "Îmbunătățește-mi descrierea",
+    "suggestVendor2": "Ce rezervări am luna viitoare?",
+    "suggestVendor3": "Ajută-mă cu profilul",
+    "placeholder": "Scrie un mesaj...",
+    "send": "Trimite mesaj",
+    "unavailable": "Serviciul AI nu este disponibil momentan. Verifică configurația ANTHROPIC_API_KEY."
   },
   "ui": {
     "aiPowered": "Cu inteligență artificială",
@@ -546,5 +889,1139 @@
     "empty": "Nicio locație cu adresă cunoscută încă.",
     "loading": "Se încarcă harta…",
     "failed": "Harta nu s-a putut încărca."
+  },
+  "publicError": {
+    "title": "A apărut o eroare",
+    "description": "Ne cerem scuze pentru inconveniență. Încercați din nou sau reveniți mai târziu.",
+    "retry": "Încearcă din nou"
+  },
+  "venues": {
+    "breadcrumb": "Săli",
+    "city": {
+      "h1": "Săli și restaurante pentru evenimente în {city}",
+      "itemListName": "Săli pentru evenimente în {city}",
+      "intro": "{count} săli și restaurante disponibile în {city} pentru nuntă, botez, cumătrie sau eveniment corporate. Verifică disponibilitatea, capacitatea și prețul pe persoană direct pe pagina fiecărei locații.",
+      "noneListed": "Nu avem săli listate în {city} momentan. Contactează-ne pentru recomandări.",
+      "empty": "Nicio sală disponibilă în {city} momentan.",
+      "viewAll": "Vezi toate sălile →"
+    },
+    "list": {
+      "breadcrumb": "Săli",
+      "title": "Săli pentru evenimentul tău",
+      "description": "Descoperă restaurante, săli de nuntă și locații premium pentru orice eveniment din Republica Moldova.",
+      "allMoldova": "Toată Moldova",
+      "anyCapacity": "Orice capacitate",
+      "eventDate": "Data evenimentului",
+      "filter": "Filtrează rezultate",
+      "locality": "Localitate",
+      "allLocations": "Toate localitățile",
+      "apply": "Aplică filtrele",
+      "unsure": "Nu știi ce locație să alegi?",
+      "ctaDesc": "Spune-ne numărul de invitați și stilul evenimentului, iar noi îți recomandăm săli potrivite.",
+      "recommendations": "Primește recomandări",
+      "heroAlt": "Sală elegantă pentru evenimente în Republica Moldova",
+      "newLabel": "Nou",
+      "upTo": "până la"
+    }
+  },
+  "compare": {
+    "artists": {
+      "title": "Compară artiști",
+      "emptyBefore": "Alege 2 sau 3 artiști de pe pagina",
+      "emptyAfter": "cu butonul „Compară” pentru a-i vedea side-by-side aici.",
+      "back": "Înapoi la artiști",
+      "heading": "Comparație — {count} artiști"
+    },
+    "row": {
+      "priceFrom": "Preț de la",
+      "rating": "Rating",
+      "city": "Oraș",
+      "pricePerPerson": "Preț / persoană",
+      "virtualTour": "Tur virtual 360°",
+      "menuAvailable": "Meniu disponibil",
+      "description": "Descriere"
+    },
+    "maxReached": "Poți compara până la {max} elemente — șterge unul înainte",
+    "selectedHint": "{count} selectate · apasă \"Compară\" în lista de jos",
+    "added": "Adăugat la comparare",
+    "inCompare": "În comparare",
+    "compare": "Compară",
+    "title": "Compară săli",
+    "emptyIntro": "Alege 2 sau 3 săli de pe pagina",
+    "venuesLink": "Săli",
+    "emptyOutro": "cu butonul „Compară” pentru a le vedea side-by-side aici.",
+    "backToVenues": "Înapoi la săli",
+    "heading": "Comparație — {count} săli",
+    "people": "persoane",
+    "facility": {
+      "parking": "Parcare",
+      "airConditioning": "Aer condiționat",
+      "professionalSound": "Sunet profesional",
+      "projector": "Proiector",
+      "danceFloor": "Ring de dans",
+      "terrace": "Terasa",
+      "garden": "Grădină",
+      "bridalSuite": "Cameră miri",
+      "freeWifi": "Wi-Fi gratuit"
+    },
+    "bar": {
+      "venues": "{count} săli în comparare",
+      "artists": "{count} artiști în comparare",
+      "clear": "Curăță selecția",
+      "cta": "Compară acum"
+    }
+  },
+  "blog": {
+    "post": {
+      "back": "Înapoi la blog",
+      "planCta": "Planifică",
+      "sidebarCta": "Transformă inspirația într-un plan clar pentru evenimentul tău.",
+      "contentUnavailable": "Conținutul articolului nu este disponibil momentan."
+    },
+    "eyebrow": "Inspirație ePetrecere",
+    "title": "Idei care transformă planurile în momente memorabile",
+    "description": "Ghiduri practice, tendințe și recomandări pentru nunți, cumetrii, aniversări și evenimente corporate în Republica Moldova.",
+    "featured": "Articol recomandat",
+    "read": "Citește articolul",
+    "latest": "Cele mai noi",
+    "ideas": "Sfaturi și idei",
+    "articles": "articole",
+    "emptyTitle": "Primele articole sunt în pregătire",
+    "emptyDescription": "Revino în curând pentru ghiduri și idei noi de organizare."
+  },
+  "header": {
+    "signIn": "Autentificare",
+    "signUp": "Înregistrare",
+    "myAccount": "Contul meu",
+    "venueDashboard": "Dashboard Sală",
+    "partnerDashboard": "Dashboard Partener",
+    "myCabinet": "Cabinetul Meu",
+    "adminPanel": "Admin Panel",
+    "signOut": "Deconectare",
+    "closeMenu": "Închide meniul",
+    "openMenu": "Deschide meniul"
+  },
+  "artists": {
+    "listTitle": "Artiști pentru Evenimente"
+  },
+  "timezone": {
+    "label": "Fus orar",
+    "updated": "Fus orar actualizat",
+    "saveFailed": "Nu s-a putut salva fusul orar",
+    "hint": "Afectează formatarea orelor în emailuri și reminder-uri. Dashboard-ul folosește fusul browser-ului.",
+    "customPlaceholder": "Ex: Asia/Tokyo",
+    "enterCustom": "Intră o zonă custom",
+    "pickFromList": "Alege din listă"
+  },
+  "reviewPhotos": {
+    "maxReached": "Maximum {max} fotografii",
+    "imagesOnly": "{file}: doar imagini",
+    "tooLarge": "{file}: prea mare (max 10MB)",
+    "uploadFailed": "upload eșuat",
+    "networkError": "{file}: eroare rețea",
+    "addedOne": "{count} fotografie adăugată",
+    "addedMany": "{count} fotografii adăugate",
+    "photoAlt": "Fotografie {index}",
+    "remove": "Șterge fotografia",
+    "add": "Adaugă fotografie",
+    "hint": "Adaugă până la {max} fotografii (JPG/PNG, max 10MB fiecare). Ajută alți clienți să vadă rezultatul real!"
+  },
+  "moments": {
+    "unitMin": "min",
+    "unitSec": "sec",
+    "errNameAndPhoto": "Scrie numele tău și alege cel puțin o poză.",
+    "errAllShotsUsed": "Ai folosit toate cele {count} cadre alocate pe acest dispozitiv.",
+    "errUploadFailed": "Upload eșuat",
+    "errSaveFailed": "Salvare eșuată",
+    "errGeneric": "Eroare",
+    "shareYours": "Împărtășește momentele tale.",
+    "liveGalleryNote": "Pozele apar live în galerie.",
+    "galleryOpensAtEnd": "Galeria se deschide la finalul evenimentului.",
+    "vintageActive": "Filtru polaroid activ — pozele tale primesc automat un ton vintage cald",
+    "filmOpensIn": "Filmul se deschide în {time}",
+    "waitingFor": "Te așteptăm",
+    "thenYouCanUpload": "— atunci poți începe să încarci poze.",
+    "filmClosed": "Filmul s-a închis",
+    "filmClosedHint": "Mulțumim pentru participare! Pozele tale sunt în galerie.",
+    "allPromptsDone": "Toate misiunile completate! 🎉",
+    "allPromptsDoneHint": "Mulțumim — ai răspuns la toate {count} provocările! Mai poți încărca poze libere mai jos.",
+    "promptProgress": "Provocare {current}/{total}",
+    "skipPrompt": "Sari peste această provocare",
+    "allShotsUsed": "Toate cadrele tale au fost folosite",
+    "shotsLeftOne": "Ai {count} cadru rămas",
+    "shotsLeftMany": "Ai {count} cadre rămase",
+    "yourName": "Numele tău",
+    "namePlaceholder": "Ion Popescu",
+    "message": "Mesaj (opțional)",
+    "messagePlaceholder": "Ce nuntă frumoasă! 💍",
+    "photosSelected": "{count} poze selectate",
+    "tapToPick": "Atinge pentru a alege poze",
+    "fileHint": "JPG, PNG, WEBP · max 10MB per poză",
+    "thanks": "Mulțumim!",
+    "sendPhotos": "Trimite poze",
+    "filmClosesIn": "Filmul se închide în {time}",
+    "galleryOpens": "Galeria se deschide",
+    "inTime": "în {time}",
+    "atEventEnd": "la finalul evenimentului",
+    "uploadedSoFarOne": "{count} cadru a fost încărcat până acum. Toți le vom vedea împreună la dezvăluire.",
+    "uploadedSoFarMany": "{count} cadre au fost încărcate până acum. Toți le vom vedea împreună la dezvăluire.",
+    "beFirst": "Fii primul care încarcă o amintire — totul rămâne ascuns până la dezvăluire.",
+    "liveGallery": "Galerie live ({count})",
+    "removeReaction": "Retrage reacția {emoji}",
+    "addReaction": "Adaugă reacția {emoji}",
+    "slideshow": {
+      "revealingNow": "se dezvăluie acum",
+      "revealsIn": "Galeria se dezvăluie în",
+      "awaitingEnd": "așteaptăm finalul evenimentului",
+      "framesReceived": "cadre primite",
+      "qrInvite": "Scanează codul QR și trimite amintirile tale. Le vom vedea împreună la dezvăluire.",
+      "waitingFirstPhotos": "În așteptarea primelor poze...",
+      "scanAndSend": "Scanează QR-ul și trimite momentele tale",
+      "qrAlt": "Scan pentru upload poze",
+      "scan": "Scanează",
+      "sendPhotos": "trimite poze",
+      "unmute": "Activează sunetul",
+      "mute": "Oprește sunetul",
+      "noSound": "Fără sunet",
+      "music": "Muzică",
+      "startMusic": "Pornește muzica"
+    },
+    "unit": {
+      "day": "zi",
+      "days": "zile",
+      "hour": "oră",
+      "hours": "ore",
+      "min": "min",
+      "sec": "sec"
+    }
+  },
+  "services": {
+    "hero": {
+      "imageAlt": "Servicii pentru nunți și evenimente în Chișinău și Moldova",
+      "eyebrow": "Ce oferim",
+      "title": "Servicii pentru evenimente",
+      "subtitle": "Tot ce ai nevoie pentru un eveniment perfect, într-un singur loc"
+    },
+    "filters": {
+      "music": "Muzică",
+      "photoVideo": "Foto & Video",
+      "decor": "Decor",
+      "technical": "Tehnic",
+      "entertainment": "Entertainment"
+    },
+    "groups": {
+      "moderatori": {
+        "name": "Moderatori / MC",
+        "desc": "Profesioniști care conduc ceremonia și petrecerea cu stil."
+      },
+      "dj": {
+        "desc": "Muzică pentru orice gust și atmosferă."
+      },
+      "cantareti": {
+        "name": "Cântăreți",
+        "desc": "Voci excepționale pentru momentele speciale."
+      },
+      "formatii": {
+        "name": "Formații & Grupuri",
+        "desc": "Muzică live pentru o petrecere de neuitat."
+      },
+      "fotografi": {
+        "name": "Fotografi",
+        "desc": "Capturăm cele mai frumoase momente."
+      },
+      "videografi": {
+        "name": "Videografi",
+        "desc": "Filmări profesionale pentru amintiri veșnice."
+      },
+      "decor": {
+        "desc": "Transformăm spațiul în vis."
+      },
+      "animatori": {
+        "name": "Animatori",
+        "desc": "Distracție garantată pentru toate vârstele."
+      },
+      "sali": {
+        "desc": "Locația perfectă pentru evenimentul tău."
+      },
+      "echipamentTehnic": {
+        "name": "Echipament Tehnic",
+        "desc": "Sunet, lumini și scenă profesionale."
+      },
+      "showProgram": {
+        "name": "Show Program",
+        "desc": "Spectacole de foc, circ și magie."
+      }
+    },
+    "card": {
+      "imageAlt": "{name} pentru evenimente în Moldova"
+    },
+    "cta": {
+      "title": "Nu știi de ce servicii ai nevoie?",
+      "desc": "Răspunde la câteva întrebări despre evenimentul tău și îți recomandăm cele mai potrivite servicii, adaptate bugetului și stilului tău.",
+      "button": "Primește recomandări personalizate",
+      "free": "Gratuit, rapid și fără obligații"
+    },
+    "popular": {
+      "title": "Servicii populare",
+      "viewAll": "Vezi toate serviciile",
+      "imageAlt": "{name} pentru nunți și evenimente în Moldova",
+      "dj": {
+        "name": "DJ pentru petreceri",
+        "note": "Cel mai solicitat"
+      },
+      "fotoVideo": {
+        "name": "Foto & Video premium",
+        "note": "Top alegere"
+      },
+      "decor": {
+        "note": "Tendință în creștere"
+      },
+      "sali": {
+        "note": "Locații de top"
+      }
+    }
+  },
+  "venuesPage": {
+    "breadcrumb": "Săli",
+    "itemListName": "Săli pentru Evenimente"
+  },
+  "realWeddings": {
+    "breadcrumb": "Nunți reale",
+    "detail": {
+      "backToGallery": "Înapoi la galerie",
+      "vendorsHere": "Furnizorii de la acest eveniment",
+      "ctaTitle": "Inspirat de povestea lor?",
+      "ctaDesc": "Începe planificarea propriei tale nunți cu instrumentele și furnizorii noștri.",
+      "ctaButton": "Planifică nunta ta"
+    },
+    "title": "Nunți reale din Moldova",
+    "description": "Povești adevărate de la cuplurile care și-au planificat nunta pe ePetrecere.md. Inspirație, idei și furnizori verificați din comunitate.",
+    "emptyTitle": "Primele povești sunt pe drum",
+    "emptyDescription": "În curând vei putea vedea aici fotografii și povești de la nunți reale.",
+    "planCta": "Planifică-ți propria nuntă",
+    "photoCount": "{count} foto"
+  },
+  "pwa": {
+    "install": {
+      "ariaLabel": "Instalează ePetrecere ca aplicație",
+      "title": "Instalează ePetrecere pe telefon",
+      "desc": "Acces rapid din ecranul principal — ca o aplicație. Notificări când primești răspuns de la artiști sau săli.",
+      "confirm": "Instalează",
+      "later": "Mai târziu"
+    }
+  },
+  "appearance": {
+    "title": "Aspect",
+    "font": "Font",
+    "fontHint": "Alege fontul folosit pe întreg site-ul (Google Fonts)",
+    "fontDefault": "Implicit (DM Sans)",
+    "fontSampleTitle": "Exemplu de text cu fontul ales",
+    "fontSampleBody": "Servicii pentru evenimente din Republica Moldova.",
+    "textSize": "Mărime text",
+    "textSizeHint": "Ajustează mărimea textului de la -20% la +30%",
+    "textSizeSample": "Acesta este un exemplu de text. Preferința se aplică pe întreg site-ul și este salvată local."
+  },
+  "notifPrefs": {
+    "title": "Tip notificări",
+    "hint": "Alege pe ce canal vrei să primești fiecare tip. Notificările in-app (clopoțelul din header) se afișează mereu — toggle-urile de mai jos controlează doar email + push.",
+    "loading": "Se încarcă preferințele...",
+    "saveError": "Nu s-a putut salva preferința",
+    "footnote": "ℹ️ Dezactivarea unui rând nu afectează notificările critice (booking confirmat, anulare) — acelea ajung mereu instant prin email.",
+    "rows": {
+      "bookingRequests": {
+        "label": "Solicitări noi",
+        "sub": "Cerere nouă de rezervare, conflicte pe aceeași dată"
+      },
+      "bookingUpdates": {
+        "label": "Actualizări booking",
+        "sub": "Acceptat, confirmat de client, anulat, finalizat"
+      },
+      "messages": {
+        "sub": "Chat cu clienți + alte conversații"
+      },
+      "reviews": {
+        "sub": "Recenzie nouă primită sau cerere de a scrie una"
+      },
+      "reminders": {
+        "label": "Reminder-uri",
+        "sub": "Evenimente viitoare, RSVP-uri, follow-up-uri"
+      }
+    }
+  },
+  "privacy": {
+    "legalPack": {
+      "title": "Pachetul legal complet",
+      "body": "Acordurile pentru parteneri și locații, regulile marketplace, tarifele și politicile de recenzii, anti-fraudă și calitate sunt disponibile în română și rusă la"
+    }
+  },
+  "catalogSeo": {
+    "artists": {
+      "title": "Cum alegi artiști pentru evenimente în Moldova în 2026",
+      "p1Pre": "Compară ",
+      "p1Strong": "artiști pentru evenimente în Chișinău și Moldova",
+      "p1Post": " după portofoliu, stil, experiență, recenzii și potrivirea cu publicul tău. Prețul este important, dar oferta trebuie să precizeze durata programului, echipamentul, transportul și orele suplimentare.",
+      "p2": "Pentru o nuntă, verifică repertoriul complet și felul în care artistul comunică cu prezentatorul, sala și echipa tehnică. Pentru un eveniment corporate, cere un program adaptat profilului invitaților și un plan tehnic clar.",
+      "faq": {
+        "q1": "Când trebuie rezervat un artist pentru nuntă?",
+        "a1": "Pentru datele populare din 2026, începe selecția cu 6 - 12 luni înainte. Artiștii solicitați pot avea calendarul ocupat mai devreme.",
+        "q2": "Ce trebuie să includă contractul?",
+        "a2": "Contractul trebuie să indice data, orele, durata programului, echipamentul, transportul, avansul, anularea și condițiile pentru ore suplimentare.",
+        "q3": "Cum compar ofertele artiștilor?",
+        "a3": "Compară aceeași durată și aceleași servicii, apoi verifică portofoliul recent, recenziile și cerințele tehnice."
+      }
+    },
+    "venues": {
+      "title": "Cum alegi o sală de nuntă în Chișinău și Moldova",
+      "p1Pre": "O ",
+      "p1Strong": "sală de nuntă în Chișinău",
+      "p1Post": " trebuie comparată după capacitatea confortabilă, meniul complet, acces, parcare, acustică și planul pentru vreme nefavorabilă. Verifică spațiul după instalarea scenei, ringului și decorului.",
+      "p2": "Cere o ofertă scrisă cu meniul, băuturile, taxa de servire, orele suplimentare și toate serviciile incluse. Pentru locații din afara orașului, adaugă transportul invitaților și furnizorilor la costul total.",
+      "faq": {
+        "q1": "Cu cât timp înainte se rezervă sala?",
+        "a1": "Pentru o sâmbătă din sezonul 2026, este prudent să începi cu 9 - 14 luni înainte.",
+        "q2": "Cum verific capacitatea reală?",
+        "a2": "Cere o schiță cu mesele, scena, ringul, candy barul și culoarele montate pentru numărul tău de invitați.",
+        "q3": "Ce costuri suplimentare trebuie verificate?",
+        "a3": "Verifică taxa de servire, meniul echipei, curățenia, orele suplimentare, băuturile externe și eventualele taxe de locație."
+      }
+    }
+  },
+  "calc": {
+    "nav": {
+      "calculators": "Calculatoare"
+    },
+    "menu": {
+      "breadcrumb": "Meniu",
+      "title": "Calculator meniu eveniment",
+      "subtitle": "Află câte kilograme de mâncare îți trebuie pe fiecare fel de mâncare — de la răcituri și salate până la tort și gustare de noapte.",
+      "details": "Detalii",
+      "eventType": "Tip eveniment",
+      "includeSoup": "Include zeamă / supă (tradițional nuntă moldovenească)",
+      "includeLateNight": "Include gustare de noapte (kebab, frigărui)",
+      "breakdown": "Detaliere pe feluri",
+      "dish": "Fel de mâncare",
+      "gramsPerGuest": "g/invitat",
+      "totalKg": "Total kg",
+      "cost": "Cost",
+      "disclaimer": "Prețurile sunt indicative, pentru achiziție en-gros (Moldova 2026). Dacă lucrezi cu o sală care asigură tot meniul, verifică prețul pe persoană al acesteia.",
+      "totalFood": "Total mâncare",
+      "estimatedCost": "Cost estimativ: {amount}"
+    },
+    "wedding": {
+      "breadcrumb": "Cost nuntă",
+      "title": "Calculator cost nuntă Moldova",
+      "subtitle": "Estimare completă a bugetului pentru nunta ta, cu categorii specifice tradițiilor moldovenești. Modifică valorile în fiecare categorie pentru a vedea impactul pe totalul final.",
+      "cat": {
+        "venue": {
+          "label": "Sală & închiriere",
+          "desc": "Chirie sală + taxe suplimentare (aer condiționat, generator)"
+        },
+        "menu": {
+          "label": "Meniu & servire",
+          "desc": "Cost mâncare + băuturi + servire (pe invitat)"
+        },
+        "brideDress": {
+          "label": "Rochia miresei",
+          "desc": "Rochie + accesorii + probe + curățătorie"
+        },
+        "groomSuit": {
+          "label": "Costum mire",
+          "desc": "Costum + pantofi + cămașă + accesorii"
+        },
+        "rings": {
+          "label": "Verighete & inele",
+          "desc": "Verighete + inel de logodnă"
+        },
+        "photoVideo": {
+          "label": "Foto & Video",
+          "desc": "Fotograf + videograf + album + editare"
+        },
+        "music": {
+          "label": "Muzică & MC",
+          "desc": "Formație / DJ + moderator + sonorizare"
+        },
+        "decor": {
+          "label": "Decor & Floristică",
+          "desc": "Aranjamente florale + decor sală + buchete"
+        },
+        "makeup": {
+          "label": "Machiaj & coafură",
+          "desc": "Machiaj + coafură mireasă (+ cumătre opțional)"
+        },
+        "transport": {
+          "label": "Transport & limuzină",
+          "desc": "Limuzină sau mașină decorată + microbuz invitați"
+        },
+        "cake": {
+          "label": "Tort de nuntă",
+          "desc": "Tort + dulciuri candy bar"
+        },
+        "invitations": {
+          "label": "Invitații & papetărie",
+          "desc": "Invitații + save-the-date + meniu tipărit"
+        },
+        "honeymoon": {
+          "label": "Lună de miere",
+          "desc": "Vacanță postnupțială (opțional)"
+        }
+      },
+      "perGuestUnit": "€ / invitat",
+      "typicalRange": "Interval tipic: {min} – {max}",
+      "typicalRangePerGuest": "Interval tipic: {min} – {max} / invitat",
+      "reset": "Resetează valorile",
+      "totalEstimate": "Total estimat",
+      "perGuestSummary": "{amount} / invitat · {guests} invitați",
+      "typicalMin": "Minim tipic:",
+      "typicalMax": "Maxim tipic:",
+      "top5": "Top 5 categorii",
+      "ctaIntro": "Gata cu calculele? Găsește furnizorii potriviți pentru nunta ta.",
+      "ctaQuiz": "Chestionar furnizori",
+      "ctaPlan": "Planifică eveniment"
+    },
+    "index": {
+      "title": "Calculatoare pentru evenimente",
+      "description": "Planifică bugetul, cantitățile și logistica înainte de a contacta furnizorii. Estimările folosesc repere pentru Republica Moldova actualizate în 2026.",
+      "open": "Deschide calculatorul",
+      "ctaTitle": "Gata cu calculele? Găsește furnizorii potriviți.",
+      "ctaDesc": "Folosește planificatorul și primești rezultate personalizate în mai puțin de un minut.",
+      "cta": "Planifică evenimentul",
+      "faqTitle": "Întrebări frecvente",
+      "cards": {
+        "darNunta": {
+          "title": "Cât să dau dar la nuntă?",
+          "desc": "Calculează suma potrivită după relație, tipul sălii și orașul nunții.",
+          "h1": "Minimum, tipic și generos",
+          "h2": "Adulți și copii",
+          "h3": "Relație și zonă"
+        },
+        "nunta": {
+          "title": "Calculator Cost Nuntă",
+          "desc": "Estimare completă pentru sală, ținute, inele, foto-video, muzică, decor și luna de miere.",
+          "h1": "13 categorii cu intervale",
+          "h2": "Preț pe invitat",
+          "h3": "Categorii principale"
+        },
+        "buget": {
+          "title": "Calculator Buget Eveniment",
+          "desc": "Estimează costul nunții, botezului sau cumătriei, inclusiv meniu, artiști și decor.",
+          "h1": "Peste 12 categorii",
+          "h2": "Interval minim și maxim",
+          "h3": "Preț pe persoană"
+        },
+        "invitati": {
+          "title": "Calculator Invitați și Mese",
+          "desc": "Află câte mese, ospătari și locuri de parcare sunt necesare pentru invitații tăi.",
+          "h1": "Mese și locuri",
+          "h2": "Rata de absențe",
+          "h3": "Personal și parcare"
+        },
+        "alcool": {
+          "title": "Calculator Băuturi",
+          "desc": "Calculează vinul, băuturile tari, șampania, berea și apa necesare.",
+          "h1": "Norme pentru Moldova",
+          "h2": "Cost total estimat",
+          "h3": "Ajustare după durată"
+        },
+        "meniu": {
+          "title": "Calculator Meniu",
+          "desc": "Calculează aperitivele, felul principal, tortul, fructele și gustarea de noapte.",
+          "h1": "Grame pe invitat",
+          "h2": "Kilograme totale",
+          "h3": "Cost estimat"
+        }
+      },
+      "faq": {
+        "q1": "Estimările sunt prețuri garantate?",
+        "a1": "Nu. Rezultatele sunt orientative pentru planificare. Oferta scrisă a furnizorului este valoarea finală.",
+        "q2": "Calculatoarele folosesc repere pentru Moldova?",
+        "a2": "Da. Formulele și intervalele sunt adaptate evenimentelor din Republica Moldova și actualizate pentru 2026.",
+        "q3": "Trebuie să am cont?",
+        "a3": "Poți deschide calculatoarele public, iar contul îți permite să păstrezi rezultatele și să continui planificarea."
+      }
+    },
+    "gift": {
+      "breadcrumb": "Dar de nuntă",
+      "crumb": "Dar de nuntă",
+      "title": "Cât să dau dar la nuntă?",
+      "intro": "Calculator specific pentru Moldova. Suma ar trebui să acopere costul farfuriei tale și să lase ceva pentru tinerii căsătoriți. Folosește estimările ca reper — nu sunt reguli bătute în cuie.",
+      "relTitle": "Relația cu mirii",
+      "venueTitle": "Tipul sălii / restaurantului",
+      "cityTitle": "Unde este nunta",
+      "attendeesTitle": "Câți mergeți",
+      "adults": "Adulți",
+      "children": "Copii",
+      "rel": {
+        "colleague": {
+          "label": "Coleg de serviciu / cunoscut",
+          "desc": "Relație profesională sau cunoaștere ocazională"
+        },
+        "friend": {
+          "label": "Prieten apropiat",
+          "desc": "Vă vedeți regulat, vă cunoașteți familiile"
+        },
+        "close_friend": {
+          "label": "Prieten foarte apropiat",
+          "desc": "Prietenie de ani de zile, ca o familie"
+        },
+        "cousin": {
+          "label": "Rudă (văr, mătușă, etc.)",
+          "desc": "Membru al familiei extinse"
+        },
+        "sibling": {
+          "label": "Rudă apropiată (frate, unchi)",
+          "desc": "Familie apropiată"
+        },
+        "nas": {
+          "label": "Naș / cumătru",
+          "desc": "Rol ceremonial — suma este mult mai mare"
+        }
+      },
+      "venue": {
+        "modest": "Cantină / sală modestă",
+        "standard": "Restaurant standard",
+        "premium": "Restaurant premium",
+        "luxury": "Sală luxury / hotel 5★"
+      },
+      "city": {
+        "chisinau": "Chișinău / Bălți",
+        "regional": "Centru raional",
+        "rural": "Sat / comună"
+      },
+      "perPerson": "≈{amount}€ / persoană",
+      "suggestion": "Sugestia noastră",
+      "typicalNote": "Suma tipică pentru situația ta. Farfuria ta costă aproximativ",
+      "min": "Minim",
+      "minNote": "doar farfuria",
+      "typical": "Tipic",
+      "typicalTag": "recomandat",
+      "generous": "Generos",
+      "generousNote": "cadou mare",
+      "basis": "Calculul se bazează pe: {venue} ({plate} / plat) × {guests} invitați × multiplicator \"{rel}\" × zonă {city}.",
+      "nasNote": "Dacă ești naș sau cumătru, suma reală este adesea mult mai mare — include și cheltuielile ceremoniale (lumânare, tort, daruri).",
+      "cta": "Planifici propria nuntă?"
+    },
+    "drinks": {
+      "title": "Calculator băuturi pentru eveniment",
+      "intro": "Află exact câte sticle de vin, vodcă, coniac, șampanie, bere și apă trebuie să cumperi în funcție de tipul evenimentului, numărul de invitați și durata petrecerii.",
+      "eventDetails": "Detalii eveniment",
+      "eventType": "Tip eveniment",
+      "drinkersRatio": "% invitați care consumă alcool",
+      "duration": "Durată eveniment (ore)",
+      "breakdown": "Detaliere pe băuturi",
+      "colDrink": "Băutură",
+      "colTotalMl": "Total ml",
+      "colBottles": "Sticle",
+      "colCost": "Cost",
+      "totalBottles": "Total sticle",
+      "estimatedCost": "Cost estimativ: {amount}"
+    },
+    "eventType": {
+      "wedding": "Nuntă",
+      "cununie": "Cununie",
+      "baptism": "Botez",
+      "cumatrie": "Cumătrie",
+      "birthday": "Aniversare",
+      "kids_birthday": "Aniversare copii",
+      "corporate": "Corporate",
+      "concert": "Concert / Petrecere",
+      "other": "Alt tip"
+    },
+    "guests": {
+      "method": {
+        "attendance": "Prezența reală = invitați × (1 − rata absențe)",
+        "bathrooms": "Băi: minim 2, apoi 1 per 50 invitați (normă sanitară)",
+        "parking": "Parcare: 1 loc per 3 invitați (presupune ride-sharing parțial)",
+        "tables": "Mese = ceil(locuri necesare / locuri per masă) + masa principală",
+        "waiters": "Ospătari: 1 per 15 invitați la dineu cu servire"
+      },
+      "stats": {
+        "bathrooms": "Băi necesare",
+        "emptySeats": "Locuri libere la ultima masă",
+        "expected": "Invitați confirmați estimați",
+        "parking": "Locuri de parcare",
+        "tables": "Mese necesare",
+        "waiters": "Ospătari recomandați"
+      },
+      "breadcrumb": "Invitați",
+      "detailsTitle": "Detalii",
+      "expectedAttendance": "Prezență estimată",
+      "headTableSeats": "Locuri la masa principală (mirii)",
+      "methodTitle": "Cum calculăm?",
+      "noShowHint": "Media în Moldova: 8–12% nu confirmă prezența la ultimul moment.",
+      "noShowRate": "Rata de absențe (%)",
+      "outOf": "din {count}",
+      "pageIntro": "Află câte mese, băi, ospătari și locuri de parcare îți sunt necesare pentru un eveniment confortabil și bine organizat.",
+      "pageTitle": "Calculator invitați & mese",
+      "seats10": "10 locuri (standard)",
+      "seats12": "12 locuri",
+      "seats6": "6 locuri",
+      "seats8": "8 locuri",
+      "seatsPerTable": "Locuri la masă",
+      "totalGuests": "Număr total invitați"
+    },
+    "guestCount": "Număr invitați"
+  },
+  "terms": {
+    "breadcrumb": "Termeni",
+    "title": "Termeni și Condiții",
+    "updated": "Ultima actualizare: 1 ianuarie 2026",
+    "s1": {
+      "title": "1. Despre serviciu",
+      "body": "ePetrecere.md este un marketplace care pune în legătură clienții care planifică evenimente cu furnizorii de servicii (artiști, săli, fotografi, etc.) din Moldova. Nu suntem parte la contractele dintre clienți și furnizori."
+    },
+    "s2": {
+      "title": "2. Cont și eligibilitate",
+      "body": "Trebuie să ai cel puțin 18 ani pentru a crea un cont. Ești responsabil pentru păstrarea credențialelor în siguranță."
+    },
+    "s3": {
+      "title": "3. Conduita utilizatorilor",
+      "body": "Este interzis să postezi conținut ilegal, înșelător, jignitor sau să folosești platforma pentru spam. Recenziile false sunt interzise și vor fi șterse."
+    },
+    "s4": {
+      "title": "4. Responsabilități",
+      "body": "Nu garantăm disponibilitatea, calitatea sau legalitatea serviciilor furnizorilor listați. Încurajăm clienții să verifice fiecare furnizor independent și să semneze un contract scris."
+    },
+    "s5": {
+      "title": "5. Proprietate intelectuală",
+      "body": "Brand-ul ePetrecere, logoul și designul sunt protejate. Conținutul generat de utilizatori rămâne al autorilor, dar ne acordați o licență non-exclusivă pentru afișare pe platformă."
+    },
+    "s6": {
+      "title": "6. Modificări",
+      "body": "Putem actualiza acești termeni. Versiunea curentă este mereu accesibilă la /termeni. Continuarea utilizării înseamnă acceptare."
+    },
+    "s7": {
+      "title": "7. Operatorul platformei",
+      "body": "Operatorul platformei este Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.), IDNO 1026023123354, cu sediul în MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova.",
+      "docs": "Documentele contractuale complete — Termenii Generali, acordurile cu partenerii și cu locațiile, politicile de confidențialitate, cookie, recenzii și anti-fraudă — sunt publicate la"
+    },
+    "s8": {
+      "title": "8. Contact"
+    },
+    "questions": "Întrebări?"
+  },
+  "push": {
+    "notConfigured": "Server push nu e configurat",
+    "enabled": "Notificări activate 🔔",
+    "enableFailed": "Nu am putut activa notificările",
+    "disabled": "Notificări dezactivate",
+    "disableError": "Eroare la dezactivare",
+    "checking": "Verific…",
+    "unsupported": "Browser-ul tău nu suportă notificări push.",
+    "blockedTitle": "Notificări blocate",
+    "blockedBody": "Le-ai blocat din setările browserului. Deschide setările site-ului (🔒 lângă URL) și re-permite notificările.",
+    "activeToggle": "Notificări active — apasă pentru a dezactiva",
+    "enable": "Activează notificări"
+  },
+  "booking": {
+    "card": {
+      "sendError": "Eroare la trimitere",
+      "sentTo": "Cerere trimisă către {name}!",
+      "requestSent": "Cerere trimisă",
+      "limitReached": "Limită atinsă (5)",
+      "requestBooking": "Solicită rezervare",
+      "eventDetails": "Detalii eveniment",
+      "dateLabel": "Data:",
+      "typeLabel": "Tip:",
+      "guestsLabel": "Invitați:",
+      "nameLabel": "Nume:",
+      "phoneLabel": "Telefon:",
+      "messageOptional": "Mesaj (opțional)",
+      "messagePlaceholder": "Alte detalii despre eveniment...",
+      "viewProfile": "Vezi profil",
+      "sendRequest": "Trimite cerere"
+    }
+  },
+  "referral": {
+    "titleShort": "Invită & câștigi",
+    "title": "Invită & câștigi credit",
+    "intro": {
+      "p1": "Pentru fiecare prieten care își publică profilul primești",
+      "p2": ". Pentru prima lor rezervare acceptată pe platformă primești încă",
+      "p3": ". Creditul e redeemable împotriva abonamentului viitor (Stripe)."
+    },
+    "creditEarned": "Credit acumulat",
+    "invitedOne": "{count} persoană invitate",
+    "invitedMany": "{count} persoane invitate",
+    "uniqueLink": "Linkul tău unic",
+    "copyLink": "Copiază link",
+    "share": "Share",
+    "yourCode": "Codul tău:",
+    "invitedPeople": "Persoane invitate",
+    "userFallback": "Utilizator",
+    "milestone": {
+      "signup": "S-a înregistrat",
+      "onboarded": "Profil publicat",
+      "firstBooking": "Prima rezervare"
+    },
+    "awaitingFirstBooking": "Așteaptă prima rezervare",
+    "emptyState": "Încă n-ai invitat pe nimeni. Distribuie linkul prietenilor care au nevoie de servicii pentru evenimente!",
+    "footnote": "ℹ️ Creditul se acumulează automat când persoana invitată își publică profilul sau primește o rezervare. Plățile Stripe urmează.",
+    "linkCopied": "Link copiat!",
+    "copyFailed": "Nu s-a putut copia",
+    "shareTitle": "Invitație ePetrecere.md",
+    "shareText": "Am folosit ePetrecere.md pentru evenimentul meu și chiar m-a ajutat. Încearcă-l și tu — folosește linkul meu: {url}"
+  },
+  "artistsCity": {
+    "heading": "Artiști pentru evenimente în {city}",
+    "listName": "Artiști în {city}",
+    "intro": "{count} și trupe profesioniste disponibile în {city} pentru nuntă, botez, cumătrie, aniversare și evenimente corporate. Compară prețuri, citește recenzii și rezervă direct online.",
+    "empty": "Momentan nu avem artiști listați în {city}. Explorează lista completă de artiști sau contactează-ne pentru recomandări personalizate.",
+    "none": "Niciun artist disponibil în {city} momentan."
+  },
+  "packages": {
+    "eyebrow": "Pentru furnizori",
+    "title": "Listează-ți serviciile pe ePetrecere.md",
+    "subtitle": "Trei pachete simple — începe gratuit și face upgrade oricând. Fără comisioane pe rezervări, plătești doar abonamentul.",
+    "popular": "Popular",
+    "compare": "Vezi comparația completă",
+    "free": "Gratuit",
+    "forever": "pentru totdeauna",
+    "perMonth": "pe lună",
+    "basic": {
+      "f1": "Profil public",
+      "f2": "5 fotografii",
+      "f3": "1 pachet servicii",
+      "f4": "Cereri de ofertă",
+      "cta": "Începe gratuit"
+    },
+    "pro": {
+      "f1": "Galerie nelimitată",
+      "f2": "Calendar sincronizat",
+      "f3": "Răspuns automat",
+      "f4": "Prioritate în căutare",
+      "cta": "Aplică pentru Pro"
+    },
+    "premium": {
+      "f1": "Featured pe homepage",
+      "f2": "AI Assistant inclus",
+      "f3": "Manager de cont",
+      "f4": "Rapoarte lunare",
+      "cta": "Vreau Premium"
+    }
+  },
+  "upload": {
+    "maxFiles": "Maximum {max} imagini",
+    "tooLarge": "{name} depășește 10MB",
+    "added": "{count} imagini adăugate",
+    "uploading": "Se uploadează...",
+    "dragHere": "Trage imaginile aici",
+    "hint": "sau click pentru a selecta (max 10MB/img, {max} total)",
+    "setCoverAria": "Setează ca imagine principală",
+    "setCoverTitle": "Setează ca cover",
+    "deleteAria": "Șterge imaginea"
+  },
+  "share": {
+    "action": "Partajează",
+    "on": "Partajează pe {network}",
+    "copied": "Link copiat",
+    "copy": "Copiază link",
+    "copiedShort": "Copiat!"
+  },
+  "quiz": {
+    "eyebrow": "Chestionar rapid",
+    "title": "Găsim împreună furnizorii perfecți",
+    "stepOf": "Pas {current} din {total}",
+    "steps": {
+      "eventType": "Tipul evenimentului",
+      "guestCount": "Numărul invitaților",
+      "budget": "Bugetul aproximativ",
+      "location": "Locația",
+      "style": "Stilul dorit",
+      "services": "Ce servicii cauți"
+    },
+    "styles": {
+      "elegant": "Elegant & clasic",
+      "elegantDesc": "Rafinament și simplitate",
+      "modern": "Modern & trendy",
+      "modernDesc": "Minimalism actual",
+      "rustic": "Rustic & tradițional",
+      "rusticDesc": "Autentic moldovenesc",
+      "glamour": "Glamour & luxos",
+      "glamourDesc": "Spectaculos și opulent",
+      "boho": "Boho & natural",
+      "bohoDesc": "Relaxat și organic",
+      "themed": "Tematic",
+      "themedDesc": "Concept personalizat"
+    },
+    "services": {
+      "singer": "Cântăreț / Interpret",
+      "band": "Formație muzicală",
+      "dj": "DJ",
+      "mc": "Moderator",
+      "photographer": "Foto-Video",
+      "show": "Show-program / Dansatori",
+      "decor": "Decor & Floristică",
+      "animators": "Animatori copii"
+    },
+    "guests": {
+      "under50": "Sub 50 invitați",
+      "under50Desc": "Intim",
+      "to150": "50–150 invitați",
+      "to150Desc": "Mediu",
+      "to300": "150–300 invitați",
+      "to300Desc": "Mare",
+      "over300": "Peste 300 invitați",
+      "over300Desc": "Foarte mare"
+    },
+    "budget": {
+      "under1500": "Sub 1.500€",
+      "to5000": "1.500€ – 5.000€",
+      "to12000": "5.000€ – 12.000€",
+      "to25000": "12.000€ – 25.000€",
+      "over25000": "Peste 25.000€"
+    },
+    "submitError": "A apărut o eroare. Încearcă din nou.",
+    "resultsTitle": "Am găsit {count} furnizori potriviți pentru tine",
+    "emptyTitle": "Niciun furnizor găsit",
+    "resultsHint": "Sortați după scorul de potrivire cu răspunsurile tale.",
+    "emptyHint": "Încearcă să ajustezi criteriile (buget, oraș sau servicii).",
+    "startOver": "Începe din nou",
+    "seeAllArtists": "Vezi toți artiștii",
+    "findVendors": "Găsește furnizori"
+  },
+  "catalogFilters": {
+    "title": "Filtrează rezultate",
+    "price": "Preț",
+    "location": "Locație",
+    "allMoldova": "Toată Moldova",
+    "minRating": "Rating minim",
+    "apply": "Aplică filtrele",
+    "close": "Închide filtrele",
+    "category": "Categorie",
+    "allCategories": "Toate categoriile",
+    "allLocations": "Toate localitățile"
+  },
+  "categoryPage": {
+    "heroAlt": "Profesioniști pentru evenimente din Moldova",
+    "premium": "Categorie premium",
+    "fallbackDesc": "Descoperă profesioniști potriviți pentru evenimentul tău, într-o selecție modernă și ușor de filtrat.",
+    "searchIn": "Caută în",
+    "found": "găsiți",
+    "entityVendors": "furnizori",
+    "entityArtists": "artiști",
+    "ctaTitle": "Vrei recomandări potrivite evenimentului tău?",
+    "ctaDesc": "Spune-ne ce organizezi și planificatorul îți pregătește o selecție personalizată.",
+    "ctaButton": "Planifică evenimentul"
+  },
+  "artistsPage": {
+    "heroAlt": "Artist pe scenă la un eveniment din Moldova",
+    "title": "Artiști pentru evenimentul tău",
+    "description": "Descoperă artiști, formații și prezentatori profesioniști pentru evenimente în toată Republica Moldova.",
+    "searchPlaceholder": "Caută artiști, formații, prezentatori...",
+    "popularSearches": "Căutări populare:",
+    "ctaTitle": "Nu știi ce ți se potrivește?",
+    "ctaDesc": "Spune-ne despre eveniment și îți recomandăm artiști potriviți.",
+    "ctaButton": "Primește recomandări personalizate"
+  },
+  "cookies": {
+    "title": "Preferințe de confidențialitate",
+    "description": "Folosim elemente esențiale pentru funcționare. Analytics și marketing sunt dezactivate până când alegi.",
+    "policy": "Politica Cookies",
+    "customize": "Personalizează",
+    "reject": "Refuz opționale",
+    "accept": "Accept toate",
+    "save": "Salvează alegerea",
+    "necessary": "Necesare",
+    "necessaryDesc": "Autentificare, securitate și funcții de bază. Mereu active.",
+    "preferences": "Preferințe",
+    "preferencesDesc": "Limba, aspectul și setările tale.",
+    "analytics": "Analytics",
+    "analyticsDesc": "Măsurare agregată a utilizării și performanței.",
+    "marketing": "Marketing",
+    "marketingDesc": "Atribuire campanii și conținut promoțional personalizat.",
+    "settings": "Setări cookies"
+  },
+  "budgetCalc": {
+    "eventDetails": "Detalii eveniment",
+    "eventType": "Tip eveniment",
+    "guestCount": "Număr invitați",
+    "pricePerPerson": "Preț sală / persoană (€)",
+    "pricePerPersonHint": "Pune 0 dacă ai deja locația rezervată.",
+    "venueRental": "Chirie sală (€, opțional)",
+    "services": "Servicii dorite",
+    "estimatedBudget": "Buget estimat",
+    "range": "Interval:",
+    "emptyBreakdown": "Selectează servicii pentru a vedea detalierea.",
+    "findVendors": "Găsește vendori pentru acest buget",
+    "breadcrumb": "Buget",
+    "pageTitle": "Calculator buget eveniment",
+    "pageIntro": "Alege tipul evenimentului, numărul de invitați, prețul pe persoană la sală și serviciile de care ai nevoie. Îți calculăm instant bugetul total cu un interval realistic."
+  },
+  "contactPage": {
+    "subtitle": "Contactează-ne pentru orice întrebare legată de serviciile noastre",
+    "address": "Adresă",
+    "addressValue": "Chișinău, Republica Moldova",
+    "hours": "Program",
+    "hoursWeekdays": "Luni — Vineri: 09:00 – 18:00",
+    "hoursSaturday": "Sâmbătă: 10:00 – 14:00",
+    "sentTitle": "Mesajul a fost trimis!",
+    "sentBody": "Te vom contacta in cel mai scurt timp posibil.",
+    "sendFailed": "Nu am putut trimite mesajul. Încercați din nou sau contactați-ne telefonic.",
+    "phoneFormat": "Format: +373 XX XXX XXX sau 0XX XXX XXX"
+  },
+  "notifications": {
+    "title": "Notificări",
+    "unreadCount": "{count} necitite",
+    "markAll": "Marchează toate",
+    "empty": "Nicio notificare încă.",
+    "justNow": "acum",
+    "minutesAgo": "{n}m",
+    "hoursAgo": "{n}h",
+    "daysAgo": "{n}z"
+  },
+  "filterBar": {
+    "price": "Preț:",
+    "category": "Categorie:",
+    "city": "Oraș:",
+    "capacity": "Capacitate:",
+    "priceAria": "Filtru preț: {value}",
+    "categoryAria": "Filtru categorie: {value}",
+    "cityAria": "Filtru oraș: {value}",
+    "capacityAria": "Filtru capacitate: {value}",
+    "resetAll": "Resetează filtrele"
+  },
+  "partners": {
+    "title": "Partenerii noștri"
+  },
+  "chat": {
+    "signInArtist": "Chat cu artistul (autentifică-te)",
+    "signInVenue": "Chat cu locația (autentifică-te)",
+    "header": "Chat",
+    "close": "Închide chat",
+    "emptyArtist": "Scrie primul mesaj — artistul va primi notificare.",
+    "emptyVenue": "Scrie primul mesaj — echipa locației va primi notificare.",
+    "inputPlaceholder": "Scrie un mesaj...",
+    "send": "Trimite mesaj",
+    "direct": "Chat direct",
+    "sendFailed": "Mesajul nu a putut fi trimis."
+  },
+  "about": {
+    "title": "Platforma Nr. 1 pentru Evenimente din Moldova",
+    "subtitle": "ePetrecere.md conectează organizatorii de evenimente cu cei mai buni artiști, săli și furnizori de servicii din Republica Moldova.",
+    "features": {
+      "artists": {
+        "title": "500+ Artiști",
+        "desc": "Cea mai mare bază de artiști și furnizori de servicii pentru evenimente din Moldova."
+      },
+      "calendar": {
+        "title": "Calendar Live",
+        "desc": "Verifică disponibilitatea artiștilor și sălilor în timp real."
+      },
+      "verified": {
+        "title": "Verificați",
+        "desc": "Toți artiștii sunt verificați și evaluați de clienți reali."
+      },
+      "ai": {
+        "desc": "Asistent AI pentru planificarea evenimentului perfect."
+      }
+    },
+    "mission": {
+      "title": "Misiunea Noastră",
+      "body": "Ne dorim să facem planificarea evenimentelor accesibilă, transparentă și plăcută. Prin tehnologie modernă și o selecție atentă de profesioniști, transformăm fiecare eveniment într-o experiență memorabilă."
+    }
+  },
+  "requestForm": {
+    "requestPrice": "Solicită Preț",
+    "priceSubtitle": "Lăsați datele de contact și vă vom reveni cu o ofertă personalizată.",
+    "priceSent": "Cererea a fost trimisă! Vă vom contacta în curând.",
+    "sendRequest": "Trimite cererea",
+    "requestBooking": "Solicită Rezervare",
+    "bookingSubtitle": "Completați detaliile evenimentului și vă vom confirma disponibilitatea.",
+    "errorNoDate": "Selectează data evenimentului ca să trimiți cererea.",
+    "errorNoName": "Completează numele.",
+    "errorNoPhone": "Completează numărul de telefon.",
+    "sentLinkedToPlan": "Cererea a fost trimisă și legată de planul tău!",
+    "sentSeeInMyBookings": "Cererea de rezervare a fost trimisă! O vezi în Rezervările Mele.",
+    "sentWeWillContact": "Cererea de rezervare a fost trimisă! Vă vom contacta în curând.",
+    "capacityWarning": "Depășește capacitatea maximă ({max} locuri)",
+    "sendBookingRequest": "Trimite cererea de rezervare"
+  },
+  "results": {
+    "loadError": "Nu am putut încărca rezultatele. Încearcă din nou.",
+    "title": "Rezultatele tale",
+    "subtitle": "Doar artiști și săli disponibile pentru data ta. Trimite cereri de rezervare direct de aici (max 5 artiști per categorie).",
+    "editPlan": "Modifică planificarea",
+    "guestsChip": "{count} invitați",
+    "budgetChip": "Buget {amount}€",
+    "withVenue": "Cu sală",
+    "planCreated": "Planul tău a fost creat automat. Cererile trimise vor apărea în tabul",
+    "bookingsTab": "Rezervări Artiști",
+    "viewInCrm": "Vezi în CRM",
+    "openPlan": "Deschide planul",
+    "venuesTitle": "Săli disponibile",
+    "venuesSubtitle": "Săli libere pe {date} pentru minim {guests} invitați",
+    "venuesEmpty": "Nicio sală disponibilă pentru filtrele alese. Încearcă să modifici data sau numărul de invitați.",
+    "artistsSubtitle": "{count} artiști liberi · {used}/{max} cereri trimise",
+    "artistsEmpty": "Niciun artist disponibil în această categorie pentru data aleasă.",
+    "noCategories": "Nu ai selectat nicio categorie. Revino și alege cel puțin una.",
+    "helpTitle": "Nu găsești ce cauți?",
+    "helpDesc": "Trimite-ne detaliile evenimentului și te ajutăm să găsim combinația perfectă.",
+    "helpCta": "Contactează-ne"
+  },
+  "utilitati": {
+    "eyebrow": "Utilități",
+    "title": "Instrumente pentru evenimentul tău",
+    "description": "Organizează o nuntă, cumătrie, botez sau eveniment corporate din Moldova cu instrumente gratuite, într-un singur loc.",
+    "online": "Instrumente online",
+    "calculators": "Calculatoare",
+    "all": "Vezi toate",
+    "open": "Deschide",
+    "calc": {
+      "buget": {
+        "title": "Calculator Buget",
+        "desc": "Estimează bugetul total al evenimentului."
+      },
+      "invitati": {
+        "title": "Invitați și Mese",
+        "desc": "Câte mese, ospătari și locuri de parcare îți trebuie?"
+      },
+      "darNunta": {
+        "title": "Calculator Dar Nuntă",
+        "desc": "Cât să dai dar la nuntă în Moldova."
+      },
+      "nunta": {
+        "title": "Calculator Cost Nuntă",
+        "desc": "Estimare totală pentru nunta ta în 2026."
+      },
+      "alcool": {
+        "title": "Calculator Băuturi",
+        "desc": "Câte sticle de vin, vodcă și șampanie pe invitat."
+      },
+      "meniu": {
+        "title": "Calculator Meniu",
+        "desc": "Cantități realiste pentru aperitive, fel principal, desert."
+      }
+    }
+  },
+  "cityCategory": {
+    "heading": "{category} în {city}",
+    "intro": "{total} {category} profesioniști în {city}. Compară prețuri, citește recenzii și rezervă direct online pentru nuntă, botez, cumătrie sau eveniment corporate.",
+    "empty": "Momentan nu avem {category} listați în {city}. Explorează alte categorii sau orașe.",
+    "none": "Niciun {category} disponibil în {city}.",
+    "viewAllCategory": "Vezi toți {category} →",
+    "viewAllCity": "Vezi toți artiștii din {city} →"
+  },
+  "addToEvent": {
+    "bookForEvent": "Rezervă pentru evenimentul tău",
+    "addArtist": "Adaugă artistul la un eveniment",
+    "addVenue": "Adaugă sala la un eveniment",
+    "dialogTitle": "Alege evenimentul",
+    "dialogDescription": "Alege evenimentul tău. Evenimentele unde partenerul este deja ocupat sunt marcate corespunzător.",
+    "noDate": "Fără dată stabilită",
+    "busy": "Ocupat — partenerul are deja o rezervare în această zi.",
+    "newEvent": "Eveniment nou",
+    "newEventHint": "Creezi evenimentul în câteva secunde — apoi îți trimitem cererea către acest partener automat."
+  },
+  "gallery": {
+    "openImage": "Deschide imaginea {index}",
+    "image": "Imagine {index}",
+    "ariaLabel": "Galerie imagini",
+    "close": "Închide galeria",
+    "prevImage": "Imagine precedentă",
+    "nextImage": "Imagine următoare",
+    "noPhotos": "Nu există fotografii disponibile.",
+    "photo": "Fotografie {index}",
+    "prevPhoto": "Precedenta",
+    "nextPhoto": "Următoarea"
   }
 }

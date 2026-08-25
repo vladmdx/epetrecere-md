@@ -7,6 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { NOUNS, plural } from "@/lib/i18n/plural";
+import { t } from "@/i18n";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Calendar, MapPin, ArrowLeft, Users } from "lucide-react";
 import { RealWeddingGallery } from "./gallery";
@@ -113,15 +114,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function RealWeddingPage({ params }: Props) {
-  const { id } = await params;
+  const { locale: rawLocale, id } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const data = await getWedding(Number(id));
   if (!data) notFound();
 
   const { plan, photos, taggedArtists, taggedVenues } = data;
 
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Nunți reale", url: "/nunti-reale" },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("realWeddings.breadcrumb", locale), url: "/nunti-reale" },
     { name: plan.title, url: `/nunti-reale/${id}` },
   ];
 
@@ -140,7 +142,7 @@ export default async function RealWeddingPage({ params }: Props) {
           className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-gold"
         >
           <ArrowLeft className="h-4 w-4" />
-          Înapoi la galerie
+          {t("realWeddings.detail.backToGallery", locale)}
         </Link>
 
         <header className="mb-8">
@@ -167,7 +169,7 @@ export default async function RealWeddingPage({ params }: Props) {
             {plan.guestCountTarget && (
               <span className="flex items-center gap-1.5">
                 <Users className="h-4 w-4" />
-                {plan.guestCountTarget} invitați
+                {plural(plan.guestCountTarget, locale, NOUNS.guests)}
               </span>
             )}
           </div>
@@ -177,7 +179,7 @@ export default async function RealWeddingPage({ params }: Props) {
         {(taggedArtists.length > 0 || taggedVenues.length > 0) && (
           <div className="mb-8 rounded-2xl border border-border/40 bg-card p-5">
             <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-              Furnizorii de la acest eveniment
+              {t("realWeddings.detail.vendorsHere", locale)}
             </p>
             <div className="flex flex-wrap gap-2">
               {taggedVenues.map((v) => (
@@ -213,17 +215,16 @@ export default async function RealWeddingPage({ params }: Props) {
 
         <div className="mt-12 rounded-2xl border border-gold/20 bg-gold/5 p-6 text-center">
           <h3 className="mb-2 font-heading text-lg font-semibold">
-            Inspirat de povestea lor?
+            {t("realWeddings.detail.ctaTitle", locale)}
           </h3>
           <p className="mb-4 text-sm text-muted-foreground">
-            Începe planificarea propriei tale nunți cu instrumentele și
-            furnizorii noștri.
+            {t("realWeddings.detail.ctaDesc", locale)}
           </p>
           <Link
             href="/planifica"
             className="inline-flex items-center gap-2 rounded-lg bg-gold px-6 py-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
           >
-            Planifică nunta ta
+            {t("realWeddings.detail.ctaButton", locale)}
           </Link>
         </div>
       </div>

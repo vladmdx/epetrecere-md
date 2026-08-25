@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, artists, venues } from "@/lib/db/schema";
 import { and, eq, desc, sql } from "drizzle-orm";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
+import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Camera, Calendar, MapPin, ArrowRight } from "lucide-react";
@@ -157,18 +158,24 @@ async function getRealWeddings(): Promise<RealWeddingCard[]> {
 
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
 
-export default async function RealWeddingsPage() {
+export default async function RealWeddingsPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: rawLocale } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const weddings = await getRealWeddings();
 
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Nunți reale", url: "/nunti-reale" },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("realWeddings.breadcrumb", locale), url: "/nunti-reale" },
   ];
 
   const itemList = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Nunți reale din Moldova",
+    name: t("realWeddings.title", locale),
     numberOfItems: weddings.length,
     itemListElement: weddings.slice(0, 10).map((w, i) => ({
       "@type": "ListItem",
@@ -193,9 +200,9 @@ export default async function RealWeddingsPage() {
 
       <div className="mx-auto max-w-7xl px-4 py-12 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">Acasă</Link>
+          <Link href="/" className="hover:text-gold">{t("nav.home", locale)}</Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">Nunți reale</span>
+          <span className="text-foreground">{t("realWeddings.breadcrumb", locale)}</span>
         </nav>
 
         <header className="mb-10 text-center">
@@ -203,11 +210,10 @@ export default async function RealWeddingsPage() {
             <Camera className="h-8 w-8 text-gold" />
           </div>
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            Nunți reale din Moldova
+            {t("realWeddings.title", locale)}
           </h1>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
-            Povești adevărate de la cuplurile care și-au planificat nunta pe
-            ePetrecere.md. Inspirație, idei și furnizori verificați din comunitate.
+            {t("realWeddings.description", locale)}
           </p>
         </header>
 
@@ -215,16 +221,16 @@ export default async function RealWeddingsPage() {
           <div className="rounded-2xl border border-dashed border-border/40 bg-card py-20 text-center">
             <Camera className="mx-auto h-12 w-12 text-muted-foreground/40" />
             <h2 className="mt-4 font-heading text-lg font-semibold">
-              Primele povești sunt pe drum
+              {t("realWeddings.emptyTitle", locale)}
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              În curând vei putea vedea aici fotografii și povești de la nunți reale.
+              {t("realWeddings.emptyDescription", locale)}
             </p>
             <Link
               href="/planifica"
               className="mt-6 inline-flex items-center gap-2 rounded-lg bg-gold px-5 py-2 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
             >
-              Planifică-ți propria nuntă
+              {t("realWeddings.planCta", locale)}
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -245,7 +251,7 @@ export default async function RealWeddingsPage() {
                     className="object-cover transition-transform group-hover:scale-105"
                   />
                   <div className="absolute bottom-3 right-3 rounded-full bg-background/90 px-2.5 py-1 text-[11px] font-medium">
-                    {w.photoCount} foto
+                    {t("realWeddings.photoCount", locale, { count: w.photoCount })}
                   </div>
                 </div>
                 <div className="p-5">

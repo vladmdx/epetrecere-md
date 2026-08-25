@@ -63,6 +63,7 @@ interface ResultsClientProps {
 
 export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
   const router = useRouter();
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const storageKey = adminMode ? "admin-wizard-data" : "wizard-data";
   const planIdKey = adminMode ? "admin-wizard-plan-id" : "wizard-plan-id";
@@ -74,6 +75,7 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
   >({});
   const [venues, setVenues] = useState<VenueItem[]>([]);
   const [loading, setLoading] = useState(true);
+  /** Translation key of the load error, resolved at render time. */
   const [error, setError] = useState<string | null>(null);
   const [planId, setPlanId] = useState<number | null>(null);
   /** Set of artist IDs that already have a booking request for this plan. */
@@ -244,7 +246,7 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
         setArtistsByService(grouped);
         setVenues(venueResults);
       } catch {
-        if (alive) setError("Nu am putut încărca rezultatele. Încearcă din nou.");
+        if (alive) setError("results.loadError");
       } finally {
         if (alive) setLoading(false);
       }
@@ -304,24 +306,23 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
         <div className="mx-auto max-w-6xl px-4 py-6">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h1 className="font-heading text-2xl font-bold">Rezultatele tale</h1>
+              <h1 className="font-heading text-2xl font-bold">{t("results.title")}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
-                Doar artiști și săli disponibile pentru data ta. Trimite cereri de
-                rezervare direct de aici (max 5 artiști per categorie).
+                {t("results.subtitle")}
               </p>
             </div>
             <Button variant="outline" onClick={() => router.push(backRoute)} className="gap-2">
-              <ArrowLeft className="h-4 w-4" /> Modifică planificarea
+              <ArrowLeft className="h-4 w-4" /> {t("results.editPlan")}
             </Button>
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2 text-xs">
             <SummaryChip icon={<Calendar className="h-3.5 w-3.5" />} label={formattedDate} />
             <SummaryChip icon={<MapPin className="h-3.5 w-3.5" />} label={wizard.location || "—"} />
-            <SummaryChip icon={<Users className="h-3.5 w-3.5" />} label={`${wizard.guestCount} invitați`} />
-            <SummaryChip icon={<Wallet className="h-3.5 w-3.5" />} label={`Buget ${wizard.budget.toLocaleString()}€`} />
+            <SummaryChip icon={<Users className="h-3.5 w-3.5" />} label={t("results.guestsChip", { count: wizard.guestCount })} />
+            <SummaryChip icon={<Wallet className="h-3.5 w-3.5" />} label={t("results.budgetChip", { amount: wizard.budget.toLocaleString() })} />
             {wizard.venueNeeded === "yes" && (
-              <SummaryChip icon={<Sparkles className="h-3.5 w-3.5" />} label="Cu sală" />
+              <SummaryChip icon={<Sparkles className="h-3.5 w-3.5" />} label={t("results.withVenue")} />
             )}
           </div>
 
@@ -329,14 +330,14 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
             <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-gold/30 bg-gold/5 px-4 py-2.5 text-sm">
               <ClipboardList className="h-4 w-4 text-gold shrink-0" />
               <p className="flex-1 text-foreground/90">
-                Planul tău a fost creat automat. Cererile trimise vor apărea în
-                tabul <span className="font-medium text-gold">Rezervări Artiști</span>.
+                {t("results.planCreated")}{" "}
+                <span className="font-medium text-gold">{t("results.bookingsTab")}</span>.
               </p>
               <Link
                 href={adminMode ? `/admin/crm` : `/cabinet/planifica/${planId}`}
                 className="inline-flex items-center gap-1 text-xs font-medium text-gold hover:underline"
               >
-                {adminMode ? "Vezi în CRM" : "Deschide planul"} <ExternalLink className="h-3 w-3" />
+                {adminMode ? t("results.viewInCrm") : t("results.openPlan")} <ExternalLink className="h-3 w-3" />
               </Link>
             </div>
           )}
@@ -352,7 +353,7 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
 
         {!loading && error && (
           <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-sm text-red-400">
-            {error}
+            {t(error)}
           </div>
         )}
 
@@ -361,12 +362,15 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
             {wizard.venueNeeded === "yes" && (
               <section>
                 <SectionHeader
-                  title="Săli disponibile"
-                  subtitle={`Săli libere pe ${formattedDate} pentru minim ${wizard.guestCount} invitați`}
+                  title={t("results.venuesTitle")}
+                  subtitle={t("results.venuesSubtitle", {
+                    date: formattedDate,
+                    guests: wizard.guestCount,
+                  })}
                   count={venues.length}
                 />
                 {venues.length === 0 ? (
-                  <EmptyState message="Nicio sală disponibilă pentru filtrele alese. Încearcă să modifici data sau numărul de invitați." />
+                  <EmptyState message={t("results.venuesEmpty")} />
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {venues.map((venue) => (
@@ -396,11 +400,15 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
                 <section key={svc}>
                   <SectionHeader
                     title={SERVICE_LABELS[svc] ?? svc}
-                    subtitle={`${items.length} artiști liberi · ${usedInCategory}/${MAX_PER_CATEGORY} cereri trimise`}
+                    subtitle={t("results.artistsSubtitle", {
+                      count: items.length,
+                      used: usedInCategory,
+                      max: MAX_PER_CATEGORY,
+                    })}
                     count={items.length}
                   />
                   {items.length === 0 ? (
-                    <EmptyState message="Niciun artist disponibil în această categorie pentru data aleasă." />
+                    <EmptyState message={t("results.artistsEmpty")} />
                   ) : (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
                       {items.map((a) => {
@@ -433,19 +441,19 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
             })}
 
             {wizard.services.length === 0 && wizard.venueNeeded !== "yes" && (
-              <EmptyState message="Nu ai selectat nicio categorie. Revino și alege cel puțin una." />
+              <EmptyState message={t("results.noCategories")} />
             )}
           </div>
         )}
 
         <div className="mt-16 flex flex-col items-center gap-3 rounded-xl border border-gold/20 bg-gold/5 p-8 text-center">
-          <p className="font-heading text-lg">Nu găsești ce cauți?</p>
+          <p className="font-heading text-lg">{t("results.helpTitle")}</p>
           <p className="text-sm text-muted-foreground">
-            Trimite-ne detaliile evenimentului și te ajutăm să găsim combinația perfectă.
+            {t("results.helpDesc")}
           </p>
           <Link href="/contact">
             <Button className="mt-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
-              Contactează-ne
+              {t("results.helpCta")}
             </Button>
           </Link>
         </div>

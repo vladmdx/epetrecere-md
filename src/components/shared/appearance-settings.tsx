@@ -9,16 +9,18 @@ import {
   GOOGLE_FONTS,
   TEXT_SIZES,
 } from "@/hooks/use-preferences";
+import { useLocale } from "@/hooks/use-locale";
 
 export function AppearanceSettings() {
   const { font, textSize, setFont, setTextSize, reset } = usePreferences();
+  const { t } = useLocale();
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2">
           <Type className="h-5 w-5 text-gold" />
-          Aspect
+          {t("appearance.title")}
         </CardTitle>
         <Button
           type="button"
@@ -28,24 +30,24 @@ export function AppearanceSettings() {
           className="gap-1.5 text-xs"
         >
           <RotateCcw className="h-3.5 w-3.5" />
-          Resetează
+          {t("catalog.reset")}
         </Button>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Font Picker */}
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">
-            <Type className="h-3.5 w-3.5" /> Font
+            <Type className="h-3.5 w-3.5" /> {t("appearance.font")}
           </Label>
           <p className="text-xs text-muted-foreground">
-            Alege fontul folosit pe întreg site-ul (Google Fonts)
+            {t("appearance.fontHint")}
           </p>
           <select
             value={font}
             onChange={(e) => setFont(e.target.value as typeof font)}
             className="w-full rounded-lg border border-border/40 bg-background px-3 py-2 text-sm focus:border-gold/50 focus:outline-none"
           >
-            <option value="default">Implicit (DM Sans)</option>
+            <option value="default">{t("appearance.fontDefault")}</option>
             {GOOGLE_FONTS.map((f) => (
               <option key={f} value={f} style={{ fontFamily: `"${f}"` }}>
                 {f}
@@ -59,9 +61,9 @@ export function AppearanceSettings() {
                 font === "default" ? undefined : `"${font}", sans-serif`,
             }}
           >
-            <p className="font-bold">Exemplu de text cu fontul ales</p>
+            <p className="font-bold">{t("appearance.fontSampleTitle")}</p>
             <p className="text-muted-foreground">
-              Servicii pentru evenimente din Republica Moldova.
+              {t("appearance.fontSampleBody")}
             </p>
           </div>
         </div>
@@ -69,10 +71,10 @@ export function AppearanceSettings() {
         {/* Text Size Scale */}
         <div className="space-y-2">
           <Label className="flex items-center gap-1.5">
-            <Text className="h-3.5 w-3.5" /> Mărime text
+            <Text className="h-3.5 w-3.5" /> {t("appearance.textSize")}
           </Label>
           <p className="text-xs text-muted-foreground">
-            Ajustează mărimea textului de la -20% la +30%
+            {t("appearance.textSizeHint")}
           </p>
           <div className="flex flex-wrap gap-1.5">
             {TEXT_SIZES.map((size) => (
@@ -94,10 +96,7 @@ export function AppearanceSettings() {
             className="mt-2 rounded-lg border border-border/40 bg-muted/30 p-3"
             style={{ fontSize: `${1 + textSize / 100}rem` }}
           >
-            <p>
-              Acesta este un exemplu de text. Preferința se aplică pe întreg
-              site-ul și este salvată local.
-            </p>
+            <p>{t("appearance.textSizeSample")}</p>
           </div>
         </div>
       </CardContent>

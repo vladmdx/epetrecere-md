@@ -2,6 +2,7 @@ import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { ContactPageClient } from "./client";
+import { t } from "@/i18n";
 
 export async function generateMetadata({
   params,
@@ -35,7 +36,13 @@ export async function generateMetadata({
   );
 }
 
-export default function ContactPage() {
+export default async function ContactPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   return (
     <>
       <script
@@ -43,8 +50,8 @@ export default function ContactPage() {
         dangerouslySetInnerHTML={{
           __html: safeJsonLd([
             breadcrumbJsonLd([
-              { name: "Acasă", url: "https://epetrecere.md" },
-              { name: "Contact", url: "https://epetrecere.md/contact" },
+              { name: t("nav.home", locale), url: "https://epetrecere.md" },
+              { name: t("nav.contact", locale), url: "https://epetrecere.md/contact" },
             ]),
             {
               "@context": "https://schema.org",

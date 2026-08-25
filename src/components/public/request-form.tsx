@@ -39,7 +39,7 @@ interface FormBaseProps {
 }
 
 // ─── Price Request (simple: name + phone) ────────────────
-export function RequestPriceForm({ artistId, venueId, className, label = "Solicită Preț", variant = "primary" }: FormBaseProps) {
+export function RequestPriceForm({ artistId, venueId, className, label, variant = "primary" }: FormBaseProps) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -64,10 +64,10 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
         }),
       });
       if (!res.ok) throw new Error();
-      toast.success("Cererea a fost trimisă! Vă vom contacta în curând.");
+      toast.success(t("requestForm.priceSent"));
       setOpen(false);
     } catch {
-      toast.error("A apărut o eroare. Încercați din nou.");
+      toast.error(t("form.errorRetry"));
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
           className,
         )}
       >
-        {label}
+        {label ?? t("requestForm.requestPrice")}
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
@@ -107,20 +107,20 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
             <SheetHeader className="px-0 pt-2 pb-0">
               <SheetTitle className="font-heading flex items-center gap-2 text-lg">
                 <Sparkles className="h-5 w-5 text-gold" />
-                Solicită Preț
+                {t("requestForm.requestPrice")}
               </SheetTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Lăsați datele de contact și vă vom reveni cu o ofertă personalizată.
+                {t("requestForm.priceSubtitle")}
               </p>
             </SheetHeader>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-6">
-              <FormField icon={User} label="Nume" required>
+              <FormField icon={User} label={t("form.name")} required>
                 <input id="price-name" name="name" required
-                  className="form-input" placeholder="Numele dvs." />
+                  className="form-input" placeholder={t("form.namePlaceholder")} />
               </FormField>
 
-              <FormField icon={Phone} label="Telefon" required>
+              <FormField icon={Phone} label={t("form.phone")} required>
                 <div className="flex gap-2">
                   <span className="flex h-11 w-20 items-center justify-center rounded-xl border border-border/40 bg-accent/30 text-sm text-muted-foreground shrink-0">
                     +373
@@ -140,7 +140,7 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
               <Button type="submit" disabled={loading}
                 className="w-full h-12 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                  <><Send className="mr-2 h-4 w-4" /> Trimite cererea</>
+                  <><Send className="mr-2 h-4 w-4" /> {t("requestForm.sendRequest")}</>
                 )}
               </Button>
             </form>
@@ -152,8 +152,8 @@ export function RequestPriceForm({ artistId, venueId, className, label = "Solici
 }
 
 // ─── Booking Request (full form) ─────────────────────────
-export function RequestBookingForm({ artistId, venueId, eventPlanId, preselectedDate, className, label = "Solicită Rezervare", variant = "outline", icon, presetMessage, capacityMax }: FormBaseProps & { capacityMax?: number | null }) {
-  const { t } = useLocale();
+export function RequestBookingForm({ artistId, venueId, eventPlanId, preselectedDate, className, label, variant = "outline", icon, presetMessage, capacityMax }: FormBaseProps & { capacityMax?: number | null }) {
+  const { t, locale } = useLocale();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [capacityWarning, setCapacityWarning] = useState(false);
@@ -178,15 +178,15 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
     // the catch-all toast says "A apărut o eroare" which is confusing.
     const useBookingFlow = !!(artistId || venueId);
     if (useBookingFlow && !eventDate) {
-      toast.error("Selectează data evenimentului ca să trimiți cererea.");
+      toast.error(t("requestForm.errorNoDate"));
       return;
     }
     if (useBookingFlow && !form.get("name")) {
-      toast.error("Completează numele.");
+      toast.error(t("requestForm.errorNoName"));
       return;
     }
     if (useBookingFlow && !form.get("phone")) {
-      toast.error("Completează numărul de telefon.");
+      toast.error(t("requestForm.errorNoPhone"));
       return;
     }
 
@@ -244,13 +244,13 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
       toast.success(
         useBookingFlow
           ? eventPlanId
-            ? "Cererea a fost trimisă și legată de planul tău!"
-            : "Cererea de rezervare a fost trimisă! O vezi în Rezervările Mele."
-          : "Cererea de rezervare a fost trimisă! Vă vom contacta în curând.",
+            ? t("requestForm.sentLinkedToPlan")
+            : t("requestForm.sentSeeInMyBookings")
+          : t("requestForm.sentWeWillContact"),
       );
       setOpen(false);
     } catch {
-      toast.error("A apărut o eroare. Încercați din nou.");
+      toast.error(t("form.errorRetry"));
     } finally {
       setLoading(false);
     }
@@ -261,7 +261,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
   // product writes "cumatrie".
   const eventTypes = ALL_EVENT_TYPES.map((k) => ({
     value: k,
-    label: `${EVENT_TYPE_EMOJI[k]} ${eventTypeLabel(k)}`,
+    label: `${EVENT_TYPE_EMOJI[k]} ${eventTypeLabel(k, locale)}`,
   }));
 
   return (
@@ -289,7 +289,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
         )}
       >
         {icon}
-        {label}
+        {label ?? t("requestForm.requestBooking")}
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
@@ -298,20 +298,20 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
             <SheetHeader className="px-0 pt-2 pb-0">
               <SheetTitle className="font-heading flex items-center gap-2 text-lg">
                 <CalendarDays className="h-5 w-5 text-gold" />
-                Solicită Rezervare
+                {t("requestForm.requestBooking")}
               </SheetTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                Completați detaliile evenimentului și vă vom confirma disponibilitatea.
+                {t("requestForm.bookingSubtitle")}
               </p>
             </SheetHeader>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-              <FormField icon={User} label="Nume" required>
+              <FormField icon={User} label={t("form.name")} required>
                 <input id="book-name" name="name" required
-                  className="form-input" placeholder="Numele dvs." />
+                  className="form-input" placeholder={t("form.namePlaceholder")} />
               </FormField>
 
-              <FormField icon={Phone} label="Telefon" required>
+              <FormField icon={Phone} label={t("form.phone")} required>
                 <div className="flex gap-2">
                   <span className="flex h-11 w-20 items-center justify-center rounded-xl border border-border/40 bg-accent/30 text-sm text-muted-foreground shrink-0">
                     +373
@@ -321,33 +321,33 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
                 </div>
               </FormField>
 
-              <FormField icon={Mail} label="Email">
+              <FormField icon={Mail} label={t("form.email")}>
                 <input id="book-email" name="email" type="email"
                   className="form-input" placeholder="email@exemplu.md" />
               </FormField>
 
-              <FormField icon={Sparkles} label="Tip Eveniment">
+              <FormField icon={Sparkles} label={t("form.event_type")}>
                 <select name="eventType"
                   className="form-input appearance-none cursor-pointer">
-                  <option value="">Selectează tipul</option>
+                  <option value="">{t("form.selectType")}</option>
                   {eventTypes.map(et => (
                     <option key={et.value} value={et.value}>{et.label}</option>
                   ))}
                 </select>
               </FormField>
 
-              <FormField icon={CalendarDays} label="Data Evenimentului">
+              <FormField icon={CalendarDays} label={t("form.event_date")}>
                 <MiniCalendar value={eventDate} onChange={setEventDate} />
               </FormField>
 
-              <FormField icon={MapPin} label="Locație">
+              <FormField icon={MapPin} label={t("form.location")}>
                 <input id="book-location" name="location"
-                  className="form-input" placeholder="Orașul, locația" />
+                  className="form-input" placeholder={t("form.locationPlaceholder")} />
               </FormField>
 
-              <FormField icon={Users} label="Număr invitați">
+              <FormField icon={Users} label={t("form.guest_count")}>
                 <input id="book-guests" name="guestCount" type="number" min={1}
-                  className="form-input" placeholder="ex: 150"
+                  className="form-input" placeholder={t("form.guestsPlaceholder")}
                   onChange={(e) => {
                     if (capacityMax && Number(e.target.value) > capacityMax) {
                       setCapacityWarning(true);
@@ -358,16 +358,16 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
                 />
                 {capacityWarning && capacityMax && (
                   <p className="mt-1 text-xs text-amber-500 font-medium">
-                    ⚠️ Depășește capacitatea maximă ({capacityMax} locuri)
+                    ⚠️ {t("requestForm.capacityWarning", { max: capacityMax })}
                   </p>
                 )}
               </FormField>
 
-              <FormField icon={MessageSquare} label="Mesaj">
+              <FormField icon={MessageSquare} label={t("form.message")}>
                 <textarea id="book-message" name="message" rows={3}
                   defaultValue={presetMessage}
                   className="form-input min-h-[80px] resize-none py-2.5"
-                  placeholder="Detalii suplimentare despre eveniment..." />
+                  placeholder={t("form.messagePlaceholder")} />
               </FormField>
 
               <div className="flex items-start gap-3 pt-2">
@@ -380,7 +380,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
               <Button type="submit" disabled={loading}
                 className="w-full h-12 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
-                  <><Send className="mr-2 h-4 w-4" /> Trimite cererea de rezervare</>
+                  <><Send className="mr-2 h-4 w-4" /> {t("requestForm.sendBookingRequest")}</>
                 )}
               </Button>
             </form>
@@ -422,6 +422,7 @@ function MiniCalendar({
   value: Date | null;
   onChange: (d: Date) => void;
 }) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const [viewDate, setViewDate] = useState(value || new Date());
   const ref = useRef<HTMLDivElement>(null);
@@ -443,9 +444,8 @@ function MiniCalendar({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysInPrevMonth = new Date(year, month, 0).getDate();
 
-  const monthNames = ["Ianuarie", "Februarie", "Martie", "Aprilie", "Mai", "Iunie",
-    "Iulie", "August", "Septembrie", "Octombrie", "Noiembrie", "Decembrie"];
-  const dayNames = ["Lu", "Ma", "Mi", "Jo", "Vi", "Sâ", "Du"];
+  const monthNames = Array.from({ length: 12 }, (_, i) => t(`calendar.months.${i}`));
+  const dayNames = Array.from({ length: 7 }, (_, i) => t(`calendar.days.${i}`));
 
   const startDay = firstDay === 0 ? 6 : firstDay - 1;
   const cells: { day: number; current: boolean; date: Date }[] = [];
@@ -486,7 +486,7 @@ function MiniCalendar({
         )}
       >
         <CalendarDays className="h-4 w-4 text-gold/60 shrink-0" />
-        <span className="flex-1">{value ? formatDate(value) : "Selectează data"}</span>
+        <span className="flex-1">{value ? formatDate(value) : t("calendar.selectDate")}</span>
         <ChevronDown className={cn("h-4 w-4 text-muted-foreground transition-transform", open && "rotate-180")} />
       </div>
 
@@ -537,7 +537,7 @@ function MiniCalendar({
             <button type="button"
               onClick={() => { const d = new Date(); d.setDate(d.getDate() + 1); onChange(d); setViewDate(d); setOpen(false); }}
               className="text-xs text-gold/70 hover:text-gold transition-colors">
-              Mâine
+              {t("calendar.tomorrow")}
             </button>
             <button type="button"
               onClick={() => {
@@ -546,7 +546,7 @@ function MiniCalendar({
                 onChange(next); setViewDate(next); setOpen(false);
               }}
               className="text-xs text-gold/70 hover:text-gold transition-colors">
-              Sâmbătă viitoare
+              {t("calendar.nextSaturday")}
             </button>
           </div>
         </div>

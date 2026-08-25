@@ -49,12 +49,12 @@ interface Props {
   currentPriceMax: string;
 }
 
-const sortOptions = [
-  { value: "popular", label: "Popularitate" },
-  { value: "price_asc", label: "Preț crescător" },
-  { value: "price_desc", label: "Preț descrescător" },
-  { value: "rating", label: "Rating" },
-  { value: "newest", label: "Cei mai noi" },
+const sortOptionKeys = [
+  { value: "popular", key: "catalog.popular" },
+  { value: "price_asc", key: "catalog.priceAsc" },
+  { value: "price_desc", key: "catalog.priceDesc" },
+  { value: "rating", key: "catalog.rating" },
+  { value: "newest", key: "catalog.newest" },
 ];
 
 // The chips used to be display strings pushed into ?q=, a free-text ILIKE over
@@ -88,11 +88,6 @@ export function ArtistsListClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useLocale();
-  const labels = {
-    ro: { home: "Acasă", artists: "Artiști", title: "Artiști pentru evenimentul tău", description: "Descoperă artiști, formații și prezentatori profesioniști pentru evenimente în toată Republica Moldova.", searchPlaceholder: "Caută artiști, formații, prezentatori...", allMoldova: "Toată Moldova", search: "Caută", popular: "Căutări populare:", filter: "Filtrează rezultate", reset: "Resetează", category: "Categorie", allCategories: "Toate categoriile", price: "Preț", location: "Locație", allLocations: "Toate localitățile", minimumRating: "Rating minim", apply: "Aplică filtrele", found: "artiști găsiți", active: "Filtre active", unsure: "Nu știi ce ți se potrivește?", ctaDesc: "Spune-ne despre eveniment și îți recomandăm artiști potriviți.", recommendations: "Primește recomandări personalizate", heroAlt: "Artist pe scenă la un eveniment din Moldova" },
-    ru: { home: "Главная", artists: "Артисты", title: "Артисты для вашего события", description: "Найдите профессиональных артистов, группы и ведущих для событий по всей Молдове.", searchPlaceholder: "Поиск артистов, групп, ведущих...", allMoldova: "Вся Молдова", search: "Найти", popular: "Популярные запросы:", filter: "Фильтры", reset: "Сбросить", category: "Категория", allCategories: "Все категории", price: "Цена", location: "Город", allLocations: "Все города", minimumRating: "Минимальный рейтинг", apply: "Применить фильтры", found: "артистов найдено", active: "Фильтры активны", unsure: "Не знаете, что выбрать?", ctaDesc: "Расскажите о событии, и мы предложим подходящих артистов.", recommendations: "Получить рекомендации", heroAlt: "Артист на сцене мероприятия в Молдове" },
-    en: { home: "Home", artists: "Artists", title: "Artists for your event", description: "Discover professional artists, bands and hosts for events across Moldova.", searchPlaceholder: "Search artists, bands and hosts...", allMoldova: "All Moldova", search: "Search", popular: "Popular searches:", filter: "Filter results", reset: "Reset", category: "Category", allCategories: "All categories", price: "Price", location: "Location", allLocations: "All locations", minimumRating: "Minimum rating", apply: "Apply filters", found: "artists found", active: "Active filters", unsure: "Not sure who fits?", ctaDesc: "Tell us about your event and we will suggest suitable artists.", recommendations: "Get recommendations", heroAlt: "Artist performing at an event in Moldova" },
-  }[locale];
   const [query, setQuery] = useState(searchQuery);
   const [city, setCity] = useState(searchParams.get("city") ?? "");
   const [priceMin, setPriceMin] = useState(currentPriceMin);
@@ -159,7 +154,7 @@ export function ArtistsListClient({
       <section className="relative isolate overflow-hidden border-b border-[#e4b747]/12 pt-16">
         <img
           src="/images/redesign/artists-hero.webp"
-          alt={labels.heroAlt}
+          alt={t("artistsPage.heroAlt")}
           className="absolute inset-0 -z-20 h-full w-full object-cover object-center"
         />
         <div className="absolute inset-0 -z-10 bg-[linear-gradient(90deg,rgba(5,8,13,.98)_0%,rgba(5,8,13,.88)_48%,rgba(5,8,13,.38)_78%,rgba(5,8,13,.58)_100%)]" />
@@ -167,17 +162,17 @@ export function ArtistsListClient({
 
         <div className="mx-auto max-w-[1480px] px-4 pb-9 pt-7 lg:px-8">
           <nav className="text-xs text-white/48">
-            <Link href="/" className="hover:text-[#e6b84d]">{labels.home}</Link>
+            <Link href="/" className="hover:text-[#e6b84d]">{t("nav.home")}</Link>
             <span className="mx-2">›</span>
-            <span>{labels.artists}</span>
+            <span>{t("nav.artists")}</span>
           </nav>
 
           <div className="mt-8 max-w-3xl">
             <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-              {labels.title}
+              {t("artistsPage.title")}
             </h1>
             <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/68 sm:text-base">
-              {labels.description}
+              {t("artistsPage.description")}
             </p>
 
             <form
@@ -189,7 +184,7 @@ export function ArtistsListClient({
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  placeholder={labels.searchPlaceholder}
+                  placeholder={t("artistsPage.searchPlaceholder")}
                   className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/35"
                 />
               </label>
@@ -200,7 +195,7 @@ export function ArtistsListClient({
                   onChange={(event) => setCity(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
                 >
-                  <option value="" className="bg-[#0a1019]">{labels.allMoldova}</option>
+                  <option value="" className="bg-[#0a1019]">{t("catalogFilters.allMoldova")}</option>
                   {locations.slice(1).map((item) => (
                     <option key={item} value={item} className="bg-[#0a1019]">{item}</option>
                   ))}
@@ -213,11 +208,11 @@ export function ArtistsListClient({
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] transition hover:brightness-105 disabled:cursor-progress disabled:opacity-75"
               >
                 {pending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {labels.search}
+                {t("common.search")}
               </button>
               {popularCategories.length > 0 && (
               <div className="flex flex-wrap items-center gap-1.5 sm:col-span-3">
-                <span className="mr-1 text-[10px] text-white/43">{labels.popular}</span>
+                <span className="mr-1 text-[10px] text-white/43">{t("artistsPage.popularSearches")}</span>
                 {popularCategories.map((category) => (
                   <Link
                     key={category.id}
@@ -240,17 +235,17 @@ export function ArtistsListClient({
             <div className="flex items-center justify-between border-b border-white/8 pb-4">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-[#e8c05f]">
                 <SlidersHorizontal className="h-4 w-4" />
-                {labels.filter}
+                {t("catalogFilters.title")}
               </h2>
               {hasFilters && (
                 <button onClick={resetFilters} className="text-[10px] text-white/45 hover:text-white">
-                  {labels.reset}
+                  {t("catalog.reset")}
                 </button>
               )}
             </div>
 
             <div className="border-b border-white/8 py-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{labels.category}</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{t("catalogFilters.category")}</p>
               <div className="max-h-64 space-y-1 overflow-y-auto pr-1">
                 <button
                   onClick={() => navigate({ category: undefined })}
@@ -260,7 +255,7 @@ export function ArtistsListClient({
                   )}
                 >
                   <span className={cn("h-3.5 w-3.5 rounded border", !currentCategory ? "border-[#e6b84d] bg-[#e6b84d]" : "border-white/24")} />
-                  {labels.allCategories}
+                  {t("catalogFilters.allCategories")}
                 </button>
                 {categories.map((category) => {
                   const selected = currentCategory === String(category.id);
@@ -282,7 +277,7 @@ export function ArtistsListClient({
             </div>
 
             <div className="border-b border-white/8 py-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{labels.price}</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{t("catalogFilters.price")}</p>
               <div className="grid grid-cols-2 gap-2">
                 <input
                   inputMode="numeric"
@@ -302,7 +297,7 @@ export function ArtistsListClient({
             </div>
 
             <div className="border-b border-white/8 py-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{labels.location}</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{t("catalogFilters.location")}</p>
               <select
                 value={city}
                 onChange={(event) => {
@@ -311,13 +306,13 @@ export function ArtistsListClient({
                 }}
                 className="h-10 w-full rounded-lg border border-white/10 bg-[#090d14] px-3 text-xs text-white/76 outline-none"
               >
-                <option value="">{labels.allLocations}</option>
+                <option value="">{t("catalogFilters.allLocations")}</option>
                 {locations.slice(1).map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
 
             <div className="py-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{labels.minimumRating}</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{t("catalogFilters.minRating")}</p>
               <div className="flex gap-1">
                 {[3, 4, 5].map((rating) => (
                   <button
@@ -340,7 +335,7 @@ export function ArtistsListClient({
               onClick={applyPrice}
               className="h-11 w-full rounded-lg border border-[#e6b84d]/65 bg-[#e6b84d]/8 text-xs font-semibold text-[#edc666] hover:bg-[#e6b84d]/15"
             >
-              {labels.apply}
+              {t("catalogFilters.apply")}
             </button>
           </aside>
 
@@ -355,13 +350,16 @@ export function ArtistsListClient({
               <div className="flex items-center justify-between gap-3 lg:contents">
                 <div className="lg:mr-auto">
                   <p className="text-sm text-white/68">
-                    <span className="font-semibold text-white">{total}</span> {labels.found}
+                    <span className="font-semibold text-white">{total}</span> {t("catalog.foundArtists")}
                   </p>
-                  {hasFilters && <p className="mt-0.5 text-[10px] text-[#e6b84d]">{labels.active}</p>}
+                  {hasFilters && <p className="mt-0.5 text-[10px] text-[#e6b84d]">{t("catalog.activeFilters")}</p>}
                 </div>
                 <div className="lg:order-2">
                   <SortBar
-                    options={sortOptions}
+                    options={sortOptionKeys.map((option) => ({
+                      value: option.value,
+                      label: t(option.key),
+                    }))}
                     current={currentSort}
                     onChange={(value) => navigate({ sort: value })}
                   />
@@ -389,7 +387,7 @@ export function ArtistsListClient({
                 <Sparkles className="mx-auto h-9 w-9 text-[#e6b84d]/60" />
                 <p className="mt-4 text-sm text-white/58">{t("common.noResults")}</p>
                 <button onClick={resetFilters} className="mt-4 text-xs text-[#e6b84d]">
-                  {labels.reset}
+                  {t("catalog.reset")}
                 </button>
               </div>
             )}
@@ -404,17 +402,17 @@ export function ArtistsListClient({
               <ServiceHat />
               <div className="flex-1">
                 <h2 className="font-heading text-2xl font-semibold text-[#edd08a]">
-                  {labels.unsure}
+                  {t("artistsPage.ctaTitle")}
                 </h2>
                 <p className="mt-1 text-sm text-white/56">
-                  {labels.ctaDesc}
+                  {t("artistsPage.ctaDesc")}
                 </p>
               </div>
               <Link
                 href="/planifica"
                 className="inline-flex h-11 items-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-6 text-xs font-semibold text-[#07101d]"
               >
-                {labels.recommendations} <ArrowRight className="h-4 w-4" />
+                {t("artistsPage.ctaButton")} <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
 

@@ -159,12 +159,13 @@ function UserMenu() {
   const { signOut } = useClerk();
   const [open, setOpen] = useState(false);
   const { userRole } = useUserRole();
+  const { t } = useLocale();
 
   if (!isSignedIn) {
     return (
       <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
         <Link href="/sign-in">
-          <Button variant="ghost" size="icon" aria-label="Autentificare">
+          <Button variant="ghost" size="icon" aria-label={t("header.signIn")}>
             <User className="h-5 w-5" />
           </Button>
         </Link>
@@ -175,10 +176,10 @@ function UserMenu() {
               className="absolute right-0 top-full z-50 mt-2 w-48 rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
             >
               <Link href="/sign-in" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-                <LogIn className="h-4 w-4" /> Autentificare
+                <LogIn className="h-4 w-4" /> {t("header.signIn")}
               </Link>
               <Link href="/sign-up" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-                <UserCircle className="h-4 w-4" /> Înregistrare
+                <UserCircle className="h-4 w-4" /> {t("header.signUp")}
               </Link>
             </motion.div>
           )}
@@ -189,7 +190,7 @@ function UserMenu() {
 
   return (
     <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <Button variant="ghost" size="icon" aria-label="Contul meu" className="relative">
+      <Button variant="ghost" size="icon" aria-label={t("header.myAccount")} className="relative">
         {user?.imageUrl ? (
           <img src={user.imageUrl} alt="" className="h-7 w-7 rounded-full" />
         ) : (
@@ -208,21 +209,21 @@ function UserMenu() {
             </div>
             {userRole && (userRole.role === "artist" || userRole.hasVenue) ? (
               <Link href="/dashboard" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-                <LayoutDashboard className="h-4 w-4" /> {userRole.hasVenue ? "Dashboard Sală" : "Dashboard Partener"}
+                <LayoutDashboard className="h-4 w-4" /> {userRole.hasVenue ? t("header.venueDashboard") : t("header.partnerDashboard")}
               </Link>
             ) : (
               <Link href="/cabinet" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-                <UserCircle className="h-4 w-4" /> Cabinetul Meu
+                <UserCircle className="h-4 w-4" /> {t("header.myCabinet")}
               </Link>
             )}
             {userRole && (userRole.role === "admin" || userRole.role === "super_admin") && (
               <Link href="/admin" className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-gold" onClick={() => setOpen(false)}>
-                <Shield className="h-4 w-4" /> Admin Panel
+                <Shield className="h-4 w-4" /> {t("header.adminPanel")}
               </Link>
             )}
             <div className="border-t border-border/40 mt-1 pt-1">
               <button onClick={() => { signOut(); setOpen(false); }} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-destructive hover:bg-accent">
-                <LogOut className="h-4 w-4" /> Deconectare
+                <LogOut className="h-4 w-4" /> {t("header.signOut")}
               </button>
             </div>
           </motion.div>
@@ -293,7 +294,7 @@ export function Header() {
           <Button
             variant="ghost"
             size="icon"
-            aria-label={mobileOpen ? "Închide meniul" : "Deschide meniul"}
+            aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
             aria-expanded={mobileOpen}
             className="text-white/90 hover:bg-white/10 hover:text-white xl:hidden"
             onClick={() => setMobileOpen(!mobileOpen)}

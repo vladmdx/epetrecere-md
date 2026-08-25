@@ -20,6 +20,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { useLocale } from "@/hooks/use-locale";
 
 type Relationship =
   | "colleague"
@@ -32,28 +33,31 @@ type Relationship =
 type VenueTier = "modest" | "standard" | "premium" | "luxury";
 type CityTier = "chisinau" | "regional" | "rural";
 
-const RELATIONSHIPS: { id: Relationship; label: string; description: string; multiplier: number }[] = [
-  { id: "colleague", label: "Coleg de serviciu / cunoscut", description: "Relație profesională sau cunoaștere ocazională", multiplier: 1.0 },
-  { id: "friend", label: "Prieten apropiat", description: "Vă vedeți regulat, vă cunoașteți familiile", multiplier: 1.2 },
-  { id: "close_friend", label: "Prieten foarte apropiat", description: "Prietenie de ani de zile, ca o familie", multiplier: 1.4 },
-  { id: "cousin", label: "Rudă (văr, mătușă, etc.)", description: "Membru al familiei extinse", multiplier: 1.3 },
-  { id: "sibling", label: "Rudă apropiată (frate, unchi)", description: "Familie apropiată", multiplier: 1.6 },
-  { id: "nas", label: "Naș / cumătru", description: "Rol ceremonial — suma este mult mai mare", multiplier: 2.5 },
+// Labels and descriptions live in the dictionaries under
+// `calc.gift.rel.<id>` / `calc.gift.venue.<id>` / `calc.gift.city.<id>`;
+// only the numbers stay here.
+const RELATIONSHIPS: { id: Relationship; multiplier: number }[] = [
+  { id: "colleague", multiplier: 1.0 },
+  { id: "friend", multiplier: 1.2 },
+  { id: "close_friend", multiplier: 1.4 },
+  { id: "cousin", multiplier: 1.3 },
+  { id: "sibling", multiplier: 1.6 },
+  { id: "nas", multiplier: 2.5 },
 ];
 
 // No static "≈X€/persoană" here: the calculator multiplies the plate by the
 // city factor, so the effective figure is derived at render time instead.
-const VENUE_TIERS: { id: VenueTier; label: string; plate: number }[] = [
-  { id: "modest", label: "Cantină / sală modestă", plate: 25 },
-  { id: "standard", label: "Restaurant standard", plate: 45 },
-  { id: "premium", label: "Restaurant premium", plate: 70 },
-  { id: "luxury", label: "Sală luxury / hotel 5★", plate: 110 },
+const VENUE_TIERS: { id: VenueTier; plate: number }[] = [
+  { id: "modest", plate: 25 },
+  { id: "standard", plate: 45 },
+  { id: "premium", plate: 70 },
+  { id: "luxury", plate: 110 },
 ];
 
-const CITY_TIERS: { id: CityTier; label: string; factor: number }[] = [
-  { id: "chisinau", label: "Chișinău / Bălți", factor: 1.15 },
-  { id: "regional", label: "Centru raional", factor: 1.0 },
-  { id: "rural", label: "Sat / comună", factor: 0.85 },
+const CITY_TIERS: { id: CityTier; factor: number }[] = [
+  { id: "chisinau", factor: 1.15 },
+  { id: "regional", factor: 1.0 },
+  { id: "rural", factor: 0.85 },
 ];
 
 function formatEUR(n: number): string {
@@ -65,6 +69,7 @@ function formatEUR(n: number): string {
 }
 
 export function DarNuntaClient() {
+  const { t } = useLocale();
   const [relationship, setRelationship] = useState<Relationship>("friend");
   const [venue, setVenue] = useState<VenueTier>("standard");
   const [city, setCity] = useState<CityTier>("chisinau");
@@ -101,11 +106,11 @@ export function DarNuntaClient() {
     <div className="mx-auto max-w-5xl px-4 py-12 lg:px-8">
       {/* Breadcrumb */}
       <nav className="mb-4 text-xs text-muted-foreground">
-        <Link href="/" className="hover:text-gold">Acasă</Link>
+        <Link href="/" className="hover:text-gold">{t("nav.home")}</Link>
         <span className="mx-2">/</span>
-        <Link href="/calculatoare" className="hover:text-gold">Calculatoare</Link>
+        <Link href="/calculatoare" className="hover:text-gold">{t("tools.calculators")}</Link>
         <span className="mx-2">/</span>
-        <span className="text-foreground">Dar de nuntă</span>
+        <span className="text-foreground">{t("calc.gift.crumb")}</span>
       </nav>
 
       {/* Header */}
@@ -114,12 +119,10 @@ export function DarNuntaClient() {
           <Gift className="h-8 w-8 text-gold" />
         </div>
         <h1 className="font-heading text-3xl font-bold md:text-4xl">
-          Cât să dau dar la nuntă?
+          {t("calc.gift.title")}
         </h1>
         <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground md:text-base">
-          Calculator specific pentru Moldova. Suma ar trebui să acopere costul
-          farfuriei tale și să lase ceva pentru tinerii căsătoriți. Folosește
-          estimările ca reper — nu sunt reguli bătute în cuie.
+          {t("calc.gift.intro")}
         </p>
       </header>
 
@@ -130,7 +133,7 @@ export function DarNuntaClient() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Heart className="h-4 w-4 text-gold" /> Relația cu mirii
+                <Heart className="h-4 w-4 text-gold" /> {t("calc.gift.relTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -146,13 +149,13 @@ export function DarNuntaClient() {
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{r.label}</span>
+                    <span className="text-sm font-medium">{t(`calc.gift.rel.${r.id}.label`)}</span>
                     {relationship === r.id && (
                       <span className="text-xs text-gold">✓</span>
                     )}
                   </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    {r.description}
+                    {t(`calc.gift.rel.${r.id}.desc`)}
                   </p>
                 </button>
               ))}
@@ -163,7 +166,7 @@ export function DarNuntaClient() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Utensils className="h-4 w-4 text-gold" /> Tipul sălii / restaurantului
+                <Utensils className="h-4 w-4 text-gold" /> {t("calc.gift.venueTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-2">
@@ -178,9 +181,13 @@ export function DarNuntaClient() {
                       : "border-border/40 hover:border-gold/40"
                   }`}
                 >
-                  <p className="text-sm font-medium">{v.label}</p>
+                  <p className="text-sm font-medium">{t(`calc.gift.venue.${v.id}`)}</p>
                   <p className="text-xs text-muted-foreground">
-                    ≈{Math.round(v.plate * (CITY_TIERS.find((c) => c.id === city)?.factor ?? 1))}€ / persoană
+                    {t("calc.gift.perPerson", {
+                      amount: Math.round(
+                        v.plate * (CITY_TIERS.find((c) => c.id === city)?.factor ?? 1),
+                      ),
+                    })}
                   </p>
                 </button>
               ))}
@@ -191,7 +198,7 @@ export function DarNuntaClient() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <MapPin className="h-4 w-4 text-gold" /> Unde este nunta
+                <MapPin className="h-4 w-4 text-gold" /> {t("calc.gift.cityTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="grid gap-2 sm:grid-cols-3">
@@ -206,7 +213,7 @@ export function DarNuntaClient() {
                       : "border-border/40 hover:border-gold/40"
                   }`}
                 >
-                  {c.label}
+                  {t(`calc.gift.city.${c.id}`)}
                 </button>
               ))}
             </CardContent>
@@ -216,12 +223,12 @@ export function DarNuntaClient() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <Users className="h-4 w-4 text-gold" /> Câți mergeți
+                <Users className="h-4 w-4 text-gold" /> {t("calc.gift.attendeesTitle")}
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs text-muted-foreground">Adulți</Label>
+                <Label className="text-xs text-muted-foreground">{t("calc.gift.adults")}</Label>
                 <Input
                   type="number"
                   min={1}
@@ -234,7 +241,7 @@ export function DarNuntaClient() {
                 />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Copii</Label>
+                <Label className="text-xs text-muted-foreground">{t("calc.gift.children")}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -255,37 +262,37 @@ export function DarNuntaClient() {
           <Card className="border-gold/40 bg-gradient-to-br from-gold/10 to-transparent">
             <CardContent className="p-6">
               <p className="text-xs font-medium uppercase tracking-wider text-gold">
-                Sugestia noastră
+                {t("calc.gift.suggestion")}
               </p>
               <div className="mt-2 font-accent text-5xl font-bold">
                 {formatEUR(result.typical)}
               </div>
               <p className="mt-2 text-sm text-muted-foreground">
-                Suma tipică pentru situația ta. Farfuria ta costă aproximativ{" "}
+                {t("calc.gift.typicalNote")}{" "}
                 <strong>{formatEUR(result.plateCost)}</strong>.
               </p>
 
               <div className="mt-6 grid grid-cols-3 gap-3 text-center">
                 <div className="rounded-lg border border-border/40 bg-background p-3">
-                  <p className="text-[10px] uppercase text-muted-foreground">Minim</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">{t("calc.gift.min")}</p>
                   <p className="mt-1 font-accent text-lg font-bold">
                     {formatEUR(result.minimum)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">doar farfuria</p>
+                  <p className="text-[10px] text-muted-foreground">{t("calc.gift.minNote")}</p>
                 </div>
                 <div className="rounded-lg border border-gold bg-gold/10 p-3">
-                  <p className="text-[10px] uppercase text-gold">Tipic</p>
+                  <p className="text-[10px] uppercase text-gold">{t("calc.gift.typical")}</p>
                   <p className="mt-1 font-accent text-lg font-bold text-gold">
                     {formatEUR(result.typical)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">recomandat</p>
+                  <p className="text-[10px] text-muted-foreground">{t("calc.gift.typicalTag")}</p>
                 </div>
                 <div className="rounded-lg border border-border/40 bg-background p-3">
-                  <p className="text-[10px] uppercase text-muted-foreground">Generos</p>
+                  <p className="text-[10px] uppercase text-muted-foreground">{t("calc.gift.generous")}</p>
                   <p className="mt-1 font-accent text-lg font-bold">
                     {formatEUR(result.generous)}
                   </p>
-                  <p className="text-[10px] text-muted-foreground">cadou mare</p>
+                  <p className="text-[10px] text-muted-foreground">{t("calc.gift.generousNote")}</p>
                 </div>
               </div>
             </CardContent>
@@ -295,15 +302,16 @@ export function DarNuntaClient() {
             <CardContent className="space-y-2 p-4">
               <p className="flex items-start gap-2 text-xs text-muted-foreground">
                 <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gold" />
-                Calculul se bazează pe: {result.venue.label.toLowerCase()}{" "}
-                ({formatEUR(result.venue.plate)} / plat) × {attendees + children * 0.5}{" "}
-                invitați × multiplicator &quot;{result.rel.label.toLowerCase()}&quot;{" "}
-                × zonă {result.city.label.toLowerCase()}.
+                {t("calc.gift.basis", {
+                  venue: t(`calc.gift.venue.${result.venue.id}`).toLowerCase(),
+                  plate: formatEUR(result.venue.plate),
+                  guests: attendees + children * 0.5,
+                  rel: t(`calc.gift.rel.${result.rel.id}.label`).toLowerCase(),
+                  city: t(`calc.gift.city.${result.city.id}`).toLowerCase(),
+                })}
               </p>
               <p className="text-xs text-muted-foreground">
-                Dacă ești naș sau cumătru, suma reală este adesea mult mai
-                mare — include și cheltuielile ceremoniale (lumânare, tort,
-                daruri).
+                {t("calc.gift.nasNote")}
               </p>
             </CardContent>
           </Card>
@@ -312,7 +320,7 @@ export function DarNuntaClient() {
             href="/planifica"
             className="flex items-center justify-center gap-2 rounded-xl border border-gold/40 bg-card p-4 text-sm font-medium text-gold hover:bg-gold/5"
           >
-            Planifici propria nuntă?
+            {t("calc.gift.cta")}
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

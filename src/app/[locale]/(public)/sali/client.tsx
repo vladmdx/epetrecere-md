@@ -60,21 +60,15 @@ interface Props {
 }
 
 const sortOptions = [
-  { value: "popular", label: "Popularitate" },
-  { value: "price_asc", label: "Preț crescător" },
-  { value: "price_desc", label: "Preț descrescător" },
-  { value: "rating", label: "Rating" },
-  { value: "capacity", label: "Capacitate" },
+  { value: "popular", key: "catalog.popular" },
+  { value: "price_asc", key: "catalog.priceAsc" },
+  { value: "price_desc", key: "catalog.priceDesc" },
+  { value: "rating", key: "catalog.rating" },
+  { value: "capacity", key: "catalog.capacity" },
 ];
 
-const capacityOptions = [
-  { value: "", label: "Orice capacitate" },
-  { value: "50", label: "50+ invitați" },
-  { value: "100", label: "100+ invitați" },
-  { value: "200", label: "200+ invitați" },
-  { value: "300", label: "300+ invitați" },
-  { value: "500", label: "500+ invitați" },
-];
+/** Empty value = "any capacity"; the rest render as "<n>+ invitați". */
+const capacityOptions = ["", "50", "100", "200", "300", "500"];
 
 const knownCities = ["Chișinău", "Bălți", "Orhei", "Cahul", "Ungheni", "Soroca"];
 
@@ -92,11 +86,6 @@ export function VenuesListClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useLocale();
-  const labels = {
-    ro: { home: "Acasă", venues: "Săli", title: "Săli pentru evenimentul tău", description: "Descoperă restaurante, săli de nuntă și locații premium pentru orice eveniment din Republica Moldova.", allMoldova: "Toată Moldova", anyCapacity: "Orice capacitate", eventDate: "Data evenimentului", guests: "invitați", search: "Caută", filter: "Filtrează rezultate", reset: "Resetează", locality: "Localitate", allLocations: "Toate localitățile", capacity: "Capacitate", apply: "Aplică filtrele", found: "locații găsite", active: "Filtre active", unsure: "Nu știi ce locație să alegi?", ctaDesc: "Spune-ne numărul de invitați și stilul evenimentului, iar noi îți recomandăm săli potrivite.", recommendations: "Primește recomandări", heroAlt: "Sală elegantă pentru evenimente în Republica Moldova", newLabel: "Nou", upTo: "până la" },
-    ru: { home: "Главная", venues: "Залы", title: "Залы для вашего события", description: "Найдите рестораны, свадебные залы и премиальные площадки по всей Молдове.", allMoldova: "Вся Молдова", anyCapacity: "Любая вместимость", eventDate: "Дата события", guests: "гостей", search: "Найти", filter: "Фильтры", reset: "Сбросить", locality: "Город", allLocations: "Все города", capacity: "Вместимость", apply: "Применить фильтры", found: "локаций найдено", active: "Фильтры активны", unsure: "Не знаете, какой зал выбрать?", ctaDesc: "Укажите число гостей и стиль события, и мы предложим подходящие залы.", recommendations: "Получить рекомендации", heroAlt: "Элегантный зал для событий в Республике Молдова", newLabel: "Новый", upTo: "до" },
-    en: { home: "Home", venues: "Venues", title: "Venues for your event", description: "Discover restaurants, wedding halls and premium venues across Moldova.", allMoldova: "All Moldova", anyCapacity: "Any capacity", eventDate: "Event date", guests: "guests", search: "Search", filter: "Filter results", reset: "Reset", locality: "Location", allLocations: "All locations", capacity: "Capacity", apply: "Apply filters", found: "venues found", active: "Active filters", unsure: "Not sure which venue to choose?", ctaDesc: "Tell us your guest count and event style, and we will suggest suitable venues.", recommendations: "Get recommendations", heroAlt: "Elegant event venue in the Republic of Moldova", newLabel: "New", upTo: "up to" },
-  }[locale];
   const [city, setCity] = useState(currentCity);
   const [capacity, setCapacity] = useState(currentCapacityMin);
   const [date, setDate] = useState(currentDate);
@@ -175,7 +164,7 @@ export function VenuesListClient({
       <section className="relative isolate overflow-hidden border-b border-[#e4b747]/12 pt-16">
         <Image
           src="/images/redesign/venues-catalog-hero.webp"
-          alt={labels.heroAlt}
+          alt={t("venues.list.heroAlt")}
           fill
           priority
           sizes="100vw"
@@ -186,17 +175,17 @@ export function VenuesListClient({
 
         <div className="mx-auto max-w-[1480px] px-4 pb-9 pt-7 lg:px-8">
           <nav className="text-xs text-white/48">
-            <Link href="/" className="hover:text-[#e6b84d]">{labels.home}</Link>
+            <Link href="/" className="hover:text-[#e6b84d]">{t("nav.home")}</Link>
             <span className="mx-2">›</span>
-            <span>{labels.venues}</span>
+            <span>{t("venues.list.breadcrumb")}</span>
           </nav>
 
           <div className="mt-8 max-w-4xl">
             <h1 className="max-w-3xl font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-              {labels.title}
+              {t("venues.list.title")}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/68 sm:text-base">
-              {labels.description}
+              {t("venues.list.description")}
             </p>
 
             <form
@@ -210,7 +199,7 @@ export function VenuesListClient({
                   onChange={(event) => setCity(event.target.value)}
                   className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
                 >
-                  <option value="" className="bg-[#0a1019]">{labels.allMoldova}</option>
+                  <option value="" className="bg-[#0a1019]">{t("venues.list.allMoldova")}</option>
                   {locations.map((item) => (
                     <option key={item} value={item} className="bg-[#0a1019]">{item}</option>
                   ))}
@@ -224,8 +213,8 @@ export function VenuesListClient({
                   className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none"
                 >
                   {capacityOptions.map((item) => (
-                    <option key={item.value} value={item.value} className="bg-[#0a1019]">
-                      {item.value ? `${item.value}+ ${labels.guests}` : labels.anyCapacity}
+                    <option key={item} value={item} className="bg-[#0a1019]">
+                      {item ? `${item}+ ${t("common.guests")}` : t("venues.list.anyCapacity")}
                     </option>
                   ))}
                 </select>
@@ -239,8 +228,8 @@ export function VenuesListClient({
                   type="date"
                   value={date}
                   onChange={(event) => setDate(event.target.value)}
-                  aria-label={labels.eventDate}
-                  title={labels.eventDate}
+                  aria-label={t("venues.list.eventDate")}
+                  title={t("venues.list.eventDate")}
                   className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none [color-scheme:dark]"
                 />
               </label>
@@ -251,7 +240,7 @@ export function VenuesListClient({
                 className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-7 text-sm font-semibold text-[#07101d] transition hover:brightness-105 disabled:cursor-progress disabled:opacity-75"
               >
                 {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                {labels.search}
+                {t("common.search")}
               </button>
             </form>
           </div>
@@ -264,17 +253,17 @@ export function VenuesListClient({
             <div className="flex items-center justify-between border-b border-white/8 pb-4">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-[#e8c05f]">
                 <SlidersHorizontal className="h-4 w-4" />
-                {labels.filter}
+                {t("venues.list.filter")}
               </h2>
               {hasFilters && (
                 <button onClick={resetFilters} className="text-[10px] text-white/45 hover:text-white">
-                  {labels.reset}
+                  {t("catalog.reset")}
                 </button>
               )}
             </div>
 
             <div className="border-b border-white/8 py-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{labels.locality}</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{t("venues.list.locality")}</p>
               <select
                 value={city}
                 onChange={(event) => {
@@ -283,21 +272,21 @@ export function VenuesListClient({
                 }}
                 className="h-10 w-full rounded-lg border border-white/10 bg-[#090d14] px-3 text-xs text-white/76 outline-none"
               >
-                <option value="">{labels.allLocations}</option>
+                <option value="">{t("venues.list.allLocations")}</option>
                 {locations.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
 
             <div className="border-b border-white/8 py-4">
-              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{labels.capacity}</p>
+              <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#e8c05f]">{t("catalog.capacity")}</p>
               <div className="grid grid-cols-2 gap-2">
                 {capacityOptions.slice(1).map((item) => {
-                  const selected = currentCapacityMin === item.value;
+                  const selected = currentCapacityMin === item;
                   return (
                     <button
-                      key={item.value}
+                      key={item}
                       onClick={() => {
-                        const next = selected ? "" : item.value;
+                        const next = selected ? "" : item;
                         setCapacity(next);
                         navigate({ capacity_min: next || undefined });
                       }}
@@ -308,7 +297,7 @@ export function VenuesListClient({
                           : "border-white/10 text-white/58 hover:border-[#e6b84d]/35",
                       )}
                     >
-                      {item.label.replace(" invitați", "")}
+                      {item}+
                     </button>
                   );
                 })}
@@ -319,7 +308,7 @@ export function VenuesListClient({
               onClick={() => navigate({ city: city || undefined, capacity_min: capacity || undefined, date: date || undefined })}
               className="h-11 w-full rounded-lg border border-[#e6b84d]/65 bg-[#e6b84d]/8 text-xs font-semibold text-[#edc666] hover:bg-[#e6b84d]/15"
             >
-              {labels.apply}
+              {t("venues.list.apply")}
             </button>
           </aside>
 
@@ -334,13 +323,13 @@ export function VenuesListClient({
               <div className="flex items-center justify-between gap-3 lg:contents">
                 <div className="lg:mr-auto">
                   <p className="text-sm text-white/68">
-                    <span className="font-semibold text-white">{total}</span> {labels.found}
+                    <span className="font-semibold text-white">{total}</span> {t("catalog.foundVenues")}
                   </p>
-                  {hasFilters && <p className="mt-0.5 text-[10px] text-[#e6b84d]">{labels.active}</p>}
+                  {hasFilters && <p className="mt-0.5 text-[10px] text-[#e6b84d]">{t("catalog.activeFilters")}</p>}
                 </div>
                 <div className="lg:order-2">
                   <SortBar
-                    options={sortOptions}
+                    options={sortOptions.map((o) => ({ value: o.value, label: t(o.key) }))}
                     current={currentSort}
                     onChange={(value) => navigate({ sort: value })}
                   />
@@ -358,7 +347,7 @@ export function VenuesListClient({
                   }`}
                 >
                   <MapIcon className="h-3.5 w-3.5" />
-                  {t("catalog.map") !== "catalog.map" ? t("catalog.map") : "Hartă"}
+                  {t("catalog.map")}
                 </button>
                 <ViewSwitcher mode={viewMode} onChange={setViewMode} />
               </div>
@@ -389,7 +378,7 @@ export function VenuesListClient({
                 <Sparkles className="mx-auto h-9 w-9 text-[#e6b84d]/60" />
                 <p className="mt-4 text-sm text-white/58">{t("common.noResults")}</p>
                 <button onClick={resetFilters} className="mt-4 text-xs text-[#e6b84d]">
-                  {labels.reset}
+                  {t("catalog.reset")}
                 </button>
               </div>
             )}
@@ -404,17 +393,17 @@ export function VenuesListClient({
               <VenueIllustration />
               <div className="flex-1">
                 <h2 className="font-heading text-2xl font-semibold text-[#edd08a]">
-                  {labels.unsure}
+                  {t("venues.list.unsure")}
                 </h2>
                 <p className="mt-1 text-sm text-white/56">
-                  {labels.ctaDesc}
+                  {t("venues.list.ctaDesc")}
                 </p>
               </div>
               <Link
                 href="/planifica"
                 className="inline-flex h-11 items-center gap-2 rounded-lg bg-[linear-gradient(135deg,#f0ce72,#d8a63c)] px-6 text-xs font-semibold text-[#07101d]"
               >
-                {labels.recommendations} <ArrowRight className="h-4 w-4" />
+                {t("venues.list.recommendations")} <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
 
@@ -431,8 +420,6 @@ export function VenuesListClient({
 
 function VenueListCard({ venue, detailed, imageIndex }: { venue: Venue; detailed: boolean; imageIndex: number }) {
   const { locale, t } = useLocale();
-  const upTo = locale === "ru" ? "до" : locale === "en" ? "up to" : "până la";
-  const newLabel = locale === "ru" ? "Новый" : locale === "en" ? "New" : "Nou";
   const name = getLocalized(venue, "name", locale);
   const fallback = `/images/venues/hall-${(imageIndex % 6) + 1}.jpg`;
   const image = venue.coverImageUrl || fallback;
@@ -450,8 +437,8 @@ function VenueListCard({ venue, detailed, imageIndex }: { venue: Venue; detailed
             </Link>
             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/48">
               {venue.city && <span className="flex items-center gap-1"><MapPin className="h-3 w-3 text-[#e6b84d]" />{venue.city}</span>}
-              {venue.capacityMax && <span className="flex items-center gap-1"><Users className="h-3 w-3" />{upTo} {venue.capacityMax} {t("common.guests")}</span>}
-              <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-[#e6b84d] text-[#e6b84d]" />{venue.ratingAvg?.toFixed(1) || newLabel}</span>
+              {venue.capacityMax && <span className="flex items-center gap-1"><Users className="h-3 w-3" />{t("venues.list.upTo")} {venue.capacityMax} {t("common.guests")}</span>}
+              <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-[#e6b84d] text-[#e6b84d]" />{venue.ratingAvg?.toFixed(1) || t("venues.list.newLabel")}</span>
             </div>
             {detailed && venue.address && <p className="mt-3 text-xs text-white/46">{venue.address}</p>}
           </div>

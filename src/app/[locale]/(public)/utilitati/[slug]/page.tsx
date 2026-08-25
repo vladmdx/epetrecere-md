@@ -8,6 +8,7 @@ import { ToolHeroImage } from "@/components/public/tool-hero-image";
 import { TOOLS_BY_SLUG, TOOL_DEFS } from "@/lib/utilitati/tools";
 import { localizeTool } from "@/lib/utilitati/tools-i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Check, ArrowRight } from "lucide-react";
 
@@ -18,7 +19,7 @@ interface Props {
 }
 
 export async function generateStaticParams() {
-  return TOOL_DEFS.map((t) => ({ slug: t.slug }));
+  return TOOL_DEFS.map((def) => ({ slug: def.slug }));
 }
 
 export async function generateMetadata({ params }: Props) {
@@ -43,10 +44,14 @@ export default async function ToolLandingPage({ params }: Props) {
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const tool = localizeTool(sourceTool, locale);
   const labels = {
-    ro: { home: "Acasă", tools: "Utilități", free: "Instrument gratuit", other: "Vezi alte instrumente", note: "Gratuit · Nu necesită eveniment activ · Cont nou în 1 minut", start: "Începe acum, gratuit", cta: `Creează-ți contul în 1 minut și folosește ${tool.title.toLowerCase()} fără limită. Instrumentul rulează independent, chiar dacă nu ai încă un eveniment activ.` },
-    ru: { home: "Главная", tools: "Инструменты", free: "Бесплатный инструмент", other: "Другие инструменты", note: "Бесплатно · Не требует активного события · Новый аккаунт за 1 минуту", start: "Начните бесплатно", cta: `Создайте аккаунт за 1 минуту и используйте ${tool.title.toLowerCase()} без ограничений. Инструмент работает даже без активного события.` },
-    en: { home: "Home", tools: "Tools", free: "Free tool", other: "View other tools", note: "Free · No active event required · New account in 1 minute", start: "Start for free", cta: `Create an account in 1 minute and use ${tool.title.toLowerCase()} without limits. The tool works even without an active event.` },
-  }[locale];
+    home: t("nav.home", locale),
+    tools: t("tools.landing.breadcrumb", locale),
+    free: t("tools.landing.free", locale),
+    other: t("tools.landing.other", locale),
+    note: t("tools.landing.note", locale),
+    start: t("tools.landing.start", locale),
+    cta: t("tools.landing.cta", locale, { tool: tool.title.toLowerCase() }),
+  };
 
   const breadcrumbs = [
     { name: labels.home, url: "/" },

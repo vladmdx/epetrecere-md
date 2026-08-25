@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "@/components/shared/locale-link";
 import { CookieSettingsButton } from "@/components/shared/cookie-consent";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import { generateMeta } from "@/lib/seo/generate-meta";
 
 const copy = {
@@ -116,11 +117,10 @@ export default async function CookiesPage({
       </div>
     
       <div className="mt-8 rounded-xl border border-gold/30 bg-gold/5 p-4 text-sm">
-        <p className="font-semibold">Pachetul legal complet</p>
+        <p className="font-semibold">{t("legal.packet.title", locale)}</p>
         <p className="mt-1 text-muted-foreground">
-          Acordurile pentru parteneri și locații, regulile marketplace, tarifele și
-          politicile de recenzii, anti-fraudă și calitate sunt disponibile în română și
-          rusă la <Link href="/legal" className="text-gold hover:underline">Documente legale</Link>.
+          {t("legal.packet.body", locale)}{" "}
+          <Link href="/legal" className="text-gold hover:underline">{t("legal.docsTitle", locale)}</Link>.
         </p>
       </div>
     </div>

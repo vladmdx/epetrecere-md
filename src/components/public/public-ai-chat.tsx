@@ -110,7 +110,7 @@ export function PublicAiChat() {
         ...prev,
         {
           role: "assistant",
-          content: data.reply ?? "Îmi pare rău, ceva a mers prost.",
+          content: data.reply ?? t("aiChat.errorGeneric"),
         },
       ]);
     } catch {
@@ -118,8 +118,7 @@ export function PublicAiChat() {
         ...prev,
         {
           role: "assistant",
-          content:
-            "Am o problemă de conexiune. Încearcă din nou în câteva secunde.",
+          content: t("aiChat.errorNetwork"),
         },
       ]);
     } finally {
@@ -145,7 +144,7 @@ export function PublicAiChat() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="Deschide asistentul AI"
+          aria-label={t("aiChat.openLabel")}
           className={cn(
             "fixed right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full shadow-lg transition-all hover:scale-105",
             "bg-gradient-to-br from-gold to-gold-dark text-[#0D0D0D]",
@@ -175,18 +174,18 @@ export function PublicAiChat() {
               <Sparkles className="h-4 w-4 text-gold" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-heading text-sm font-bold">Asistent ePetrecere</p>
+              <p className="font-heading text-sm font-bold">{t("aiChat.title")}</p>
               <p className="truncate text-[11px] text-muted-foreground">
-                Îți răspund în română, rusă sau engleză
+                {t("aiChat.subtitle")}
               </p>
             </div>
             <button
               type="button"
               onClick={reset}
               className="text-[11px] text-muted-foreground hover:text-foreground"
-              title="Conversație nouă"
+              title={t("aiChat.newConversation")}
             >
-              Resetează
+              {t("aiChat.reset")}
             </button>
             {/* Close — always reachable from inside the panel, regardless
                 of the floating trigger being hidden under Safari's toolbar
@@ -194,7 +193,7 @@ export function PublicAiChat() {
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Închide asistentul"
+              aria-label={t("aiChat.closeLabel")}
               className="ml-1 flex h-7 w-7 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             >
               <X className="h-4 w-4" />
@@ -231,7 +230,7 @@ export function PublicAiChat() {
             {sending && (
               <div className="flex justify-start">
                 <div className="flex items-center gap-2 rounded-2xl bg-accent/60 px-3 py-2 text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" /> Scriu…
+                  <Loader2 className="h-3 w-3 animate-spin" /> {t("aiChat.typing")}
                 </div>
               </div>
             )}
@@ -265,7 +264,7 @@ export function PublicAiChat() {
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Scrie un mesaj…"
+              placeholder={t("aiChat.inputPlaceholder")}
               className="flex-1 rounded-lg border border-border/40 bg-background px-3 py-2 text-sm outline-none focus:border-gold"
               maxLength={500}
               disabled={sending}
@@ -273,7 +272,7 @@ export function PublicAiChat() {
             <Button
               type="submit"
               size="icon"
-              aria-label="Trimite mesaj"
+              aria-label={t("aiChat.sendLabel")}
               disabled={sending || !draft.trim()}
               className="h-9 w-9 shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >

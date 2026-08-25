@@ -1,5 +1,7 @@
 "use client";
 
+import { useLocale } from "@/hooks/use-locale";
+
 const partners = [
   { name: "Orange Moldova", logo: "/images/partners/orange.svg" },
   { name: "Moldtelecom", logo: "/images/partners/moldtelecom.svg" },
@@ -12,11 +14,12 @@ const partners = [
 ];
 
 export function ClientLogosSection() {
+  const { t } = useLocale();
   return (
     <section className="py-16">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
         <p className="mb-10 text-center text-sm font-medium uppercase tracking-[3px] text-gold">
-          Partenerii noștri
+          {t("partners.title")}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-6 md:gap-10">
           {partners.map((partner) => (

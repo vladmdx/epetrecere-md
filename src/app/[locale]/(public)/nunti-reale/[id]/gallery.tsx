@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import { useLocale } from "@/hooks/use-locale";
 
 interface Photo {
   id: number;
@@ -14,6 +15,7 @@ interface Photo {
 }
 
 export function RealWeddingGallery({ photos }: { photos: Photo[] }) {
+  const { t } = useLocale();
   const [openIdx, setOpenIdx] = useState<number | null>(null);
 
   const close = useCallback(() => setOpenIdx(null), []);
@@ -43,7 +45,7 @@ export function RealWeddingGallery({ photos }: { photos: Photo[] }) {
   if (photos.length === 0) {
     return (
       <p className="py-10 text-center text-sm text-muted-foreground">
-        Nu există fotografii disponibile.
+        {t("gallery.noPhotos")}
       </p>
     );
   }
@@ -60,7 +62,7 @@ export function RealWeddingGallery({ photos }: { photos: Photo[] }) {
           >
             <Image
               src={p.url}
-              alt={p.caption || `Fotografie ${i + 1}`}
+              alt={p.caption || t("gallery.photo", { index: i + 1 })}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               className="object-cover transition-transform group-hover:scale-105"
@@ -81,7 +83,7 @@ export function RealWeddingGallery({ photos }: { photos: Photo[] }) {
               close();
             }}
             className="absolute right-4 top-4 rounded-full bg-card p-2 hover:bg-accent"
-            aria-label="Închide"
+            aria-label={t("common.close")}
           >
             <X className="h-5 w-5" />
           </button>
@@ -92,7 +94,7 @@ export function RealWeddingGallery({ photos }: { photos: Photo[] }) {
               prev();
             }}
             className="absolute left-4 top-1/2 -translate-y-1/2 rounded-full bg-card p-2 hover:bg-accent"
-            aria-label="Precedenta"
+            aria-label={t("gallery.prevPhoto")}
           >
             <ChevronLeft className="h-5 w-5" />
           </button>
@@ -103,7 +105,7 @@ export function RealWeddingGallery({ photos }: { photos: Photo[] }) {
               next();
             }}
             className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full bg-card p-2 hover:bg-accent"
-            aria-label="Următoarea"
+            aria-label={t("gallery.nextPhoto")}
           >
             <ChevronRight className="h-5 w-5" />
           </button>

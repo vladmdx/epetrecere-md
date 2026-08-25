@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Bell, Check, Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/hooks/use-locale";
 import { cn } from "@/lib/utils";
 import { playNotificationChime } from "@/lib/notifications/sound";
 
@@ -41,19 +42,23 @@ const HIDDEN_TYPES = new Set([
   "conversation_new",
 ]);
 
-function timeAgo(iso: string): string {
+function timeAgo(
+  iso: string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1) return "acum";
-  if (mins < 60) return `${mins}m`;
+  if (mins < 1) return t("notifications.justNow");
+  if (mins < 60) return t("notifications.minutesAgo", { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h`;
+  if (hours < 24) return t("notifications.hoursAgo", { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}z`;
+  if (days < 7) return t("notifications.daysAgo", { n: days });
   return new Date(iso).toLocaleDateString("ro-MD");
 }
 
 export function NotificationBell() {
+  const { t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<Notification[]>([]);
@@ -158,7 +163,7 @@ export function NotificationBell() {
         size="icon"
         className="relative h-9 w-9 rounded-full"
         onClick={toggleAndMarkSeen}
-        aria-label="Notificări"
+        aria-label={t("notifications.title")}
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
@@ -182,10 +187,10 @@ export function NotificationBell() {
           >
             <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
               <div>
-                <p className="text-sm font-medium">Notificări</p>
+                <p className="text-sm font-medium">{t("notifications.title")}</p>
                 {unreadCount > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    {unreadCount} necitite
+                    {t("notifications.unreadCount", { count: unreadCount })}
                   </p>
                 )}
               </div>
@@ -194,7 +199,7 @@ export function NotificationBell() {
                   onClick={markAllRead}
                   className="flex items-center gap-1 text-xs text-gold hover:underline"
                 >
-                  <Check className="h-3 w-3" /> Marchează toate
+                  <Check className="h-3 w-3" /> {t("notifications.markAll")}
                 </button>
               )}
             </div>
@@ -206,7 +211,7 @@ export function NotificationBell() {
                 </div>
               ) : items.length === 0 ? (
                 <p className="py-10 text-center text-sm text-muted-foreground">
-                  Nicio notificare încă.
+                  {t("notifications.empty")}
                 </p>
               ) : (
                 items.map((n) => {
@@ -244,7 +249,7 @@ export function NotificationBell() {
                             </p>
                           )}
                           <p className="mt-1 text-[10px] uppercase text-muted-foreground">
-                            {timeAgo(n.createdAt)}
+                            {timeAgo(n.createdAt, t)}
                           </p>
                         </div>
                       </div>

@@ -29,14 +29,14 @@ export function CompareButton({ entityType, entityId,
     e.stopPropagation();
     const result = toggle(entityId);
     if (result.reason === "max") {
-      toast.error(`Poți compara până la ${max} elemente — șterge unul înainte`);
+      toast.error(t("compare.maxReached", { max }));
       return;
     }
     if (result.added) {
       toast.success(
         ids.length + 1 >= 2
-          ? `${ids.length + 1} selectate · apasă "Compară" în lista de jos`
-          : "Adăugat la comparare",
+          ? t("compare.selectedHint", { count: ids.length + 1 })
+          : t("compare.added"),
       );
     }
   }
@@ -47,7 +47,7 @@ export function CompareButton({ entityType, entityId,
       onClick={handleClick}
       aria-pressed={active}
       aria-label={`${t(active ? "a11y.removeCompare" : "a11y.addCompare")}${entityName ? `: ${entityName}` : ""}`}
-      title={active ? "În comparare" : "Adaugă la comparare"}
+      title={t(active ? "compare.inCompare" : "a11y.addCompare")}
       className={cn(
         "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
         active
@@ -57,7 +57,7 @@ export function CompareButton({ entityType, entityId,
       )}
     >
       {active ? <Check className="h-3 w-3" /> : <Scale className="h-3 w-3" />}
-      {active ? "În comparare" : "Compară"}
+      {t(active ? "compare.inCompare" : "compare.compare")}
     </button>
   );
 }

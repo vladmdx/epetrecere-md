@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useLocale } from "@/hooks/use-locale";
 
 const PRESETS: Array<{ value: string; label: string }> = [
   { value: "Europe/Chisinau", label: "🇲🇩 Chișinău (Europe/Chisinau)" },
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function TimezoneSelector({ initialValue }: Props) {
+  const { t } = useLocale();
   const [value, setValue] = useState(initialValue ?? "Europe/Chisinau");
   const [mode, setMode] = useState<"preset" | "custom">(
     initialValue && !PRESETS.some((p) => p.value === initialValue)
@@ -76,11 +78,11 @@ export function TimezoneSelector({ initialValue }: Props) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        toast.error(err.error || "Nu s-a putut salva fusul orar");
+        toast.error(err.error || t("timezone.saveFailed"));
         return false;
       }
       setValue(next);
-      toast.success("Fus orar actualizat");
+      toast.success(t("timezone.updated"));
       return true;
     } finally {
       setSaving(false);
@@ -91,11 +93,10 @@ export function TimezoneSelector({ initialValue }: Props) {
     <div className="flex items-start justify-between gap-3 rounded-lg bg-muted/30 p-3">
       <div className="min-w-0 flex-1">
         <Label className="flex items-center gap-1.5 text-sm font-medium">
-          <Globe className="h-3.5 w-3.5 text-gold" /> Fus orar
+          <Globe className="h-3.5 w-3.5 text-gold" /> {t("timezone.label")}
         </Label>
         <p className="mt-1 text-xs text-muted-foreground">
-          Afectează formatarea orelor în emailuri și reminder-uri. Dashboard-ul
-          folosește fusul browser-ului.
+          {t("timezone.hint")}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           {mode === "preset" ? (
@@ -121,7 +122,7 @@ export function TimezoneSelector({ initialValue }: Props) {
               <Input
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
-                placeholder="Ex: Asia/Tokyo"
+                placeholder={t("timezone.customPlaceholder")}
                 className="h-8 w-48 font-mono text-xs"
               />
               <Button
@@ -137,7 +138,7 @@ export function TimezoneSelector({ initialValue }: Props) {
                 {saving ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
-                  "Salvează"
+                  t("common.save")
                 )}
               </Button>
             </div>
@@ -149,7 +150,7 @@ export function TimezoneSelector({ initialValue }: Props) {
             }
             className="text-[10px] text-gold hover:underline"
           >
-            {mode === "preset" ? "Intră o zonă custom" : "Alege din listă"}
+            {mode === "preset" ? t("timezone.enterCustom") : t("timezone.pickFromList")}
           </button>
         </div>
       </div>

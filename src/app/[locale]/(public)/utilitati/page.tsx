@@ -4,6 +4,7 @@ import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { TOOL_DEFS } from "@/lib/utilitati/tools";
 import { localizeTool } from "@/lib/utilitati/tools-i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import {
   ArrowRight,
   Gift,
@@ -34,34 +35,21 @@ export async function generateMetadata({ params }: Props) {
   }, locale);
 }
 
+// `key` is the i18n leaf under `utilitati.calc.*` — the slug carries a hyphen
+// that a dictionary key cannot.
 const CALCULATORS = [
-  { slug: "buget", title: "Calculator Buget", desc: "Estimează bugetul total al evenimentului.", icon: WalletCards },
-  { slug: "invitati", title: "Calculator Invitați & Mese", desc: "Câte mese, ospătari și locuri de parcare îți trebuie?", icon: UsersRound },
-  { slug: "dar-nunta", title: "Calculator Dar Nuntă", desc: "Cât să dai dar la nuntă în Moldova.", icon: Gift },
-  { slug: "nunta", title: "Calculator Cost Nuntă", desc: "Estimare totală pentru nunta ta în 2026.", icon: Heart },
-  { slug: "alcool", title: "Calculator Băuturi", desc: "Câte sticle de vin, vodcă și șampanie pe invitat.", icon: Wine },
-  { slug: "meniu", title: "Calculator Meniu", desc: "Cantități realiste pentru aperitive, fel principal, desert.", icon: UtensilsCrossed },
+  { slug: "buget", key: "buget", icon: WalletCards },
+  { slug: "invitati", key: "invitati", icon: UsersRound },
+  { slug: "dar-nunta", key: "darNunta", icon: Gift },
+  { slug: "nunta", key: "nunta", icon: Heart },
+  { slug: "alcool", key: "alcool", icon: Wine },
+  { slug: "meniu", key: "meniu", icon: UtensilsCrossed },
 ];
 
 export default async function UtilitatiHubPage({ params }: Props) {
   const { locale: rawLocale } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const tools = TOOL_DEFS.map((tool) => localizeTool(tool, locale));
-  const labels = {
-    ro: { eyebrow: "Utilități", title: "Instrumente pentru evenimentul tău", description: "Organizează o nuntă, cumătrie, botez sau eveniment corporate din Moldova cu instrumente gratuite, într-un singur loc.", online: "Instrumente online", calculators: "Calculatoare", all: "Vezi toate", open: "Deschide" },
-    ru: { eyebrow: "Инструменты", title: "Инструменты для вашего события", description: "Организуйте свадьбу, крестины, семейное или корпоративное событие в Молдове с бесплатными онлайн инструментами.", online: "Онлайн инструменты", calculators: "Калькуляторы", all: "Смотреть все", open: "Открыть" },
-    en: { eyebrow: "Tools", title: "Tools for your event", description: "Organize a wedding, baptism, family celebration or corporate event in Moldova with free online tools.", online: "Online tools", calculators: "Calculators", all: "View all", open: "Open" },
-  }[locale];
-  const localizedCalculators = {
-    ro: ["Calculator Buget", "Invitați și Mese", "Calculator Dar Nuntă", "Calculator Cost Nuntă", "Calculator Băuturi", "Calculator Meniu"],
-    ru: ["Калькулятор бюджета", "Гости и столы", "Свадебный подарок", "Стоимость свадьбы", "Напитки", "Меню"],
-    en: ["Budget Calculator", "Guests and Tables", "Wedding Gift Calculator", "Wedding Cost Calculator", "Drinks Calculator", "Menu Calculator"],
-  }[locale];
-  const localizedCalculatorDescriptions = {
-    ro: CALCULATORS.map((calculator) => calculator.desc),
-    ru: ["Оцените общий бюджет события.", "Рассчитайте столы, персонал и парковку.", "Оцените сумму подарка на свадьбу в Молдове.", "Получите ориентир полной стоимости свадьбы 2026.", "Рассчитайте вино, крепкие напитки и воду.", "Определите реальные количества блюд и десерта."],
-    en: ["Estimate the total event budget.", "Calculate tables, staff and parking.", "Estimate a suitable wedding gift in Moldova.", "Get a full 2026 wedding cost estimate.", "Calculate wine, spirits and water.", "Plan realistic food and dessert quantities."],
-  }[locale];
   return (
     <main className="relative min-h-screen pt-24 pb-20">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -77,13 +65,13 @@ export default async function UtilitatiHubPage({ params }: Props) {
         <ScrollReveal>
           <div className="mb-12 text-center">
             <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">
-              {labels.eyebrow}
+              {t("utilitati.eyebrow", locale)}
             </p>
             <h1 className="font-heading text-3xl font-bold md:text-5xl text-[#FAF8F2]">
-              {labels.title}
+              {t("utilitati.title", locale)}
             </h1>
             <p className="mt-4 max-w-2xl mx-auto text-base text-muted-foreground">
-              {labels.description}
+              {t("utilitati.description", locale)}
             </p>
           </div>
         </ScrollReveal>
@@ -92,7 +80,7 @@ export default async function UtilitatiHubPage({ params }: Props) {
         <section className="mb-16">
           <ScrollReveal>
             <h2 className="mb-6 font-heading text-2xl font-bold text-[#FAF8F2]">
-              {labels.online}
+              {t("utilitati.online", locale)}
             </h2>
           </ScrollReveal>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -110,7 +98,7 @@ export default async function UtilitatiHubPage({ params }: Props) {
                     {tool.shortPitch}
                   </p>
                   <div className="mt-4 flex items-center gap-1 text-xs font-medium text-gold opacity-0 transition-opacity group-hover:opacity-100">
-                    {labels.open}
+                    {t("utilitati.open", locale)}
                     <ArrowRight className="h-3 w-3" />
                   </div>
                 </Link>
@@ -124,21 +112,21 @@ export default async function UtilitatiHubPage({ params }: Props) {
           <ScrollReveal>
             <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
               <h2 className="font-heading text-2xl font-bold text-[#FAF8F2]">
-                {labels.calculators}
+                {t("utilitati.calculators", locale)}
               </h2>
               <Link
                 href="/calculatoare"
                 className="text-xs text-gold hover:underline flex items-center gap-1"
               >
-                {labels.all} <ArrowRight className="h-3 w-3" />
+                {t("utilitati.all", locale)} <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
           </ScrollReveal>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {CALCULATORS.map((calc, i) => {
               const Icon = calc.icon;
-              const title = localizedCalculators[i];
-              const description = localizedCalculatorDescriptions[i];
+              const title = t(`utilitati.calc.${calc.key}.title`, locale);
+              const description = t(`utilitati.calc.${calc.key}.desc`, locale);
               return (
                 <ScrollReveal key={calc.slug} delay={i * 0.04}>
                   <Link

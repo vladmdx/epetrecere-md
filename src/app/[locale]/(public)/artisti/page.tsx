@@ -5,6 +5,7 @@ import { metaForPath } from "@/lib/seo/page-meta";
 import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { ArtistsListClient } from "./client";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 
 export async function generateMetadata({
   params,
@@ -72,15 +73,15 @@ export default async function ArtistsPage({ params, searchParams }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: safeJsonLd(breadcrumbJsonLd([
-            { name: locale === "ru" ? "Главная" : locale === "en" ? "Home" : "Acasă", url: "https://epetrecere.md" },
-            { name: locale === "ru" ? "Артисты" : locale === "en" ? "Artists" : "Artiști", url: "https://epetrecere.md/artisti" },
+            { name: t("nav.home", locale), url: "https://epetrecere.md" },
+            { name: t("nav.artists", locale), url: "https://epetrecere.md/artisti" },
           ])),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: safeJsonLd(itemListJsonLd(jsonLdItems, locale === "ru" ? "Артисты на события" : locale === "en" ? "Event Artists" : "Artiști pentru Evenimente")),
+          __html: safeJsonLd(itemListJsonLd(jsonLdItems, t("artists.listTitle", locale))),
         }}
       />
     <ArtistsListClient

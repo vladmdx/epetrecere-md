@@ -25,7 +25,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { calcLabel } from "@/lib/calculators/labels";
 
 export function BudgetCalculatorClient() {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const [eventType, setEventType] = useState<EventType>("wedding");
   const [guestCount, setGuestCount] = useState(100);
   const [pricePerPerson, setPricePerPerson] = useState(30);
@@ -61,10 +61,10 @@ export function BudgetCalculatorClient() {
       {/* ── Input form ───────────────────────────────── */}
       <div className="space-y-6">
         <div className="rounded-xl border border-border/40 bg-card p-5">
-          <h2 className="mb-4 font-heading text-lg font-semibold">Detalii eveniment</h2>
+          <h2 className="mb-4 font-heading text-lg font-semibold">{t("budgetCalc.eventDetails")}</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label>Tip eveniment</Label>
+              <Label>{t("budgetCalc.eventType")}</Label>
               <Select value={eventType} onValueChange={(v) => setEventType(v as EventType)}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -77,7 +77,7 @@ export function BudgetCalculatorClient() {
               </Select>
             </div>
             <div>
-              <Label>Număr invitați</Label>
+              <Label>{t("budgetCalc.guestCount")}</Label>
               <Input
                 type="number"
                 min={10}
@@ -88,7 +88,7 @@ export function BudgetCalculatorClient() {
               />
             </div>
             <div>
-              <Label>Preț sală / persoană (€)</Label>
+              <Label>{t("budgetCalc.pricePerPerson")}</Label>
               <Input
                 type="number"
                 min={0}
@@ -97,11 +97,11 @@ export function BudgetCalculatorClient() {
                 className="mt-1"
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Pune 0 dacă ai deja locația rezervată.
+                {t("budgetCalc.pricePerPersonHint")}
               </p>
             </div>
             <div>
-              <Label>Chirie sală (€, opțional)</Label>
+              <Label>{t("budgetCalc.venueRental")}</Label>
               <Input
                 type="number"
                 min={0}
@@ -114,7 +114,7 @@ export function BudgetCalculatorClient() {
         </div>
 
         <div className="rounded-xl border border-border/40 bg-card p-5">
-          <h2 className="mb-4 font-heading text-lg font-semibold">Servicii dorite</h2>
+          <h2 className="mb-4 font-heading text-lg font-semibold">{t("budgetCalc.services")}</h2>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {Object.entries(BUDGET_SERVICE_RATES).map(([slug, rate]) => {
               const active = services.includes(slug);
@@ -148,18 +148,18 @@ export function BudgetCalculatorClient() {
         <div className="overflow-hidden rounded-2xl border border-gold/30 bg-card">
           <div className="bg-gold/10 p-5 text-center">
             <Wallet className="mx-auto mb-2 h-6 w-6 text-gold" />
-            <p className="text-xs uppercase tracking-wider text-muted-foreground">Buget estimat</p>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("budgetCalc.estimatedBudget")}</p>
             <p className="mt-1 font-heading text-3xl font-bold text-gold">
               {formatEUR(result.total)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Interval: {formatEUR(result.totalLow)} – {formatEUR(result.totalHigh)}
+              {t("budgetCalc.range")} {formatEUR(result.totalLow)} – {formatEUR(result.totalHigh)}
             </p>
           </div>
           <div className="max-h-[420px] overflow-y-auto divide-y divide-border/40">
             {result.items.length === 0 ? (
               <p className="p-5 text-center text-sm text-muted-foreground">
-                Selectează servicii pentru a vedea detalierea.
+                {t("budgetCalc.emptyBreakdown")}
               </p>
             ) : (
               result.items.map((item) => (
@@ -184,7 +184,7 @@ export function BudgetCalculatorClient() {
           <div className="border-t border-border/40 p-4">
             <Link href="/planifica">
               <Button className="w-full gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark">
-                Găsește vendori pentru acest buget <ArrowRight className="h-4 w-4" />
+                {t("budgetCalc.findVendors")} <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
           </div>

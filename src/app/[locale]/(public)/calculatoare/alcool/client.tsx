@@ -15,7 +15,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { calcLabel } from "@/lib/calculators/labels";
 
 export function DrinksCalculatorClient() {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const [eventType, setEventType] = useState<EventType>("wedding");
   const [guestCount, setGuestCount] = useState(100);
   const [drinkersRatio, setDrinkersRatio] = useState(80);
@@ -36,21 +36,21 @@ export function DrinksCalculatorClient() {
     <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
       <div className="space-y-6">
         <div className="rounded-xl border border-border/40 bg-card p-5">
-          <h2 className="mb-4 font-heading text-lg font-semibold">Detalii eveniment</h2>
+          <h2 className="mb-4 font-heading text-lg font-semibold">{t("calc.drinks.eventDetails")}</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label>Tip eveniment</Label>
+              <Label>{t("calc.drinks.eventType")}</Label>
               <Select value={eventType} onValueChange={(v) => setEventType(v as EventType)}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {(Object.keys(EVENT_TYPE_LABELS) as EventType[]).map((k) => (
-                    <SelectItem key={k} value={k}>{EVENT_TYPE_LABELS[k]}</SelectItem>
+                    <SelectItem key={k} value={k}>{calcLabel(EVENT_TYPE_LABELS[k], locale)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label>Număr invitați</Label>
+              <Label>{t("calc.guestCount")}</Label>
               <Input
                 type="number"
                 min={10}
@@ -60,7 +60,7 @@ export function DrinksCalculatorClient() {
               />
             </div>
             <div>
-              <Label>% invitați care consumă alcool</Label>
+              <Label>{t("calc.drinks.drinkersRatio")}</Label>
               <Input
                 type="number"
                 min={0}
@@ -71,7 +71,7 @@ export function DrinksCalculatorClient() {
               />
             </div>
             <div>
-              <Label>Durată eveniment (ore)</Label>
+              <Label>{t("calc.drinks.duration")}</Label>
               <Input
                 type="number"
                 min={2}
@@ -85,15 +85,15 @@ export function DrinksCalculatorClient() {
         </div>
 
         <div className="rounded-xl border border-border/40 bg-card p-5">
-          <h2 className="mb-4 font-heading text-lg font-semibold">Detaliere pe băuturi</h2>
+          <h2 className="mb-4 font-heading text-lg font-semibold">{t("calc.drinks.breakdown")}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="border-b border-border/40">
                 <tr className="text-left text-xs uppercase text-muted-foreground">
-                  <th className="pb-2">Băutură</th>
-                  <th className="pb-2 text-right">Total ml</th>
-                  <th className="pb-2 text-right">Sticle</th>
-                  <th className="pb-2 text-right">Cost</th>
+                  <th className="pb-2">{t("calc.drinks.colDrink")}</th>
+                  <th className="pb-2 text-right">{t("calc.drinks.colTotalMl")}</th>
+                  <th className="pb-2 text-right">{t("calc.drinks.colBottles")}</th>
+                  <th className="pb-2 text-right">{t("calc.drinks.colCost")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -118,13 +118,13 @@ export function DrinksCalculatorClient() {
           <div className="bg-gold/10 p-5 text-center">
             <Wine className="mx-auto mb-2 h-6 w-6 text-gold" />
             <p className="text-xs uppercase tracking-wider text-muted-foreground">
-              Total sticle
+              {t("calc.drinks.totalBottles")}
             </p>
             <p className="mt-1 font-heading text-3xl font-bold text-gold">
               {result.totalBottles}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
-              Cost estimativ: {formatEUR(result.totalCost)}
+              {t("calc.drinks.estimatedCost", { amount: formatEUR(result.totalCost) })}
             </p>
           </div>
           <div className="divide-y divide-border/40">

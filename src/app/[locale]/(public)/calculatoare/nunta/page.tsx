@@ -1,5 +1,6 @@
 import Link from "@/components/shared/locale-link";
 import { metaForPath } from "@/lib/seo/page-meta";
+import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { WeddingCostCalculatorClient } from "./client";
@@ -37,11 +38,17 @@ export async function generateMetadata({
   }, locale);
 }
 
-export default function WeddingCostPage() {
+export default async function WeddingCostPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Calculatoare", url: "/calculatoare" },
-    { name: "Cost nuntă", url: "/calculatoare/nunta" },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("calc.nav.calculators", locale), url: "/calculatoare" },
+    { name: t("calc.wedding.breadcrumb", locale), url: "/calculatoare/nunta" },
   ];
 
   return (
@@ -55,23 +62,21 @@ export default function WeddingCostPage() {
       <div className="mx-auto max-w-5xl px-4 py-12 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
           <Link href="/" className="hover:text-gold">
-            Acasă
+            {t("nav.home", locale)}
           </Link>
           <span className="mx-2">/</span>
           <Link href="/calculatoare" className="hover:text-gold">
-            Calculatoare
+            {t("calc.nav.calculators", locale)}
           </Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">Cost nuntă</span>
+          <span className="text-foreground">{t("calc.wedding.breadcrumb", locale)}</span>
         </nav>
         <header className="mb-8">
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            Calculator cost nuntă Moldova
+            {t("calc.wedding.title", locale)}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground md:text-base">
-            Estimare completă a bugetului pentru nunta ta, cu categorii
-            specifice tradițiilor moldovenești. Modifică valorile în fiecare
-            categorie pentru a vedea impactul pe totalul final.
+            {t("calc.wedding.subtitle", locale)}
           </p>
         </header>
         <WeddingCostCalculatorClient />

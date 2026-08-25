@@ -10,6 +10,7 @@ import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
 import { Star, MapPin, ArrowLeft, X, Check } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import { ClearCompareButton } from "./clear-button";
 import { NotSpecified } from "@/components/public/not-specified";
 import { formatPrice } from "@/lib/format/price";
@@ -49,10 +50,13 @@ export async function generateMetadata({
 }
 
 interface Props {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<{ ids?: string }>;
 }
 
-export default async function ArtistCompareePage({ searchParams }: Props) {
+export default async function ArtistCompareePage({ params, searchParams }: Props) {
+  const { locale: rawLocale } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const sp = await searchParams;
   const ids = (sp.ids || "")
     .split(",")
@@ -65,14 +69,14 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16 text-center lg:px-8">
         <h1 className="font-heading text-2xl font-bold">
-          Compară artiști
+          {t("compare.artists.title", locale)}
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Alege 2 sau 3 artiști de pe pagina{" "}
+          {t("compare.artists.emptyBefore", locale)}{" "}
           <Link href="/artisti" className="text-gold hover:underline">
-            Artiști
+            {t("nav.artists", locale)}
           </Link>{" "}
-          cu butonul „Compară” pentru a-i vedea side-by-side aici.
+          {t("compare.artists.emptyAfter", locale)}
         </p>
       </div>
     );
@@ -118,14 +122,14 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
     render: (a: (typeof rows)[number]) => React.ReactNode;
   }> = [
     {
-      label: "Preț de la",
+      label: t("compare.row.priceFrom", locale),
       render: (a) =>
         a.priceFrom
           ? formatPrice(a.priceFrom, a.priceCurrency)
           : <NotSpecified />,
     },
     {
-      label: "Rating",
+      label: t("compare.row.rating", locale),
       render: (a) =>
         a.ratingAvg ? (
           <span className="inline-flex items-center gap-1">
@@ -140,7 +144,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
         ),
     },
     {
-      label: "Locație",
+      label: t("venue.location", locale),
       render: (a) =>
         a.location ? (
           <span className="inline-flex items-center gap-1">
@@ -152,7 +156,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
         ),
     },
     {
-      label: "Verificat",
+      label: t("common.verified", locale),
       render: (a) =>
         a.isVerified ? (
           <Check className="h-4 w-4 text-emerald-500" />
@@ -161,7 +165,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
         ),
     },
     {
-      label: "Premium",
+      label: t("common.premium", locale),
       render: (a) =>
         a.isPremium ? (
           <Check className="h-4 w-4 text-gold" />
@@ -170,7 +174,7 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
         ),
     },
     {
-      label: "Descriere",
+      label: t("artist.description", locale),
       render: (a) =>
         a.descriptionRo ? (
           <p className="line-clamp-6 text-xs text-muted-foreground">
@@ -190,10 +194,10 @@ export default async function ArtistCompareePage({ searchParams }: Props) {
             href="/artisti"
             className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-gold"
           >
-            <ArrowLeft className="h-3 w-3" /> Înapoi la artiști
+            <ArrowLeft className="h-3 w-3" /> {t("compare.artists.back", locale)}
           </Link>
           <h1 className="mt-2 font-heading text-2xl font-bold">
-            Comparație — {ordered.length} artiști
+            {t("compare.artists.heading", locale, { count: ordered.length })}
           </h1>
         </div>
         <ClearCompareButton />

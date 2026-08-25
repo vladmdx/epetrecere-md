@@ -2,6 +2,7 @@ import Link from "@/components/shared/locale-link";
 import { getAllCategories } from "@/lib/db/queries/categories";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { getLocalized, t } from "@/i18n";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { CategoryCard } from "./category-card";
 
@@ -77,7 +78,13 @@ const LOCAL_IMAGES: Record<string, string> = {
   "foto-zona-selfie": "/images/categories/foto-zona-selfie.jpg",
 };
 
-export default async function AllCategoriesPage() {
+export default async function AllCategoriesPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const cats = await getAllCategories();
   // Show artist + service categories. Venues live on a separate /sali page.
   const visible = cats
@@ -103,13 +110,13 @@ export default async function AllCategoriesPage() {
         <ScrollReveal>
           <div className="mb-12 text-center">
             <p className="mb-2 text-sm font-medium uppercase tracking-[3px] text-gold">
-              Categorii
+              {t("categories.title", locale)}
             </p>
             <h1 className="font-heading text-3xl font-bold md:text-5xl text-[#FAF8F2]">
-              Toate Categoriile
+              {t("categories.allTitle", locale)}
             </h1>
             <p className="mt-4 text-base text-muted-foreground">
-              Alege categoria de artiști sau servicii pentru evenimentul tău.
+              {t("categories.chooseDesc", locale)}
             </p>
           </div>
         </ScrollReveal>
@@ -119,7 +126,7 @@ export default async function AllCategoriesPage() {
           <section className="mb-16">
             <ScrollReveal>
               <h2 className="mb-6 font-heading text-2xl font-bold text-[#FAF8F2]">
-                Artiști
+                {t("nav.artists", locale)}
               </h2>
             </ScrollReveal>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -127,7 +134,7 @@ export default async function AllCategoriesPage() {
                 <ScrollReveal key={cat.slug} delay={i * 0.04}>
                   <CategoryCard
                     slug={cat.slug}
-                    name={cat.nameRo}
+                    name={getLocalized(cat, "name", locale)}
                     image={cat.imageUrl ?? LOCAL_IMAGES[cat.slug] ?? null}
                     imageAlt={cat.imageAlt}
                     priceFrom={cat.priceFrom}
@@ -144,7 +151,7 @@ export default async function AllCategoriesPage() {
           <section>
             <ScrollReveal>
               <h2 className="mb-6 font-heading text-2xl font-bold text-[#FAF8F2]">
-                Servicii
+                {t("nav.services", locale)}
               </h2>
             </ScrollReveal>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
@@ -152,7 +159,7 @@ export default async function AllCategoriesPage() {
                 <ScrollReveal key={cat.slug} delay={i * 0.04}>
                   <CategoryCard
                     slug={cat.slug}
-                    name={cat.nameRo}
+                    name={getLocalized(cat, "name", locale)}
                     image={cat.imageUrl ?? LOCAL_IMAGES[cat.slug] ?? null}
                     imageAlt={cat.imageAlt}
                     priceFrom={cat.priceFrom}
@@ -170,7 +177,7 @@ export default async function AllCategoriesPage() {
               href="/artisti"
               className="inline-flex items-center gap-2 rounded-full bg-gold px-6 py-3 text-sm font-medium text-[#0D0D0D] transition-all hover:bg-gold-dark"
             >
-              Vezi toți artiștii
+              {t("catalog.viewAllArtists", locale)}
               <span aria-hidden>→</span>
             </Link>
           </div>

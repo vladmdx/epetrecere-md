@@ -1,6 +1,7 @@
 import Link from "@/components/shared/locale-link";
 import { metaForPath } from "@/lib/seo/page-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { t } from "@/i18n";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { GuestCalculatorClient } from "./client";
 
@@ -35,11 +36,17 @@ export async function generateMetadata({
   }, locale);
 }
 
-export default function GuestCalculatorPage() {
+export default async function GuestCalculatorPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const breadcrumbs = [
-    { name: "Acasă", url: "/" },
-    { name: "Calculatoare", url: "/calculatoare" },
-    { name: "Invitați", url: "/calculatoare/invitati" },
+    { name: t("nav.home", locale), url: "/" },
+    { name: t("tools.calculators", locale), url: "/calculatoare" },
+    { name: t("calc.guests.breadcrumb", locale), url: "/calculatoare/invitati" },
   ];
   return (
     <>
@@ -49,19 +56,18 @@ export default function GuestCalculatorPage() {
       />
       <div className="mx-auto max-w-4xl px-4 py-10 lg:px-8">
         <nav className="mb-4 text-xs text-muted-foreground">
-          <Link href="/" className="hover:text-gold">Acasă</Link>
+          <Link href="/" className="hover:text-gold">{t("nav.home", locale)}</Link>
           <span className="mx-2">/</span>
-          <Link href="/calculatoare" className="hover:text-gold">Calculatoare</Link>
+          <Link href="/calculatoare" className="hover:text-gold">{t("tools.calculators", locale)}</Link>
           <span className="mx-2">/</span>
-          <span className="text-foreground">Invitați</span>
+          <span className="text-foreground">{t("calc.guests.breadcrumb", locale)}</span>
         </nav>
         <header className="mb-8">
           <h1 className="font-heading text-3xl font-bold md:text-4xl">
-            Calculator invitați & mese
+            {t("calc.guests.pageTitle", locale)}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground md:text-base">
-            Află câte mese, băi, ospătari și locuri de parcare îți sunt necesare
-            pentru un eveniment confortabil și bine organizat.
+            {t("calc.guests.pageIntro", locale)}
           </p>
         </header>
         <GuestCalculatorClient />

@@ -80,6 +80,16 @@ interface VenueData {
   }>;
 }
 
+/** Shown only when the owner listed no facilities of their own. */
+const DEFAULT_FACILITY_KEYS = [
+  "venue.detail.facilityParking",
+  "venue.detail.facilityCeremony",
+  "venue.detail.facilityStage",
+  "venue.detail.facilityMenu",
+  "venue.detail.facilityAc",
+  "venue.detail.facilityWifi",
+];
+
 interface MenuCategory {
   id: number;
   nameRo: string;
@@ -179,7 +189,7 @@ export function VenueDetailClient({
     <div className="-mt-16 min-h-screen bg-[#05080d] pt-16 text-[#f5efe4]">
     <div className="mx-auto max-w-[1480px] px-4 py-8 lg:px-8">
       <nav className="mb-7 text-xs text-white/42">
-        <Link href="/" className="hover:text-gold">Acasă</Link>
+        <Link href="/" className="hover:text-gold">{t("nav.home")}</Link>
         <span className="mx-2">/</span>
         <Link href="/sali" className="hover:text-gold">{t("nav.venues")}</Link>
         <span className="mx-2">/</span>
@@ -191,7 +201,7 @@ export function VenueDetailClient({
           <div className="flex flex-wrap items-start gap-3">
             <div>
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-[.28em] text-[#e6b84d]">
-                Locație pentru evenimente
+                {t("venue.detail.eyebrow")}
               </p>
               <h1 className="font-heading text-3xl font-semibold tracking-tight text-[#fbf7ee] md:text-5xl">{name}</h1>
             </div>
@@ -202,7 +212,7 @@ export function VenueDetailClient({
 
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-white/58">
             <Badge className="gap-1 border border-[#e6b84d]/30 bg-[#e6b84d]/10 text-[#ebc765]">
-              <Sparkles className="h-3 w-3" /> Locație verificată
+              <Sparkles className="h-3 w-3" /> {t("venue.detail.verified")}
             </Badge>
             {venue.city && (
               <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {venue.address || venue.city}</span>
@@ -212,11 +222,11 @@ export function VenueDetailClient({
             )}
             <span className="flex items-center gap-1">
               <Star className="h-3.5 w-3.5 fill-gold text-gold" />
-              {venue.ratingAvg && venue.ratingAvg > 0 ? venue.ratingAvg.toFixed(1) : "Nou"}
+              {venue.ratingAvg && venue.ratingAvg > 0 ? venue.ratingAvg.toFixed(1) : t("venue.detail.new")}
               {venue.ratingCount ? <span className="text-white/36">({plural(venue.ratingCount, locale, NOUNS.reviews)})</span> : null}
             </span>
             {venue.workingHours && (
-              <span className="flex items-center gap-1" title="Program funcționare">
+              <span className="flex items-center gap-1" title={t("venue.detail.workingHours")}>
                 <Clock className="h-3.5 w-3.5" />
                 {formatWorkingHours(venue.workingHours)}
               </span>
@@ -238,12 +248,14 @@ export function VenueDetailClient({
             >
               <img
                 src={venueHeroImage}
-                alt={`${name} — vedere exterioară`}
+                alt={t("venue.detail.heroAlt", { name })}
                 className="h-full w-full object-cover transition duration-700 group-hover:scale-[1.02]"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
               <span className="absolute bottom-4 left-4 rounded-lg border border-white/20 bg-black/46 px-4 py-2 text-xs font-medium text-white backdrop-blur">
-                Vezi galeria ({Math.max(venue.images.length, galleryImages.length + 1)})
+                {t("venue.detail.viewGallery", {
+                  count: Math.max(venue.images.length, galleryImages.length + 1),
+                })}
               </span>
             </a>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -257,7 +269,7 @@ export function VenueDetailClient({
                   >
                     <img
                       src={image}
-                      alt={`${name} — galerie ${index + 1}`}
+                      alt={t("venue.detail.galleryAlt", { name, index: index + 1 })}
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                       loading="lazy"
                     />
@@ -273,11 +285,11 @@ export function VenueDetailClient({
 
           <nav className="mt-7 flex gap-1 overflow-x-auto rounded-xl border border-white/8 bg-[#0c111b] p-1 text-xs">
             {[
-              ["#despre", "Despre locație"],
-              ["#facilitati", "Facilități"],
-              ["#pachete", "Pachete"],
-              ["#recenzii", `Recenzii (${venue.reviews.length})`],
-              ["#locatie", "Localizare"],
+              ["#despre", t("venue.detail.tabAbout")],
+              ["#facilitati", t("venue.facilities")],
+              ["#pachete", t("venue.detail.tabPackages")],
+              ["#recenzii", t("venue.detail.tabReviews", { count: venue.reviews.length })],
+              ["#locatie", t("venue.detail.tabLocation")],
             ].map(([href, label]) => (
               <a key={href} href={href} className="shrink-0 rounded-lg px-4 py-2.5 text-white/56 hover:bg-[#e6b84d]/10 hover:text-[#e6b84d]">
                 {label}
@@ -287,18 +299,30 @@ export function VenueDetailClient({
 
           {/* Description */}
           <section id="despre" className="mt-8 scroll-mt-24">
-            <h2 className="font-heading text-2xl font-semibold text-[#fbf7ee]">Despre locație</h2>
+            <h2 className="font-heading text-2xl font-semibold text-[#fbf7ee]">{t("venue.detail.tabAbout")}</h2>
             <div className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
               <div className="rounded-xl border border-white/8 bg-white/[.025] p-5">
                 <p className="text-sm leading-7 text-white/62">
-                  {description || `${name} este o locație creată pentru evenimente memorabile, cu spații flexibile și servicii adaptate fiecărui concept.`}
+                  {description || t("venue.detail.descriptionFallback", { name })}
                 </p>
               </div>
               <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-white/8 bg-[#0d1119]">
-                <VenueFact icon={Users} label="Capacitate" value={venue.capacityMax ? `${venue.capacityMin || 1}–${venue.capacityMax} invitați` : "La cerere"} />
-                <VenueFact icon={MapPin} label="Localitate" value={venue.city || "Moldova"} />
-                <VenueFact icon={Clock} label="Program" value={venue.workingHours ? formatWorkingHours(venue.workingHours) : "Flexibil"} />
-                <VenueFact icon={Building2} label="Tip spațiu" value="Sală de evenimente" />
+                <VenueFact
+                  icon={Users}
+                  label={t("venue.capacity")}
+                  value={
+                    venue.capacityMax
+                      ? `${venue.capacityMin || 1}–${venue.capacityMax} ${t("common.guests")}`
+                      : t("venue.detail.onRequest")
+                  }
+                />
+                <VenueFact icon={MapPin} label={t("venue.detail.factLocality")} value={venue.city || t("venue.detail.moldova")} />
+                <VenueFact
+                  icon={Clock}
+                  label={t("venue.detail.factSchedule")}
+                  value={venue.workingHours ? formatWorkingHours(venue.workingHours) : t("venue.detail.flexible")}
+                />
+                <VenueFact icon={Building2} label={t("venue.detail.factSpaceType")} value={t("venue.detail.eventHall")} />
               </div>
             </div>
           </section>
@@ -307,7 +331,10 @@ export function VenueDetailClient({
           <section id="facilitati" className="mt-8 scroll-mt-24">
               <h2 className="mb-4 font-heading text-2xl font-semibold">{t("venue.facilities")}</h2>
               <div className="flex flex-wrap gap-2">
-                {(venue.facilities?.length ? venue.facilities : ["Parcare", "Zonă pentru ceremonie", "Scenă și sonorizare", "Meniu personalizat", "Aer condiționat", "Wi-Fi"]).map((f) => (
+                {(venue.facilities?.length
+                  ? venue.facilities
+                  : DEFAULT_FACILITY_KEYS.map((key) => t(key))
+                ).map((f) => (
                   <Badge key={f} variant="secondary" className="gap-1 border border-[#e6b84d]/20 bg-[#e6b84d]/7 text-white/68">
                     <Check className="h-3 w-3 text-[#e6b84d]" /> {f}
                   </Badge>
@@ -318,7 +345,7 @@ export function VenueDetailClient({
           {/* G-70 — Google Maps embed */}
           {venue.lat && venue.lng && (
             <section id="locatie" className="mt-8 scroll-mt-24">
-              <h2 className="mb-4 font-heading text-2xl font-semibold">Locație</h2>
+              <h2 className="mb-4 font-heading text-2xl font-semibold">{t("venue.location")}</h2>
               <div className="aspect-video overflow-hidden rounded-xl border border-border/40">
                 <iframe
                   src={`https://www.google.com/maps/embed?pb=!1m14!1m12!1m3!1d2000!2d${venue.lng}!3d${venue.lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!5e0!3m2!1sro!2smd`}
@@ -327,7 +354,7 @@ export function VenueDetailClient({
                   allowFullScreen
                   loading="lazy"
                   referrerPolicy="no-referrer-when-downgrade"
-                  title={`Locație — ${name}`}
+                  title={t("venue.detail.mapTitle", { name })}
                 />
               </div>
               {venue.address && (
@@ -340,8 +367,8 @@ export function VenueDetailClient({
 
           {/* F-S4 — Meniu digital (spec section 5) */}
           <section id="pachete" className="mt-10 scroll-mt-24">
-              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">Opțiuni flexibile</p>
-              <h2 className="mt-2 mb-5 font-heading text-2xl font-semibold">Pachete &amp; meniu</h2>
+              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("venue.detail.packagesEyebrow")}</p>
+              <h2 className="mt-2 mb-5 font-heading text-2xl font-semibold">{t("venue.detail.packagesTitle")}</h2>
 
               {/* Packages */}
               {menu && menu.packages.length > 0 ? (
@@ -358,7 +385,7 @@ export function VenueDetailClient({
                     >
                       {p.isRecommended && (
                         <div className="absolute -top-2 right-4 rounded-full bg-gold px-3 py-0.5 text-[10px] font-bold text-[#0D0D0D]">
-                          RECOMANDAT
+                          {t("venue.detail.recommended")}
                         </div>
                       )}
                       <h3 className="font-heading text-lg font-bold">
@@ -369,18 +396,18 @@ export function VenueDetailClient({
                           {p.pricePerPerson}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {currencySymbol(p.currency)} / persoană
+                          {currencySymbol(p.currency)} / {t("venue.detail.perPerson")}
                         </span>
                       </div>
                       {p.minGuests && (
                         <p className="mt-1 text-[11px] text-muted-foreground">
-                          Min. {p.minGuests} persoane
+                          {t("venue.detail.minGuests", { count: p.minGuests })}
                         </p>
                       )}
                       {p.includes && (
                         <div className="mt-3">
                           <p className="text-[10px] font-medium uppercase tracking-wider text-emerald-500">
-                            Include
+                            {t("venue.detail.included")}
                           </p>
                           <p className="mt-0.5 whitespace-pre-wrap text-xs">
                             {p.includes}
@@ -390,7 +417,7 @@ export function VenueDetailClient({
                       {p.excludes && (
                         <div className="mt-2">
                           <p className="text-[10px] font-medium uppercase tracking-wider text-red-400">
-                            Nu include
+                            {t("venue.detail.notIncluded")}
                           </p>
                           <p className="mt-0.5 whitespace-pre-wrap text-xs text-muted-foreground">
                             {p.excludes}
@@ -434,7 +461,7 @@ export function VenueDetailClient({
                       onClick={() => trackClick("venue", venue.id, "menu")}
                       className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/5 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/15"
                     >
-                      Vezi meniul pe site
+                      {t("venue.detail.menuOnSite")}
                     </a>
                   )}
                   {venue.menuPdfUrl && (
@@ -452,7 +479,7 @@ export function VenueDetailClient({
                       onClick={() => trackClick("venue", venue.id, "menu")}
                       className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-4 py-2 text-sm font-medium text-gold hover:bg-gold/20"
                     >
-                      Descarcă meniu PDF
+                      {t("venue.detail.menuPdf")}
                     </a>
                   )}
                 </div>
@@ -462,13 +489,13 @@ export function VenueDetailClient({
           {/* F-S5 — Virtual tour 360° */}
           {venue.virtualTourUrl && (
             <div className="mt-6">
-              <h2 className="mb-3 font-heading text-lg font-bold">Tur virtual 360°</h2>
+              <h2 className="mb-3 font-heading text-lg font-bold">{t("venue.detail.virtualTour")}</h2>
               <div className="aspect-video overflow-hidden rounded-xl border border-border/40">
                 <iframe
                   src={venue.virtualTourUrl}
                   className="h-full w-full"
                   allow="xr-spatial-tracking; fullscreen"
-                  title={`Tur virtual — ${name}`}
+                  title={t("venue.detail.virtualTourTitle", { name })}
                 />
               </div>
             </div>
@@ -476,7 +503,7 @@ export function VenueDetailClient({
 
           {/* Reviews */}
           <section id="recenzii" className="mt-10 scroll-mt-24">
-              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">Experiențe reale</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("venue.detail.reviewsEyebrow")}</p>
               <h2 className="mt-2 mb-5 font-heading text-2xl font-semibold">{t("artist.reviews")} ({venue.reviews.length})</h2>
               {venue.reviews.length > 0 ? (
               <div className="grid gap-3 md:grid-cols-2">
@@ -504,7 +531,7 @@ export function VenueDetailClient({
                             { }
                             <img
                               src={url}
-                              alt={`Fotografie recenzie ${i + 1}`}
+                              alt={t("venue.detail.reviewPhotoAlt", { index: i + 1 })}
                               className="h-full w-full object-cover"
                               loading="lazy"
                             />
@@ -517,7 +544,7 @@ export function VenueDetailClient({
               </div>
               ) : (
                 <p className="rounded-xl border border-white/8 bg-white/[.02] p-5 text-sm text-white/48">
-                  Fii primul care împărtășește experiența la această locație.
+                  {t("venue.detail.noReviews")}
                 </p>
               )}
 
@@ -532,13 +559,13 @@ export function VenueDetailClient({
         <div className="space-y-4">
           <div className="space-y-3 rounded-2xl border border-[#e6b84d]/55 bg-[linear-gradient(180deg,#161922,#0b1017)] p-5 shadow-[0_24px_60px_rgba(0,0,0,.34)] lg:sticky lg:top-20">
             <div className="border-b border-white/8 pb-4">
-              <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-[#e6b84d]">Rezervă locația</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[.22em] text-[#e6b84d]">{t("venue.detail.bookEyebrow")}</p>
               <h2 className="mt-2 font-heading text-xl font-semibold text-[#fbf7ee]">
-                Planifică evenimentul la {name}
+                {t("venue.detail.bookTitle", { name })}
               </h2>
               <div className="mt-3 flex items-center gap-2 text-xs text-white/48">
                 <CalendarDays className="h-3.5 w-3.5 text-[#e6b84d]" />
-                Confirmă data și numărul de invitați
+                {t("venue.detail.bookHint")}
               </div>
             </div>
             <div className="py-1 text-center">
@@ -553,7 +580,7 @@ export function VenueDetailClient({
                     href={`/sign-in?redirect_url=${encodeURIComponent(`/sali/${venue.slug}`)}`}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
                   >
-                    <Lock className="h-4 w-4" /> Preț la autentificare
+                    <Lock className="h-4 w-4" /> {t("venue.detail.priceOnLogin")}
                   </a>
                 )
               ) : !canSeePrice ? (
@@ -561,10 +588,10 @@ export function VenueDetailClient({
                   href={`/sign-in?redirect_url=${encodeURIComponent(`/sali/${venue.slug}`)}`}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
                 >
-                  <Lock className="h-4 w-4" /> Preț la autentificare
+                  <Lock className="h-4 w-4" /> {t("venue.detail.priceOnLogin")}
                 </a>
               ) : (
-                <p className="text-sm text-white/54">Ofertă personalizată pentru evenimentul tău</p>
+                <p className="text-sm text-white/54">{t("venue.detail.customOffer")}</p>
               )}
             </div>
             <RequestPriceForm venueId={venue.id} />
@@ -583,10 +610,10 @@ export function VenueDetailClient({
             {/* Share buttons */}
             <div className="rounded-xl border border-border/40 bg-card p-3">
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Partajează
+                {t("venue.detail.share")}
               </p>
               <ShareButtons
-                title={`${name} — sală evenimente pe ePetrecere.md`}
+                title={t("venue.detail.shareTitle", { name })}
                 compact
               />
             </div>
@@ -601,11 +628,11 @@ export function VenueDetailClient({
         <section className="mt-16 border-t border-white/8 pt-10">
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">Descoperă mai multe</p>
-              <h2 className="mt-2 font-heading text-2xl font-semibold">Locații similare</h2>
+              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("venue.detail.moreEyebrow")}</p>
+              <h2 className="mt-2 font-heading text-2xl font-semibold">{t("venue.detail.similar")}</h2>
             </div>
             <Link href="/sali" className="inline-flex items-center gap-2 text-xs font-semibold text-[#e6b84d] hover:text-[#f1d684]">
-              Vezi toate sălile <ArrowRight className="h-4 w-4" />
+              {t("venue.detail.allVenues")} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -637,21 +664,22 @@ function VenueFact({
 }
 
 function GenericVenuePackages() {
+  const { t } = useLocale();
   const packages = [
     {
       name: "Elegant",
       icon: Utensils,
-      description: "Meniu personalizat, servire completă și consultanță pentru organizare.",
+      descriptionKey: "venue.detail.genericElegant",
     },
     {
       name: "Signature",
       icon: Sparkles,
-      description: "Concept complet pentru nuntă sau eveniment privat, adaptat numărului de invitați.",
+      descriptionKey: "venue.detail.genericSignature",
     },
     {
       name: "Corporate",
       icon: Building2,
-      description: "Configurație flexibilă, tehnică și servicii pentru întâlniri și gale.",
+      descriptionKey: "venue.detail.genericCorporate",
     },
   ];
   return (
@@ -666,8 +694,8 @@ function GenericVenuePackages() {
         >
           <item.icon className="h-5 w-5 text-[#e6b84d]" />
           <h3 className="mt-4 font-heading text-lg font-semibold">{item.name}</h3>
-          <p className="mt-2 text-xs leading-5 text-white/48">{item.description}</p>
-          <p className="mt-5 text-sm font-semibold text-[#e6b84d]">Preț la cerere</p>
+          <p className="mt-2 text-xs leading-5 text-white/48">{t(item.descriptionKey)}</p>
+          <p className="mt-5 text-sm font-semibold text-[#e6b84d]">{t("venue.detail.priceOnRequest")}</p>
         </article>
       ))}
     </div>
@@ -730,18 +758,18 @@ function CategoryAccordion({
 }
 
 function VenueReviewForm() {
+  const { t } = useLocale();
   return (
     <div className="rounded-xl border border-border/40 bg-card p-5">
-      <h3 className="font-heading text-base font-bold">Recenzii verificate</h3>
+      <h3 className="font-heading text-base font-bold">{t("venue.detail.verifiedReviews")}</h3>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
-        Recenzia poate fi trimisă după un eveniment confirmat, direct din
-        cabinetul clientului. Astfel, feedbackul public provine din rezervări reale.
+        {t("venue.detail.verifiedReviewsHint")}
       </p>
       <Link
         href="/cabinet/recenzii"
         className="mt-4 inline-flex items-center gap-2 rounded-md bg-gold px-5 py-2.5 text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark"
       >
-        Vezi rezervările eligibile <ArrowRight className="h-4 w-4" />
+        {t("venue.detail.eligibleBookings")} <ArrowRight className="h-4 w-4" />
       </Link>
     </div>
   );
