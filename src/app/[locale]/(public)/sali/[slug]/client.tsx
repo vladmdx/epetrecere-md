@@ -32,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { trackClick } from "@/lib/analytics/track-click";
 import { plural, NOUNS } from "@/lib/i18n/plural";
 import { formatPrice, currencySymbol } from "@/lib/format/price";
+import { useGatedDetails } from "@/hooks/use-gated-details";
 
 interface VenueData {
   id: number;
@@ -148,6 +149,14 @@ export function VenueDetailClient({
   const description = getLocalized(venue, "description", locale);
   // M0a #8 — price gated behind login
   const canSeePrice = isLoaded && isSignedIn;
+
+  // Prerendered anonymously — the price and the venue's website arrive from
+  // the authenticated endpoint once Clerk confirms a session.
+  const gated = useGatedDetails<{
+    pricePerPerson: number | null;
+    website: string | null;
+  }>("venue", venue.slug);
+  const shown = gated ? { ...venue, ...gated } : venue;
   const venueFallbackImages = [
     "/images/redesign/venue-chateau-hero.webp",
     "/images/venues/hall-1.jpg",
@@ -569,10 +578,10 @@ export function VenueDetailClient({
               </div>
             </div>
             <div className="py-1 text-center">
-              {venue.pricePerPerson ? (
+              {shown.pricePerPerson ? (
                 canSeePrice ? (
                   <>
-                    <p className="font-accent text-3xl font-semibold text-gold">{formatPrice(venue.pricePerPerson, null, locale)}</p>
+                    <p className="font-accent text-3xl font-semibold text-gold">{formatPrice(shown.pricePerPerson, null, locale)}</p>
                     <p className="text-sm text-muted-foreground">{t("venue.price_per_person")}</p>
                   </>
                 ) : (

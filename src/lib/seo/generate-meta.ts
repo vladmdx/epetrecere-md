@@ -148,6 +148,10 @@ export async function generateMeta(
   const titleField = title.includes(SITE_NAME) ? { absolute: title } : title;
 
   return {
+    // Also set here, not only in the root layout: a page that returns its own
+    // openGraph object does not inherit the parent's metadataBase, and Next
+    // then resolves social images against localhost.
+    metadataBase: new URL(SITE_URL),
     title: titleField,
     description,
     openGraph: {
@@ -157,15 +161,24 @@ export async function generateMeta(
       siteName: SITE_NAME,
       type: opts.type || "website",
       locale: ogLocaleFor(locale),
-      ...(opts.image && {
-        images: [{ url: opts.image, width: 1200, height: 630, alt: title }],
-      }),
+      // A page that sets openGraph itself does not inherit the file-based
+      // opengraph-image, so name it. Without this every share of every page
+      // was a bare link with no card — which is how the whole site was after
+      // the routes moved under [locale] and the root image stopped applying.
+      images: [
+        {
+          url: opts.image || `${localizePath("/opengraph-image", locale)}`,
+          width: 1200,
+          height: 630,
+          alt: title,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      ...(opts.image && { images: [opts.image] }),
+      images: [opts.image || localizePath("/opengraph-image", locale)],
     },
     alternates: {
       canonical: url,

@@ -1,14 +1,8 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
-import { auth } from "@clerk/nextjs/server";
 import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import {
-  venueMenuCategories,
-  venueMenuItems,
-  venueMenuPackages,
-  redirects,
-} from "@/lib/db/schema";
+import { redirects, venueMenuCategories, venueMenuItems, venueMenuPackages, venues } from "@/lib/db/schema";
 import { getVenueBySlug, getVenues } from "@/lib/db/queries/venues";
 
 /** When a venue slug is not found, check the redirects table — the
@@ -34,11 +28,30 @@ import { getLocalized, t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { VenueDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
+import { LOCALES } from "@/lib/i18n/routing";
 
 interface Props {
   params: Promise<{ locale: string; slug: string }>;
 }
 
+
+/**
+ * Prerender the venue profiles at build time, one page per language. New rows
+ * added after a deploy still work — dynamicParams defaults to true, so an
+ * unknown slug renders on demand and is cached from then on.
+ */
+export async function generateStaticParams() {
+  const rows = await db
+    .select({ slug: venues.slug })
+    .from(venues)
+    .where(eq(venues.isActive, true));
+  return LOCALES.flatMap((locale) =>
+    rows.map((r) => ({ locale, slug: r.slug })),
+  );
+}
+
+/** Rebuild a profile at most hourly; owners edit these rarely. */
+export const revalidate = 3600;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale: rawLocale, slug } = await params;
@@ -107,18 +120,16 @@ export default async function VenuePage({ params }: Props) {
   const venue = await getVenueBySlug(slug);
   if (!venue) notFound();
 
-  // Phone and email admin-only. Clients must communicate via platform.
-  // Price and website visible to authed users; all redacted for anon.
-  const { userId } = await auth();
-  const gatedVenue = userId
-    ? { ...venue, phone: null, email: null }
-    : {
-        ...venue,
-        pricePerPerson: null,
-        phone: null,
-        email: null,
-        website: null,
-      };
+  // Always the anonymous shape — see the note on the artist page. Reading
+  // the session here would keep this route out of the prerender, and the
+  // signed-in extras arrive from /api/public/gated-details in the browser.
+  const gatedVenue = {
+    ...venue,
+    pricePerPerson: null,
+    phone: null,
+    email: null,
+    website: null,
+  };
 
   const name = getLocalized(venue, "name", "ro");
 
@@ -195,7 +206,7 @@ export default async function VenuePage({ params }: Props) {
         similar={relatedResult.items
           .filter((item) => item.id !== venue.id)
           .slice(0, 4)
-          .map((item) => userId ? item : { ...item, pricePerPerson: null })}
+          .map((item) => ({ ...item, pricePerPerson: null }))}
       />
       <ViewTracker kind="venue" id={venue.id} />
     </>

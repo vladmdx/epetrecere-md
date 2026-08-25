@@ -37,6 +37,7 @@ import { getLocalized } from "@/i18n";
 import { formatPrice } from "@/lib/format/price";
 import { eventTypeLabel, type EventTypeKey } from "@/lib/events/normalize";
 import { formatDuration } from "@/lib/pricing/resolve";
+import { useGatedDetails } from "@/hooks/use-gated-details";
 
 interface ArtistData {
   id: number;
@@ -231,6 +232,19 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   // M0a #8 — contact info and price are gated behind login. We wait for Clerk
   // to hydrate so we don't flash a "Lock" state for authenticated visitors.
   const canSeeContact = isLoaded && isSignedIn;
+  // The page is prerendered in its anonymous shape, so the price and the
+  // artist's own links are not in the HTML. Fetch them once we know there
+  // is a session, and read through this object from here on.
+  const gated = useGatedDetails<{
+    priceFrom: number | null;
+    priceCurrency: string | null;
+    instagram: string | null;
+    facebook: string | null;
+    tiktok: string | null;
+    youtube: string | null;
+    website: string | null;
+  }>("artist", artist.slug);
+  const shown = gated ? { ...artist, ...gated } : artist;
 
   return (
     <div className="-mt-16 min-h-screen bg-[#05080d] pt-16 text-[#f5efe4]">
@@ -321,10 +335,10 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                   <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-xs font-medium text-gold/90">
                     {t("artist.profile.priceOnRequest")}
                   </span>
-                ) : artist.priceFrom ? (
+                ) : shown.priceFrom ? (
                   canSeeContact ? (
                     <span className="font-accent font-semibold text-gold">
-                      {t("common.from")} {formatPrice(artist.priceFrom, artist.priceCurrency, locale)}
+                      {t("common.from")} {formatPrice(shown.priceFrom, shown.priceCurrency, locale)}
                     </span>
                   ) : (
                     <a
@@ -380,15 +394,15 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 <p className="text-muted-foreground">{t("artist.profile.noDescription")}</p>
               )}
               {/* Phone number hidden from public view — only visible in admin panel */}
-              {artist.instagram && canSeeContact && (
+              {shown.instagram && canSeeContact && (
                 <div className="mt-2">
                   <a
-                    href={artist.instagram.startsWith("http") ? artist.instagram : `https://instagram.com/${artist.instagram.replace(/^@/, "")}`}
+                    href={shown.instagram.startsWith("http") ? shown.instagram : `https://instagram.com/${shown.instagram.replace(/^@/, "")}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-gold"
                   >
-                    <Globe className="h-4 w-4" /> {artist.instagram}
+                    <Globe className="h-4 w-4" /> {shown.instagram}
                   </a>
                 </div>
               )}
@@ -665,7 +679,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                       </p>
                     )}
                     <p className="mt-4 font-heading text-xl font-semibold text-[#e6b84d]">
-                      {formatPrice(ep.price, artist.priceCurrency, locale)}
+                      {formatPrice(ep.price, shown.priceCurrency, locale)}
                     </p>
                     <Link
                       href={
@@ -778,9 +792,9 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                 <CalendarDays className="h-3.5 w-3.5 text-[#e6b84d]" />
                 {t("artist.profile.pickDate")}
               </div>
-              {artist.priceFrom && canSeeContact && !artist.priceHidden && (
+              {shown.priceFrom && canSeeContact && !artist.priceHidden && (
                 <p className="mt-4 font-heading text-2xl font-semibold text-[#e6b84d]">
-                  {t("common.from")} {formatPrice(artist.priceFrom, artist.priceCurrency, locale)}
+                  {t("common.from")} {formatPrice(shown.priceFrom, shown.priceCurrency, locale)}
                 </p>
               )}
             </div>

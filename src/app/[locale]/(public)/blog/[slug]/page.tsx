@@ -12,10 +12,27 @@ import { findEditorialPost2026 } from "@/lib/blog/editorial-posts-2026";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { articleJsonLd, breadcrumbJsonLd, faqJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { localizeBlogCategory } from "@/i18n/blog-categories";
+import { LOCALES } from "@/lib/i18n/routing";
 
 interface Props {
   params: Promise<{ locale: string; slug: string }>;
 }
+
+/**
+ * Prerender the published posts, one page per language. Posts added later
+ * render on demand and are cached from then on (dynamicParams defaults true).
+ */
+export async function generateStaticParams() {
+  const rows = await db
+    .select({ slug: blogPosts.slug })
+    .from(blogPosts)
+    .where(eq(blogPosts.status, "published"));
+  return LOCALES.flatMap((locale) =>
+    rows.map((r) => ({ locale, slug: r.slug })),
+  );
+}
+
+export const revalidate = 3600;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale: rawLocale, slug } = await params;

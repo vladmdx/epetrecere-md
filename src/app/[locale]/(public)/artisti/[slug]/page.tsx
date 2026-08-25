@@ -1,9 +1,8 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
-import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { redirects } from "@/lib/db/schema";
+import { artists, redirects } from "@/lib/db/schema";
 import {
   getArtistBySlug,
   getSimilarArtists,
@@ -15,6 +14,7 @@ import { getLocalized, t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { ArtistDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
+import { LOCALES } from "@/lib/i18n/routing";
 
 /** AD-29: resolve slug redirect chain — follows up to 5 hops to guard against loops. */
 async function resolveRedirect(slug: string): Promise<string | null> {
@@ -35,6 +35,24 @@ async function resolveRedirect(slug: string): Promise<string | null> {
 interface Props {
   params: Promise<{ locale: string; slug: string }>;
 }
+
+/**
+ * Prerender the artist profiles at build time, one page per language. New rows
+ * added after a deploy still work — dynamicParams defaults to true, so an
+ * unknown slug renders on demand and is cached from then on.
+ */
+export async function generateStaticParams() {
+  const rows = await db
+    .select({ slug: artists.slug })
+    .from(artists)
+    .where(eq(artists.isActive, true));
+  return LOCALES.flatMap((locale) =>
+    rows.map((r) => ({ locale, slug: r.slug })),
+  );
+}
+
+/** Rebuild a profile at most hourly; owners edit these rarely. */
+export const revalidate = 3600;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale: rawLocale, slug } = await params;
@@ -95,30 +113,30 @@ export default async function ArtistPage({ params }: Props) {
   const artist = await getArtistBySlug(slug);
   if (!artist) notFound();
 
-  // Phone and email are admin-only. Clients must use chat / booking
-  // form on the platform — no direct contact exposed.
-  const { userId } = await auth();
-  const gatedArtist = userId
-    ? { ...artist, phone: null, email: null }
-    : {
-        ...artist,
-        priceFrom: null,
-        phone: null,
-        email: null,
-        instagram: null,
-        facebook: null,
-        tiktok: null,
-        youtube: null,
-        website: null,
-      };
+  // Always the anonymous shape. Reading the session here would opt this
+  // route out of prerendering, and it is one of the two most-crawled pages
+  // on the site; signed-in visitors get the withheld fields from
+  // /api/public/gated-details once the page is interactive.
+  //
+  // Phone and e-mail stay null for everyone: they are admin-only, and
+  // clients are meant to reach an artist through the platform.
+  const gatedArtist = {
+    ...artist,
+    priceFrom: null,
+    phone: null,
+    email: null,
+    instagram: null,
+    facebook: null,
+    tiktok: null,
+    youtube: null,
+    website: null,
+  };
 
   const [similar, ugcPhotos] = await Promise.all([
     getSimilarArtists(artist.id, artist.categoryIds ?? [], 4),
     getUgcPhotosForArtist(artist.id, 12),
   ]);
-  const gatedSimilar = userId
-    ? similar
-    : similar.map((a) => ({ ...a, priceFrom: null }));
+  const gatedSimilar = similar.map((a) => ({ ...a, priceFrom: null }));
 
   const name = getLocalized(artist, "name", "ro");
   const desc = getLocalized(artist, "description", "ro");
