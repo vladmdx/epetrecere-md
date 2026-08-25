@@ -4163,7 +4163,7 @@ function SettingsTab({
 
         <div className="space-y-2">
           <Label htmlFor="s-loc">{t("cabinet.plan.settings.location")}</Label>
-          <Input id="s-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Chișinău" />
+          <Input id="s-loc" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t("cabinet.plan.cityPlaceholder")} />
         </div>
 
         <div className="grid grid-cols-2 gap-3">

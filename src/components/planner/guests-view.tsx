@@ -727,7 +727,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                       onChange={(e) =>
                         setCustom((s) => ({ ...s, headerText: e.target.value }))
                       }
-                      placeholder="Ești invitat"
+                      placeholder={t("planner.guests.inviteTitlePlaceholder")}
                     />
                   </div>
 

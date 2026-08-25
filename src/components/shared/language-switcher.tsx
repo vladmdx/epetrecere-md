@@ -18,7 +18,7 @@ const localeFlags = {
 } as const;
 
 export function LanguageSwitcher() {
-  const { locale, setLocale } = useLocale();
+  const { locale, setLocale, t } = useLocale();
   const router = useRouter();
   const pathname = usePathname() || "/";
 
@@ -45,7 +45,7 @@ export function LanguageSwitcher() {
     <DropdownMenu>
       <DropdownMenuTrigger
         className="inline-flex items-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium hover:bg-accent"
-        aria-label={`Limba curentă: ${localeNames[locale]}`}
+        aria-label={`${t("a11y.currentLanguage")}: ${localeNames[locale]}`}
       >
         <span
           className="flex h-6 w-6 items-center justify-center overflow-hidden rounded-full bg-white/10 text-[15px] leading-none shadow-[0_0_0_1px_rgba(255,255,255,.18)]"

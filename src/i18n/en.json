@@ -1947,7 +1947,8 @@
       "urlSlug": "URL address (slug)",
       "useGalleryCover": "Use gallery cover",
       "viewPublic": "View public page",
-      "workingHoursHint": "Appears on the public profile as “Mon-Fri 10:00-22:00 · Sat-Sun 10:00-24:00”. Leave closed days switched off."
+      "workingHoursHint": "Appears on the public profile as “Mon-Fri 10:00-22:00 · Sat-Sun 10:00-24:00”. Leave closed days switched off.",
+      "addressPlaceholder": "25 Florilor St., Chișinău"
     },
     "venueReviews": {
       "askAll": "Ask everyone ({n})",
@@ -2429,7 +2430,8 @@
     "addFavorite": "Add to favourites",
     "removeFavorite": "Remove from favourites",
     "addCompare": "Add to comparison",
-    "removeCompare": "Remove from comparison"
+    "removeCompare": "Remove from comparison",
+    "currentLanguage": "Current language"
   },
   "aiChat": {
     "greeting": "Hi! I'm the ePetrecere.md assistant. I can help you find artists and venues, work out your wedding budget, or answer questions about planning your event. What can I help with?",
@@ -4271,7 +4273,8 @@
       "updateError": "Error on update.",
       "urgent": "Urgent",
       "viewArtist": "See the artist",
-      "you": "You"
+      "you": "You",
+      "cityPlaceholder": "Chișinău"
     },
     "planner": {
       "eventTypes": {
@@ -5546,6 +5549,9 @@
       "updateError": "Could not update.",
       "upload": "Upload",
       "uploadFailed": "Upload failed."
+    },
+    "guests": {
+      "inviteTitlePlaceholder": "You are invited"
     }
   },
   "timeline": {

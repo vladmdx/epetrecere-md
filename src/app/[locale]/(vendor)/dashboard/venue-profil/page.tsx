@@ -673,7 +673,7 @@ export default function VenueProfilePage() {
                   className="mt-1"
                   value={venue.address ?? ""}
                   onChange={(e) => setVenue({ ...venue, address: e.target.value })}
-                  placeholder="Str. Florilor 25, Chișinău"
+                  placeholder={t("vendor.venueProfile.addressPlaceholder")}
                 />
               </div>
 

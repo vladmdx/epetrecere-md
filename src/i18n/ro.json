@@ -1947,7 +1947,8 @@
       "urlSlug": "Adresă URL (slug)",
       "useGalleryCover": "Folosește coperta galeriei",
       "viewPublic": "Vezi public",
-      "workingHoursHint": "Apare pe profilul public sub formă de „Lu-Vi 10:00-22:00 · Sâ-Du 10:00-24:00”. Lasă zilele închise dezactivate."
+      "workingHoursHint": "Apare pe profilul public sub formă de „Lu-Vi 10:00-22:00 · Sâ-Du 10:00-24:00”. Lasă zilele închise dezactivate.",
+      "addressPlaceholder": "Str. Florilor 25, Chișinău"
     },
     "venueReviews": {
       "askAll": "Cere de la toți ({n})",
@@ -2429,7 +2430,8 @@
     "addFavorite": "Adaugă la favorite",
     "removeFavorite": "Scoate din favorite",
     "addCompare": "Adaugă la comparare",
-    "removeCompare": "Scoate din comparare"
+    "removeCompare": "Scoate din comparare",
+    "currentLanguage": "Limba curentă"
   },
   "aiChat": {
     "greeting": "Salut! Sunt asistentul ePetrecere.md. Te pot ajuta să găsești artiști, săli, să calculezi bugetul nunții sau să răspund la întrebări despre planificarea evenimentului. Cu ce te pot ajuta?",
@@ -4271,7 +4273,8 @@
       "updateError": "Eroare la actualizare.",
       "urgent": "Urgent",
       "viewArtist": "Vezi artistul",
-      "you": "Tu"
+      "you": "Tu",
+      "cityPlaceholder": "Chișinău"
     },
     "planner": {
       "eventTypes": {
@@ -5546,6 +5549,9 @@
       "updateError": "Nu am putut actualiza.",
       "upload": "Încarcă",
       "uploadFailed": "Upload eșuat."
+    },
+    "guests": {
+      "inviteTitlePlaceholder": "Ești invitat"
     }
   },
   "timeline": {
