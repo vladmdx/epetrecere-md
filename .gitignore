@@ -57,3 +57,13 @@ packages/mobile/credentials/
 *.p8
 
 packages/mobile/build-*.ipa
+
+# iCloud duplicate files. Syncing this repo from iCloud Drive occasionally
+# leaves a second copy of a file named "<name> 2.<ext>" beside the original.
+# They are never real source; keeping them out stops `git add -A` from
+# committing a stale fork of a script nobody edited.
+*\ 2.ts
+*\ 2.tsx
+*\ 2.mjs
+*\ 2.json
+*\ 2.md

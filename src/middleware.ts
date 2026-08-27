@@ -39,6 +39,55 @@ let redirectsCacheLoadedAt = 0;
 // but query is trivial (table is small).
 const REDIRECTS_CACHE_TTL_MS = 60 * 1000;
 
+type RedirectRow = { from_path: string; to_path: string };
+
+/**
+ * Middleware runs on the Edge runtime, where there are no TCP sockets — so
+ * this cannot use the same driver as the rest of the app. Neon answers over
+ * HTTP, which is why the original code could query it directly from here.
+ * Supabase does not offer an HTTP SQL endpoint, but it does expose the table
+ * through PostgREST, which is a plain fetch and works on Edge unchanged.
+ *
+ * Whichever backend is configured, a failure here is not fatal: the caller
+ * falls back to the last-known map, and /sali/[slug] still redirects on its
+ * own — just with a 200 instead of a 308.
+ */
+async function loadRedirectRows(): Promise<RedirectRow[]> {
+  const url = process.env.DATABASE_URL ?? "";
+
+  if (url.includes("neon.tech")) {
+    const sql = neon(url);
+    return (await sql`
+      SELECT from_path, to_path FROM redirects
+      WHERE from_path LIKE '/sali/%' OR from_path LIKE '/artisti/%'
+    `) as RedirectRow[];
+  }
+
+  const restUrl = process.env.SUPABASE_URL;
+  const restKey =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_ANON_KEY;
+  if (!restUrl || !restKey) {
+    throw new Error(
+      "no Edge-reachable redirects source: set SUPABASE_URL and a Supabase key",
+    );
+  }
+
+  const query =
+    `${restUrl}/rest/v1/redirects` +
+    `?select=from_path,to_path` +
+    `&or=(from_path.like./sali/*,from_path.like./artisti/*)`;
+  const res = await fetch(query, {
+    headers: { apikey: restKey, Authorization: `Bearer ${restKey}` },
+    // The 60s cache above is the real one; this just avoids a second layer
+    // holding a stale copy past a slug rename.
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`redirects fetch failed: ${res.status}`);
+  }
+  return (await res.json()) as RedirectRow[];
+}
+
 async function getSlugRedirectsMap(): Promise<Map<string, string>> {
   if (
     redirectsCache &&
@@ -47,11 +96,7 @@ async function getSlugRedirectsMap(): Promise<Map<string, string>> {
     return redirectsCache;
   }
   try {
-    const sql = neon(process.env.DATABASE_URL!);
-    const rows = (await sql`
-      SELECT from_path, to_path FROM redirects
-      WHERE from_path LIKE '/sali/%' OR from_path LIKE '/artisti/%'
-    `) as Array<{ from_path: string; to_path: string }>;
+    const rows = await loadRedirectRows();
     const map = new Map<string, string>();
     for (const r of rows) map.set(r.from_path, r.to_path);
     redirectsCache = map;

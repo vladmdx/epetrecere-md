@@ -21,6 +21,7 @@ import "dotenv/config";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Pool } from "@neondatabase/serverless";
+import postgres from "postgres";
 
 const fileArg = process.argv[2];
 if (!fileArg) {
@@ -38,9 +39,29 @@ const path = resolve(process.cwd(), fileArg);
 const sql = readFileSync(path, "utf8");
 
 (async () => {
+  console.log(`Applying ${path} …`);
+
+  // Neon keeps its own pool; every other host — Supabase included — is
+  // reached with the ordinary driver. Both send the file as ONE
+  // multi-statement query, so a migration may carry its own BEGIN/COMMIT
+  // and dollar-quoted DO blocks.
+  if (!url!.includes("neon.tech")) {
+    const client = postgres(url!, { ssl: "require", max: 1, onnotice: () => {} });
+    try {
+      await client.unsafe(sql);
+      console.log("Done.");
+    } catch (err) {
+      console.error("FAILED");
+      console.error(err);
+      process.exitCode = 1;
+    } finally {
+      await client.end();
+    }
+    return;
+  }
+
   const pool = new Pool({ connectionString: url });
   const client = await pool.connect();
-  console.log(`Applying ${path} …`);
   try {
     await client.query(sql);
     console.log("Done.");
