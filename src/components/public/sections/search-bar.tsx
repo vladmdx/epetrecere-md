@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { CustomCalendar } from "@/components/public/custom-calendar";
 import { useLocale } from "@/hooks/use-locale";
-import { Baby, Briefcase, Cake, ChevronDown, Church, Heart, MapPin, Music, PartyPopper, Search, Sparkles, Users } from "lucide-react";
+import { Baby, Briefcase, Cake, ChevronDown, Church, Flower2, Heart, MapPin, Music, PartyPopper, Search, Sparkles, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MOLDOVA_CITIES, DEFAULT_CITY } from "@/lib/moldova-cities";
 import { ALL_EVENT_TYPES, eventTypeLabel, type EventTypeKey } from "@/lib/events/normalize";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 
 function getTomorrow() {
   const d = new Date();
@@ -47,6 +48,7 @@ interface CategoryItem {
 /** One lucide icon per event type; the label comes from the shared table. */
 const EVENT_TYPE_ICONS: Record<EventTypeKey, CategoryItem["icon"]> = {
   wedding: Heart,
+  proposal: Flower2,
   cununie: Church,
   baptism: Baby,
   cumatrie: Users,
@@ -140,7 +142,7 @@ function CustomDropdown({
 
 export function SearchBarSection() {
   const { t } = useLocale();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const { isSignedIn, isLoaded } = useUser();
   const [city, setCity] = useState(DEFAULT_CITY);
   const [date, setDate] = useState(getTomorrow());

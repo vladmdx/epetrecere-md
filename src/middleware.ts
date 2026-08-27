@@ -190,6 +190,7 @@ const LOCALE_COOKIE_ROUTES = [
 const LEGACY_EVENT_KEYWORDS = new Set([
   "nunta",
   "cununie",
+  "cerere-in-casatorie",
   "botez",
   "cumetrie",
   "corporate",

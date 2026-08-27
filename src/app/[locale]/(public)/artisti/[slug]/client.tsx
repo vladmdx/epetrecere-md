@@ -38,6 +38,7 @@ import { formatPrice } from "@/lib/format/price";
 import { eventTypeLabel, type EventTypeKey } from "@/lib/events/normalize";
 import { formatDuration } from "@/lib/pricing/resolve";
 import { useGatedDetails } from "@/hooks/use-gated-details";
+import { useLocalizePath } from "@/components/shared/locale-link";
 
 interface ArtistData {
   id: number;
@@ -125,6 +126,7 @@ interface Props {
 
 export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   const { locale, t } = useLocale();
+  const lp = useLocalizePath();
   const { isSignedIn, isLoaded } = useUser();
   const searchParams = useSearchParams();
   const name = getLocalized(artist, "name", locale);
@@ -342,7 +344,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
                     </span>
                   ) : (
                     <a
-                      href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
+                      href={`/sign-in?redirect_url=${encodeURIComponent(lp(`/artisti/${artist.slug}`))}`}
                       className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2.5 py-0.5 text-xs font-medium text-gold/90 hover:text-gold"
                     >
                       <Lock className="h-3 w-3" /> {t("common.priceOnLogin")}
@@ -800,7 +802,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
             </div>
             {!canSeeContact ? (
               <a
-                href={`/sign-in?redirect_url=${encodeURIComponent(`/artisti/${artist.slug}`)}`}
+                href={`/sign-in?redirect_url=${encodeURIComponent(lp(`/artisti/${artist.slug}`))}`}
                 className="flex flex-col items-center gap-2 rounded-xl border border-gold/40 bg-gold/10 px-4 py-5 text-center hover:bg-gold/20"
               >
                 <Lock className="h-5 w-5 text-gold" />

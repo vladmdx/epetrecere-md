@@ -62,6 +62,7 @@ interface Props {
 /** Color palette for the pie chart — one tone per event type. */
 const EVENT_COLORS: Record<string, string> = {
   wedding: "#E74C3C",
+  proposal: "#D946EF",
   nunta: "#E74C3C",
   cununie: "#EC7063",
   baptism: "#3498DB",

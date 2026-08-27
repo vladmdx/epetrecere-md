@@ -33,6 +33,13 @@ const ALIASES: Record<string, EventTypeKey> = {
   nunta: "wedding",
   nunti: "wedding",
   svadba: "wedding",
+  // proposal — the moment before everything else
+  proposal: "proposal",
+  cerere: "proposal",
+  cerere_in_casatorie: "proposal",
+  cerere_casatorie: "proposal",
+  marry_me: "proposal",
+  predlozhenie: "proposal",
   // cununie — the ceremony, often organised as its own event here
   cununie: "cununie",
   cununia: "cununie",
@@ -83,6 +90,11 @@ export function normalizeEventType(
 
 const LABELS: Record<EventTypeKey, { ro: string; ru: string; en: string }> = {
   wedding: { ro: "Nuntă", ru: "Свадьба", en: "Wedding" },
+  proposal: {
+    ro: "Cerere în căsătorie",
+    ru: "Предложение руки и сердца",
+    en: "Marriage proposal",
+  },
   cununie: { ro: "Cununie", ru: "Венчание", en: "Wedding ceremony" },
   baptism: { ro: "Botez", ru: "Крестины", en: "Baptism" },
   cumatrie: { ro: "Cumătrie", ru: "Кумэтрия", en: "Cumătrie" },
@@ -105,6 +117,7 @@ const LABELS: Record<EventTypeKey, { ro: string; ru: string; en: string }> = {
  */
 export const EVENT_TYPE_EMOJI: Record<EventTypeKey, string> = {
   wedding: "💍",
+  proposal: "💐",
   cununie: "⛪",
   baptism: "👶",
   cumatrie: "🤝",

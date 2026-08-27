@@ -59,6 +59,7 @@ function randomMomentsSlug(): string {
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   wedding: "Nuntă",
+  proposal: "Cerere în căsătorie",
   cununie: "Cununie",
   baptism: "Botez",
   cumatrie: "Cumătrie",

@@ -114,6 +114,7 @@
   },
   "event_types": {
     "wedding": "Wedding",
+    "proposal": "Marriage proposal",
     "cununie": "Wedding ceremony",
     "baptism": "Baptism",
     "cumatrie": "Cumătrie",
@@ -419,7 +420,8 @@
       "corporate": "Ex: Company Party",
       "birthday": "Ex: Maria's Birthday",
       "kidsBirthday": "Ex: Sofia's Birthday — 5 years",
-      "concert": "Ex: Live Concert"
+      "concert": "Ex: Live Concert",
+      "proposal": "Ex: The proposal for Ana"
     }
   },
   "process": {

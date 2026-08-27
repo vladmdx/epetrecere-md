@@ -114,6 +114,7 @@
   },
   "event_types": {
     "wedding": "Nuntă",
+    "proposal": "Cerere în căsătorie",
     "cununie": "Cununie",
     "baptism": "Botez",
     "cumatrie": "Cumătrie",
@@ -419,7 +420,8 @@
       "corporate": "Ex: Petrecerea companiei",
       "birthday": "Ex: Ziua de naștere a Mariei",
       "kidsBirthday": "Ex: Aniversarea Sofiei — 5 ani",
-      "concert": "Ex: Concert Live"
+      "concert": "Ex: Concert Live",
+      "proposal": "Ex: Cererea pentru Ana"
     }
   },
   "process": {

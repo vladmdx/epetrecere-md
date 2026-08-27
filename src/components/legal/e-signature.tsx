@@ -13,7 +13,7 @@
  */
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { Check, FileText, ShieldCheck } from "lucide-react";
 import { SignaturePad, type SignatureValue } from "./signature-pad";
 import { useLocale } from "@/hooks/use-locale";

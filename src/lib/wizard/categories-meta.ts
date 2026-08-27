@@ -13,6 +13,7 @@
 
 export type EventTypeKey =
   | "wedding"
+  | "proposal"
   | "cununie"
   | "baptism"
   | "cumatrie"
@@ -33,6 +34,7 @@ export type EventTypeKey =
  */
 export const ALL_EVENT_TYPES: EventTypeKey[] = [
   "wedding",
+  "proposal",
   "cununie",
   "baptism",
   "cumatrie",
@@ -69,6 +71,10 @@ const VENUE_NEUTRAL = [
 // a live band, a gypsy ensemble, a fire show — is wrong for a room full of
 // eight-year-olds.
 const KIDS = ["kids_birthday"] as const;
+// PROPOSAL = the short, private list that suits a marriage proposal: the
+// moment is for two people, so a band, a host or a venue package would be
+// out of place, but a photographer, a violinist and flowers are the point.
+const PROPOSAL = ["proposal"] as const;
 
 export const CATEGORY_META: Record<string, CategoryMeta> = {
   // ── Music ─────────────────────────────────────────
@@ -77,14 +83,14 @@ export const CATEGORY_META: Record<string, CategoryMeta> = {
   cantareti: {
     emoji: "🎙️",
     // Excluded from baptism — religious ceremony, no secular performers.
-    allowedEventTypes: ["wedding", "cumatrie", "corporate", "birthday", "concert", "other"],
+    allowedEventTypes: ["wedding", "cumatrie", "corporate", "birthday", "concert", "other", ...PROPOSAL],
   },
   "cantareti-de-estrada": { emoji: "🎤", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "interpreti-muzica-populara": { emoji: "🪗", allowedEventTypes: [...VENUE_NEUTRAL, "concert"] },
   formatii: { emoji: "🎸", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "cover-band": { emoji: "🎼", allowedEventTypes: [...ALL_EVENT_TYPES] },
   instrumentalisti: { emoji: "🎻", allowedEventTypes: [...ALL_EVENT_TYPES] },
-  cvartet: { emoji: "🎻", allowedEventTypes: [...VENUE_NEUTRAL, "concert"] },
+  cvartet: { emoji: "🎻", allowedEventTypes: [...VENUE_NEUTRAL, "concert", ...PROPOSAL] },
 
   // ── Dance ─────────────────────────────────────────
   dansatori: { emoji: "💃", allowedEventTypes: [...ADULT, "baptism", "cumatrie", ...KIDS] },
@@ -97,7 +103,7 @@ export const CATEGORY_META: Record<string, CategoryMeta> = {
   "show-program": { emoji: "🎭", allowedEventTypes: [...VENUE_NEUTRAL, ...KIDS] },
   "iluzionisti-magicieni": { emoji: "🎩", allowedEventTypes: [...VENUE_NEUTRAL, ...KIDS] },
   animatori: { emoji: "🎈", allowedEventTypes: ["baptism", "cumatrie", "birthday", "other", ...KIDS] }, // kids
-  "show-ul-focului": { emoji: "🔥", allowedEventTypes: ["wedding", "corporate", "birthday", "other"] },
+  "show-ul-focului": { emoji: "🔥", allowedEventTypes: ["wedding", "corporate", "birthday", "other", ...PROPOSAL] },
   clovni: { emoji: "🤡", allowedEventTypes: ["birthday", "other", ...KIDS] }, // kids birthdays only
   "interesant-la-sarbatoare": { emoji: "✨", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "show-circus": { emoji: "🎪", allowedEventTypes: [...VENUE_NEUTRAL, ...KIDS] },

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+
 import { MapPin, Music, Sparkles, ArrowRight } from "lucide-react";
 import { ScrollReveal } from "@/components/shared/scroll-reveal";
 import { CustomCalendar } from "@/components/public/custom-calendar";
 import { useLocale } from "@/hooks/use-locale";
 import { ALL_EVENT_TYPES, eventTypeLabel } from "@/lib/events/normalize";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 
 function getTomorrow() {
   const d = new Date();
@@ -44,7 +45,7 @@ const RECOS = [
 
 export function RecommendationsSection() {
   const { t, locale } = useLocale();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [eventType, setEventType] = useState("wedding");
   const [date, setDate] = useState<Date | null>(getTomorrow());
   const [guests, setGuests] = useState("120");

@@ -2,7 +2,7 @@
 
 import { FormEvent, useState, useTransition } from "react";
 import Link from "@/components/shared/locale-link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { ArrowRight, MapPin, Search, SlidersHorizontal, Sparkles, Loader2 } from "lucide-react";
 import { ArtistCard } from "@/components/public/artist-card";
 import { ArtistListCard } from "@/components/public/artist-list-card";
@@ -15,6 +15,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { CatalogSeoContent } from "@/components/public/catalog-seo-content";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 
 interface Artist {
   id: number;
@@ -85,7 +86,7 @@ export function ArtistsListClient({
   currentPriceMin,
   currentPriceMax,
 }: Props) {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useLocale();
   const [query, setQuery] = useState(searchQuery);

@@ -86,6 +86,7 @@ const EVENT_TYPE_STYLE: Partial<
   Record<EventTypeKey, { bg: string; text: string; chip: string }>
 > = {
   wedding: { bg: "bg-red-500/25 border-red-500/60", text: "text-red-400", chip: "bg-red-500/40" },
+  proposal: { bg: "bg-fuchsia-500/25 border-fuchsia-500/60", text: "text-fuchsia-400", chip: "bg-fuchsia-500/40" },
   cununie: { bg: "bg-pink-500/25 border-pink-500/60", text: "text-pink-400", chip: "bg-pink-500/40" },
   baptism: { bg: "bg-blue-500/25 border-blue-500/60", text: "text-blue-400", chip: "bg-blue-500/40" },
   cumatrie: { bg: "bg-cyan-500/25 border-cyan-500/60", text: "text-cyan-400", chip: "bg-cyan-500/40" },

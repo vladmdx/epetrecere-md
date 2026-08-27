@@ -12,10 +12,11 @@
 //   - Shows what it understood + a "Refă căutarea" fallback link
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+
 import { Sparkles, Loader2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 
 interface Props {
   /** Suggestion chips shown below the input to hint what works. */
@@ -37,7 +38,7 @@ export function SmartSearchBar({
   const { t } = useLocale();
   const examples =
     placeholderExamples ?? DEFAULT_EXAMPLE_KEYS.map((key) => t(key));
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{

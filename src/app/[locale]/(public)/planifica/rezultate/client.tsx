@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "@/components/shared/locale-link";
-import { useRouter } from "next/navigation";
+
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { BookingArtistCard } from "@/components/public/booking-artist-card";
@@ -24,6 +24,8 @@ import {
 } from "@/lib/wizard/service-mapping";
 import { plural, NOUNS } from "@/lib/i18n/plural";
 import { useLocale } from "@/hooks/use-locale";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
+import { useLocalizePath } from "@/components/shared/locale-link";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -62,8 +64,9 @@ interface ResultsClientProps {
 }
 
 export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const { t } = useLocale();
+  const lp = useLocalizePath();
   const { isSignedIn, isLoaded } = useUser();
   const storageKey = adminMode ? "admin-wizard-data" : "wizard-data";
   const planIdKey = adminMode ? "admin-wizard-plan-id" : "wizard-plan-id";
@@ -102,7 +105,7 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
     if (adminMode) return;
     if (isLoaded && !isSignedIn) {
       router.replace(
-        `/sign-in?redirect_url=${encodeURIComponent("/planifica/rezultate")}`,
+        `/sign-in?redirect_url=${encodeURIComponent(lp("/planifica/rezultate"))}`,
       );
     }
   }, [isLoaded, isSignedIn, router, adminMode]);

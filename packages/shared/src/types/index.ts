@@ -15,6 +15,7 @@
 
 export type EventType =
   | "wedding"
+  | "proposal"
   | "cununie"
   | "baptism"
   | "cumatrie"

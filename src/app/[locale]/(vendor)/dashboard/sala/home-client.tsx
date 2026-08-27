@@ -80,6 +80,7 @@ interface Props {
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
   wedding: "bg-red-500/80",
+  proposal: "bg-fuchsia-500/80",
   nunta: "bg-red-500/80",
   cununie: "bg-rose-500/80",
   baptism: "bg-blue-500/80",

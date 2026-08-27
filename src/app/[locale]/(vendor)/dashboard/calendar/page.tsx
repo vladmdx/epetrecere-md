@@ -89,6 +89,11 @@ const EVENT_TYPE_STYLES: Record<
     border: "border-l-rose-500",
     text: "text-rose-500",
   },
+  proposal: {
+    dot: "bg-fuchsia-500",
+    border: "border-l-fuchsia-500",
+    text: "text-fuchsia-500",
+  },
   cununie: {
     dot: "bg-pink-500",
     border: "border-l-pink-500",

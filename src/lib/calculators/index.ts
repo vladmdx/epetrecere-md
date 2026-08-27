@@ -81,6 +81,9 @@ export const BUDGET_SERVICE_RATES: Record<string, ServiceRate> = {
 // ceremony, etc.
 const EVENT_TYPE_MULTIPLIER: Record<EventType, number> = {
   wedding: 1.15,
+  // A proposal is two people and an hour. The money goes on the setting —
+  // flowers, a photographer, a musician — not on feeding a room.
+  proposal: 0.35,
   // The ceremony alone: fewer guests, shorter, no full dinner service.
   cununie: 0.7,
   baptism: 0.9,
@@ -276,6 +279,8 @@ const DRINK_DEFAULTS = [
 // drinks mostly beer, etc.
 const EVENT_DRINK_WEIGHT: Record<EventType, Partial<Record<string, number>>> = {
   wedding:   { wine_red: 1.0, wine_white: 1.0, vodka: 1.0, cognac: 1.0, champagne: 1.0, beer: 0.5, water: 1.0, juice: 1.0 },
+  // Champagne and water. Nothing else belongs in the moment.
+  proposal:  { wine_red: 0.1, wine_white: 0.2, vodka: 0, cognac: 0, champagne: 1.5, beer: 0, water: 1.0, juice: 0.3 },
   // A ceremony is a toast, not a night of drinking.
   cununie:   { wine_red: 0.4, wine_white: 0.5, vodka: 0.2, cognac: 0.2, champagne: 1.2, beer: 0.2, water: 1.2, juice: 1.2 },
   baptism:   { wine_red: 0.9, wine_white: 0.9, vodka: 0.7, cognac: 0.7, champagne: 1.0, beer: 0.4, water: 1.0, juice: 1.2 },
@@ -371,6 +376,8 @@ const MENU_DEFAULTS = [
 
 const MENU_EVENT_SCALE: Record<EventType, number> = {
   wedding: 1.0,
+  // Dessert and a glass, if anything at all.
+  proposal: 0.2,
   // A ceremony is a toast and a few canapés, not a seated dinner.
   cununie: 0.35,
   baptism: 0.9,
@@ -439,6 +446,7 @@ export function calculateMenu(input: MenuInput): MenuResult {
 
 export const EVENT_TYPE_LABELS: Record<EventType, string> = {
   wedding: "Nuntă",
+  proposal: "Cerere în căsătorie",
   cununie: "Cununie",
   baptism: "Botez",
   cumatrie: "Cumătrie",

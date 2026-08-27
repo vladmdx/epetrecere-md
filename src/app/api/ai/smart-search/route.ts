@@ -87,7 +87,7 @@ Output ONLY valid JSON, no prose, no markdown fence. Shape:
 
 Rules:
 - If query mentions "sală", "restaurant", "loc", "local" → entity = "venue"; otherwise entity = "artist"
-- "nuntă/nunta/wedding" → eventType="wedding"; "cununie/cununia/ceremonie" → "cununie"; "cumătrie/cumatrie" → "cumatrie"; "botez" → "baptism"; "corporate" → "corporate"; "zi de naștere/aniversare/birthday" → "birthday"; "aniversare copii/petrecere copii/zi de naștere copil" → "kids_birthday"; "concert" → "concert"; else "other" or null
+- "nuntă/nunta/wedding" → eventType="wedding"; "cununie/cununia/ceremonie" → "cununie"; "cerere în căsătorie/cerere in casatorie/marry me/предложение руки" → "proposal"; "cumătrie/cumatrie" → "cumatrie"; "botez" → "baptism"; "corporate" → "corporate"; "zi de naștere/aniversare/birthday" → "birthday"; "aniversare copii/petrecere copii/zi de naștere copil" → "kids_birthday"; "concert" → "concert"; else "other" or null
 - Price words: "ieftin/cheap" → priceMax=300; "sub 500€" → priceMax=500; "premium" → priceMin=1000; otherwise null
 - Resolve common Romanian city typos: "kishinev/chisinau/chișinău" → "chisinau"; "balti/bălți/beltsy" → "balti"
 - Category mapping: "DJ" → "dj", "moderator" → "moderatori", "formație live/band" → "cover-band" or "formatii", "muzică populară" → "interpreti-muzica-populara", "fotograf/video" → "foto-video", "animator copii" → "animatori"

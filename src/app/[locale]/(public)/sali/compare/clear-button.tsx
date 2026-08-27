@@ -1,13 +1,14 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+
 import { Trash2 } from "lucide-react";
 import { useCompare } from "@/hooks/use-compare";
 import { useLocale } from "@/hooks/use-locale";
 import { localizePath } from "@/lib/i18n/routing";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 
 export function ClearCompareButton() {
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const { locale, t } = useLocale();
   const { clear } = useCompare("venue");
 

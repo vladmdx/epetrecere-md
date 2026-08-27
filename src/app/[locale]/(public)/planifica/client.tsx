@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +16,8 @@ import { cn } from "@/lib/utils";
 import { AlertCircle, ArrowLeft, ArrowRight, Building2, Calendar, Camera, Check, ClipboardCheck, ClipboardList, Loader2, LogIn, PartyPopper, Send, Sparkles, Users, UtensilsCrossed, Wrench } from "lucide-react";
 import { isCategoryAllowedForEvent } from "@/lib/wizard/categories-meta";
 import { localizeMoldovaCity, MOLDOVA_CITIES } from "@/lib/moldova-cities";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
+import { useLocalizePath } from "@/components/shared/locale-link";
 
 // ═══════════════════════════════════════════════
 // TYPES
@@ -73,6 +75,7 @@ interface WizardData {
  *  so the "rezervare artist" modal auto-fills sensible start/end times. */
 const DEFAULT_DURATION_HOURS: Record<string, number> = {
   wedding: 10,
+  proposal: 2,
   cununie: 2,
   baptism: 6,
   cumatrie: 6,
@@ -86,6 +89,7 @@ const DEFAULT_DURATION_HOURS: Record<string, number> = {
 /** Reasonable default start hour per event type. */
 const DEFAULT_START_TIME: Record<string, string> = {
   wedding: "14:00",
+  proposal: "19:00",
   cununie: "11:00",
   baptism: "12:00",
   cumatrie: "17:00",
@@ -104,6 +108,7 @@ const DEFAULT_START_TIME: Record<string, string> = {
  */
 const DEFAULT_GUEST_COUNT: Record<string, number> = {
   wedding: 150,
+  proposal: 2,
   cununie: 30,
   baptism: 40,
   cumatrie: 50,
@@ -190,7 +195,8 @@ interface WizardClientProps {
 
 export function WizardClient({ adminMode = false, categories: initialCategories = [] }: WizardClientProps = {}) {
   const { t } = useLocale();
-  const router = useRouter();
+  const lp = useLocalizePath();
+  const router = useLocalizedRouter();
   const searchParams = useSearchParams();
   const { isSignedIn, user } = useUser();
   const [step, setStep] = useState(0);
@@ -398,7 +404,7 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
     // sent to sign-in and /planifica/rezultate takes over after login.
     if (!adminMode && !isSignedIn) {
       sessionStorage.setItem(storageKey, JSON.stringify(data));
-      router.push(`/sign-in?redirect_url=${encodeURIComponent("/planifica/rezultate")}`);
+      router.push(`/sign-in?redirect_url=${encodeURIComponent(lp("/planifica/rezultate"))}`);
       return;
     }
 
@@ -648,6 +654,7 @@ function WizardStepHeading({
 // and nothing here needs to change.
 const eventTypes = [
   { value: "wedding", image: "/images/redesign/event-wedding.webp" },
+  { value: "proposal", image: "/images/redesign/event-proposal.webp" },
   { value: "cununie", image: "/images/redesign/event-cununie.webp" },
   { value: "baptism", image: "/images/redesign/event-baptism.webp" },
   { value: "cumatrie", image: "/images/redesign/event-cumatrie.webp" },
@@ -1450,6 +1457,8 @@ function eventNamePlaceholderKey(eventType: string): string {
   switch (eventType) {
     case "cununie":
       return "wizard.namePlaceholder.cununie";
+    case "proposal":
+      return "wizard.namePlaceholder.proposal";
     case "baptism":
       return "wizard.namePlaceholder.baptism";
     case "cumatrie":

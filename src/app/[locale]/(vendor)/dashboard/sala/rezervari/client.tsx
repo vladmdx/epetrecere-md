@@ -96,6 +96,7 @@ const TABS: Array<{ key: VenueBookingTab; labelKey: string }> = [
 
 const EVENT_TYPE_BORDER: Record<string, string> = {
   wedding: "border-l-red-500",
+  proposal: "border-l-fuchsia-500",
   nunta: "border-l-red-500",
   cununie: "border-l-rose-500",
   baptism: "border-l-blue-500",

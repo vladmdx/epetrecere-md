@@ -33,6 +33,7 @@ import { trackClick } from "@/lib/analytics/track-click";
 import { plural, NOUNS } from "@/lib/i18n/plural";
 import { formatPrice, currencySymbol } from "@/lib/format/price";
 import { useGatedDetails } from "@/hooks/use-gated-details";
+import { useLocalizePath } from "@/components/shared/locale-link";
 
 interface VenueData {
   id: number;
@@ -143,6 +144,7 @@ export function VenueDetailClient({
   }>;
 }) {
   const { locale, t } = useLocale();
+  const lp = useLocalizePath();
   const { isSignedIn, isLoaded } = useUser();
   const searchParams = useSearchParams();
   const name = getLocalized(venue, "name", locale);
@@ -586,7 +588,7 @@ export function VenueDetailClient({
                   </>
                 ) : (
                   <a
-                    href={`/sign-in?redirect_url=${encodeURIComponent(`/sali/${venue.slug}`)}`}
+                    href={`/sign-in?redirect_url=${encodeURIComponent(lp(`/sali/${venue.slug}`))}`}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
                   >
                     <Lock className="h-4 w-4" /> {t("venue.detail.priceOnLogin")}
@@ -594,7 +596,7 @@ export function VenueDetailClient({
                 )
               ) : !canSeePrice ? (
                 <a
-                  href={`/sign-in?redirect_url=${encodeURIComponent(`/sali/${venue.slug}`)}`}
+                  href={`/sign-in?redirect_url=${encodeURIComponent(lp(`/sali/${venue.slug}`))}`}
                   className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
                 >
                   <Lock className="h-4 w-4" /> {t("venue.detail.priceOnLogin")}

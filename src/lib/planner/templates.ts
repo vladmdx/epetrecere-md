@@ -6,6 +6,7 @@
 
 export type TemplateEventType =
   | "wedding"
+  | "proposal"
   | "cununie"
   | "baptism"
   | "cumatrie"
@@ -163,8 +164,24 @@ const KIDS_BIRTHDAY_TEMPLATE: TemplateItem[] = [
   { title: "Confirmă prezența copiilor", category: "guests", priority: "medium", dueDaysBefore: 3 },
 ];
 
+// A proposal is a small production with one audience member. The list is
+// short on purpose: everything on it exists to protect the surprise.
+const PROPOSAL_TEMPLATE: TemplateItem[] = [
+  { title: "Alege inelul", category: "budget", priority: "high", dueDaysBefore: 30 },
+  { title: "Alege locul și verifică-l la ora potrivită", category: "venue", priority: "high", dueDaysBefore: 21 },
+  { title: "Cere acordul locației pentru decor și foto", category: "venue", priority: "high", dueDaysBefore: 14 },
+  { title: "Rezervă fotograful (discret)", category: "media", priority: "high", dueDaysBefore: 14 },
+  { title: "Comandă florile și decorul", category: "decor", priority: "high", dueDaysBefore: 7 },
+  { title: "Alege muzica sau instrumentistul", category: "artists", priority: "medium", dueDaysBefore: 7 },
+  { title: "Pregătește un pretext credibil pentru ziua respectivă", category: "logistics", priority: "high", dueDaysBefore: 3 },
+  { title: "Anunță-i pe cei care trebuie să știe (și pe nimeni altcineva)", category: "guests", priority: "medium", dueDaysBefore: 2 },
+  { title: "Verifică vremea și pregătește varianta de rezervă", category: "logistics", priority: "high", dueDaysBefore: 1 },
+  { title: "Pune inelul în buzunar", category: "ceremony", priority: "high", dueDaysBefore: 0 },
+];
+
 const TEMPLATES: Record<TemplateEventType, TemplateItem[]> = {
   wedding: WEDDING_TEMPLATE,
+  proposal: PROPOSAL_TEMPLATE,
   cununie: CUNUNIE_TEMPLATE,
   baptism: BAPTISM_TEMPLATE,
   cumatrie: CUMATRIE_TEMPLATE,

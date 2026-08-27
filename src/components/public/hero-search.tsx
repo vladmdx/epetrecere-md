@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+
 import { Search, MapPin, Users } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 import { CustomCalendar } from "@/components/public/custom-calendar";
 import { localizePath } from "@/lib/i18n/routing";
 import { cn } from "@/lib/utils";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 
 type Tab = "venues" | "artists" | "services";
 
@@ -37,7 +38,7 @@ const TAB_ROUTES: Record<Tab, string> = {
  */
 export function HeroSearch() {
   const { t, locale } = useLocale();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const [tab, setTab] = useState<Tab>("venues");
   const [q, setQ] = useState("");
   const [city, setCity] = useState("");
