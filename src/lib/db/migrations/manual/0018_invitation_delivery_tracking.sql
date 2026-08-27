@@ -73,14 +73,29 @@ BEGIN
     -- left a trail of duplicates and the last one holds every guest.
     -- If you'd rather not guess, delete this UPDATE: the only cost is
     -- one more duplicate wave per existing plan.
+    -- Titles are free text and not unique, so two plans of one host can
+    -- carry the same one. Pairing them off in two passes keeps the link
+    -- 1:1 in both directions: each plan takes its newest matching
+    -- invitation, then each invitation is kept by only the newest plan
+    -- claiming it. Without the second pass both plans point at one
+    -- invitation, and a Send from either rewrites the other's event under
+    -- guests who already hold RSVP links.
+    WITH best AS (
+      SELECT DISTINCT ON (p."id")
+             p."id" AS plan_id, i."id" AS invitation_id, p."created_at"
+        FROM "event_plans" p
+        JOIN "invitations" i
+          ON i."user_id" = p."user_id"
+         AND i."couple_names" = p."title"
+       ORDER BY p."id", i."created_at" DESC
+    ), pairs AS (
+      SELECT DISTINCT ON (invitation_id) plan_id, invitation_id
+        FROM best
+       ORDER BY invitation_id, "created_at" DESC
+    )
     UPDATE "event_plans" p
-       SET "invitation_id" = (
-         SELECT i."id"
-           FROM "invitations" i
-          WHERE i."user_id" = p."user_id"
-            AND i."couple_names" = p."title"
-          ORDER BY i."created_at" DESC
-          LIMIT 1
-       );
+       SET "invitation_id" = pairs.invitation_id
+      FROM pairs
+     WHERE pairs.plan_id = p."id";
   END IF;
 END $$;

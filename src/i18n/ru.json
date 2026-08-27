@@ -3904,7 +3904,19 @@
       "statPending": "В ожидании",
       "statRejected": "Отклонено",
       "totalExpected": "Всего ожидается:",
-      "totalExpectedSuffix": "человек (подтверждённые + сопровождающие)"
+      "totalExpectedSuffix": "человек (подтверждённые + сопровождающие)",
+      "guestAddFailed": "Не удалось добавить гостя.",
+      "allAlreadySent": "Все гости с адресом эл. почты уже получили приглашение. Чтобы отправить его снова, нажмите «Отправить ещё раз» рядом с нужным человеком.",
+      "sendReport": "Отправлено: {count}",
+      "sendReportSkipped": "{count} уже получили",
+      "sendReportFailed": "{count} с ошибкой",
+      "resendConfirm": "Отправить приглашение {name} ({email}) ещё раз?",
+      "resendSuccess": "Приглашение повторно отправлено {name}.",
+      "unsentCount": "{count} ещё не получили приглашение",
+      "deliverySent": "Отправлено {date}",
+      "deliveryPending": "Не отправлено",
+      "resend": "Отправить ещё раз",
+      "sendToGuest": "Отправить"
     },
     "inviteWizard": {
       "steps": {
@@ -4749,7 +4761,16 @@
       "updateError": "Не удалось обновить.",
       "uploadError": "Ошибка при загрузке",
       "uploadImage": "Загрузить изображение",
-      "usingDefaults": "Изменения используют значения из шаблона по умолчанию."
+      "usingDefaults": "Изменения используют значения из шаблона по умолчанию.",
+      "sendReportSent": "Отправлено: {count}",
+      "sendReportSkipped": "{count} уже получили",
+      "sendReportFailed": "{count} с ошибкой",
+      "savedButSendFailed": "Приглашение сохранено, но отправить не удалось.",
+      "checkingExisting": "Проверяем, есть ли уже приглашение для этого события…",
+      "existingInvitationIntro": "У этого события уже есть приглашение. Изменения ниже применяются к нему, а письма уходят ",
+      "existingInvitationOnlyUnsent": "только гостям, которые ещё его не получили",
+      "existingInvitationNewGuests": " ({added} новых гостей будет добавлено, из них {mailable} с эл. почтой).",
+      "existingInvitationNoNewGuests": ". Сейчас в списке нет новых гостей — сначала добавьте их здесь или отправьте повторно со страницы приглашения."
     },
     "invitations": {
       "confirmDelete": "Вы уверены, что хотите удалить это приглашение?",

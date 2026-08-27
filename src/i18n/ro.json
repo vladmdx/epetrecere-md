@@ -3904,7 +3904,19 @@
       "statPending": "În așteptare",
       "statRejected": "Refuzat",
       "totalExpected": "Total așteptat:",
-      "totalExpectedSuffix": "persoane (confirmați + însoțitori)"
+      "totalExpectedSuffix": "persoane (confirmați + însoțitori)",
+      "guestAddFailed": "Invitatul nu a putut fi adăugat.",
+      "allAlreadySent": "Toți invitații cu email au primit deja invitația. Folosește butonul „Retrimite” din dreptul unei persoane pentru a i-o trimite din nou.",
+      "sendReport": "Trimise: {count}",
+      "sendReportSkipped": "{count} au primit-o deja",
+      "sendReportFailed": "{count} eșuate",
+      "resendConfirm": "Trimiți din nou invitația către {name} ({email})?",
+      "resendSuccess": "Invitația a fost trimisă din nou către {name}.",
+      "unsentCount": "{count} încă nu au primit invitația",
+      "deliverySent": "Trimisă {date}",
+      "deliveryPending": "Netrimisă",
+      "resend": "Retrimite",
+      "sendToGuest": "Trimite"
     },
     "inviteWizard": {
       "steps": {
@@ -4749,7 +4761,16 @@
       "updateError": "Nu am putut actualiza.",
       "uploadError": "Eroare la upload",
       "uploadImage": "Încarcă imagine",
-      "usingDefaults": "Modificările folosesc valorile din șablon implicit."
+      "usingDefaults": "Modificările folosesc valorile din șablon implicit.",
+      "sendReportSent": "Trimise: {count}",
+      "sendReportSkipped": "{count} au primit-o deja",
+      "sendReportFailed": "{count} eșuate",
+      "savedButSendFailed": "Invitația a fost salvată, dar trimiterea nu a reușit.",
+      "checkingExisting": "Verificăm dacă evenimentul are deja o invitație...",
+      "existingInvitationIntro": "Acest eveniment are deja o invitație. Modificările de mai jos se aplică pe ea, iar emailurile pleacă ",
+      "existingInvitationOnlyUnsent": "doar către invitații care nu au primit-o încă",
+      "existingInvitationNewGuests": " ({added} invitați noi de adăugat, dintre care {mailable} cu email).",
+      "existingInvitationNoNewGuests": ". Momentan nu ai invitați noi pe listă — adaugă-i mai întâi aici, sau retrimite individual din pagina invitației."
     },
     "invitations": {
       "confirmDelete": "Sigur vrei să ștergi această invitație?",

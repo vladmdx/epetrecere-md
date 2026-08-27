@@ -3904,7 +3904,19 @@
       "statPending": "Waiting",
       "statRejected": "Rejected",
       "totalExpected": "Total expected:",
-      "totalExpectedSuffix": "people (confirmed + companions)"
+      "totalExpectedSuffix": "people (confirmed + companions)",
+      "guestAddFailed": "The guest could not be added.",
+      "allAlreadySent": "Every guest with an email address has already received the invitation. Use the “Resend” button next to a person to send it to them again.",
+      "sendReport": "Sent: {count}",
+      "sendReportSkipped": "{count} already had it",
+      "sendReportFailed": "{count} failed",
+      "resendConfirm": "Send the invitation to {name} ({email}) again?",
+      "resendSuccess": "The invitation was sent to {name} again.",
+      "unsentCount": "{count} have not received the invitation yet",
+      "deliverySent": "Sent {date}",
+      "deliveryPending": "Not sent",
+      "resend": "Resend",
+      "sendToGuest": "Send"
     },
     "inviteWizard": {
       "steps": {
@@ -4749,7 +4761,16 @@
       "updateError": "Could not update.",
       "uploadError": "Upload error",
       "uploadImage": "Upload image",
-      "usingDefaults": "Changes use values from the default template."
+      "usingDefaults": "Changes use values from the default template.",
+      "sendReportSent": "Sent: {count}",
+      "sendReportSkipped": "{count} already had it",
+      "sendReportFailed": "{count} failed",
+      "savedButSendFailed": "The invitation was saved, but sending failed.",
+      "checkingExisting": "Checking whether this event already has an invitation…",
+      "existingInvitationIntro": "This event already has an invitation. The changes below apply to it, and emails go ",
+      "existingInvitationOnlyUnsent": "only to guests who have not received it yet",
+      "existingInvitationNewGuests": " ({added} new guests to add, {mailable} of them with an email address).",
+      "existingInvitationNoNewGuests": ". You have no new guests on the list right now — add them here first, or resend individually from the invitation page."
     },
     "invitations": {
       "confirmDelete": "Are you sure you want to delete this invitation?",

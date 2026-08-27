@@ -57,7 +57,11 @@ interface Guest {
 }
 
 export function InvitationDetailClient({ id }: { id: number }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  // The delivery badge prints a month name; pinning it to ro-RO put Romanian
+  // months into the English and Russian pages.
+  const dateLocale =
+    locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-RO";
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,8 +124,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
     // Was silent on failure, which hid both the missing-contact rule and
     // the duplicate-email guard — the host just saw nothing happen.
     const err = await res.json().catch(() => ({}));
-    // TODO i18n: cabinet.invitation.guestAddFailed
-    toast.error(err.error || "Invitatul nu a putut fi adăugat.");
+    toast.error(err.error || t("cabinet.invitation.guestAddFailed"));
   }
 
   async function publish() {
@@ -150,10 +153,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
     }
     const unsent = guestsWithEmail.filter((g) => !g.invitationSentAt);
     if (unsent.length === 0) {
-      // TODO i18n: cabinet.invitation.allAlreadySent
-      toast.info(
-        "Toți invitații cu email au primit deja invitația. Folosește butonul „Retrimite” din dreptul unei persoane pentru a i-o trimite din nou.",
-      );
+      toast.info(t("cabinet.invitation.allAlreadySent"));
       return;
     }
     if (!confirm(t("cabinet.invitation.sendConfirm", { count: unsent.length }))) return;
@@ -169,10 +169,15 @@ export function InvitationDetailClient({ id }: { id: number }) {
       const data = await res.json();
       // Say what actually happened. Claiming the whole list was mailed is
       // what hid this bug from the host in the first place.
-      // TODO i18n: cabinet.invitation.sendReport / sendReportSkipped / sendReportFailed
-      const parts = [`Trimise: ${data.sent}`];
-      if (data.skipped > 0) parts.push(`${data.skipped} au primit-o deja`);
-      if (data.failed > 0) parts.push(`${data.failed} eșuate`);
+      const parts = [t("cabinet.invitation.sendReport", { count: data.sent })];
+      if (data.skipped > 0)
+        parts.push(
+          t("cabinet.invitation.sendReportSkipped", { count: data.skipped }),
+        );
+      if (data.failed > 0)
+        parts.push(
+          t("cabinet.invitation.sendReportFailed", { count: data.failed }),
+        );
       toast.success(parts.join(" · "));
       await refreshGuests();
     } catch (err) {
@@ -187,8 +192,14 @@ export function InvitationDetailClient({ id }: { id: number }) {
    *  with duplicates. */
   async function resendTo(guest: Guest) {
     if (!guest.email) return;
-    // TODO i18n: cabinet.invitation.resendConfirm
-    if (!confirm(`Trimiți din nou invitația către ${guest.name} (${guest.email})?`)) {
+    if (
+      !confirm(
+        t("cabinet.invitation.resendConfirm", {
+          name: guest.name,
+          email: guest.email,
+        }),
+      )
+    ) {
       return;
     }
     setResendingId(guest.id);
@@ -204,8 +215,9 @@ export function InvitationDetailClient({ id }: { id: number }) {
       }
       const data = await res.json();
       if (data.sent > 0) {
-        // TODO i18n: cabinet.invitation.resendSuccess
-        toast.success(`Invitația a fost trimisă din nou către ${guest.name}.`);
+        toast.success(
+          t("cabinet.invitation.resendSuccess", { name: guest.name }),
+        );
       } else {
         toast.error(t("cabinet.invitation.sendError"));
       }
@@ -367,8 +379,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
             <Users className="h-4 w-4" /> {t("cabinet.invitation.guestsHeading", { count: guests.length })}
             {invitation.status === "published" && stats.unsent > 0 && (
               <Badge variant="outline" className="text-xs font-normal">
-                {/* TODO i18n: cabinet.invitation.unsentCount */}
-                {stats.unsent} încă nu au primit invitația
+                {t("cabinet.invitation.unsentCount", { count: stats.unsent })}
               </Badge>
             )}
           </CardTitle>
@@ -421,12 +432,14 @@ export function InvitationDetailClient({ id }: { id: number }) {
                         className="gap-1 text-xs font-normal"
                       >
                         <Check className="h-3 w-3" />
-                        {/* TODO i18n: cabinet.invitation.deliverySent */}
-                        Trimisă{" "}
-                        {new Date(g.invitationSentAt).toLocaleDateString(
-                          "ro-RO",
-                          { day: "numeric", month: "short" },
-                        )}
+                        {t("cabinet.invitation.deliverySent", {
+                          date: new Date(
+                            g.invitationSentAt,
+                          ).toLocaleDateString(dateLocale, {
+                            day: "numeric",
+                            month: "short",
+                          }),
+                        })}
                       </Badge>
                     ) : (
                       <Badge
@@ -434,8 +447,7 @@ export function InvitationDetailClient({ id }: { id: number }) {
                         className="gap-1 text-xs font-normal text-muted-foreground"
                       >
                         <Clock className="h-3 w-3" />
-                        {/* TODO i18n: cabinet.invitation.deliveryPending */}
-                        Netrimisă
+                        {t("cabinet.invitation.deliveryPending")}
                       </Badge>
                     ))}
                   <RsvpBadge status={g.rsvpStatus} />
@@ -465,8 +477,9 @@ export function InvitationDetailClient({ id }: { id: number }) {
                       ) : (
                         <Send className="h-3 w-3" />
                       )}
-                      {/* TODO i18n: cabinet.invitation.resend / cabinet.invitation.sendToGuest */}
-                      {g.invitationSentAt ? "Retrimite" : "Trimite"}
+                      {g.invitationSentAt
+                        ? t("cabinet.invitation.resend")
+                        : t("cabinet.invitation.sendToGuest")}
                     </Button>
                   )}
                 </div>

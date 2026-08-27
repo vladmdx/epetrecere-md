@@ -423,13 +423,18 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
           coupleNames: invData.coupleNames,
           hostName: invData.coupleNames,
           eventDate: invData.eventDate,
-          ceremonyTime: invData.ceremonyTime || undefined,
-          receptionTime: invData.receptionTime || undefined,
-          ceremonyLocation: invData.ceremonyLocation || undefined,
-          receptionLocation: invData.receptionLocation || undefined,
-          message: invData.message || undefined,
-          dressCode: invData.dressCode || undefined,
-          rsvpDeadline: invData.rsvpDeadline || undefined,
+          // Always sent, empty string included. This dialog is pre-filled
+          // from the invitation and is the only place these are edited, so
+          // an empty box means "the host cleared it" — dropping the key
+          // instead let the reuse UPDATE keep the old value, and clearing a
+          // dress code or a message silently did nothing.
+          ceremonyTime: invData.ceremonyTime ?? "",
+          receptionTime: invData.receptionTime ?? "",
+          ceremonyLocation: invData.ceremonyLocation ?? "",
+          receptionLocation: invData.receptionLocation ?? "",
+          message: invData.message ?? "",
+          dressCode: invData.dressCode ?? "",
+          rsvpDeadline: invData.rsvpDeadline ?? "",
           designId: invData.designId,
           // Persist the host's customizations so the rendered email +
           // public RSVP page can reflect them. Only emit overrides the
@@ -492,18 +497,17 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         // Report what happened rather than implying the whole list went
         // out: "sent 1, 12 already had it" is the answer that would have
         // made this bug obvious the first time it happened.
-        // TODO i18n: cabinet.guests.sendReport{Sent,Skipped,Failed}
-        const parts = [`Trimise: ${d.sent}`];
-        if (d.skipped > 0) parts.push(`${d.skipped} au primit-o deja`);
-        if (d.failed > 0) parts.push(`${d.failed} eșuate`);
+        const parts = [t("cabinet.guests.sendReportSent", { count: d.sent })];
+        if (d.skipped > 0)
+          parts.push(
+            t("cabinet.guests.sendReportSkipped", { count: d.skipped }),
+          );
+        if (d.failed > 0)
+          parts.push(t("cabinet.guests.sendReportFailed", { count: d.failed }));
         toast.success(parts.join(" · "));
       } else {
         const err = await sendRes.json().catch(() => ({}));
-        // TODO i18n: cabinet.guests.savedButSendFailed
-        toast.error(
-          err.error ||
-            "Invitația a fost salvată, dar trimiterea nu a reușit.",
-        );
+        toast.error(err.error || t("cabinet.guests.savedButSendFailed"));
       }
       setExistingInv(null);
       setSendDialogOpen(false);
@@ -1658,28 +1662,21 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             {loadingExisting && (
               <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                {/* TODO i18n: cabinet.guests.checkingExisting */}
-                Verificăm dacă evenimentul are deja o invitație...
+                {t("cabinet.guests.checkingExisting")}
               </div>
             )}
             {!loadingExisting && existingInv && (
               <div className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-sm">
-                {/* TODO i18n: cabinet.guests.existingInvitationNotice */}
-                Acest eveniment are deja o invitație. Modificările de mai jos
-                se aplică pe ea, iar emailurile pleacă{" "}
-                <strong>doar către invitații care nu au primit-o încă</strong>
-                {pendingInvites.added > 0 ? (
-                  <>
-                    {" "}
-                    ({pendingInvites.added} invitați noi de adăugat, dintre care{" "}
-                    {pendingInvites.mailable} cu email).
-                  </>
-                ) : (
-                  <>
-                    . Momentan nu ai invitați noi pe listă — adaugă-i mai întâi
-                    aici, sau retrimite individual din pagina invitației.
-                  </>
-                )}
+                {t("cabinet.guests.existingInvitationIntro")}
+                <strong>
+                  {t("cabinet.guests.existingInvitationOnlyUnsent")}
+                </strong>
+                {pendingInvites.added > 0
+                  ? t("cabinet.guests.existingInvitationNewGuests", {
+                      added: pendingInvites.added,
+                      mailable: pendingInvites.mailable,
+                    })
+                  : t("cabinet.guests.existingInvitationNoNewGuests")}
               </div>
             )}
 

@@ -32,14 +32,14 @@ const sendSchema = z.object({
 });
 
 /** Migrations here are applied by hand (see migrations/README.md), so the
- *  deploy can land before 0017 does. When the column is missing we fall
+ *  deploy can land before 0018 does. When the column is missing we fall
  *  back to the old send-to-everyone behavior rather than 500-ing every
  *  send.
  *
  *  Only a positive answer is cached. Caching "missing" would keep a warm
  *  lambda mailing the whole list for as long as it lives after the
  *  migration lands — an error in the direction that caused this bug. The
- *  re-probe costs one trivial query, and only until 0017 is applied. */
+ *  re-probe costs one trivial query, and only until 0018 is applied. */
 let sentColumnPresent = false;
 
 async function hasSentColumn(): Promise<boolean> {
@@ -153,7 +153,7 @@ export async function POST(
   };
 
   // Load guests. Columns are listed explicitly so the query still runs on
-  // a database that hasn't had 0017 applied yet — `select()` would emit
+  // a database that hasn't had 0018 applied yet — `select()` would emit
   // invitation_sent_at and fail there.
   const baseCols = {
     id: invitationGuests.id,
@@ -171,7 +171,7 @@ export async function POST(
       .where(eq(invitationGuests.invitationId, invitationId));
   } else {
     console.warn(
-      "[invitation-send] invitation_sent_at missing — apply migration 0017; sending to every guest",
+      "[invitation-send] invitation_sent_at missing — apply migration 0018; sending to every guest",
     );
     const rows = await db
       .select(baseCols)

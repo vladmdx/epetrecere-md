@@ -159,6 +159,9 @@ export async function POST(req: NextRequest) {
     title: string;
     version: string;
     contentHash: string;
+    /** The row's own accepted_at, so the mailed evidence and the stored
+     *  record state the same moment. */
+    acceptedAt: Date;
   }[] = [];
 
   for (const slug of slugs) {
@@ -168,7 +171,7 @@ export async function POST(req: NextRequest) {
     const text = legalBlocks(doc, locale).map((b) => b.text).join("\n");
     const contentHash = createHash("sha256").update(text).digest("hex");
 
-    await db
+    const [inserted] = await db
       .insert(legalAcceptances)
       .values({
         userId: u.id,
@@ -190,12 +193,25 @@ export async function POST(req: NextRequest) {
       })
       // Re-signing the same version is a no-op rather than an error; the
       // original signature (and its timestamp) is what counts.
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning();
+
+    // Nothing written means this version was already signed, and the
+    // announcement below already went out for it. Announcing again mailed
+    // every admin a second "contract signed" with the signature attached and
+    // wrote them a second notification row — reachable whenever registration
+    // fails after the acceptance lands (a phone already in use, a duplicate
+    // name), because the page keeps the signature and re-POSTs here on the
+    // next press. Worse, each re-announcement carried a fresh timestamp, IP
+    // and user agent, so the "proof" in the mailbox described no row in the
+    // table and disagreed with what /admin/contracte showed.
+    if (!inserted) continue;
     recordedDocs.push({
       slug: doc.slug,
       title: legalTitle(doc, locale),
       version: doc.version,
       contentHash,
+      acceptedAt: inserted.acceptedAt,
     });
   }
 
@@ -204,7 +220,10 @@ export async function POST(req: NextRequest) {
   // Everything below is fire-and-forget: a mail failure must never undo a
   // recorded signature.
   if (recordedDocs.length > 0) {
-    const acceptedAt = new Date();
+    // The stored timestamp, not a fresh one: this value is printed in the
+    // signer's copy and the admin mail as the moment of acceptance, and it
+    // has to be the moment the row actually records.
+    const acceptedAt = recordedDocs[0].acceptedAt;
     const subjectName = (subjectType === "venue" ? v?.name : a?.name) ?? null;
 
     void (async () => {

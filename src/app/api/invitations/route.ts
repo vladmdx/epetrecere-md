@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
       // Invitation deleted out from under the plan — treat as unlinked.
       return NextResponse.json({ invitation: null, guests: [] });
     }
-    // Contact columns only: this runs before migration 0017 on a fresh
+    // Contact columns only: this runs before migration 0018 on a fresh
     // deploy, and it is all the caller needs to count who is new.
     const guests = await db
       .select({
@@ -107,7 +107,7 @@ const createSchema = z.object({
   message: z.string().max(1000).optional(),
   dressCode: z.string().optional(),
   rsvpDeadline: z.string().optional(),
-  allowPlusOne: z.boolean().default(true),
+  allowPlusOne: z.boolean().optional(),
   guests: z
     .array(
       z.object({
@@ -202,27 +202,46 @@ export async function POST(req: NextRequest) {
 
   const data = parsed.data;
 
+  /** An absent key means "leave whatever is there" — the reuse UPDATE below
+   *  writes only the keys present here, and drizzle drops undefined values.
+   *  An empty string means the host cleared the box and has to become NULL,
+   *  which is the distinction the send dialog now relies on. */
+  const cleared = <K extends string>(key: K, value: string | undefined) =>
+    value === undefined
+      ? ({} as Record<K, never>)
+      : ({ [key]: value === "" ? null : value } as Record<K, string | null>);
+
   // Store design selection in customColors JSON. Merge with any custom colors
   // passed by the client.
   const customColors = {
     ...(data.customColors || {}),
     ...(data.designId ? { designId: data.designId } : {}),
   };
+  // Only the fields the caller actually supplied. The reuse branch below
+  // writes this object straight onto an existing invitation, and the planner's
+  // Send payload carries no plus-one flag, no RSVP deadline and no colours —
+  // spelling those out as `true`/`null` here silently reset three settings the
+  // host had chosen in the invitation editor, on every single press of Send.
+  // Defaults belong on the insert path, which is the only place they are new.
   const content = {
-    templateId: data.templateId && data.templateId > 0 ? data.templateId : null,
     eventType: data.eventType,
     coupleNames: data.coupleNames,
     hostName: data.hostName,
     eventDate: data.eventDate,
-    ceremonyTime: data.ceremonyTime,
-    receptionTime: data.receptionTime,
-    ceremonyLocation: data.ceremonyLocation,
-    receptionLocation: data.receptionLocation,
-    message: data.message,
-    dressCode: data.dressCode,
-    rsvpDeadline: data.rsvpDeadline || null,
-    allowPlusOne: data.allowPlusOne,
-    customColors: Object.keys(customColors).length > 0 ? customColors : null,
+    ...cleared("ceremonyTime", data.ceremonyTime),
+    ...cleared("receptionTime", data.receptionTime),
+    ...cleared("ceremonyLocation", data.ceremonyLocation),
+    ...cleared("receptionLocation", data.receptionLocation),
+    ...cleared("message", data.message),
+    ...cleared("dressCode", data.dressCode),
+    ...(data.templateId && data.templateId > 0
+      ? { templateId: data.templateId }
+      : {}),
+    ...cleared("rsvpDeadline", data.rsvpDeadline),
+    ...(data.allowPlusOne !== undefined
+      ? { allowPlusOne: data.allowPlusOne }
+      : {}),
+    ...(Object.keys(customColors).length > 0 ? { customColors } : {}),
   };
 
   // A plan owns exactly one invitation. Pressing Send again has to land on
@@ -252,8 +271,9 @@ export async function POST(req: NextRequest) {
         .limit(1);
 
       if (existing) {
-        // The dialog is pre-filled from this row, so whatever came back is
-        // either unchanged or an edit the host meant to make.
+        // Only the keys the caller supplied are present in `content`, so an
+        // edit the host made here lands and everything they set elsewhere —
+        // colours, RSVP deadline, the plus-one switch — survives untouched.
         const [updated] = await db
           .update(invitations)
           .set({ ...content, updatedAt: new Date() })
@@ -282,6 +302,10 @@ export async function POST(req: NextRequest) {
       userId: appUser.userId,
       slug,
       status: "draft",
+      // templateId / rsvpDeadline / customColors are nullable and default to
+      // NULL; only the plus-one switch needs a value when the caller is
+      // silent, and `content` overrides it whenever they are not.
+      allowPlusOne: true,
       ...content,
     })
     .returning();
