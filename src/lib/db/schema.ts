@@ -978,17 +978,27 @@ export const bookingRequestStatusEnum = pgEnum("booking_request_status", [
  *
  * Venue Agreement, Anexa 2 requires the system to fix: the entity and
  * representative identity, the document version, date/time, email/phone
- * confirmation, IP and user-agent, plus an UNMODIFIABLE audit record. The last
- * requirement is enforced in the database itself by an append-only trigger, so
- * no application path — not even an admin route — can rewrite a signature.
+ * confirmation, IP and user-agent, plus an UNMODIFIABLE audit record.
+ *
+ * That last requirement is real only because of
+ * `migrations/manual/0017_legal_acceptances_evidence.sql`, which installs a
+ * BEFORE UPDATE OR DELETE trigger:
+ *   - every DELETE is rejected;
+ *   - every UPDATE is rejected except clearing a linkage column that a
+ *     parent row's deletion nulls out, and setting artist_id / venue_id once
+ *     (NULL → id) when the vendor profile is created right after signing.
+ *
+ * `userId` is deliberately NOT `cascade`: erasing the account must not erase
+ * the proof that a contract was signed. The row carries its own copy of the
+ * signer's name, e-mail, phone, signature, IP and content hash, so it stands
+ * on its own once the user is gone.
  */
 export const legalAcceptances = pgTable(
   "legal_acceptances",
   {
     id: serial("id").primaryKey(),
-    userId: uuid("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+    /** Nullable on purpose — see the note above: the evidence outlives the account. */
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     /** "artist" | "venue" — who the representative signed for. */
     subjectType: text("subject_type").notNull(),
     artistId: integer("artist_id").references(() => artists.id, { onDelete: "set null" }),
@@ -1311,6 +1321,16 @@ export const eventPlans = pgTable("event_plans", {
   /** Seating only makes sense once a guest list exists, so the wizard
    *  hides the seating question when guestsEnabled is false. */
   seatingEnabled: boolean("seating_enabled").default(false).notNull(),
+  /** The ONE invitation this plan sends from. Before this existed the
+   *  planner's Send button minted a fresh invitation (new slug, new RSVP
+   *  tokens) on every press, so day two's send produced a second
+   *  invitation holding every guest — everyone got a duplicate mail with
+   *  a different link and day one's RSVPs were orphaned on the first
+   *  invitation. Set on the first send; every later send reuses it and
+   *  only adds the guests it doesn't already hold. */
+  invitationId: integer("invitation_id").references(() => invitations.id, {
+    onDelete: "set null",
+  }),
   /** Max radius (km) from the event city the user is willing to travel
    *  for a venue. 0 = only the selected city, 999 = no limit. Used to
    *  expand the city filter on the Săli tab via a city-proximity map.
@@ -1911,6 +1931,13 @@ export const invitationGuests = pgTable("invitation_guests", {
   message: text("message"), // message from guest to host
   // Unique token for one-click RSVP links (sent via email/SMS)
   rsvpToken: text("rsvp_token").unique(),
+  /** When this guest was actually mailed their invitation. NULL = never
+   *  sent. Without it the bulk send had nothing to exclude on, so every
+   *  press re-mailed the whole list — a host who added one guest on day
+   *  two spammed everyone invited on day one. The send route filters on
+   *  this and stamps it per guest the moment that guest's mail succeeds,
+   *  so a failure halfway through doesn't re-mail the ones already done. */
+  invitationSentAt: timestamp("invitation_sent_at", { withTimezone: true }),
   remindersSent: integer("reminders_sent").default(0).notNull(),
   lastReminderAt: timestamp("last_reminder_at"),
   // Event-day check-in — when the guest scans their QR at the door the

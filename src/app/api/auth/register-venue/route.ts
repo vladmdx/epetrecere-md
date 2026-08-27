@@ -295,6 +295,30 @@ export async function POST(req: Request) {
       .set({ onboardingComplete: true })
       .where(eq(users.id, appUser.id));
 
+    // Link the Legal Pack signature to the venue that has just been created.
+    // Onboarding records the acceptance BEFORE the venue row exists —
+    // deliberately, so nobody goes live without a contract — which left
+    // venue_id NULL on every signature and made the admin contracts page
+    // fall back to a bare e-mail instead of the partner's name. The
+    // append-only trigger on legal_acceptances allows exactly this
+    // NULL → id transition and nothing else.
+    try {
+      const { legalAcceptances } = await import("@/lib/db/schema");
+      const { isNull } = await import("drizzle-orm");
+      await db
+        .update(legalAcceptances)
+        .set({ venueId: venue.id })
+        .where(
+          and(
+            eq(legalAcceptances.userId, appUser.id),
+            eq(legalAcceptances.subjectType, "venue"),
+            isNull(legalAcceptances.venueId),
+          ),
+        );
+    } catch (err) {
+      console.error("[register-venue] linking signature to venue failed", err);
+    }
+
     // Auto-improve the description with AI in the background. The seed
     // can come from either the partner or the Maps autofill summary —
     // either way, polishing it gives the public page launch-ready copy.
@@ -369,10 +393,11 @@ export async function POST(req: Request) {
       ? `<p style="margin:12px 0 0;">Contract semnat de <strong>${signed.name}</strong> la ${new Date(signed.acceptedAt).toLocaleString("ro-RO")}.${signatureAttachment ? " Semnătura este atașată." : ""}</p>`
       : `<p style="margin:12px 0 0;color:#E8B84B;">⚠ Nu există un contract semnat pentru acest cont.</p>`;
 
-        const admins = await db
-          .select({ id: users.id, email: users.email })
-          .from(users)
-          .where(eq(users.role, "super_admin"));
+        // "admin" and "super_admin" both pass every requireAdmin() gate;
+        // filtering on super_admin alone meant a second administrator got
+        // nothing.
+        const { getAdminRecipients } = await import("@/lib/email/recipients");
+        const admins = await getAdminRecipients();
         for (const admin of admins) {
           await db.insert(notifications).values({
             userId: admin.id,

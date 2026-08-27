@@ -306,12 +306,35 @@ export async function POST(req: Request) {
       }
     })();
 
+    // Link the Legal Pack signature to the profile that has just been
+    // created. Onboarding records the acceptance BEFORE the artist row
+    // exists — deliberately, so nobody goes live without a contract — which
+    // left artist_id NULL on every signature and made the admin contracts
+    // page fall back to a bare e-mail instead of the partner's name.
+    // Backfilling here is the fix: the id is written once, at the first
+    // moment it exists, and the append-only trigger allows exactly this
+    // NULL → id transition and nothing else.
+    const { legalAcceptances } = await import("@/lib/db/schema");
+    const { desc: descOrder, isNull } = await import("drizzle-orm");
+    try {
+      await db
+        .update(legalAcceptances)
+        .set({ artistId: artist.id })
+        .where(
+          and(
+            eq(legalAcceptances.userId, appUser.id),
+            eq(legalAcceptances.subjectType, "artist"),
+            isNull(legalAcceptances.artistId),
+          ),
+        );
+    } catch (err) {
+      console.error("[register-artist] linking signature to artist failed", err);
+    }
+
     // Notify admins (in-app + email)
     // Attach the vendor's signed contract (drawn signature) to the admin
     // notification, so whoever approves the request sees what was signed
     // without digging through the admin panel.
-    const { legalAcceptances } = await import("@/lib/db/schema");
-    const { desc: descOrder } = await import("drizzle-orm");
     const signedRows = await db
       .select({
         image: legalAcceptances.signatureImage,
@@ -332,10 +355,10 @@ export async function POST(req: Request) {
       ? `<p style="margin:12px 0 0;">Contract semnat de <strong>${signed.name}</strong> la ${new Date(signed.acceptedAt).toLocaleString("ro-RO")}.${signatureAttachment ? " Semnătura este atașată." : ""}</p>`
       : `<p style="margin:12px 0 0;color:#E8B84B;">⚠ Nu există un contract semnat pentru acest cont.</p>`;
 
-    const admins = await db
-      .select({ id: users.id, email: users.email })
-      .from(users)
-      .where(eq(users.role, "super_admin"));
+    // "admin" and "super_admin" both pass every requireAdmin() gate; filtering
+    // on super_admin alone meant a second administrator got nothing.
+    const { getAdminRecipients } = await import("@/lib/email/recipients");
+    const admins = await getAdminRecipients();
     for (const admin of admins) {
       await db.insert(notifications).values({
         userId: admin.id,

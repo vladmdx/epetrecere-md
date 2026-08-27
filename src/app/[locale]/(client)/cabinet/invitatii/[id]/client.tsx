@@ -51,6 +51,9 @@ interface Guest {
   message: string | null;
   rsvpToken: string | null;
   respondedAt: string | null;
+  /** NULL = this guest has never been mailed. The bulk send targets only
+   *  these; everyone else is re-reached one at a time, on purpose. */
+  invitationSentAt: string | null;
 }
 
 export function InvitationDetailClient({ id }: { id: number }) {
@@ -62,6 +65,8 @@ export function InvitationDetailClient({ id }: { id: number }) {
   const [newGuestEmail, setNewGuestEmail] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [sending, setSending] = useState(false);
+  /** Which single guest is being deliberately re-mailed right now. */
+  const [resendingId, setResendingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetch(`/api/invitations/${id}`)
@@ -75,6 +80,15 @@ export function InvitationDetailClient({ id }: { id: number }) {
       .finally(() => setLoading(false));
   }, [id]);
 
+  /** Re-read after any send so the per-guest "sent" stamps are the
+   *  server's truth rather than an optimistic guess. */
+  async function refreshGuests() {
+    const res = await fetch(`/api/invitations/${id}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data?.guests) setGuests(data.guests);
+  }
+
   const stats = useMemo(() => {
     const total = guests.length;
     const yes = guests.filter((g) => g.rsvpStatus === "yes").length;
@@ -83,7 +97,9 @@ export function InvitationDetailClient({ id }: { id: number }) {
     const pending = guests.filter((g) => g.rsvpStatus === "pending").length;
     const plusOnes = guests.filter((g) => g.plusOne).length;
     const responseRate = total > 0 ? ((total - pending) / total) * 100 : 0;
-    return { total, yes, no, maybe, pending, plusOnes, responseRate };
+    /** What the bulk Send button will actually do. */
+    const unsent = guests.filter((g) => g.email && !g.invitationSentAt).length;
+    return { total, yes, no, maybe, pending, plusOnes, responseRate, unsent };
   }, [guests]);
 
   async function addGuest() {
@@ -99,7 +115,13 @@ export function InvitationDetailClient({ id }: { id: number }) {
       setNewGuestName("");
       setNewGuestEmail("");
       toast.success(t("cabinet.invitation.guestAdded"));
+      return;
     }
+    // Was silent on failure, which hid both the missing-contact rule and
+    // the duplicate-email guard — the host just saw nothing happen.
+    const err = await res.json().catch(() => ({}));
+    // TODO i18n: cabinet.invitation.guestAddFailed
+    toast.error(err.error || "Invitatul nu a putut fi adăugat.");
   }
 
   async function publish() {
@@ -117,13 +139,24 @@ export function InvitationDetailClient({ id }: { id: number }) {
     setPublishing(false);
   }
 
+  /** Bulk send — only reaches guests who don't have the invitation yet.
+   *  It used to mail everyone with an address on every press, so adding
+   *  one guest re-spammed the whole list. */
   async function sendInvitations() {
     const guestsWithEmail = guests.filter((g) => g.email);
     if (guestsWithEmail.length === 0) {
       toast.error(t("cabinet.invitation.noGuestEmail"));
       return;
     }
-    if (!confirm(t("cabinet.invitation.sendConfirm", { count: guestsWithEmail.length }))) return;
+    const unsent = guestsWithEmail.filter((g) => !g.invitationSentAt);
+    if (unsent.length === 0) {
+      // TODO i18n: cabinet.invitation.allAlreadySent
+      toast.info(
+        "Toți invitații cu email au primit deja invitația. Folosește butonul „Retrimite” din dreptul unei persoane pentru a i-o trimite din nou.",
+      );
+      return;
+    }
+    if (!confirm(t("cabinet.invitation.sendConfirm", { count: unsent.length }))) return;
     setSending(true);
     try {
       const res = await fetch(`/api/invitations/${id}/send`, {
@@ -134,11 +167,53 @@ export function InvitationDetailClient({ id }: { id: number }) {
         throw new Error(err.error || t("cabinet.invitation.sendError"));
       }
       const data = await res.json();
-      toast.success(t("cabinet.invitation.sendSuccess", { count: data.sent }));
+      // Say what actually happened. Claiming the whole list was mailed is
+      // what hid this bug from the host in the first place.
+      // TODO i18n: cabinet.invitation.sendReport / sendReportSkipped / sendReportFailed
+      const parts = [`Trimise: ${data.sent}`];
+      if (data.skipped > 0) parts.push(`${data.skipped} au primit-o deja`);
+      if (data.failed > 0) parts.push(`${data.failed} eșuate`);
+      toast.success(parts.join(" · "));
+      await refreshGuests();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("cabinet.invitation.sendError"));
     } finally {
       setSending(false);
+    }
+  }
+
+  /** Deliberate one-person re-send. Without this the only way to re-reach
+   *  someone was the all-guests button, which is how everybody ended up
+   *  with duplicates. */
+  async function resendTo(guest: Guest) {
+    if (!guest.email) return;
+    // TODO i18n: cabinet.invitation.resendConfirm
+    if (!confirm(`Trimiți din nou invitația către ${guest.name} (${guest.email})?`)) {
+      return;
+    }
+    setResendingId(guest.id);
+    try {
+      const res = await fetch(`/api/invitations/${id}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestIds: [guest.id], resend: true }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || t("cabinet.invitation.sendError"));
+      }
+      const data = await res.json();
+      if (data.sent > 0) {
+        // TODO i18n: cabinet.invitation.resendSuccess
+        toast.success(`Invitația a fost trimisă din nou către ${guest.name}.`);
+      } else {
+        toast.error(t("cabinet.invitation.sendError"));
+      }
+      await refreshGuests();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("cabinet.invitation.sendError"));
+    } finally {
+      setResendingId(null);
     }
   }
 
@@ -288,8 +363,14 @@ export function InvitationDetailClient({ id }: { id: number }) {
       {/* Guests management */}
       <Card className="mt-6" id="guests">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex flex-wrap items-center gap-2">
             <Users className="h-4 w-4" /> {t("cabinet.invitation.guestsHeading", { count: guests.length })}
+            {invitation.status === "published" && stats.unsent > 0 && (
+              <Badge variant="outline" className="text-xs font-normal">
+                {/* TODO i18n: cabinet.invitation.unsentCount */}
+                {stats.unsent} încă nu au primit invitația
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -333,6 +414,30 @@ export function InvitationDetailClient({ id }: { id: number }) {
                       </div>
                     )}
                   </div>
+                  {g.email &&
+                    (g.invitationSentAt ? (
+                      <Badge
+                        variant="secondary"
+                        className="gap-1 text-xs font-normal"
+                      >
+                        <Check className="h-3 w-3" />
+                        {/* TODO i18n: cabinet.invitation.deliverySent */}
+                        Trimisă{" "}
+                        {new Date(g.invitationSentAt).toLocaleDateString(
+                          "ro-RO",
+                          { day: "numeric", month: "short" },
+                        )}
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="gap-1 text-xs font-normal text-muted-foreground"
+                      >
+                        <Clock className="h-3 w-3" />
+                        {/* TODO i18n: cabinet.invitation.deliveryPending */}
+                        Netrimisă
+                      </Badge>
+                    ))}
                   <RsvpBadge status={g.rsvpStatus} />
                   {g.plusOne && (
                     <Badge variant="secondary" className="text-xs">
@@ -347,6 +452,23 @@ export function InvitationDetailClient({ id }: { id: number }) {
                   >
                     <Copy className="h-3 w-3" /> {t("cabinet.invitation.rsvpLink")}
                   </Button>
+                  {invitation.status === "published" && g.email && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => resendTo(g)}
+                      disabled={resendingId !== null}
+                      className="gap-1"
+                    >
+                      {resendingId === g.id ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Send className="h-3 w-3" />
+                      )}
+                      {/* TODO i18n: cabinet.invitation.resend / cabinet.invitation.sendToGuest */}
+                      {g.invitationSentAt ? "Retrimite" : "Trimite"}
+                    </Button>
+                  )}
                 </div>
               ))}
             </div>

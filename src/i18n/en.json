@@ -2084,7 +2084,21 @@
     "monthShort6": "Jun",
     "monthShort7": "Jul",
     "monthShort8": "Aug",
-    "monthShort9": "Sep"
+    "monthShort9": "Sep",
+    "signedDocs": {
+      "title": "Signed documents",
+      "subtitle": "The legal pack you accepted and the record kept about the signing.",
+      "empty": "You have no signed documents yet.",
+      "pack": "Legal pack v{v}",
+      "hash": "SHA-256 fingerprint",
+      "signature": "Your signature",
+      "download": "Download",
+      "technical": "View the record kept about the signing",
+      "ip": "IP address",
+      "device": "Device (user-agent)",
+      "contact": "Confirmed contact",
+      "retention": "We keep this data as proof that the contract was accepted, per Annex 2 of the agreement. You can request or contest it at privacy@epetrecere.md."
+    }
   },
   "calendar": {
     "months": [
@@ -4989,6 +5003,10 @@
       "valueOverPeriod": "Value over the period"
     },
     "contracts": {
+      "accountDeleted": "Account deleted",
+      "contentHash": "SHA-256 fingerprint",
+      "device": "Device",
+      "documents": "Accepted documents",
       "download": "Download",
       "empty": "No signed contract yet. They appear here as soon as an artist or a venue accepts the documents at registration.",
       "language": "language {lang}",
@@ -5000,6 +5018,7 @@
       "subjectArtist": "Artist",
       "subjectVenue": "Venue",
       "subtitle": "The vendors' electronic acceptances, with the technical record required by Annex 2. The entries cannot be modified or deleted.",
+      "technical": "Technical record",
       "title": "Signed contracts"
     },
     "crm": {

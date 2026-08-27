@@ -34,6 +34,7 @@ import { AppearanceSettings } from "@/components/shared/appearance-settings";
 import { MOLDOVA_CITIES, TRAVEL_DISTANCE_OPTIONS } from "@/lib/moldova-cities";
 import { ReferralCard } from "@/components/shared/referral-card";
 import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
+import { SignedDocumentsCard } from "@/components/vendor/signed-documents-card";
 import { NotificationSoundToggle } from "@/components/shared/notification-sound-toggle";
 import { TimezoneSelector } from "@/components/shared/timezone-selector";
 import { useLocale } from "@/hooks/use-locale";
@@ -503,6 +504,9 @@ export default function VendorSettingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* The Legal Pack this vendor signed, with the record kept about them. */}
+      <SignedDocumentsCard />
 
       <AppearanceSettings />
 

@@ -2084,7 +2084,21 @@
     "monthShort6": "Iun",
     "monthShort7": "Iul",
     "monthShort8": "Aug",
-    "monthShort9": "Sep"
+    "monthShort9": "Sep",
+    "signedDocs": {
+      "title": "Documente semnate",
+      "subtitle": "Pachetul legal pe care l-ai acceptat și înregistrarea păstrată despre semnare.",
+      "empty": "Nu ai încă documente semnate.",
+      "pack": "Pachet legal v{v}",
+      "hash": "amprentă SHA-256",
+      "signature": "Semnătura ta",
+      "download": "Descarcă",
+      "technical": "Vezi înregistrarea păstrată despre semnare",
+      "ip": "Adresa IP",
+      "device": "Dispozitiv (user-agent)",
+      "contact": "Contact confirmat",
+      "retention": "Păstrăm aceste date ca dovadă a acceptării contractului, conform Anexei 2. Le poți solicita sau contesta la privacy@epetrecere.md."
+    }
   },
   "calendar": {
     "months": [
@@ -4989,6 +5003,10 @@
       "valueOverPeriod": "Valoare pe perioadă"
     },
     "contracts": {
+      "accountDeleted": "Cont șters",
+      "contentHash": "amprentă SHA-256",
+      "device": "Dispozitiv",
+      "documents": "Documente acceptate",
       "download": "Descarcă",
       "empty": "Niciun contract semnat încă. Apar aici imediat ce un artist sau o sală acceptă documentele la înregistrare.",
       "language": "limba {lang}",
@@ -5000,6 +5018,7 @@
       "subjectArtist": "Artist",
       "subjectVenue": "Sală",
       "subtitle": "Acceptările electronice ale furnizorilor, cu fixarea tehnică cerută de Anexa 2. Înregistrările nu pot fi modificate sau șterse.",
+      "technical": "Fixare tehnică",
       "title": "Contracte semnate"
     },
     "crm": {

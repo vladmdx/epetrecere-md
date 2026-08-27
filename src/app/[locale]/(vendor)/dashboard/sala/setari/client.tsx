@@ -37,6 +37,7 @@ import { PushSubscribeButton } from "@/components/shared/push-subscribe-button";
 import { WhatsAppPhoneInput } from "@/components/shared/whatsapp-phone-input";
 import { ReferralCard } from "@/components/shared/referral-card";
 import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
+import { SignedDocumentsCard } from "@/components/vendor/signed-documents-card";
 import { TimezoneSelector } from "@/components/shared/timezone-selector";
 import { useLocale } from "@/hooks/use-locale";
 
@@ -536,6 +537,9 @@ export function VenueSettingsClient({
           </div>
         </CardContent>
       </Card>
+
+      {/* The Legal Pack this venue signed, with the record kept about it. */}
+      <SignedDocumentsCard />
 
       {/* Appearance */}
       <AppearanceSettings />

@@ -23,7 +23,7 @@ const copy = {
       },
       {
         title: "3. Date și scopuri",
-        body: "Putem prelucra date de cont și identitate, detalii despre eveniment, buget, invitați, cereri, rezervări, mesaje, recenzii, fișiere, fotografii și date tehnice de securitate. Datele de analytics și marketing sunt folosite numai când categoria opțională corespunzătoare a fost acceptată.",
+        body: "Putem prelucra date de cont și identitate, detalii despre eveniment, buget, invitați, cereri, rezervări, mesaje, recenzii, fișiere, fotografii și date tehnice de securitate. Când semnezi electronic documentele platformei, păstrăm în plus numele semnatarului, imaginea semnăturii desenate, adresa IP, șirul user-agent al dispozitivului, data și ora și amprenta SHA-256 a textului care ți-a fost afișat; aceste date sunt păstrate strict ca dovadă a acceptării contractului. Datele de analytics și marketing sunt folosite numai când categoria opțională corespunzătoare a fost acceptată.",
       },
       {
         title: "4. Temeiuri",
@@ -76,7 +76,7 @@ const copy = {
       },
       {
         title: "3. Данные и цели",
-        body: "Мы можем обрабатывать данные аккаунта и личности, сведения о событии, бюджете, гостях, запросах, бронированиях, сообщениях, отзывах, файлах, фотографиях и технические данные безопасности. Аналитические и маркетинговые данные используются только после согласия на соответствующую необязательную категорию.",
+        body: "Мы можем обрабатывать данные аккаунта и личности, сведения о событии, бюджете, гостях, запросах, бронированиях, сообщениях, отзывах, файлах, фотографиях и технические данные безопасности. Когда вы подписываете документы платформы электронно, мы дополнительно храним имя подписанта, изображение нарисованной подписи, IP-адрес, строку user-agent устройства, дату и время и отпечаток SHA-256 показанного вам текста; эти данные хранятся строго как доказательство принятия договора. Аналитические и маркетинговые данные используются только после согласия на соответствующую необязательную категорию.",
       },
       {
         title: "4. Правовые основания",
@@ -129,7 +129,7 @@ const copy = {
       },
       {
         title: "3. Data and purposes",
-        body: "We may process account and identity data, event details, budget, guests, enquiries, bookings, messages, reviews, files, photographs and technical security data. Analytics and marketing data are used only when the relevant optional category has been accepted.",
+        body: "We may process account and identity data, event details, budget, guests, enquiries, bookings, messages, reviews, files, photographs and technical security data. When you sign the platform's documents electronically, we additionally keep the signatory's name, the image of the drawn signature, the IP address, the device user-agent string, the date and time and the SHA-256 fingerprint of the text that was displayed to you; this data is kept strictly as proof that the contract was accepted. Analytics and marketing data are used only when the relevant optional category has been accepted.",
       },
       {
         title: "4. Legal bases",

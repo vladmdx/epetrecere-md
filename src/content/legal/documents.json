@@ -6082,7 +6082,7 @@
         },
         {
           "type": "p",
-          "text": " Date de identificare și înregistrare: nume, organizație, IDNO, reprezentant și verificare.  Date de contact: telefon, e-mail și alte date comunicate.  Date ale contului: identificator, statut, setări, autentificări și acțiuni.  Date ale evenimentului: tip, dată, localitate, Locație, invitați, servicii, buget și preferințe.  Date privind solicitările și rezervările: furnizori selectați, statuturi, confirmări, refuzuri, anulări și executare.  Mesaje prin chat și suport.  Date profesionale, portofoliu, fotografii, calendar, prețuri și documente ale Partenerilor și Locațiilor.  Recenzii și evaluări.  Date tehnice: IP, dispozitiv, sistem de operare, browser, identificatori, erori și evenimente de securitate."
+          "text": " Date de identificare și înregistrare: nume, organizație, IDNO, reprezentant și verificare.  Date de contact: telefon, e-mail și alte date comunicate.  Date ale contului: identificator, statut, setări, autentificări și acțiuni.  Date ale evenimentului: tip, dată, localitate, Locație, invitați, servicii, buget și preferințe.  Date privind solicitările și rezervările: furnizori selectați, statuturi, confirmări, refuzuri, anulări și executare.  Mesaje prin chat și suport.  Date profesionale, portofoliu, fotografii, calendar, prețuri și documente ale Partenerilor și Locațiilor.  Recenzii și evaluări.  Date tehnice: IP, dispozitiv, sistem de operare, browser, identificatori, erori și evenimente de securitate.  Date privind semnarea electronică a documentelor: numele semnatarului, calitatea în care semnează, imaginea semnăturii olografe desenate, adresa IP, șirul user-agent al browserului sau al dispozitivului, data și ora, limba de afișare și amprenta SHA-256 a textului afișat în momentul semnării."
         },
         {
           "type": "h2",
@@ -6098,7 +6098,7 @@
         },
         {
           "type": "p",
-          "text": " Înregistrarea, autentificarea și administrarea contului.  Verificarea Partenerilor și Locațiilor.  Căutarea, solicitările și rezervările.  Comunicarea și suportul.  Evidența plăților și remunerației de serviciu.  Securitate, prevenirea fraudei și incidente.  Recenzii, ratinguri, reclamații și litigii.  Îndeplinirea obligațiilor legale și protejarea drepturilor.  Analiză și îmbunătățirea Platformei.  Marketing când există temei juridic."
+          "text": " Înregistrarea, autentificarea și administrarea contului.  Verificarea Partenerilor și Locațiilor.  Căutarea, solicitările și rezervările.  Comunicarea și suportul.  Evidența plăților și remunerației de serviciu.  Securitate, prevenirea fraudei și incidente.  Recenzii, ratinguri, reclamații și litigii.  Îndeplinirea obligațiilor legale și protejarea drepturilor.  Analiză și îmbunătățirea Platformei.  Marketing când există temei juridic.  Dovada acceptării documentelor legale: cine a semnat, ce versiune i-a fost afișată, când și de pe ce dispozitiv. Aceste date sunt păstrate exclusiv ca probă a acceptării și pentru apărarea unui drept în instanță."
         },
         {
           "type": "h2",
@@ -6256,7 +6256,7 @@
         },
         {
           "type": "p",
-          "text": " Регистрационные и идентификационные данные: имя, фамилия, организация, IDNO, сведения представителя и данные верификации.  Контактные данные: телефон, e-mail и иные предоставленные контакты.  Данные аккаунта: идентификатор, статус, настройки, история входов и действий.  Данные мероприятия: тип, дата, населенный пункт, выбранное Заведение, количество гостей, категории услуг, бюджет и пожелания.  Данные заявок и бронирований: выбранные поставщики, статусы, подтверждения, отказы, отмены и история исполнения.  Переписка через встроенный чат и поддержку.  Профессиональные данные Партнеров и Заведений, портфолио, фотографии, календарь, цены и документы проверки.  Отзывы, оценки и сведения, необходимые для проверки права на отзыв.  Технические данные: IP, устройство, ОС, браузер, идентификаторы, журналы ошибок и события безопасности."
+          "text": " Регистрационные и идентификационные данные: имя, фамилия, организация, IDNO, сведения представителя и данные верификации.  Контактные данные: телефон, e-mail и иные предоставленные контакты.  Данные аккаунта: идентификатор, статус, настройки, история входов и действий.  Данные мероприятия: тип, дата, населенный пункт, выбранное Заведение, количество гостей, категории услуг, бюджет и пожелания.  Данные заявок и бронирований: выбранные поставщики, статусы, подтверждения, отказы, отмены и история исполнения.  Переписка через встроенный чат и поддержку.  Профессиональные данные Партнеров и Заведений, портфолио, фотографии, календарь, цены и документы проверки.  Отзывы, оценки и сведения, необходимые для проверки права на отзыв.  Технические данные: IP, устройство, ОС, браузер, идентификаторы, журналы ошибок и события безопасности.  Данные об электронном подписании документов: имя подписанта, качество, в котором он подписывает, изображение собственноручной подписи, IP-адрес, строка user-agent браузера или устройства, дата и время, язык отображения и отпечаток SHA-256 текста, показанного в момент подписания."
         },
         {
           "type": "h2",
@@ -6272,7 +6272,7 @@
         },
         {
           "type": "p",
-          "text": " Регистрация, аутентификация и обслуживание аккаунта.  Верификация Партнеров и Заведений.  Поиск, подбор, заявки и бронирования.  Коммуникация между Пользователями и служба поддержки.  Учет платежей и сервисного вознаграждения.  Безопасность, предотвращение мошенничества и расследование инцидентов.  Отзывы, рейтинги, жалобы и разрешение споров.  Исполнение юридических обязанностей и защита прав.  Аналитика и улучшение Платформы.  Маркетинговые коммуникации при наличии правового основания."
+          "text": " Регистрация, аутентификация и обслуживание аккаунта.  Верификация Партнеров и Заведений.  Поиск, подбор, заявки и бронирования.  Коммуникация между Пользователями и служба поддержки.  Учет платежей и сервисного вознаграждения.  Безопасность, предотвращение мошенничества и расследование инцидентов.  Отзывы, рейтинги, жалобы и разрешение споров.  Исполнение юридических обязанностей и защита прав.  Аналитика и улучшение Платформы.  Маркетинговые коммуникации при наличии правового основания.  Доказательство принятия правовых документов: кто подписал, какая версия была ему показана, когда и с какого устройства. Эти данные хранятся исключительно как доказательство принятия и для защиты права в суде."
         },
         {
           "type": "h2",
@@ -6430,7 +6430,7 @@
         },
         {
           "type": "p",
-          "text": " Identification and registration data: name, organisation, IDNO, representative and verification.  Contact data: telephone, e-mail and other data communicated.  Account data: identifier, status, settings, authentications and actions.  Event data: type, date, locality, Venue, guests, services, budget and preferences.  Data concerning requests and Bookings: selected providers, statuses, confirmations, refusals, cancellations and performance.  Messages through chat and support.  Professional data, portfolio, photographs, calendar, prices and documents of Partners and Venues.  Reviews and ratings.  Technical data: IP, device, operating system, browser, identifiers, errors and security events."
+          "text": " Identification and registration data: name, organisation, IDNO, representative and verification.  Contact data: telephone, e-mail and other data communicated.  Account data: identifier, status, settings, authentications and actions.  Event data: type, date, locality, Venue, guests, services, budget and preferences.  Data concerning requests and Bookings: selected providers, statuses, confirmations, refusals, cancellations and performance.  Messages through chat and support.  Professional data, portfolio, photographs, calendar, prices and documents of Partners and Venues.  Reviews and ratings.  Technical data: IP, device, operating system, browser, identifiers, errors and security events.  Data concerning the electronic signing of documents: the name of the signatory, the capacity in which they sign, the image of the handwritten signature, the IP address, the user-agent string of the browser or device, the date and time, the display language and the SHA-256 fingerprint of the text displayed at the moment of signing."
         },
         {
           "type": "h2",
@@ -6446,7 +6446,7 @@
         },
         {
           "type": "p",
-          "text": " Registration, authentication and administration of the account.  Verification of Partners and Venues.  Search, requests and Bookings.  Communication and support.  Recording of payments and of the service remuneration.  Security, fraud prevention and incidents.  Reviews, ratings, complaints and disputes.  Compliance with legal obligations and protection of rights.  Analysis and improvement of the Platform.  Marketing where a legal basis exists."
+          "text": " Registration, authentication and administration of the account.  Verification of Partners and Venues.  Search, requests and Bookings.  Communication and support.  Recording of payments and of the service remuneration.  Security, fraud prevention and incidents.  Reviews, ratings, complaints and disputes.  Compliance with legal obligations and protection of rights.  Analysis and improvement of the Platform.  Marketing where a legal basis exists.  Proof of acceptance of the legal documents: who signed, which version was displayed to them, when and from which device. This data is kept solely as evidence of the acceptance and for the defence of a legal claim."
         },
         {
           "type": "h2",

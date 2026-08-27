@@ -93,6 +93,23 @@ function defaultGreeting(guestType: GuestType | null | undefined): string {
   return "Ești invitat";
 }
 
+/** Mirrors the contact match POST /api/invitations uses to decide who is
+ *  already on the invitation. Nothing links a planner guest row to an
+ *  invitation_guests row, so the address is the identity. Keep the two in
+ *  step or the dialog's "new guests" count will disagree with what the
+ *  server actually adds. */
+function contactKey(g: {
+  name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}): string {
+  const email = g.email?.trim().toLowerCase();
+  if (email) return `e:${email}`;
+  const phone = g.phone?.replace(/\D/g, "");
+  if (phone) return `p:${phone}`;
+  return `n:${(g.name ?? "").trim().toLowerCase()}`;
+}
+
 /** Curated set of decorative icons the host can use as the invitation's
  *  centerpiece. Mix of bridal/festive emoji + the original glyphs. */
 const DECOR_ICONS = [
@@ -188,6 +205,16 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
   // Invitation sending dialog state
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [sending, setSending] = useState(false);
+  /** The plan's existing invitation, if it already has one. Send adds to
+   *  this rather than minting a second — a second invitation means a new
+   *  slug and new RSVP tokens, so every earlier guest gets a duplicate
+   *  mail with a different link and their first answer is orphaned. */
+  const [existingInv, setExistingInv] = useState<{
+    id: number;
+    status: string;
+    guestKeys: string[];
+  } | null>(null);
+  const [loadingExisting, setLoadingExisting] = useState(false);
   const [invData, setInvData] = useState({
     designId: "elegant-gold" as InvitationDesignId,
     coupleNames: "",
@@ -265,7 +292,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
     }
   }
 
-  function openSendDialog() {
+  async function openSendDialog() {
     if (!plan) {
       toast.error(t("cabinet.guests.missingEventData"));
       return;
@@ -286,8 +313,92 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       dressCode: "",
       rsvpDeadline: "",
     }));
+    setExistingInv(null);
     setSendDialogOpen(true);
+
+    // If the plan already has an invitation, the dialog must show what is
+    // actually saved on it. Sending re-writes the invitation from these
+    // fields, so opening with the plan defaults would quietly overwrite a
+    // design the host spent time on the first time round.
+    setLoadingExisting(true);
+    try {
+      const res = await fetch(`/api/invitations?planId=${plan.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.invitation) {
+          const inv = data.invitation;
+          const cc = (inv.customColors || {}) as Record<string, unknown>;
+          const str = (k: string) =>
+            typeof cc[k] === "string" ? (cc[k] as string) : "";
+          const align = (k: string): Align => {
+            const v = str(k);
+            return v === "left" || v === "right" ? v : "center";
+          };
+          const num = (k: string, fallback: number) => {
+            const n = Number(cc[k]);
+            return Number.isFinite(n) && n > 0 ? n : fallback;
+          };
+          setInvData({
+            designId: (str("designId") ||
+              "elegant-gold") as InvitationDesignId,
+            coupleNames: inv.coupleNames || plan.title || "",
+            eventDate: inv.eventDate || plan.eventDate || "",
+            ceremonyTime: inv.ceremonyTime || "",
+            receptionTime: inv.receptionTime || "",
+            ceremonyLocation: inv.ceremonyLocation || "",
+            receptionLocation: inv.receptionLocation || "",
+            message: inv.message || "",
+            dressCode: inv.dressCode || "",
+            rsvpDeadline: inv.rsvpDeadline || "",
+          });
+          setCustom({
+            headerText: str("headerText"),
+            eventName: str("eventName"),
+            decorIcon: str("decorIcon"),
+            iconImageUrl: str("iconImageUrl"),
+            iconSize: num("iconSize", initialCustom.iconSize),
+            iconAlign: align("iconAlign"),
+            bgColor: str("bgColor"),
+            textColor: str("textColor"),
+            accentColor: str("accentColor"),
+            fontHeading: str("fontHeading"),
+            titleSize: num("titleSize", initialCustom.titleSize),
+            titleAlign: align("titleAlign"),
+          });
+          setExistingInv({
+            id: inv.id,
+            status: inv.status,
+            guestKeys: (data.guests ?? []).map(contactKey),
+          });
+        }
+      }
+    } catch {
+      // Offline or the lookup failed — the plan defaults above still let
+      // the host send; the server is the one that refuses to duplicate.
+    } finally {
+      setLoadingExisting(false);
+    }
   }
+
+  /** Planner guests who aren't on the invitation yet. `added` is how many
+   *  rows Send will create; `mailable` is how many of those actually get
+   *  an email, since delivery is email-only — a phone-only guest joins the
+   *  list but nothing is sent to them. The button counts the mailable
+   *  ones so its number matches the toast that follows. */
+  const pendingInvites = useMemo(() => {
+    const withContact = guests.filter((g) => g.email || g.phone);
+    const known = existingInv ? new Set(existingInv.guestKeys) : new Set<string>();
+    const fresh = withContact.filter(
+      (g) =>
+        !known.has(
+          contactKey({ name: g.fullName, email: g.email, phone: g.phone }),
+        ),
+    );
+    return {
+      added: fresh.length,
+      mailable: fresh.filter((g) => g.email).length,
+    };
+  }, [guests, existingInv]);
 
   async function createAndSendInvitation() {
     if (!plan) return;
@@ -305,6 +416,9 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          // Naming the plan is what makes this create-or-reuse instead of
+          // "another invitation, every press".
+          planId: plan.id,
           eventType: (plan.eventType as "wedding" | "birthday" | "baptism" | "corporate") ?? "wedding",
           coupleNames: invData.coupleNames,
           hostName: invData.coupleNames,
@@ -354,25 +468,44 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         const err = await createRes.json().catch(() => ({}));
         throw new Error(err.error || t("cabinet.guests.createFailed"));
       }
+      // The server either created the plan's invitation or added the new
+      // guests to the one it already had.
       const invitation = await createRes.json();
 
-      // 2. Publish it
-      await fetch(`/api/invitations/${invitation.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: "published" }),
-      });
+      // 2. Publish it — only when it isn't already, so a reused invitation
+      //    isn't needlessly rewritten on every send.
+      if (invitation.status !== "published") {
+        await fetch(`/api/invitations/${invitation.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "published" }),
+        });
+      }
 
-      // 3. Send emails
+      // 3. Send emails. No body — the route mails only the guests who
+      //    don't have the invitation yet.
       const sendRes = await fetch(`/api/invitations/${invitation.id}/send`, {
         method: "POST",
       });
       if (sendRes.ok) {
         const d = await sendRes.json();
-        toast.success(t("cabinet.guests.sentCount", { count: d.sent }));
+        // Report what happened rather than implying the whole list went
+        // out: "sent 1, 12 already had it" is the answer that would have
+        // made this bug obvious the first time it happened.
+        // TODO i18n: cabinet.guests.sendReport{Sent,Skipped,Failed}
+        const parts = [`Trimise: ${d.sent}`];
+        if (d.skipped > 0) parts.push(`${d.skipped} au primit-o deja`);
+        if (d.failed > 0) parts.push(`${d.failed} eșuate`);
+        toast.success(parts.join(" · "));
       } else {
-        toast.success(t("cabinet.guests.createdQueued"));
+        const err = await sendRes.json().catch(() => ({}));
+        // TODO i18n: cabinet.guests.savedButSendFailed
+        toast.error(
+          err.error ||
+            "Invitația a fost salvată, dar trimiterea nu a reușit.",
+        );
       }
+      setExistingInv(null);
       setSendDialogOpen(false);
     } catch (err) {
       toast.error(
@@ -1519,6 +1652,37 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
           </DialogHeader>
 
           <div className="space-y-5">
+            {/* What this press will actually do. Before the plan was
+                linked to one invitation, every press created a new one and
+                mailed the whole list again. */}
+            {loadingExisting && (
+              <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                {/* TODO i18n: cabinet.guests.checkingExisting */}
+                Verificăm dacă evenimentul are deja o invitație...
+              </div>
+            )}
+            {!loadingExisting && existingInv && (
+              <div className="rounded-lg border border-gold/40 bg-gold/10 px-3 py-2 text-sm">
+                {/* TODO i18n: cabinet.guests.existingInvitationNotice */}
+                Acest eveniment are deja o invitație. Modificările de mai jos
+                se aplică pe ea, iar emailurile pleacă{" "}
+                <strong>doar către invitații care nu au primit-o încă</strong>
+                {pendingInvites.added > 0 ? (
+                  <>
+                    {" "}
+                    ({pendingInvites.added} invitați noi de adăugat, dintre care{" "}
+                    {pendingInvites.mailable} cu email).
+                  </>
+                ) : (
+                  <>
+                    . Momentan nu ai invitați noi pe listă — adaugă-i mai întâi
+                    aici, sau retrimite individual din pagina invitației.
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Design picker */}
             <div>
               <Label className="mb-2 block">
@@ -1718,7 +1882,15 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
             </Button>
             <Button
               onClick={createAndSendInvitation}
-              disabled={sending || !invData.eventDate || !invData.coupleNames}
+              // Blocked while the existing invitation is still loading:
+              // submitting now would save the plan defaults over whatever
+              // the host designed the first time.
+              disabled={
+                sending ||
+                loadingExisting ||
+                !invData.eventDate ||
+                !invData.coupleNames
+              }
               className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {sending ? (
@@ -1727,7 +1899,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                 <Send className="h-4 w-4" />
               )}
               {t("cabinet.guests.sendInvitations", {
-                count: guests.filter((g) => g.email || g.phone).length,
+                count: pendingInvites.mailable,
               })}
             </Button>
           </DialogFooter>

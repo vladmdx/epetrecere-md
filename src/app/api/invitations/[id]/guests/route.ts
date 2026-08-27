@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { invitations, invitationGuests } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { requireAppUser } from "@/lib/planner/ownership";
 
 async function requireOwner(id: number) {
@@ -83,6 +83,30 @@ export async function POST(
       },
       { status: 400 },
     );
+  }
+
+  // A second row for the same address is a second invitation email to the
+  // same person — the exact complaint this feature set is fixing. The new
+  // row would also read as never-sent, so the next bulk send would mail
+  // them again even though the first row is stamped.
+  const email = parsed.data.email?.trim().toLowerCase();
+  if (email) {
+    const existing = await db
+      .select({ id: invitationGuests.id })
+      .from(invitationGuests)
+      .where(
+        and(
+          eq(invitationGuests.invitationId, invId),
+          sql`lower(${invitationGuests.email}) = ${email}`,
+        ),
+      )
+      .limit(1);
+    if (existing.length > 0) {
+      return NextResponse.json(
+        { error: "Acest email este deja pe lista de invitați." },
+        { status: 409 },
+      );
+    }
   }
 
   const [guest] = await db
