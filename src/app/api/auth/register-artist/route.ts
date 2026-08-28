@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { checkName, checkDescription } from "@/lib/validation/text-quality";
 import { z } from "zod/v4";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
@@ -15,20 +16,74 @@ import { validatePhone } from "@/lib/phone/validate";
 
 /** A single duration → price tier the onboarding wizard can submit
  *  alongside the artist row. Mirrors the artist_packages columns. */
+/** The ten canonical keys from lib/events/normalize.ts. */
+const EVENT_TYPE_KEYS = [
+  "wedding",
+  "proposal",
+  "cununie",
+  "baptism",
+  "cumatrie",
+  "birthday",
+  "kids_birthday",
+  "corporate",
+  "concert",
+  "other",
+] as const;
+
+/** Default Romanian label when the partner does not name the tier itself.
+ *  Display elsewhere goes through eventTypeLabel() for the reader's locale;
+ *  this is only the stored name_ro. */
+const EVENT_TYPE_NAME_RO: Record<string, string> = {
+  wedding: "Nuntă",
+  proposal: "Cerere în căsătorie",
+  cununie: "Cununie",
+  baptism: "Botez",
+  cumatrie: "Cumătrie",
+  birthday: "Zi de naștere",
+  kids_birthday: "Zi de naștere pentru copii",
+  corporate: "Eveniment corporativ",
+  concert: "Concert",
+  other: "Alt eveniment",
+};
+
 const packageTierSchema = z.object({
   hours: z.number().int().min(0).max(24).default(0),
   minutes: z.number().int().min(0).max(59).default(0),
   price: z.number().int().min(0).max(100_000),
   nameRo: z.string().max(120).optional(),
+  /** per_hour — N minutes for `price`, the classic duration tier.
+   *  per_event — one figure for a whole event, whatever it runs to. A
+   *  photographer charges by the wedding, not by the hour. */
+  pricingMode: z.enum(["per_hour", "per_event"]).default("per_hour"),
+  /** Which event this price is for; null means "any". Only meaningful
+   *  alongside per_event. */
+  eventType: z.enum(EVENT_TYPE_KEYS).nullish(),
 });
 
+/** A duration tier needs a duration; an event tier needs only a price, since
+ *  it deliberately has none. Requiring hours/minutes of both is what would
+ *  silently drop every per-event price on the way to the database. */
+function isUsableTier(p: z.infer<typeof packageTierSchema>): boolean {
+  if (p.price <= 0) return false;
+  return p.pricingMode === "per_event" || p.hours > 0 || p.minutes > 0;
+}
+
 const registerSchema = z.object({
-  name: z.string().min(2),
+  // Shared with the wizard so the disabled button and the API agree. min(2)
+  // accepted "kk"; this asks for letters and more than one distinct one.
+  name: z.string().refine((v) => checkName(v).ok, {
+    message: "name_not_substantive",
+  }),
   // Phone is now collected at registration and stored on the user; the
   // onboarding form may send an empty string. We fall back to users.phone.
   phone: z.string().optional().default(""),
   categoryId: z.number(),
-  description: z.string().optional(),
+  description: z
+    .string()
+    .refine((v) => checkDescription(v).ok, {
+      message: "description_not_substantive",
+    })
+    .optional(),
   location: z.string().optional(),
   imageUrl: z.string().optional(),
   /** Legacy single "preț de start". Still supported for backwards
@@ -199,9 +254,7 @@ export async function POST(req: Request) {
     // priceFrom precedence: minimum across the packages array, falling
     // back to the legacy `priceFrom` field. Listing pages still sort
     // by this column, so we keep it accurate even with multiple tiers.
-    const validTiers = (data.packages ?? []).filter(
-      (p) => p.price > 0 && (p.hours > 0 || p.minutes > 0),
-    );
+    const validTiers = (data.packages ?? []).filter(isUsableTier);
     const minTierPrice = validTiers.length
       ? Math.min(...validTiers.map((p) => p.price))
       : null;
@@ -275,12 +328,19 @@ export async function POST(req: Request) {
           artistId: artist.id,
           nameRo:
             p.nameRo?.trim() ||
-            (p.hours > 0
-              ? `${p.hours}h${p.minutes ? ` ${p.minutes}min` : ""}`
-              : `${p.minutes} min`),
+            (p.pricingMode === "per_event"
+              ? EVENT_TYPE_NAME_RO[p.eventType ?? "other"]
+              : p.hours > 0
+                ? `${p.hours}h${p.minutes ? ` ${p.minutes}min` : ""}`
+                : `${p.minutes} min`),
           price: p.price,
-          durationHours: p.hours > 0 ? p.hours : null,
-          durationMinutes: p.minutes,
+          // For a per-event tier the duration is not a billable unit; leave it
+          // empty rather than writing a zero that reads as "0 hours".
+          durationHours:
+            p.pricingMode === "per_event" ? null : p.hours > 0 ? p.hours : null,
+          durationMinutes: p.pricingMode === "per_event" ? 0 : p.minutes,
+          pricingMode: p.pricingMode,
+          eventType: p.pricingMode === "per_event" ? (p.eventType ?? null) : null,
           scope: "base" as const,
           isVisible: true,
         })),

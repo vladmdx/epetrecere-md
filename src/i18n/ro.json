@@ -1140,7 +1140,11 @@
       "title": "Înregistrare Partener",
       "travelFeeHint": "Activează dacă percepi extra pentru evenimente în afara orașului de bază.",
       "uploadPhoto": "Încarcă poza",
-      "yourData": "Datele tale"
+      "yourData": "Datele tale",
+      "pricingByDuration": "Pe durată",
+      "pricingByEvent": "Pe eveniment",
+      "eventTypeLabel": "Tip eveniment",
+      "eventTypeAny": "Orice eveniment"
     },
     "aiAssistantPage": {
       "subtitle": "Asistentul tău personal pentru gestionarea profilului"
@@ -6065,5 +6069,20 @@
     "toastError": "Eroare. Încearcă din nou.",
     "toastRemoved": "Scos din favorite",
     "toastSaved": "Salvat în favorite"
+  },
+  "validation": {
+    "name": {
+      "too_short": "Numele trebuie să aibă cel puțin 3 caractere.",
+      "too_long": "Numele este prea lung.",
+      "no_letters": "Numele trebuie să conțină litere.",
+      "too_few_distinct": "Scrie numele tău real, nu caractere repetate."
+    },
+    "description": {
+      "too_short": "Descrierea trebuie să aibă cel puțin 40 de caractere.",
+      "too_long": "Descrierea este prea lungă.",
+      "no_letters": "Descrierea trebuie să conțină litere.",
+      "too_few_distinct": "Scrie o descriere reală, nu caractere repetate.",
+      "too_few_words": "Scrie cel puțin câteva cuvinte despre ce oferi."
+    }
   }
 }

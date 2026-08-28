@@ -13,6 +13,12 @@
 // follow-up PATCH (/api/artists/crud PUT) saves the extended fields.
 
 import { useState, useEffect, useRef } from "react";
+import {
+  checkName,
+  checkDescription,
+  textIssueKey,
+} from "@/lib/validation/text-quality";
+import { eventTypeLabel, type EventTypeKey } from "@/lib/events/normalize";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +67,19 @@ const STEP_KEYS = [
 
 const MIN_AI_INPUT = 40;
 
+const PRICING_EVENT_KEYS = [
+  "wedding",
+  "cununie",
+  "baptism",
+  "cumatrie",
+  "birthday",
+  "kids_birthday",
+  "corporate",
+  "concert",
+  "proposal",
+  "other",
+] as const;
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useUser();
@@ -94,6 +113,12 @@ export default function OnboardingPage() {
       minutes: number;
       price: number;
       nameRo: string;
+      /** per_hour — a duration tier. per_event — one figure for the whole
+       *  event, which is how photographers and videographers actually
+       *  quote: one price for a wedding, another for a christening. */
+      pricingMode: "per_hour" | "per_event";
+      /** Which event the per_event price covers; "" means any. */
+      eventType: string;
     }>,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -224,9 +249,19 @@ export default function OnboardingPage() {
     try {
       // Drop empty / zero-priced tiers before submit. Server validates
       // again but trimming here keeps the payload clean.
-      const cleanPackages = (data.pricePackages || []).filter(
-        (p) => p.price > 0 && (p.hours > 0 || p.minutes > 0),
-      );
+      // An event tier has no duration by design, so requiring one here would
+      // throw away exactly the prices the partner came to set.
+      const cleanPackages = (data.pricePackages || [])
+        .filter(
+          (p) =>
+            p.price > 0 &&
+            (p.pricingMode === "per_event" || p.hours > 0 || p.minutes > 0),
+        )
+        .map((p) => ({
+          ...p,
+          eventType:
+            p.pricingMode === "per_event" && p.eventType ? p.eventType : null,
+        }));
 
       // 1. Create the artist row (same endpoint as before).
       // Record the electronic acceptance first: if the profile were created
@@ -305,9 +340,12 @@ export default function OnboardingPage() {
       case 0:
         return !!data.categoryId;
       case 1:
-        return !!data.name.trim();
+        // Presence was the only rule, so "kk" walked straight through.
+        return checkName(data.name).ok;
       case 2:
-        return true; // description is optional
+        // Still optional — but if something was typed, it has to say
+        // something. "000" used to reach an admin for approval.
+        return checkDescription(data.description).ok;
       case 3:
         return !!data.baseCity;
       case 4:
@@ -442,12 +480,21 @@ export default function OnboardingPage() {
           </div>
 
           <div>
-            <Label>{t("vendor.onboarding.stageName")}</Label>
+            <Label className="mb-1.5 block">
+              {t("vendor.onboarding.stageName")}
+            </Label>
             <Input
               value={data.name}
               onChange={(e) => update({ name: e.target.value })}
               placeholder={t("vendor.onboarding.stageNamePlaceholder")}
             />
+            {/* Say why Continue is disabled. A dead button with no reason is
+                worse than one that lets junk through. */}
+            {data.name.trim().length > 0 && !checkName(data.name).ok && (
+              <p className="mt-1.5 text-xs text-amber-500">
+                {t(textIssueKey("name", checkName(data.name).issue!))}
+              </p>
+            )}
           </div>
         </div>
       )}
@@ -483,6 +530,17 @@ export default function OnboardingPage() {
                 </span>
               )}
             </p>
+            {data.description.trim().length > 0 &&
+              !checkDescription(data.description).ok && (
+                <p className="mt-1.5 text-xs text-amber-500">
+                  {t(
+                    textIssueKey(
+                      "description",
+                      checkDescription(data.description).issue!,
+                    ),
+                  )}
+                </p>
+              )}
             <Button
               type="button"
               variant="outline"
@@ -605,9 +663,93 @@ export default function OnboardingPage() {
                   key={i}
                   className="rounded-lg border border-border/40 bg-background/50 p-3"
                 >
+                  {/* How this tier prices the work. A photographer quotes by
+                      the wedding, a DJ by the hour — both have to fit. */}
+                  <div className="mb-3 flex gap-1.5">
+                    {(["per_hour", "per_event"] as const).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          const next = [...data.pricePackages];
+                          next[i] = { ...tier, pricingMode: mode };
+                          update({ pricePackages: next });
+                        }}
+                        className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${
+                          tier.pricingMode === mode
+                            ? "bg-gold/15 text-gold ring-1 ring-gold/40"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {mode === "per_hour"
+                          ? t("vendor.onboarding.pricingByDuration")
+                          : t("vendor.onboarding.pricingByEvent")}
+                      </button>
+                    ))}
+                  </div>
+
+                  {tier.pricingMode === "per_event" ? (
+                    <div className="grid grid-cols-12 items-end gap-2">
+                      <div className="col-span-6">
+                        <Label className="mb-1.5 block text-[11px]">
+                          {t("vendor.onboarding.eventTypeLabel")}
+                        </Label>
+                        <select
+                          value={tier.eventType}
+                          onChange={(e) => {
+                            const next = [...data.pricePackages];
+                            next[i] = { ...tier, eventType: e.target.value };
+                            update({ pricePackages: next });
+                          }}
+                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                        >
+                          <option value="">
+                            {t("vendor.onboarding.eventTypeAny")}
+                          </option>
+                          {PRICING_EVENT_KEYS.map((k) => (
+                            <option key={k} value={k}>
+                              {eventTypeLabel(k as EventTypeKey, locale)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="col-span-4">
+                        <Label className="mb-1.5 block text-[11px]">
+                          {t("vendor.calPage.priceLabel")}
+                        </Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={tier.price || ""}
+                          onChange={(e) => {
+                            const next = [...data.pricePackages];
+                            next[i] = {
+                              ...tier,
+                              price: Number(e.target.value) || 0,
+                            };
+                            update({ pricePackages: next });
+                          }}
+                        />
+                      </div>
+                      <div className="col-span-2 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = data.pricePackages.filter(
+                              (_, j) => j !== i,
+                            );
+                            update({ pricePackages: next });
+                          }}
+                          className="rounded-md border border-destructive/40 px-2 py-1.5 text-xs text-destructive hover:bg-destructive/10"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-12 items-end gap-2">
                     <div className="col-span-3">
-                      <Label className="text-[11px]">
+                      <Label className="mb-1.5 block text-[11px]">
                         {t("vendor.onboarding.hours")}
                       </Label>
                       <Input
@@ -626,7 +768,7 @@ export default function OnboardingPage() {
                       />
                     </div>
                     <div className="col-span-3">
-                      <Label className="text-[11px]">
+                      <Label className="mb-1.5 block text-[11px]">
                         {t("vendor.onboarding.minutes")}
                       </Label>
                       <Input
@@ -646,7 +788,7 @@ export default function OnboardingPage() {
                       />
                     </div>
                     <div className="col-span-4">
-                      <Label className="text-[11px]">
+                      <Label className="mb-1.5 block text-[11px]">
                         {t("vendor.calPage.priceLabel")}
                       </Label>
                       <Input
@@ -678,6 +820,7 @@ export default function OnboardingPage() {
                       </button>
                     </div>
                   </div>
+                  )}
                 </div>
               ))}
               <button
@@ -686,7 +829,14 @@ export default function OnboardingPage() {
                   update({
                     pricePackages: [
                       ...data.pricePackages,
-                      { hours: 0, minutes: 0, price: 0, nameRo: "" },
+                      {
+                        hours: 0,
+                        minutes: 0,
+                        price: 0,
+                        nameRo: "",
+                        pricingMode: "per_hour" as const,
+                        eventType: "",
+                      },
                     ],
                   })
                 }
@@ -808,6 +958,18 @@ export default function OnboardingPage() {
         </div>
       )}
 
+      {/* The signature sits ABOVE the navigation row, on its own full-width
+          line. It used to be a third flex child of that row, between the two
+          buttons — `justify-between` then pushed Back to the far left and
+          Submit to the far right and squeezed the signature card into the
+          middle, which is why this step looked broken while every other one
+          looked fine. */}
+      {step === STEP_LABELS.length - 1 && (
+        <div className="mt-8">
+          <ESignature subjectType="artist" onChange={setSignature} />
+        </div>
+      )}
+
       {/* Navigation */}
       <div className="mt-8 flex items-center justify-between">
         <Button
@@ -827,13 +989,6 @@ export default function OnboardingPage() {
             {t("common.next")} <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <>
-          <div className="mb-4">
-            <ESignature
-              subjectType="artist"
-              onChange={setSignature}
-            />
-          </div>
           <Button
             onClick={handleSubmit}
             disabled={submitting || !signature?.accepted}
@@ -848,7 +1003,6 @@ export default function OnboardingPage() {
               </>
             )}
           </Button>
-          </>
         )}
       </div>
     </div>

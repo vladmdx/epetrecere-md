@@ -41,6 +41,9 @@ export function SignaturePad({
   const points = useRef(0);
   const bounds = useRef({ minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9 });
   const [hasInk, setHasInk] = useState(false);
+  /** Mirrors isSubstantial() so the "too small" hint re-renders as you draw —
+   *  reading the refs during render never updated it. */
+  const [isSubstantialNow, setIsSubstantialNow] = useState(false);
 
   const ctx = () => canvasRef.current?.getContext("2d") ?? null;
 
@@ -63,19 +66,42 @@ export function SignaturePad({
     c.fillRect(0, 0, rect.width, height);
   }, [height]);
 
+  /**
+   * Callers pass an inline arrow, so `onChange` is a new function on every
+   * parent render. Holding it in a ref keeps it out of the effect's
+   * dependencies below — with it in there, finishing a stroke set parent
+   * state, the parent re-rendered, the effect re-ran, and `setup()` painted
+   * the canvas white again. The signature vanished the instant the mouse
+   * came up, which read as "signing does not work".
+   */
+  const onChangeRef = useRef(onChange);
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
+
   useEffect(() => {
     setup();
+    // Resizing has to re-scale the backing store, which clears it. Carry the
+    // drawing across instead of discarding it: someone who has already signed
+    // should not lose it because they turned their phone or opened devtools.
     const onResize = () => {
-      // Resizing clears the canvas, so reset the validity state with it.
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const previous = points.current > 0 ? canvas.toDataURL("image/png") : null;
       setup();
-      points.current = 0;
-      bounds.current = { minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9 };
-      setHasInk(false);
-      onChange?.({ dataUrl: null, isValid: false });
+      if (!previous) return;
+      const img = new Image();
+      img.onload = () => {
+        const c = canvasRef.current?.getContext("2d");
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!c || !rect) return;
+        c.drawImage(img, 0, 0, rect.width, height);
+      };
+      img.src = previous;
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [setup, onChange]);
+  }, [setup, height]);
 
   function pos(e: React.PointerEvent<HTMLCanvasElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -93,7 +119,10 @@ export function SignaturePad({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ok = isSubstantial();
-    onChange?.({ dataUrl: ok ? canvas.toDataURL("image/png") : null, isValid: ok });
+    onChangeRef.current?.({
+      dataUrl: ok ? canvas.toDataURL("image/png") : null,
+      isValid: ok,
+    });
   }
 
   function start(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -127,6 +156,9 @@ export function SignaturePad({
     b.maxX = Math.max(b.maxX, p.x);
     b.minY = Math.min(b.minY, p.y);
     b.maxY = Math.max(b.maxY, p.y);
+    // Only on the transition, so this is not a setState per pointermove.
+    const ok = isSubstantial();
+    setIsSubstantialNow((was) => (was === ok ? was : ok));
   }
 
   function end(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -145,7 +177,8 @@ export function SignaturePad({
     points.current = 0;
     bounds.current = { minX: 1e9, maxX: -1e9, minY: 1e9, maxY: -1e9 };
     setHasInk(false);
-    onChange?.({ dataUrl: null, isValid: false });
+    setIsSubstantialNow(false);
+    onChangeRef.current?.({ dataUrl: null, isValid: false });
   }
 
   return (
@@ -187,7 +220,7 @@ export function SignaturePad({
         <div className="pointer-events-none absolute inset-x-6 bottom-8 border-b border-dashed border-[#D4CFC4]" />
       </div>
 
-      {hasInk && !isSubstantial() && (
+      {hasInk && !isSubstantialNow && (
         <p className="mt-1 text-xs text-amber-500">
           {t("legal.signatureTooSmall")}
         </p>

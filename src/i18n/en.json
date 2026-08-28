@@ -1140,7 +1140,11 @@
       "title": "Partner Registration",
       "travelFeeHint": "Enable if you charge extra for events outside the base city.",
       "uploadPhoto": "Upload photo",
-      "yourData": "Your data"
+      "yourData": "Your data",
+      "pricingByDuration": "By duration",
+      "pricingByEvent": "Per event",
+      "eventTypeLabel": "Event type",
+      "eventTypeAny": "Any event"
     },
     "aiAssistantPage": {
       "subtitle": "Your personal assistant for profile management"
@@ -6065,5 +6069,20 @@
     "toastError": "Error. Please try again.",
     "toastRemoved": "Removed from favorites",
     "toastSaved": "Saved to favorites"
+  },
+  "validation": {
+    "name": {
+      "too_short": "The name needs at least 3 characters.",
+      "too_long": "That name is too long.",
+      "no_letters": "The name has to contain letters.",
+      "too_few_distinct": "Enter your real name, not repeated characters."
+    },
+    "description": {
+      "too_short": "The description needs at least 40 characters.",
+      "too_long": "That description is too long.",
+      "no_letters": "The description has to contain letters.",
+      "too_few_distinct": "Write a real description, not repeated characters.",
+      "too_few_words": "Write at least a few words about what you offer."
+    }
   }
 }

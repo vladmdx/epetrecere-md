@@ -703,6 +703,15 @@ export default function VenueOnboardingPage() {
         </div>
       )}
 
+      {/* Full width, above the buttons. It used to be a third flex child of
+          the navigation row, which `justify-between` then squeezed between
+          Back and Submit. */}
+      {step === STEP_LABEL_KEYS.length - 1 && (
+        <div className="mt-8">
+          <ESignature subjectType="venue" onChange={setSignature} />
+        </div>
+      )}
+
       <div className="mt-8 flex items-center justify-between">
         <Button
           variant="outline"
@@ -721,13 +730,6 @@ export default function VenueOnboardingPage() {
             {t("common.next")} <ArrowRight className="h-4 w-4" />
           </Button>
         ) : (
-          <>
-          <div className="mb-4">
-            <ESignature
-              subjectType="venue"
-              onChange={setSignature}
-            />
-          </div>
           <Button
             onClick={handleSubmit}
             disabled={submitting || !signature?.accepted}
@@ -741,7 +743,6 @@ export default function VenueOnboardingPage() {
               </>
             )}
           </Button>
-          </>
         )}
       </div>
     </div>
