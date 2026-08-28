@@ -2358,7 +2358,25 @@
       "body": "Acordurile pentru parteneri și locații, regulile marketplace, tarifele și politicile de recenzii, anti-fraudă și calitate sunt disponibile în română și rusă la"
     },
     "indexTitle": "Documente legale",
-    "availableIn": "disponibil în română, rusă și engleză."
+    "availableIn": "disponibil în română, rusă și engleză.",
+    "identityTitle": "Datele tale pentru contract",
+    "identityIntro": "Acestea apar în contract, ca Anexa 5 — Rechizitele Partenerului.",
+    "partnerTypeIndividual": "Persoană fizică",
+    "partnerTypeSoleTrader": "Întreprinzător individual",
+    "partnerTypeCompany": "Persoană juridică",
+    "legalNameIndividual": "Nume și prenume complet",
+    "legalNameEntity": "Denumirea oficială",
+    "idNumberIndividual": "IDNP",
+    "idNumberEntity": "IDNO",
+    "legalAddressIndividual": "Domiciliu",
+    "legalAddressEntity": "Sediu",
+    "representativeName": "Administrator sau reprezentant",
+    "readContract": "Citește contractul",
+    "hideContract": "Ascunde contractul",
+    "contractWithYourData": "Contractul de mai jos include datele tale, la final.",
+    "mustReadContract": "Deschide și parcurge contractul înainte de a semna.",
+    "contractRead": "Ai parcurs contractul",
+    "fillIdentityFirst": "Completează datele de mai sus ca să vezi contractul cu ele."
   },
   "pricing": {
     "metaTitle": "Tarife pentru furnizori",

@@ -2358,7 +2358,25 @@
       "body": "The partner and venue agreements, the marketplace rules, the fees and the review, anti-fraud and quality policies are available in Romanian and Russian at"
     },
     "indexTitle": "Legal documents",
-    "availableIn": "available in Romanian, Russian and English."
+    "availableIn": "available in Romanian, Russian and English.",
+    "identityTitle": "Your details for the contract",
+    "identityIntro": "These appear in the contract as Annex 5 — Partner details.",
+    "partnerTypeIndividual": "Individual",
+    "partnerTypeSoleTrader": "Sole trader",
+    "partnerTypeCompany": "Legal entity",
+    "legalNameIndividual": "Full legal name",
+    "legalNameEntity": "Official name",
+    "idNumberIndividual": "IDNP",
+    "idNumberEntity": "IDNO",
+    "legalAddressIndividual": "Domicile",
+    "legalAddressEntity": "Registered office",
+    "representativeName": "Administrator or representative",
+    "readContract": "Read the contract",
+    "hideContract": "Hide the contract",
+    "contractWithYourData": "The contract below includes your details, at the end.",
+    "mustReadContract": "Open and read through the contract before signing.",
+    "contractRead": "You have read through the contract",
+    "fillIdentityFirst": "Fill in the details above to see the contract with them."
   },
   "pricing": {
     "metaTitle": "Vendor pricing",

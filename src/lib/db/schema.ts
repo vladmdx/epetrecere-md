@@ -1015,7 +1015,19 @@ export const legalAcceptances = pgTable(
     signatureImage: text("signature_image"),
     representativeRole: text("representative_role"),
 
-    acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
+      /** Which §5 subsection governs this partner: individual | sole_trader |
+   *  company. Decides which of the fields below the contract requires. */
+  partnerType: text("partner_type"),
+  /** Official name of the bound party — the person's full legal name, or the
+   *  registered name of the sole trader or company. */
+  legalName: text("legal_name"),
+  /** IDNP for an individual, IDNO for a sole trader or a company. */
+  idNumber: text("id_number"),
+  /** Registered address / domicile, as it appears in the contract. */
+  legalAddress: text("legal_address"),
+  /** Who signs on behalf of the entity, when that is not the partner. */
+  representativeName: text("representative_name"),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
     ipAddress: text("ip_address"),
     userAgent: text("user_agent"),
     email: text("email"),

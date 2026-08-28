@@ -248,6 +248,7 @@ export default function VenueOnboardingPage() {
             signatureName: signature.signatureName,
             signatureImage: signature.signatureImage,
             documents: signature.documents,
+            identity: signature.identity,
             locale: document.documentElement.lang || "ro",
           }),
         });

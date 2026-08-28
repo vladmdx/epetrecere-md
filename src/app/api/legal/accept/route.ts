@@ -96,6 +96,32 @@ export async function POST(req: NextRequest) {
     representativeRole?: string;
     locale?: string;
     documents?: string[];
+    /** The party details shown in the contract's Annex 5. Frozen onto the
+     *  acceptance row so the signed document stays reproducible exactly as
+     *  it was on screen. */
+    identity?: {
+      partnerType?: "individual" | "sole_trader" | "company";
+      legalName?: string;
+      idNumber?: string | null;
+      legalAddress?: string | null;
+      representativeName?: string | null;
+    };
+  };
+
+  // Trimmed and length-capped: these get printed into a contract, so an
+  // over-long value is either a mistake or an attempt to stuff the row.
+  const cap = (v: unknown, n: number) =>
+    typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null;
+  const identity = {
+    partnerType: ["individual", "sole_trader", "company"].includes(
+      body.identity?.partnerType ?? "",
+    )
+      ? (body.identity!.partnerType as string)
+      : null,
+    legalName: cap(body.identity?.legalName, 200),
+    idNumber: cap(body.identity?.idNumber, 40),
+    legalAddress: cap(body.identity?.legalAddress, 300),
+    representativeName: cap(body.identity?.representativeName, 200),
   };
 
   const subjectType = body.subjectType === "venue" ? "venue" : "artist";
@@ -185,6 +211,11 @@ export async function POST(req: NextRequest) {
         signatureName,
         signatureImage,
         representativeRole: body.representativeRole ?? null,
+        partnerType: identity.partnerType,
+        legalName: identity.legalName,
+        idNumber: identity.idNumber,
+        legalAddress: identity.legalAddress,
+        representativeName: identity.representativeName,
         ipAddress: ip,
         userAgent: ua,
         email: u.email,

@@ -2358,7 +2358,25 @@
       "body": "Соглашения для партнёров и локаций, правила маркетплейса, тарифы и политики отзывов, антифрода и качества доступны на румынском и русском языке в разделе"
     },
     "indexTitle": "Правовые документы",
-    "availableIn": "доступно на румынском, русском и английском."
+    "availableIn": "доступно на румынском, русском и английском.",
+    "identityTitle": "Ваши данные для договора",
+    "identityIntro": "Они появятся в договоре как Приложение 5 — Реквизиты Партнёра.",
+    "partnerTypeIndividual": "Физическое лицо",
+    "partnerTypeSoleTrader": "Индивидуальный предприниматель",
+    "partnerTypeCompany": "Юридическое лицо",
+    "legalNameIndividual": "Полное имя",
+    "legalNameEntity": "Официальное наименование",
+    "idNumberIndividual": "IDNP",
+    "idNumberEntity": "IDNO",
+    "legalAddressIndividual": "Место жительства",
+    "legalAddressEntity": "Юридический адрес",
+    "representativeName": "Администратор или представитель",
+    "readContract": "Прочитать договор",
+    "hideContract": "Скрыть договор",
+    "contractWithYourData": "Договор ниже включает ваши данные, в конце.",
+    "mustReadContract": "Откройте и просмотрите договор перед подписанием.",
+    "contractRead": "Вы просмотрели договор",
+    "fillIdentityFirst": "Заполните данные выше, чтобы увидеть договор с ними."
   },
   "pricing": {
     "metaTitle": "Тарифы для поставщиков",
