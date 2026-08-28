@@ -5062,7 +5062,16 @@
       "subjectVenue": "Sală",
       "subtitle": "Acceptările electronice ale furnizorilor, cu fixarea tehnică cerută de Anexa 2. Înregistrările nu pot fi modificate sau șterse.",
       "technical": "Fixare tehnică",
-      "title": "Contracte semnate"
+      "title": "Contracte semnate",
+      "partnerDetails": "Rechizitele Partenerului",
+      "partnerType": "Calitatea",
+      "partnerType_individual": "Persoană fizică",
+      "partnerType_sole_trader": "Întreprinzător individual",
+      "partnerType_company": "Persoană juridică",
+      "legalName": "Denumire",
+      "idNumber": "IDNO / IDNP",
+      "legalAddress": "Sediu / Domiciliu",
+      "representative": "Reprezentant"
     },
     "crm": {
       "allStatuses": "Toate statusurile",

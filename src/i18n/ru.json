@@ -5062,7 +5062,16 @@
       "subjectVenue": "Зал",
       "subtitle": "Электронные акцепты поставщиков с технической фиксацией, требуемой Приложением 2. Записи нельзя изменить или удалить.",
       "technical": "Техническая фиксация",
-      "title": "Подписанные договоры"
+      "title": "Подписанные договоры",
+      "partnerDetails": "Реквизиты Партнёра",
+      "partnerType": "Статус",
+      "partnerType_individual": "Физическое лицо",
+      "partnerType_sole_trader": "Индивидуальный предприниматель",
+      "partnerType_company": "Юридическое лицо",
+      "legalName": "Наименование",
+      "idNumber": "IDNO / IDNP",
+      "legalAddress": "Адрес",
+      "representative": "Представитель"
     },
     "crm": {
       "allStatuses": "Все статусы",

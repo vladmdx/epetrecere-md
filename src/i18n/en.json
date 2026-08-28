@@ -5062,7 +5062,16 @@
       "subjectVenue": "Venue",
       "subtitle": "The vendors' electronic acceptances, with the technical record required by Annex 2. The entries cannot be modified or deleted.",
       "technical": "Technical record",
-      "title": "Signed contracts"
+      "title": "Signed contracts",
+      "partnerDetails": "Partner details",
+      "partnerType": "Status",
+      "partnerType_individual": "Individual",
+      "partnerType_sole_trader": "Sole trader",
+      "partnerType_company": "Legal entity",
+      "legalName": "Legal name",
+      "idNumber": "IDNO / IDNP",
+      "legalAddress": "Address",
+      "representative": "Representative"
     },
     "crm": {
       "allStatuses": "All statuses",

@@ -44,6 +44,11 @@ export default async function AdminContractsPage({
       signatureName: legalAcceptances.signatureName,
       signatureImage: legalAcceptances.signatureImage,
       representativeRole: legalAcceptances.representativeRole,
+      partnerType: legalAcceptances.partnerType,
+      legalName: legalAcceptances.legalName,
+      idNumber: legalAcceptances.idNumber,
+      legalAddress: legalAcceptances.legalAddress,
+      representativeName: legalAcceptances.representativeName,
       acceptedAt: legalAcceptances.acceptedAt,
       ipAddress: legalAcceptances.ipAddress,
       userAgent: legalAcceptances.userAgent,
@@ -206,6 +211,56 @@ export default async function AdminContractsPage({
                           );
                         })}
                       </ul>
+
+                      {/* The other party, as it appears in the contract's
+                          Annex 5. Frozen with the signature, so this is what
+                          was on screen when they signed — not whatever the
+                          profile says today. */}
+                      {g.legalName && (
+                        <div className="mt-3 rounded-lg border border-gold/25 bg-gold/[0.04] p-3">
+                          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            {t("adminUi.contracts.partnerDetails", locale)}
+                          </p>
+                          <dl className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                            {(
+                              [
+                                [
+                                  t("adminUi.contracts.partnerType", locale),
+                                  g.partnerType
+                                    ? t(
+                                        `adminUi.contracts.partnerType_${g.partnerType}`,
+                                        locale,
+                                      )
+                                    : null,
+                                ],
+                                [
+                                  t("adminUi.contracts.legalName", locale),
+                                  g.legalName,
+                                ],
+                                [
+                                  t("adminUi.contracts.idNumber", locale),
+                                  g.idNumber,
+                                ],
+                                [
+                                  t("adminUi.contracts.legalAddress", locale),
+                                  g.legalAddress,
+                                ],
+                                [
+                                  t("adminUi.contracts.representative", locale),
+                                  g.representativeName,
+                                ],
+                              ] as Array<[string, string | null]>
+                            )
+                              .filter(([, v]) => !!v)
+                              .map(([k, v]) => (
+                                <div key={k} className="flex gap-2">
+                                  <dt className="shrink-0">{k}</dt>
+                                  <dd className="text-foreground/80">{v}</dd>
+                                </div>
+                              ))}
+                          </dl>
+                        </div>
+                      )}
 
                       <div className="mt-3 rounded-lg border border-border/50 bg-muted/30 p-3">
                         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
