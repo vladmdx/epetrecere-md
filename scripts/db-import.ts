@@ -47,7 +47,7 @@ const manifest: Manifest = JSON.parse(
 
 
 async function main() {
-  const sql = postgres(url!, { ssl: "require", max: 1, onnotice: () => {} });
+  const sql = postgres(url!, { ssl: "require", max: 1, onnotice: () => {}, prepare: false });
   try {
     const existing = await sql`
       SELECT count(*)::int AS n FROM information_schema.tables

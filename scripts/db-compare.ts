@@ -115,8 +115,8 @@ const QUERIES: { label: string; sql: string; key: (r: Row) => string }[] = [
 ];
 
 async function main() {
-  const src = postgres(sourceUrl!, { ssl: "require", max: 1, onnotice: () => {} });
-  const tgt = postgres(targetUrl!, { ssl: "require", max: 1, onnotice: () => {} });
+  const src = postgres(sourceUrl!, { ssl: "require", max: 1, onnotice: () => {}, prepare: false });
+  const tgt = postgres(targetUrl!, { ssl: "require", max: 1, onnotice: () => {}, prepare: false });
   try {
     for (const { label, sql: text, key } of QUERIES) {
       const [a, b] = await Promise.all([src.unsafe(text), tgt.unsafe(text)]);
