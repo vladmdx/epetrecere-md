@@ -123,7 +123,7 @@ export function AdminSidebar() {
           <Link href="/admin" className="flex items-center gap-2">
             <BrandMark className="h-6 w-6" />
             <span className="font-heading text-lg font-bold">
-              e<span className="text-gold">P</span> Admin
+              Admin
             </span>
           </Link>
         )}
@@ -193,7 +193,7 @@ export function AdminSidebar() {
               >
                 <BrandMark className="h-6 w-6" />
                 <span className="font-heading text-lg font-bold">
-                  e<span className="text-gold">P</span> Admin
+                  Admin
                 </span>
               </Link>
               <button

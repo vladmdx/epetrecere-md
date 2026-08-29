@@ -147,7 +147,7 @@ export function VendorSidebar() {
           <Link href="/dashboard" className="flex items-center gap-2">
             <BrandMark className="h-6 w-6" />
             <span className="font-heading text-lg font-bold">
-              e<span className="text-gold">P</span> {roleLabel}
+              {roleLabel}
             </span>
           </Link>
         </div>
@@ -194,7 +194,7 @@ export function VendorSidebar() {
               >
                 <BrandMark className="h-6 w-6" />
                 <span className="font-heading text-lg font-bold">
-                  e<span className="text-gold">P</span> {roleLabel}
+                  {roleLabel}
                 </span>
               </Link>
               <button
