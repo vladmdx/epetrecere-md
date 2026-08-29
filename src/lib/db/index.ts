@@ -32,24 +32,26 @@ function createDb(): Db {
 
   if (isNeon(url)) return drizzleNeon(neon(url), { schema });
 
-  // A build is not a serverless request and must not be sized like one.
-  // `next build` is a single long-lived process rendering 1500+ pages, and it
-  // gives each one 60 seconds; with a single socket every query on a page
-  // queues behind the last, which across an ocean is enough to blow that
-  // budget — it took four production deploys down before this was found.
-  // At runtime the reasoning is unchanged: one socket per serverless
-  // instance, because the pooler is what multiplexes and stacking a local
-  // pool on top of it only moves the exhaustion problem.
-  const isBuild = process.env.NEXT_PHASE === "phase-production-build";
-
+  // Two sockets, and no more — during a build as much as at runtime.
+  //
+  // Raising this to 8 for builds seemed obvious and made things worse: Next.js
+  // forks a worker per core and each one opens its own pool, so 8 became 16 or
+  // 32 against a plan whose pooler allows 15. Past that, `postgres` does not
+  // fail — it waits. A page then hangs rather than erroring, which is how
+  // /servicii sat for five full minutes on a query that takes 71ms.
+  //
+  // The queries were never the problem. Measured against production: 71ms for
+  // the per-category counts, 79ms for the bookings tally, on tables of 10 and
+  // 29 rows. Contention was the problem, and the cure for contention is not
+  // more connections.
   const client = postgres(url, {
     ssl: "require",
     prepare: false,
-    max: isBuild ? 8 : 1,
+    max: 2,
     idle_timeout: 20,
-    // The smallest Supabase instance can take seconds just to hand over a
+    // The smallest instance can take a couple of seconds simply to hand over a
     // connection; 10s left no room for that before the first query even ran.
-    connect_timeout: isBuild ? 30 : 15,
+    connect_timeout: 20,
   });
   // The two drivers expose the same query surface; the driver-specific halves
   // of the type are not used anywhere in this codebase.

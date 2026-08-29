@@ -9,6 +9,7 @@
  */
 
 import { and, eq, sql } from "drizzle-orm";
+import { withTimeout } from "@/lib/db/with-timeout";
 import { db } from "@/lib/db";
 import { artists, venues, categories, bookingRequests, users } from "@/lib/db/schema";
 
@@ -46,7 +47,12 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
   };
 
   try {
-    const [[artistRow], [venueRow], [catRow], [reqRow]] = await Promise.all([
+    // Bounded. Every caller already renders without these numbers, so a slow
+    // or contended database should cost a counter, never a page — and never a
+    // deploy. Waiting is the failure mode that actually happens here: the
+    // driver queues rather than erroring once the pooler is full.
+    const [[artistRow], [venueRow], [catRow], [reqRow]] = await withTimeout(
+      Promise.all([
       db
         .select({ n: sql<number>`count(*)::int` })
         .from(artists)
@@ -67,13 +73,15 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
           sql`${bookingRequests.status} in ('completed','confirmed_by_client')
               and (${users.email} is null or ${users.email} !~* '(test|qa|demo|e2e)')`,
         ),
-    ]);
+    ]),
+    );
 
     // One grouped statement for every tile. This used to be a loop that
     // awaited a separate count per tile — five more strictly serial
     // round-trips to Frankfurt on every homepage render, which was the
     // single longest stretch of the critical path.
-    const perCategory = await db
+    const perCategory = await withTimeout(
+      db
       .select({
         slug: categories.slug,
         n: sql<number>`count(${artists.id})::int`,
@@ -86,7 +94,8 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
           sql`${categories.id} = ANY(${artists.categoryIds})`,
         ),
       )
-      .groupBy(categories.slug);
+      .groupBy(categories.slug),
+    );
 
     const countBySlug = new Map(perCategory.map((r) => [r.slug, r.n]));
     const result: Record<string, number> = {};
