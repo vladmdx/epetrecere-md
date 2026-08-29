@@ -1,6 +1,22 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  /**
+   * Next.js allows a statically generated page 60 seconds by default, retries
+   * three times, then fails the whole export. That budget assumes the database
+   * is near the builder. Ours is not: Vercel builds this project in Washington
+   * — the region is fixed on the current plan — while the database sits in
+   * Frankfurt, so every query pays a transatlantic round trip. Four production
+   * deploys died that way, each on a different page as the previous one was
+   * made faster.
+   *
+   * Raising the ceiling does not paper over a hang: the pages still finish,
+   * they simply need more than a minute from that distance. The runtime side
+   * is being fixed properly by moving the functions to Frankfurt, next to the
+   * data; this is what keeps the build honest until the build region can
+   * follow them.
+   */
+  staticPageGenerationTimeout: 300,
   eslint: {
     ignoreDuringBuilds: true,
   },
