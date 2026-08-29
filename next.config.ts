@@ -65,6 +65,26 @@ const nextConfig: NextConfig = {
   // M11 Intern #2 — tree-shake big icon libraries so Turbopack doesn't ship
   // the whole catalog to the client bundle.
   experimental: {
+    /**
+     * One static-generation worker, not one per core.
+     *
+     * The page that fails has moved every build — /ro, then /servicii, then
+     * /ro and /planifica — which is the signature of contention rather than of
+     * any one slow page. The queries themselves measure 71ms and 79ms against
+     * production.
+     *
+     * What changed is the driver. Neon was reached over HTTP: every query a
+     * stateless request, no sockets held, so parallel workers could not
+     * contend for anything. Supabase speaks the ordinary wire protocol, so the
+     * workers now share a connection pool — and when it is exhausted the
+     * driver waits instead of failing, which turns into a page that never
+     * finishes rather than one that errors.
+     *
+     * Serialising generation removes the variable outright. It costs build
+     * time, which is spent once per deploy, and buys back deploys that
+     * complete, which had stopped happening.
+     */
+    cpus: 1,
     optimizePackageImports: [
       "lucide-react",
       "@radix-ui/react-icons",
