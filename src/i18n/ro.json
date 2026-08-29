@@ -341,7 +341,7 @@
       "title": "Alege",
       "accent": "data și locația evenimentului",
       "desc": "Spune-ne când și unde va avea loc evenimentul pentru a-ți recomanda opțiuni potrivite.",
-      "cityHint": "Chișinău + Top 5 orașe sunt primele, restul în ordine alfabetică.",
+      "cityHint": "Orașul în care va avea loc evenimentul.",
       "startTime": "Ora începerii",
       "duration": "Durata (ore)",
       "interval": "Interval eveniment:",
@@ -461,14 +461,14 @@
     "blogTips": "Blog & Sfaturi",
     "register": "Înregistrează-te",
     "howItWorks": "Cum funcționează",
-    "subscription": "Abonament",
     "resources": "Resurse pentru furnizori",
     "promote": "Promovează-te",
     "about": "Despre noi",
     "faq": "Întrebări frecvente",
     "newsletterDesc": "Primește inspirație și oferte exclusive pentru evenimentul tău.",
     "emailPlaceholder": "Email-ul tău",
-    "legalDocs": "Documente legale"
+    "legalDocs": "Documente legale",
+    "tariffs": "Tarife"
   },
   "admin": {
     "dashboard": "Panou de Control",

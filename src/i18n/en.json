@@ -341,7 +341,7 @@
       "title": "Choose",
       "accent": "the event date and location",
       "desc": "Tell us when and where the event will take place to recommend suitable options.",
-      "cityHint": "Chișinău + Top 5 cities are first, the rest in alphabetical order.",
+      "cityHint": "The city where the event will take place.",
       "startTime": "Start time",
       "duration": "Duration (hours)",
       "interval": "Event interval:",
@@ -461,14 +461,14 @@
     "blogTips": "Blog & Tips",
     "register": "Sign up",
     "howItWorks": "How it works",
-    "subscription": "Subscription",
     "resources": "Vendor resources",
     "promote": "Promote yourself",
     "about": "About us",
     "faq": "FAQ",
     "newsletterDesc": "Get inspiration and exclusive offers for your event.",
     "emailPlaceholder": "Your email",
-    "legalDocs": "Legal documents"
+    "legalDocs": "Legal documents",
+    "tariffs": "Tariffs"
   },
   "admin": {
     "dashboard": "Dashboard",

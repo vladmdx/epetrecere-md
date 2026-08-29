@@ -23,7 +23,11 @@ const COLUMNS: { title: string; links: { key: string; href: string }[] }[] = [
     links: [
       { key: "footer.register", href: "/sign-up" },
       { key: "footer.howItWorks", href: "/#cum-functioneaza" },
-      { key: "footer.subscription", href: "/pachete" },
+      // The page this points at is titled "Tarife pentru furnizori" and its
+      // first line is that there is no subscription fee — only a 5% commission
+      // on confirmed orders. Calling the link "Abonament" told partners the
+      // opposite of what they would read on arrival.
+      { key: "footer.tariffs", href: "/pachete" },
       { key: "footer.resources", href: "/blog" },
       { key: "footer.promote", href: "/contact" },
     ],
