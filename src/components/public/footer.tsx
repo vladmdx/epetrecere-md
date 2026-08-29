@@ -5,7 +5,7 @@ import { Send, Globe, Camera, Music2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
-import { BrandMark } from "@/components/public/brand-mark";
+import { BrandLogo } from "@/components/public/brand-mark";
 
 const COLUMNS: { title: string; links: { key: string; href: string }[] }[] = [
   {
@@ -63,16 +63,17 @@ export function Footer() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-gold/10 bg-[#0A0A0A]">
+    <footer className="border-t border-gold/10 bg-[#070707]">
       <div className="mx-auto max-w-7xl px-4 py-14 lg:px-8">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-5">
           {/* Brand */}
           <div className="space-y-4 lg:col-span-1">
-            <Link href="/" className="flex items-center gap-2 text-white">
-              <BrandMark className="text-[#e8bd59]" />
-              <span className="font-heading text-xl font-bold">
-                e<span className="text-gold">Petrecere</span>.md
-              </span>
+            <Link
+              href="/"
+              className="flex items-center text-white"
+              aria-label="ePetrecere.md"
+            >
+              <BrandLogo className="h-9 w-auto" />
             </Link>
             <p className="text-sm leading-relaxed text-[#9A9AAB]">
               {t("footer.tagline")}

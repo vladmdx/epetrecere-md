@@ -1,20 +1,50 @@
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 
+/**
+ * The real brand assets, replacing the hand-drawn sparkles that stood in for
+ * them until now.
+ *
+ * Both files carry the logo's own near-black (#070707) baked in — they are
+ * photographs of the mark, not transparent cut-outs — so they only sit
+ * correctly on a surface of that same colour. Every placement below is on one.
+ * Do NOT drop these onto a light background or into an email: the black
+ * rectangle will show. If a light-surface version is ever needed, it has to
+ * come from the designer as SVG or transparent PNG, not from cutting these.
+ */
+
+/** Square mark: the "e" on its rounded tile. Sidebars, avatars, app icon. */
 export function BrandMark({ className }: { className?: string }) {
   return (
-    <svg
+    <Image
+      src="/brand/icon-192.png"
+      alt=""
       aria-hidden="true"
-      viewBox="0 0 32 32"
-      className={cn("h-7 w-7", className)}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.7"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M15.8 4.2c1.4 4.8 3.2 6.6 8 8-4.8 1.4-6.6 3.2-8 8-1.4-4.8-3.2-6.6-8-8 4.8-1.4 6.6-3.2 8-8Z" />
-      <path d="M7.8 19.2c.8 2.8 1.8 3.8 4.6 4.6-2.8.8-3.8 1.8-4.6 4.6-.8-2.8-1.8-3.8-4.6-4.6 2.8-.8 3.8-1.8 4.6-4.6ZM25.2 3.6c.5 1.8 1.2 2.5 3 3-1.8.5-2.5 1.2-3 3-.5-1.8-1.2-2.5-3-3 1.8-.5 2.5-1.2 3-3Z" />
-      <circle cx="16" cy="12.3" r="1.3" />
-    </svg>
+      width={192}
+      height={192}
+      priority
+      className={cn("h-7 w-7 rounded-[22%] object-contain", className)}
+    />
+  );
+}
+
+/** Full lockup: mark plus "ePetrecere.md". Header, footer, anywhere the name
+ *  is being stated rather than merely marked. */
+export function BrandLogo({
+  className,
+  priority = false,
+}: {
+  className?: string;
+  priority?: boolean;
+}) {
+  return (
+    <Image
+      src="/brand/logo-header.png"
+      alt="ePetrecere.md"
+      width={560}
+      height={107}
+      priority={priority}
+      className={cn("h-9 w-auto object-contain", className)}
+    />
   );
 }

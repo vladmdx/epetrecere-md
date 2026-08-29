@@ -30,7 +30,7 @@ import { ChatBell } from "@/components/public/chat-bell";
 import { useLocale } from "@/hooks/use-locale";
 import { useUserRole, isClientOrGuest } from "@/hooks/use-user-role";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { BrandMark } from "@/components/public/brand-mark";
+import { BrandLogo } from "@/components/public/brand-mark";
 
 const UTILITATI_TOOLS = [
   { slug: "checklist", key: "tools.checklist", emoji: "✅" },
@@ -243,14 +243,20 @@ export function Header() {
   // facing action. Guests + clients still see it.
   const showPlannerCta = isClientOrGuest(userRole);
   return (
-    <header className={`fixed top-0 z-50 w-full transition-all duration-300 backdrop-blur-md ${scrolled ? "bg-[#0D0D0D]/90 border-b border-gold/10 shadow-lg" : "bg-[#0D0D0D]/40 border-b border-transparent"}`}>
+    // Opaque, and in the logo's own #070707. The bar used to be translucent
+    // (40% unscrolled, 90% scrolled) over a blur, which was fine for a drawn
+    // icon but not for the real logo: that file has its black baked in, so
+    // over anything see-through it reads as a black rectangle sliding across
+    // the page. Matching the colour exactly makes the edges disappear.
+    <header className={`fixed top-0 z-50 w-full bg-[#070707] transition-all duration-300 ${scrolled ? "border-b border-gold/10 shadow-lg" : "border-b border-transparent"}`}>
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex shrink-0 items-center gap-2 text-white">
-          <BrandMark className="text-[#e8bd59]" />
-          <span className="font-heading text-xl font-bold tracking-tight">
-            e<span className="text-gold">Petrecere</span>.md
-          </span>
+        <Link
+          href="/"
+          className="flex shrink-0 items-center text-white"
+          aria-label="ePetrecere.md"
+        >
+          <BrandLogo priority className="h-8 w-auto sm:h-9" />
         </Link>
 
         {/* Desktop navigation */}

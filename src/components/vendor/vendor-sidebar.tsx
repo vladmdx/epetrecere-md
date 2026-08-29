@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandMark } from "@/components/public/brand-mark";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
@@ -144,7 +145,7 @@ export function VendorSidebar() {
       <aside className="hidden lg:flex h-screen w-64 flex-col border-r border-border/40 bg-sidebar">
         <div className="flex h-16 items-center border-b border-border/40 px-4">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-gold" />
+            <BrandMark className="h-6 w-6" />
             <span className="font-heading text-lg font-bold">
               e<span className="text-gold">P</span> {roleLabel}
             </span>
@@ -191,7 +192,7 @@ export function VendorSidebar() {
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-2"
               >
-                <Sparkles className="h-5 w-5 text-gold" />
+                <BrandMark className="h-6 w-6" />
                 <span className="font-heading text-lg font-bold">
                   e<span className="text-gold">P</span> {roleLabel}
                 </span>

@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { ogLogoDataUri } from "@/lib/brand/og-logo";
 
 // Default OG image for pages that don't generate their own.
 // 1200x630 is the standard Open Graph image size.
@@ -8,6 +9,7 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 export default function OGImage() {
+  const logo = ogLogoDataUri();
   return new ImageResponse(
     (
       <div
@@ -32,17 +34,24 @@ export default function OGImage() {
             marginBottom: 24,
           }}
         />
-        <div
-          style={{
-            fontSize: 64,
-            fontWeight: 700,
-            color: "#FFFFFF",
-            letterSpacing: "-0.02em",
-            marginBottom: 8,
-          }}
-        >
-          ePetrecere.md
-        </div>
+        {/* The real lockup when it can be read off disk; the wordmark in text
+            if not, so a share card never fails to render over a missing file. */}
+        {logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logo} width={520} height={99} alt="ePetrecere.md" style={{ marginBottom: 8 }} />
+        ) : (
+          <div
+            style={{
+              fontSize: 64,
+              fontWeight: 700,
+              color: "#FFFFFF",
+              letterSpacing: "-0.02em",
+              marginBottom: 8,
+            }}
+          >
+            ePetrecere.md
+          </div>
+        )}
         <div
           style={{
             fontSize: 28,

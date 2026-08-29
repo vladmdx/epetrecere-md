@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BrandMark } from "@/components/public/brand-mark";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
@@ -120,7 +121,7 @@ export function AdminSidebar() {
       <div className="flex h-16 items-center justify-between border-b border-border/40 px-4">
         {!collapsed && (
           <Link href="/admin" className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-gold" />
+            <BrandMark className="h-6 w-6" />
             <span className="font-heading text-lg font-bold">
               e<span className="text-gold">P</span> Admin
             </span>
@@ -190,7 +191,7 @@ export function AdminSidebar() {
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-2"
               >
-                <Sparkles className="h-5 w-5 text-gold" />
+                <BrandMark className="h-6 w-6" />
                 <span className="font-heading text-lg font-bold">
                   e<span className="text-gold">P</span> Admin
                 </span>
