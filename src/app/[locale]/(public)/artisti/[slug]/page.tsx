@@ -42,13 +42,22 @@ interface Props {
  * unknown slug renders on demand and is cached from then on.
  */
 export async function generateStaticParams() {
-  const rows = await db
-    .select({ slug: artists.slug })
-    .from(artists)
-    .where(eq(artists.isActive, true));
-  return LOCALES.flatMap((locale) =>
-    rows.map((r) => ({ locale, slug: r.slug })),
-  );
+  // Deliberately empty: nothing in this route is enumerated at build time.
+  //
+  // Building every one of these up front meant 1537 pages, each opening
+  // queries against a database in another region, on a two-core builder.
+  // Whichever page happened to be rendering when the shared connection pool
+  // ran dry would wait rather than fail — postgres.js queues instead of
+  // erroring — and Next.js would eventually kill it and take the whole
+  // deploy with it. The page that died moved every attempt, which is how the
+  // contention gave itself away.
+  //
+  // `dynamicParams` defaults to true, so every slug still resolves; the page
+  // is simply rendered on its first request and then cached under the
+  // `revalidate` below, which is where all but the first visitor was already
+  // being served from. What this costs is one slow request per page after a
+  // deploy. What it buys is a build that finishes.
+  return [];
 }
 
 /** Rebuild a profile at most hourly; owners edit these rarely. */

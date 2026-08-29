@@ -44,14 +44,50 @@ function createDb(): Db {
   // the per-category counts, 79ms for the bookings tally, on tables of 10 and
   // 29 rows. Contention was the problem, and the cure for contention is not
   // more connections.
-  const client = postgres(url, {
+  /**
+   * Builds go through the session pooler, requests through the transaction
+   * pooler. Same database, different port, and the difference is decisive.
+   *
+   * Transaction mode is right for serverless: a connection is borrowed per
+   * statement and handed straight back, which is what lets hundreds of short
+   * lived instances share a small pool. A build is the opposite shape of
+   * workload — one process issuing thousands of sequential queries — and
+   * against it the transaction pooler stalls. Measured, same commit, same
+   * machine: on 6543 the build hangs partway with pages timing out after five
+   * minutes each; on 5432 it completes 460/460 with none. Neon never showed
+   * this because its HTTP driver has no pooler in the path at all.
+   *
+   * Deriving the build URL here rather than adding a second environment
+   * variable keeps one source of truth: DATABASE_URL stays the runtime value,
+   * and nobody has to remember to change two things when the password rotates.
+   */
+  const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+  const connectionUrl =
+    isBuild && url.includes(".pooler.supabase.com:6543")
+      ? url.replace(".pooler.supabase.com:6543", ".pooler.supabase.com:5432")
+      : url;
+
+  const client = postgres(connectionUrl, {
     ssl: "require",
     prepare: false,
-    max: 2,
+    max: isBuild ? 4 : 1,
     idle_timeout: 20,
-    // The smallest instance can take a couple of seconds simply to hand over a
-    // connection; 10s left no room for that before the first query even ran.
     connect_timeout: 20,
+    connection: {
+      // The database cancels its own slow queries, and this is the only kind
+      // of timeout that actually frees the connection.
+      //
+      // Racing a query against a timer in JavaScript does not: the promise is
+      // abandoned but the driver still holds the socket until the query
+      // finishes, so each expiry permanently costs a connection. Do that a
+      // few times against a small pool and every later query waits forever —
+      // which is precisely the 300-second page hangs, and they got worse as I
+      // narrowed the pool, because a smaller pool drains sooner.
+      //
+      // A server-side statement_timeout ends the query, returns an error the
+      // caller can catch, and puts the connection back.
+      statement_timeout: 20_000,
+    },
   });
   // The two drivers expose the same query surface; the driver-specific halves
   // of the type are not used anywhere in this codebase.

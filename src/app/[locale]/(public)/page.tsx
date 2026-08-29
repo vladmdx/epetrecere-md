@@ -1,5 +1,4 @@
 import { HeroSection } from "@/components/public/sections/hero";
-import { withTimeout } from "@/lib/db/with-timeout";
 import { FeatureHighlightsSection } from "@/components/public/sections/feature-highlights";
 import { CategoriesSection } from "@/components/public/sections/categories";
 import { FeaturedArtistsSection } from "@/components/public/sections/featured-artists";
@@ -77,13 +76,11 @@ export default async function HomePage() {
     // seconds; exceeding it fails the entire export, which is exactly how four
     // production deploys were lost. Everything below renders without this
     // data, so waiting indefinitely for it buys nothing and risks the build.
-    const [artists, venues, counts] = await withTimeout(
-      Promise.all([
-        getFeaturedArtists(5),
-        getFeaturedVenues(3),
-        getSupplyCounts(),
-      ]),
-    );
+    const [artists, venues, counts] = await Promise.all([
+      getFeaturedArtists(5),
+      getFeaturedVenues(3),
+      getSupplyCounts(),
+    ]);
     featuredArtists = artists;
     featuredVenues = venues;
     supply = counts;
