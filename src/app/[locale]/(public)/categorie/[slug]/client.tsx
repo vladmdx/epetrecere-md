@@ -53,6 +53,8 @@ interface Category {
   slug: string;
   priceFrom: number | null;
   seoBodyRo: string | null;
+  seoBodyRu: string | null;
+  seoBodyEn: string | null;
 }
 
 interface Props {
@@ -218,6 +220,13 @@ export function CategoryPageClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { locale, t } = useLocale();
+  // No Romanian fallback on purpose — see the render site below.
+  const seoBody =
+    locale === "ru"
+      ? category.seoBodyRu
+      : locale === "en"
+        ? category.seoBodyEn
+        : category.seoBodyRo;
   const [query, setQuery] = useState(searchQuery);
   const [city, setCity] = useState(currentCity);
   const [priceMin, setPriceMin] = useState(currentPriceMin);
@@ -486,9 +495,15 @@ export function CategoryPageClient({
               </Link>
             </div>
 
-            {category.seoBodyRo && (
+            {/* The body in the reader's own language, and nothing if it is
+                missing. Rendering the Romanian to everyone put Romanian
+                headings and paragraphs inside a Russian page — worse for the
+                reader than an absent section, and a mixed-language signal on
+                an indexed URL. An empty space says nothing; the wrong language
+                says the site is unfinished. */}
+            {seoBody && (
               <article className="mx-auto mt-12 max-w-3xl border-t border-white/8 pt-8">
-                {category.seoBodyRo.split(/\n\s*\n/).map((paragraph, index) => {
+                {seoBody.split(/\n\s*\n/).map((paragraph, index) => {
                   const value = paragraph.trim();
                   if (!value) return null;
                   if (value.startsWith("## ")) {
