@@ -32,14 +32,24 @@ function createDb(): Db {
 
   if (isNeon(url)) return drizzleNeon(neon(url), { schema });
 
+  // A build is not a serverless request and must not be sized like one.
+  // `next build` is a single long-lived process rendering 1500+ pages, and it
+  // gives each one 60 seconds; with a single socket every query on a page
+  // queues behind the last, which across an ocean is enough to blow that
+  // budget — it took four production deploys down before this was found.
+  // At runtime the reasoning is unchanged: one socket per serverless
+  // instance, because the pooler is what multiplexes and stacking a local
+  // pool on top of it only moves the exhaustion problem.
+  const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+
   const client = postgres(url, {
     ssl: "require",
     prepare: false,
-    // One socket per serverless instance. The pooler is what multiplexes;
-    // opening a local pool on top of it only moves the exhaustion problem.
-    max: 1,
+    max: isBuild ? 8 : 1,
     idle_timeout: 20,
-    connect_timeout: 10,
+    // The smallest Supabase instance can take seconds just to hand over a
+    // connection; 10s left no room for that before the first query even ran.
+    connect_timeout: isBuild ? 30 : 15,
   });
   // The two drivers expose the same query surface; the driver-specific halves
   // of the type are not used anywhere in this codebase.

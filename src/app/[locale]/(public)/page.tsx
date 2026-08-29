@@ -1,4 +1,5 @@
 import { HeroSection } from "@/components/public/sections/hero";
+import { withTimeout } from "@/lib/db/with-timeout";
 import { FeatureHighlightsSection } from "@/components/public/sections/feature-highlights";
 import { CategoriesSection } from "@/components/public/sections/categories";
 import { FeaturedArtistsSection } from "@/components/public/sections/featured-artists";
@@ -72,16 +73,23 @@ export default async function HomePage() {
   const visibleSections: string[] = defaultSectionOrder;
 
   try {
-    const [artists, venues, counts] = await Promise.all([
-      getFeaturedArtists(5),
-      getFeaturedVenues(3),
-      getSupplyCounts(),
-    ]);
+    // Bounded on purpose. Next.js allows a statically generated page 60
+    // seconds; exceeding it fails the entire export, which is exactly how four
+    // production deploys were lost. Everything below renders without this
+    // data, so waiting indefinitely for it buys nothing and risks the build.
+    const [artists, venues, counts] = await withTimeout(
+      Promise.all([
+        getFeaturedArtists(5),
+        getFeaturedVenues(3),
+        getSupplyCounts(),
+      ]),
+    );
     featuredArtists = artists;
     featuredVenues = venues;
     supply = counts;
   } catch {
-    // DB not connected — sections still render; featured lists stay empty.
+    // DB unreachable or too slow — sections still render, featured lists stay
+    // empty, and ISR fills them in on the first request after deploy.
   }
 
   // Map section type to React element
