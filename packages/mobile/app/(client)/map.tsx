@@ -1,20 +1,27 @@
 // Map view of artists + venues.
 //
-// react-native-maps with the Google provider (set via app.json
-// android.googleMapsApiKey + ios.config.googleMapsApiKey when we
-// have the API key).
+// No `provider` prop, which means each platform uses its own map: Apple Maps
+// on iOS, Google on Android (where Google is the only option and the prop is
+// a no-op anyway).
+//
+// It used to pin PROVIDER_GOOGLE on both. The note that stood here said iOS
+// would "fall back to Apple Maps" without a key — it does not; it renders
+// nothing. And `userInterfaceStyle="dark"` below is documented Apple-Maps-only,
+// so the one thing that made the map match the app's dark UI was being
+// silently ignored on the only platform that could honour it.
+//
+// Nothing here needs Google specifically: `customMapStyle` is unused, and
+// pin colours, titles and the user-location dot are supported by both. So iOS
+// gets a working dark map with no key and no billing, and Android keeps the
+// key it already has in every EAS environment.
 //
 // Markers are tinted gold for premium / muted for standard. Tap a
 // marker → bottom sheet (BottomSheet from @gorhom — we'll add it in
 // a later milestone) → quick preview + "Vezi profil" CTA.
-//
-// Note: this screen requires Google Maps API key in EAS env. Without
-// it Android renders a blank grey area but iOS uses Apple Maps as
-// fallback. We document this in README.
 
 import { useState, useMemo } from "react";
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from "react-native-maps";
+import MapView, { Marker, Region } from "react-native-maps";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin } from "lucide-react-native";
@@ -91,7 +98,6 @@ export default function MapScreen() {
   return (
     <View className="flex-1 bg-background">
       <MapView
-        provider={PROVIDER_GOOGLE}
         style={{ flex: 1 }}
         initialRegion={DEFAULT_REGION}
         showsUserLocation

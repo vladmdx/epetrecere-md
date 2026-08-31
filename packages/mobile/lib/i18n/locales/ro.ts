@@ -58,6 +58,11 @@ export default {
     agreeTerms: "Continuând, accepți Termenii și Politica de Confidențialitate.",
     termsLink: "Termenii",
     privacyLink: "Politica de Confidențialitate",
+    // Split out of agreeTerms so the two document names can be tapped. The
+    // sentence is assembled around them rather than interpolated, because
+    // the link text differs per language and has to stay translatable.
+    agreeTermsPrefix: "Continuând, accepți",
+    and: "și",
   },
 
   onboarding: {

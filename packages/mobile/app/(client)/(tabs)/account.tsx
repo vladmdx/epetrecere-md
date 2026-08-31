@@ -14,6 +14,8 @@ import {
   Globe,
   HelpCircle,
   Shield,
+  FileText,
+  Trash2,
   LogOut,
   Star,
   type LucideIcon,
@@ -106,9 +108,23 @@ export default function AccountTab() {
           onPress={() => openExternal(WEB_LINKS.contact)}
         />
         <Row
-          Icon={Shield}
-          label="Termeni & Confidențialitate"
+          Icon={FileText}
+          label="Termeni și condiții"
           onPress={() => openExternal(WEB_LINKS.terms)}
+        />
+        {/* Split from the terms row it used to share. The label promised a
+            privacy policy and opened /termeni; WEB_LINKS.privacy was defined
+            and used nowhere. Both stores require the policy to be reachable
+            from inside the app, and it has to be the policy. */}
+        <Row
+          Icon={Shield}
+          label="Politica de confidențialitate"
+          onPress={() => openExternal(WEB_LINKS.privacy)}
+        />
+        <Row
+          Icon={Trash2}
+          label="Șterge contul"
+          onPress={() => router.push("/delete-account")}
         />
       </Section>
 

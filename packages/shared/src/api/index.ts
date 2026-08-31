@@ -172,6 +172,10 @@ export const API_PATHS = {
   myArtist: "/me/artist",
   myVenue: "/me/venue",
 
+  // Your own account — leaving with your data, and erasing it.
+  dataExport: "/me/data-export",
+  deleteAccount: "/me/delete-account",
+
   // Legal pack — reading the contract and signing it. Registration is only
   // allowed after a signature exists, so these come before registerArtist.
   legalDocuments: "/legal/documents",

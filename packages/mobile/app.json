@@ -13,7 +13,9 @@
       "resizeMode": "contain",
       "backgroundColor": "#0D0D0D"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "md.epetrecere.app",
@@ -33,7 +35,8 @@
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0D0D0D"
+        "backgroundColor": "#0D0D0D",
+        "monochromeImage": "./assets/adaptive-icon-monochrome.png"
       },
       "permissions": [
         "android.permission.CAMERA",
@@ -49,8 +52,16 @@
       "intentFilters": [
         {
           "action": "VIEW",
-          "data": [{ "scheme": "https", "host": "epetrecere.md" }],
-          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "epetrecere.md"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
           "autoVerify": true
         }
       ]

@@ -52,6 +52,8 @@ export default {
     agreeTerms: "By continuing, you agree to the Terms and Privacy Policy.",
     termsLink: "Terms",
     privacyLink: "Privacy Policy",
+    agreeTermsPrefix: "By continuing, you agree to the",
+    and: "and",
   },
 
   onboarding: {

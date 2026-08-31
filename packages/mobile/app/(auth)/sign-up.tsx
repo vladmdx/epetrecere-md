@@ -16,6 +16,7 @@ import { Eye, EyeOff } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
 import { Button, Input, SafeScreen } from "../../components/ui";
 import { colors } from "../../constants/theme";
+import { openExternal, WEB_LINKS } from "../../lib/links";
 
 export default function SignUp() {
   const { t } = useTranslation();
@@ -170,8 +171,27 @@ export default function SignUp() {
                 {errors.general}
               </Text>
             )}
+            {/* The consent line used to be one flat Text: it asserted the
+                user accepts two documents and gave no way to open either.
+                Both stores expect the policy to be reachable at the moment
+                consent is given, not only from a settings tab — and the link
+                labels were already translated and referenced nowhere. */}
             <Text className="mt-2 text-center text-[11px] leading-4 text-muted-foreground">
-              {t("auth.agreeTerms")}
+              {t("auth.agreeTermsPrefix")}{" "}
+              <Text
+                className="text-gold underline"
+                onPress={() => openExternal(WEB_LINKS.terms)}
+              >
+                {t("auth.termsLink")}
+              </Text>{" "}
+              {t("auth.and")}{" "}
+              <Text
+                className="text-gold underline"
+                onPress={() => openExternal(WEB_LINKS.privacy)}
+              >
+                {t("auth.privacyLink")}
+              </Text>
+              .
             </Text>
             <Button
               onPress={handleSignUp}

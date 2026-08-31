@@ -67,3 +67,10 @@ packages/mobile/build-*.ipa
 *\ 2.mjs
 *\ 2.json
 *\ 2.md
+
+# iCloud duplicates. Syncing this repo from iCloud Drive periodically leaves
+# "<name> 2.ext" copies next to the originals — byte-identical, invisible in
+# an editor's file tree, and picked up by `git add -A`. Several were committed
+# that way before this rule existed.
+*\ 2.*
+*\ 3.*

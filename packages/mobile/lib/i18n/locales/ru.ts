@@ -52,6 +52,8 @@ export default {
     agreeTerms: "Продолжая, вы принимаете Условия и Политику конфиденциальности.",
     termsLink: "Условия",
     privacyLink: "Политика конфиденциальности",
+    agreeTermsPrefix: "Продолжая, вы принимаете",
+    and: "и",
   },
 
   onboarding: {
