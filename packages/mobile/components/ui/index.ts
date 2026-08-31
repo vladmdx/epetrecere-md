@@ -5,6 +5,9 @@ export { Avatar } from "./Avatar";
 export { Badge, type BadgeTone } from "./Badge";
 export { Button } from "./Button";
 export { Card } from "./Card";
+// plan/new.tsx imports this from the barrel; without the line here the screen
+// resolves it to undefined at runtime and typecheck fails outright.
+export { CalendarPicker } from "./CalendarPicker";
 export { Input } from "./Input";
 export { ProgressBar } from "./ProgressBar";
 export { SafeScreen } from "./SafeScreen";
