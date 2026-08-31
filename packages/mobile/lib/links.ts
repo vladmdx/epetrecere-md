@@ -5,7 +5,6 @@
 // every environment (prod / preview) instead of being hardcoded.
 
 import * as WebBrowser from "expo-web-browser";
-import i18n from "./i18n";
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? "https://epetrecere.md/api/v1";
 export const WEB_BASE = API.replace(/\/api\/v1\/?$/, "") || "https://epetrecere.md";
@@ -29,7 +28,17 @@ export const WEB_LINKS = {
  * unreachable from the app.
  */
 export function localizedPath(path: string): string {
-  const lang = (i18n.language || "ro").slice(0, 2);
+  // Required lazily rather than imported at the top. This module is a leaf
+  // helper pulled in by many screens; a top-level import would drag the whole
+  // i18n module and its three locale files into each of them, and run i18n's
+  // initialisation at whatever moment the first of those screens happens to
+  // load. Reading the language at call time is all this needs.
+  let lang = "ro";
+  try {
+    lang = ((require("./i18n").default?.language as string) || "ro").slice(0, 2);
+  } catch {
+    // i18n not ready yet — Romanian is the site's unprefixed default.
+  }
   return lang === "ru" || lang === "en" ? `/${lang}${path}` : path;
 }
 

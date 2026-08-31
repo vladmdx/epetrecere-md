@@ -90,14 +90,22 @@ export const Button = forwardRef<React.ElementRef<typeof Pressable>, Props>(
     },
     ref,
   ) {
-    const pressed = useSharedValue(0);
-    const animatedStyle = useAnimatedStyle(() => ({
-      transform: [{ scale: 1 - pressed.value * 0.05 }],
-      opacity: 1 - pressed.value * 0.12,
-    }));
-
     const sizeCfg = SIZES[size];
     const isDisabled = disabled || loading;
+
+    const pressed = useSharedValue(0);
+    const animatedStyle = useAnimatedStyle(
+      () => ({
+        transform: [{ scale: 1 - pressed.value * 0.05 }],
+        // The dimming for a disabled button belongs HERE, not in a class.
+        // It used to be `isDisabled && "opacity-50"` on className, which this
+        // inline style silently overrode — so every disabled button in the app
+        // rendered at full strength. A person tapped a bright gold button that
+        // did nothing and had no way to tell why.
+        opacity: (isDisabled ? 0.5 : 1) - pressed.value * 0.12,
+      }),
+      [isDisabled],
+    );
 
     return (
       <AnimatedPressable
@@ -128,7 +136,6 @@ export const Button = forwardRef<React.ElementRef<typeof Pressable>, Props>(
           sizeCfg.container,
           CONTAINER_BY_VARIANT[variant],
           fullWidth && "w-full",
-          isDisabled && "opacity-50",
         )}
         {...rest}
       >

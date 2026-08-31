@@ -30,8 +30,18 @@ const MIN_POINTS = 12;
 
 export const SignaturePad = forwardRef<
   SignaturePadHandle,
-  { height?: number; onChange?: (hasSignature: boolean) => void }
->(function SignaturePad({ height = 190, onChange }, ref) {
+  {
+    height?: number;
+    onChange?: (hasSignature: boolean) => void;
+    /**
+     * Fires true while a stroke is in progress. The parent uses it to turn
+     * off its ScrollView: the responder flags below help, but a native
+     * ScrollView pan can still take the gesture, and the only reliable way
+     * to draw inside one is to stop it scrolling while the finger is down.
+     */
+    onDrawingChange?: (drawing: boolean) => void;
+  }
+>(function SignaturePad({ height = 190, onChange, onDrawingChange }, ref) {
   const svgRef = useRef<Svg>(null);
   const [paths, setPaths] = useState<string[]>([]);
   const current = useRef<string>("");
@@ -42,12 +52,27 @@ export const SignaturePad = forwardRef<
   // callback — the same mistake that made the web pad wipe itself.
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onDrawingRef = useRef(onDrawingChange);
+  onDrawingRef.current = onDrawingChange;
 
   const responder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      // The pad lives inside the registration form's ScrollView, and without
+      // these three the ScrollView wins: it claims the gesture a few pixels
+      // into a stroke, so the page slides away under the finger and the
+      // signature arrives in fragments. Verified on a simulator — a slow,
+      // deliberate signature (which is how people actually sign) broke after
+      // the first centimetre while the form scrolled.
+      //
+      // Capture phase beats the parent to the gesture; refusing termination
+      // stops it being taken back mid-stroke.
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
+      onPanResponderTerminationRequest: () => false,
       onPanResponderGrant: (e) => {
+        onDrawingRef.current?.(true);
         const { locationX, locationY } = e.nativeEvent;
         current.current = `M${locationX.toFixed(1)},${locationY.toFixed(1)}`;
         pointCount.current += 1;
@@ -67,6 +92,14 @@ export const SignaturePad = forwardRef<
         setPaths((prev) => [...prev, current.current]);
       },
       onPanResponderRelease: () => {
+        onDrawingRef.current?.(false);
+        onChangeRef.current?.(pointCount.current >= MIN_POINTS);
+      },
+      // If the system takes the gesture anyway (an incoming call, a system
+      // sheet), keep what was drawn rather than leaving a half-stroke that
+      // never counts.
+      onPanResponderTerminate: () => {
+        onDrawingRef.current?.(false);
         onChangeRef.current?.(pointCount.current >= MIN_POINTS);
       },
     }),

@@ -14,7 +14,11 @@ export default function PartnerLayout() {
       }}
     >
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="booking/[id]" />
+      {/* The file is booking/[id]/index.tsx, so the route is
+          "booking/[id]/index". Naming it "booking/[id]" matched nothing and
+          expo-router warned on every render while these options went
+          unapplied. */}
+      <Stack.Screen name="booking/[id]/index" />
       <Stack.Screen
         name="booking/[id]/accept"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}

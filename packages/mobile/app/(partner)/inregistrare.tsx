@@ -122,6 +122,7 @@ export default function InregistrareArtistScreen() {
   const [signatureName, setSignatureName] = useState("");
   const [readAll, setReadAll] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  const [signing, setSigning] = useState(false);
   const padRef = useRef<SignaturePadHandle>(null);
 
   const step3Ok =
@@ -297,6 +298,11 @@ export default function InregistrareArtistScreen() {
           gap: 14,
         }}
         keyboardShouldPersistTaps="handled"
+        // Held still while a signature is being drawn. Without this the form
+        // scrolls out from under the finger a centimetre into the stroke and
+        // the signature arrives in fragments — seen on a simulator, and worse
+        // with a real finger, which moves more slowly than an injected drag.
+        scrollEnabled={!signing}
       >
         {step === 0 && (
           <>
@@ -581,7 +587,11 @@ export default function InregistrareArtistScreen() {
 
             <View style={{ gap: 8 }}>
               <Label>Semnătura</Label>
-              <SignaturePad ref={padRef} onChange={setHasSignature} />
+              <SignaturePad
+                ref={padRef}
+                onChange={setHasSignature}
+                onDrawingChange={setSigning}
+              />
             </View>
 
             <Button
