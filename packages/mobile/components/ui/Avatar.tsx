@@ -5,6 +5,7 @@
 // transparent BlurHash support if we ever ship LQIP placeholders.
 
 import { Image } from "expo-image";
+import { mediaUrl } from "../../lib/links";
 import { View, Text } from "react-native";
 import { initials as toInitials } from "@epetrecere/shared/utils";
 import { cn } from "../../lib/cn";
@@ -30,6 +31,9 @@ export function Avatar({
   sizeClass = "h-12 w-12",
   ring = "none",
 }: Props) {
+  // The API hands back site-relative paths, which have no meaning to a phone.
+  const resolved = mediaUrl(uri);
+
   return (
     <View
       accessibilityRole="image"
@@ -40,13 +44,13 @@ export function Avatar({
         RING[ring],
       )}
     >
-      {uri ? (
+      {resolved ? (
         <Image
-          source={{ uri }}
+          source={{ uri: resolved }}
           style={{ width: "100%", height: "100%" }}
           contentFit="cover"
           transition={150}
-          recyclingKey={uri}
+          recyclingKey={resolved}
         />
       ) : (
         <Text className="font-heading text-[14px] font-bold text-gold">

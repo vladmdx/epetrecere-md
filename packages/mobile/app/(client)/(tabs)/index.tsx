@@ -17,9 +17,15 @@ import { View, Text, ScrollView, Pressable } from "react-native";
 import {  useRouter } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Sparkles, ArrowRight } from "lucide-react-native";
+import { Search, ClipboardList, ArrowRight } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
-import { SafeScreen, Card, Avatar, Badge } from "../../../components/ui";
+import {
+  SafeScreen,
+  Card,
+  Avatar,
+  Badge,
+  ServiceIcon,
+} from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { publicApi } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
@@ -64,11 +70,16 @@ export default function HomeScreen() {
   });
 
   const featuredQuery = useQuery({
-    queryKey: ["artists", "featured"],
+    // Keyed by what is actually requested. The cache is persisted to disk, so
+    // leaving the old key would have served yesterday's empty answer to every
+    // existing install even after the request changed.
+    queryKey: ["artists", "showcase"],
     queryFn: async () => {
       const res = await publicApi.get<{ items: ArtistCardData[] }>(
         API_PATHS.artists,
-        { query: { featured: 1, limit: 10 } },
+        // showcase, not featured: `featured=1` is a plain filter on a flag
+        // nothing carries, so this section rendered its heading over nothing.
+        { query: { showcase: 1, limit: 10 } },
       );
       return res.data?.items ?? [];
     },
@@ -124,7 +135,10 @@ export default function HomeScreen() {
                 className="w-[88px] items-center gap-2"
               >
                 <View className="h-16 w-16 items-center justify-center rounded-2xl border border-border bg-card">
-                  <Sparkles size={24} color={colors.gold} />
+                  {/* The category's own drawing, the same one the website
+                      uses. Every tile used to be a Sparkles glyph, so a DJ, a
+                      photographer and a fire show looked identical. */}
+                  <ServiceIcon slug={cat.slug} size={26} color={colors.gold} />
                 </View>
                 <Text
                   numberOfLines={2}
@@ -175,7 +189,9 @@ export default function HomeScreen() {
       >
         <View className="flex-row items-center gap-4 p-5">
           <View className="h-14 w-14 items-center justify-center rounded-2xl bg-gold/15">
-            <Sparkles size={28} color={colors.gold} />
+            {/* The planner, not a flourish: the same ClipboardList the web
+                uses for this feature. */}
+            <ClipboardList size={28} color={colors.gold} />
           </View>
           <View className="flex-1">
             <Text className="font-heading text-[18px] font-bold text-foreground">

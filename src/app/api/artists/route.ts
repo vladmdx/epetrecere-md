@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { getArtists } from "@/lib/db/queries/artists";
+import { getArtists, getFeaturedArtists } from "@/lib/db/queries/artists";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -60,7 +60,25 @@ export async function GET(req: NextRequest) {
     limit: params.get("limit") ? Number(params.get("limit")) : 12,
   };
 
-  const result = await getArtists(filters);
+  /**
+   * `showcase=1` asks for the homepage selection rather than a filter.
+   *
+   * The app's home screen used `featured=1`, which is a plain WHERE on
+   * is_featured — and nothing in the database is flagged, so the "Artiști
+   * recomandați" section was empty for every user, always, under a heading
+   * promising content. The website never had that problem because it calls
+   * getFeaturedArtists, which falls back to top-rated and then to a random
+   * fill precisely so the section cannot come out empty.
+   *
+   * Shaped like getArtists' result so the redaction below, and every caller,
+   * treat the two identically.
+   */
+  const result = params.get("showcase") === "1"
+    ? await (async () => {
+        const items = await getFeaturedArtists(filters.limit);
+        return { items, total: items.length, page: 1, totalPages: 1 };
+      })()
+    : await getArtists(filters);
 
   // Phone and email are admin-only (clients must communicate via platform).
   // Price and socials are visible to authenticated users, hidden from anon.

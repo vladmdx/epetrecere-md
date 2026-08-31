@@ -20,3 +20,4 @@ export {
 export { StatTile, type StatTint } from "./StatTile";
 export { ComingSoon } from "./ComingSoon";
 export { ErrorState } from "./ErrorState";
+export { ServiceIcon } from "./ServiceIcon";

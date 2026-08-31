@@ -11,6 +11,7 @@
 //   7. Footer flourish
 
 import { View, Text, Pressable, ActivityIndicator } from "react-native";
+import { mediaUrl } from "../../../lib/links";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@clerk/clerk-expo";
@@ -360,7 +361,7 @@ function HeroCard({
         <View className="h-20 w-20 overflow-hidden rounded-2xl border-2 border-gold/40">
           {profile.photoUrl ? (
             <Image
-              source={{ uri: profile.photoUrl }}
+              source={{ uri: mediaUrl(profile.photoUrl)! }}
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
             />

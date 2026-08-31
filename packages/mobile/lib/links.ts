@@ -55,3 +55,21 @@ export function openExternal(pathOrUrl: string): Promise<unknown> {
     // Swallow — a failed browser open shouldn't crash the screen.
   });
 }
+
+/**
+ * Turns an image path from the API into something a phone can load.
+ *
+ * The API returns site-relative paths — "/images/artists/igor.jpg" — which a
+ * browser resolves against the origin it is already on. React Native has no
+ * origin, so `<Image source={{ uri: "/images/…" }}>` silently renders
+ * nothing. Every artist photo, venue cover and avatar in the app was blank
+ * for this reason, which read as "these listings have no pictures".
+ *
+ * Absolute URLs and data/file URIs are returned untouched, so an uploaded
+ * image that already carries a full URL keeps working.
+ */
+export function mediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (/^(https?:|data:|file:|blob:)/i.test(path)) return path;
+  return `${WEB_BASE}${path.startsWith("/") ? path : `/${path}`}`;
+}
