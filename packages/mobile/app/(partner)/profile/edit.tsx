@@ -24,7 +24,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ArrowLeft, Save } from "lucide-react-native";
-import { Button, Input, Card } from "../../../components/ui";
+import { Button, Input, Card, ErrorState } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
 import { useApi } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
@@ -65,11 +65,24 @@ export default function ProfileEditScreen() {
     },
   });
 
-  if (artistQuery.isLoading || !artistQuery.data) {
+  if (artistQuery.isLoading) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator color={colors.gold} />
       </SafeAreaView>
+    );
+  }
+
+  // A failed read used to land here too, and this guard never reopened —
+  // the query resolved with data:null, so isLoading went false while the
+  // condition stayed true. Now failure has its own branch and a way out.
+  if (artistQuery.isError || !artistQuery.data) {
+    return (
+      <ErrorState
+        error={artistQuery.error}
+        onRetry={() => artistQuery.refetch()}
+        retrying={artistQuery.isFetching}
+      />
     );
   }
 

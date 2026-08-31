@@ -21,9 +21,9 @@ import {
   Phone,
   Mail,
 } from "lucide-react-native";
-import { Card, Button, Badge } from "../../../../components/ui";
+import { Card, Button, Badge, ErrorState } from "../../../../components/ui";
 import { colors } from "../../../../constants/theme";
-import { useApi } from "../../../../lib/api";
+import { useApi, unwrap } from "../../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
 import {
   eventTypeLabel,
@@ -80,7 +80,7 @@ export default function PartnerBookingDetailScreen() {
         action: "complete",
       });
       if (!res.ok) throw new Error(res.error?.message ?? "finalize_failed");
-      return res.data;
+      return unwrap(res);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["partner-booking", bookingId] });
@@ -116,11 +116,24 @@ export default function PartnerBookingDetailScreen() {
     },
   });
 
-  if (detailQuery.isLoading || !detailQuery.data) {
+  if (detailQuery.isLoading) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator color={colors.gold} />
       </SafeAreaView>
+    );
+  }
+
+  // A failed read used to land here too, and this guard never reopened —
+  // the query resolved with data:null, so isLoading went false while the
+  // condition stayed true. Now failure has its own branch and a way out.
+  if (detailQuery.isError || !detailQuery.data) {
+    return (
+      <ErrorState
+        error={detailQuery.error}
+        onRetry={() => detailQuery.refetch()}
+        retrying={detailQuery.isFetching}
+      />
     );
   }
 

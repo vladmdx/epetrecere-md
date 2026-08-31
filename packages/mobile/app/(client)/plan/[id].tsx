@@ -35,11 +35,11 @@ import {
   Search,
 } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Card, ProgressBar, Badge } from "../../../components/ui";
+import { Card, ProgressBar, Badge, ErrorState } from "../../../components/ui";
 import { ChecklistTab } from "../../../components/plan/ChecklistTab";
 import { GuestsTab } from "../../../components/plan/GuestsTab";
 import { colors } from "../../../constants/theme";
-import { useApi } from "../../../lib/api";
+import { useApi, unwrap } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
 import {
   eventTypeLabel,
@@ -102,7 +102,7 @@ export default function PlanDetailScreen() {
     enabled: Number.isFinite(planId),
     queryFn: async () => {
       const res = await api.get<PlanDetail>(API_PATHS.eventPlan(planId));
-      return res.data;
+      return unwrap(res);
     },
   });
 
@@ -122,11 +122,24 @@ export default function PlanDetailScreen() {
     },
   });
 
-  if (planQuery.isLoading || !planQuery.data) {
+  if (planQuery.isLoading) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator color={colors.gold} />
       </SafeAreaView>
+    );
+  }
+
+  // A failed read used to land here too, and this guard never reopened —
+  // the query resolved with data:null, so isLoading went false while the
+  // condition stayed true. Now failure has its own branch and a way out.
+  if (planQuery.isError || !planQuery.data) {
+    return (
+      <ErrorState
+        error={planQuery.error}
+        onRetry={() => planQuery.refetch()}
+        retrying={planQuery.isFetching}
+      />
     );
   }
 

@@ -47,3 +47,49 @@ export const publicApi = createApiClient({
   baseUrl: BASE_URL,
   userAgent: USER_AGENT,
 });
+
+/**
+ * Turns a failed response into a thrown error, which is what React Query needs
+ * in order to have a failure at all.
+ *
+ * The client never throws — on a 404, a 500 or a dead network it returns
+ * `{ ok: false, data: null }`. Screens were written as
+ * `queryFn: async () => (await api.get(path)).data`, so a failure resolved
+ * *successfully* with `data === null`. `isLoading` went false, `isError` stayed
+ * false, and the usual guard `if (isLoading || !data) return <Spinner/>` never
+ * opened again: seven detail screens spun forever on any failure, and no error
+ * could ever be displayed because none was ever raised.
+ *
+ * Wrap every read in this and React Query gets its error, retries work, and
+ * `isError` means something.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  constructor(message: string, status: number, code: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+  /** A signed-out or expired session, which callers may want to treat apart. */
+  get isAuth() {
+    return this.status === 401 || this.status === 403;
+  }
+}
+
+export function unwrap<T>(res: {
+  ok: boolean;
+  status: number;
+  data: T | null;
+  error: { code: string; message: string } | null;
+}): T {
+  if (!res.ok || res.data === null) {
+    throw new ApiError(
+      res.error?.message ?? "Ceva nu a mers. Încearcă din nou.",
+      res.status,
+      res.error?.code ?? "unknown",
+    );
+  }
+  return res.data;
+}

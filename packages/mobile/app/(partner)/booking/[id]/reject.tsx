@@ -8,7 +8,7 @@ import { X, XCircle } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Button, Input, Card } from "../../../../components/ui";
 import { colors } from "../../../../constants/theme";
-import { useApi } from "../../../../lib/api";
+import { useApi, unwrap } from "../../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
 
 export default function RejectBookingSheet() {
@@ -28,7 +28,7 @@ export default function RejectBookingSheet() {
         reply: reply.trim() || undefined,
       });
       if (!res.ok) throw new Error(res.error?.message ?? "reject_failed");
-      return res.data;
+      return unwrap(res);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["partner-bookings"] });

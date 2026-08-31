@@ -45,12 +45,12 @@ care Metro nu transformă niciun fișier. Până aici nu se poate verifica nimic
 | react | 19.1.0 | 18.3.1 |
 | expo-router | 6.0.24 | 4.0.22 |
 
-- [ ] `npm ci` în `packages/mobile` — lockfile-ul e corect și sincron (1140 pachete)
-- [ ] Șterge cele 6 duplicate iCloud din `app/` — în expo-router fiecare fișier e o rută,
+- [x] `npm ci` în `packages/mobile` — lockfile-ul e corect și sincron (1140 pachete)
+- [x] Șterge cele 6 duplicate iCloud din `app/` — în expo-router fiecare fișier e o rută,
       deci sunt ecrane fantomă în navigație
-- [ ] Comite cele 5 fișiere netrackuite (`account/*`, `plan/new.tsx`, `CalendarPicker.tsx`)
+- [x] Comite cele 5 fișiere netrackuite (`account/*`, `plan/new.tsx`, `CalendarPicker.tsx`)
       — EAS construiește din arborele git, deci azi ar compila fără ele
-- [ ] Exportă `CalendarPicker` din `components/ui/index.ts` — `plan/new.tsx:18` îl importă
+- [x] Exportă `CalendarPicker` din `components/ui/index.ts` — `plan/new.tsx:18` îl importă
       de acolo, azi typecheck-ul cade
 
 **Verificare:** `npx expo start` pornește; `npm run typecheck` curat; `git status` fără
@@ -65,11 +65,11 @@ cod netrackuit; navigația fără rute cu spațiu în nume.
 Vine *înaintea* reparațiilor: cât timp fiecare eșec arată ca un spinner, nu ai cum să
 confirmi că o reparație a funcționat.
 
-- [ ] Clientul aruncă la eșec — `packages/shared/src/api/index.ts:103, 111-118`
+- [x] Clientul aruncă la eșec — `packages/shared/src/api/index.ts:103, 111-118`
       (azi întoarce o valoare și pe eroare de rețea, și pe 4xx)
-- [ ] Citește `error`, nu `message` — `index.ts:97-100`. 139 de rute întorc `{error}`,
+- [x] Citește `error`, nu `message` — `index.ts:97-100`. 139 de rute întorc `{error}`,
       una singură `{message}`, deci utilizatorul vede „HTTP 403"
-- [ ] Ramură de eroare cu reîncercare pe cele 7 ecrane de detaliu: `artist/[slug]:94`,
+- [x] Ramură de eroare cu reîncercare pe cele 7 ecrane de detaliu: `artist/[slug]:94`,
       `venue/[slug]:68`, `plan/[id]`, `(partner)/(tabs)/index:154`, +3
 
 **Verificare:** cu rețeaua oprită, un profil de artist arată mesaj și buton de reîncercare;
@@ -192,9 +192,9 @@ Se completează pe măsură ce fazele trec.
 
 | fază | stare | notă |
 |---|---|---|
-| 0 | în lucru | — |
-| 1 | de început | — |
-| 2 | de început | — |
+| 0 | **trecută** | npm ci; 6 rute fantomă șterse; 5 fișiere comise; CalendarPicker exportat. Bundle 21,3 MB, tsc 0 erori. |
+| 1 | **trecută** | clientul aruncă prin `unwrap()`; citește `error` nu `message`; 7 ecrane au ramură de eroare cu reîncercare. |
+| 2 | în lucru | — |
 | 3 | de început | — |
 | 4 | de început | — |
 | 5 | de început | — |

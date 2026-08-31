@@ -34,9 +34,9 @@ import {
   Send,
 } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Button, Badge, Card } from "../../../components/ui";
+import { Button, Badge, Card, ErrorState } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
-import { publicApi } from "../../../lib/api";
+import { publicApi, unwrap } from "../../../lib/api";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const GALLERY_HEIGHT = 380;
@@ -82,20 +82,36 @@ export default function ArtistDetailScreen() {
   const [galleryIndex, setGalleryIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
 
-  const { data: artist, isLoading } = useQuery({
+  const {
+    data: artist,
+    isLoading,
+    isError,
+    error,
+    refetch,
+    isFetching,
+  } = useQuery({
     queryKey: ["artist", slug],
     queryFn: async () => {
       const res = await publicApi.get<ArtistDetail>(`/artists/${slug}`);
-      return res.data;
+      return unwrap(res);
     },
     enabled: !!slug,
   });
 
-  if (isLoading || !artist) {
+  if (isLoading) {
     return (
       <SafeAreaView className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator color={colors.gold} />
       </SafeAreaView>
+    );
+  }
+
+  // Failure has its own branch now. Before, a 404 or a dead network
+  // resolved the query with data:null, so this guard stayed true and the
+  // screen span forever with no way to tell what had gone wrong.
+  if (isError || !artist) {
+    return (
+      <ErrorState error={error} onRetry={() => refetch()} retrying={isFetching} />
     );
   }
 

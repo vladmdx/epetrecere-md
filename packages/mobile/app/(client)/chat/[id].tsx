@@ -29,7 +29,7 @@ import {
 } from "lucide-react-native";
 import { Avatar } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
-import { useApi } from "../../../lib/api";
+import { useApi, unwrap } from "../../../lib/api";
 import { API_PATHS } from "@epetrecere/shared/api";
 import { relativeTimeRO } from "@epetrecere/shared/utils";
 
@@ -107,7 +107,7 @@ export default function ChatThreadScreen() {
         { message },
       );
       if (!res.ok) throw new Error(res.error?.message ?? "send_failed");
-      return res.data;
+      return unwrap(res);
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });

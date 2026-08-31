@@ -17,7 +17,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Star } from "lucide-react-native";
 import { SafeScreen, Card, Button, Input } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
-import { useApi } from "../../../lib/api";
+import { useApi, unwrap } from "../../../lib/api";
 import { formatDateRO } from "@epetrecere/shared/utils";
 
 interface Reviewable {
@@ -74,7 +74,7 @@ export default function ReviewsScreen() {
         comment: comments[bookingId]?.trim() || undefined,
       });
       if (!res.ok) throw new Error(res.error?.message ?? "submit_failed");
-      return res.data;
+      return unwrap(res);
     },
     onSuccess: () => {
       Alert.alert("Mulțumim!", "Recenzia ta a fost trimisă.");

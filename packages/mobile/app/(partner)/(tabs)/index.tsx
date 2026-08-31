@@ -30,17 +30,15 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react-native";
-import {
-  SafeScreen,
+import { SafeScreen,
   Card,
   ProgressBar,
   StatTile,
   Badge,
   Button,
-  type BadgeTone,
-} from "../../../components/ui";
+  type BadgeTone, ErrorState } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
-import { useApi } from "../../../lib/api";
+import { useApi, unwrap } from "../../../lib/api";
 import { initials } from "@epetrecere/shared/utils";
 
 interface DashboardResponse {
@@ -147,17 +145,30 @@ export default function PartnerDashboardScreen() {
     enabled: !!isSignedIn,
     queryFn: async () => {
       const res = await api.get<DashboardResponse>("/me/artist/dashboard");
-      return res.data;
+      return unwrap(res);
     },
   });
 
-  if (dashQuery.isLoading || !dashQuery.data) {
+  if (dashQuery.isLoading) {
     return (
       <SafeScreen scroll={false}>
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color={colors.gold} />
         </View>
       </SafeScreen>
+    );
+  }
+
+  // A failed read used to land here too, and this guard never reopened —
+  // the query resolved with data:null, so isLoading went false while the
+  // condition stayed true. Now failure has its own branch and a way out.
+  if (dashQuery.isError || !dashQuery.data) {
+    return (
+      <ErrorState
+        error={dashQuery.error}
+        onRetry={() => dashQuery.refetch()}
+        retrying={dashQuery.isFetching}
+      />
     );
   }
 

@@ -94,10 +94,21 @@ export function createApiClient(opts: ApiClientOptions) {
           code: typeof parsed === "object" && parsed && "code" in parsed
             ? String((parsed as Record<string, unknown>).code)
             : "http_error",
-          message:
-            typeof parsed === "object" && parsed && "message" in parsed
-              ? String((parsed as Record<string, unknown>).message)
-              : `HTTP ${res.status}`,
+          // The API answers with `{ error: "..." }` — 139 route files do, and
+          // exactly one uses `message`. Reading only `message` meant every
+          // server explanation was discarded and the user shown the bare
+          // status line instead: "HTTP 403" where the server had said why.
+          message: (() => {
+            if (typeof parsed === "object" && parsed) {
+              const o = parsed as Record<string, unknown>;
+              for (const key of ["error", "message"]) {
+                const v = o[key];
+                if (typeof v === "string" && v.trim()) return v;
+              }
+            }
+            if (typeof parsed === "string" && parsed.trim()) return parsed;
+            return `HTTP ${res.status}`;
+          })(),
         };
         opts.onError?.(res.status, parsed);
         return { ok: false, status: res.status, data: null, error };
