@@ -192,6 +192,21 @@ abatere. Dacă a fost nevoie de web ca să se închidă parcursul, parcursul a p
 
 ---
 
+## Găsite la rulare, pe simulator
+
+Niciuna nu blochează publicarea; toate au apărut abia când aplicația a rulat efectiv.
+
+- **`expo-av` e depreciat** și anunțat pentru eliminare — `lib/voice-recorder.ts:13` încă îl
+  folosește, iar `package.json:34` îl fixează la `~16.0.8`. Merge azi pe SDK 54, dar se rupe
+  la următorul. Înlocuitorii sunt `expo-audio` / `expo-video`.
+- **`Intl.PluralRules` lipsește** din runtime, deci i18next cade pe formatul v3. Azi e inofensiv:
+  niciun fișier de traducere nu are chei de plural (`_one`, `_few`, `_many`). Devine vizibil în
+  momentul în care cineva adaugă prima — și rusa are reguli de plural complexe.
+- **Vechea regulă „tot stilul trebuie inline" nu mai e necesară.** `className` randează corect
+  pe SDK 54 cu css-interop 0.2.6, verificat pe ecrane reale.
+
+---
+
 ## Lăsate deoparte deliberat
 
 Reale, dar niciuna nu blochează un utilizator care poate deja rezerva și se poate înregistra.
@@ -219,4 +234,4 @@ Se completează pe măsură ce fazele trec.
 | 2 | **trecută** | 404 „fără profil" tratat ca prima stare; null-uri eliminate din rezervare și planificator; telefonul cerut de la utilizator. Payload validat cu schema serverului. |
 | 3 | **cod gata, poarta neverificată** | ecran de înregistrare în 3 pași + pad de semnătură pe react-native-svg; 4 rute expuse în v1 și confirmate live; editarea tarifelor nu mai salvează gol; preț pe eveniment și comision pe telefon. Poarta cere un simulator — blocat de `xcode-select`. |
 | 4 | **5 din 7 făcute** | ștergerea contului, icoanele din brandul nou, politica accesibilă și localizată, harta pe Apple Maps; două puncte din plan s-au dovedit false. Rămân Apple Sign-In și credențialele de trimitere — ambele cer acces la conturi. |
-| 5 | de început | — |
+| 5 | **în curs** | dev client construit și rulează pe simulator; icoana nouă, linkurile de consimțământ și politica localizată verificate pe ecran. Restul parcursurilor cer o sesiune autentificată. |
