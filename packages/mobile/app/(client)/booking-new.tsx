@@ -67,6 +67,13 @@ export default function BookingNewScreen() {
     d.setHours(17, 0, 0, 0);
     return d;
   });
+  // The partner calls this number back, so a placeholder is worse than an
+  // empty field: "+37300000000" is 11 non-uniform digits, which sails through
+  // the server's sanity check and reaches the partner looking real.
+  const clerkPhone = user?.phoneNumbers?.[0]?.phoneNumber ?? "";
+  const [phone, setPhone] = useState(clerkPhone);
+  const phoneOk = phone.replace(/\D/g, "").length >= 8;
+
   const [guestCount, setGuestCount] = useState("100");
   const [message, setMessage] = useState("");
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -75,19 +82,25 @@ export default function BookingNewScreen() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      // Absent fields are omitted, never sent as null. The server declares
+      // them `.optional()` without `.nullable()`, so an explicit null fails
+      // validation — which is why every booking sent from the app came back
+      // 400. One of artistId/venueId is always unset, so this alone was fatal.
       const body = BookingRequestCreateSchema.parse({
-        artistId,
-        venueId,
+        ...(artistId !== null ? { artistId } : {}),
+        ...(venueId !== null ? { venueId } : {}),
         clientName:
           `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim() ||
           "Client",
-        clientPhone: user?.phoneNumbers?.[0]?.phoneNumber ?? "+37300000000",
-        clientEmail: user?.primaryEmailAddress?.emailAddress ?? null,
+        clientPhone: phone.trim(),
+        ...(user?.primaryEmailAddress?.emailAddress
+          ? { clientEmail: user.primaryEmailAddress.emailAddress }
+          : {}),
         eventDate: eventDate.toISOString().slice(0, 10),
         startTime: `${String(startTime.getHours()).padStart(2, "0")}:${String(startTime.getMinutes()).padStart(2, "0")}`,
         eventType,
-        guestCount: Number(guestCount) || null,
-        message: message.trim() || null,
+        ...(Number(guestCount) ? { guestCount: Number(guestCount) } : {}),
+        ...(message.trim() ? { message: message.trim() } : {}),
       });
       const res = await api.post(API_PATHS.bookingRequests, body);
       if (!res.ok) throw new Error(res.error?.message ?? "submit_failed");
@@ -193,6 +206,23 @@ export default function BookingNewScreen() {
           </Card>
         </Pressable>
 
+        {/* Phone — the number the partner will call back on. Prefilled from the
+            account when there is one, asked for when there is not, because the
+            alternative was inventing one. */}
+        <View>
+          <Input
+            label="Telefon de contact"
+            value={phone}
+            onChangeText={setPhone}
+            keyboardType="phone-pad"
+            hint={
+              clerkPhone
+                ? "Din contul tău. Poți schimba numărul pentru această cerere."
+                : "Artistul te sună pe acest număr."
+            }
+          />
+        </View>
+
         {/* Guest count */}
         <View>
           <Input
@@ -223,11 +253,17 @@ export default function BookingNewScreen() {
         <Button
           onPress={() => submitMutation.mutate()}
           loading={submitMutation.isPending}
+          disabled={!phoneOk}
           fullWidth
           size="lg"
         >
           Trimite cererea
         </Button>
+        {!phoneOk && (
+          <Text className="text-center text-[12px] text-muted-foreground">
+            Adaugă un număr de telefon ca artistul să te poată contacta.
+          </Text>
+        )}
 
         <Text className="text-center text-[11px] leading-4 text-muted-foreground">
           Continuând, accepți ca furnizorul să te contacteze cu privire la

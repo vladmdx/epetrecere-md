@@ -38,7 +38,7 @@ import { SafeScreen,
   Button,
   type BadgeTone, ErrorState } from "../../../components/ui";
 import { colors } from "../../../constants/theme";
-import { useApi, unwrap } from "../../../lib/api";
+import { useApi, unwrap, ApiError} from "../../../lib/api";
 import { initials } from "@epetrecere/shared/utils";
 
 interface DashboardResponse {
@@ -145,8 +145,18 @@ export default function PartnerDashboardScreen() {
     enabled: !!isSignedIn,
     queryFn: async () => {
       const res = await api.get<DashboardResponse>("/me/artist/dashboard");
+      // A partner who has picked the artist role but not yet built a profile
+      // gets 404 `no_artist_profile` here. That is not a failure — it is the
+      // ordinary first state, and the screen below already knows how to render
+      // it. Treating it as an error left every new partner staring at a
+      // spinner with no way forward, which is where they all stopped.
+      if (res.status === 404) return { profile: null } as DashboardResponse;
       return unwrap(res);
     },
+    retry: (count, err) =>
+      err instanceof ApiError && (err.status === 404 || err.isAuth)
+        ? false
+        : count < 2,
   });
 
   if (dashQuery.isLoading) {

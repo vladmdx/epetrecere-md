@@ -83,16 +83,16 @@ o rezervare invalidă arată textul real de la server; reîncercarea reface cere
 
 Fiecare oprește singur un utilizator real. Niciunul nu ține de drift — existau în iulie.
 
-- [ ] **Partener nou → rotiță infinită.** `app/(partner)/(tabs)/index.tsx:154`.
+- [x] **Partener nou → rotiță infinită.** `app/(partner)/(tabs)/index.tsx:154`.
       Dashboard-ul întoarce 404 `no_artist_profile` pentru un utilizator fără rând de
       artist; clientul îl face `data:null`; garda nu se mai deschide. Trebuie stare goală
       cu „creează-ți profilul".
-- [ ] **Fiecare rezervare respinsă cu 400.** `booking-new.tsx:56-57, 85, 89-90` trimite
+- [x] **Fiecare rezervare respinsă cu 400.** `booking-new.tsx:56-57, 85, 89-90` trimite
       `null` explicit pentru câmpuri `.optional()` fără `.nullable()`. Trimite `undefined`,
       sau adaugă `.nullable()` pe server.
-- [ ] **Telefon fals pe fiecare rezervare.** `booking-new.tsx:84` — `?? "+37300000000"`.
+- [x] **Telefon fals pe fiecare rezervare.** `booking-new.tsx:84` — `?? "+37300000000"`.
       11 cifre neuniforme, deci trece de garda serverului și ajunge la partener ca număr real.
-- [ ] **Primul plan de eveniment → 400.** `planning.tsx:35, 49-51`, același tipar de `null`.
+- [x] **Primul plan de eveniment → 400.** `planning.tsx:35, 49-51`, același tipar de `null`.
       Ecranul corect (`plan/new.tsx`) există dar nu e legat nicăieri.
 
 **Verificare:** cont nou → rol artist → stare goală cu pas următor; o rezervare apare în
@@ -194,7 +194,7 @@ Se completează pe măsură ce fazele trec.
 |---|---|---|
 | 0 | **trecută** | npm ci; 6 rute fantomă șterse; 5 fișiere comise; CalendarPicker exportat. Bundle 21,3 MB, tsc 0 erori. |
 | 1 | **trecută** | clientul aruncă prin `unwrap()`; citește `error` nu `message`; 7 ecrane au ramură de eroare cu reîncercare. |
-| 2 | în lucru | — |
-| 3 | de început | — |
+| 2 | **trecută** | 404 „fără profil" tratat ca prima stare; null-uri eliminate din rezervare și planificator; telefonul cerut de la utilizator. Payload validat cu schema serverului. |
+| 3 | în lucru | — |
 | 4 | de început | — |
 | 5 | de început | — |

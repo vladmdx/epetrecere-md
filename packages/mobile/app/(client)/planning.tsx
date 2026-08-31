@@ -44,12 +44,18 @@ export default function PlanningScreen() {
       const res = await api.post<{ id?: number; plan?: { id: number } }>(
         API_PATHS.eventPlans,
         {
+          // Omitted, not null — same reason as booking-new: the server marks
+          // these `.optional()` without `.nullable()`, so an explicit null is a
+          // validation failure. This screen is the empty-state CTA of the
+          // planner, so the very first plan a person tried to create returned
+          // 400.
           title: title.trim(),
-          eventType,
-          eventDate: eventDate.trim() || null,
-          location: location.trim() || null,
-          guestCountTarget:
-            guestCount && guestCount > 0 ? guestCount : null,
+          ...(eventType ? { eventType } : {}),
+          ...(eventDate.trim() ? { eventDate: eventDate.trim() } : {}),
+          ...(location.trim() ? { location: location.trim() } : {}),
+          ...(guestCount && guestCount > 0
+            ? { guestCountTarget: guestCount }
+            : {}),
           venueNeeded: true,
           checklistEnabled: true,
           budgetEnabled: true,
