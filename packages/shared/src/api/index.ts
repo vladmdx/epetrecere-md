@@ -172,6 +172,16 @@ export const API_PATHS = {
   myArtist: "/me/artist",
   myVenue: "/me/venue",
 
+  // Legal pack — reading the contract and signing it. Registration is only
+  // allowed after a signature exists, so these come before registerArtist.
+  legalDocuments: "/legal/documents",
+  legalAccept: "/legal/accept",
+  registerArtist: "/auth/register-artist",
+
+  // Commissions — what the partner owes the platform on confirmed orders.
+  // Scoped server-side to the caller's own artist/venue.
+  commissions: "/commissions",
+
   // Booking requests
   bookingRequests: "/booking-requests",
   bookingRequest: (id: number) => `/booking-requests/${id}`,

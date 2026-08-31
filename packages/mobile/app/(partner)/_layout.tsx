@@ -27,6 +27,7 @@ export default function PartnerLayout() {
         name="booking/[id]/propose-price"
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
       />
+      <Stack.Screen name="inregistrare" />
       <Stack.Screen name="profile/edit" />
       <Stack.Screen
         name="tarife/[id]"

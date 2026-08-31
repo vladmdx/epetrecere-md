@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ALL_EVENT_TYPES } from "@/lib/wizard/categories-meta";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
@@ -21,15 +22,13 @@ const scopeEnum = z.enum([
 
 // Kept in step with lib/events/normalize.ts. A null event type means "any
 // event", which is what every row created before per-event pricing means.
-const eventTypeEnum = z.enum([
-  "wedding",
-  "baptism",
-  "cumatrie",
-  "corporate",
-  "birthday",
-  "concert",
-  "other",
-]);
+// Derived from the canonical list rather than retyped, because retyping is how
+// it drifted: the API accepted seven keys while the product had ten, so an
+// artist pricing a cununie, a cerere în căsătorie or a children's birthday —
+// three event types the platform itself offers — was rejected here.
+const eventTypeEnum = z.enum(
+  ALL_EVENT_TYPES as [string, ...string[]],
+);
 
 const pricingModeEnum = z.enum(["per_hour", "per_event"]);
 

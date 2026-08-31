@@ -191,7 +191,8 @@ export default function PartnerDashboardScreen() {
             Panoul Meu
           </Text>
           <Text className="mt-1 text-[13px] text-muted-foreground">
-            Completează profilul pentru a fi vizibil pe site.
+            Creează-ți profilul și semnează contractul ca să fii vizibil pe
+            site.
           </Text>
         </View>
         <Card className="mt-4 gap-3 border-gold/40 bg-gold/5 p-5">
@@ -206,8 +207,17 @@ export default function PartnerDashboardScreen() {
               </Text>
             </View>
           </View>
-          <Button onPress={() => router.push("/(partner)/profile/edit")} fullWidth size="md">
-            Completează profilul
+          {/* Registration, not the edit screen: /artists/crud only ever
+              UPDATES an existing row, so sending a partner without a profile
+              there was a dead end — the button opened a form that could not
+              save. This route creates the profile, and signs the contract
+              that has to exist before it. */}
+          <Button
+            onPress={() => router.push("/(partner)/inregistrare")}
+            fullWidth
+            size="md"
+          >
+            Creează profilul
           </Button>
         </Card>
       </SafeScreen>

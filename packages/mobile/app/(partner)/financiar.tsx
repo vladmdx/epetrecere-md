@@ -33,6 +33,10 @@ interface BookingRow {
   paidStatus: "unpaid" | "partial" | "paid";
 }
 
+interface CommissionsResponse {
+  totals: { pending: number; paid: number; overdue: number; count: number };
+}
+
 export default function FinanciarScreen() {
   const { isSignedIn } = useAuth();
   const router = useRouter();
@@ -58,6 +62,24 @@ export default function FinanciarScreen() {
         query: { artist_id: artistQuery.data ?? "" },
       });
       return Array.isArray(res.data) ? res.data : [];
+    },
+  });
+
+  /**
+   * What the partner owes the platform.
+   *
+   * The screen showed only money coming in, so a partner had no way to see the
+   * 5% fee the Partner Agreement charges on a confirmed order — the web
+   * cabinet shows it, the phone did not. The rate is admin-editable in
+   * site_settings, so the amounts are read from the server rather than
+   * recomputed here, where they could silently disagree.
+   */
+  const commissionsQuery = useQuery({
+    queryKey: ["financiar-commissions"],
+    enabled: !!isSignedIn,
+    queryFn: async () => {
+      const res = await api.get<CommissionsResponse>(API_PATHS.commissions);
+      return res.data?.totals ?? null;
     },
   });
 
@@ -183,6 +205,72 @@ export default function FinanciarScreen() {
               tint={colors.info}
             />
           </View>
+
+          {/* What the partner owes the platform, kept visually apart from the
+              income tiles above so the two are never read as one number. */}
+          {commissionsQuery.data && commissionsQuery.data.count > 0 && (
+            <View
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 14,
+                padding: 14,
+                gap: 10,
+              }}
+            >
+              <Text
+                style={{
+                  color: colors.foreground,
+                  fontSize: 15,
+                  fontWeight: "600",
+                }}
+              >
+                Comision platformă
+              </Text>
+              <View style={{ flexDirection: "row", gap: 20 }}>
+                <View style={{ gap: 2 }}>
+                  <Text
+                    style={{ color: colors.mutedForeground, fontSize: 12 }}
+                  >
+                    De achitat
+                  </Text>
+                  <Text
+                    style={{
+                      color:
+                        commissionsQuery.data.overdue > 0
+                          ? colors.danger
+                          : colors.foreground,
+                      fontSize: 19,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {commissionsQuery.data.pending} €
+                  </Text>
+                </View>
+                <View style={{ gap: 2 }}>
+                  <Text
+                    style={{ color: colors.mutedForeground, fontSize: 12 }}
+                  >
+                    Achitat
+                  </Text>
+                  <Text
+                    style={{
+                      color: colors.mutedForeground,
+                      fontSize: 19,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {commissionsQuery.data.paid} €
+                  </Text>
+                </View>
+              </View>
+              {commissionsQuery.data.overdue > 0 && (
+                <Text style={{ color: colors.danger, fontSize: 12.5 }}>
+                  {commissionsQuery.data.overdue} € au depășit termenul de plată.
+                </Text>
+              )}
+            </View>
+          )}
 
           {/* Upcoming */}
           <Section title="Viitoare" items={sections.upcoming} />

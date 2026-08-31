@@ -19,6 +19,33 @@ interface Package {
   descriptionRo: string | null;
   price: number;
   durationHours: number | null;
+  /**
+   * Artists told us their real pricing is per event and per event type, not
+   * per hour. The server has stored both since per-event pricing shipped; the
+   * app was still typed as if only the hourly tier existed, so a partner who
+   * edited any tariff from the phone silently converted it back to hourly.
+   */
+  pricingMode: "per_hour" | "per_event" | null;
+  eventType: string | null;
+}
+
+/** Ordered as a partner thinks about them, matching the web wizard. */
+const EVENT_TYPES: { key: string; label: string }[] = [
+  { key: "wedding", label: "Nuntă" },
+  { key: "proposal", label: "Cerere în căsătorie" },
+  { key: "cununie", label: "Cununie" },
+  { key: "baptism", label: "Botez" },
+  { key: "cumatrie", label: "Cumătrie" },
+  { key: "birthday", label: "Aniversare" },
+  { key: "kids_birthday", label: "Aniversare copii" },
+  { key: "corporate", label: "Corporate" },
+  { key: "concert", label: "Concert / Petrecere" },
+  { key: "other", label: "Alt tip" },
+];
+
+/** A null event type means "orice eveniment" — what every older row means. */
+function eventTypeLabel(key: string | null): string {
+  return EVENT_TYPES.find((t) => t.key === key)?.label ?? "Orice eveniment";
 }
 
 export default function TarifeScreen() {
@@ -119,8 +146,14 @@ export default function TarifeScreen() {
                   )}
                   <Text className="text-[16px] font-bold text-gold">
                     {item.price} €
+                    <Text className="text-[12px] font-normal text-muted-foreground">
+                      {item.pricingMode === "per_event" ? " / eveniment" : " / oră"}
+                    </Text>
                   </Text>
                 </View>
+                <Text className="mt-1 text-[12px] text-muted-foreground">
+                  {eventTypeLabel(item.eventType)}
+                </Text>
               </View>
               <View className="gap-1">
                 <Pressable
@@ -156,7 +189,17 @@ export default function TarifeScreen() {
         }
       />
 
+      {/*
+        Mounted only while open, and keyed by the package being edited.
+        Before this, the sheet was mounted from the first render, so its
+        `useState` initialisers ran once — while `pkg` was still null. Tapping
+        edit reused that blank state, and saving wrote the empty form over a
+        real tariff. The key makes React discard the state between packages,
+        which is what the dead "re-sync" no-op below was reaching for.
+      */}
+      {(showAdd || editingPkg !== null) && (
       <PackageSheet
+        key={editingPkg?.id ?? "new"}
         visible={showAdd || editingPkg !== null}
         onDismiss={() => {
           setShowAdd(false);
@@ -170,6 +213,7 @@ export default function TarifeScreen() {
           setEditingPkg(null);
         }}
       />
+      )}
     </View>
   );
 }
@@ -194,12 +238,13 @@ function PackageSheet({
   const [duration, setDuration] = useState(
     pkg?.durationHours != null ? String(pkg.durationHours) : "",
   );
+  const [mode, setMode] = useState<"per_hour" | "per_event">(
+    pkg?.pricingMode === "per_event" ? "per_event" : "per_hour",
+  );
+  const [eventType, setEventType] = useState<string | null>(
+    pkg?.eventType ?? null,
+  );
   const [submitting, setSubmitting] = useState(false);
-
-  // Re-sync when editing different package
-  if (pkg && title !== pkg.nameRo && !visible) {
-    // no-op — we just want fresh state on next open
-  }
 
   async function handleSave() {
     if (!title.trim() || !price) return;
@@ -210,6 +255,10 @@ function PackageSheet({
         descriptionRo: description.trim() || null,
         price: Number(price),
         durationHours: duration ? Number(duration) : null,
+        pricingMode: mode,
+        // Explicitly null, not omitted: null is how the server stores "any
+        // event", so clearing the picker has to reach it as a value.
+        eventType,
       };
       const res = pkg
         ? await api.put(`/artist-packages/${pkg.id}`, body)
@@ -256,6 +305,91 @@ function PackageSheet({
             multiline
             numberOfLines={3}
           />
+          <View style={{ gap: 8 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+              Cum tarifezi
+            </Text>
+            <View style={{ flexDirection: "row", gap: 8 }}>
+              {(
+                [
+                  ["per_hour", "Pe oră"],
+                  ["per_event", "Pe eveniment"],
+                ] as const
+              ).map(([value, label]) => (
+                <Pressable
+                  key={value}
+                  onPress={() => setMode(value)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: mode === value }}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 11,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    alignItems: "center",
+                    borderColor: mode === value ? colors.gold : colors.border,
+                    backgroundColor:
+                      mode === value ? colors.gold + "1A" : "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: "600",
+                      color:
+                        mode === value ? colors.gold : colors.mutedForeground,
+                    }}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          <View style={{ gap: 8 }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+              Pentru ce eveniment
+            </Text>
+            <View
+              style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}
+            >
+              {[{ key: null, label: "Orice eveniment" }, ...EVENT_TYPES].map(
+                (t) => {
+                  const on = eventType === t.key;
+                  return (
+                    <Pressable
+                      key={t.key ?? "any"}
+                      onPress={() => setEventType(t.key)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      style={{
+                        paddingHorizontal: 13,
+                        paddingVertical: 8,
+                        borderRadius: 999,
+                        borderWidth: 1,
+                        borderColor: on ? colors.gold : colors.border,
+                        backgroundColor: on
+                          ? colors.gold + "1A"
+                          : "transparent",
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: on ? colors.gold : colors.mutedForeground,
+                          fontWeight: on ? "600" : "400",
+                        }}
+                      >
+                        {t.label}
+                      </Text>
+                    </Pressable>
+                  );
+                },
+              )}
+            </View>
+          </View>
+
           <View className="flex-row gap-3">
             <View className="flex-1">
               <Input
@@ -267,7 +401,9 @@ function PackageSheet({
             </View>
             <View className="flex-1">
               <Input
-                label="Durata (ore)"
+                label={
+                  mode === "per_event" ? "Durata medie (ore)" : "Durata (ore)"
+                }
                 value={duration}
                 onChangeText={(v) => setDuration(v.replace(/\D/g, "").slice(0, 2))}
                 keyboardType="number-pad"
