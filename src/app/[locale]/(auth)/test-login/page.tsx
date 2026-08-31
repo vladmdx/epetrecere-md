@@ -8,24 +8,35 @@ import { Building2, Loader2, User2, Music2 } from "lucide-react";
 
 type WhoKey = "igor" | "venue" | "client";
 
-const PERSONAS: Record<WhoKey, { label: string; email: string; role: string; dest: string; icon: React.ReactNode }> = {
+/**
+ * No e-mail addresses here, deliberately.
+ *
+ * This is a "use client" component, so every module-level constant in it is
+ * compiled into a public JS chunk and served to anyone who requests the page
+ * — which is what happened: three real account addresses were downloadable
+ * from the live site, giving both a target list for the moment the flag
+ * flipped and three addresses to phish today. The comment below about not
+ * leaking which e-mails the app uses described a goal the code did not meet;
+ * the probe ran long after the bundle had already said everything.
+ *
+ * The API resolves the account from the persona key on the server, so the
+ * browser never needs to know an address.
+ */
+const PERSONAS: Record<WhoKey, { label: string; role: string; dest: string; icon: React.ReactNode }> = {
   igor: {
     label: "Igor Nedoseikin (Artist)",
-    email: "igor.nedoseikin@epetrecere.md",
     role: "Artist — vede panoul de rezervări",
     dest: "/dashboard/rezervari",
     icon: <Music2 className="h-5 w-5" />,
   },
   venue: {
     label: "Sala Demo QA (Sală)",
-    email: "venue.test@epetrecere.md",
     role: "Sală — vede rezervările locației",
     dest: "/dashboard/sala/rezervari",
     icon: <Building2 className="h-5 w-5" />,
   },
   client: {
     label: "Test Client (Client)",
-    email: "client.test@epetrecere.md",
     role: "Client — vede rezervările sale",
     dest: "/cabinet",
     icon: <User2 className="h-5 w-5" />,
@@ -145,7 +156,7 @@ export default function TestLoginPage() {
                 </div>
                 <div className="flex-1">
                   <p className="font-semibold">{p.label}</p>
-                  <p className="text-xs text-muted-foreground">{p.email}</p>
+                  <p className="text-xs text-muted-foreground">{p.role}</p>
                   <p className="text-xs text-muted-foreground">{p.role}</p>
                 </div>
               </button>

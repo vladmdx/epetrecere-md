@@ -10,7 +10,7 @@
 // in alert() dialogs — alerts are interruptive and feel un-native.
 
 import { useState } from "react";
-import { View, Text, Pressable } from "react-native";
+import { View, Text, Pressable, Alert } from "react-native";
 import { useRouter, Link } from "expo-router";
 import { useSignIn, useOAuth } from "@clerk/clerk-expo";
 import { Eye, EyeOff, Mail, Lock } from "lucide-react-native";
@@ -18,6 +18,11 @@ import { useTranslation } from "react-i18next";
 import * as WebBrowser from "expo-web-browser";
 import { Button, Input, SafeScreen } from "../../components/ui";
 import { colors } from "../../constants/theme";
+import {
+  DEV_LOGIN_AVAILABLE,
+  DEV_LOGIN_EMAIL,
+  fetchDevTicket,
+} from "../../lib/dev-session";
 
 // Required on iOS for the OAuth browser dismissal to work correctly.
 // Safe to call multiple times — Expo dedupes internally.
@@ -73,6 +78,39 @@ export default function SignIn() {
       setGeneralError(msg);
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  const [devBusy, setDevBusy] = useState(false);
+
+  /**
+   * Signs in as the allow-listed test account using a Clerk sign-in token, so
+   * an automated run can reach the screens behind the login form. No password
+   * is involved at any point — the token is minted server-side and lives one
+   * minute.
+   */
+  async function handleDevSignIn() {
+    if (!isLoaded || !signIn) return;
+    setDevBusy(true);
+    try {
+      const { ticket } = await fetchDevTicket();
+      const attempt = await signIn.create({ strategy: "ticket", ticket });
+      if (attempt.status === "complete" && attempt.createdSessionId) {
+        await setActive({ session: attempt.createdSessionId });
+        router.replace("/");
+      } else {
+        Alert.alert(
+          "Sesiunea de test nu s-a deschis",
+          `Clerk a răspuns cu starea „${attempt.status}".`,
+        );
+      }
+    } catch (e) {
+      Alert.alert(
+        "Sesiunea de test a eșuat",
+        e instanceof Error ? e.message : "Eroare necunoscută.",
+      );
+    } finally {
+      setDevBusy(false);
     }
   }
 
@@ -197,6 +235,40 @@ export default function SignIn() {
         >
           {t("auth.signInWithGoogle")}
         </Button>
+
+        {/*
+          Development only. `__DEV__` folds to `false` in a production bundle,
+          so DEV_LOGIN_AVAILABLE is false and this never renders; the secret
+          and the address fold away with it.
+
+          Stated precisely because the first version of this comment was
+          wrong: the button's markup and the endpoint string do survive into
+          the bundle, dropped or not depending on the minifier. What is
+          guaranteed is that the branch cannot execute and carries no secret —
+          not that no trace of it ships.
+        */}
+        {DEV_LOGIN_AVAILABLE && (
+          <View style={{ gap: 6, marginTop: 4 }}>
+            <Button
+              variant="outline"
+              onPress={handleDevSignIn}
+              loading={devBusy}
+              fullWidth
+              size="md"
+            >
+              Sesiune de test (dev)
+            </Button>
+            <Text
+              style={{
+                color: colors.mutedForeground,
+                fontSize: 11.5,
+                textAlign: "center",
+              }}
+            >
+              {DEV_LOGIN_EMAIL}
+            </Text>
+          </View>
+        )}
 
         {/* Sign-up footer */}
         <View className="flex-row items-center justify-center gap-1.5">
