@@ -134,25 +134,41 @@ profilul public; editarea păstrează valorile.
 
 **Poarta:** o construcție de producție urcă în TestFlight.
 
-Primele două aduc **respingere automată**, indiferent cât de bine merge aplicația.
+Șapte puncte, cercetate fiecare separat și apoi verificate advers. **Două s-au
+dovedit greșite în plan** — sunt notate ca atare, nu „reparate".
 
-- [ ] **Sign in with Apple** (Ghidul 4.8) — există doar Google; `expo-apple-authentication`
-      nu e dependință. Login social terț fără Apple → respingere automată pe iOS.
-- [ ] **Ștergerea contului din aplicație** (5.1.1(v) + cerința Play) — ambele ecrane de cont
-      se termină la „ieși din cont". Ruta `/api/me/delete-account` există pe server, dar nu
-      e expusă în v1.
-- [ ] **`google-services.json`** — lipsește, e gitignorat, niciun profil EAS nu setează
-      `GOOGLE_SERVICES_JSON` → build-ul Android cade la rezolvarea configului.
-- [ ] **Credențialele de trimitere** — `eas.json:53, :58` arată spre fișiere inexistente
-      și gitignorate (`.p8`, cont de serviciu Play).
-- [ ] **Politica de confidențialitate accesibilă** — `lib/links.ts:16` o definește dar
-      nimic n-o folosește; rândul din cont deschide doar termenii.
-- [ ] **Icoanele** — `icon.png` și `adaptive-icon.png` au același hash; icoana adaptivă e o
-      copie cu colțuri deja rotunjite și canal alfa, pe care Android le va rotunji din nou.
-- [ ] **Cheia Google Maps** — `map.tsx:94` fixează `PROVIDER_GOOGLE`, deci și iOS cere
-      cheia; niciun profil EAS n-o trimite → hartă albă pe ambele platforme.
-
----
+- [x] **Ștergerea contului din aplicație** (5.1.1(v) + Play) — ecran nou la
+      `/delete-account`, plus `me/delete-account` și `me/data-export` expuse în v1.
+      Ștergerea făcea și mai puțin decât spunea: `artists.user_id` e `SET NULL`, deci
+      un partener șters lăsa în urmă un profil public viu, care primea cereri fără
+      cont care să răspundă. Acum profilul e scos din vitrină înainte de ștergere.
+- [x] **Icoanele** — **icoana aplicației era încă placeholderul.** Brandul nou a ajuns
+      pe site pe 29 august și niciodată în aplicație. Refăcute din marcă: iOS 1024 RGB
+      fără alfa și cu colțuri drepte, prim-planul Android pe transparență cu marca în
+      cercul sigur de 66% (semi-diagonală 328px față de rază 338px), plus stratul
+      monocrom pentru Android 13.
+- [x] **Politica de confidențialitate accesibilă** — rândul etichetat „Termeni &
+      Confidențialitate" deschidea doar termenii. Acum două rânduri care corespund
+      etichetelor, linkuri apăsabile chiar în consimțământul de la înregistrare, și
+      URL-uri după limbă: politica RU și EN existau și erau inaccesibile din aplicație.
+- [x] ~~**Cheia Google Maps**~~ — **planul greșea.** `eas env:list` arată
+      `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` setată în toate cele trei medii. Defectul real
+      era `PROVIDER_GOOGLE`, care forța Google și pe iOS și dezactiva tăcut
+      `userInterfaceStyle="dark"` (documentat Apple-Maps-only). Prop-ul e scos.
+- [x] ~~**`google-services.json`**~~ — **planul greșea.** `app.config.js:22` citește
+      `GOOGLE_SERVICES_JSON`, iar EAS îl ține ca fișier secret în fiecare mediu.
+- [ ] **Sign in with Apple** (Ghidul 4.8) — **blocat pe cont, nu pe cod.** Instanța
+      Clerk de producție `clerk.epetrecere.md` are activat exact un furnizor social:
+      `oauth_google`. Un buton Apple adăugat acum ar eșua la rulare, ceea ce e mai rău
+      decât lipsa lui. Cere: capacitatea Sign In with Apple pe App ID
+      `md.epetrecere.app`, un Services ID și o cheie `.p8`, apoi conexiunea Apple în
+      Clerk. **Notă:** PR #1 (`fix/security-hardening`) conține deja un buton Apple
+      pe jumătate construit, fără dependință și fără `usesAppleSignIn` — de nu merjat
+      ca atare.
+- [ ] **Credențialele de trimitere** — **blocat pe cont.** `eas.json:53` arată spre
+      `./credentials/AuthKey_32F8XDP8TG.p8`, care nu există nicăieri pe mașină (căutat
+      exhaustiv, inclusiv `mdfind`), iar `:58` spre un cont de serviciu Play la fel de
+      absent. Cere chei noi din App Store Connect și Google Play Console.
 
 ## Faza 5 — Testarea, pe fluxuri întregi
 
@@ -202,5 +218,5 @@ Se completează pe măsură ce fazele trec.
 | 1 | **trecută** | clientul aruncă prin `unwrap()`; citește `error` nu `message`; 7 ecrane au ramură de eroare cu reîncercare. |
 | 2 | **trecută** | 404 „fără profil" tratat ca prima stare; null-uri eliminate din rezervare și planificator; telefonul cerut de la utilizator. Payload validat cu schema serverului. |
 | 3 | **cod gata, poarta neverificată** | ecran de înregistrare în 3 pași + pad de semnătură pe react-native-svg; 4 rute expuse în v1 și confirmate live; editarea tarifelor nu mai salvează gol; preț pe eveniment și comision pe telefon. Poarta cere un simulator — blocat de `xcode-select`. |
-| 4 | de început | — |
+| 4 | **5 din 7 făcute** | ștergerea contului, icoanele din brandul nou, politica accesibilă și localizată, harta pe Apple Maps; două puncte din plan s-au dovedit false. Rămân Apple Sign-In și credențialele de trimitere — ambele cer acces la conturi. |
 | 5 | de început | — |
