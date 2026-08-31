@@ -105,18 +105,24 @@ a planificatorului duce la un plan creat.
 
 **Poarta:** un artist se înregistrează complet, de pe telefon.
 
-- [ ] **Semnarea contractului** — ecran nou + `POST /api/legal/accept` cu datele părții
+- [x] **Semnarea contractului** — ecran nou + `POST /api/legal/accept` cu datele părții
       (tip, denumire, IDNO, sediu), documentele bifate, numele și semnătura desenată.
       Fără ea un partener **nu se poate înregistra deloc** din aplicație: web-ul refuză
       acum înregistrarea nesemnată. Pad-ul pe RN cere altă implementare decât canvas-ul web.
-- [ ] **Preț pe eveniment** — `app/(partner)/tarife/[id].tsx`. Tariful e tipat doar
+- [x] **Preț pe eveniment** — `app/(partner)/tarife/[id].tsx`. Tariful e tipat doar
       `{price, durationHours}`; `pricingMode` și `eventType` nu ajung pe telefon.
-- [ ] **Editarea unui tarif salvează gol** — `tarife/[id].tsx:159, 191-196`. Formularul e
+- [x] **Editarea unui tarif salvează gol** — `tarife/[id].tsx:159, 191-196`. Formularul e
       montat necondiționat, deci `useState` se inițializează cât `pkg` e încă null.
-- [ ] **Cele trei tipuri de eveniment noi** — `src/app/api/artist-packages/*` listează 7
+- [x] **Cele trei tipuri de eveniment noi** — `src/app/api/artist-packages/*` listează 7
       chei, vocabularul canonic are 10. Drift pe server, nu în aplicație.
-- [ ] **Comisionul, vizibil partenerului** — `app/(partner)/financiar.tsx` arată doar
+- [x] **Comisionul, vizibil partenerului** — `app/(partner)/financiar.tsx` arată doar
       încasările; web-ul arată ce se datorează.
+
+Găsit pe parcurs, nu era în plan: **nimic din aplicație nu putea crea un profil de artist.**
+Butonul „Completează profilul" din Faza 2 ducea la un ecran susținut de `PUT /artists/crud`,
+care doar actualizează un rând existent. Deci a fost nevoie de un ecran de înregistrare
+întreg, nu doar de semnătură, plus patru rute expuse în v1: `legal/documents`,
+`legal/accept`, `auth/register-artist` și `commissions`.
 
 **Verificare:** înregistrare completă de pe telefon până la „trimis spre aprobare"; rând în
 `legal_acceptances` cu rechizitele; un tarif pe eveniment creat de pe telefon apare în
@@ -195,6 +201,6 @@ Se completează pe măsură ce fazele trec.
 | 0 | **trecută** | npm ci; 6 rute fantomă șterse; 5 fișiere comise; CalendarPicker exportat. Bundle 21,3 MB, tsc 0 erori. |
 | 1 | **trecută** | clientul aruncă prin `unwrap()`; citește `error` nu `message`; 7 ecrane au ramură de eroare cu reîncercare. |
 | 2 | **trecută** | 404 „fără profil" tratat ca prima stare; null-uri eliminate din rezervare și planificator; telefonul cerut de la utilizator. Payload validat cu schema serverului. |
-| 3 | în lucru | — |
+| 3 | **cod gata, poarta neverificată** | ecran de înregistrare în 3 pași + pad de semnătură pe react-native-svg; 4 rute expuse în v1 și confirmate live; editarea tarifelor nu mai salvează gol; preț pe eveniment și comision pe telefon. Poarta cere un simulator — blocat de `xcode-select`. |
 | 4 | de început | — |
 | 5 | de început | — |
