@@ -21,6 +21,7 @@ import { colors } from "../../constants/theme";
 import {
   DEV_LOGIN_AVAILABLE,
   DEV_LOGIN_EMAIL,
+  DEV_LOGIN_EMAILS,
   fetchDevTicket,
 } from "../../lib/dev-session";
 
@@ -89,11 +90,26 @@ export default function SignIn() {
    * is involved at any point — the token is minted server-side and lives one
    * minute.
    */
-  async function handleDevSignIn() {
+  /** Asks which account when more than one is configured. */
+  function handleDevSignInPress() {
+    if (DEV_LOGIN_EMAILS.length <= 1) {
+      void handleDevSignIn(DEV_LOGIN_EMAILS[0]);
+      return;
+    }
+    Alert.alert("Sesiune de test", "Ca cine?", [
+      ...DEV_LOGIN_EMAILS.map((email) => ({
+        text: email.split("@")[0]!,
+        onPress: () => void handleDevSignIn(email),
+      })),
+      { text: "Renunț", style: "cancel" as const },
+    ]);
+  }
+
+  async function handleDevSignIn(email?: string) {
     if (!isLoaded || !signIn) return;
     setDevBusy(true);
     try {
-      const { ticket } = await fetchDevTicket();
+      const { ticket } = await fetchDevTicket(email);
       const attempt = await signIn.create({ strategy: "ticket", ticket });
       if (attempt.status === "complete" && attempt.createdSessionId) {
         await setActive({ session: attempt.createdSessionId });
@@ -251,7 +267,7 @@ export default function SignIn() {
           <View style={{ gap: 6, marginTop: 4 }}>
             <Button
               variant="outline"
-              onPress={handleDevSignIn}
+              onPress={handleDevSignInPress}
               loading={devBusy}
               fullWidth
               size="md"
@@ -265,7 +281,9 @@ export default function SignIn() {
                 textAlign: "center",
               }}
             >
-              {DEV_LOGIN_EMAIL}
+              {DEV_LOGIN_EMAILS.length > 1
+                ? `${DEV_LOGIN_EMAILS.length} conturi — alege la apăsare`
+                : DEV_LOGIN_EMAIL}
             </Text>
           </View>
         )}

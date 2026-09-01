@@ -36,6 +36,11 @@ export default function AcceptBookingSheet() {
       return unwrap(res);
     },
     onSuccess: () => {
+      // The screen we are returning to reads ["partner-booking", id]. Without
+      // this it still shows "Nouă" with the accept/reject buttons live, and
+      // pressing one again answers 409 — the partner is told their own action
+      // failed, seconds after it worked.
+      void qc.invalidateQueries({ queryKey: ["partner-booking", bookingId] });
       void qc.invalidateQueries({ queryKey: ["partner-bookings"] });
       void qc.invalidateQueries({ queryKey: ["partner-dashboard"] });
       router.back();
@@ -92,10 +97,30 @@ export default function AcceptBookingSheet() {
           label="Mesaj pentru client (opțional)"
           value={reply}
           onChangeText={setReply}
-          error={error}
           multiline
           numberOfLines={4}
         />
+
+        {/* The server's refusal, on its own line. It used to be passed as
+
+            the message field's `error`, which drew a red border round that
+
+            input and read as "your message is wrong" — for failures like
+
+            "only pending requests can be accepted", which have nothing to
+
+            do with anything the partner typed. */}
+
+        {error && (
+
+          <Text style={{ color: colors.danger, fontSize: 13.5, lineHeight: 19 }}>
+
+            {error}
+
+          </Text>
+
+        )}
+
 
         <Button
           onPress={() => acceptMutation.mutate()}

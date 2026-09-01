@@ -41,11 +41,24 @@ const DEV_SECRET = __DEV__
   ? (process.env.EXPO_PUBLIC_DEV_LOGIN_SECRET ?? "")
   : "";
 
-export const DEV_LOGIN_EMAIL = __DEV__
+/**
+ * Comma-separated, because testing a marketplace means being both sides of
+ * it: a client sends a request, a partner has to receive it. Editing an env
+ * var and restarting Metro between the two made every two-sided check a
+ * five-minute detour.
+ */
+export const DEV_LOGIN_EMAILS: string[] = __DEV__
   ? (process.env.EXPO_PUBLIC_DEV_LOGIN_EMAIL ?? "")
-  : "";
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean)
+  : [];
 
-export const DEV_LOGIN_AVAILABLE = __DEV__ && !!DEV_SECRET && !!DEV_LOGIN_EMAIL;
+/** The first one, for the label under the button when there is only one. */
+export const DEV_LOGIN_EMAIL = DEV_LOGIN_EMAILS[0] ?? "";
+
+export const DEV_LOGIN_AVAILABLE =
+  __DEV__ && !!DEV_SECRET && DEV_LOGIN_EMAILS.length > 0;
 
 /**
  * The dev endpoint lives outside /api/v1 on purpose, so derive its host from
