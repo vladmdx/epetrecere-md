@@ -169,6 +169,12 @@ export default function PartnerProfileTab() {
           label="Centrul de ajutor"
           onPress={() => openExternal(WEB_LINKS.contact)}
         />
+        {/* Their own signed contract, not the generic published terms. */}
+        <Row
+          Icon={FileText}
+          label="Documente semnate"
+          onPress={() => router.push("/(partner)/documente")}
+        />
         <Row
           Icon={FileText}
           label="Termeni și condiții"

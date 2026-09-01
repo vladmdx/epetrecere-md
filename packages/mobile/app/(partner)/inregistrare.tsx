@@ -17,6 +17,8 @@ import { checkName, checkDescription, textIssueMessage } from "@epetrecere/share
 import { useApi } from "../../lib/api";
 import { colors } from "../../constants/theme";
 import { Button, Input, ErrorState } from "../../components/ui";
+import { DocumentReader } from "../../components/legal/DocumentReader";
+import { openExternal } from "../../lib/links";
 import {
   SignaturePad,
   type SignaturePadHandle,
@@ -121,11 +123,14 @@ export default function InregistrareArtistScreen() {
   const [representativeName, setRepresentativeName] = useState("");
   const [signatureName, setSignatureName] = useState("");
   const [readAll, setReadAll] = useState(false);
+  /** Set once every section of the main agreement has been opened. */
+  const [docRead, setDocRead] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
   const [signing, setSigning] = useState(false);
   const padRef = useRef<SignaturePadHandle>(null);
 
   const step3Ok =
+    docRead &&
     readAll &&
     hasSignature &&
     signatureName.trim().length >= 3 &&
@@ -151,6 +156,7 @@ export default function InregistrareArtistScreen() {
       const res = await api.get<{
         items: {
           slug: string;
+          version: string;
           title: string;
           blocks: { type: string; text: string }[];
         }[];
@@ -160,6 +166,12 @@ export default function InregistrareArtistScreen() {
       return res.data?.items ?? [];
     },
   });
+
+  // The partner agreement is the one read in full here; the rest are short
+  // and open on the website.
+  const allDocs = docsQuery.data ?? [];
+  const mainDoc = allDocs.find((d) => d.slug === "acord-parteneri") ?? allDocs[0];
+  const otherDocs = allDocs.filter((d) => d.slug !== mainDoc?.slug);
 
   async function handleSubmit() {
     setSubmitting(true);
@@ -486,8 +498,14 @@ export default function InregistrareArtistScreen() {
             {/* The documents themselves. Shown, not linked: this is the text
                 whose hash is stored as evidence of what was signed, so it has
                 to be readable in the same place the signature is given. */}
+            {/*
+              The main agreement, opened a section at a time. The other four
+              required documents are listed by name and open on the website —
+              they are short, and stacking five documents inside one scroll
+              box is what made this unreadable in the first place.
+            */}
             <View style={{ gap: 8 }}>
-              <Label>Documentele pe care le semnezi</Label>
+              <Label>Documentul pe care îl semnezi</Label>
               {docsQuery.isLoading ? (
                 <ActivityIndicator color={colors.gold} />
               ) : docsQuery.isError ? (
@@ -497,49 +515,43 @@ export default function InregistrareArtistScreen() {
                   onRetry={() => docsQuery.refetch()}
                   retrying={docsQuery.isFetching}
                 />
-              ) : (
-                <View
-                  style={{
-                    maxHeight: 320,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: 14,
-                  }}
-                >
-                  <ScrollView
-                    nestedScrollEnabled
-                    contentContainerStyle={{ padding: 14, gap: 10 }}
+              ) : mainDoc ? (
+                <DocumentReader
+                  title={mainDoc.title}
+                  version={mainDoc.version}
+                  blocks={mainDoc.blocks}
+                  onAllRead={() => setDocRead(true)}
+                  signature={
+                    signatureName.trim()
+                      ? { name: signatureName.trim() }
+                      : null
+                  }
+                />
+              ) : null}
+
+              {otherDocs.length > 0 && (
+                <View style={{ gap: 5, marginTop: 2 }}>
+                  <Text
+                    style={{ color: colors.mutedForeground, fontSize: 12.5 }}
                   >
-                    {(docsQuery.data ?? []).map((doc) => (
-                      <View key={doc.slug} style={{ gap: 6 }}>
-                        <Text
-                          style={{
-                            color: colors.gold,
-                            fontSize: 14,
-                            fontWeight: "700",
-                          }}
-                        >
-                          {doc.title}
-                        </Text>
-                        {doc.blocks.map((b, i) => (
-                          <Text
-                            key={i}
-                            style={{
-                              color:
-                                b.type === "h2"
-                                  ? colors.foreground
-                                  : colors.mutedForeground,
-                              fontSize: b.type === "h2" ? 13.5 : 12.5,
-                              fontWeight: b.type === "h2" ? "600" : "400",
-                              lineHeight: 19,
-                            }}
-                          >
-                            {b.text}
-                          </Text>
-                        ))}
-                      </View>
-                    ))}
-                  </ScrollView>
+                    Semnezi și, în aceeași formă:
+                  </Text>
+                  {otherDocs.map((d) => (
+                    <Pressable
+                      key={d.slug}
+                      onPress={() => openExternal(`/legal/${d.slug}`)}
+                    >
+                      <Text
+                        style={{
+                          color: colors.gold,
+                          fontSize: 12.5,
+                          textDecorationLine: "underline",
+                        }}
+                      >
+                        {d.title}
+                      </Text>
+                    </Pressable>
+                  ))}
                 </View>
               )}
             </View>
@@ -574,7 +586,7 @@ export default function InregistrareArtistScreen() {
                 }}
               >
                 Am citit și accept documentele de mai sus, inclusiv comisionul
-                de 5% prevăzut în Acordul de Parteneriat.
+                prevăzut în Condițiile de colaborare.
               </Text>
             </Pressable>
 

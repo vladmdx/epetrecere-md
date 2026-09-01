@@ -32,6 +32,7 @@ export default function PartnerLayout() {
         options={{ presentation: "modal", animation: "slide_from_bottom" }}
       />
       <Stack.Screen name="inregistrare" />
+      <Stack.Screen name="documente" />
       <Stack.Screen name="profile/edit" />
       <Stack.Screen
         name="tarife/[id]"
