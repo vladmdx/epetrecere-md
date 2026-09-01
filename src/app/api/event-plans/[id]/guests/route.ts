@@ -82,8 +82,26 @@ export async function POST(
   const body = await req.json().catch(() => null);
   const parsed = createGuestSchema.safeParse(body);
   if (!parsed.success) {
+    /**
+     * A sentence, not "Validation failed".
+     *
+     * The app puts whatever `error` says straight under the field, so a
+     * person adding a guest was told "Validation failed" in English on an
+     * otherwise Romanian screen, with no hint that the party size caps at 8 —
+     * which is the only limit they are likely to hit.
+     */
+    const issue = parsed.error.issues[0];
+    const field = String(issue?.path?.[0] ?? "");
+    const message =
+      field === "fullName"
+        ? "Scrie numele invitatului."
+        : field === "partySize"
+          ? "Numărul de persoane trebuie să fie între 1 și 8. Pentru grupuri mai mari, adaugă mai multe intrări."
+          : field === "kidsCount"
+            ? "Numărul de copii trebuie să fie între 0 și 20."
+            : "Verifică datele introduse și încearcă din nou.";
     return NextResponse.json(
-      { error: "Validation failed", details: parsed.error.issues },
+      { error: message, details: parsed.error.issues },
       { status: 400 },
     );
   }

@@ -150,14 +150,38 @@ function StatChip({
   value: string;
   tone: BadgeTone;
 }) {
+  // The label is plain coloured text, not a Badge. Four pills sharing a row
+  // left no width for "Confirmați" or "În așteptare", so both broke mid-word —
+  // "Confirma / ți". In a stat tile the number is the subject anyway; the
+  // label only has to name it.
+  const labelColor =
+    tone === "success"
+      ? colors.success
+      : tone === "warning"
+        ? colors.warning
+        : tone === "danger"
+          ? colors.danger
+          : colors.mutedForeground;
+
   return (
     <View className="flex-1 items-center rounded-xl border border-border bg-card p-2">
       <Text className="font-heading text-[16px] font-bold text-foreground">
         {value}
       </Text>
-      <Badge tone={tone} size="sm">
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.75}
+        style={{
+          color: labelColor,
+          fontSize: 11.5,
+          fontWeight: "600",
+          marginTop: 2,
+          textAlign: "center",
+        }}
+      >
         {label}
-      </Badge>
+      </Text>
     </View>
   );
 }
@@ -268,8 +292,18 @@ function AddGuestModal({
           fullName: name.trim(),
           guestType,
           partySize: size,
-          contactChannel: "whatsapp",
-          contactValue: contactValue.trim() || null,
+          // Omitted rather than sent as null. The server's field is
+          // `.optional()` without `.nullable()`, so an explicit null is a
+          // validation failure — which meant no guest could be added at all
+          // unless a phone number was typed, on a field labelled optional.
+          // The same mistake was fixed in booking-new and planning; it
+          // survived here.
+          ...(contactValue.trim()
+            ? {
+                contactChannel: "whatsapp",
+                contactValue: contactValue.trim(),
+              }
+            : {}),
         },
       );
       if (!res.ok) {
@@ -314,7 +348,15 @@ function AddGuestModal({
           <Input
             label="Persoane (cu însoțitor)"
             value={partySize}
-            onChangeText={(v) => setPartySize(v.replace(/\D/g, ""))}
+            // Clamped to the range the server accepts. maxLength={2} allowed
+            // any two digits, so a 12 could be typed and only refused after a
+            // round trip — as "Validation failed", which said nothing about
+            // the limit.
+            onChangeText={(v) => {
+              const digits = v.replace(/\D/g, "").slice(0, 2);
+              if (!digits) return setPartySize("");
+              setPartySize(String(Math.min(8, Math.max(1, Number(digits)))));
+            }}
             keyboardType="number-pad"
             maxLength={2}
           />
