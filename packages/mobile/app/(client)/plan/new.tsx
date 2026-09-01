@@ -48,6 +48,19 @@ export default function PlanNewScreen() {
   const [location, setLocation] = useState("Chișinău");
   const [guestCount, setGuestCount] = useState("");
   const [budget, setBudget] = useState("");
+  /**
+   * Which modules the event panel opens with.
+   *
+   * These default to false in the database, and the app never sent them — so
+   * every plan created from the phone opened with the checklist and the guest
+   * list hidden, and no way to turn them on. The home screen's own card
+   * promises "buget, invitați, checklist, totul în app". The web wizard asks
+   * this question on a dedicated step; this is that step, with the answers
+   * pre-selected rather than off, because the app advertised them.
+   */
+  const [checklistEnabled, setChecklistEnabled] = useState(true);
+  const [guestsEnabled, setGuestsEnabled] = useState(true);
+  const [momentsEnabled, setMomentsEnabled] = useState(false);
   const [venueNeeded, setVenueNeeded] = useState(true);
   const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -91,6 +104,9 @@ export default function PlanNewScreen() {
             guestCount && guests > 0 ? guests : undefined,
           budgetTarget: budget && budgetVal >= 0 ? budgetVal : undefined,
           venueNeeded,
+          checklistEnabled,
+          guestsEnabled,
+          momentsEnabled,
           selectedCategories:
             selectedCategories.length > 0 ? selectedCategories : undefined,
         },
@@ -291,6 +307,78 @@ export default function PlanNewScreen() {
         />
 
         {/* Venue needed */}
+        {/* The modules the event panel opens with. Same three the web wizard
+            offers, same wording, so a plan made on a phone and one made in a
+            browser behave alike. */}
+        <View style={{ gap: 10 }}>
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: "600",
+              textTransform: "uppercase",
+              letterSpacing: 2,
+              color: colors.mutedForeground,
+            }}
+          >
+            Ce vrei să folosești
+          </Text>
+          {(
+            [
+              [checklistEnabled, setChecklistEnabled, "Checklist",
+               "Lista pașilor de pregătire, pre-populată după tipul evenimentului."],
+              [guestsEnabled, setGuestsEnabled, "Listă invitați",
+               "RSVP și alocare la mese, toate datele într-un singur loc."],
+              [momentsEnabled, setMomentsEnabled, "Photo Moments",
+               "Invitații scanează un QR și încarcă poze, fără cont și fără aplicație."],
+            ] as const
+          ).map(([on, set, title, desc]) => (
+            <Pressable
+              key={title}
+              onPress={() => set(!on)}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+              style={{
+                flexDirection: "row",
+                gap: 12,
+                alignItems: "flex-start",
+                borderWidth: 1,
+                borderRadius: 14,
+                padding: 13,
+                borderColor: on ? colors.gold : colors.border,
+                backgroundColor: on ? "rgba(201,168,76,0.10)" : "transparent",
+              }}
+            >
+              <View
+                style={{
+                  width: 22,
+                  height: 22,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  marginTop: 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderColor: on ? colors.gold : colors.border,
+                  backgroundColor: on ? colors.gold : "transparent",
+                }}
+              >
+                {on && (
+                  <Text style={{ color: colors.background, fontSize: 13, fontWeight: "700" }}>
+                    ✓
+                  </Text>
+                )}
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={{ color: colors.foreground, fontSize: 14.5, fontWeight: "600" }}>
+                  {title}
+                </Text>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12.5, lineHeight: 18 }}>
+                  {desc}
+                </Text>
+              </View>
+            </Pressable>
+          ))}
+        </View>
+
         <View>
           <Text
             className="mb-2 text-[12px] font-semibold uppercase tracking-widest text-muted-foreground"

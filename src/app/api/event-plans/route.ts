@@ -64,6 +64,14 @@ const createPlanSchema = z.object({
    *  caller can immediately bounce the user to /cabinet/moments/{id}.
    *  Used by /utilitati/momente-eveniment and the cabinet moments hub. */
   momentsEnabled: z.boolean().optional(),
+  /** Which modules the event panel opens with. Both default to false in the
+   *  column, and until now only the web wizard could turn them on — through a
+   *  separate step the app does not have. So every plan created from the
+   *  phone opened with the checklist and the guest list hidden, and nothing
+   *  in the app could reveal them, under a card promising "buget, invitați,
+   *  checklist, totul în app". */
+  checklistEnabled: z.boolean().optional(),
+  guestsEnabled: z.boolean().optional(),
 });
 
 /** Random base36 slug for /moments/[slug]. Same recipe as the
@@ -120,7 +128,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { eventDate, selectedCategories, momentsEnabled, ...rest } = parsed.data;
+  const {
+    eventDate,
+    selectedCategories,
+    momentsEnabled,
+    checklistEnabled,
+    guestsEnabled,
+    ...rest
+  } = parsed.data;
 
   const [plan] = await db
     .insert(eventPlans)
@@ -133,6 +148,8 @@ export async function POST(req: NextRequest) {
       // the public slug so the caller can deep-link straight into the
       // dashboard without a separate /api/event-plans/[id]/moments POST.
       momentsEnabled: momentsEnabled ?? false,
+      checklistEnabled: checklistEnabled ?? false,
+      guestsEnabled: guestsEnabled ?? false,
       momentsSlug: momentsEnabled ? randomMomentsSlug() : null,
     })
     .returning();
