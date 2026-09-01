@@ -436,7 +436,7 @@ function NextEventCard({
       <View className="gap-3 p-4">
         <View className="aspect-[16/10] w-full overflow-hidden rounded-xl">
           <Image
-            source={{ uri: image }}
+            source={{ uri: mediaUrl(image)! }}
             style={{ width: "100%", height: "100%" }}
             contentFit="cover"
             transition={200}

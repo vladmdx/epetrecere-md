@@ -3,6 +3,7 @@
 // tour link, facilities list.
 
 import { useState, useRef } from "react";
+import { mediaUrl } from "../../../lib/links";
 import {
   View,
   Text,
@@ -140,7 +141,7 @@ export default function VenueDetailScreen() {
             {gallery.map((src, i) => (
               <Image
                 key={i}
-                source={{ uri: src }}
+                source={{ uri: mediaUrl(src)! }}
                 style={{ width: SCREEN_WIDTH, height: GALLERY_HEIGHT }}
                 contentFit="cover"
                 transition={200}

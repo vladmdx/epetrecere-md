@@ -10,6 +10,7 @@
 // then refetch the photo list to show the new entry.
 
 import { useState, useCallback } from "react";
+import { mediaUrl } from "../../../lib/links";
 import {
   View,
   Text,
@@ -225,7 +226,7 @@ export default function MomentsScreen() {
             className="overflow-hidden rounded-lg"
           >
             <Image
-              source={{ uri: item.url }}
+              source={{ uri: mediaUrl(item.url)! }}
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
               transition={150}
@@ -300,7 +301,7 @@ export default function MomentsScreen() {
                   }}
                 >
                   <Image
-                    source={{ uri: item.url }}
+                    source={{ uri: mediaUrl(item.url)! }}
                     style={{ width: SCREEN_WIDTH, aspectRatio: 1 }}
                     contentFit="contain"
                     transition={200}

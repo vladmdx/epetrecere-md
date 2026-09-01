@@ -15,6 +15,7 @@
 // tab.
 
 import { useMemo } from "react";
+import { mediaUrl } from "../../../lib/links";
 import {
   View,
   Text,
@@ -411,7 +412,7 @@ function HeroCard({
         <Pressable onPress={onPressOpen}>
           <View className="aspect-[4/3] w-32 overflow-hidden rounded-xl border border-border">
             <Image
-              source={{ uri: "/images/backgrounds/party-dance.jpg" }}
+              source={{ uri: mediaUrl("/images/backgrounds/party-dance.jpg")! }}
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
               transition={200}
