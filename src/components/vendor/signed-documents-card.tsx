@@ -17,6 +17,9 @@ import { FileSignature, Loader2 } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 
 interface Acceptance {
+  /** Frozen copy of what was signed, when the acceptance carries one. */
+  documentBlocks?: { type: string; text: string }[] | null;
+  documentTitleStored?: string | null;
   id: number;
   subjectType: string;
   documentSlug: string;
@@ -37,6 +40,7 @@ interface Acceptance {
 
 export function SignedDocumentsCard() {
   const { t } = useLocale();
+  const [openDoc, setOpenDoc] = useState<number | null>(null);
   const [items, setItems] = useState<Acceptance[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -113,20 +117,83 @@ export function SignedDocumentsCard() {
                     <ul className="mt-3 space-y-2">
                       {group.map((d) => (
                         <li key={d.id} className="text-xs">
-                          <a
-                            href={`/legal/${d.documentSlug}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-gold hover:underline"
-                          >
-                            {d.documentTitle}
-                          </a>{" "}
+                          {/*
+                            Opens the copy stored with the signature, not
+                            /legal/<slug>. That link pointed at whatever the
+                            pack says today: the moment a document is
+                            superseded — as the partner agreement just was —
+                            it stops being what this person signed.
+                          */}
+                          {d.documentBlocks?.length ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setOpenDoc(openDoc === d.id ? null : d.id)
+                              }
+                              className="text-gold hover:underline"
+                            >
+                              {d.documentTitleStored ?? d.documentTitle}
+                            </button>
+                          ) : (
+                            <a
+                              href={`/legal/${d.documentSlug}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-gold hover:underline"
+                              title="Semnat înainte ca textul să fie păstrat pe acceptare — se deschide versiunea publicată."
+                            >
+                              {d.documentTitle}
+                            </a>
+                          )}{" "}
                           <span className="text-muted-foreground">
                             v{d.documentVersion}
                           </span>
                           <span className="block break-all font-mono text-[11px] text-muted-foreground/70">
                             {t("vendor.signedDocs.hash")}: {d.contentHash ?? "—"}
                           </span>
+                          {openDoc === d.id && d.documentBlocks?.length ? (
+                            <div className="mt-2 max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-3">
+                              {d.documentBlocks.map((b, bi) =>
+                                b.type === "h2" ? (
+                                  <p
+                                    key={bi}
+                                    className="pt-2 font-heading text-[12px] font-bold"
+                                  >
+                                    {b.text}
+                                  </p>
+                                ) : (
+                                  <p
+                                    key={bi}
+                                    className="text-[11.5px] leading-relaxed text-muted-foreground"
+                                  >
+                                    {b.text}
+                                  </p>
+                                ),
+                              )}
+                              <div className="mt-3 border-t border-border pt-2">
+                                <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                                  Semnat de
+                                </p>
+                                <p className="text-[12px] font-semibold">
+                                  {g.signatureName}
+                                </p>
+                                <p className="text-[11px] text-muted-foreground">
+                                  {new Date(g.acceptedAt).toLocaleDateString(
+                                    "ro-RO",
+                                    { day: "numeric", month: "long", year: "numeric" },
+                                  )}
+                                </p>
+                                {g.signatureImage && (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={g.signatureImage}
+                                    alt="Semnătura"
+                                    className="mt-1 h-14 rounded bg-white p-1"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

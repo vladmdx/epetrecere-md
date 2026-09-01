@@ -63,6 +63,11 @@ export async function GET() {
       signatureName: legalAcceptances.signatureName,
       signatureImage: legalAcceptances.signatureImage,
       representativeRole: legalAcceptances.representativeRole,
+      // The frozen copy, so a partner re-reads what they signed rather than
+      // whatever the pack says today.
+      documentTitleStored: legalAcceptances.documentTitle,
+      documentBlocks: legalAcceptances.documentBlocks,
+      deviceSummary: legalAcceptances.deviceSummary,
       acceptedAt: legalAcceptances.acceptedAt,
       ipAddress: legalAcceptances.ipAddress,
       userAgent: legalAcceptances.userAgent,

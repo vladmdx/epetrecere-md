@@ -344,6 +344,14 @@ export function ESignature({
                   setContractRead(true);
                   emit(ticked, name, signature, true);
                 }}
+                // Shown at the foot of the document as it is given, so the
+                // page reads as a signed contract rather than a form sitting
+                // next to one.
+                signature={
+                  name.trim()
+                    ? { name: name.trim(), image: signature.dataUrl }
+                    : null
+                }
               />
             </div>
           )}

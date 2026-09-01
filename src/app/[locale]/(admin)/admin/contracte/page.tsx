@@ -55,6 +55,9 @@ export default async function AdminContractsPage({
       email: legalAcceptances.email,
       phone: legalAcceptances.phone,
       contentHash: legalAcceptances.contentHash,
+      documentTitleStored: legalAcceptances.documentTitle,
+      documentBlocks: legalAcceptances.documentBlocks,
+      deviceSummary: legalAcceptances.deviceSummary,
       userEmail: users.email,
       userName: users.name,
     })
@@ -207,6 +210,38 @@ export default async function AdminContractsPage({
                                 {t("adminUi.contracts.contentHash", locale)}:{" "}
                                 {d.contentHash ?? "—"}
                               </span>
+                              {/*
+                                The document as signed, frozen on the row.
+                                The link above points at whatever the pack
+                                says today — which, once a document is
+                                superseded, is not what this person agreed to.
+                                Collapsed by default: a contract is long and
+                                an administrator is usually scanning a list.
+                              */}
+                              {d.documentBlocks?.length ? (
+                                <details className="mt-1">
+                                  <summary className="cursor-pointer text-[11px] text-gold">
+                                    Textul semnat ({d.documentBlocks.length} blocuri)
+                                  </summary>
+                                  <div className="mt-2 max-h-[28rem] space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-3">
+                                    {d.documentBlocks.map((b, bi) =>
+                                      b.type === "h2" ? (
+                                        <p key={bi} className="pt-2 font-heading text-[12px] font-bold">
+                                          {b.text}
+                                        </p>
+                                      ) : (
+                                        <p key={bi} className="text-[11.5px] leading-relaxed text-muted-foreground">
+                                          {b.text}
+                                        </p>
+                                      ),
+                                    )}
+                                  </div>
+                                </details>
+                              ) : (
+                                <span className="block text-[11px] text-muted-foreground/70">
+                                  Semnat înainte ca textul să fie păstrat pe acceptare.
+                                </span>
+                              )}
                             </li>
                           );
                         })}
@@ -275,8 +310,16 @@ export default async function AdminContractsPage({
                             <dt className="shrink-0">
                               {t("adminUi.contracts.device", locale)}
                             </dt>
-                            <dd className="break-all font-mono text-foreground/80">
-                              {g.userAgent ?? "—"}
+                            <dd className="text-foreground/80">
+                              {/* The readable summary is the answer; the raw
+                                  string stays underneath because it is the
+                                  actual evidence and the summary is derived. */}
+                              {g.deviceSummary ?? "—"}
+                              {g.userAgent && (
+                                <span className="mt-1 block break-all font-mono text-[10.5px] text-muted-foreground/70">
+                                  {g.userAgent}
+                                </span>
+                              )}
                             </dd>
                           </div>
                         </dl>
