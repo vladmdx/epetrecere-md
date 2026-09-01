@@ -28,8 +28,28 @@ export interface VenueTier {
   fixedAmount: number | null;
 }
 
+/**
+ * One band of a venue's fee schedule. `maxGuests` is an INCLUSIVE upper
+ * bound, matching how the signed agreement words them — "până la 80
+ * invitați" means 80 pays the lower fee. The old single-threshold code split
+ * on `guests >= threshold`, so a booking with exactly 80 guests was billed
+ * the upper rate, against the contract.
+ *
+ * `maxGuests: null` is the open-ended top band.
+ */
+export interface VenueBand {
+  maxGuests: number | null;
+  fixedAmount: number;
+}
+
 export interface CommissionRules {
   artist: { rateBps: number };
+  /**
+   * Fixed venue fees per event type, from §11.3 of the partner agreement.
+   * Keyed by the platform's own event-type keys; an event type with no
+   * schedule falls through to `venue` below.
+   */
+  venueSchedules: Record<string, VenueBand[]>;
   venue: {
     /** Guest count at which the tier switches. `below` applies to < threshold. */
     guestThreshold: number;
@@ -46,8 +66,54 @@ export interface CommissionRules {
  * and charge a venue for it. `computeCommission` returns null for venues while
  * they are unset.
  */
+/**
+ * §11.3 of the agreement, as data. Ordered by band, lowest first.
+ *
+ * The document names five event categories; the platform has ten event
+ * types, so the rest are mapped to the nearest named one. `other` and the
+ * ceremonies fall under "Banchet mic / alt eveniment", which the document
+ * defines only up to 30 guests — above that it prescribes nothing, and this
+ * charges nothing rather than inventing a figure.
+ */
+export const VENUE_SCHEDULES_FROM_AGREEMENT: Record<string, VenueBand[]> = {
+  // Nuntă — orice dimensiune
+  wedding: [{ maxGuests: null, fixedAmount: 200 }],
+  // Cumătrie
+  cumatrie: [
+    { maxGuests: 80, fixedAmount: 100 },
+    { maxGuests: null, fixedAmount: 150 },
+  ],
+  baptism: [
+    { maxGuests: 80, fixedAmount: 100 },
+    { maxGuests: null, fixedAmount: 150 },
+  ],
+  // Zi de naștere / jubileu
+  birthday: [
+    { maxGuests: 40, fixedAmount: 50 },
+    { maxGuests: 80, fixedAmount: 80 },
+    { maxGuests: null, fixedAmount: 100 },
+  ],
+  kids_birthday: [
+    { maxGuests: 40, fixedAmount: 50 },
+    { maxGuests: 80, fixedAmount: 80 },
+    { maxGuests: null, fixedAmount: 100 },
+  ],
+  // Corporativ
+  corporate: [
+    { maxGuests: 80, fixedAmount: 100 },
+    { maxGuests: 150, fixedAmount: 150 },
+    { maxGuests: null, fixedAmount: 200 },
+  ],
+  // Banchet mic / alt eveniment — defined only to 30 guests
+  other: [{ maxGuests: 30, fixedAmount: 50 }],
+  proposal: [{ maxGuests: 30, fixedAmount: 50 }],
+  cununie: [{ maxGuests: 30, fixedAmount: 50 }],
+  concert: [{ maxGuests: 30, fixedAmount: 50 }],
+};
+
 export const DEFAULT_RULES: CommissionRules = {
   artist: { rateBps: DEFAULT_ARTIST_RATE_BPS },
+  venueSchedules: VENUE_SCHEDULES_FROM_AGREEMENT,
   venue: {
     guestThreshold: DEFAULT_VENUE_GUEST_THRESHOLD,
     below: { rateBps: null, fixedAmount: null },
@@ -67,10 +133,22 @@ export function normalizeRules(stored: unknown): CommissionRules {
     rateBps: numOrNull(t?.rateBps),
     fixedAmount: numOrNull(t?.fixedAmount),
   });
+  // Schedules come from the agreement unless an admin has stored their own.
+  // A stored value replaces the whole map rather than merging per key: a
+  // half-overridden fee table is harder to reason about than either one.
+  const storedSchedules = r.venueSchedules;
+  const venueSchedules =
+    storedSchedules &&
+    typeof storedSchedules === "object" &&
+    Object.keys(storedSchedules).length
+      ? (storedSchedules as Record<string, VenueBand[]>)
+      : VENUE_SCHEDULES_FROM_AGREEMENT;
+
   return {
     artist: {
       rateBps: numOrNull(r.artist?.rateBps) ?? DEFAULT_ARTIST_RATE_BPS,
     },
+    venueSchedules,
     venue: {
       guestThreshold:
         numOrNull(venue.guestThreshold) ?? DEFAULT_VENUE_GUEST_THRESHOLD,
@@ -91,12 +169,18 @@ export interface CommissionInput {
   baseAmount: number;
   /** Needed to pick the venue tier; ignored for artists. */
   guestCount?: number | null;
+  /**
+   * Which schedule applies. The agreement prices a venue by event type as
+   * well as by size, so without this the fee cannot be determined at all.
+   */
+  eventType?: string | null;
 }
 
 export interface CommissionResult {
   amount: number;
   rateBps: number | null;
-  tier: "artist_flat" | "venue_below" | "venue_at_or_above";
+  /** `venue_band:<eventType>:<index>` for a scheduled fee. */
+  tier: string;
   currency: string;
 }
 
@@ -124,8 +208,34 @@ export function computeCommission(
     };
   }
 
-  // Venue: pick the tier by guest count. Unknown guest count is treated as
-  // below the threshold (the cheaper/safer assumption for the venue).
+  // Venue: the agreement prices by event type first, then by size.
+  const schedule = input.eventType
+    ? rules.venueSchedules?.[input.eventType]
+    : undefined;
+  if (schedule?.length) {
+    // Bands are ordered lowest first and their upper bounds are INCLUSIVE.
+    // An unknown guest count takes the lowest band — the cheaper assumption,
+    // and the one that cannot overcharge a venue on missing data.
+    const guests = input.guestCount ?? 0;
+    const idx = schedule.findIndex(
+      (b) => b.maxGuests == null || guests <= b.maxGuests,
+    );
+    // No band covers this size — the agreement prescribes nothing above the
+    // last bound for this event type, so nothing is owed. Charging an
+    // invented figure would be worse than charging none.
+    if (idx === -1) return null;
+    const band = schedule[idx]!;
+    if (!(band.fixedAmount > 0)) return null;
+    return {
+      amount: Math.round(band.fixedAmount),
+      rateBps: null,
+      tier: `venue_band:${input.eventType}:${idx}`,
+      currency: rules.currency,
+    };
+  }
+
+  // Legacy single-threshold path, kept for a stored override that predates
+  // the per-event schedules.
   const guests = input.guestCount ?? 0;
   const atOrAbove = guests >= rules.venue.guestThreshold;
   const tierCfg = atOrAbove ? rules.venue.atOrAbove : rules.venue.below;

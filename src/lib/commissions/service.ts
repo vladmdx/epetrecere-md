@@ -72,6 +72,10 @@ export async function ensureCommissionForBooking(
       status: bookingRequests.status,
       agreedPrice: bookingRequests.agreedPrice,
       guestCount: bookingRequests.guestCount,
+      // The agreement prices a venue by event type as well as by size, so the
+      // fee cannot be worked out without it. It was not selected before,
+      // because until now the venue tiers were a single global threshold.
+      eventType: bookingRequests.eventType,
       source: bookingRequests.source,
     })
     .from(bookingRequests)
@@ -117,7 +121,12 @@ export async function ensureCommissionForBooking(
   const baseAmount = b.agreedPrice ?? 0;
   const rules = await getCommissionRules();
   const result = computeCommission(
-    { vendorType, baseAmount, guestCount: b.guestCount },
+    {
+      vendorType,
+      baseAmount,
+      guestCount: b.guestCount,
+      eventType: b.eventType,
+    },
     rules,
   );
   if (!result) return null;
