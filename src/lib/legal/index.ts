@@ -27,8 +27,16 @@ export interface LegalDocument {
 
 export const LEGAL_DOCUMENTS = raw as unknown as LegalDocument[];
 
-/** Current pack version, shown next to acceptance records. */
-export const LEGAL_PACK_VERSION = "1.0";
+/**
+ * Current pack version, shown next to acceptance records.
+ *
+ * Bumped to 2.0 when `acord-parteneri` was replaced: the old text was a
+ * 31-article agreement, the new one the 23-section "Condiții de colaborare"
+ * that covers partners and venues alike. Signatures already collected attest
+ * to the 1.0 text and its hash and stay valid for it — the version on the row
+ * is what says which document a person actually signed.
+ */
+export const LEGAL_PACK_VERSION = "2.0";
 
 export function getLegalDocument(slug: string): LegalDocument | null {
   return LEGAL_DOCUMENTS.find((d) => d.slug === slug) ?? null;
@@ -54,6 +62,10 @@ export const PARTNER_REQUIRED_DOCS = [
 ] as const;
 
 export const VENUE_REQUIRED_DOCS = [
+  // Venues sign the same conditions as partners — §9 of that document is
+  // written for them, and the fixed-fee table in §11.3 applies only to them.
+  // `acord-locatii` stays alongside it for the venue-specific terms.
+  "acord-parteneri",
   "acord-locatii",
   "termeni-generali",
   "politica-confidentialitate",

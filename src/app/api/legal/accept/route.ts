@@ -18,6 +18,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createHash } from "node:crypto";
+import { describeDevice } from "@/lib/legal/device";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { legalAcceptances, notifications, users, artists, venues } from "@/lib/db/schema";
@@ -25,7 +26,9 @@ import {
   LEGAL_PACK_VERSION,
   getLegalDocument,
   legalBlocks,
+  legalBlocksFor,
   legalTitle,
+  type PartnerType,
   PARTNER_REQUIRED_DOCS,
   VENUE_REQUIRED_DOCS,
 } from "@/lib/legal";
@@ -190,11 +193,35 @@ export async function POST(req: NextRequest) {
     acceptedAt: Date;
   }[] = [];
 
+  const device = describeDevice(ua, req.headers.get("x-client"));
+
   for (const slug of slugs) {
     const doc = getLegalDocument(slug);
     if (!doc) continue;
-    // Hash exactly what the signer was shown, so later edits are detectable.
-    const text = legalBlocks(doc, locale).map((b) => b.text).join("\n");
+
+    /**
+     * The blocks the signer actually saw — annex included.
+     *
+     * This used to hash `legalBlocks`, the base text, while the signing screen
+     * rendered `legalBlocksFor`, which appends the partner's own Annex 5 built
+     * from the identity they had just typed. The attestation was therefore
+     * narrower than the display: the one part of the document unique to this
+     * signer sat outside the thing that proves what they signed.
+     */
+    // Only when the party details are actually there. legalBlocksFor falls
+    // back to the plain document otherwise, which is the right answer for a
+    // signer who gave none.
+    const shown =
+      identity.partnerType && identity.legalName
+        ? legalBlocksFor(doc, locale, {
+            partnerType: identity.partnerType as PartnerType,
+            legalName: identity.legalName,
+            idNumber: identity.idNumber,
+            legalAddress: identity.legalAddress,
+            representativeName: identity.representativeName,
+          })
+        : legalBlocks(doc, locale);
+    const text = shown.map((b) => b.text).join("\n");
     const contentHash = createHash("sha256").update(text).digest("hex");
 
     const [inserted] = await db
@@ -211,6 +238,13 @@ export async function POST(req: NextRequest) {
         signatureName,
         signatureImage,
         representativeRole: body.representativeRole ?? null,
+        // Frozen with the signature. documents.json keeps one version per
+        // slug, so without this the wording a person agreed to disappears the
+        // moment the document is superseded — which is exactly what replacing
+        // the partner agreement with v2.0 just did to every earlier signature.
+        documentTitle: legalTitle(doc, locale),
+        documentBlocks: shown,
+        deviceSummary: device,
         partnerType: identity.partnerType,
         legalName: identity.legalName,
         idNumber: identity.idNumber,

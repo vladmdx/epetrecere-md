@@ -1,3048 +1,634 @@
 [
   {
     "slug": "acord-parteneri",
-    "version": "1.0",
+    "version": "2.0",
     "order": 1,
     "title": {
-      "ro": "Acord de colaborare cu Partenerii",
-      "ru": "Соглашение о сотрудничестве с Партнёрами",
-      "en": "Partner Collaboration Agreement"
+      "ro": "Condițiile de colaborare pentru parteneri și locații",
+      "ru": "Условия сотрудничества для партнёров и локаций",
+      "en": "Terms of cooperation for partners and venues"
     },
     "blocks": {
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE LEGAL | Acord pentru Parteneri v1.0 EPETRECERE ACORD DE COLABORARE CU PARTENERII PLATFORMEI Versiunea 1.0 | Republica Moldova | 2026 Operator EPETRECERE S.R.L. Site epetrecere.md Data intrării în vigoare 20 iulie 2026 Statut În vigoare Limba prioritară Româna. Versiunile în rusă și engleză sunt traduceri de curtoazie; în caz de divergență prevalează textul român. EPETRECERE LEGAL | Acord pentru Parteneri v1.0 Istoricul versiunilor Versiune Data Statut Descriere"
+          "text": "CONDIȚIILE DE COLABORARE PENTRU PARTENERII ȘI LOCAȚIILE PLATFORMEI epetrecere.md"
         },
         {
           "type": "p",
-          "text": "1.0 20 iulie 2026 În vigoare Prima versiune consolidată Cuprins"
+          "text": "Acord electronic. Versiunea 2.0. Data intrării în vigoare: 1 septembrie 2026. Limba care prevalează: româna."
         },
         {
-          "type": "h2",
-          "text": "1. 1. Dispoziții generale"
-        },
-        {
-          "type": "h2",
-          "text": "2. 2. Termeni și definiții"
-        },
-        {
-          "type": "h2",
-          "text": "3. 3. Statutul Platformei"
-        },
-        {
-          "type": "h2",
-          "text": "4. 4. Acceptarea electronică și dovada încheierii"
-        },
-        {
-          "type": "h2",
-          "text": "5. 5. Înregistrarea și statutul Partenerului"
-        },
-        {
-          "type": "h2",
-          "text": "6. 6. Verificarea"
-        },
-        {
-          "type": "h2",
-          "text": "7. 7. Profilul și Conținutul"
-        },
-        {
-          "type": "h2",
-          "text": "8. 8. Calendarul, prețurile și condițiile comerciale"
-        },
-        {
-          "type": "h2",
-          "text": "9. 9. Solicitările, chatul și contactele"
-        },
-        {
-          "type": "h2",
-          "text": "10. 10. Confirmarea și modificarea Comenzii"
-        },
-        {
-          "type": "h2",
-          "text": "11. 11. Remunerația de serviciu de 5%"
-        },
-        {
-          "type": "h2",
-          "text": "12. 12. Facturarea, termenele și datoria"
-        },
-        {
-          "type": "h2",
-          "text": "13. 13. Anularea, neprezentarea și restituirile"
-        },
-        {
-          "type": "h2",
-          "text": "14. 14. Interdicția eludării Platformei"
-        },
-        {
-          "type": "h2",
-          "text": "15. 15. Drepturile și obligațiile Partenerului"
-        },
-        {
-          "type": "h2",
-          "text": "16. 16. Drepturile și obligațiile Operatorului"
-        },
-        {
-          "type": "h2",
-          "text": "17. 17. Ratingul, recenziile și clasarea"
-        },
-        {
-          "type": "h2",
-          "text": "18. 18. Sisteme automatizate și inteligență artificială"
-        },
-        {
-          "type": "h2",
-          "text": "19. 19. Proprietatea intelectuală a Operatorului"
-        },
-        {
-          "type": "h2",
-          "text": "20. 20. Date cu caracter personal"
-        },
-        {
-          "type": "h2",
-          "text": "21. 21. Confidențialitatea"
-        },
-        {
-          "type": "h2",
-          "text": "22. 22. Securitatea informațională"
-        },
-        {
-          "type": "h2",
-          "text": "23. 23. Reclamații, verificări și moderare"
-        },
-        {
-          "type": "h2",
-          "text": "24. 24. Limitarea răspunderii Operatorului"
-        },
-        {
-          "type": "h2",
-          "text": "25. 25. Răspunderea Partenerului și despăgubirea"
-        },
-        {
-          "type": "h2",
-          "text": "26. 26. Forța majoră"
-        },
-        {
-          "type": "h2",
-          "text": "27. 27. Durata, suspendarea și încetarea"
-        },
-        {
-          "type": "h2",
-          "text": "28. 28. Modificarea Acordului și tarifelor"
-        },
-        {
-          "type": "h2",
-          "text": "29. 29. Notificări"
-        },
-        {
-          "type": "h2",
-          "text": "30. 30. Legea aplicabilă și litigiile"
-        },
-        {
-          "type": "h2",
-          "text": "31. 31. Dispoziții finale"
-        },
-        {
-          "type": "h2",
-          "text": "32. Anexa 1. Tarife și calcul"
-        },
-        {
-          "type": "h2",
-          "text": "33. Anexa 2. Standarde de calitate"
-        },
-        {
-          "type": "h2",
-          "text": "34. Anexa 3. Înregistrarea tehnică a acceptării"
-        },
-        {
-          "type": "p",
-          "text": "EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
-        },
-        {
-          "type": "h2",
-          "text": "35. Anexa 4. Rechizitele Operatorului"
-        },
-        {
-          "type": "p",
-          "text": "EPETRECERE LEGAL | Acord pentru Parteneri v1.0 Baza juridică a versiunii Codul civil al Republicii Moldova; Legea nr. 284/2004 privind comerțul electronic; Legea nr. 124/2022 privind identificarea electronică și serviciile de încredere; legislația privind protecția datelor, inclusiv trecerea la Legea nr. 195/2024 din 23 august 2026. Referințele normative au caracter informativ. În cazul modificării legii se aplică normele imperative în vigoare."
-        },
-        {
-          "type": "h2",
-          "text": "1. Dispoziții generale"
-        },
-        {
-          "type": "p",
-          "text": "1.1. Prezentul Acord de colaborare pentru partenerii platformei EPETRECERE (denumit în continuare „Acordul”) reglementează raporturile dintre EPETRECERE S.R.L., persoană juridică constituită și activând conform legislației Republicii Moldova (denumită în continuare „Operatorul”), și persoana care se înregistrează pe Platformă pentru a oferi servicii legate de organizarea și desfășurarea evenimentelor (denumită în continuare „Partenerul”)."
-        },
-        {
-          "type": "p",
-          "text": "1.2. Partener poate fi o persoană fizică cu capacitate deplină de exercițiu, un întreprinzător individual, o gospodărie țărănească, un profesionist, o altă formă de activitate independentă permisă de lege sau o persoană juridică. Persoana care creează contul în numele unei organizații declară că dispune de împuterniciri suficiente pentru acceptarea Acordului în numele acesteia."
-        },
-        {
-          "type": "p",
-          "text": "1.3. Acordul se încheie prin aderare electronică la momentul înregistrării. Acceptarea este integrală și include anexele sale."
-        },
-        {
           "type": "p",
-          "text": "1.4. Versiunea în limba română este versiunea principală. Versiunea rusă este oferită pentru comoditate. În caz de neconcordanță prevalează versiunea română, cu excepția situațiilor în care normele imperative prevăd altfel."
+          "text": "Prezentele Condiții de colaborare, denumite în continuare „Condiții”, reglementează înregistrarea partenerilor și a locațiilor, moderarea profilurilor, utilizarea platformei digitale, primirea solicitărilor, comunicarea cu clienții, transmiterea ofertelor, confirmarea comenzilor, achitarea remunerației Platformei și interdicția de ocolire a Platformei."
         },
         {
           "type": "p",
-          "text": "1.5. Acordul se aplică împreună cu Politica de confidențialitate, Regulile Platformei, Politica de conținut, Regulile privind recenziile, tarifele și celelalte documente indicate expres drept părți integrante."
+          "text": "Prezentele Condiții constituie un acord electronic între EPETRECERE S.R.L., IDNO 1026023123354, cu sediul în MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova, denumită în continuare „Platforma”, și persoana care se înregistrează sau utilizează epetrecere.md în calitate de prestator de servicii sau locație, denumită în continuare „Partener”."
         },
         {
           "type": "h2",
-          "text": "2. Termeni și definiții"
-        },
-        {
-          "type": "p",
-          "text": "2.1. „Platforma” înseamnă site-ul epetrecere.md, aplicațiile mobile, conturile personale, interfețele software și serviciile digitale conexe ale Operatorului."
-        },
-        {
-          "type": "p",
-          "text": "2.2. „Clientul” este utilizatorul care caută, solicită, rezervă sau achiziționează serviciile Partenerului prin intermediul Platformei."
-        },
-        {
-          "type": "p",
-          "text": "2.3. „Solicitarea” este cererea electronică transmisă de Client unuia sau mai multor Parteneri prin funcționalitatea Platformei."
+          "text": "1. Acceptarea electronică a Condițiilor"
         },
         {
           "type": "p",
-          "text": "2.4. „Comanda confirmată” este Solicitarea acceptată de Partener prin acțiunea prevăzută de Platformă ori tranzacția a cărei încheiere rezultă din ansamblul datelor electronice și al circumstanțelor de fapt."
+          "text": "1.1. Partenerul acceptă prezentele Condiții la înregistrarea pe epetrecere.md prin bifarea câmpului „Accept Condițiile de colaborare pentru partenerii epetrecere.md”, apăsarea butonului „Înregistrare”, „Devino partener”, „Trimite formularul”, „Accept condițiile” sau printr-o acțiune similară."
         },
         {
           "type": "p",
-          "text": "2.5. „Prețul Comenzii” este remunerația totală a Partenerului pentru Comanda respectivă, inclusiv suplimentele obligatorii și serviciile suplimentare convenite. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
+          "text": "1.2. Acceptarea Condițiilor înseamnă că Partenerul a citit Condițiile, le înțelege și este de acord să le respecte."
         },
         {
           "type": "p",
-          "text": "2.6. „Remunerația de serviciu” este plata datorată Operatorului pentru infrastructura digitală, atragerea Clientului, instrumentele de căutare, comunicare, rezervare, administrare, promovare, analiză și suport. Nivelul de bază este de 5% din Prețul Comenzii."
+          "text": "1.3. Din momentul acceptării electronice, între Platformă și Partener se naște un acord obligatoriu."
         },
         {
           "type": "p",
-          "text": "2.7. „Eludarea Platformei” înseamnă acțiunile destinate ascunderii, anulării formale sau transferării în afara Platformei a unei tranzacții inițiate prin aceasta, în scopul evitării totale sau parțiale a Remunerației de serviciu ori a regulilor Platformei."
+          "text": "1.4. Platforma are dreptul să păstreze dovezi tehnice ale acceptării: ID-ul partenerului, numele/denumirea, e-mailul, telefonul, adresa IP, data și ora, dispozitivul, versiunea Condițiilor și textul bifei acceptate."
         },
         {
           "type": "p",
-          "text": "2.8. „Conținutul” include textele, imaginile, logourile, materialele video și audio, listele de prețuri, documentele, mesajele și celelalte materiale încărcate sau transmise de Partener."
+          "text": "1.5. Dacă Partenerul nu este de acord cu prezentele Condiții, acesta nu are dreptul să se înregistreze și să utilizeze funcționalitățile pentru parteneri."
         },
         {
-          "type": "p",
-          "text": "2.9. „Jurnalele electronice” sunt înregistrările automate privind înregistrarea, acceptarea, autentificarea, acțiunile, mesajele, notificările, modificările profilului, Solicitările, Comenzile și plățile."
-        },
-        {
           "type": "h2",
-          "text": "3. Statutul Platformei"
-        },
-        {
-          "type": "p",
-          "text": "3.1. EPETRECERE este o platformă digitală și un furnizor de servicii informaționale și tehnologice. În lipsa unui document special, Operatorul nu prestează serviciile Partenerului, nu este organizatorul evenimentului, angajator, reprezentant, agent, comisionar, asigurător, garant sau participant la o activitate comună a Partenerului."
-        },
-        {
-          "type": "p",
-          "text": "3.2. Contractul privind serviciul concret se încheie direct între Client și Partener. Partenerul răspunde pentru descriere, preț, legalitate, calitate, siguranță, termene și rezultat."
+          "text": "2. Definiții"
         },
         {
           "type": "p",
-          "text": "3.3. Operatorul nu garantează un număr minim de Solicitări, venituri, vizualizări, o poziție în rezultate sau un rezultat comercial."
+          "text": "Platforma epetrecere.md — serviciu digital online, portal web, aplicație mobilă, cabinete personale, sistem de solicitări, chat, calendar și notificări."
         },
         {
           "type": "p",
-          "text": "3.4. Operatorul poate introduce modele distincte de plată, abonamente, promovare, publicitate, tranzacții protejate, integrări de plată și categorii noi prin condiții speciale."
-        },
-        {
-          "type": "h2",
-          "text": "4. Acceptarea electronică și dovada încheierii"
+          "text": "Partener — prestator de servicii aprobat de Platformă: moderator, DJ, formație muzicală, artist, fotograf, videograf, decorator, colectiv de dans, sală, restaurant sau altă locație."
         },
         {
           "type": "p",
-          "text": "4.1. Înainte de finalizarea înregistrării, Partenerului i se oferă posibilitatea de a deschide și salva versiunea în vigoare a Acordului."
+          "text": "Client — utilizator care creează un eveniment, alege data, orașul, sala, categoriile de parteneri și transmite solicitări."
         },
         {
           "type": "p",
-          "text": "4.2. Acceptarea se realizează prin bifarea separată a acordului și apăsarea butonului „Înregistrare”, „Creează cont”, „Continuă” sau a unui buton echivalent. Căsuța nu va fi bifată în prealabil."
+          "text": "Fișa evenimentului — solicitare structurată a Clientului cu informații care influențează prețul și posibilitatea prestării serviciului."
         },
         {
           "type": "p",
-          "text": "4.3. Operatorul poate înregistra data și ora acceptării, ID-ul contului, versiunea documentului, adresa IP, tipul dispozitivului, browserul, limba interfeței și alte date tehnice necesare probării acceptării și securității."
+          "text": "Oferta Partenerului — ofertă comercială transmisă prin Platformă, cu prețul, componența serviciului, condițiile și termenul de valabilitate."
         },
         {
           "type": "p",
-          "text": "4.4. Mesajele electronice, jurnalele, înregistrările bazei de date, copiile documentelor, notificările sistemului și istoricul acțiunilor pot fi utilizate ca probe în măsura permisă de lege."
+          "text": "Comandă confirmată — comanda pentru care Clientul a acceptat oferta Partenerului prin Platformă, iar pentru săli — suplimentar, sala a confirmat rezervarea."
         },
         {
           "type": "p",
-          "text": "4.5. Partenerul menține actuale adresa de e-mail și numărul de telefon. Riscul neprimirii notificărilor din cauza datelor incorecte sau a setărilor proprii revine Partenerului. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
+          "text": "Remunerația Platformei — plata pentru utilizarea serviciului digital epetrecere.md și procesarea solicitării confirmate."
         },
         {
           "type": "h2",
-          "text": "5. Înregistrarea și statutul Partenerului"
-        },
-        {
-          "type": "p",
-          "text": "5.1. Partenerul furnizează date complete și veridice, corespunzătoare statutului său real și juridic."
+          "text": "3. Statut juridic și model IT/SaaS"
         },
         {
           "type": "p",
-          "text": "5.2. Persoana fizică indică datele necesare identificării și declară că poate presta legal serviciile și își îndeplinește obligațiile fiscale și de înregistrare."
+          "text": "3.1. epetrecere.md este o platformă digitală IT/SaaS și un serviciu web care oferă instrumente software pentru publicarea profilurilor, gestionarea solicitărilor, calendarului, chatului și ofertelor."
         },
         {
           "type": "p",
-          "text": "5.3. Întreprinzătorul individual sau profesionistul indică denumirea, numărul de identificare, adresa, reprezentantul și datele solicitate."
+          "text": "3.2. Platforma nu este organizator de evenimente, agenție de evenimente, angajator, reprezentant al Partenerului, agent al Clientului sau prestator direct al serviciilor."
         },
         {
           "type": "p",
-          "text": "5.4. Persoana juridică indică denumirea oficială, IDNO, sediul, statutul fiscal, administratorul sau reprezentantul împuternicit și, la cerere, documentele justificative."
+          "text": "3.3. Serviciile la eveniment sunt prestate de Partener în mod independent și direct Clientului."
         },
         {
           "type": "p",
-          "text": "5.5. Contul nu poate induce în eroare asupra executantului real. Înlocuirea executantului principal este permisă numai cu informarea clară a Clientului."
+          "text": "3.4. Partenerul răspunde independent pentru calitatea serviciului, termene, preț, taxe, autorizații, personal, echipament, transport, drepturi de autor, siguranță și executarea înțelegerilor cu Clientul."
         },
         {
           "type": "p",
-          "text": "5.6. Transferarea contului fără acordul scris al Operatorului este interzisă."
+          "text": "3.5. Remunerația Platformei se percepe pentru serviciul digital, cabinetul personal, procesarea solicitării, instrumentele de comunicare, calendarul, notificările și infrastructura tehnologică."
         },
         {
           "type": "h2",
-          "text": "6. Verificarea"
+          "text": "4. Înregistrarea și moderarea Partenerului"
         },
         {
           "type": "p",
-          "text": "6.1. Operatorul poate solicita actul de identitate, documente de înregistrare, procură, confirmarea contului bancar, licențe, certificate, autorizații, exemple de lucrări și date privind beneficiarul efectiv, dacă verificarea este justificată de risc sau de lege."
+          "text": "4.1. Pentru înregistrare, Partenerul furnizează date veridice: nume/denumire, IDNP/IDNO dacă este cazul, telefon, e-mail, categoria serviciilor, orașul și regiunile de lucru, descriere, fotografii, video, portofoliu, nivelul prețului, calendarul disponibilității și alte date solicitate."
         },
         {
           "type": "p",
-          "text": "6.2. Operatorul poate utiliza registre publice, furnizori de identificare și surse deschise, cu respectarea protecției datelor."
+          "text": "4.2. Înregistrarea nu înseamnă publicarea automată. Profilul se publică după aprobarea administrației Platformei."
         },
         {
           "type": "p",
-          "text": "6.3. Până la finalizarea verificării pot fi limitate publicarea profilului, primirea Solicitărilor, accesul la contacte, retragerea mijloacelor sau alte funcții."
+          "text": "4.3. Platforma poate refuza publicarea, ascunde, șterge sau trimite profilul spre completare dacă acesta nu corespunde standardelor de calitate, conține date false, contacte interzise sau încalcă drepturile terților."
         },
         {
           "type": "p",
-          "text": "6.4. Refuzul de a furniza date necesare, indicii de fals, neconcordanțe sau fraudă pot conduce la refuz, suspendare sau încetare."
+          "text": "4.4. Partenerul este obligat să mențină actuale profilul, prețurile, fotografiile, descrierea, regiunile de lucru și calendarul disponibilității."
         },
         {
           "type": "p",
-          "text": "6.5. Verificarea nu constituie o garanție a calificării profesionale."
+          "text": "4.5. Platforma poate verifica materialele Partenerului, inclusiv fotografii, video, texte, recenzii, plângeri, date de contact, indicii de ocolire și calitatea completării profilului."
         },
         {
           "type": "h2",
-          "text": "7. Profilul și Conținutul"
+          "text": "5. Pachetele Partenerilor și afișarea prețului"
         },
         {
           "type": "p",
-          "text": "7.1. Partenerul răspunde pentru exactitatea profilului, categoria, aria de activitate, portofoliu, prețuri, condiții, disponibilitate și informații despre echipă."
+          "text": "Basic — Obligatoriu „preț de la”, interval de preț sau preț pe oră/eveniment/persoană. Afișare obișnuită, profil de bază, funcții suplimentare limitate."
         },
         {
           "type": "p",
-          "text": "7.2. Sunt interzise distincțiile false, lucrările străine fără permisiune, imaginile înșelătoare, publicitatea serviciilor ilegale, contactele plasate în câmpuri interzise și materialele care încalcă drepturi."
+          "text": "Pro — Se poate indica „preț de la”, interval, pachete gata sau ofertă individuală. Profil extins, mai multe materiale, posibilitatea pachetelor de servicii."
         },
         {
           "type": "p",
-          "text": "7.3. Operatorul poate adapta formatarea, decupa imagini, crea previzualizări, aplica filigran, traduce descrierea, ascunde sau elimina Conținutul. Sensul comercial nu va fi modificat substanțial fără acord."
+          "text": "Premium — Se poate afișa „ofertă individuală” sau „preț la cerere”. Funcții prioritare, badge, portofoliu extins, oferte individuale."
         },
         {
           "type": "p",
-          "text": "7.4. Partenerul acordă Operatorului o licență neexclusivă, gratuită și teritorial nelimitată pentru stocarea, reproducerea, adaptarea formatului, afișarea și distribuirea Conținutului în scopul funcționării și promovării Platformei și profilului. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
+          "text": "5.1. Chiar dacă prețul exact nu este afișat public, Partenerul este obligat să trimită Clientului o ofertă clară prin Platformă după primirea fișei evenimentului."
         },
         {
           "type": "p",
-          "text": "7.5. Partenerul repară prejudiciile și cheltuielile justificate rezultate din pretenții ale terților asupra Conținutului, dacă încălcarea îi este imputabilă."
+          "text": "5.2. Prețul final poate depinde de dată, sezon, oraș, sală, durată, numărul de invitați, cerințe tehnice, componența echipei, transport și alte detalii."
         },
         {
-          "type": "h2",
-          "text": "8. Calendarul, prețurile și condițiile comerciale"
-        },
-        {
-          "type": "p",
-          "text": "8.1. Partenerul menține calendarul și prețurile actualizate."
-        },
-        {
-          "type": "p",
-          "text": "8.2. Dacă tariful cere afișarea prețului, Partenerul indică un preț real sau un interval clar și nu utilizează prețuri fictiv reduse."
-        },
-        {
           "type": "p",
-          "text": "8.3. După confirmare, prețul nu poate fi majorat unilateral, cu excepția serviciilor suplimentare ori circumstanțelor convenite și fixate în Platformă."
+          "text": "5.3. epetrecere.md nu adaugă adaos ascuns pentru Client. Prețul serviciului Partenerului este stabilit de Partener și agreat între Partener și Client."
         },
         {
           "type": "p",
-          "text": "8.4. Partenerul dezvăluie limitările esențiale: durata, transportul, riderul tehnic, cazarea, avansul, garanția și condițiile de anulare."
+          "text": "5.4. Partenerul se obligă să nu majoreze prețul pentru Clienții veniți prin epetrecere.md față de prețul pe care l-ar oferi la o solicitare directă în condiții similare ale evenimentului."
         },
         {
           "type": "p",
-          "text": "8.5. Calendarul inexact, refuzurile nejustificate sau schimbarea prețului pot afecta ratingul și vizibilitatea."
+          "text": "5.5. Platforma poate afișa Clienților nivelul orientativ de preț: €, €€, €€€, €€€€."
         },
         {
           "type": "h2",
-          "text": "9. Solicitările, chatul și contactele"
-        },
-        {
-          "type": "p",
-          "text": "9.1. Clientul poate transmite Solicitări mai multor Parteneri din aceeași categorie în limitele Platformei. Primirea nu obligă la acceptare."
-        },
-        {
-          "type": "p",
-          "text": "9.2. Până la etapa stabilită de Platformă, comunicarea are loc prin chatul intern. Este interzisă transmiterea telefonului, e-mailului, mesageriei, rețelelor sociale, site-ului, codurilor QR sau contactelor mascate pentru eludare."
-        },
-        {
-          "type": "p",
-          "text": "9.3. Operatorul poate detecta automat datele de contact, avertiza, ascunde mesajul sau transmite conținutul spre moderare."
+          "text": "6. Crearea evenimentului și afișarea categoriilor"
         },
         {
           "type": "p",
-          "text": "9.4. După acceptare, contactele pot fi dezvăluite conform funcționalității. Dezvăluirea nu înlătură originea Comenzii din Platformă."
+          "text": "6.1. Clientul creează evenimentul alegând tipul evenimentului, data, orașul/regiunea și indicând dacă sala este deja aleasă sau este necesară selectarea unei săli."
         },
         {
           "type": "p",
-          "text": "9.5. Timpul de răspuns poate influența clasarea."
+          "text": "6.2. Dacă Clientul are nevoie de sală, Platforma poate afișa mai întâi sălile disponibile la data și în orașul/regiunea selectate."
         },
         {
-          "type": "h2",
-          "text": "10. Confirmarea și modificarea Comenzii"
-        },
-        {
-          "type": "p",
-          "text": "10.1. Comanda este confirmată prin butonul corespunzător, acceptarea avansului prin mecanism integrat sau o altă acțiune neechivocă indicată în interfață."
-        },
-        {
           "type": "p",
-          "text": "10.2. Dacă părțile negociază în afara Platformei după Solicitare, Comanda rămâne provenită din Platformă, cu excepția relației anterioare documentate pentru același eveniment."
+          "text": "6.3. După întrebarea privind sala, Clientul alege categoriile necesare: DJ, formație, moderator, fotograf, videograf, decor, dansatori, show program, animatori, special guests și altele."
         },
         {
           "type": "p",
-          "text": "10.3. Modificarea datei, locului, serviciilor sau prețului se consemnează prin Platformă. Majorarea prețului majorează baza Remunerației."
+          "text": "6.4. Platforma afișează partenerii pe categoriile alese, succesiv sau pe blocuri: mai întâi toți partenerii disponibili dintr-o categorie, apoi categoria următoare."
         },
         {
           "type": "p",
-          "text": "10.4. Reprogramarea nu stinge Comanda dacă serviciul se păstrează. Dacă executarea devine imposibilă, se aplică regulile de anulare."
+          "text": "6.5. Într-o categorie, Clientul poate trimite solicitarea mai multor parteneri, de exemplu la trei DJ. Confirmarea este permisă doar pentru un singur partener din aceeași categorie pentru același eveniment, dacă Platforma nu permite o excepție."
         },
         {
           "type": "p",
-          "text": "10.5. Partenerul comunică prețul final și statutul executării la solicitarea Platformei. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
+          "text": "6.6. Platforma afișează doar partenerii aprobați, activi, disponibili la data aleasă, care lucrează în orașul/regiunea selectată și corespund categoriei selectate."
         },
         {
           "type": "h2",
-          "text": "11. Remunerația de serviciu de 5%"
-        },
-        {
-          "type": "p",
-          "text": "11.1. Remunerația de bază este de 5% din Prețul fiecărei Comenzi confirmate, dacă nu sunt publicate condiții speciale."
+          "text": "7. Fișa evenimentului"
         },
         {
           "type": "p",
-          "text": "11.2. Remunerația se datorează pentru serviciul digital și oportunitatea comercială, indiferent de metoda de plată a Clientului."
+          "text": "7.1. Fișa evenimentului poate conține: tipul evenimentului, data, orașul/regiunea, sala aleasă sau informația că sala nu este încă aleasă, numărul de invitați, durata, categoria serviciului necesar, dorințe și buget, dacă Clientul decide să îl indice."
         },
         {
           "type": "p",
-          "text": "11.3. Pentru prețuri în valută, calculul se efectuează în valuta facturii sau în lei moldovenești conform cursului indicat în tarife ori factură."
+          "text": "7.2. Partenerul vede datele fișei necesare pentru calcularea ofertei și evaluarea posibilității de prestare."
         },
         {
           "type": "p",
-          "text": "11.4. Baza include serviciile suplimentare, prelungirea, transportul, echipamentul sau personalul, dacă fac parte din remunerația Partenerului."
+          "text": "7.3. Partenerul poate vedea orașul și denumirea sălii, dacă Clientul a ales sau a indicat sala, deoarece aceste date influențează costul, logistica, cerințele tehnice și programul."
         },
         {
           "type": "p",
-          "text": "11.5. Impozitele aplicabile se adaugă sau se includ în funcție de statutul fiscal al Operatorului și de lege."
+          "text": "7.4. Până la confirmarea comenzii, Partenerul nu primește telefonul, e-mailul, messengerul și alte date directe de contact ale Clientului."
         },
         {
           "type": "p",
-          "text": "11.6. Reducerile și condițiile individuale nu creează un drept permanent."
+          "text": "7.5. Adresa exactă a unei persoane private, telefonul, e-mailul și messengerul se dezvăluie doar după confirmarea comenzii sau în alte cazuri permise de funcționalul Platformei."
         },
         {
           "type": "h2",
-          "text": "12. Facturarea, termenele și datoria"
+          "text": "8. Chatul și Oferta Partenerului"
         },
         {
           "type": "p",
-          "text": "12.1. Termenul este indicat în factură, tarife sau interfață; în lipsă, plata se face în 5 zile lucrătoare."
+          "text": "8.1. Chatul se utilizează pentru clarificarea detaliilor evenimentului, programului, duratei, cerințelor tehnice, bugetului și altor condiții."
         },
         {
           "type": "p",
-          "text": "12.2. Plata este efectuată la creditarea contului Operatorului sau confirmarea furnizorului de plată."
+          "text": "8.2. Chatul trebuie să funcționeze ca instrument de pregătire a unei mini-oferte comerciale, nu ca modalitate de ocolire a Platformei."
         },
         {
           "type": "p",
-          "text": "12.3. În caz de întârziere, Operatorul poate transmite notificări, limita Solicitările, suspenda profilul și solicita penalități legale și proporționale."
+          "text": "8.3. Partenerul transmite oferta prin funcția specială a Platformei, indicând prețul, ce include serviciul, durata, costurile suplimentare, avansul dacă există, termenul de valabilitate și comentariul."
         },
         {
           "type": "p",
-          "text": "12.4. Factura se contestă motivat în 10 zile calendaristice. Partea necontestată se plătește la termen."
+          "text": "8.4. Clientul poate accepta oferta, discuta detalii, respinge oferta sau alege alt partener."
         },
         {
           "type": "p",
-          "text": "12.5. Operatorul poate compensa datoria confirmată cu sume datorate Partenerului prin Platformă, după notificare și în limitele legii."
+          "text": "8.5. Pentru toți partenerii, cu excepția sălilor, comanda se consideră confirmată după acceptarea ofertei de către Client prin Platformă."
         },
         {
           "type": "p",
-          "text": "12.6. Cheltuielile rezonabile de recuperare sunt suportate de partea culpabilă în măsura recunoscută de lege sau instanță."
+          "text": "8.6. După confirmarea comenzii, Platforma poate deschide datele de contact ale părților conform funcționalului."
         },
         {
           "type": "h2",
-          "text": "13. Anularea, neprezentarea și restituirile"
-        },
-        {
-          "type": "p",
-          "text": "13.1. Condițiile de anulare dintre Client și Partener sunt afișate în ofertă și respectă normele imperative."
-        },
-        {
-          "type": "p",
-          "text": "13.2. Dacă Clientul anulează după confirmare, Remunerația se calculează asupra sumei efectiv reținute de Partener. Suma restituită integral se exclude după dovada restituirii."
-        },
-        {
-          "type": "p",
-          "text": "13.3. Dacă anularea este imputabilă Partenerului, Operatorul poate anula Remunerația, aplica măsuri asupra profilului și solicita cheltuieli directe dovedite."
+          "text": "9. Logica specială pentru săli, restaurante și locații"
         },
         {
           "type": "p",
-          "text": "13.4. Neprezentarea nejustificată a Partenerului este o încălcare esențială."
+          "text": "9.1. Pentru săli, restaurante și locații, Clientul acceptă oferta, iar solicitarea primește statutul „Clientul a acceptat oferta. Se așteaptă confirmarea rezervării de către sală”."
         },
         {
           "type": "p",
-          "text": "13.5. Operatorul nu restituie din fonduri proprii plățile primite direct de Partener. Pentru plăți integrate se aplică condiții speciale. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
+          "text": "9.2. Comanda sălii se consideră confirmată doar după ce sala apasă în cabinetul personal „Confirmă rezervarea” sau efectuează o acțiune similară."
         },
         {
-          "type": "h2",
-          "text": "14. Interdicția eludării Platformei"
-        },
-        {
-          "type": "p",
-          "text": "14.1. Partenerul nu poate propune ascunderea, anularea formală sau reînregistrarea Comenzii în afara Platformei pentru evitarea Remunerației."
-        },
-        {
           "type": "p",
-          "text": "14.2. Indiciile includ transmiterea prematură a contactelor, respingerea fictivă urmată de prestare, prețul artificial redus, redirecționarea către o persoană afiliată, ștergerea mesajelor sau declararea falsă a anulării."
+          "text": "9.3. La etapa MVP, Platforma nu este obligată să verifice faptul achitării avansului. Sala confirmă independent rezervarea după înțelegerea sa internă cu Clientul."
         },
         {
           "type": "p",
-          "text": "14.3. Înaintea consecințelor financiare, Operatorul notifică împrejurările esențiale și oferă un termen rezonabil pentru explicații, cu excepția măsurilor urgente."
+          "text": "9.4. Platforma poate întreba suplimentar Clientul: „Rezervarea a avut loc?” cu variantele „Da”, „Nu, încă mă gândesc”, „Nu, am ales altă sală”. Aceasta se utilizează ca semnal de control pentru administrator."
         },
         {
           "type": "p",
-          "text": "14.4. În caz de eludare dovedită se achită Remunerația neachitată și o clauză penală egală cu dublul acesteia, dar nu mai puțin de echivalentul a 50 euro și nu mai mult de 500 euro pentru o Comandă, cu dreptul instanței de reducere în cazurile legale."
+          "text": "9.5. Dacă Clientul comunică faptul că rezervarea a avut loc, iar sala nu confirmă rezervarea, Platforma poate verifica situația manual și solicita explicații de la sală."
         },
         {
           "type": "p",
-          "text": "14.5. Eludarea repetată sau intenționată permite încetarea Acordului. Operatorul poate cere prejudiciul dovedit neacoperit de penalitate, în măsura permisă."
+          "text": "9.6. Dacă sala a obținut Clientul prin epetrecere.md, a rezervat data, a primit avans sau a încheiat în alt mod o înțelegere cu Clientul, dar nu a confirmat rezervarea în Platformă, aceasta se consideră ocolire a Platformei."
         },
         {
           "type": "p",
-          "text": "14.6. Clauza nu împiedică lucrul cu Clientul pentru comenzi independente care nu provin din Platformă."
+          "text": "9.7. Plata sălii către Platformă se calculează doar după statutul „Rezervare confirmată”."
         },
         {
           "type": "h2",
-          "text": "15. Drepturile și obligațiile Partenerului"
-        },
-        {
-          "type": "p",
-          "text": "15.1. Partenerul prestează profesionist, legal, sigur și conform condițiilor convenite."
+          "text": "10. Calendarul disponibilității"
         },
         {
           "type": "p",
-          "text": "15.2. Partenerul asigură autorizații, licențe, drepturi de autor, relații de muncă, siguranță tehnică și asigurări, dacă sunt necesare."
+          "text": "10.1. Partenerul este obligat să mențină actualizat calendarul disponibilității."
         },
         {
           "type": "p",
-          "text": "15.3. Sunt interzise discriminarea, amenințările, hărțuirea, spamul și manipularea recenziilor."
+          "text": "10.2. Platforma poate afișa Clienților doar Partenerii disponibili la data selectată."
         },
         {
           "type": "p",
-          "text": "15.4. Partenerul poate refuza înainte de confirmare, administra profilul, solicita suport, primi informații despre calcule și contesta moderarea."
+          "text": "10.3. Dacă Partenerul nu a actualizat calendarul și primește o solicitare pentru o dată ocupată, Partenerul răspunde pentru informația incorectă."
         },
         {
           "type": "p",
-          "text": "15.5. Partenerul comunică imediat compromiterea contului, interdicția activității sau imposibilitatea executării."
+          "text": "10.4. Platforma poate reduce poziția, ascunde profilul sau limita afișările Partenerului dacă acesta nu actualizează sistematic calendarul sau respinge frecvent solicitări din cauza indisponibilității."
         },
         {
-          "type": "p",
-          "text": "15.6. Datele Clientului nu se colectează excesiv și nu se folosesc pentru publicitate nedorită."
-        },
-        {
           "type": "h2",
-          "text": "16. Drepturile și obligațiile Operatorului"
+          "text": "11. Remunerația Platformei"
         },
         {
           "type": "p",
-          "text": "16.1. Operatorul asigură disponibilitatea rezonabilă, cu dreptul de mentenanță, actualizare și lucrări urgente."
+          "text": "11.1. Partenerul achită Platformei remunerația pentru utilizarea serviciului digital epetrecere.md: cabinet personal, fișe ale evenimentelor, sistem de solicitări, chat, calendar, notificări, procesarea solicitărilor, transmiterea ofertelor și alte funcții."
         },
         {
           "type": "p",
-          "text": "16.2. Operatorul poate modifica interfața, funcțiile, categoriile, algoritmii, limitele și modelele comerciale, respectând notificarea modificărilor esențiale."
+          "text": "11.2. Pentru toate categoriile de Parteneri, cu excepția sălilor, restaurantelor și locațiilor, remunerația constituie 5% din valoarea finală a comenzii confirmate, agreată prin Platformă."
         },
         {
           "type": "p",
-          "text": "16.3. Operatorul poate modera Conținutul, verifica reclamații, solicita explicații, avertiza, limita, reduce vizibilitatea, suspenda sau elimina conturi."
+          "text": "11.3. Pentru săli, restaurante și locații se aplică o taxă fixă în funcție de tipul evenimentului și numărul de invitați, conform tabelului de mai jos."
         },
         {
           "type": "p",
-          "text": "16.4. Operatorul prelucrează legal datele și adoptă măsuri proporționale de securitate."
+          "text": "Tabelul taxelor fixe pentru săli, restaurante și locații:"
         },
         {
           "type": "p",
-          "text": "16.5. Operatorul poate contracta furnizori cloud, de plată, suport și analiză, în limitele răspunderii legale. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
+          "text": "Nuntă — orice dimensiune — 200 EUR"
         },
         {
           "type": "p",
-          "text": "16.6. Operatorul nu are obligația controlului prealabil permanent, dar reacționează la notificări întemeiate."
-        },
-        {
-          "type": "h2",
-          "text": "17. Ratingul, recenziile și clasarea"
+          "text": "Cumătrie — până la 80 invitați — 100 EUR"
         },
         {
           "type": "p",
-          "text": "17.1. Poziția poate depinde de relevanță, disponibilitate, viteza răspunsului, profil, calitate, recenzii, Comenzi confirmate, promovare și respectarea regulilor."
+          "text": "Cumătrie — 81+ invitați — 150 EUR"
         },
         {
           "type": "p",
-          "text": "17.2. Formula exactă poate rămâne confidențială pentru prevenirea manipulării și protecția proprietății intelectuale."
+          "text": "Zi de naștere / jubileu — până la 40 invitați — 50 EUR"
         },
         {
           "type": "p",
-          "text": "17.3. Sunt interzise recenziile false, comenzile fictive, presiunea asupra Clientului și avantajele ascunse pentru recenzii pozitive."
+          "text": "Zi de naștere / jubileu — 41–80 invitați — 80 EUR"
         },
         {
           "type": "p",
-          "text": "17.4. Operatorul poate elimina o recenzie fără legătură cu o interacțiune reală, ilegală, publicitară, amenințătoare sau demonstrat falsă."
+          "text": "Zi de naștere / jubileu — 81+ invitați — 100 EUR"
         },
         {
           "type": "p",
-          "text": "17.5. O recenzie negativă nu se elimină doar pentru caracterul negativ; Partenerului i se poate oferi drept de răspuns."
-        },
-        {
-          "type": "h2",
-          "text": "18. Sisteme automatizate și inteligență artificială"
+          "text": "Corporativ — până la 80 invitați — 100 EUR"
         },
         {
           "type": "p",
-          "text": "18.1. Operatorul poate utiliza instrumente automatizate pentru recomandări, traducere, detectarea contactelor, spamului, fraudei, Conținutului interzis și anomaliilor."
+          "text": "Corporativ — 81–150 invitați — 150 EUR"
         },
         {
           "type": "p",
-          "text": "18.2. Rezultatul automat poate genera o limitare temporară sau o verificare prioritară; o decizie esențială poate fi revizuită de o persoană, când legea o cere sau este rezonabil posibil."
+          "text": "Corporativ — 151+ invitați — 200 EUR"
         },
         {
           "type": "p",
-          "text": "18.3. Partenerul nu poate utiliza roboți, scraping, mesaje automate în masă sau instrumente care creează activitate falsă."
+          "text": "Banchet mic / alt eveniment — până la 30 invitați — 50 EUR"
         },
         {
           "type": "p",
-          "text": "18.4. Datele anonimizate sau agregate pot fi folosite pentru analiză și dezvoltare."
+          "text": "11.4. Valoarea finală a comenzii se fixează în oferta Partenerului transmisă prin Platformă. Dacă valoarea se modifică după confirmare, Partenerul este obligat să actualizeze oferta sau să informeze Platforma."
         },
         {
-          "type": "h2",
-          "text": "19. Proprietatea intelectuală a Operatorului"
-        },
-        {
           "type": "p",
-          "text": "19.1. Software-ul, designul, bazele de date, structura cataloagelor, mărcile, domeniile și metodele interne aparțin Operatorului sau sunt licențiate."
+          "text": "11.5. Remunerația Platformei nu reprezintă plata serviciului Partenerului, organizarea evenimentului, plata prestației artistice, fotografierii, chiriei sălii, decorului sau altui serviciu offline. Aceasta reprezintă plata serviciului digital și procesarea solicitării confirmate."
         },
         {
           "type": "p",
-          "text": "19.2. Partenerului i se acordă un drept limitat, revocabil și netransmisibil de utilizare a Platformei pentru Acord."
+          "text": "11.6. Termenul de plată a remunerației: 30 zile calendaristice de la data confirmării comenzii, dacă un alt termen nu este indicat în cabinetul personal sau în tarife."
         },
         {
           "type": "p",
-          "text": "19.3. Sunt interzise copierea bazelor de date, ingineria inversă, eludarea limitărilor, extragerea sistematică și utilizarea neautorizată a mărcii EPETRECERE."
+          "text": "11.7. Plata se efectuează în MDL la cursul oficial al Băncii Naționale a Moldovei la data emiterii facturii, cu excepția cazului în care Platforma indică o altă metodă permisă."
         },
         {
           "type": "p",
-          "text": "19.4. Sugestiile Partenerului pot fi utilizate liber, dacă nu există un acord scris diferit."
+          "text": "11.8. Platforma poate modifica tarifele prin publicarea unei noi versiuni în cabinetul personal sau pe website. Noile tarife se aplică solicitărilor noi după data intrării în vigoare a modificărilor."
         },
         {
           "type": "h2",
-          "text": "20. Date cu caracter personal"
-        },
-        {
-          "type": "p",
-          "text": "20.1. Până la 23 august 2026 prelucrarea ține cont de Legea nr. 133/2011, iar de la intrarea noului regim - de Legea nr. 195/2024 și actele aplicabile. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
-        },
-        {
-          "type": "p",
-          "text": "20.2. Scopurile, temeiurile, categoriile, destinatarii, termenele, transferurile și drepturile sunt descrise în Politica de confidențialitate."
+          "text": "12. Contacte și interdicția de ocolire a Platformei"
         },
         {
           "type": "p",
-          "text": "20.3. Operatorul și Partenerul pot fi operatori independenți pentru scopurile proprii. Datele Clientului obținute prin Platformă se folosesc numai pentru Comandă, obligații legale și apărarea drepturilor."
-        },
-        {
-          "type": "p",
-          "text": "20.4. Partenerul asigură confidențialitatea, limitează accesul, șterge datele după încetarea necesității și notifică incidentele care pot afecta Platforma sau Clienții."
-        },
-        {
-          "type": "p",
-          "text": "20.5. Comunicările comerciale se transmit numai cu temei și opțiune de dezabonare."
-        },
-        {
-          "type": "p",
-          "text": "20.6. Acceptarea Acordului nu înlocuiește consimțămintele separate cerute de lege."
-        },
-        {
-          "type": "h2",
-          "text": "21. Confidențialitatea"
+          "text": "12.1. Până la confirmarea comenzii, Partenerul este obligat să comunice cu Clientul doar prin Platformă."
         },
         {
           "type": "p",
-          "text": "21.1. Informația nepublică comercială, tehnică, financiară și statistică este confidențială dacă natura sa indică acest caracter."
+          "text": "12.2. Până la confirmarea comenzii este interzisă transmiterea numărului de telefon, e-mailului, linkurilor către WhatsApp, Viber, Telegram, Instagram, Facebook, website, cod QR, rechizite bancare sau alte date care permit ocolirea Platformei."
         },
         {
           "type": "p",
-          "text": "21.2. Obligația nu acoperă informația publică, obținută legal, dezvoltată independent sau dezvăluită conform legii."
+          "text": "12.3. Platforma poate bloca, ascunde sau modera automat mesajele care conțin date de contact, linkuri sau indicii de ocolire."
         },
         {
           "type": "p",
-          "text": "21.3. Informația se utilizează numai pentru executarea Acordului și se acordă accesul pe principiul necesității."
+          "text": "12.4. Ocolirea include transmiterea contactelor, propunerea de a negocia direct, anularea solicitării pe Platformă cu continuarea reală a discuțiilor în afara Platformei, desfășurarea evenimentului cu un Client obținut prin Platformă fără confirmarea comenzii, precum și ascunderea rezervării confirmate de către sală."
         },
         {
           "type": "p",
-          "text": "21.4. Obligația durează pe parcursul Acordului și 3 ani după încetare, iar pentru secretul comercial atât timp cât păstrează acest statut."
+          "text": "12.5. În cazul constatării ocolirii, Platforma poate avertiza Partenerul, limita accesul la solicitări, ascunde profilul, șterge profilul, solicita plata remunerației și aplica penalități, dacă acestea sunt prevăzute în tarife."
         },
         {
           "type": "h2",
-          "text": "22. Securitatea informațională"
+          "text": "13. Anularea comenzii și neprezentarea"
         },
         {
           "type": "p",
-          "text": "22.1. Partenerul folosește o parolă sigură, nu transmite codurile, actualizează dispozitivele și respectă recomandările rezonabile."
+          "text": "13.1. Partenerul este obligat să informeze imediat Clientul și Platforma dacă nu poate executa o comandă confirmată."
         },
         {
           "type": "p",
-          "text": "22.2. Acțiunile din cont sunt prezumate ale Partenerului până la notificarea compromiterii, dacă nu se dovedește contrariul."
+          "text": "13.2. Anularea nejustificată a unei comenzi confirmate poate atrage scăderea ratingului, ascunderea profilului, penalitate sau eliminarea de pe Platformă."
         },
         {
           "type": "p",
-          "text": "22.3. Operatorul poate închide sesiuni, reseta parola, cere reidentificarea sau bloca temporar contul."
+          "text": "13.3. Neprezentarea Partenerului la eveniment fără motiv întemeiat constituie încălcare gravă a Condițiilor."
         },
         {
           "type": "p",
-          "text": "22.4. Nicio sistemă nu garantează securitate absolută; răspunderea se stabilește conform legii și măsurilor rezonabile adoptate."
+          "text": "13.4. Partenerul răspunde independent față de Client pentru anulare, neprezentare, prestarea necorespunzătoare a serviciului sau încălcarea înțelegerilor."
         },
         {
           "type": "h2",
-          "text": "23. Reclamații, verificări și moderare"
-        },
-        {
-          "type": "p",
-          "text": "23.1. Operatorul examinează reclamațiile Clienților, Partenerilor, titularilor de drepturi și autorităților."
+          "text": "14. Rating, recenzii și calitate"
         },
         {
           "type": "p",
-          "text": "23.2. Partenerul furnizează explicații și documente într-un termen rezonabil."
+          "text": "14.1. Clienții pot lăsa recenzii și evaluări despre Partener."
         },
         {
           "type": "p",
-          "text": "23.3. Limitarea urgentă este permisă în caz de risc de securitate, fraudă, conținut ilegal, compromitere sau prejudiciu semnificativ. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
+          "text": "14.2. Platforma poate lua în calcul recenziile, viteza de răspuns, numărul anulărilor, calitatea profilului, completarea calendarului, plângerile și respectarea regulilor la formarea ratingului și ordinii de afișare."
         },
         {
           "type": "p",
-          "text": "23.4. Măsurile includ avertisment, corectare, eliminare, reducerea vizibilității, limitare, suspendare și încetare."
+          "text": "14.3. Platforma poate ascunde o recenzie dacă aceasta conține insulte, conținut ilegal, spam, date personale sau informații evident neveridice."
         },
         {
           "type": "p",
-          "text": "23.5. Partenerul poate depune o contestație motivată, examinată de o altă persoană când este practic posibil."
+          "text": "14.4. Partenerul se obligă să mențină un nivel profesional de comunicare și prestare a serviciilor."
         },
         {
           "type": "h2",
-          "text": "24. Limitarea răspunderii Operatorului"
-        },
-        {
-          "type": "p",
-          "text": "24.1. Operatorul nu răspunde pentru faptele Clientului sau Partenerului, calitatea serviciului, siguranța la eveniment, bunurile, taxele, licențele, personalul și încălcările Partenerului."
-        },
-        {
-          "type": "p",
-          "text": "24.2. Operatorul nu răspunde pentru prejudicii indirecte, profit ratat, reputație sau date, dacă răspunderea nu este obligatorie și prejudiciul nu rezultă din intenție sau culpă gravă."
+          "text": "15. Materialele Partenerului și proprietatea intelectuală"
         },
         {
           "type": "p",
-          "text": "24.3. Răspunderea contractuală totală pentru un incident este limitată la Remunerația achitată de Partener în ultimele 6 luni, cu excepția limitărilor interzise de lege."
+          "text": "15.1. Partenerul confirmă că deține drepturi asupra fotografiilor, videoclipurilor, textelor, logo-urilor, muzicii, imaginilor și altor materiale plasate pe Platformă."
         },
         {
           "type": "p",
-          "text": "24.4. Operatorul nu răspunde pentru telecomunicații, hosting, plăți, forță majoră, restricții publice și atacuri imposibil de prevenit rezonabil."
+          "text": "15.2. Partenerul acordă Platformei dreptul neexclusiv de a utiliza materialele pentru publicarea profilului, afișarea către Clienți, promovarea Partenerului pe epetrecere.md, postări în rețelele sociale, prezentări și materiale publicitare ale Platformei."
         },
         {
           "type": "p",
-          "text": "24.5. Răspunderea care nu poate fi exclusă rămâne aplicabilă."
+          "text": "15.3. Partenerul răspunde pentru pretențiile terților legate de încălcarea drepturilor de autor, conexe, de marcă sau altor drepturi."
         },
         {
           "type": "h2",
-          "text": "25. Răspunderea Partenerului și despăgubirea"
-        },
-        {
-          "type": "p",
-          "text": "25.1. Partenerul răspunde pentru neexecutare, activitate ilegală, date false, Conținut, taxe, personal, echipament și prejudiciul cauzat."
-        },
-        {
-          "type": "p",
-          "text": "25.2. Partenerul repară cheltuielile și prejudiciile documentate rezultate din pretenții ale terților cauzate de încălcarea imputabilă."
-        },
-        {
-          "type": "p",
-          "text": "25.3. Operatorul notifică pretenția și permite participarea la apărare când aceasta este posibilă și nu îi prejudiciază interesele."
+          "text": "16. Date cu caracter personal"
         },
         {
           "type": "p",
-          "text": "25.4. Partenerul nu recunoaște obligații și nu încheie tranzacții în numele Operatorului fără acord."
-        },
-        {
-          "type": "h2",
-          "text": "26. Forța majoră"
+          "text": "16.1. Platforma și Partenerul se obligă să respecte legislația Republicii Moldova privind protecția datelor cu caracter personal."
         },
         {
           "type": "p",
-          "text": "26.1. Partea nu răspunde pentru neexecutarea cauzată de un eveniment extraordinar și inevitabil în afara controlului rezonabil."
+          "text": "16.2. Platforma prelucrează datele Partenerului și ale Clienților pentru înregistrare, moderare, funcționarea cabinetului personal, procesarea solicitărilor, comunicare, confirmarea comenzilor, calcularea remunerației, securitate, prevenirea ocolirii și îndeplinirea obligațiilor legale."
         },
         {
           "type": "p",
-          "text": "26.2. Partea notifică fără întârziere nejustificată și reduce consecințele."
+          "text": "16.3. Partenerul utilizează datele personale ale Clientului doar pentru executarea comenzii confirmate și nu le transmite terților fără temei legal."
         },
         {
           "type": "p",
-          "text": "26.3. Obligațiile bănești scadente anterior nu se sting automat."
+          "text": "16.4. Partenerul este obligat să protejeze datele Clientului împotriva pierderii, accesului ilegal, divulgării sau utilizării neautorizate."
         },
         {
           "type": "p",
-          "text": "26.4. După 30 de zile de imposibilitate esențială, Acordul poate fi încetat pentru viitor."
+          "text": "16.5. În caz de scurgere sau divulgare ilegală a datelor Clientului, Partenerul este obligat să informeze imediat Platforma."
         },
         {
           "type": "h2",
-          "text": "27. Durata, suspendarea și încetarea"
-        },
-        {
-          "type": "p",
-          "text": "27.1. Acordul intră în vigoare la acceptare și durează până la încetare. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
-        },
-        {
-          "type": "p",
-          "text": "27.2. Partenerul poate închide contul după executarea Comenzilor, achitarea datoriilor și păstrarea datelor obligatorii."
-        },
-        {
-          "type": "p",
-          "text": "27.3. Operatorul poate înceta cu preaviz de 15 zile fără invocarea unei încălcări, fără a afecta Comenzile deja confirmate și drepturile imperative."
+          "text": "17. Răspunderea Partenerului"
         },
         {
           "type": "p",
-          "text": "27.4. Încetarea imediată este permisă pentru fraudă, risc grav, activitate ilegală, documente false, eludare repetată, neplată după avertizare sau încălcare esențială repetată."
+          "text": "17.1. Partenerul răspunde pentru veridicitatea profilului, calitatea serviciilor, actualitatea calendarului, respectarea înțelegerilor cu Clientul, achitarea remunerației Platformei, respectarea legislației, taxe, drepturi asupra materialelor, date personale și interdicția de ocolire."
         },
         {
           "type": "p",
-          "text": "27.5. Încetarea nu stinge datoriile și clauzele care, prin natura lor, supraviețuiesc."
+          "text": "17.2. În caz de încălcare a Condițiilor, Platforma poate aplica avertisment, limitare temporară a funcțiilor, scădere a poziției, ascunderea profilului, blocarea contului, ștergerea profilului, recuperarea datoriei, penalității și prejudiciilor."
         },
         {
-          "type": "p",
-          "text": "27.6. Operatorul păstrează înregistrările minime necesare obligațiilor legale și apărării drepturilor."
-        },
-        {
           "type": "h2",
-          "text": "28. Modificarea Acordului și tarifelor"
-        },
-        {
-          "type": "p",
-          "text": "28.1. Operatorul poate modifica Acordul pentru lege, securitate, funcții noi, model de afaceri sau claritate."
-        },
-        {
-          "type": "p",
-          "text": "28.2. Modificările esențiale se notifică prin cont și/sau e-mail cu cel puțin 15 zile înainte, cu excepția urgențelor legale sau de securitate."
+          "text": "18. Răspunderea Platformei"
         },
         {
           "type": "p",
-          "text": "28.3. Tarifele noi nu se aplică Comenzilor deja confirmate, dacă nu s-a convenit altfel."
+          "text": "18.1. Platforma nu garantează Partenerului un anumit număr de vizualizări, solicitări, comenzi, clienți sau venit."
         },
         {
           "type": "p",
-          "text": "28.4. Când este necesar, se solicită o nouă acceptare activă; în celelalte cazuri continuarea utilizării după intrarea în vigoare poate constitui acceptare."
+          "text": "18.2. Platforma nu răspunde pentru acțiunile Clienților, anularea evenimentului de către Client, neachitarea de către Client a serviciului Partenerului, disputele dintre Client și Partener, defecțiunile tehnice ale terților sau forța majoră."
         },
         {
           "type": "p",
-          "text": "28.5. Operatorul păstrează arhiva versiunilor și datele intrării în vigoare."
+          "text": "18.3. Platforma poate ajuta la soluționarea disputelor, dar nu este obligată să ia partea Clientului sau Partenerului."
         },
         {
           "type": "h2",
-          "text": "29. Notificări"
+          "text": "19. Modificarea Condițiilor"
         },
         {
           "type": "p",
-          "text": "29.1. Notificările se transmit prin cont, e-mail, push sau scrisoare recomandată când este necesar."
+          "text": "19.1. Platforma poate modifica prezentele Condiții, tarifele, regulile, funcționalul și modul de lucru al Platformei."
         },
         {
           "type": "p",
-          "text": "29.2. Notificarea electronică se consideră primită în următoarea zi lucrătoare dacă nu există mesaj de nelivrare și este disponibilă și în cont."
+          "text": "19.2. Noua versiune se publică pe website, în cabinetul personal sau se transmite Partenerului electronic."
         },
         {
           "type": "p",
-          "text": "29.3. Partenerul actualizează contactele în 3 zile lucrătoare."
+          "text": "19.3. Continuarea utilizării Platformei după publicarea noii versiuni înseamnă acceptarea modificărilor de către Partener."
         },
         {
           "type": "p",
-          "text": "29.4. Datele oficiale ale Operatorului și adresa pentru pretenții sunt indicate în rechizite și pe Platformă."
+          "text": "19.4. Dacă Partenerul nu este de acord cu modificările, acesta trebuie să înceteze utilizarea Platformei și poate solicita ștergerea profilului."
         },
         {
           "type": "h2",
-          "text": "30. Legea aplicabilă și litigiile"
+          "text": "20. Durata și încetarea colaborării"
         },
         {
           "type": "p",
-          "text": "30.1. Acordul este guvernat de legislația Republicii Moldova."
+          "text": "20.1. Condițiile produc efecte din momentul acceptării de către Partener și până la încetarea utilizării Platformei."
         },
         {
           "type": "p",
-          "text": "30.2. Înainte de instanță se transmite o pretenție scrisă cu cereri și dovezi. Termenul de răspuns este de 15 zile lucrătoare, cu posibilitatea unui termen suplimentar rezonabil."
+          "text": "20.2. Partenerul poate înceta colaborarea prin transmiterea unei solicitări de ștergere a profilului."
         },
         {
           "type": "p",
-          "text": "30.3. Părțile pot utiliza negocieri și mediere."
+          "text": "20.3. Platforma poate înceta colaborarea și șterge profilul în caz de încălcare a Condițiilor."
         },
         {
           "type": "p",
-          "text": "30.4. Litigiul este soluționat de instanța competentă din Republica Moldova. Clauza nu limitează drepturile imperative. EPETRECERE LEGAL | Acord pentru Parteneri v1.0"
+          "text": "20.4. Încetarea colaborării nu exonerează Partenerul de obligația de a achita datoriile apărute până la data încetării."
         },
         {
-          "type": "p",
-          "text": "30.5. Dacă Partenerul are calitatea de consumator într-un raport concret cu Operatorul, se aplică garanțiile imperative; înregistrarea pentru oferirea sistematică de servicii are, de regulă, scop profesional."
-        },
-        {
           "type": "h2",
-          "text": "31. Dispoziții finale"
-        },
-        {
-          "type": "p",
-          "text": "31.1. Acordul și anexele constituie înțelegerea completă privind utilizarea Platformei ca Partener."
-        },
-        {
-          "type": "p",
-          "text": "31.2. Nulitatea unei clauze nu afectează celelalte; clauza se înlocuiește cu una legală apropiată scopului economic."
+          "text": "21. Notificări electronice"
         },
         {
           "type": "p",
-          "text": "31.3. Neexercitarea unui drept nu constituie renunțare."
+          "text": "21.1. Platforma poate transmite notificări prin cabinetul personal, e-mail, SMS, notificări push, messengere dacă Partenerul a oferit un astfel de canal, sau prin publicare pe website."
         },
         {
           "type": "p",
-          "text": "31.4. Partenerul nu poate cesiona fără acord. Operatorul poate transfera Acordul succesorului afacerii, cu notificare și păstrarea drepturilor legale."
+          "text": "21.2. Notificarea se consideră primită dacă a fost transmisă la datele de contact indicate de Partener la înregistrare."
         },
         {
           "type": "p",
-          "text": "31.5. Titlurile sunt orientative."
+          "text": "21.3. Partenerul este obligat să mențină actuale datele sale de contact."
         },
         {
-          "type": "p",
-          "text": "31.6. Rechizitele Operatorului se completează înaintea publicării versiunii 1.0. EPETRECERE LEGAL | Acord pentru Parteneri v1.0 ANEXE"
-        },
-        {
           "type": "h2",
-          "text": "Anexa 1. Tarife și calcul"
-        },
-        {
-          "type": "p",
-          "text": "1. Remunerația de bază: 5% din Prețul Comenzii confirmate."
+          "text": "22. Legea aplicabilă și litigiile"
         },
         {
           "type": "p",
-          "text": "2. Exemplu: preț 20 000 MDL; remunerație fără taxele aplicabile - 1 000 MDL."
+          "text": "22.1. Prezentele Condiții sunt guvernate de legislația Republicii Moldova."
         },
         {
           "type": "p",
-          "text": "3. La majorarea prețului la 24 000 MDL, remunerația este 1 200 MDL."
+          "text": "22.2. Părțile vor încerca să soluționeze litigiile prin negocieri."
         },
         {
           "type": "p",
-          "text": "4. Dacă Partenerul restituie integral suma Clientului și dovedește restituirea, remunerația se corectează la zero, cu excepția costurilor de plată convenite separat."
+          "text": "22.3. Dacă litigiul nu poate fi soluționat prin negocieri, acesta va fi examinat de instanțele competente ale Republicii Moldova."
         },
         {
           "type": "p",
-          "text": "5. Restaurantele, sălile și locațiile pentru evenimente au un acord separat."
+          "text": "22.4. Condițiile pot fi publicate în limba rusă, română și alte limbi. În caz de divergențe, prevalează versiunea în limba română, dacă Platforma nu indică altfel."
         },
         {
           "type": "h2",
-          "text": "Anexa 2. Standarde de calitate"
-        },
-        {
-          "type": "p",
-          "text": "1. Fotografii și descrieri reale și actuale."
+          "text": "23. Datele Platformei"
         },
         {
           "type": "p",
-          "text": "2. Răspuns recomandat în maximum 24 de ore."
+          "text": "Denumire — EPETRECERE S.R.L."
         },
         {
           "type": "p",
-          "text": "3. Confirmarea numai dacă executarea este posibilă."
+          "text": "IDNO — 1026023123354"
         },
         {
           "type": "p",
-          "text": "4. Respectarea orei, aspectului, programului, echipei și cerințelor tehnice."
+          "text": "Sediu juridic — MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova"
         },
         {
           "type": "p",
-          "text": "5. Informarea promptă despre întârzieri sau imposibilitate."
+          "text": "E-mail pentru notificări juridice — legal@epetrecere.md"
         },
         {
           "type": "p",
-          "text": "6. Fără majorarea prețului după confirmare fără acord clar."
+          "text": "E-mail pentru date cu caracter personal — privacy@epetrecere.md"
         },
         {
           "type": "p",
-          "text": "7. Respectarea confidențialității, siguranței, drepturilor de autor și conduitei respectuoase."
+          "text": "Website — epetrecere.md"
         },
         {
           "type": "h2",
-          "text": "Anexa 3. Înregistrarea tehnică a acceptării"
-        },
-        {
-          "type": "p",
-          "text": "1. Căsuță separată nebifată, cu link către Acord și Politica de confidențialitate."
-        },
-        {
-          "type": "p",
-          "text": "2. Păstrarea user_id, partner_type, document_version, accepted_at UTC, IP, user-agent, limba, hash-ul fișierului și sursa înregistrării."
-        },
-        {
-          "type": "p",
-          "text": "3. Jurnal imuabil al versiunilor și posibilitatea exportului dovezii acceptării."
-        },
-        {
-          "type": "p",
-          "text": "4. Reacceptare activă pentru modificări esențiale când este necesară."
+          "text": "Anexa 1. Textul consimțământului la înregistrare"
         },
         {
           "type": "p",
-          "text": "5. Consimțăminte separate pentru marketing și cookie-uri opționale."
-        },
-        {
-          "type": "h2",
-          "text": "Anexa 4. Rechizitele Operatorului"
+          "text": "„Confirm că am citit și accept Condițiile de colaborare pentru partenerii epetrecere.md, Politica de confidențialitate și tarifele Platformei. Înțeleg că acceptarea condițiilor în formă electronică creează un acord obligatoriu între mine și Platformă. Mă oblig să nu transmit contacte Clienților până la confirmarea comenzii și să achit remunerația Platformei conform tarifelor.”"
         },
         {
           "type": "p",
-          "text": "Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediu: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail pentru notificări juridice: legal@epetrecere.md Site: epetrecere.md Data intrării în vigoare a versiunii 1.0: 20 iulie 2026. EPETRECERE LEGAL | Acord pentru Parteneri v1.0 Textul acceptării electronice Confirm că am citit, am înțeles și accept integral Acordul de colaborare cu Partenerii EPETRECERE, anexele sale, Regulile Platformei și Politica de confidențialitate. Confirm veridicitatea datelor și, dacă acționez în numele unei persoane juridice, existența împuternicirilor necesare. Confirmare pentru arhivă La acceptare, Platforma înregistrează automat: ID-ul contului, tipul Partenerului (persoană fizică / ÎI / persoană juridică), versiunea documentului (1.0), data și ora acceptării și amprenta criptografică (hash) a textului acceptat."
+          "text": "Buton: „Accept condițiile și trimit formularul spre moderare”."
         }
       ],
-      "ru": [
-        {
-          "type": "p",
-          "text": "EPETRECERE LEGAL | Partner Agreement v1.0 EPETRECERE СОГЛАШЕНИЕ О СОТРУДНИЧЕСТВЕ С ПАРТНЁРАМИ ПЛАТФОРМЫ Версия 1.0 | Республика Молдова | 2026 Оператор EPETRECERE S.R.L. Сайт epetrecere.md Дата вступления в силу 20 июля 2026 г. Статус Действует Приоритетный язык Румынский. Русская и английская версии являются переводами для удобства; при расхождении преобладает румынский текст. EPETRECERE LEGAL | Partner Agreement v1.0 История версий Версия Дата Статус Описание"
-        },
-        {
-          "type": "p",
-          "text": "1.0 20 июля 2026 г. Действует Первая консолидированная редакция Содержание"
-        },
-        {
-          "type": "h2",
-          "text": "1. 1. Общие положения"
-        },
-        {
-          "type": "h2",
-          "text": "2. 2. Термины и определения"
-        },
-        {
-          "type": "h2",
-          "text": "3. 3. Статус Платформы"
-        },
-        {
-          "type": "h2",
-          "text": "4. 4. Электронный акцепт и доказательство заключения"
-        },
-        {
-          "type": "h2",
-          "text": "5. 5. Регистрация и статус Партнёра"
-        },
-        {
-          "type": "h2",
-          "text": "6. 6. Верификация и проверка"
-        },
-        {
-          "type": "h2",
-          "text": "7. 7. Профиль и Контент"
-        },
-        {
-          "type": "h2",
-          "text": "8. 8. Календарь, цены и коммерческие условия"
-        },
-        {
-          "type": "h2",
-          "text": "9. 9. Заявки, чат и контакты"
-        },
-        {
-          "type": "p",
-          "text": "10.10. Подтверждение и изменение заказа"
-        },
-        {
-          "type": "p",
-          "text": "11.11. Сервисное вознаграждение 5%"
-        },
-        {
-          "type": "p",
-          "text": "12.12. Счета, сроки и задолженность"
-        },
-        {
-          "type": "p",
-          "text": "13.13. Отмена, неявка и возвраты"
-        },
-        {
-          "type": "p",
-          "text": "14.14. Запрет обхода Платформы"
-        },
-        {
-          "type": "p",
-          "text": "15.15. Права и обязанности Партнёра"
-        },
-        {
-          "type": "p",
-          "text": "16.16. Права и обязанности Оператора"
-        },
-        {
-          "type": "p",
-          "text": "17.17. Рейтинг, отзывы и ранжирование"
-        },
-        {
-          "type": "p",
-          "text": "18.18. Автоматизированные системы и искусственный интеллект"
-        },
-        {
-          "type": "p",
-          "text": "19.19. Интеллектуальная собственность Оператора"
-        },
-        {
-          "type": "p",
-          "text": "20.20. Персональные данные"
-        },
-        {
-          "type": "p",
-          "text": "21.21. Конфиденциальность"
-        },
-        {
-          "type": "p",
-          "text": "22.22. Информационная безопасность"
-        },
-        {
-          "type": "p",
-          "text": "23.23. Жалобы, проверки и модерация"
-        },
-        {
-          "type": "p",
-          "text": "24.24. Ограничение ответственности Оператора"
-        },
-        {
-          "type": "p",
-          "text": "25.25. Ответственность Партнёра и возмещение"
-        },
-        {
-          "type": "p",
-          "text": "26.26. Форс-мажор"
-        },
-        {
-          "type": "p",
-          "text": "27.27. Срок, приостановление и прекращение"
-        },
-        {
-          "type": "p",
-          "text": "28.28. Изменение Соглашения и тарифов"
-        },
-        {
-          "type": "p",
-          "text": "29.29. Уведомления"
-        },
-        {
-          "type": "p",
-          "text": "30.30. Применимое право и споры"
-        },
-        {
-          "type": "p",
-          "text": "31.31. Заключительные положения 32.Приложение 1. Тарифы и расчёт 33.Приложение 2. Стандарты качества EPETRECERE LEGAL | Partner Agreement v1.0 34.Приложение 3. Техническая фиксация акцепта 35.Приложение 4. Реквизиты Оператора EPETRECERE LEGAL | Partner Agreement v1.0 Правовая основа редакции Гражданский кодекс Республики Молдова; Закон №284/2004 об электронной торговле; Закон №124/2022 об электронной идентификации и доверительных услугах; законодательство о защите персональных данных, включая переход к Закону №195/2024 с"
-        },
-        {
-          "type": "p",
-          "text": "23 августа 2026 года. Ссылки на нормативные акты носят справочный характер. При изменении закона применяются обязательные нормы в действующей редакции."
-        },
-        {
-          "type": "h2",
-          "text": "1. Общие положения"
-        },
-        {
-          "type": "p",
-          "text": "1.1. Настоящее Соглашение о сотрудничестве с партнёрами платформы EPETRECERE (далее - «Соглашение») регулирует отношения между EPETRECERE S.R.L., юридическим лицом, созданным и действующим по законодательству Республики Молдова (далее - «Оператор»), и лицом, регистрирующимся на Платформе для предложения услуг, связанных с организацией и проведением мероприятий (далее - «Партнёр»)."
-        },
-        {
-          "type": "p",
-          "text": "1.2. Партнёром может быть дееспособное физическое лицо, индивидуальный предприниматель, крестьянское (фермерское) хозяйство, лицо свободной профессии, иная разрешённая законом форма самостоятельной деятельности либо юридическое лицо. Если аккаунт создаётся от имени организации, лицо, совершающее регистрацию, заверяет, что имеет достаточные полномочия для принятия Соглашения от имени этой организации."
-        },
-        {
-          "type": "p",
-          "text": "1.3. Соглашение заключается путём электронного присоединения при регистрации. Партнёр не вправе принять отдельные положения с оговорками: акцепт распространяется на Соглашение и его приложения в полном объёме."
-        },
-        {
-          "type": "p",
-          "text": "1.4. Румынская редакция является основной. Русская редакция предоставляется для удобства. При расхождениях преимущественную силу имеет румынская редакция, если обязательные нормы закона не требуют иного."
-        },
-        {
-          "type": "p",
-          "text": "1.5. Соглашение применяется вместе с Политикой конфиденциальности, Правилами платформы, Политикой контента, Правилами отзывов, тарифами и иными документами, прямо обозначенными как его неотъемлемые части."
-        },
-        {
-          "type": "h2",
-          "text": "2. Термины и определения"
-        },
-        {
-          "type": "p",
-          "text": "2.1. «Платформа» - веб-сайт epetrecere.md, мобильные приложения, личные кабинеты, программные интерфейсы и связанные цифровые сервисы Оператора."
-        },
-        {
-          "type": "p",
-          "text": "2.2. «Клиент» - пользователь, который посредством Платформы ищет, запрашивает, бронирует или приобретает услуги Партнёра."
-        },
-        {
-          "type": "p",
-          "text": "2.3. «Заявка» - электронный запрос Клиента, направленный одному или нескольким Партнёрам через функционал Платформы. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "2.4. «Подтверждённый заказ» - Заявка, которую Партнёр принял через предусмотренное Платформой действие, либо сделка, заключение которой подтверждается совокупностью электронных данных и фактических обстоятельств."
-        },
-        {
-          "type": "p",
-          "text": "2.5. «Цена заказа» - общая сумма вознаграждения Партнёра по конкретному заказу, включая обязательные доплаты и согласованные дополнительные услуги, но без сумм, которые Партнёр документально подтвердил как прямые транзитные расходы третьим лицам и которые Оператор письменно исключил из базы расчёта."
-        },
-        {
-          "type": "p",
-          "text": "2.6. «Сервисное вознаграждение» - плата Оператору за цифровую инфраструктуру, привлечение Клиента, инструменты поиска, коммуникации, бронирования, управления заказом, продвижения, аналитики и поддержки. Базовый размер - 5% от Цены заказа."
-        },
-        {
-          "type": "p",
-          "text": "2.7. «Обход Платформы» - действия, направленные на сокрытие, прекращение или перенос за пределы Платформы сделки, инициированной через неё, с целью полностью или частично избежать Сервисного вознаграждения либо правил Платформы."
-        },
-        {
-          "type": "p",
-          "text": "2.8. «Контент» - тексты, изображения, логотипы, видео, аудио, прайс-листы, документы, сообщения и иные материалы, загружаемые или передаваемые Партнёром."
-        },
-        {
-          "type": "p",
-          "text": "2.9. «Логи» - автоматические записи о регистрации, акцепте, авторизации, действиях, сообщениях, уведомлениях, изменениях профиля, заявках, заказах и платежах."
-        },
-        {
-          "type": "h2",
-          "text": "3. Статус Платформы"
-        },
-        {
-          "type": "p",
-          "text": "3.1. EPETRECERE является цифровой платформой и поставщиком информационно- технологических сервисов. Если иное прямо не согласовано отдельным документом, Оператор не оказывает Клиенту услуги Партнёра, не является организатором мероприятия, работодателем, представителем, агентом, комиссионером, страховщиком, гарантом или участником совместной деятельности Партнёра."
-        },
-        {
-          "type": "p",
-          "text": "3.2. Договор об оказании конкретной услуги возникает непосредственно между Клиентом и Партнёром. Партнёр самостоятельно отвечает за описание, цену, законность, качество, безопасность, сроки и результат своей услуги."
-        },
-        {
-          "type": "p",
-          "text": "3.3. Оператор не гарантирует Партнёру минимальное количество заявок, доход, просмотры, положение в выдаче, постоянную доступность отдельных функций или коммерческий результат."
-        },
-        {
-          "type": "p",
-          "text": "3.4. Оператор вправе вводить отдельные модели оплаты, подписки, продвижение, рекламу, безопасную сделку, интеграцию платёжных сервисов и новые категории услуг посредством специальных условий."
-        },
-        {
-          "type": "h2",
-          "text": "4. Электронный акцепт и доказательство заключения"
-        },
-        {
-          "type": "p",
-          "text": "4.1. До завершения регистрации Партнёру предоставляется возможность открыть и сохранить действующую редакцию Соглашения. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "4.2. Акцептом является установка отдельной отметки о согласии и нажатие кнопки «Зарегистрироваться», «Создать аккаунт», «Продолжить» либо аналогичной кнопки. Поле согласия не должно быть предварительно отмечено."
-        },
-        {
-          "type": "p",
-          "text": "4.3. Оператор вправе фиксировать дату и время акцепта, идентификатор аккаунта, номер версии документа, IP-адрес, тип устройства, браузер, язык интерфейса и иные технические данные, необходимые для доказывания акцепта и безопасности."
-        },
-        {
-          "type": "p",
-          "text": "4.4. Электронные сообщения, Логи, записи базы данных, копии документов, системные уведомления и история действий могут использоваться сторонами как доказательства в пределах, допускаемых законодательством."
-        },
-        {
-          "type": "p",
-          "text": "4.5. Партнёр обязан обеспечить актуальность электронной почты и номера телефона. Риск неполучения уведомлений из-за неверных данных, фильтров или отключённых уведомлений несёт Партнёр, кроме случаев, вызванных виновными действиями Оператора."
-        },
-        {
-          "type": "h2",
-          "text": "5. Регистрация и статус Партнёра"
-        },
-        {
-          "type": "p",
-          "text": "5.1. Партнёр предоставляет полные и достоверные данные, соответствующие его фактическому и правовому статусу."
-        },
-        {
-          "type": "p",
-          "text": "5.2. Физическое лицо указывает имя, дату рождения, контакты и иные сведения, необходимые для идентификации. Оно подтверждает, что вправе самостоятельно оказывать заявленные услуги и выполняет налоговые и регистрационные требования."
-        },
-        {
-          "type": "p",
-          "text": "5.3. Индивидуальный предприниматель или иной зарегистрированный профессионал указывает наименование, идентификационный номер, адрес, представителя и реквизиты, предусмотренные формой регистрации."
-        },
-        {
-          "type": "p",
-          "text": "5.4. Юридическое лицо указывает официальное наименование, IDNO, юридический адрес, налоговый статус, данные руководителя или уполномоченного представителя и, по запросу, подтверждающие документы."
-        },
-        {
-          "type": "p",
-          "text": "5.5. Один аккаунт не может использоваться для введения пользователей в заблуждение относительно личности фактического исполнителя. Замена основного исполнителя допускается только при ясном раскрытии этого обстоятельства Клиенту."
-        },
-        {
-          "type": "p",
-          "text": "5.6. Передача аккаунта другому лицу без письменного согласия Оператора запрещена."
-        },
-        {
-          "type": "h2",
-          "text": "6. Верификация и проверка"
-        },
-        {
-          "type": "p",
-          "text": "6.1. Оператор вправе до или после публикации профиля запросить документ, удостоверяющий личность, регистрационные документы, доверенность, подтверждение банковского счёта, лицензии, сертификаты, разрешения, примеры работ и сведения о бенефициарном владельце, если такая проверка оправдана риском или законом."
-        },
-        {
-          "type": "p",
-          "text": "6.2. Оператор вправе использовать государственные реестры, доверенных поставщиков идентификации и открытые источники, соблюдая требования о персональных данных. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "6.3. До завершения проверки Оператор вправе ограничить публикацию профиля, получение заявок, доступ к контактам, вывод средств или другие функции."
-        },
-        {
-          "type": "p",
-          "text": "6.4. Отказ предоставить необходимые данные, признаки подделки, несоответствия или мошенничества являются основанием для отказа в регистрации, приостановления или прекращения Соглашения."
-        },
-        {
-          "type": "p",
-          "text": "6.5. Верификация не является гарантией профессиональной квалификации Партнёра и не освобождает Клиента от разумной осмотрительности."
-        },
-        {
-          "type": "h2",
-          "text": "7. Профиль и Контент"
-        },
-        {
-          "type": "p",
-          "text": "7.1. Партнёр отвечает за точность профиля, категорию, географию работы, портфолио, цены, условия, доступность и сведения о команде."
-        },
-        {
-          "type": "p",
-          "text": "7.2. Запрещены ложные награды, чужие работы без разрешения, вводящие в заблуждение изображения, скрытая реклама запрещённых услуг, контактные данные в полях, где Платформа их запрещает, и любые материалы, нарушающие закон или права третьих лиц."
-        },
-        {
-          "type": "p",
-          "text": "7.3. Оператор вправе редактировать форматирование, обрезать изображения, создавать превью, добавлять водяной знак, переводить описание, скрывать или удалять Контент. Существенное изменение смысла коммерческого предложения без согласия Партнёра не допускается."
-        },
-        {
-          "type": "p",
-          "text": "7.4. Партнёр предоставляет Оператору неисключительную, территориально неограниченную, безвозмездную лицензию на хранение, воспроизведение, адаптацию формата, публичный показ и распространение Контента для работы и продвижения Платформы и профиля Партнёра. Лицензия действует в период размещения и разумный период после удаления для архивов, доказательств и ранее созданных рекламных материалов."
-        },
-        {
-          "type": "p",
-          "text": "7.5. Партнёр возмещает Оператору обоснованные убытки и расходы, возникшие вследствие претензий третьих лиц к Контенту Партнёра, если нарушение связано с виновными действиями Партнёра."
-        },
-        {
-          "type": "h2",
-          "text": "8. Календарь, цены и коммерческие условия"
-        },
-        {
-          "type": "p",
-          "text": "8.1. Партнёр обязан поддерживать календарь занятости и цены в актуальном состоянии."
-        },
-        {
-          "type": "p",
-          "text": "8.2. Если тариф требует публикации цены, Партнёр указывает реальную цену или понятный диапазон и не использует фиктивно низкую цену для привлечения заявки."
-        },
-        {
-          "type": "p",
-          "text": "8.3. После подтверждения заказа Партнёр не вправе односторонне увеличивать цену, кроме дополнительных услуг или обстоятельств, прямо согласованных с Клиентом и зафиксированных в Платформе."
-        },
-        {
-          "type": "p",
-          "text": "8.4. Партнёр обязан раскрыть существенные ограничения: продолжительность выступления, транспортные расходы, технический райдер, необходимость питания или проживания, лимит гостей, залог, аванс и условия отмены. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "8.5. Систематически неактуальный календарь, необоснованные отказы или изменение цены после подтверждения могут влиять на рейтинг и доступность профиля."
-        },
-        {
-          "type": "h2",
-          "text": "9. Заявки, чат и контакты"
-        },
-        {
-          "type": "p",
-          "text": "9.1. Клиент может направить Заявку нескольким Партнёрам одной категории в пределах, установленных Платформой. Получение Заявки не обязывает Партнёра принять её."
-        },
-        {
-          "type": "p",
-          "text": "9.2. До этапа, определённого Платформой, стороны общаются через внутренний чат. Запрещено передавать телефон, электронную почту, мессенджеры, социальные сети, адрес сайта, QR-коды или завуалированные контакты с целью обхода правил."
-        },
-        {
-          "type": "p",
-          "text": "9.3. Оператор вправе автоматически обнаруживать контактные данные, предупреждать пользователя, скрывать сообщение или направлять его на модерацию. Автоматическая проверка не должна использоваться для тайного чтения, не связанного с безопасностью и исполнением Соглашения."
-        },
-        {
-          "type": "p",
-          "text": "9.4. После принятия Заявки контакты могут быть раскрыты в объёме, предусмотренном функционалом. Раскрытие контактов не отменяет обязанность учитывать заказ как полученный через Платформу."
-        },
-        {
-          "type": "p",
-          "text": "9.5. Партнёр обязан отвечать в разумный срок. Показатели ответа могут влиять на ранжирование."
-        },
-        {
-          "type": "h2",
-          "text": "10. Подтверждение и изменение заказа"
-        },
-        {
-          "type": "p",
-          "text": "10.1. Заказ считается подтверждённым после нажатия Партнёром соответствующей кнопки, принятия аванса через интегрированный механизм либо иного однозначного действия, указанного в интерфейсе."
-        },
-        {
-          "type": "p",
-          "text": "10.2. Если стороны договорились вне Платформы после первоначальной Заявки, заказ всё равно считается происходящим из Платформы, если Партнёр не докажет, что до Заявки существовали самостоятельные документально подтверждённые отношения по тому же мероприятию."
-        },
-        {
-          "type": "p",
-          "text": "10.3. Изменение даты, места, состава услуг или цены фиксируется через Платформу. Увеличение цены увеличивает базу Сервисного вознаграждения; уменьшение учитывается при наличии достоверного подтверждения."
-        },
-        {
-          "type": "p",
-          "text": "10.4. Перенос мероприятия не прекращает заказ, если услуга сохраняется. Если перенос объективно невозможен и стороны прекращают заказ, применяются правила отмены."
-        },
-        {
-          "type": "p",
-          "text": "10.5. Партнёр обязан сообщить Оператору окончательную цену и статус исполнения, если Платформа запрашивает такую информацию. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "h2",
-          "text": "11. Сервисное вознаграждение 5%"
-        },
-        {
-          "type": "p",
-          "text": "11.1. Базовое Сервисное вознаграждение составляет 5% от Цены каждого подтверждённого заказа, если для категории или тарифа не опубликованы специальные условия."
-        },
-        {
-          "type": "p",
-          "text": "11.2. Вознаграждение начисляется за цифровой сервис и привлечение коммерческой возможности, независимо от того, осуществляется оплата Клиентом наличными, переводом, через платёжного провайдера или иным способом."
-        },
-        {
-          "type": "p",
-          "text": "11.3. Если цена выражена в иностранной валюте, сумма вознаграждения рассчитывается в валюте счёта либо в молдавских леях по курсу, указанному в тарифах или счёте."
-        },
-        {
-          "type": "p",
-          "text": "11.4. В базу входят согласованные дополнительные услуги, продление времени, доплата за транспорт, оборудование или персонал, если они являются частью вознаграждения Партнёра. Возмещаемые документально подтверждённые расходы могут исключаться по правилам тарифов."
-        },
-        {
-          "type": "p",
-          "text": "11.5. Налоги, применимые к Сервисному вознаграждению, начисляются сверх или включаются в него в зависимости от налогового статуса Оператора и требований закона, что указывается в счёте."
-        },
-        {
-          "type": "p",
-          "text": "11.6. Оператор вправе предоставлять скидки, промокоды или индивидуальные условия. Они не создают постоянного права на льготный тариф."
-        },
-        {
-          "type": "h2",
-          "text": "12. Счета, сроки и задолженность"
-        },
-        {
-          "type": "p",
-          "text": "12.1. Срок оплаты указывается в счёте, тарифах или интерфейсе. При отсутствии специального срока Партнёр оплачивает вознаграждение в течение 5 рабочих дней с момента получения счёта или уведомления."
-        },
-        {
-          "type": "p",
-          "text": "12.2. Платёж считается совершённым после зачисления средств на счёт Оператора или подтверждения платёжным провайдером."
-        },
-        {
-          "type": "p",
-          "text": "12.3. При просрочке Оператор вправе направить напоминание, ограничить новые Заявки, приостановить профиль и потребовать законную пеню или проценты за просрочку, если они предусмотрены счётом или тарифами и не являются явно несоразмерными."
-        },
-        {
-          "type": "p",
-          "text": "12.4. Партнёр обязан оспорить счёт с конкретным обоснованием в течение 10 календарных дней. Неоспоренная часть подлежит оплате в срок."
-        },
-        {
-          "type": "p",
-          "text": "12.5. Оператор вправе зачесть подтверждённую задолженность против сумм, подлежащих перечислению Партнёру через Платформу, после уведомления и в пределах закона."
-        },
-        {
-          "type": "p",
-          "text": "12.6. Расходы на разумное внесудебное и судебное взыскание возмещаются виновной стороной в объёме, признанном законом или судом. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "h2",
-          "text": "13. Отмена, неявка и возвраты"
-        },
-        {
-          "type": "p",
-          "text": "13.1. Условия отмены между Клиентом и Партнёром указываются в предложении и должны соответствовать обязательным нормам права."
-        },
-        {
-          "type": "p",
-          "text": "13.2. Если заказ отменён Клиентом после подтверждения, начисление Сервисного вознаграждения зависит от фактически удержанной Партнёром суммы и правил тарифа. С суммы, возвращённой Клиенту полностью, вознаграждение не взимается либо корректируется, если Партнёр представил доказательства возврата."
-        },
-        {
-          "type": "p",
-          "text": "13.3. Если заказ отменён по вине Партнёра, Оператор вправе аннулировать вознаграждение за этот заказ, но применить меры к профилю и взыскать прямые документально подтверждённые расходы, вызванные нарушением."
-        },
-        {
-          "type": "p",
-          "text": "13.4. Неявка Партнёра без уважительной причины является существенным нарушением."
-        },
-        {
-          "type": "p",
-          "text": "13.5. Оператор не обязан возвращать Клиенту деньги из собственных средств, если не принимал оплату как сторона расчёта. При интегрированной оплате применяются отдельные платёжные и возвратные условия."
-        },
-        {
-          "type": "h2",
-          "text": "14. Запрет обхода Платформы"
-        },
-        {
-          "type": "p",
-          "text": "14.1. Партнёр не вправе предлагать Клиенту скрыть, отменить или переоформить заказ вне Платформы для уклонения от Сервисного вознаграждения."
-        },
-        {
-          "type": "p",
-          "text": "14.2. Признаками обхода могут быть передача контактов до разрешённого этапа, фиктивное отклонение Заявки с последующим оказанием услуги, указание нулевой или заниженной цены, перенаправление заказа связанному лицу, удаление переписки или ложное сообщение об отмене."
-        },
-        {
-          "type": "p",
-          "text": "14.3. До применения финансовых последствий Оператор уведомляет Партнёра о существенных обстоятельствах и предоставляет разумный срок для объяснений, кроме срочных мер безопасности."
-        },
-        {
-          "type": "p",
-          "text": "14.4. При доказанном обходе Партнёр обязан уплатить неуплаченное Сервисное вознаграждение. Дополнительно Оператор вправе потребовать договорную неустойку в размере двукратного неуплаченного вознаграждения, но не менее эквивалента 50 евро и не более эквивалента 500 евро за один заказ, с правом суда уменьшить её в предусмотренных законом случаях."
-        },
-        {
-          "type": "p",
-          "text": "14.5. Повторный или умышленный обход является основанием для прекращения Соглашения. Меры не ограничивают право Оператора требовать доказанные убытки в части, не покрытой неустойкой и допускаемой законом."
-        },
-        {
-          "type": "p",
-          "text": "14.6. Пункт не запрещает Партнёру работать с Клиентом по самостоятельным заказам, которые не возникли из использования Платформы."
-        },
-        {
-          "type": "h2",
-          "text": "15. Права и обязанности Партнёра"
-        },
-        {
-          "type": "p",
-          "text": "15.1. Партнёр обязан оказывать услуги профессионально, законно, безопасно и в соответствии с согласованными условиями. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "15.2. Партнёр самостоятельно обеспечивает разрешения, лицензии, авторские и смежные права, трудовые отношения с персоналом, техническую безопасность и страхование, если они требуются."
-        },
-        {
-          "type": "p",
-          "text": "15.3. Партнёр обязан уважительно общаться, не допускать дискриминации, угроз, домогательств, спама и манипуляции отзывами."
-        },
-        {
-          "type": "p",
-          "text": "15.4. Партнёр вправе отказаться от Заявки до подтверждения, управлять профилем, обращаться в поддержку, получать информацию о начислениях и оспаривать меры модерации."
-        },
-        {
-          "type": "p",
-          "text": "15.5. Партнёр обязан незамедлительно сообщать о компрометации аккаунта, существенной жалобе, запрете деятельности или обстоятельствах, препятствующих исполнению подтверждённого заказа."
-        },
-        {
-          "type": "p",
-          "text": "15.6. Партнёр не вправе собирать данные Клиента сверх необходимого, использовать их для нежелательной рекламы или передавать третьим лицам без основания."
-        },
-        {
-          "type": "h2",
-          "text": "16. Права и обязанности Оператора"
-        },
-        {
-          "type": "p",
-          "text": "16.1. Оператор обеспечивает разумную техническую доступность Платформы, но вправе проводить обслуживание, обновления, тестирование и аварийные работы."
-        },
-        {
-          "type": "p",
-          "text": "16.2. Оператор вправе менять интерфейс, функции, категории, алгоритмы, лимиты, способы связи и коммерческие модели, соблюдая порядок уведомления о существенных договорных изменениях."
-        },
-        {
-          "type": "p",
-          "text": "16.3. Оператор вправе модерировать Контент, проверять жалобы, запрашивать объяснения и документы, предупреждать, ограничивать, понижать видимость, приостанавливать или удалять аккаунты."
-        },
-        {
-          "type": "p",
-          "text": "16.4. Оператор обязан обрабатывать персональные данные законно, обеспечивать предусмотренные законом права субъектов данных и принимать соразмерные меры безопасности."
-        },
-        {
-          "type": "p",
-          "text": "16.5. Оператор вправе привлекать подрядчиков, облачных и платёжных поставщиков, службы поддержки и аналитики, оставаясь ответственным в предусмотренных законом пределах."
-        },
-        {
-          "type": "p",
-          "text": "16.6. Оператор не обязан предварительно проверять каждое сообщение или материал, но реагирует на обоснованные уведомления о нарушениях."
-        },
-        {
-          "type": "h2",
-          "text": "17. Рейтинг, отзывы и ранжирование"
-        },
-        {
-          "type": "p",
-          "text": "17.1. Позиция профиля может зависеть от релевантности, доступности, скорости ответа, полноты профиля, качества, отзывов, подтверждённых заказов, коммерческого продвижения и соблюдения правил."
-        },
-        {
-          "type": "p",
-          "text": "17.2. Оператор не раскрывает точную формулу алгоритма, если это создаёт риск манипуляции, мошенничества или нарушения интеллектуальной собственности. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "17.3. Партнёр не вправе покупать фиктивные отзывы, создавать ложные заказы, оказывать давление на Клиента или предлагать выгоду только за положительный отзыв без ясного раскрытия."
-        },
-        {
-          "type": "p",
-          "text": "17.4. Оператор вправе удалить отзыв, если он не относится к реальному взаимодействию, содержит незаконный контент, персональные данные, угрозы, рекламу или доказанно ложные факты."
-        },
-        {
-          "type": "p",
-          "text": "17.5. Негативный отзыв сам по себе не является основанием для удаления. Партнёру может предоставляться право ответа."
-        },
-        {
-          "type": "h2",
-          "text": "18. Автоматизированные системы и искусственный интеллект"
-        },
-        {
-          "type": "p",
-          "text": "18.1. Оператор вправе использовать автоматизированные инструменты для рекомендаций, перевода, выявления контактов, спама, мошенничества, запрещённого Контента и технических аномалий."
-        },
-        {
-          "type": "p",
-          "text": "18.2. Автоматизированный результат может влиять на временное ограничение или приоритет проверки, но окончательное существенное решение по запросу Партнёра подлежит пересмотру уполномоченным лицом, когда это требуется законом или разумно возможно."
-        },
-        {
-          "type": "p",
-          "text": "18.3. Партнёр не вправе использовать ботов, скрейпинг, автоматическую массовую рассылку, вмешательство в алгоритмы или инструменты, создающие ложную активность."
-        },
-        {
-          "type": "p",
-          "text": "18.4. Оператор вправе использовать обезличенные или агрегированные данные для аналитики и развития продукта."
-        },
-        {
-          "type": "h2",
-          "text": "19. Интеллектуальная собственность Оператора"
-        },
-        {
-          "type": "p",
-          "text": "19.1. Программное обеспечение, дизайн, базы данных, структура каталогов, товарные знаки, доменные имена, тексты Оператора и внутренние методы являются собственностью Оператора или лицензированы ему."
-        },
-        {
-          "type": "p",
-          "text": "19.2. Партнёру предоставляется ограниченное, отзывное, непередаваемое право использовать Платформу только для целей Соглашения."
-        },
-        {
-          "type": "p",
-          "text": "19.3. Запрещены копирование базы партнёров или клиентов, обратная разработка, обход технических ограничений, создание конкурирующего сервиса путём систематического извлечения данных и использование бренда EPETRECERE без разрешения."
-        },
-        {
-          "type": "p",
-          "text": "19.4. Обратная связь и предложения Партнёра могут свободно использоваться Оператором без обязанности выплаты, если стороны письменно не договорились иначе."
-        },
-        {
-          "type": "h2",
-          "text": "20. Персональные данные"
-        },
-        {
-          "type": "p",
-          "text": "20.1. До 23 августа 2026 года обработка осуществляется с учётом Закона №133/2011, а с даты вступления в силу нового режима - Закона №195/2024 и иных применимых актов. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "20.2. Подробные цели, основания, категории данных, получатели, сроки хранения, международные передачи и права субъектов описываются в Политике конфиденциальности."
-        },
-        {
-          "type": "p",
-          "text": "20.3. Оператор и Партнёр могут выступать самостоятельными операторами данных в отношении собственных целей. Если Партнёр обрабатывает данные Клиента, полученные через Платформу, он обязан использовать их только для заказа, законных обязанностей и защиты прав."
-        },
-        {
-          "type": "p",
-          "text": "20.4. Партнёр обеспечивает конфиденциальность данных, ограничивает доступ персонала, удаляет данные после утраты законной необходимости и уведомляет Оператора о нарушении безопасности, которое может затронуть Платформу или Клиентов."
-        },
-        {
-          "type": "p",
-          "text": "20.5. Маркетинговые сообщения направляются только при наличии надлежащего основания и возможности отказаться от них."
-        },
-        {
-          "type": "p",
-          "text": "20.6. Согласие на Соглашение не заменяет отдельные согласия, когда закон требует добровольного отдельного согласия."
-        },
-        {
-          "type": "h2",
-          "text": "21. Конфиденциальность"
-        },
-        {
-          "type": "p",
-          "text": "21.1. Непубличная коммерческая, техническая, финансовая и статистическая информация, доступная в связи с сотрудничеством, считается конфиденциальной, если по характеру очевидно, что она не предназначена для распространения."
-        },
-        {
-          "type": "p",
-          "text": "21.2. Обязательство не распространяется на общедоступные сведения, законно полученные от третьего лица, самостоятельно разработанные данные и раскрытие по требованию закона или компетентного органа."
-        },
-        {
-          "type": "p",
-          "text": "21.3. Получающая сторона использует конфиденциальную информацию только для исполнения Соглашения и обеспечивает доступ по принципу необходимости."
-        },
-        {
-          "type": "p",
-          "text": "21.4. Обязанность действует в течение Соглашения и 3 лет после его прекращения, а в отношении коммерческой тайны - пока информация сохраняет такой статус."
-        },
-        {
-          "type": "h2",
-          "text": "22. Информационная безопасность"
-        },
-        {
-          "type": "p",
-          "text": "22.1. Партнёр обязан использовать сложный пароль, не передавать коды доступа, своевременно обновлять устройства и соблюдать разумные рекомендации безопасности."
-        },
-        {
-          "type": "p",
-          "text": "22.2. Все действия через аккаунт предполагаются совершёнными Партнёром до момента уведомления о компрометации, если Партнёр не докажет иное."
-        },
-        {
-          "type": "p",
-          "text": "22.3. Оператор вправе принудительно завершить сессии, сбросить пароль, потребовать повторную идентификацию или временно заблокировать аккаунт при подозрительной активности."
-        },
-        {
-          "type": "p",
-          "text": "22.4. Ни одна система не обеспечивает абсолютную безопасность. Оператор отвечает за нарушение только в пределах, установленных законом и с учётом принятых разумных мер. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "h2",
-          "text": "23. Жалобы, проверки и модерация"
-        },
-        {
-          "type": "p",
-          "text": "23.1. Оператор вправе рассматривать жалобы Клиентов, Партнёров, правообладателей и органов власти."
-        },
-        {
-          "type": "p",
-          "text": "23.2. Партнёр обязан предоставить объяснения и документы в указанный разумный срок. Непредоставление может учитываться при принятии решения."
-        },
-        {
-          "type": "p",
-          "text": "23.3. Срочное временное ограничение допускается при угрозе безопасности, мошенничестве, незаконном Контенте, компрометации аккаунта или риске значительного ущерба."
-        },
-        {
-          "type": "p",
-          "text": "23.4. Обычные меры включают предупреждение, требование исправления, удаление Контента, снижение видимости, ограничение функций, временную приостановку и прекращение Соглашения."
-        },
-        {
-          "type": "p",
-          "text": "23.5. Партнёр вправе подать мотивированное возражение через поддержку. Решение пересматривается лицом, не принимавшим первоначальное решение, когда это практически возможно."
-        },
-        {
-          "type": "h2",
-          "text": "24. Ограничение ответственности Оператора"
-        },
-        {
-          "type": "p",
-          "text": "24.1. Оператор не отвечает за действия Клиента или Партнёра, качество услуги, личную безопасность на мероприятии, утрату имущества, налоговые обязательства, лицензии, трудовые отношения и нарушение Партнёром прав третьих лиц."
-        },
-        {
-          "type": "p",
-          "text": "24.2. Оператор не отвечает за непрямые убытки, упущенную прибыль, потерю репутации или данных, если такая ответственность не является обязательной по закону и если ущерб не вызван умыслом или грубой неосторожностью Оператора."
-        },
-        {
-          "type": "p",
-          "text": "24.3. Совокупная договорная ответственность Оператора перед Партнёром за один инцидент ограничивается суммой Сервисного вознаграждения, фактически уплаченной этим Партнёром за последние 6 месяцев, но ограничение не применяется там, где закон запрещает его."
-        },
-        {
-          "type": "p",
-          "text": "24.4. Оператор не отвечает за перебои связи, действия хостинга, платёжного провайдера, форс-мажор, государственные ограничения и кибератаки, которые невозможно было разумно предотвратить."
-        },
-        {
-          "type": "p",
-          "text": "24.5. Ничто в Соглашении не исключает ответственность, которую нельзя исключить или ограничить законом."
-        },
-        {
-          "type": "h2",
-          "text": "25. Ответственность Партнёра и возмещение"
-        },
-        {
-          "type": "p",
-          "text": "25.1. Партнёр отвечает за нарушение заказа, незаконную деятельность, недостоверные сведения, Контент, налоги, персонал, оборудование и причинённый им ущерб."
-        },
-        {
-          "type": "p",
-          "text": "25.2. Партнёр обязан возместить Оператору документально подтверждённые расходы и убытки по претензиям третьих лиц, возникшим вследствие виновного нарушения Партнёром Соглашения или закона. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "25.3. Оператор уведомляет Партнёра о существенной претензии и предоставляет возможность участвовать в защите, если это не вредит интересам Оператора и допускается процедурой."
-        },
-        {
-          "type": "p",
-          "text": "25.4. Партнёр не вправе признавать обязательства от имени Оператора или заключать мировое соглашение, затрагивающее Оператора, без письменного согласия."
-        },
-        {
-          "type": "h2",
-          "text": "26. Форс-мажор"
-        },
-        {
-          "type": "p",
-          "text": "26.1. Сторона не отвечает за неисполнение, вызванное непредотвратимым чрезвычайным событием вне разумного контроля, включая стихийные бедствия, войну, массовые беспорядки, эпидемии, решения властей, масштабные сбои энергии или связи."
-        },
-        {
-          "type": "p",
-          "text": "26.2. Сторона уведомляет другую сторону без неоправданной задержки и принимает разумные меры для уменьшения последствий."
-        },
-        {
-          "type": "p",
-          "text": "26.3. Денежные обязательства, возникшие до форс-мажора, не прекращаются автоматически."
-        },
-        {
-          "type": "p",
-          "text": "26.4. Если невозможность длится более 30 дней и существенно лишает Соглашение смысла, каждая сторона вправе прекратить его без ответственности за будущее исполнение."
-        },
-        {
-          "type": "h2",
-          "text": "27. Срок, приостановление и прекращение"
-        },
-        {
-          "type": "p",
-          "text": "27.1. Соглашение вступает в силу с акцепта и действует до прекращения."
-        },
-        {
-          "type": "p",
-          "text": "27.2. Партнёр вправе закрыть аккаунт после исполнения заказов, оплаты задолженности и сохранения данных, которые закон требует хранить."
-        },
-        {
-          "type": "p",
-          "text": "27.3. Оператор вправе прекратить Соглашение с уведомлением за 15 календарных дней без указания нарушения, если это не затрагивает уже подтверждённые заказы и обязательные права Партнёра."
-        },
-        {
-          "type": "p",
-          "text": "27.4. Немедленное прекращение допускается при мошенничестве, серьёзной угрозе безопасности, незаконной деятельности, поддельных документах, повторном обходе, неуплате после предупреждения или существенном повторном нарушении."
-        },
-        {
-          "type": "p",
-          "text": "27.5. Прекращение не освобождает от задолженности, ответственности за прежние нарушения, конфиденциальности, интеллектуальной собственности и положений, которые по смыслу продолжают действовать."
-        },
-        {
-          "type": "p",
-          "text": "27.6. Оператор вправе сохранить минимальные записи об акцепте, заказах, начислениях, жалобах и блокировках для законных обязанностей и защиты прав."
-        },
-        {
-          "type": "h2",
-          "text": "28. Изменение Соглашения и тарифов"
-        },
-        {
-          "type": "p",
-          "text": "28.1. Оператор вправе изменять Соглашение в связи с законом, безопасностью, новыми функциями, бизнес-моделью или улучшением ясности. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "28.2. О существенных изменениях Партнёр уведомляется через личный кабинет и/или электронную почту не менее чем за 15 календарных дней, если более короткий срок не необходим по закону или срочной безопасности."
-        },
-        {
-          "type": "p",
-          "text": "28.3. Изменение тарифов не применяется к уже подтверждённым заказам, если стороны прямо не согласовали иное."
-        },
-        {
-          "type": "p",
-          "text": "28.4. Когда закон или характер изменения требует нового активного согласия, Оператор запрашивает повторный акцепт. В иных случаях продолжение использования после даты вступления может означать принятие изменений."
-        },
-        {
-          "type": "p",
-          "text": "28.5. Архив редакций и дата вступления публикуются или сохраняются Оператором."
-        },
-        {
-          "type": "h2",
-          "text": "29. Уведомления"
-        },
-        {
-          "type": "p",
-          "text": "29.1. Юридически значимые уведомления направляются через личный кабинет, на зарегистрированную электронную почту, посредством push-уведомления или заказным письмом, если это требуется."
-        },
-        {
-          "type": "p",
-          "text": "29.2. Электронное уведомление считается полученным на следующий рабочий день после отправки, если отправителю не поступило сообщение о недоставке, а уведомление также доступно в личном кабинете."
-        },
-        {
-          "type": "p",
-          "text": "29.3. Партнёр обязан обновить контакты в течение 3 рабочих дней после изменения."
-        },
-        {
-          "type": "p",
-          "text": "29.4. Официальные контакты Оператора и адрес для претензий указываются в реквизитах и на Платформе."
-        },
-        {
-          "type": "h2",
-          "text": "30. Применимое право и споры"
-        },
-        {
-          "type": "p",
-          "text": "30.1. Соглашение регулируется законодательством Республики Молдова."
-        },
-        {
-          "type": "p",
-          "text": "30.2. До обращения в суд сторона направляет письменную претензию с описанием требований и доказательствами. Срок ответа - 15 рабочих дней, если сложность не требует дополнительного разумного срока."
-        },
-        {
-          "type": "p",
-          "text": "30.3. Стороны могут использовать переговоры и медиацию."
-        },
-        {
-          "type": "p",
-          "text": "30.4. Спор рассматривается компетентным судом Республики Молдова по правилам подсудности. Условие о подсудности не лишает сторону прав, которые нельзя ограничить соглашением."
-        },
-        {
-          "type": "p",
-          "text": "30.5. Если Партнёр является потребителем по конкретному отношению с Оператором, применяются обязательные гарантии защиты потребителей; однако регистрация для систематического предложения услуг обычно имеет профессиональную цель."
-        },
-        {
-          "type": "h2",
-          "text": "31. Заключительные положения"
-        },
-        {
-          "type": "p",
-          "text": "31.1. Соглашение и приложения составляют полное соглашение сторон относительно использования Платформы в качестве Партнёра. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "31.2. Недействительность одного положения не затрагивает остальные. Оно заменяется законным положением, максимально близким к экономической цели."
-        },
-        {
-          "type": "p",
-          "text": "31.3. Бездействие стороны не является отказом от права."
-        },
-        {
-          "type": "p",
-          "text": "31.4. Партнёр не вправе уступать Соглашение без согласия Оператора. Оператор вправе передать его правопреемнику бизнеса с уведомлением Партнёра и сохранением его законных прав."
-        },
-        {
-          "type": "p",
-          "text": "31.5. Заголовки используются для удобства и не ограничивают смысл."
-        },
-        {
-          "type": "p",
-          "text": "31.6. Реквизиты Оператора приведены в Приложении 4. EPETRECERE LEGAL | Partner Agreement v1.0 ПРИЛОЖЕНИЯ"
-        },
-        {
-          "type": "h2",
-          "text": "Приложение 1. Тарифы и расчёт"
-        },
-        {
-          "type": "p",
-          "text": "1. Базовое Сервисное вознаграждение: 5% от Цены подтверждённого заказа."
-        },
-        {
-          "type": "p",
-          "text": "2. Пример: цена услуги 20 000 MDL; вознаграждение без учёта применимых налогов - 1 000 MDL."
-        },
-        {
-          "type": "p",
-          "text": "3. При увеличении цены до 24 000 MDL итоговое вознаграждение - 1 200 MDL."
-        },
-        {
-          "type": "h2",
-          "text": "4. Если Партнёр вернул Клиенту 100% суммы и подтвердил возврат, вознаграждение"
-        },
-        {
-          "type": "p",
-          "text": "корректируется до нуля, кроме отдельно согласованной платы за платёжные операции."
-        },
-        {
-          "type": "h2",
-          "text": "5. Тарифы для ресторанов, банкетных залов и event-локаций регулируются отдельным"
-        },
-        {
-          "type": "p",
-          "text": "соглашением."
-        },
-        {
-          "type": "h2",
-          "text": "Приложение 2. Стандарты качества"
-        },
-        {
-          "type": "p",
-          "text": "1. Использовать реальные и актуальные фотографии и описания."
-        },
-        {
-          "type": "p",
-          "text": "2. Отвечать на Заявки желательно в течение 24 часов."
-        },
-        {
-          "type": "p",
-          "text": "3. Не подтверждать заказ при отсутствии возможности исполнить его."
-        },
-        {
-          "type": "h2",
-          "text": "4. Соблюдать согласованное время, внешний вид, программу, состав команды и"
-        },
-        {
-          "type": "p",
-          "text": "технические требования."
-        },
-        {
-          "type": "p",
-          "text": "5. Своевременно сообщать о риске задержки или невозможности исполнения."
-        },
-        {
-          "type": "p",
-          "text": "6. Не изменять цену после подтверждения без ясного согласия Клиента."
-        },
-        {
-          "type": "h2",
-          "text": "7. Соблюдать конфиденциальность, безопасность, авторские права и уважительное"
-        },
-        {
-          "type": "p",
-          "text": "отношение."
-        },
-        {
-          "type": "h2",
-          "text": "Приложение 3. Техническая фиксация акцепта"
-        },
-        {
-          "type": "h2",
-          "text": "1. Отдельный неотмеченный чекбокс со ссылками на Соглашение и Политику"
-        },
-        {
-          "type": "p",
-          "text": "конфиденциальности."
-        },
-        {
-          "type": "p",
-          "text": "2. Сохранение user_id, partner_type, document_version, accepted_at в UTC, IP, user-agent, языка, хеша файла и источника регистрации."
-        },
-        {
-          "type": "h2",
-          "text": "3. Неизменяемый журнал версии документа и возможность выгрузить подтверждение"
-        },
-        {
-          "type": "p",
-          "text": "акцепта."
-        },
-        {
-          "type": "p",
-          "text": "4. Повторный активный акцепт при существенных изменениях, когда он требуется."
-        },
-        {
-          "type": "p",
-          "text": "5. Отдельные согласия для маркетинга и необязательных cookies."
-        },
-        {
-          "type": "h2",
-          "text": "Приложение 4. Реквизиты Оператора"
-        },
-        {
-          "type": "p",
-          "text": "Полное наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail для юридических уведомлений: legal@epetrecere.md EPETRECERE LEGAL | Partner Agreement v1.0 Веб-сайт: epetrecere.md Дата вступления версии 1.0 в силу: 20 июля 2026 г. EPETRECERE LEGAL | Partner Agreement v1.0 Текст электронного акцепта Я подтверждаю, что ознакомился(лась), понял(а) и полностью принимаю Соглашение о сотрудничестве с партнёрами EPETRECERE, его приложения, Правила платформы и Политику конфиденциальности. Я подтверждаю достоверность указанных данных и, если действую от имени юридического лица, наличие необходимых полномочий. Подтверждение для архива При акцепте Платформа автоматически фиксирует: ID аккаунта, тип Партнёра (физическое лицо / ИП / юридическое лицо), версию документа (1.0), дату и время акцепта, а также криптографический отпечаток (хеш) принятого текста."
-        }
-      ],
-      "en": [
-        {
-          "type": "p",
-          "text": "EPETRECERE LEGAL | Partner Agreement v1.0 EPETRECERE COLLABORATION AGREEMENT WITH THE PARTNERS OF THE PLATFORM Version 1.0 | Republic of Moldova | 2026 Operator EPETRECERE S.R.L. Website epetrecere.md Effective date 20 July 2026 Status In force Governing language Romanian. The Russian and English versions are courtesy translations; in the event of divergence the Romanian text shall prevail. EPETRECERE LEGAL | Partner Agreement v1.0 Version history Version Date Status Description"
-        },
-        {
-          "type": "p",
-          "text": "1.0 20 July 2026 In force First consolidated version Contents"
-        },
-        {
-          "type": "h2",
-          "text": "1. 1. General Provisions"
-        },
-        {
-          "type": "h2",
-          "text": "2. 2. Terms and Definitions"
-        },
-        {
-          "type": "h2",
-          "text": "3. 3. Status of the Platform"
-        },
-        {
-          "type": "h2",
-          "text": "4. 4. Electronic Acceptance and Evidence of Conclusion"
-        },
-        {
-          "type": "h2",
-          "text": "5. 5. Registration and Status of the Partner"
-        },
-        {
-          "type": "h2",
-          "text": "6. 6. Verification"
-        },
-        {
-          "type": "h2",
-          "text": "7. 7. The Profile and the Content"
-        },
-        {
-          "type": "h2",
-          "text": "8. 8. The Calendar, Prices and Commercial Terms"
-        },
-        {
-          "type": "h2",
-          "text": "9. 9. Requests, Chat and Contact Details"
-        },
-        {
-          "type": "h2",
-          "text": "10. 10. Confirmation and Amendment of the Booking"
-        },
-        {
-          "type": "h2",
-          "text": "11. 11. The 5% Service Fee"
-        },
-        {
-          "type": "h2",
-          "text": "12. 12. Invoicing, Payment Terms and Debt"
-        },
-        {
-          "type": "h2",
-          "text": "13. 13. Cancellation, No-Show and Refunds"
-        },
-        {
-          "type": "h2",
-          "text": "14. 14. Prohibition on Circumventing the Platform"
-        },
-        {
-          "type": "h2",
-          "text": "15. 15. Rights and Obligations of the Partner"
-        },
-        {
-          "type": "h2",
-          "text": "16. 16. Rights and Obligations of the Operator"
-        },
-        {
-          "type": "h2",
-          "text": "17. 17. Rating, Reviews and Ranking"
-        },
-        {
-          "type": "h2",
-          "text": "18. 18. Automated Systems and Artificial Intelligence"
-        },
-        {
-          "type": "h2",
-          "text": "19. 19. Intellectual Property of the Operator"
-        },
-        {
-          "type": "h2",
-          "text": "20. 20. Personal Data"
-        },
-        {
-          "type": "h2",
-          "text": "21. 21. Confidentiality"
-        },
-        {
-          "type": "h2",
-          "text": "22. 22. Information Security"
-        },
-        {
-          "type": "h2",
-          "text": "23. 23. Complaints, Checks and Moderation"
-        },
-        {
-          "type": "h2",
-          "text": "24. 24. Limitation of the Operator's Liability"
-        },
-        {
-          "type": "h2",
-          "text": "25. 25. Liability of the Partner and Indemnity"
-        },
-        {
-          "type": "h2",
-          "text": "26. 26. Force Majeure"
-        },
-        {
-          "type": "h2",
-          "text": "27. 27. Term, Suspension and Termination"
-        },
-        {
-          "type": "h2",
-          "text": "28. 28. Amendment of the Agreement and of the Fees"
-        },
-        {
-          "type": "h2",
-          "text": "29. 29. Notices"
-        },
-        {
-          "type": "h2",
-          "text": "30. 30. Governing Law and Disputes"
-        },
-        {
-          "type": "h2",
-          "text": "31. 31. Final Provisions"
-        },
-        {
-          "type": "h2",
-          "text": "32. Annex 1. Fees and Calculation"
-        },
-        {
-          "type": "h2",
-          "text": "33. Annex 2. Quality Standards"
-        },
-        {
-          "type": "h2",
-          "text": "34. Annex 3. Technical Record of Acceptance"
-        },
-        {
-          "type": "p",
-          "text": "EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "h2",
-          "text": "35. Annex 4. Details of the Operator"
-        },
-        {
-          "type": "p",
-          "text": "EPETRECERE LEGAL | Partner Agreement v1.0 Legal basis of this version The Civil Code of the Republic of Moldova; Law No. 284/2004 on electronic commerce; Law No. 124/2022 on electronic identification and trust services; the legislation on data protection, including the transition to Law No. 195/2024 as from 23 August 2026. The references to legislation are of an informative nature. Should the law be amended, the mandatory rules in force shall apply."
-        },
-        {
-          "type": "h2",
-          "text": "1. General Provisions"
-        },
-        {
-          "type": "p",
-          "text": "1.1. This Collaboration Agreement for the partners of the EPETRECERE platform (hereinafter the „Agreement”) governs the relations between EPETRECERE S.R.L., a legal entity incorporated and operating under the legislation of the Republic of Moldova (hereinafter the „Operator”), and the person who registers on the Platform in order to provide services connected with the organisation and holding of events (hereinafter the „Partner”)."
-        },
-        {
-          "type": "p",
-          "text": "1.2. A Partner may be a natural person with full legal capacity, an individual entrepreneur, a peasant household (gospodărie țărănească), a professional, another form of independent activity permitted by law, or a legal entity. The person who creates the account on behalf of an organisation declares that it holds sufficient authority to accept the Agreement on that organisation's behalf."
-        },
-        {
-          "type": "p",
-          "text": "1.3. The Agreement is concluded by electronic adherence at the moment of registration. Acceptance is given in full and includes its Annexes."
-        },
-        {
-          "type": "p",
-          "text": "1.4. The Romanian-language version is the principal version. The Russian version is provided for convenience. In the event of any discrepancy, the Romanian version shall prevail, except where mandatory rules provide otherwise."
-        },
-        {
-          "type": "p",
-          "text": "1.5. The Agreement applies together with the Privacy Policy, the Platform Rules, the Content Policy, the Rules on Reviews, the fees and the other documents expressly designated as integral parts hereof."
-        },
-        {
-          "type": "h2",
-          "text": "2. Terms and Definitions"
-        },
-        {
-          "type": "p",
-          "text": "2.1. “Platform” means the epetrecere.md website, the mobile applications, the personal accounts, the software interfaces and the related digital services of the Operator."
-        },
-        {
-          "type": "p",
-          "text": "2.2. “Client” means the user who searches for, requests, books or purchases the Partner’s services through the Platform."
-        },
-        {
-          "type": "p",
-          "text": "2.3. “Request” means the electronic request submitted by the Client to one or more Partners through the functionality of the Platform."
-        },
-        {
-          "type": "p",
-          "text": "2.4. “Confirmed Booking” means the Request accepted by the Partner through the action provided for by the Platform, or the transaction whose conclusion follows from the totality of the electronic data and the factual circumstances."
-        },
-        {
-          "type": "p",
-          "text": "2.5. “Booking Price” means the Partner’s total remuneration for the respective Booking, including the mandatory supplements and the additional services agreed upon. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "2.6. “Service Fee” means the payment due to the Operator for the digital infrastructure, for attracting the Client and for the search, communication, booking, administration, promotion, analytics and support tools. The base level is 5% of the Booking Price."
-        },
-        {
-          "type": "p",
-          "text": "2.7. “Platform Circumvention” means actions intended to conceal, formally cancel or transfer outside the Platform a transaction initiated through it, for the purpose of avoiding, in whole or in part, the Service Fee or the rules of the Platform."
-        },
-        {
-          "type": "p",
-          "text": "2.8. “Content” includes the texts, images, logos, video and audio materials, price lists, documents, messages and the other materials uploaded or transmitted by the Partner."
-        },
-        {
-          "type": "p",
-          "text": "2.9. “Electronic Logs” means the automatic records concerning registration, acceptance, authentication, actions, messages, notifications, profile changes, Requests, Bookings and payments."
-        },
-        {
-          "type": "h2",
-          "text": "3. Status of the Platform"
-        },
-        {
-          "type": "p",
-          "text": "3.1. EPETRECERE is a digital platform and a provider of information and technology services. In the absence of a special document, the Operator does not provide the Partner’s services and is not the organiser of the event, an employer, a representative, an agent, a commission agent, an insurer, a guarantor or a participant in a joint activity of the Partner."
-        },
-        {
-          "type": "p",
-          "text": "3.2. The contract for the specific service is concluded directly between the Client and the Partner. The Partner is liable for the description, the price, legality, quality, safety, time limits and the result."
-        },
-        {
-          "type": "p",
-          "text": "3.3. The Operator does not guarantee a minimum number of Requests, revenue, views, a position in the results or a commercial outcome."
-        },
-        {
-          "type": "p",
-          "text": "3.4. The Operator may introduce separate payment models, subscriptions, promotion, advertising, protected transactions, payment integrations and new categories by way of special terms."
-        },
-        {
-          "type": "h2",
-          "text": "4. Electronic Acceptance and Proof of Conclusion"
-        },
-        {
-          "type": "p",
-          "text": "4.1. Before registration is completed, the Partner is given the opportunity to open and save the version of the Agreement in force."
-        },
-        {
-          "type": "p",
-          "text": "4.2. Acceptance is effected by separately ticking the consent box and pressing the “Register”, “Create account”, “Continue” button or an equivalent button. The box shall not be pre-ticked."
-        },
-        {
-          "type": "p",
-          "text": "4.3. The Operator may record the date and time of acceptance, the account ID, the version of the document, the IP address, the device type, the browser, the interface language and other technical data necessary for proving acceptance and for security."
-        },
-        {
-          "type": "p",
-          "text": "4.4. Electronic messages, logs, database records, copies of documents, system notifications and the history of actions may be used as evidence to the extent permitted by law."
-        },
-        {
-          "type": "p",
-          "text": "4.5. The Partner shall keep its e-mail address and telephone number up to date. The risk of not receiving notifications on account of incorrect data or of the Partner’s own settings lies with the Partner. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "h2",
-          "text": "5. Registration and Status of the Partner"
-        },
-        {
-          "type": "p",
-          "text": "5.1. The Partner shall provide complete and truthful data corresponding to its actual and legal status."
-        },
-        {
-          "type": "p",
-          "text": "5.2. A natural person shall state the data necessary for identification and declares that it may lawfully provide the services and that it fulfils its tax and registration obligations."
-        },
-        {
-          "type": "p",
-          "text": "5.3. An individual entrepreneur or a professional shall state the name, the identification number, the address, the representative and the data requested."
-        },
-        {
-          "type": "p",
-          "text": "5.4. A legal entity shall state the official name, the IDNO, the registered office, the tax status, the administrator or the authorised representative and, upon request, the supporting documents."
-        },
-        {
-          "type": "p",
-          "text": "5.5. The account may not be misleading as to the actual performer. Replacement of the principal performer is permitted only with clear notification to the Client."
-        },
-        {
-          "type": "p",
-          "text": "5.6. Transfer of the account without the Operator’s written consent is prohibited."
-        },
-        {
-          "type": "h2",
-          "text": "6. Verification"
-        },
-        {
-          "type": "p",
-          "text": "6.1. The Operator may request the identity document, registration documents, a power of attorney, confirmation of the bank account, licences, certificates, authorisations, samples of work and data concerning the beneficial owner, where the verification is justified by risk or by law."
-        },
-        {
-          "type": "p",
-          "text": "6.2. The Operator may use public registers, identification providers and open sources, in compliance with data protection."
-        },
-        {
-          "type": "p",
-          "text": "6.3. Until the verification is completed, publication of the profile, the receipt of Requests, access to contact details, the withdrawal of funds or other functions may be restricted."
-        },
-        {
-          "type": "p",
-          "text": "6.4. Refusal to provide the necessary data, indications of forgery, inconsistencies or fraud may lead to refusal, suspension or termination."
-        },
-        {
-          "type": "p",
-          "text": "6.5. Verification does not constitute a guarantee of professional qualification."
-        },
-        {
-          "type": "h2",
-          "text": "7. Profile and Content"
-        },
-        {
-          "type": "p",
-          "text": "7.1. The Partner is liable for the accuracy of the profile, the category, the field of activity, the portfolio, the prices, the terms, the availability and the information about the team."
-        },
-        {
-          "type": "p",
-          "text": "7.2. False distinctions, third-party works used without permission, misleading images, the advertising of unlawful services, contact details placed in prohibited fields and materials that infringe rights are prohibited."
-        },
-        {
-          "type": "p",
-          "text": "7.3. The Operator may adapt the formatting, crop images, create previews, apply a watermark, translate the description, hide or remove the Content. The commercial meaning shall not be substantially altered without consent."
-        },
-        {
-          "type": "p",
-          "text": "7.4. The Partner grants the Operator a non-exclusive, royalty-free and territorially unlimited licence to store, reproduce, adapt the format of, display and distribute the Content for the purpose of the operation and promotion of the Platform and of the profile. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "7.5. The Partner shall make good the damage and the justified expenses resulting from third-party claims in respect of the Content, where the infringement is attributable to the Partner."
-        },
-        {
-          "type": "h2",
-          "text": "8. Calendar, Prices and Commercial Terms"
-        },
-        {
-          "type": "p",
-          "text": "8.1. The Partner shall keep the calendar and the prices up to date."
-        },
-        {
-          "type": "p",
-          "text": "8.2. Where the tariff plan requires the price to be displayed, the Partner shall state a real price or a clear price range and shall not use fictitiously reduced prices."
-        },
-        {
-          "type": "p",
-          "text": "8.3. After confirmation, the price may not be increased unilaterally, except for additional services or circumstances agreed upon and recorded in the Platform."
-        },
-        {
-          "type": "p",
-          "text": "8.4. The Partner shall disclose the essential limitations: the duration, transport, the technical rider, accommodation, the advance payment, the guarantee and the cancellation terms."
-        },
-        {
-          "type": "p",
-          "text": "8.5. An inaccurate calendar, unjustified refusals or a change of price may affect the rating and the visibility."
-        },
-        {
-          "type": "h2",
-          "text": "9. Requests, Chat and Contact Details"
-        },
-        {
-          "type": "p",
-          "text": "9.1. The Client may send Requests to several Partners in the same category within the limits of the Platform. Receipt of a Request does not create an obligation to accept it."
-        },
-        {
-          "type": "p",
-          "text": "9.2. Until the stage established by the Platform, communication shall take place through the internal chat. It is prohibited to transmit telephone numbers, e-mail addresses, messaging accounts, social networks, websites, QR codes or contact details disguised for the purpose of circumvention."
-        },
-        {
-          "type": "p",
-          "text": "9.3. The Operator may automatically detect contact details, issue a warning, hide the message or refer the content for moderation."
-        },
-        {
-          "type": "p",
-          "text": "9.4. Following acceptance, contact details may be disclosed in accordance with the functionality of the Platform. Such disclosure does not remove the origin of the Booking in the Platform."
-        },
-        {
-          "type": "p",
-          "text": "9.5. Response time may influence ranking."
-        },
-        {
-          "type": "h2",
-          "text": "10. Confirmation and Amendment of the Booking"
-        },
-        {
-          "type": "p",
-          "text": "10.1. The Booking is confirmed by means of the corresponding button, by acceptance of the advance payment through an integrated mechanism, or by another unequivocal action indicated in the interface."
-        },
-        {
-          "type": "p",
-          "text": "10.2. If the parties negotiate outside the Platform after a Request, the Booking shall remain one originating from the Platform, save in the case of a documented prior relationship concerning the same event."
-        },
-        {
-          "type": "p",
-          "text": "10.3. Any change of the date, the place, the Services or the price shall be recorded through the Platform. An increase in the price increases the basis of the Service Fee."
-        },
-        {
-          "type": "p",
-          "text": "10.4. Rescheduling does not extinguish the Booking where the service is maintained. If performance becomes impossible, the cancellation rules shall apply."
-        },
-        {
-          "type": "p",
-          "text": "10.5. The Partner shall communicate the final price and the status of performance at the request of the Platform. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "h2",
-          "text": "11. The 5% Service Fee"
-        },
-        {
-          "type": "p",
-          "text": "11.1. The base Service Fee is 5% of the Price of each confirmed Booking, unless special conditions are published."
-        },
-        {
-          "type": "p",
-          "text": "11.2. The Service Fee is due for the digital service and for the commercial opportunity, irrespective of the Client's method of payment."
-        },
-        {
-          "type": "p",
-          "text": "11.3. For prices in foreign currency, the calculation shall be made in the currency of the invoice or in Moldovan lei (MDL) at the exchange rate indicated in the tariffs or in the invoice."
-        },
-        {
-          "type": "p",
-          "text": "11.4. The basis includes additional services, extension, transport, equipment or personnel, where these form part of the Partner's remuneration."
-        },
-        {
-          "type": "p",
-          "text": "11.5. Applicable taxes shall be added or included depending on the Operator's tax status and on the law."
-        },
-        {
-          "type": "p",
-          "text": "11.6. Discounts and individual terms do not create a permanent right."
-        },
-        {
-          "type": "h2",
-          "text": "12. Invoicing, Payment Terms and Debt"
-        },
-        {
-          "type": "p",
-          "text": "12.1. The payment term is indicated in the invoice, in the tariffs or in the interface; in the absence thereof, payment shall be made within 5 business days."
-        },
-        {
-          "type": "p",
-          "text": "12.2. Payment is made upon the crediting of the Operator's account or upon confirmation by the payment provider."
-        },
-        {
-          "type": "p",
-          "text": "12.3. In the event of delay, the Operator may send notices, limit Requests, suspend the profile and claim penalties that are lawful and proportionate."
-        },
-        {
-          "type": "p",
-          "text": "12.4. An invoice shall be contested, with reasons, within 10 calendar days. The uncontested part shall be paid when due."
-        },
-        {
-          "type": "p",
-          "text": "12.5. The Operator may set off the confirmed debt against amounts owed to the Partner through the Platform, upon notice and within the limits of the law."
-        },
-        {
-          "type": "p",
-          "text": "12.6. Reasonable recovery costs shall be borne by the party at fault to the extent recognised by law or by the court."
-        },
-        {
-          "type": "h2",
-          "text": "13. Cancellation, No-Show and Refunds"
-        },
-        {
-          "type": "p",
-          "text": "13.1. The cancellation terms between the Client and the Partner are displayed in the offer and comply with mandatory legal rules."
-        },
-        {
-          "type": "p",
-          "text": "13.2. If the Client cancels after confirmation, the Service Fee is calculated on the amount actually retained by the Partner. An amount refunded in full is excluded upon proof of the refund."
-        },
-        {
-          "type": "p",
-          "text": "13.3. If the cancellation is attributable to the Partner, the Operator may cancel the Service Fee, apply measures to the profile and claim proven direct costs."
-        },
-        {
-          "type": "p",
-          "text": "13.4. An unjustified no-show by the Partner constitutes a material breach."
-        },
-        {
-          "type": "p",
-          "text": "13.5. The Operator does not refund out of its own funds the payments received directly by the Partner. Special conditions apply to integrated payments. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "h2",
-          "text": "14. Prohibition of Platform Circumvention"
-        },
-        {
-          "type": "p",
-          "text": "14.1. The Partner may not propose the concealment, the formal cancellation or the re-registration of the Booking outside the Platform in order to avoid the Service Fee."
-        },
-        {
-          "type": "p",
-          "text": "14.2. The indicators include the premature transmission of contact details, a sham rejection followed by performance, an artificially reduced price, redirection to an affiliated person, the deletion of messages or a false declaration of cancellation."
-        },
-        {
-          "type": "p",
-          "text": "14.3. Before any financial consequences, the Operator shall notify the essential circumstances and allow a reasonable period for explanations, save in the case of urgent measures."
-        },
-        {
-          "type": "p",
-          "text": "14.4. In the event of proven circumvention, the unpaid Service Fee shall be paid together with a contractual penalty equal to twice that amount, but not less than the equivalent of EUR 50 and not more than EUR 500 for one Booking, with the court's right to reduce it in the cases provided by law."
-        },
-        {
-          "type": "p",
-          "text": "14.5. Repeated or intentional circumvention permits termination of the Agreement. The Operator may claim the proven damage not covered by the penalty, to the extent permitted."
-        },
-        {
-          "type": "p",
-          "text": "14.6. This clause does not prevent working with the Client on independent orders that do not originate from the Platform."
-        },
-        {
-          "type": "h2",
-          "text": "15. Rights and Obligations of the Partner"
-        },
-        {
-          "type": "p",
-          "text": "15.1. The Partner shall perform in a professional, lawful and safe manner and in accordance with the agreed terms."
-        },
-        {
-          "type": "p",
-          "text": "15.2. The Partner shall ensure authorisations, licences, copyright, employment relationships, technical safety and insurance, where these are necessary."
-        },
-        {
-          "type": "p",
-          "text": "15.3. Discrimination, threats, harassment, spam and the manipulation of reviews are prohibited."
-        },
-        {
-          "type": "p",
-          "text": "15.4. The Partner may refuse before confirmation, manage the profile, request support, receive information about calculations and contest moderation."
-        },
-        {
-          "type": "p",
-          "text": "15.5. The Partner shall immediately report any compromise of the account, any prohibition of its activity or any impossibility of performance."
-        },
-        {
-          "type": "p",
-          "text": "15.6. The Client's data shall not be collected excessively and shall not be used for unsolicited advertising."
-        },
-        {
-          "type": "h2",
-          "text": "16. Rights and Obligations of the Operator"
-        },
-        {
-          "type": "p",
-          "text": "16.1. The Operator shall ensure reasonable availability, with the right to carry out maintenance, updates and urgent works."
-        },
-        {
-          "type": "p",
-          "text": "16.2. The Operator may modify the interface, the functions, the categories, the algorithms, the limits and the commercial models, subject to notification of material changes."
-        },
-        {
-          "type": "p",
-          "text": "16.3. The Operator may moderate Content, examine complaints, request explanations, issue warnings, restrict, reduce the visibility of, suspend or remove accounts."
-        },
-        {
-          "type": "p",
-          "text": "16.4. The Operator shall process data lawfully and shall adopt proportionate security measures."
-        },
-        {
-          "type": "p",
-          "text": "16.5. The Operator may engage cloud, payment, support and analytics providers, within the limits of its legal liability. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "16.6. The Operator is under no obligation of permanent prior control, but shall react to well-founded notifications."
-        },
-        {
-          "type": "h2",
-          "text": "17. Rating, Reviews and Ranking"
-        },
-        {
-          "type": "p",
-          "text": "17.1. The position may depend on relevance, availability, speed of response, profile, quality, reviews, confirmed Bookings, promotion and compliance with the rules."
-        },
-        {
-          "type": "p",
-          "text": "17.2. The exact formula may remain confidential in order to prevent manipulation and to protect intellectual property."
-        },
-        {
-          "type": "p",
-          "text": "17.3. False reviews, fictitious Bookings, pressure exerted on the Client and hidden advantages in exchange for positive reviews are prohibited."
-        },
-        {
-          "type": "p",
-          "text": "17.4. The Operator may remove a review which is unrelated to an actual interaction, or which is unlawful, promotional, threatening or demonstrably false."
-        },
-        {
-          "type": "p",
-          "text": "17.5. A negative review shall not be removed solely on account of its negative character; the Partner may be granted a right of reply."
-        },
-        {
-          "type": "h2",
-          "text": "18. Automated Systems and Artificial Intelligence"
-        },
-        {
-          "type": "p",
-          "text": "18.1. The Operator may use automated tools for recommendations, translation and the detection of contact details, spam, fraud, prohibited Content and anomalies."
-        },
-        {
-          "type": "p",
-          "text": "18.2. An automated outcome may give rise to a temporary restriction or to a priority verification; a material decision may be reviewed by a person, where the law so requires or where this is reasonably possible."
-        },
-        {
-          "type": "p",
-          "text": "18.3. The Partner may not use bots, scraping, automated mass messaging or tools which create false activity."
-        },
-        {
-          "type": "p",
-          "text": "18.4. Anonymised or aggregated data may be used for analysis and development."
-        },
-        {
-          "type": "h2",
-          "text": "19. Intellectual Property of the Operator"
-        },
-        {
-          "type": "p",
-          "text": "19.1. The software, the design, the databases, the structure of the catalogues, the trade marks, the domains and the internal methods belong to the Operator or are licensed to it."
-        },
-        {
-          "type": "p",
-          "text": "19.2. The Partner is granted a limited, revocable and non-transferable right to use the Platform for the purposes of the Agreement."
-        },
-        {
-          "type": "p",
-          "text": "19.3. Copying the databases, reverse engineering, circumventing limitations, systematic extraction and unauthorised use of the EPETRECERE trade mark are prohibited."
-        },
-        {
-          "type": "p",
-          "text": "19.4. The Partner's suggestions may be used freely, unless otherwise agreed in writing."
-        },
-        {
-          "type": "h2",
-          "text": "20. Personal Data"
-        },
-        {
-          "type": "p",
-          "text": "20.1. Until 23 August 2026, processing shall have regard to Law No. 133/2011 and, as from the entry into force of the new regime, to Law No. 195/2024 and the applicable acts. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "20.2. The purposes, the legal bases, the categories, the recipients, the time limits, the transfers and the rights are described in the Privacy Policy."
-        },
-        {
-          "type": "p",
-          "text": "20.3. The Operator and the Partner may be independent controllers for their own purposes. Client data obtained through the Platform shall be used only for the Booking, for legal obligations and for the defence of rights."
-        },
-        {
-          "type": "p",
-          "text": "20.4. The Partner shall ensure confidentiality, restrict access, delete the data once they are no longer necessary and notify incidents which may affect the Platform or the Clients."
-        },
-        {
-          "type": "p",
-          "text": "20.5. Commercial communications shall be sent only on a lawful basis and with an unsubscribe option."
-        },
-        {
-          "type": "p",
-          "text": "20.6. Acceptance of the Agreement does not replace the separate consents required by law."
-        },
-        {
-          "type": "h2",
-          "text": "21. Confidentiality"
-        },
-        {
-          "type": "p",
-          "text": "21.1. Non-public commercial, technical, financial and statistical information is confidential where its nature indicates such character."
-        },
-        {
-          "type": "p",
-          "text": "21.2. The obligation does not cover information which is public, lawfully obtained, independently developed or disclosed in accordance with the law."
-        },
-        {
-          "type": "p",
-          "text": "21.3. The information shall be used solely for the performance of the Agreement and access shall be granted on a need-to-know basis."
-        },
-        {
-          "type": "p",
-          "text": "21.4. The obligation shall last for the duration of the Agreement and for 3 years after its termination and, in the case of trade secrets, for as long as they retain that status."
-        },
-        {
-          "type": "h2",
-          "text": "22. Information Security"
-        },
-        {
-          "type": "p",
-          "text": "22.1. The Partner shall use a secure password, shall not disclose the codes, shall keep devices updated and shall comply with reasonable recommendations."
-        },
-        {
-          "type": "p",
-          "text": "22.2. Actions carried out from the account are presumed to be those of the Partner until notification of the compromise, unless proven otherwise."
-        },
-        {
-          "type": "p",
-          "text": "22.3. The Operator may close sessions, reset the password, require re-identification or temporarily block the account."
-        },
-        {
-          "type": "p",
-          "text": "22.4. No system guarantees absolute security; liability shall be determined in accordance with the law and with the reasonable measures adopted."
-        },
-        {
-          "type": "h2",
-          "text": "23. Complaints, Verifications and Moderation"
-        },
-        {
-          "type": "p",
-          "text": "23.1. The Operator shall examine the complaints of Clients, Partners, rights holders and authorities."
-        },
-        {
-          "type": "p",
-          "text": "23.2. The Partner shall provide explanations and documents within a reasonable time."
-        },
-        {
-          "type": "p",
-          "text": "23.3. Urgent restriction is permitted in the event of a security risk, fraud, unlawful content, compromise or significant harm. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "23.4. The measures include warning, correction, removal, reduction of visibility, restriction, suspension and termination."
-        },
-        {
-          "type": "p",
-          "text": "23.5. The Partner may lodge a reasoned appeal, which shall be examined by a different person where practically possible."
-        },
-        {
-          "type": "h2",
-          "text": "24. Limitation of the Operator's Liability"
-        },
-        {
-          "type": "p",
-          "text": "24.1. The Operator shall not be liable for the acts of the Client or of the Partner, for the quality of the service, for safety at the event, for goods, taxes, licences, personnel or the Partner's breaches."
-        },
-        {
-          "type": "p",
-          "text": "24.2. The Operator shall not be liable for indirect damage, lost profit, reputation or data, where liability is not mandatory and the damage does not result from intent or gross negligence."
-        },
-        {
-          "type": "p",
-          "text": "24.3. The total contractual liability for a single incident is limited to the Remuneration paid by the Partner over the last 6 months, except for limitations prohibited by law."
-        },
-        {
-          "type": "p",
-          "text": "24.4. The Operator shall not be liable for telecommunications, hosting, payments, force majeure, public restrictions and attacks that cannot reasonably be prevented."
-        },
-        {
-          "type": "p",
-          "text": "24.5. Liability which cannot be excluded remains applicable."
-        },
-        {
-          "type": "h2",
-          "text": "25. The Partner's Liability and Indemnity"
-        },
-        {
-          "type": "p",
-          "text": "25.1. The Partner shall be liable for non-performance, unlawful activity, false data, Content, taxes, personnel, equipment and the damage caused."
-        },
-        {
-          "type": "p",
-          "text": "25.2. The Partner shall make good the documented costs and damages arising from third-party claims caused by a breach attributable to the Partner."
-        },
-        {
-          "type": "p",
-          "text": "25.3. The Operator shall notify the claim and shall allow participation in the defence where this is possible and does not prejudice its interests."
-        },
-        {
-          "type": "p",
-          "text": "25.4. The Partner shall not acknowledge obligations and shall not enter into settlements on behalf of the Operator without its consent."
-        },
-        {
-          "type": "h2",
-          "text": "26. Force Majeure"
-        },
-        {
-          "type": "p",
-          "text": "26.1. A Party shall not be liable for non-performance caused by an extraordinary and unavoidable event beyond its reasonable control."
-        },
-        {
-          "type": "p",
-          "text": "26.2. The Party shall give notice without undue delay and shall mitigate the consequences."
-        },
-        {
-          "type": "p",
-          "text": "26.3. Monetary obligations that fell due beforehand are not automatically extinguished."
-        },
-        {
-          "type": "p",
-          "text": "26.4. After 30 days of material impossibility, the Agreement may be terminated with effect for the future."
-        },
-        {
-          "type": "h2",
-          "text": "27. Term, Suspension and Termination"
-        },
-        {
-          "type": "p",
-          "text": "27.1. The Agreement enters into force upon acceptance and continues until termination. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "27.2. The Partner may close its account after the Bookings have been performed, the debts have been paid and the mandatory data has been retained."
-        },
-        {
-          "type": "p",
-          "text": "27.3. The Operator may terminate on 15 days' prior notice without invoking a breach, without affecting Bookings already confirmed and mandatory rights."
-        },
-        {
-          "type": "p",
-          "text": "27.4. Immediate termination is permitted for fraud, serious risk, unlawful activity, false documents, repeated circumvention, non-payment after warning or repeated material breach."
-        },
-        {
-          "type": "p",
-          "text": "27.5. Termination does not extinguish the debts or the clauses which, by their nature, survive."
-        },
-        {
-          "type": "p",
-          "text": "27.6. The Operator shall retain the minimum records necessary for its legal obligations and for the defence of its rights."
-        },
-        {
-          "type": "h2",
-          "text": "28. Amendment of the Agreement and of the Fees"
-        },
-        {
-          "type": "p",
-          "text": "28.1. The Operator may amend the Agreement on grounds of law, security, new features, business model or clarity."
-        },
-        {
-          "type": "p",
-          "text": "28.2. Material amendments shall be notified through the account and/or by e-mail at least 15 days in advance, except in legal or security emergencies."
-        },
-        {
-          "type": "p",
-          "text": "28.3. New fees do not apply to Bookings already confirmed, unless otherwise agreed."
-        },
-        {
-          "type": "p",
-          "text": "28.4. Where necessary, a new active acceptance shall be requested; in the other cases, continued use after entry into force may constitute acceptance."
-        },
-        {
-          "type": "p",
-          "text": "28.5. The Operator shall keep an archive of the versions and of the dates of entry into force."
-        },
-        {
-          "type": "h2",
-          "text": "29. Notices"
-        },
-        {
-          "type": "p",
-          "text": "29.1. Notices shall be transmitted through the account, by e-mail, by push notification or by registered letter where necessary."
-        },
-        {
-          "type": "p",
-          "text": "29.2. An electronic notice is deemed received on the following business day if there is no non-delivery message and it is also available in the account."
-        },
-        {
-          "type": "p",
-          "text": "29.3. The Partner shall update its contact details within 3 business days."
-        },
-        {
-          "type": "p",
-          "text": "29.4. The Operator's official details and the address for claims are indicated in the company particulars and on the Platform."
-        },
-        {
-          "type": "h2",
-          "text": "30. Governing Law and Disputes"
-        },
-        {
-          "type": "p",
-          "text": "30.1. The Agreement is governed by the legislation of the Republic of Moldova."
-        },
-        {
-          "type": "p",
-          "text": "30.2. Before court proceedings, a written claim setting out the requests and the evidence shall be sent. The time limit for a reply is 15 business days, with the possibility of a reasonable additional period."
-        },
-        {
-          "type": "p",
-          "text": "30.3. The Parties may use negotiation and mediation."
-        },
-        {
-          "type": "p",
-          "text": "30.4. The dispute shall be settled by the competent court of the Republic of Moldova. This clause does not limit mandatory rights. EPETRECERE LEGAL | Partner Agreement v1.0"
-        },
-        {
-          "type": "p",
-          "text": "30.5. If the Partner has the status of a consumer in a specific relationship with the Operator, the mandatory guarantees apply; registration for the systematic offering of services has, as a rule, a professional purpose."
-        },
-        {
-          "type": "h2",
-          "text": "31. Final Provisions"
-        },
-        {
-          "type": "p",
-          "text": "31.1. The Agreement and the Annexes constitute the entire understanding concerning the use of the Platform as a Partner."
-        },
-        {
-          "type": "p",
-          "text": "31.2. The nullity of one clause does not affect the others; that clause shall be replaced by a lawful one close to its economic purpose."
-        },
-        {
-          "type": "p",
-          "text": "31.3. The failure to exercise a right does not constitute a waiver."
-        },
-        {
-          "type": "p",
-          "text": "31.4. The Partner may not assign without consent. The Operator may transfer the Agreement to the successor of the business, with notice and with preservation of statutory rights."
-        },
-        {
-          "type": "p",
-          "text": "31.5. The headings are indicative."
-        },
-        {
-          "type": "p",
-          "text": "31.6. The Operator's company particulars shall be completed before the publication of version 1.0. EPETRECERE LEGAL | Partner Agreement v1.0 ANNEXES"
-        },
-        {
-          "type": "h2",
-          "text": "Annex 1. Fees and Calculation"
-        },
-        {
-          "type": "p",
-          "text": "1. Base remuneration: 5% of the Price of the confirmed Booking."
-        },
-        {
-          "type": "p",
-          "text": "2. Example: price of 20,000 MDL; remuneration excluding applicable taxes - 1,000 MDL."
-        },
-        {
-          "type": "p",
-          "text": "3. Where the price is increased to 24,000 MDL, the remuneration is 1,200 MDL."
-        },
-        {
-          "type": "p",
-          "text": "4. If the Partner refunds the full amount to the Client and provides evidence of the refund, the remuneration shall be adjusted to zero, with the exception of payment costs agreed separately."
-        },
-        {
-          "type": "p",
-          "text": "5. Restaurants, halls and event Venues are subject to a separate agreement."
-        },
-        {
-          "type": "h2",
-          "text": "Annex 2. Quality Standards"
-        },
-        {
-          "type": "p",
-          "text": "1. Genuine and up-to-date photographs and descriptions."
-        },
-        {
-          "type": "p",
-          "text": "2. A response is recommended within 24 hours at the latest."
-        },
-        {
-          "type": "p",
-          "text": "3. Confirmation only where performance is possible."
-        },
-        {
-          "type": "p",
-          "text": "4. Compliance with the time, appearance, programme, team and technical requirements."
-        },
-        {
-          "type": "p",
-          "text": "5. Prompt notification of any delay or impossibility of performance."
-        },
-        {
-          "type": "p",
-          "text": "6. No increase of the price after confirmation without clear agreement."
-        },
-        {
-          "type": "p",
-          "text": "7. Compliance with confidentiality, safety, copyright and respectful conduct."
-        },
-        {
-          "type": "h2",
-          "text": "Annex 3. Technical Recording of Acceptance"
-        },
-        {
-          "type": "p",
-          "text": "1. A separate, unticked checkbox, with a link to the Agreement and to the Privacy Policy."
-        },
-        {
-          "type": "p",
-          "text": "2. Retention of user_id, partner_type, document_version, accepted_at UTC, IP address, user-agent, language, the file hash and the source of the record."
-        },
-        {
-          "type": "p",
-          "text": "3. An immutable log of versions and the ability to export the evidence of acceptance."
-        },
-        {
-          "type": "p",
-          "text": "4. Active re-acceptance for material changes where this is necessary."
-        },
-        {
-          "type": "p",
-          "text": "5. Separate consents for marketing and for optional cookies."
-        },
-        {
-          "type": "h2",
-          "text": "Annex 4. Operator Details"
-        },
-        {
-          "type": "p",
-          "text": "Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail for legal notices: legal@epetrecere.md Website: epetrecere.md Effective date of version 1.0: 20 July 2026. EPETRECERE LEGAL | Partner Agreement v1.0 Text of the electronic acceptance I confirm that I have read, understood and fully accept the EPETRECERE Partner Collaboration Agreement, its annexes, the Platform Rules and the Privacy Policy. I confirm the accuracy of the data provided and, where I am acting on behalf of a legal entity, that I hold the necessary authority. Confirmation for the archive Upon acceptance, the Platform automatically records: the account ID, the Partner type (natural person / ÎI (individual enterprise) / legal entity), the document version (1.0), the date and time of acceptance and the cryptographic fingerprint (hash) of the accepted text."
-        }
-      ]
+      "ru": [],
+      "en": []
     }
   },
   {

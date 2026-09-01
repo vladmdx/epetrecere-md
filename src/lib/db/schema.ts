@@ -1016,6 +1016,18 @@ export const legalAcceptances = pgTable(
     /** Handwritten signature drawn with mouse/finger, as a PNG data URL. */
     signatureImage: text("signature_image"),
     representativeRole: text("representative_role"),
+    /** Title of the document as shown, in the locale it was shown in. */
+    documentTitle: text("document_title"),
+    /**
+     * The exact blocks the signer saw, annex included, frozen at signing.
+     * `documents.json` keeps one version per slug, so without this the wording
+     * a person agreed to disappears the moment the document is superseded.
+     */
+    documentBlocks: jsonb("document_blocks").$type<
+      { type: string; text: string }[]
+    >(),
+    /** Readable device/browser, derived from the user agent at signing time. */
+    deviceSummary: text("device_summary"),
 
       /** Which §5 subsection governs this partner: individual | sole_trader |
    *  company. Decides which of the fields below the contract requires. */
