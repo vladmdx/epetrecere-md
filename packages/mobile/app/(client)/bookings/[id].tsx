@@ -10,12 +10,15 @@
 //      on status
 //   6. "Deschide chatul" CTA at the bottom — links to /chat/<convId>
 
+import { useState } from "react";
 import {
   View,
   Text,
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  TextInput,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -90,6 +93,52 @@ export default function BookingDetailScreen() {
       // The /booking-requests endpoint returns an array; we filter to ours.
       const arr = Array.isArray(list.data) ? list.data : [];
       return arr.find((b) => b.id === bookingId) ?? null;
+    },
+  });
+
+  const [counterOpen, setCounterOpen] = useState(false);
+  const [counterAmount, setCounterAmount] = useState("");
+  const [counterNote, setCounterNote] = useState("");
+  const [counterError, setCounterError] = useState<string | null>(null);
+
+  /**
+   * The client's half of the negotiation.
+   *
+   * The button for this existed with an empty handler and the comment
+   * "Counter-offer modal ships in M3.7" — and it was rendered only when the
+   * booking was already accepted, which is after negotiation is over. So a
+   * partner could send a price and the client could read it and do nothing:
+   * the partner's own sheet promises "clientul vede oferta ta și poate
+   * accepta, refuza sau veni cu o altă propunere", and none of those were
+   * possible from the app.
+   *
+   * The server has always supported it — its handler says in as many words
+   * that either party can push a counter-offer — so this is only the missing
+   * screen.
+   */
+  const counterMutation = useMutation({
+    mutationFn: async (amount: number) => {
+      const res = await api.put(API_PATHS.bookingRequest(bookingId), {
+        action: "propose_price",
+        agreedPrice: amount,
+        message: counterNote.trim() || undefined,
+      });
+      if (!res.ok) throw new Error(res.error?.message ?? "counter_failed");
+      return res.data;
+    },
+    onSuccess: () => {
+      // The same keys the screen and the confirm mutation already use. Named
+      // by hand the first time and named wrongly, so the offer landed on the
+      // server and the history below it did not move.
+      void qc.invalidateQueries({ queryKey: ["booking", bookingId] });
+      void qc.invalidateQueries({ queryKey: ["my", "bookings"] });
+      setCounterOpen(false);
+      setCounterAmount("");
+      setCounterNote("");
+      setCounterError(null);
+    },
+    onError: (err) => {
+      setCounterError(err instanceof Error ? err.message : "A apărut o eroare");
     },
   });
 
@@ -331,19 +380,90 @@ export default function BookingDetailScreen() {
             >
               Confirmă rezervarea
             </Button>
-            <Button
-              variant="outline"
-              onPress={() => {
-                // Counter-offer modal ships in M3.7.
-              }}
-              fullWidth
-              size="md"
-              leftIcon={<ArrowLeftRight size={16} color={colors.gold} />}
-            >
-              Contrapropune preț
-            </Button>
           </View>
         )}
+
+        {/* Negotiation is only open while the request is pending — the same
+            window the server enforces. */}
+        {b.status === "pending" && (
+          <Button
+            variant="outline"
+            onPress={() => setCounterOpen(true)}
+            fullWidth
+            size="md"
+            leftIcon={<ArrowLeftRight size={16} color={colors.gold} />}
+          >
+            Propune alt preț
+          </Button>
+        )}
+
+        <Modal
+          visible={counterOpen}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setCounterOpen(false)}
+        >
+          <View style={{ flex: 1, backgroundColor: colors.background, padding: 20, gap: 14 }}>
+            <Text style={{ color: colors.foreground, fontSize: 19, fontWeight: "700" }}>
+              Propune alt preț
+            </Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13.5, lineHeight: 20 }}>
+              Cererea rămâne deschisă. Artistul vede propunerea ta și poate
+              accepta sau răspunde cu alta.
+            </Text>
+            <TextInput
+              value={counterAmount}
+              onChangeText={(v) => setCounterAmount(v.replace(/[^0-9]/g, "").slice(0, 6))}
+              keyboardType="number-pad"
+              placeholder="Suma propusă (€)"
+              placeholderTextColor={colors.mutedForeground}
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 14,
+                paddingHorizontal: 14,
+                paddingVertical: 14,
+                color: colors.foreground,
+                fontSize: 16,
+              }}
+            />
+            <TextInput
+              value={counterNote}
+              onChangeText={setCounterNote}
+              placeholder="Notă pentru artist (opțional)"
+              placeholderTextColor={colors.mutedForeground}
+              multiline
+              style={{
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 14,
+                paddingHorizontal: 14,
+                paddingVertical: 14,
+                minHeight: 90,
+                color: colors.foreground,
+                fontSize: 15,
+                textAlignVertical: "top",
+              }}
+            />
+            {counterError && (
+              <Text style={{ color: colors.danger, fontSize: 13.5, lineHeight: 19 }}>
+                {counterError}
+              </Text>
+            )}
+            <Button
+              onPress={() => counterMutation.mutate(Number(counterAmount))}
+              disabled={!Number(counterAmount)}
+              loading={counterMutation.isPending}
+              fullWidth
+              size="lg"
+            >
+              Trimite propunerea
+            </Button>
+            <Button variant="outline" onPress={() => setCounterOpen(false)} fullWidth size="md">
+              Renunț
+            </Button>
+          </View>
+        </Modal>
 
         {(b.artistId != null || b.venueId != null) && (
           <Button
