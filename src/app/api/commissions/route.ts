@@ -19,6 +19,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/admin";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
 import {
   markCommissionPaid,
   setCommissionStatus,
@@ -117,15 +118,20 @@ export async function GET(req: NextRequest) {
 
   const [totals] = await db
     .select({
-      pending: sql<number>`coalesce(sum(case when ${commissions.status} in ('pending','invoiced') then ${commissions.amount} else 0 end),0)::int`,
-      paid: sql<number>`coalesce(sum(case when ${commissions.status} = 'paid' then ${commissions.amount} else 0 end),0)::int`,
-      overdue: sql<number>`coalesce(sum(case when ${commissions.status} in ('pending','invoiced') and ${commissions.dueDate} < current_date then ${commissions.amount} else 0 end),0)::int`,
+      pending: sql<number>`coalesce(sum(case when ${commissions.status} in ('pending','invoiced') then ${commissions.amount} else 0 end),0)::float8`,
+      paid: sql<number>`coalesce(sum(case when ${commissions.status} = 'paid' then ${commissions.amount} else 0 end),0)::float8`,
+      overdue: sql<number>`coalesce(sum(case when ${commissions.status} in ('pending','invoiced') and ${commissions.dueDate} < current_date then ${commissions.amount} else 0 end),0)::float8`,
       count: sql<number>`count(*)::int`,
     })
     .from(commissions)
     .where(scopeWhere);
 
-  return NextResponse.json({ items, totals: totals ?? emptyTotals(), isAdmin });
+  const visibleItems = isAdmin ? items : items.map(item => contactsAreShared(item.bookingStatus ?? "")
+    ? item
+    : { ...item, clientName: null, clientEmail: null });
+  return NextResponse.json({ items: visibleItems, totals: totals ?? emptyTotals(), isAdmin }, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
 
 function emptyTotals() {

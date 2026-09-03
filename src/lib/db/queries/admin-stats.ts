@@ -359,10 +359,10 @@ export async function getAdminStats(input: StatsFilter): Promise<AdminStats> {
         // Cancelled (the event did not happen) and waived (deliberately not
         // charged) fees are not revenue. Counting them made "Venit platformă"
         // larger than anything that could ever be collected.
-        billed: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} <> 'cancelled' and ${commissions.status} <> 'waived'), 0)::int`,
-        collected: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} = 'paid'), 0)::int`,
-        outstanding: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} in ('pending','invoiced')), 0)::int`,
-        overdue: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} in ('pending','invoiced') and ${commissions.dueDate} < current_date), 0)::int`,
+        billed: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} <> 'cancelled' and ${commissions.status} <> 'waived'), 0)::float8`,
+        collected: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} = 'paid'), 0)::float8`,
+        outstanding: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} in ('pending','invoiced')), 0)::float8`,
+        overdue: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} in ('pending','invoiced') and ${commissions.dueDate} < current_date), 0)::float8`,
         rows: sql<number>`count(*)::int`,
       })
       .from(commissions)
@@ -377,8 +377,8 @@ export async function getAdminStats(input: StatsFilter): Promise<AdminStats> {
         vendorType: sql<string>`${commissions.vendorType}`,
         artistId: commissions.artistId,
         venueId: commissions.venueId,
-        billed: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} <> 'cancelled' and ${commissions.status} <> 'waived'), 0)::int`,
-        paid: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} = 'paid'), 0)::int`,
+        billed: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} <> 'cancelled' and ${commissions.status} <> 'waived'), 0)::float8`,
+        paid: sql<number>`coalesce(sum(${commissions.amount}) filter (where ${commissions.status} = 'paid'), 0)::float8`,
       })
       .from(commissions)
       .innerJoin(
