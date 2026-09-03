@@ -56,7 +56,10 @@ test("contract fee schedule has inclusive boundaries and exact cents",()=>{
   const fee=(eventType:string,guestCount?:number)=>computeCommission({vendorType:"venue",baseAmount:0,eventType,guestCount},DEFAULT_RULES)?.amount;
   assert.equal(fee("wedding"),200);
   for(const [kind,count,amount] of [["cumatrie",80,100],["cumatrie",81,150],["birthday",40,50],["birthday",41,80],["birthday",80,80],["birthday",81,100],["corporate",80,100],["corporate",81,150],["corporate",150,150],["corporate",151,200],["other",30,50]] as const) assert.equal(fee(kind,count),amount);
-  assert.equal(fee("other",31),undefined); assert.equal(fee("birthday"),undefined); assert.equal(fee("birthday",0),undefined);
+  for(const kind of ["other","proposal","cununie","concert"]) {
+    assert.equal(fee(kind,30),50); assert.equal(fee(kind,31),50); assert.equal(fee(kind,500),50);
+  }
+  assert.equal(fee("birthday"),undefined); assert.equal(fee("birthday",0),undefined);
 });
 test("onboarding rejects missing, stale, mismatched and incomplete acceptance",()=>{
   const valid={subjectType:"artist",accepted:true,packVersion:LEGAL_PACK_VERSION,signatureName:"QA Partner",signatureImage:"data:image/png;base64,QUJD",locale:"ro",documents:[...PARTNER_REQUIRED_DOCS],identity:{partnerType:"individual",legalName:"QA Partner",idNumber:"TEST1234",legalAddress:"Adresă exclusiv de test"}};
@@ -81,4 +84,20 @@ test("all event-picker images have different contents",()=>{
   assert.ok(paths.length>=10);
   const hashes=paths.map(p=>createHash("sha256").update(readFileSync("public"+p)).digest("hex"));
   assert.equal(new Set(hashes).size,paths.length);
+});
+
+test("published tariffs and pricing in all three languages match the approved terms",()=>{
+  const docs=JSON.parse(readFileSync("src/content/legal/documents.json","utf8"));
+  assert.equal(LEGAL_PACK_VERSION,"2.1");
+  for(const slug of ["acord-parteneri","acord-locatii","tarife"]) assert.equal(getLegalDocument(slug)?.version,"2.1");
+  for(const locale of ["ro","ru","en"]) {
+    const tariffs=docs.find((d:{slug:string})=>d.slug==="tarife").blocks[locale].map((b:{text:string})=>b.text).join("\n");
+    assert.ok(tariffs.includes("30"));
+    assert.match(tariffs,/50 EUR|EUR 50/);
+    assert.ok(!/10 (?:zile calendaristice|calendar days|календарных дней)/.test(tariffs));
+    assert.ok(!/Versiunea finală|Финальная редакция|The final version/.test(tariffs));
+    const {pricing}=JSON.parse(readFileSync("src/i18n/"+locale+".json","utf8"));
+    assert.ok(pricing.fee2.includes("30"));
+    assert.match(pricing.fee4,/TVA|VAT|НДС/);
+  }
 });

@@ -132,6 +132,7 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
   }
 
   const venueUnset =
+    !Object.values(rules.venueSchedules ?? {}).some(bands => bands.some(band => band.fixedAmount > 0)) &&
     rules.venue.below.rateBps == null &&
     rules.venue.below.fixedAmount == null &&
     rules.venue.atOrAbove.rateBps == null &&
@@ -300,6 +301,11 @@ export function FinanceClient({ initialRules }: { initialRules: CommissionRules 
           </CardContent>
         </Card>
       )}
+
+      <div className="rounded-xl border border-gold/30 bg-gold/5 p-4 text-sm text-muted-foreground">
+        <p>{t("pricing.fee2")} {t("pricing.fee4")}</p>
+        <p className="mt-2">{t("pricing.a4")}</p>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-4">
         <StatCard label={t("adminUi.finance.statPending")} value={`${totals.pending} ${cur}`} />

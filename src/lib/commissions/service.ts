@@ -22,8 +22,8 @@ import {
   type CommissionRules,
 } from "./rules";
 
-/** Tariffs §7 — payable within 10 calendar days unless agreed otherwise. */
-const PAYMENT_TERM_DAYS = 10;
+/** Tariffs §7: 30 calendar days from final bilateral confirmation. */
+export const PAYMENT_TERM_DAYS = 30;
 
 /** Booking statuses that mean "the order is confirmed" and the fee is due. */
 export const FEE_TRIGGER_STATUSES = ["confirmed_by_client", "completed"] as const;
@@ -47,10 +47,13 @@ export async function saveCommissionRules(rules: CommissionRules): Promise<void>
     });
 }
 
-function addDays(days: number, confirmedAt: Date): string {
-  const d = new Date(confirmedAt);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+export function commissionDueDate(confirmedAt: Date): string {
+  // The contract uses Moldova calendar dates, not the server's UTC day.
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Chisinau", year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(confirmedAt);
+  const part = (type: string) => Number(parts.find(p => p.type === type)?.value);
+  return new Date(Date.UTC(part("year"), part("month") - 1, part("day") + PAYMENT_TERM_DAYS)).toISOString().slice(0, 10);
 }
 
 /**
@@ -145,7 +148,7 @@ export async function ensureCommissionForBooking(
       amount: result.amount,
       guestCount: b.guestCount ?? null,
       tier: result.tier,
-      dueDate: b.confirmedAt ? addDays(PAYMENT_TERM_DAYS, b.confirmedAt) : null,
+      dueDate: b.confirmedAt ? commissionDueDate(b.confirmedAt) : null,
     })
     .onConflictDoNothing({ target: commissions.bookingRequestId })
     .returning({ id: commissions.id });

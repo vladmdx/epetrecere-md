@@ -74,6 +74,7 @@ export function CommissionPanel() {
         <p className="text-sm text-muted-foreground">
           {t("vendor.commission.description")}
         </p>
+        <p className="text-sm text-muted-foreground">{t("pricing.fee2")} {t("pricing.fee4")}</p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-3">

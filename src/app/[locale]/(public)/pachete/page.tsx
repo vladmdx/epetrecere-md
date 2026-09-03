@@ -46,7 +46,7 @@ export default async function PricingPage({
   const tt = (k: string) => translate(`pricing.${k}`, locale);
 
   const included = ["inc1", "inc2", "inc3", "inc4", "inc5", "inc6"].map(tt);
-  const feePoints = ["fee1", "fee2", "fee3"].map(tt);
+  const feePoints = ["fee1", "fee2", "fee3", "fee4"].map(tt);
   const faq = [1, 2, 3, 4, 5, 6].map((i) => ({
     q: tt(`q${i}`),
     a: tt(`a${i}`),

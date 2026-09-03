@@ -1,7 +1,7 @@
 [
   {
     "slug": "acord-parteneri",
-    "version": "2.0",
+    "version": "2.1",
     "order": 1,
     "title": {
       "ro": "Condițiile de colaborare pentru parteneri și locații",
@@ -16,7 +16,7 @@
         },
         {
           "type": "p",
-          "text": "Acord electronic. Versiunea 2.0. Data intrării în vigoare: 1 septembrie 2026. Limba care prevalează: româna."
+          "text": "Acord electronic. Versiunea 2.1. Data intrării în vigoare: 4 septembrie 2026. Limba care prevalează: româna."
         },
         {
           "type": "p",
@@ -32,7 +32,7 @@
         },
         {
           "type": "p",
-          "text": "1.1. Partenerul acceptă prezentele Condiții la înregistrarea pe epetrecere.md prin bifarea câmpului „Accept Condițiile de colaborare pentru partenerii epetrecere.md”, apăsarea butonului „Înregistrare”, „Devino partener”, „Trimite formularul”, „Accept condițiile” sau printr-o acțiune similară."
+          "text": "1.1. La înregistrare, Partenerul consultă documentele aplicabile, completează datele de identificare, confirmă expres acceptarea lor și aplică semnătura în formularul electronic. Trimiterea formularului semnat constituie acceptarea versiunii afișate. Simpla vizitare a website-ului nu constituie semnare."
         },
         {
           "type": "p",
@@ -44,7 +44,7 @@
         },
         {
           "type": "p",
-          "text": "1.4. Platforma are dreptul să păstreze dovezi tehnice ale acceptării: ID-ul partenerului, numele/denumirea, e-mailul, telefonul, adresa IP, data și ora, dispozitivul, versiunea Condițiilor și textul bifei acceptate."
+          "text": "1.4. Platforma păstrează, în condițiile Politicii de confidențialitate, identificatorul semnatarului, datele de identificare, versiunea și copia exactă a documentelor acceptate, semnătura, data și ora, adresa IP și informațiile disponibile despre browser și dispozitiv, precum și hash-ul conținutului. Copia este accesibilă Partenerului și administratorilor autorizați. Semnătura desenată în formular nu este prezentată drept semnătură electronică calificată."
         },
         {
           "type": "p",
@@ -136,15 +136,15 @@
         },
         {
           "type": "p",
-          "text": "Basic — Obligatoriu „preț de la”, interval de preț sau preț pe oră/eveniment/persoană. Afișare obișnuită, profil de bază, funcții suplimentare limitate."
+          "text": "Profilul Partenerului prezintă serviciile, portofoliul, aria de activitate și disponibilitatea declarată."
         },
         {
           "type": "p",
-          "text": "Pro — Se poate indica „preț de la”, interval, pachete gata sau ofertă individuală. Profil extins, mai multe materiale, posibilitatea pachetelor de servicii."
+          "text": "Partenerul poate indica un preț orientativ, un interval de preț sau pachete de servicii; oferta finală este transmisă și acceptată prin Platformă."
         },
         {
           "type": "p",
-          "text": "Premium — Se poate afișa „ofertă individuală” sau „preț la cerere”. Funcții prioritare, badge, portofoliu extins, oferte individuale."
+          "text": "Înregistrarea și publicarea standard sunt gratuite. Eventualele servicii suplimentare cu plată se activează numai după informarea și acceptarea expresă a Partenerului, conform Tarifelor."
         },
         {
           "type": "p",
@@ -216,7 +216,7 @@
         },
         {
           "type": "p",
-          "text": "7.5. Adresa exactă a unei persoane private, telefonul, e-mailul și messengerul se dezvăluie doar după confirmarea comenzii sau în alte cazuri permise de funcționalul Platformei."
+          "text": "7.5. Adresa exactă a unei persoane private, telefonul, e-mailul și messengerul se dezvăluie celeilalte părți numai după confirmarea finală a comenzii, cu excepția divulgărilor impuse de lege către autoritățile competente."
         },
         {
           "type": "h2",
@@ -260,7 +260,7 @@
         },
         {
           "type": "p",
-          "text": "9.3. La etapa MVP, Platforma nu este obligată să verifice faptul achitării avansului. Sala confirmă independent rezervarea după înțelegerea sa internă cu Clientul."
+          "text": "9.3. Sala verifică și confirmă independent îndeplinirea condițiilor convenite cu Clientul, inclusiv achitarea eventualului avans. Platforma nu certifică încasarea avansurilor achitate în afara sistemelor sale."
         },
         {
           "type": "p",
@@ -312,7 +312,7 @@
         },
         {
           "type": "p",
-          "text": "11.3. Pentru săli, restaurante și locații se aplică o taxă fixă în funcție de tipul evenimentului și numărul de invitați, conform tabelului de mai jos."
+          "text": "11.3. Pentru săli, restaurante și locații se aplică taxele fixe de mai jos. Botezul se încadrează la cumătrie, aniversarea copiilor la zi de naștere, iar cererea în căsătorie, cununia și concertul la alte evenimente. Categoria și numărul de invitați sunt cele indicate în comanda confirmată."
         },
         {
           "type": "p",
@@ -356,7 +356,7 @@
         },
         {
           "type": "p",
-          "text": "Banchet mic / alt eveniment — până la 30 invitați — 50 EUR"
+          "text": "Banchet mic / alt eveniment, indiferent de numărul invitaților, inclusiv peste 30: 50 EUR."
         },
         {
           "type": "p",
@@ -368,7 +368,7 @@
         },
         {
           "type": "p",
-          "text": "11.6. Termenul de plată a remunerației: 30 zile calendaristice de la data confirmării comenzii, dacă un alt termen nu este indicat în cabinetul personal sau în tarife."
+          "text": "11.6. Plata remunerației se efectuează în 30 de zile calendaristice de la data confirmării finale a comenzii în Platformă. Pentru săli, termenul începe numai după acceptarea ofertei de către Client și confirmarea ulterioară a rezervării de către sală. Data scadentă se calculează potrivit datei calendaristice din Republica Moldova și se afișează în Cont. EPETRECERE S.R.L. nu este înregistrată ca plătitor de TVA. TVA nu se calculează și nu se adaugă la remunerația Platformei prevăzută în aceste Tarife. Partenerii și Locațiile își îndeplinesc independent obligațiile fiscale aferente propriilor servicii. Orice schimbare ulterioară a statutului fiscal va fi comunicată și reflectată în documentele aplicabile, potrivit legii."
         },
         {
           "type": "p",
@@ -376,7 +376,7 @@
         },
         {
           "type": "p",
-          "text": "11.8. Platforma poate modifica tarifele prin publicarea unei noi versiuni în cabinetul personal sau pe website. Noile tarife se aplică solicitărilor noi după data intrării în vigoare a modificărilor."
+          "text": "11.8. Modificările tarifelor se publică într-o versiune nouă și se comunică Partenerului. Noile condiții comerciale necesită acceptare expresă și se aplică pentru viitor, fără modificarea retroactivă a tarifelor comenzilor deja confirmate."
         },
         {
           "type": "h2",
@@ -524,7 +524,7 @@
         },
         {
           "type": "p",
-          "text": "19.3. Continuarea utilizării Platformei după publicarea noii versiuni înseamnă acceptarea modificărilor de către Partener."
+          "text": "19.3. Modificările condițiilor comerciale și ale documentelor supuse semnării necesită o nouă acceptare expresă a Partenerului. Copiile deja semnate rămân păstrate în forma și versiunea acceptate; continuarea utilizării nu înlocuiește semnarea unei versiuni noi."
         },
         {
           "type": "p",
@@ -624,7 +624,7 @@
         },
         {
           "type": "p",
-          "text": "Buton: „Accept condițiile și trimit formularul spre moderare”."
+          "text": "Înregistrarea tehnică a acceptării și copia documentelor semnate se păstrează în Contul Partenerului și în evidența securizată a Platformei."
         }
       ],
       "ru": [],
@@ -633,7 +633,7 @@
   },
   {
     "slug": "acord-locatii",
-    "version": "1.0",
+    "version": "2.1",
     "order": 2,
     "title": {
       "ro": "Acord cu Locațiile",
@@ -644,7 +644,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE LEGAL ACORD DE COLABORARE CU LOCAȚIILE ÎNREGISTRATE PE PLATFORMA EPETRECERE Versiunea 1.0 / Версия 1.0 Data intrării în vigoare: 20 iulie 2026 Republica Moldova / Республика Молдова Limba prioritară Textul român este versiunea oficială; traducerile în rusă și engleză sunt furnizate pentru înlesnirea lecturii, iar în caz de divergență prevalează textul român. Cuprins"
+          "text": "Acord de colaborare cu locațiile înregistrate pe Platforma EPETRECERE. Versiunea 2.1, în vigoare din 4 septembrie 2026. Republica Moldova. Document din pachetul juridic EPETRECERE 2.1. În caz de divergențe între traduceri, prevalează textul român."
         },
         {
           "type": "h2",
@@ -1028,7 +1028,7 @@
         },
         {
           "type": "p",
-          "text": "13.2. Remunerația pentru diferite tipuri de evenimente este stabilită în Tarifele accesibile înainte de confirmare."
+          "text": "13.2. Înregistrarea și publicarea standard sunt gratuite. Taxe fixe pentru fiecare rezervare confirmată: nuntă, 200 EUR; cumătrie sau botez, 100 EUR până la 80 de invitați inclusiv și 150 EUR de la 81; zi de naștere, jubileu sau aniversare pentru copii, 50 EUR până la 40 de invitați inclusiv, 80 EUR pentru 41-80 și 100 EUR de la 81; corporativ, 100 EUR până la 80 inclusiv, 150 EUR pentru 81-150 și 200 EUR de la 151. Pentru banchet mic și alte evenimente, inclusiv cerere în căsătorie, cununie și concert, taxa este de 50 EUR indiferent de numărul invitaților, inclusiv peste 30. Nu se aplică un comision procentual suplimentar sălilor."
         },
         {
           "type": "p",
@@ -1048,7 +1048,7 @@
         },
         {
           "type": "p",
-          "text": "14.2. Locația achită în termenul indicat în Tarife, factură sau Cont."
+          "text": "14.2. Plata remunerației se efectuează în 30 de zile calendaristice de la data confirmării finale a comenzii în Platformă. Pentru săli, termenul începe numai după acceptarea ofertei de către Client și confirmarea ulterioară a rezervării de către sală. Data scadentă se calculează potrivit datei calendaristice din Republica Moldova și se afișează în Cont."
         },
         {
           "type": "p",
@@ -1060,7 +1060,7 @@
         },
         {
           "type": "p",
-          "text": "14.5. Locația își îndeplinește independent obligațiile fiscale."
+          "text": "14.5. EPETRECERE S.R.L. nu este înregistrată ca plătitor de TVA. TVA nu se calculează și nu se adaugă la remunerația Platformei prevăzută în aceste Tarife. Partenerii și Locațiile își îndeplinesc independent obligațiile fiscale aferente propriilor servicii. Orice schimbare ulterioară a statutului fiscal va fi comunicată și reflectată în documentele aplicabile, potrivit legii."
         },
         {
           "type": "h2",
@@ -1428,7 +1428,7 @@
         },
         {
           "type": "p",
-          "text": "1. Remunerația este stabilită prin Tarife separate în funcție de tipul evenimentului."
+          "text": "Înregistrarea și publicarea standard sunt gratuite. Taxe fixe pentru fiecare rezervare confirmată: nuntă, 200 EUR; cumătrie sau botez, 100 EUR până la 80 de invitați inclusiv și 150 EUR de la 81; zi de naștere, jubileu sau aniversare pentru copii, 50 EUR până la 40 de invitați inclusiv, 80 EUR pentru 41-80 și 100 EUR de la 81; corporativ, 100 EUR până la 80 inclusiv, 150 EUR pentru 81-150 și 200 EUR de la 151. Pentru banchet mic și alte evenimente, inclusiv cerere în căsătorie, cununie și concert, taxa este de 50 EUR indiferent de numărul invitaților, inclusiv peste 30. Nu se aplică un comision procentual suplimentar sălilor."
         },
         {
           "type": "p",
@@ -1458,7 +1458,7 @@
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE LEGAL СОГЛАШЕНИЕ О СОТРУДНИЧЕСТВЕ С ЗАВЕДЕНИЯМИ ПЛАТФОРМЫ EPETRECERE Версия 1.0 / Versiunea 1.0 Дата вступления в силу: 20 июля 2026 г. Republica Moldova / Республика Молдова Приоритетный язык Официальной версией является румынский текст; переводы на русский и английский предоставлены для удобства чтения, и при расхождении преобладает румынский текст. Содержание"
+          "text": "Соглашение о сотрудничестве с заведениями Платформы EPETRECERE. Версия 2.1, действует с 4 сентября 2026 года. Республика Молдова. Документ юридического пакета EPETRECERE 2.1. При расхождениях между переводами преимущество имеет румынский текст."
         },
         {
           "type": "h2",
@@ -1842,7 +1842,7 @@
         },
         {
           "type": "p",
-          "text": "13.2. Размер сервисного вознаграждения для разных типов мероприятий определяется Тарифами, доступными до подтверждения заказа."
+          "text": "13.2. Стандартная регистрация и публикация бесплатны. Фиксированная плата за каждое подтверждённое бронирование: свадьба, 200 EUR; кумэтрия или крестины, 100 EUR до 80 гостей включительно и 150 EUR от 81; день рождения, юбилей или детский день рождения, 50 EUR до 40 гостей включительно, 80 EUR за 41-80 и 100 EUR от 81; корпоратив, 100 EUR до 80 включительно, 150 EUR за 81-150 и 200 EUR от 151. Для небольшого банкета и других мероприятий, включая предложение руки и сердца, венчание и концерт, плата составляет 50 EUR независимо от числа гостей, в том числе свыше 30. Дополнительная процентная комиссия с заведений не взимается."
         },
         {
           "type": "p",
@@ -1862,7 +1862,7 @@
         },
         {
           "type": "p",
-          "text": "14.2. Заведение оплачивает начисление в срок, указанный в Тарифах, счете или Личном кабинете."
+          "text": "14.2. Вознаграждение оплачивается в течение 30 календарных дней с даты окончательного подтверждения заказа на Платформе. Для заведений срок начинается только после принятия предложения Клиентом и последующего подтверждения бронирования заведением. Срок оплаты рассчитывается по календарной дате Республики Молдова и отображается в Личном кабинете."
         },
         {
           "type": "p",
@@ -1874,7 +1874,7 @@
         },
         {
           "type": "p",
-          "text": "14.5. Заведение самостоятельно исполняет налоговые обязательства по своей деятельности."
+          "text": "14.5. EPETRECERE S.R.L. не зарегистрирована в качестве плательщика НДС. НДС не начисляется и не добавляется к вознаграждению Платформы по настоящим Тарифам. Партнёры и Заведения самостоятельно исполняют налоговые обязательства по своим услугам. Последующие изменения налогового статуса будут сообщены и отражены в применимых документах в соответствии с законом."
         },
         {
           "type": "h2",
@@ -2242,7 +2242,7 @@
         },
         {
           "type": "h2",
-          "text": "1. Размер сервисного вознаграждения устанавливается отдельными Тарифами по типу"
+          "text": "Стандартная регистрация и публикация бесплатны. Фиксированная плата за каждое подтверждённое бронирование: свадьба, 200 EUR; кумэтрия или крестины, 100 EUR до 80 гостей включительно и 150 EUR от 81; день рождения, юбилей или детский день рождения, 50 EUR до 40 гостей включительно, 80 EUR за 41-80 и 100 EUR от 81; корпоратив, 100 EUR до 80 включительно, 150 EUR за 81-150 и 200 EUR от 151. Для небольшого банкета и других мероприятий, включая предложение руки и сердца, венчание и концерт, плата составляет 50 EUR независимо от числа гостей, в том числе свыше 30. Дополнительная процентная комиссия с заведений не взимается."
         },
         {
           "type": "p",
@@ -2284,7 +2284,7 @@
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE LEGAL COOPERATION AGREEMENT WITH VENUES REGISTERED ON THE EPETRECERE PLATFORM Version 1.0 / Версия 1.0 Effective date: 20 July 2026 Republic of Moldova / Республика Молдова Governing language The Romanian text is the official version; the Russian and English translations are provided for ease of reading, and in the event of any discrepancy the Romanian text shall prevail. Contents"
+          "text": "Cooperation Agreement with Venues registered on the EPETRECERE Platform. Version 2.1, effective 4 September 2026. Republic of Moldova. Part of EPETRECERE Legal Pack 2.1. The Romanian text prevails in the event of a discrepancy between translations."
         },
         {
           "type": "h2",
@@ -2668,7 +2668,7 @@
         },
         {
           "type": "p",
-          "text": "13.2. The remuneration for the various types of events is established in the Tariffs, which are accessible before confirmation."
+          "text": "13.2. Standard registration and publication are free. Fixed fees per confirmed booking: wedding, EUR 200; cumătrie or baptism, EUR 100 for up to 80 guests inclusive and EUR 150 for 81 or more; birthday, anniversary or children's birthday, EUR 50 for up to 40 guests inclusive, EUR 80 for 41-80 and EUR 100 for 81 or more; corporate event, EUR 100 for up to 80 guests inclusive, EUR 150 for 81-150 and EUR 200 for 151 or more. For a small banquet or other event, including a marriage proposal, wedding ceremony or concert, the fee is EUR 50 regardless of guest count, including more than 30. No additional percentage commission is charged to venues."
         },
         {
           "type": "p",
@@ -2688,7 +2688,7 @@
         },
         {
           "type": "p",
-          "text": "14.2. The Venue shall pay within the term indicated in the Tariffs, in the invoice or in the Account."
+          "text": "14.2. The service fee is payable within 30 calendar days from the date of final confirmation of the order on the Platform. For venues, this period starts only after the Client accepts the offer and the venue subsequently confirms the booking. The due date is calculated using the calendar date in the Republic of Moldova and displayed in the Account."
         },
         {
           "type": "p",
@@ -2700,7 +2700,7 @@
         },
         {
           "type": "p",
-          "text": "14.5. The Venue shall discharge its tax obligations independently."
+          "text": "14.5. EPETRECERE S.R.L. is not registered as a VAT payer. VAT is not charged or added to the Platform fees stated in these Tariffs. Partners and Venues remain responsible for the tax obligations arising from their own services. Any subsequent change in tax status will be communicated and reflected in the applicable documents in accordance with the law."
         },
         {
           "type": "h2",
@@ -3068,7 +3068,7 @@
         },
         {
           "type": "p",
-          "text": "1. The remuneration is established by separate Tariffs according to the type of event."
+          "text": "Standard registration and publication are free. Fixed fees per confirmed booking: wedding, EUR 200; cumătrie or baptism, EUR 100 for up to 80 guests inclusive and EUR 150 for 81 or more; birthday, anniversary or children's birthday, EUR 50 for up to 40 guests inclusive, EUR 80 for 41-80 and EUR 100 for 81 or more; corporate event, EUR 100 for up to 80 guests inclusive, EUR 150 for 81-150 and EUR 200 for 151 or more. For a small banquet or other event, including a marriage proposal, wedding ceremony or concert, the fee is EUR 50 regardless of guest count, including more than 30. No additional percentage commission is charged to venues."
         },
         {
           "type": "p",
@@ -4899,7 +4899,7 @@
   },
   {
     "slug": "tarife",
-    "version": "1.0",
+    "version": "2.1",
     "order": 7,
     "title": {
       "ro": "Tarife",
@@ -4910,7 +4910,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE TARIFE EPETRECERE TARIFFS Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "Tarifele Platformei EPETRECERE. Versiunea 2.1, în vigoare din 4 septembrie 2026. Republica Moldova. Document din pachetul juridic EPETRECERE 2.1. În caz de divergențe între traduceri, prevalează textul român."
         },
         {
           "type": "h2",
@@ -4918,7 +4918,7 @@
         },
         {
           "type": "p",
-          "text": "Înregistrarea și publicarea standard a Partenerului sau Locației sunt gratuite dacă Tarifele sau un acord separat nu prevăd altfel. La lansare EPETRECERE nu utilizează pachete Basic/Plus/Pro/Premium/Elite."
+          "text": "Înregistrarea și publicarea standard a Partenerului sau Locației sunt gratuite. Nu se percep abonamente sau taxe de activare pentru publicarea standard."
         },
         {
           "type": "h2",
@@ -4926,7 +4926,7 @@
         },
         {
           "type": "p",
-          "text": "Pentru Partenerii prestatori de servicii, remunerația de serviciu este de 5% din valoarea Comenzii confirmate obținute prin EPETRECERE, dacă condițiile separate nu prevăd altfel."
+          "text": "Pentru artiști și ceilalți prestatori de servicii, cu excepția sălilor, remunerația Platformei este de 5% din valoarea finală a comenzii confirmate obținute prin EPETRECERE."
         },
         {
           "type": "h2",
@@ -4942,7 +4942,7 @@
         },
         {
           "type": "p",
-          "text": "Înregistrarea și publicarea standard sunt gratuite. Remunerația aplicabilă Locațiilor trebuie aprobată separat și comunicată înainte de nașterea obligației. Nu se aplică comisioane ascunse."
+          "text": "Înregistrarea și publicarea standard sunt gratuite. Taxe fixe pentru fiecare rezervare confirmată: nuntă, 200 EUR; cumătrie sau botez, 100 EUR până la 80 de invitați inclusiv și 150 EUR de la 81; zi de naștere, jubileu sau aniversare pentru copii, 50 EUR până la 40 de invitați inclusiv, 80 EUR pentru 41-80 și 100 EUR de la 81; corporativ, 100 EUR până la 80 inclusiv, 150 EUR pentru 81-150 și 200 EUR de la 151. Pentru banchet mic și alte evenimente, inclusiv cerere în căsătorie, cununie și concert, taxa este de 50 EUR indiferent de numărul invitaților, inclusiv peste 30. Nu se aplică un comision procentual suplimentar sălilor."
         },
         {
           "type": "h2",
@@ -4950,7 +4950,7 @@
         },
         {
           "type": "p",
-          "text": "Pentru Parteneri, momentul de bază este atribuirea statutului „Comandă confirmată”. Pentru Locații se aplică momentul stabilit de Acordul cu Locațiile și modelul comercial relevant."
+          "text": "Pentru artiști și ceilalți prestatori de servicii, obligația apare la acceptarea ofertei de către Client prin Platformă. Pentru săli, aceasta apare numai după acceptarea Clientului și confirmarea ulterioară a rezervării de către sală. Simpla solicitare, transmiterea unei oferte sau acceptarea doar de către furnizor nu generează remunerația."
         },
         {
           "type": "h2",
@@ -4966,7 +4966,7 @@
         },
         {
           "type": "p",
-          "text": "Dacă factura, Contul sau acordul nu stabilește alt termen, plata se efectuează în 10 zile calendaristice de la factură sau notificare."
+          "text": "Plata remunerației se efectuează în 30 de zile calendaristice de la data confirmării finale a comenzii în Platformă. Pentru săli, termenul începe numai după acceptarea ofertei de către Client și confirmarea ulterioară a rezervării de către sală. Data scadentă se calculează potrivit datei calendaristice din Republica Moldova și se afișează în Cont."
         },
         {
           "type": "h2",
@@ -4982,7 +4982,7 @@
         },
         {
           "type": "p",
-          "text": "Versiunea finală trebuie să indice expres dacă TVA este inclus, conform statutului fiscal al EPETRECERE S.R.L. Partenerii și Locațiile răspund pentru propriile obligații fiscale aferente veniturilor de la Clienți."
+          "text": "EPETRECERE S.R.L. nu este înregistrată ca plătitor de TVA. TVA nu se calculează și nu se adaugă la remunerația Platformei prevăzută în aceste Tarife. Partenerii și Locațiile își îndeplinesc independent obligațiile fiscale aferente propriilor servicii. Orice schimbare ulterioară a statutului fiscal va fi comunicată și reflectată în documentele aplicabile, potrivit legii."
         },
         {
           "type": "h2",
@@ -5022,13 +5022,13 @@
         },
         {
           "type": "p",
-          "text": "Tarifele pot fi modificate pentru viitor, cu notificare conform General Terms, fără aplicare retroactivă obligațiilor deja născute, dacă legea sau acordul expres nu permite altfel. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.0, în vigoare din 20 iulie 2026. Textul român este versiunea oficială."
+          "text": "Tarifele pot fi modificate pentru viitor, cu notificare conform General Terms, fără aplicare retroactivă obligațiilor deja născute, dacă legea sau acordul expres nu permite altfel. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 2.1, în vigoare din 4 septembrie 2026. Textul român este versiunea oficială."
         }
       ],
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ТАРИФЫ EPETRECERE TARIFFS Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "Тарифы Платформы EPETRECERE. Версия 2.1, действует с 4 сентября 2026 года. Республика Молдова. Документ юридического пакета EPETRECERE 2.1. При расхождениях между переводами преимущество имеет румынский текст."
         },
         {
           "type": "h2",
@@ -5036,7 +5036,7 @@
         },
         {
           "type": "p",
-          "text": "Регистрация и стандартное размещение Партнера или Заведения являются бесплатными, если иное прямо не установлено действующими Тарифами или отдельным соглашением. На старте EPETRECERE не использует пакеты Basic/Plus/Pro/Premium/Elite."
+          "text": "Стандартная регистрация и публикация профиля Партнёра или Заведения бесплатны. За стандартную публикацию не взимаются абонентская плата или плата за активацию."
         },
         {
           "type": "h2",
@@ -5044,7 +5044,7 @@
         },
         {
           "type": "p",
-          "text": "Для Партнеров — исполнителей услуг сервисное вознаграждение составляет 5% от стоимости Подтвержденного заказа, полученного через EPETRECERE, если иное не предусмотрено отдельными условиями."
+          "text": "Для артистов и других поставщиков услуг, кроме заведений, вознаграждение Платформы составляет 5% окончательной стоимости подтверждённого заказа, полученного через EPETRECERE."
         },
         {
           "type": "h2",
@@ -5060,7 +5060,7 @@
         },
         {
           "type": "p",
-          "text": "Регистрация и стандартное размещение Заведения бесплатны. Размер сервисного вознаграждения для Заведений должен быть утвержден отдельно и раскрыт до возникновения платежного обязательства. Скрытые комиссии не применяются."
+          "text": "Стандартная регистрация и публикация бесплатны. Фиксированная плата за каждое подтверждённое бронирование: свадьба, 200 EUR; кумэтрия или крестины, 100 EUR до 80 гостей включительно и 150 EUR от 81; день рождения, юбилей или детский день рождения, 50 EUR до 40 гостей включительно, 80 EUR за 41-80 и 100 EUR от 81; корпоратив, 100 EUR до 80 включительно, 150 EUR за 81-150 и 200 EUR от 151. Для небольшого банкета и других мероприятий, включая предложение руки и сердца, венчание и концерт, плата составляет 50 EUR независимо от числа гостей, в том числе свыше 30. Дополнительная процентная комиссия с заведений не взимается."
         },
         {
           "type": "h2",
@@ -5068,7 +5068,7 @@
         },
         {
           "type": "p",
-          "text": "Для Партнеров базовым моментом начисления является присвоение заказу статуса «Подтвержденный заказ». Для Заведения применяется момент, установленный Venue Agreement и соответствующей коммерческой моделью."
+          "text": "Для артистов и других поставщиков услуг обязательство возникает при принятии предложения Клиентом через Платформу. Для заведений оно возникает только после принятия предложения Клиентом и последующего подтверждения бронирования заведением. Заявка, отправка предложения или принятие только поставщиком сами по себе не создают обязательства по оплате."
         },
         {
           "type": "h2",
@@ -5084,7 +5084,7 @@
         },
         {
           "type": "p",
-          "text": "Если счет, Личный кабинет или отдельное соглашение не устанавливает иной срок, вознаграждение оплачивается в течение 10 календарных дней с даты счета или уведомления о начислении."
+          "text": "Вознаграждение оплачивается в течение 30 календарных дней с даты окончательного подтверждения заказа на Платформе. Для заведений срок начинается только после принятия предложения Клиентом и последующего подтверждения бронирования заведением. Срок оплаты рассчитывается по календарной дате Республики Молдова и отображается в Личном кабинете."
         },
         {
           "type": "h2",
@@ -5100,7 +5100,7 @@
         },
         {
           "type": "p",
-          "text": "Финальная редакция должна прямо указывать, включен ли НДС в суммы, исходя из налогового статуса EPETRECERE S.R.L. Партнеры и Заведения самостоятельно исполняют свои налоговые обязанности по доходам от Клиентов."
+          "text": "EPETRECERE S.R.L. не зарегистрирована в качестве плательщика НДС. НДС не начисляется и не добавляется к вознаграждению Платформы по настоящим Тарифам. Партнёры и Заведения самостоятельно исполняют налоговые обязательства по своим услугам. Последующие изменения налогового статуса будут сообщены и отражены в применимых документах в соответствии с законом."
         },
         {
           "type": "h2",
@@ -5140,13 +5140,13 @@
         },
         {
           "type": "p",
-          "text": "Тарифы могут изменяться на будущее с уведомлением в порядке General Terms и без ретроактивного изменения уже возникших обязательств, если иное не допускается законом или не согласовано сторонами. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.0, действует с 20 июля 2026 г. Официальной версией является румынский текст."
+          "text": "Тарифы могут изменяться на будущее с уведомлением в порядке General Terms и без ретроактивного изменения уже возникших обязательств, если иное не допускается законом или не согласовано сторонами. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 2.1, действует с 4 сентября 2026 года. Официальной версией является румынский текст."
         }
       ],
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE TARIFE EPETRECERE TARIFFS Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of the pack within the limits of its subject matter."
+          "text": "EPETRECERE Platform Fees. Version 2.1, effective 4 September 2026. Republic of Moldova. Part of EPETRECERE Legal Pack 2.1. The Romanian text prevails in the event of a discrepancy between translations."
         },
         {
           "type": "h2",
@@ -5154,7 +5154,7 @@
         },
         {
           "type": "p",
-          "text": "Standard registration and publication of the Partner or of the Venue are free of charge unless the Tariffs or a separate agreement provide otherwise. At launch, EPETRECERE does not use Basic/Plus/Pro/Premium/Elite packages."
+          "text": "Standard registration and publication of a Partner or Venue profile are free. Standard publication carries no subscription or activation fee."
         },
         {
           "type": "h2",
@@ -5162,7 +5162,7 @@
         },
         {
           "type": "p",
-          "text": "For Partners providing services, the service remuneration is 5% of the value of the confirmed Booking obtained through EPETRECERE, unless separate terms provide otherwise."
+          "text": "For artists and other service providers, excluding venues, the Platform fee is 5% of the final value of the confirmed order obtained through EPETRECERE."
         },
         {
           "type": "h2",
@@ -5178,7 +5178,7 @@
         },
         {
           "type": "p",
-          "text": "Standard registration and publication are free of charge. The remuneration applicable to Venues shall be approved separately and communicated before the obligation arises. No hidden commissions apply."
+          "text": "Standard registration and publication are free. Fixed fees per confirmed booking: wedding, EUR 200; cumătrie or baptism, EUR 100 for up to 80 guests inclusive and EUR 150 for 81 or more; birthday, anniversary or children's birthday, EUR 50 for up to 40 guests inclusive, EUR 80 for 41-80 and EUR 100 for 81 or more; corporate event, EUR 100 for up to 80 guests inclusive, EUR 150 for 81-150 and EUR 200 for 151 or more. For a small banquet or other event, including a marriage proposal, wedding ceremony or concert, the fee is EUR 50 regardless of guest count, including more than 30. No additional percentage commission is charged to venues."
         },
         {
           "type": "h2",
@@ -5186,7 +5186,7 @@
         },
         {
           "type": "p",
-          "text": "For Partners, the baseline moment is the assignment of the status \"Confirmed Booking\". For Venues, the moment established by the Agreement with Venues and by the relevant commercial model applies."
+          "text": "For artists and other service providers, the fee becomes due when the Client accepts the offer through the Platform. For venues, this occurs only after the Client accepts and the venue subsequently confirms the booking. A request, a submitted offer or acceptance by the provider alone does not generate a fee."
         },
         {
           "type": "h2",
@@ -5202,7 +5202,7 @@
         },
         {
           "type": "p",
-          "text": "Unless the invoice, the Account or the agreement establishes a different deadline, payment shall be made within 10 calendar days from the invoice or the notice."
+          "text": "The service fee is payable within 30 calendar days from the date of final confirmation of the order on the Platform. For venues, this period starts only after the Client accepts the offer and the venue subsequently confirms the booking. The due date is calculated using the calendar date in the Republic of Moldova and displayed in the Account."
         },
         {
           "type": "h2",
@@ -5218,7 +5218,7 @@
         },
         {
           "type": "p",
-          "text": "The final version must expressly state whether VAT is included, in accordance with the tax status of EPETRECERE S.R.L. Partners and Venues are liable for their own tax obligations relating to the revenue received from Clients."
+          "text": "EPETRECERE S.R.L. is not registered as a VAT payer. VAT is not charged or added to the Platform fees stated in these Tariffs. Partners and Venues remain responsible for the tax obligations arising from their own services. Any subsequent change in tax status will be communicated and reflected in the applicable documents in accordance with the law."
         },
         {
           "type": "h2",
@@ -5258,7 +5258,7 @@
         },
         {
           "type": "p",
-          "text": "The Tariffs may be amended for the future, with notice in accordance with the General Terms, without retroactive application to obligations that have already arisen, unless the law or an express agreement permits otherwise. Operator's details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.0, in force as of 20 July 2026. The Romanian text is the official version."
+          "text": "The Tariffs may be amended for the future, with notice in accordance with the General Terms, without retroactive application to obligations that have already arisen, unless the law or an express agreement permits otherwise. Operator's details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 2.1, in force as of 4 September 2026. The Romanian text is the official version."
         }
       ]
     }

@@ -1,11 +1,7 @@
 /**
- * Legal Pack v1.0 — the partner/venue agreements, policies and tariffs that
- * govern the marketplace. Source of truth is the signed PDF set; the JSON here
- * is a faithful text extraction rendered as web pages so users can read (and
- * accept) them without downloading anything.
- *
- * Documents exist in RO and RU. EN falls back to RO, which is also the version
- * that legally prevails (Venue Agreement §35.4).
+ * Published, versioned marketplace agreements and policies.
+ * Signed records store immutable snapshots, not a reference to today's text.
+ * Romanian prevails; documents without a translation fall back to Romanian.
  */
 
 import raw from "@/content/legal/documents.json";
@@ -30,13 +26,12 @@ export const LEGAL_DOCUMENTS = raw as unknown as LegalDocument[];
 /**
  * Current pack version, shown next to acceptance records.
  *
- * Bumped to 2.0 when `acord-parteneri` was replaced: the old text was a
- * 31-article agreement, the new one the 23-section "Condiții de colaborare"
- * that covers partners and venues alike. Signatures already collected attest
- * to the 1.0 text and its hash and stay valid for it — the version on the row
- * is what says which document a person actually signed.
+ * Version 2.1 records the owner's 2026-09-04 decision: 50 EUR for other
+ * venue events at all guest counts, payment in 30 calendar days, no added
+ * VAT because the operator is not registered as a VAT payer.
+ * Historical signatures retain their original version and exact snapshot.
  */
-export const LEGAL_PACK_VERSION = "2.0";
+export const LEGAL_PACK_VERSION = "2.1";
 
 export function getLegalDocument(slug: string): LegalDocument | null {
   return LEGAL_DOCUMENTS.find((d) => d.slug === slug) ?? null;

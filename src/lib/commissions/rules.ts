@@ -1,21 +1,7 @@
 /**
- * Commission rules — how much a vendor owes the platform for a confirmed
- * booking.
- *
- * Legal basis (EPETRECERE Legal Pack v1.0):
- *   - Artists/Partners: flat 5% of the confirmed order value.
- *     Partner Agreement §11.1, Tariffs §2 + §3 (base = full order value
- *     including add-ons).
- *   - Venues: Tariffs §4 and Venue Agreement §13.2 say the venue fee is
- *     "approved separately" per event type — the legal pack deliberately
- *     leaves the numbers blank. So venue rates are NOT hardcoded: they live in
- *     site_settings.commission_rules and an admin edits them. The shape below
- *     supports the agreed model (one rate up to a guest threshold, another
- *     above it) as either a percentage or a flat fee.
- *
- * Money is stored as whole currency units (EUR), matching the existing
- * `agreed_price` / `price_from` columns. Rates are basis points (500 = 5%) so
- * we never do float math on money.
+ * Versioned marketplace tariffs: artists pay 5% of the confirmed value;
+ * venues pay the event-specific fixed fees in the agreement.
+ * Base prices are whole EUR; percentage fees retain cents.
  */
 
 export const DEFAULT_ARTIST_RATE_BPS = 500; // 5% — fixed by the Partner Agreement
@@ -61,19 +47,11 @@ export interface CommissionRules {
 }
 
 /**
- * Shipped defaults. The artist rate is legally fixed; the venue tiers are
- * intentionally EMPTY until an admin fills them in, so we never invent a fee
- * and charge a venue for it. `computeCommission` returns null for venues while
- * they are unset.
- */
-/**
  * §11.3 of the agreement, as data. Ordered by band, lowest first.
  *
- * The document names five event categories; the platform has ten event
- * types, so the rest are mapped to the nearest named one. `other` and the
- * ceremonies fall under "Banchet mic / alt eveniment", which the document
- * defines only up to 30 guests — above that it prescribes nothing, and this
- * charges nothing rather than inventing a figure.
+ * The additional planner categories use the corresponding published bands.
+ * Since the owner-approved revision of 2026-09-04, other events cost 50 EUR
+ * regardless of guest count, including more than 30 guests.
  */
 export const VENUE_SCHEDULES_FROM_AGREEMENT: Record<string, VenueBand[]> = {
   // Nuntă — orice dimensiune
@@ -104,11 +82,11 @@ export const VENUE_SCHEDULES_FROM_AGREEMENT: Record<string, VenueBand[]> = {
     { maxGuests: 150, fixedAmount: 150 },
     { maxGuests: null, fixedAmount: 200 },
   ],
-  // Banchet mic / alt eveniment — defined only to 30 guests
-  other: [{ maxGuests: 30, fixedAmount: 50 }],
-  proposal: [{ maxGuests: 30, fixedAmount: 50 }],
-  cununie: [{ maxGuests: 30, fixedAmount: 50 }],
-  concert: [{ maxGuests: 30, fixedAmount: 50 }],
+  // Owner-approved 2026-09-04: 50 EUR for all guest counts, including above 30.
+  other: [{ maxGuests: null, fixedAmount: 50 }],
+  proposal: [{ maxGuests: null, fixedAmount: 50 }],
+  cununie: [{ maxGuests: null, fixedAmount: 50 }],
+  concert: [{ maxGuests: null, fixedAmount: 50 }],
 };
 
 export const DEFAULT_RULES: CommissionRules = {

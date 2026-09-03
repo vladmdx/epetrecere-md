@@ -5,7 +5,8 @@
  * all, which meant a partner could not finish registering from a phone —
  * the profile is only created after a contract exists.
  */
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { LEGAL_PACK_VERSION } from "@/lib/legal";
 import { POST as accept } from "../../../legal/accept/route";
 export { GET } from "../../../legal/accept/route";
 
@@ -16,6 +17,14 @@ export async function POST(req: NextRequest) {
   // format to 2.0, NEVER to the latest pack: a future legal update must force
   // a new explicit acceptance. Drawing + submitting is its acceptance action.
   if (body && body.packVersion === undefined && body.documents === undefined) {
+    if (String(LEGAL_PACK_VERSION) !== "2.0") {
+      const message = body.locale === "ru"
+        ? "Условия обновлены. Прочитайте и подпишите новую версию на epetrecere.md или обновите приложение."
+        : body.locale === "en"
+          ? "The terms have changed. Read and sign the new version on epetrecere.md or update the app."
+          : "Condițiile au fost actualizate. Citește și semnează versiunea nouă pe epetrecere.md sau actualizează aplicația.";
+      return NextResponse.json({ error: message, code: "LEGAL_VERSION_REQUIRED", packVersion: LEGAL_PACK_VERSION }, { status: 409 });
+    }
     body.packVersion = "2.0";
     body.accepted ??= true;
     body.documents = ["acord-parteneri", "termeni-generali", "politica-confidentialitate", "reguli-marketplace", "tarife"];
