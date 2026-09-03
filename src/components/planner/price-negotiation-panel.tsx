@@ -45,6 +45,7 @@ type NegotiationBooking = {
     | "cancelled"
     | "completed";
   agreedPrice: number | null;
+  clientConfirmedAt?: string | Date | null;
   priceOffers: BookingPriceOffer[] | null;
 };
 
@@ -157,7 +158,8 @@ export function PriceNegotiationPanel({
         toast.error(t("planner.negotiation.confirmError"));
         return;
       }
-      toast.success(t("planner.negotiation.confirmed"));
+      const result = await res.json();
+      toast.success(t(result.awaitingVenue ? "booking.awaitingVenue" : "planner.negotiation.confirmed"));
       await onUpdate();
     } finally {
       setBusy(false);
@@ -299,7 +301,7 @@ export function PriceNegotiationPanel({
         )}
 
         {/* Client final confirmation when artist has already accepted. */}
-        {perspective === "client" && booking.status === "accepted" && (
+        {perspective === "client" && booking.status === "accepted" && !booking.clientConfirmedAt && (
           <Button
             size="sm"
             disabled={busy}
@@ -311,6 +313,8 @@ export function PriceNegotiationPanel({
             {booking.agreedPrice ? ` (${booking.agreedPrice}€)` : ""}
           </Button>
         )}
+
+        {booking.status === "accepted" && booking.clientConfirmedAt && <p className="text-sm text-gold">{t("booking.awaitingVenue")}</p>}
 
         {myLastIsWaiting && booking.status === "pending" && (
           <span className="text-xs text-muted-foreground self-center">

@@ -83,14 +83,6 @@ interface VenueData {
 }
 
 /** Shown only when the owner listed no facilities of their own. */
-const DEFAULT_FACILITY_KEYS = [
-  "venue.detail.facilityParking",
-  "venue.detail.facilityCeremony",
-  "venue.detail.facilityStage",
-  "venue.detail.facilityMenu",
-  "venue.detail.facilityAc",
-  "venue.detail.facilityWifi",
-];
 
 interface MenuCategory {
   id: number;
@@ -117,7 +109,7 @@ interface MenuPackage {
 
 export function VenueDetailClient({
   venue,
-  menu,
+  menu: initialMenu,
   similar = [],
 }: {
   venue: VenueData;
@@ -151,31 +143,21 @@ export function VenueDetailClient({
   const description = getLocalized(venue, "description", locale);
   // M0a #8 — price gated behind login
   const canSeePrice = isLoaded && isSignedIn;
+  const hasWorkingHours = Boolean(venue.workingHours && Object.values(venue.workingHours).some(Boolean));
 
   // Prerendered anonymously — the price and the venue's website arrive from
   // the authenticated endpoint once Clerk confirms a session.
   const gated = useGatedDetails<{
     pricePerPerson: number | null;
-    website: string | null;
+    menu?: typeof initialMenu;
   }>("venue", venue.slug);
+  const menu = gated?.menu ?? initialMenu;
   const shown = gated ? { ...venue, ...gated } : venue;
-  const venueFallbackImages = [
-    "/images/redesign/venue-chateau-hero.webp",
-    "/images/venues/hall-1.jpg",
-    "/images/venues/hall-2.jpg",
-    "/images/venues/hall-3.jpg",
-    "/images/venues/hall-4.jpg",
-    "/images/venues/hall-5.jpg",
-    "/images/venues/hall-6.jpg",
-  ];
+
   const realImages = Array.from(
     new Set(venue.images.map((image) => image.url).filter(Boolean)),
   );
-  const venueHeroImage =
-    venue.slug === "chateau-vartely-events"
-      ? "/images/redesign/venue-chateau-hero.webp"
-      : realImages[0] ||
-        venueFallbackImages[venue.id % venueFallbackImages.length];
+  const venueHeroImage = realImages[0] || "/images/venues/placeholder.svg";
   // A gallery must represent this venue, not silently borrow stock photos
   // used by other listings. When the owner uploaded one photo, show one.
   const galleryImages = realImages
@@ -222,9 +204,6 @@ export function VenueDetailClient({
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-white/58">
-            <Badge className="gap-1 border border-[#e6b84d]/30 bg-[#e6b84d]/10 text-[#ebc765]">
-              <Sparkles className="h-3 w-3" /> {t("venue.detail.verified")}
-            </Badge>
             {venue.city && (
               <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {venue.address || venue.city}</span>
             )}
@@ -236,7 +215,7 @@ export function VenueDetailClient({
               {venue.ratingAvg && venue.ratingAvg > 0 ? venue.ratingAvg.toFixed(1) : t("venue.detail.new")}
               {venue.ratingCount ? <span className="text-white/36">({plural(venue.ratingCount, locale, NOUNS.reviews)})</span> : null}
             </span>
-            {venue.workingHours && (
+            {hasWorkingHours && venue.workingHours && (
               <span className="flex items-center gap-1" title={t("venue.detail.workingHours")}>
                 <Clock className="h-3.5 w-3.5" />
                 {formatWorkingHours(venue.workingHours)}
@@ -331,7 +310,7 @@ export function VenueDetailClient({
                 <VenueFact
                   icon={Clock}
                   label={t("venue.detail.factSchedule")}
-                  value={venue.workingHours ? formatWorkingHours(venue.workingHours) : t("venue.detail.flexible")}
+                  value={hasWorkingHours && venue.workingHours ? formatWorkingHours(venue.workingHours) : t("venue.detail.onRequest")}
                 />
                 <VenueFact icon={Building2} label={t("venue.detail.factSpaceType")} value={t("venue.detail.eventHall")} />
               </div>
@@ -342,10 +321,7 @@ export function VenueDetailClient({
           <section id="facilitati" className="mt-8 scroll-mt-24">
               <h2 className="mb-4 font-heading text-2xl font-semibold">{t("venue.facilities")}</h2>
               <div className="flex flex-wrap gap-2">
-                {(venue.facilities?.length
-                  ? venue.facilities
-                  : DEFAULT_FACILITY_KEYS.map((key) => t(key))
-                ).map((f) => (
+                {(venue.facilities ?? []).map((f) => (
                   <Badge key={f} variant="secondary" className="gap-1 border border-[#e6b84d]/20 bg-[#e6b84d]/7 text-white/68">
                     <Check className="h-3 w-3 text-[#e6b84d]" /> {f}
                   </Badge>
@@ -404,7 +380,7 @@ export function VenueDetailClient({
                       </h3>
                       <div className="mt-2 flex items-baseline gap-1">
                         <span className="font-accent text-3xl font-bold text-gold">
-                          {p.pricePerPerson}
+                          {canSeePrice ? p.pricePerPerson : t("common.priceOnLogin")}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {currencySymbol(p.currency)} / {t("venue.detail.perPerson")}
@@ -439,7 +415,7 @@ export function VenueDetailClient({
                   ))}
                 </div>
               ) : (
-                <GenericVenuePackages />
+                <p className="text-sm text-white/55">{t("venue.detail.onRequest")}</p>
               )}
 
               {/* Categories + Items accordion */}

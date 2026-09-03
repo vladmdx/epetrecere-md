@@ -3370,6 +3370,9 @@
     "enable": "Enable notifications"
   },
   "booking": {
+    "awaitingVenue": "Awaiting venue confirmation",
+    "awaitingClient": "Awaiting client acceptance",
+    "venueConfirm": "Confirm booking",
     "card": {
       "sendError": "Error sending",
       "sentTo": "Request sent to {name}!",

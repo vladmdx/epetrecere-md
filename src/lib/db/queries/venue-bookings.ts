@@ -1,3 +1,4 @@
+import { redactContact } from "@/lib/privacy/contact-redaction";
 // Venue bookings queries — the venue's view of incoming requests.
 // Uses the unified booking_requests table with venueId set.
 
@@ -38,6 +39,7 @@ export type VenueBooking = {
   agreedPrice: number | null;
   message: string | null;
   status: string;
+  clientConfirmedAt: Date | null;
   source: string | null;
   artistReply: string | null;
   createdAt: Date;
@@ -77,6 +79,7 @@ export async function getVenueBookings(
       agreedPrice: bookingRequests.agreedPrice,
       message: bookingRequests.message,
       status: bookingRequests.status,
+      clientConfirmedAt: bookingRequests.clientConfirmedAt,
       source: bookingRequests.source,
       artistReply: bookingRequests.artistReply,
       createdAt: bookingRequests.createdAt,
@@ -157,16 +160,14 @@ export async function getVenueBookings(
     );
   }
 
-  const contactSharedStatuses = new Set([
-    "accepted",
-    "confirmed_by_client",
-    "completed",
-  ]);
+  const contactSharedStatuses = new Set(["confirmed_by_client", "completed"]);
 
   return rows.map((r) => {
     const canSeeContact = contactSharedStatuses.has(r.status);
     return {
       ...r,
+      message: !canSeeContact && r.message ? redactContact(r.message) : r.message,
+      artistReply: !canSeeContact && r.artistReply ? redactContact(r.artistReply) : r.artistReply,
       clientPhone: canSeeContact ? r.clientPhone : null,
       clientEmail: canSeeContact ? r.clientEmail : null,
       userEmail: canSeeContact ? r.userEmail : null,

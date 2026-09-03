@@ -21,6 +21,7 @@ export function useGatedDetails<T extends object>(
   const [data, setData] = useState<T | null>(null);
 
   useEffect(() => {
+    setData(null);
     if (!isLoaded || !isSignedIn || !slug) return;
     let alive = true;
     fetch(
@@ -28,7 +29,7 @@ export function useGatedDetails<T extends object>(
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (alive && d) setData(d as T);
+        if (alive) setData(d as T | null);
       })
       .catch(() => {
         /* the profile stays in its anonymous shape — no worse than before */
@@ -38,5 +39,5 @@ export function useGatedDetails<T extends object>(
     };
   }, [isLoaded, isSignedIn, type, slug]);
 
-  return data;
+  return isLoaded && isSignedIn ? data : null;
 }

@@ -1,6 +1,7 @@
 // iCal feed for venues — subscribeable from Google / Apple / Outlook calendar.
 // Mirrors the artist feed but for venueId-linked bookings.
 
+import { redactContact } from "@/lib/privacy/contact-redaction";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -101,10 +102,10 @@ export async function GET(
         : `🟡 ${b.eventType ?? "Eveniment"} — ${b.clientName}`;
     const descParts = [
       `Client: ${b.clientName}`,
-      b.clientPhone ? `Telefon: ${b.clientPhone}` : "",
+      b.status === "confirmed_by_client" && b.clientPhone ? `Telefon: ${b.clientPhone}` : "",
       b.guestCount ? `Invitați: ${b.guestCount}` : "",
       b.startTime && b.endTime ? `Ora: ${b.startTime}–${b.endTime}` : "",
-      b.message ? `Mesaj: ${b.message}` : "",
+      b.message ? `Mesaj: ${b.status === "confirmed_by_client" ? b.message : redactContact(b.message)}` : "",
     ].filter(Boolean);
 
     lines.push(

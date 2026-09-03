@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { checkName, checkDescription } from "@/lib/validation/text-quality";
 import { z } from "zod/v4";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import {
   artists,
+  categories,
   artistPackages,
   users,
   notifications,
@@ -13,6 +14,7 @@ import {
 import { and, eq, ne } from "drizzle-orm";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { validatePhone } from "@/lib/phone/validate";
+import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 
 /** A single duration → price tier the onboarding wizard can submit
  *  alongside the artist row. Mirrors the artist_packages columns. */
@@ -77,7 +79,7 @@ const registerSchema = z.object({
   // Phone is now collected at registration and stored on the user; the
   // onboarding form may send an empty string. We fall back to users.phone.
   phone: z.string().optional().default(""),
-  categoryId: z.number(),
+  categoryId: z.number().int().positive(),
   description: z
     .string()
     .refine((v) => checkDescription(v).ok, {
@@ -85,7 +87,7 @@ const registerSchema = z.object({
     })
     .optional(),
   location: z.string().optional(),
-  imageUrl: z.string().optional(),
+  imageUrl: z.string().url().max(2000),
   /** Legacy single "preț de start". Still supported for backwards
    *  compatibility but new clients should send the packages array
    *  instead. When packages are sent, the lowest price wins as
@@ -176,6 +178,9 @@ export async function POST(req: Request) {
       }
     }
 
+    const missing = await missingRegistrationDocuments(appUser.id, "artist");
+    if (missing.length) return NextResponse.json({ error: "current_signed_contract_required", missing }, { status: 409 });
+
     // Check if already registered as artist
     const [existingArtist] = await db
       .select({ id: artists.id })
@@ -202,6 +207,8 @@ export async function POST(req: Request) {
     }
 
     const data = parsed.data;
+    const [category] = await db.select({ id: categories.id }).from(categories).where(and(eq(categories.id, data.categoryId), eq(categories.isActive, true))).limit(1);
+    if (!category) return NextResponse.json({ error: "invalid_category" }, { status: 400 });
     // Clean slug derived from the artist's name. We collide-check against
     // existing artists.slug; -2/-3 suffixes are added only when needed.
     const slug = await pickUniqueSlug(data.name, async (candidate) => {
@@ -294,7 +301,7 @@ export async function POST(req: Request) {
     // re-trigger from /dashboard/profil.
     if (data.description && data.description.trim().length >= 40) {
       const seed = data.description.trim();
-      void (async () => {
+      after(async () => {
         try {
           const { generateArtistDescription } = await import("@/lib/ai");
           const polished = await generateArtistDescription(
@@ -316,7 +323,7 @@ export async function POST(req: Request) {
         } catch (err) {
           console.error("[register-artist] auto AI rewrite failed:", err);
         }
-      })();
+      });
     }
 
     // Persist each duration tier as an artist_packages row. Skipped
@@ -354,7 +361,7 @@ export async function POST(req: Request) {
       .where(eq(users.id, appUser.id));
 
     // Referral milestone — non-blocking, dedupes server-side.
-    void (async () => {
+    after(async () => {
       try {
         const { triggerReferral } = await import("@/lib/referrals/trigger");
         await triggerReferral(appUser.id, "onboarded", {
@@ -364,7 +371,7 @@ export async function POST(req: Request) {
       } catch (err) {
         console.error("[referral] artist onboarded trigger failed", err);
       }
-    })();
+    });
 
     // Link the Legal Pack signature to the profile that has just been
     // created. Onboarding records the acceptance BEFORE the artist row

@@ -2,8 +2,6 @@
 
 import Link from "@/components/shared/locale-link";
 import { Send, Globe, Camera, Music2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useLocale } from "@/hooks/use-locale";
 import { BrandLogo } from "@/components/public/brand-mark";
 
@@ -22,7 +20,7 @@ const COLUMNS: { title: string; links: { key: string; href: string }[] }[] = [
     title: "footer.colVendors",
     links: [
       { key: "footer.register", href: "/sign-up" },
-      { key: "footer.howItWorks", href: "/#cum-functioneaza" },
+      { key: "footer.howItWorks", href: "/cum-functioneaza" },
       // The page this points at is titled "Tarife pentru furnizori" and its
       // first line is that there is no subscription fee — only a 5% commission
       // on confirmed orders. Calling the link "Abonament" told partners the
@@ -119,22 +117,11 @@ export function Footer() {
           {/* Newsletter */}
           <div>
             <h3 className="mb-4 text-xs font-bold uppercase tracking-wider text-gold">
-              {t("footer.colNewsletter")}
+              {t("footer.blogTips")}
             </h3>
-            <p className="mb-3 text-sm leading-relaxed text-[#9A9AAB]">
-              {t("footer.newsletterDesc")}
-            </p>
-            <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
-              <Input
-                type="email"
-                placeholder={t("footer.emailPlaceholder")}
-                className="flex-1 border-white/10 bg-white/[0.04] text-white placeholder:text-white/40"
-                aria-label={t("footer.emailPlaceholder")}
-              />
-              <Button className="shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark" aria-label={t("footer.colNewsletter")}>
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
+            <Link href="/blog" className="inline-flex rounded-xl bg-gold px-5 py-3 text-sm font-semibold text-[#0D0D0D] hover:bg-gold-dark">
+              {t("footer.blogTips")}
+            </Link>
           </div>
         </div>
 

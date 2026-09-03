@@ -40,7 +40,7 @@ const bookingSchema = z.object({
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   eventType: z.string().optional(),
-  guestCount: z.number().optional(),
+  guestCount: z.number().int().positive().max(10000).optional(),
   message: z.string().optional(),
   /** Optional — when the client sends the request from inside an event
    *  plan we link the booking so its agreed price flows into the budget. */
@@ -217,6 +217,7 @@ export async function GET(req: NextRequest) {
       guestCount: bookingRequests.guestCount,
       message: bookingRequests.message,
       status: bookingRequests.status,
+      clientConfirmedAt: bookingRequests.clientConfirmedAt,
       agreedPrice: bookingRequests.agreedPrice,
       paidStatus: bookingRequests.paidStatus,
       priceOffers: bookingRequests.priceOffers,
@@ -264,11 +265,7 @@ export async function GET(req: NextRequest) {
   // "confirmed_by_client"), both sides need direct contact to coordinate
   // the actual gig — chat alone isn't enough for last-minute logistics.
   // Per-row check below; this flag only gates the *default* behavior.
-  const SHARED_CONTACT_STATUSES = new Set([
-    "accepted",
-    "confirmed_by_client",
-    "completed",
-  ]);
+  const SHARED_CONTACT_STATUSES = new Set(["confirmed_by_client", "completed"]);
   const redactByDefault = !isAdmin && vendorViewer;
 
   // Phase 6 — enrich artist bookings with the venue on the same event plan
@@ -315,6 +312,10 @@ export async function GET(req: NextRequest) {
         .filter((n): n is string => Boolean(n));
     return {
       ...row,
+      adminNotes: isAdmin ? row.adminNotes : null,
+      message: !SHARED_CONTACT_STATUSES.has(row.status) && row.message ? redactContact(row.message) : row.message,
+      artistReply: !SHARED_CONTACT_STATUSES.has(row.status) && row.artistReply ? redactContact(row.artistReply) : row.artistReply,
+      priceOffers: !SHARED_CONTACT_STATUSES.has(row.status) ? row.priceOffers?.map(o => ({ ...o, message: o.message ? redactContact(o.message) : o.message })) : row.priceOffers,
       clientPhone: showContact ? row.clientPhone : null,
       clientEmail: showContact ? row.clientEmail : null,
       categoryNames: cats,

@@ -72,6 +72,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   };
 
   const result = await getArtists(filters);
+  const { userId } = await auth();
 
   const breadcrumbs = [
     { name: t("nav.home", locale), url: "/" },
@@ -93,7 +94,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
       />
       <CategoryPageClient
         category={category}
-        artists={result.items}
+        artists={publicCatalogData(result.items, Boolean(userId))}
         total={result.total}
         page={result.page}
         totalPages={result.totalPages}
@@ -106,3 +107,5 @@ export default async function CategoryPage({ params, searchParams }: Props) {
     </>
   );
 }
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
+import { auth } from "@clerk/nextjs/server";

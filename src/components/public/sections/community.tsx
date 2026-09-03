@@ -44,15 +44,7 @@ export function CommunitySection({ stats }: { stats?: CommunityStats }) {
       ]
     : [];
 
-  // Fallback testimonials so the section always renders. The
-  // /api/reviews/featured endpoint overrides these when it returns approved
-  // reviews (those come from the DB and are shown as written).
-  const fallback: Testimonial[] = [
-    { id: 1, authorName: "Ana & Andrei", eventType: t("home.community.evWedding"), location: "Chișinău", text: t("home.community.t1"), rating: 5 },
-    { id: 2, authorName: "Cristina M.", eventType: t("home.community.evBaptism"), location: "Bălți", text: t("home.community.t2"), rating: 5 },
-    { id: 3, authorName: "Sergiu & Diana", eventType: t("home.community.evCumatrie"), location: "Orhei", text: t("home.community.t3"), rating: 5 },
-  ];
-
+  // Only approved reviews, never fabricated fallback testimonials.
   const [fromApi, setFromApi] = useState<Testimonial[] | null>(null);
   const [current, setCurrent] = useState(0);
 
@@ -72,7 +64,7 @@ export function CommunitySection({ stats }: { stats?: CommunityStats }) {
     return () => { alive = false; };
   }, []);
 
-  const testimonials = fromApi ?? fallback;
+  const testimonials = fromApi ?? [];
 
   useEffect(() => {
     if (testimonials.length <= 1) return;
@@ -82,6 +74,7 @@ export function CommunitySection({ stats }: { stats?: CommunityStats }) {
     return () => clearInterval(timer);
   }, [testimonials.length]);
 
+  if (!testimonials.length) return null;
   const item = testimonials[current % testimonials.length];
   const sub = [item.eventType, item.location].filter(Boolean).join(", ");
 

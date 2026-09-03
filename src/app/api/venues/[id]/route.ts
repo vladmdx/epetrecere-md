@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { venues, venueImages, reviews, users, redirects } from "@/lib/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
 
 export async function GET(
   _req: Request,
@@ -25,6 +26,13 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   const venueId = venue.id;
+  const { userId } = await auth();
+  const [viewer] = userId ? await db.select({ id: users.id, role: users.role })
+    .from(users).where(eq(users.clerkId, userId)).limit(1) : [];
+  const privileged = viewer && (viewer.id === venue.userId || viewer.role === "admin" || viewer.role === "super_admin");
+  if (!venue.isActive && !privileged) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const [images, venueReviews] = await Promise.all([
     db.select().from(venueImages).where(eq(venueImages.venueId, venueId)).orderBy(asc(venueImages.sortOrder)),
@@ -32,18 +40,10 @@ export async function GET(
   ]);
 
   // M0a #8 — price/contact gated behind login.
-  const { userId } = await auth();
-  const payload = userId
-    ? venue
-    : {
-        ...venue,
-        pricePerPerson: null,
-        phone: null,
-        email: null,
-        website: null,
-      };
-
-  return NextResponse.json({ ...payload, images, reviews: venueReviews });
+  const payload = { ...venue, images, reviews: venueReviews };
+  return NextResponse.json(privileged ? payload : publicCatalogData(payload, Boolean(userId)), {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }
 
 // M12 — Owner-gated venue profile update. The signed-in user must own the

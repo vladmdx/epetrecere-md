@@ -61,11 +61,7 @@ async function loadContext(conversationId: number, clerkId: string) {
   return { appUser, conv, side } as const;
 }
 
-const CONTACT_SHARED_STATUSES = new Set([
-  "accepted",
-  "confirmed_by_client",
-  "completed",
-]);
+const CONTACT_SHARED_STATUSES = new Set(["confirmed_by_client", "completed"]);
 async function contactIsUnlocked(conv: typeof conversations.$inferSelect) {
   const vendorCondition = conv.artistId
     ? eq(bookingRequests.artistId, conv.artistId)

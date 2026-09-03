@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
 import { searchAll } from "@/lib/search/meilisearch";
 import { db } from "@/lib/db";
 import { artists, venues } from "@/lib/db/schema";
-import {  sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
@@ -18,11 +20,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ artists: [], venues: [] });
   }
 
+  const { userId } = await auth();
+  const respond = (data: unknown) => NextResponse.json(publicCatalogData(data, Boolean(userId)), {headers:{"Cache-Control":"private, no-store"}});
   // Try Meilisearch first, fallback to DB search
   try {
     const results = await searchAll(query, 5);
     if (results.artists.length || results.venues.length) {
-      return NextResponse.json(results);
+      // The index may lag deletions/moderation. The database is authoritative.
+      const [activeArtists, activeVenues] = await Promise.all([
+        results.artists.length ? db.select({id: artists.id}).from(artists).where(and(eq(artists.isActive, true), inArray(artists.id, results.artists.map(a => a.id)))) : [],
+        results.venues.length ? db.select({id: venues.id}).from(venues).where(and(eq(venues.isActive, true), inArray(venues.id, results.venues.map(v => v.id)))) : [],
+      ]);
+      return respond({
+        artists: results.artists.filter(a => activeArtists.some(x => x.id === a.id)),
+        venues: results.venues.filter(v => activeVenues.some(x => x.id === v.id)),
+      });
     }
   } catch {
     // Meilisearch not available, fall through to DB
@@ -66,7 +78,7 @@ export async function GET(req: NextRequest) {
       .limit(5),
   ]);
 
-  return NextResponse.json({
+  return respond({
     artists: artistResults,
     venues: venueResults,
   });

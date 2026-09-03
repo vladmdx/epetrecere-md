@@ -6,7 +6,6 @@ import Link from "@/components/shared/locale-link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
-  CalendarDays,
   MapPin,
   Search,
   SlidersHorizontal,
@@ -88,7 +87,7 @@ export function VenuesListClient({
   const { t, locale } = useLocale();
   const [city, setCity] = useState(currentCity);
   const [capacity, setCapacity] = useState(currentCapacityMin);
-  const [date, setDate] = useState(currentDate);
+  const date = currentDate;
   const [viewMode, setViewMode] = useViewMode();
   // Map mode is venue-specific, so it's a local toggle rather than a third
   // ViewSwitcher kind — /artisti shares that component and has no map.
@@ -149,7 +148,6 @@ export function VenuesListClient({
   function resetFilters() {
     setCity("");
     setCapacity("");
-    setDate("");
     startTransition(() => {
       router.push(localizePath("/sali", locale));
     });
@@ -190,7 +188,7 @@ export function VenuesListClient({
 
             <form
               onSubmit={handleSearch}
-              className="mt-6 grid gap-2 rounded-xl border border-white/12 bg-[#090d14]/82 p-3 shadow-[0_20px_50px_rgba(0,0,0,.25)] backdrop-blur-xl sm:grid-cols-2 lg:grid-cols-[1fr_210px_190px_auto]"
+              className="mt-6 grid gap-2 rounded-xl border border-white/12 bg-[#090d14]/82 p-3 shadow-[0_20px_50px_rgba(0,0,0,.25)] backdrop-blur-xl sm:grid-cols-2 lg:grid-cols-[1fr_210px_auto]"
             >
               <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
                 <MapPin className="h-4 w-4 text-[#e6b84d]" />
@@ -218,20 +216,6 @@ export function VenuesListClient({
                     </option>
                   ))}
                 </select>
-              </label>
-              {/* Availability is the one filter the cards make a claim about:
-                  only with a date does getVenues drop the venues already
-                  booked, so only then does VenueCard show its badge. */}
-              <label className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3">
-                <CalendarDays className="h-4 w-4 shrink-0 text-[#e6b84d]" />
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(event) => setDate(event.target.value)}
-                  aria-label={t("venues.list.eventDate")}
-                  title={t("venues.list.eventDate")}
-                  className="min-w-0 flex-1 bg-transparent text-sm text-white outline-none [color-scheme:dark]"
-                />
               </label>
               <button
                 type="submit"

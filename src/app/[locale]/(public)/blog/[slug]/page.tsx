@@ -1,3 +1,4 @@
+import { localizeContentLinks } from "@/lib/content/localize-links";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "@/components/shared/locale-link";
@@ -51,11 +52,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     .where(eq(blogPosts.slug, slug))
     .limit(1);
 
-  if (!post) return {};
+  if (!post || post.status !== "published") return {};
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const title = getLocalized(post, "seoTitle", locale) || getLocalized(post, "title", locale);
   const excerpt = getLocalized(post, "seoDesc", locale) || getLocalized(post, "excerpt", locale);
-  const content = getLocalized(post, "content", locale);
+  const content = localizeContentLinks(getLocalized(post, "content", locale), locale);
 
   return generateMeta({
     title,
@@ -84,7 +85,7 @@ export default async function BlogPostPage({ params }: Props) {
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const title = getLocalized(post, "title", locale);
   const excerpt = getLocalized(post, "excerpt", locale);
-  const content = getLocalized(post, "content", locale);
+  const content = localizeContentLinks(getLocalized(post, "content", locale), locale);
   const editorial = findEditorialPost2026(slug);
   const coverAlt = editorial
     ? locale === "ru"

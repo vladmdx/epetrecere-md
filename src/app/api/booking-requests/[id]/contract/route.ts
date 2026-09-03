@@ -100,6 +100,9 @@ export async function GET(
 
   const b = row.booking;
   const vendorKind: "artist" | "sala" = b.artistId ? "artist" : "sala";
+  if (!["confirmed_by_client", "completed"].includes(b.status)) {
+    return NextResponse.json({ error: "booking_confirmation_required" }, { status: 403 });
+  }
   const vendorName = b.artistId
     ? row.artistName ?? "Artist"
     : row.venueName ?? "Sală";
@@ -182,7 +185,7 @@ export async function POST(
 
   // Booking must be at least "accepted" (artist/venue said yes) to have
   // terms worth signing.
-  if (!["accepted", "confirmed_by_client"].includes(b.status)) {
+  if (!["confirmed_by_client", "completed"].includes(b.status)) {
     return NextResponse.json(
       {
         error:

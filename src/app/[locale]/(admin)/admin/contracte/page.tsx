@@ -120,7 +120,7 @@ export default async function AdminContractsPage({
   // accepts the whole pack in one action.
   const groups = new Map<string, typeof rows>();
   for (const r of rows) {
-    const key = `${r.userId ?? r.email ?? "?"}|${r.signatureName}|${new Date(r.acceptedAt).toISOString().slice(0, 16)}`;
+    const key = `${r.userId ?? r.email ?? "?"}|${r.subjectType}|${r.packVersion}|${r.signatureName}|${new Date(r.acceptedAt).toISOString()}`;
     const arr = groups.get(key);
     if (arr) arr.push(r);
     else groups.set(key, [r]);
@@ -198,7 +198,7 @@ export default async function AdminContractsPage({
                           return (
                             <li key={d.id} className="text-xs">
                               <a
-                                href={`/legal/${d.documentSlug}`}
+                                href={`/api/legal/accept/${d.id}/copy`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="text-gold hover:underline"

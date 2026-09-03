@@ -61,6 +61,7 @@ export function ESignature({
 
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [name, setName] = useState(defaultName);
+  const [signatureKey, setSignatureKey] = useState(0);
   const [signature, setSignature] = useState<SignatureValue>({
     dataUrl: null,
     isValid: false,
@@ -94,7 +95,8 @@ export function ESignature({
   const mainDoc = docs[0];
 
   const allTicked = docs.length > 0 && docs.every((d) => ticked.has(d.slug));
-  const nameOk = name.trim().length >= 3 && name.trim().includes(" ");
+  const matchesSigner = (n: string, party: PartnerIdentity) => n.trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase() === (party.partnerType === "individual" ? party.legalName : party.representativeName ?? "").trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase();
+  const nameOk = name.trim().length >= 3 && name.trim().includes(" ") && matchesSigner(name, identity);
   // All three are required: the tick is what the Partner Agreement §4.2 asks
   // for, the typed name identifies the signer, and the drawing is the
   // handwritten signature itself.
@@ -108,6 +110,16 @@ export function ESignature({
     nextRead: boolean = contractRead,
     nextIdentity: PartnerIdentity = identity,
   ) {
+    if (JSON.stringify(nextIdentity) !== JSON.stringify(identity)) {
+      // Changing the contracting party invalidates the earlier read/consent.
+      setSignatureKey(k => k + 1);
+      setContractRead(false);
+      setSignature({ dataUrl: null, isValid: false });
+      setTicked(new Set());
+      nextRead = false;
+      nextTicked = new Set();
+      nextSig = { dataUrl: null, isValid: false };
+    }
     const entity = nextIdentity.partnerType !== "individual";
     const idOk =
       (nextIdentity.legalName ?? "").trim().length >= 3 &&
@@ -120,7 +132,7 @@ export function ESignature({
       accepted:
         docs.every((d) => nextTicked.has(d.slug)) &&
         nextName.trim().length >= 3 &&
-        nextName.trim().includes(" ") &&
+        nextName.trim().includes(" ") && matchesSigner(nextName, nextIdentity) &&
         nextSig.isValid &&
         idOk &&
         nextRead,
@@ -158,6 +170,9 @@ export function ESignature({
           </p>
           <p className="text-sm text-muted-foreground">
             {t("legal.signIntro")}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {locale === "ru" ? "Электронное принятие условий с подписью на экране. Это не квалифицированная электронная подпись. Имя подписанта должно совпадать с ФИО стороны или её представителя." : locale === "en" ? "Electronic acceptance with an on-screen signature. This is not a qualified electronic signature. The signer must be the named party or its representative." : "Acceptare electronică cu semnătură desenată pe ecran. Nu este o semnătură electronică calificată. Semnatarul trebuie să fie persoana indicată în contract sau reprezentantul ei."}
           </p>
         </div>
       </div>
@@ -392,7 +407,7 @@ export function ESignature({
       </div>
 
       <div className="mt-4">
-        <SignaturePad
+        <SignaturePad key={signatureKey}
           onChange={(v) => {
             setSignature(v);
             emit(ticked, name, v);

@@ -47,8 +47,8 @@ export async function saveCommissionRules(rules: CommissionRules): Promise<void>
     });
 }
 
-function addDays(days: number): string {
-  const d = new Date();
+function addDays(days: number, confirmedAt: Date): string {
+  const d = new Date(confirmedAt);
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
 }
@@ -70,6 +70,7 @@ export async function ensureCommissionForBooking(
       artistId: bookingRequests.artistId,
       venueId: bookingRequests.venueId,
       status: bookingRequests.status,
+      confirmedAt: bookingRequests.confirmedAt,
       agreedPrice: bookingRequests.agreedPrice,
       guestCount: bookingRequests.guestCount,
       // The agreement prices a venue by event type as well as by size, so the
@@ -144,7 +145,7 @@ export async function ensureCommissionForBooking(
       amount: result.amount,
       guestCount: b.guestCount ?? null,
       tier: result.tier,
-      dueDate: addDays(PAYMENT_TERM_DAYS),
+      dueDate: b.confirmedAt ? addDays(PAYMENT_TERM_DAYS, b.confirmedAt) : null,
     })
     .onConflictDoNothing({ target: commissions.bookingRequestId })
     .returning({ id: commissions.id });
@@ -238,9 +239,9 @@ export async function getCommissionTotals(scope?: {
 
   const [row] = await db
     .select({
-      pending: sql<number>`coalesce(sum(case when ${commissions.status} in ('pending','invoiced') then ${commissions.amount} else 0 end),0)::int`,
-      paid: sql<number>`coalesce(sum(case when ${commissions.status} = 'paid' then ${commissions.amount} else 0 end),0)::int`,
-      overdue: sql<number>`coalesce(sum(case when ${commissions.status} in ('pending','invoiced') and ${commissions.dueDate} < current_date then ${commissions.amount} else 0 end),0)::int`,
+      pending: sql<number>`coalesce(sum(case when ${commissions.status} in ('pending','invoiced') then ${commissions.amount} else 0 end),0)::float8`,
+      paid: sql<number>`coalesce(sum(case when ${commissions.status} = 'paid' then ${commissions.amount} else 0 end),0)::float8`,
+      overdue: sql<number>`coalesce(sum(case when ${commissions.status} in ('pending','invoiced') and ${commissions.dueDate} < current_date then ${commissions.amount} else 0 end),0)::float8`,
       count: sql<number>`count(*)::int`,
     })
     .from(commissions)

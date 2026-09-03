@@ -37,13 +37,12 @@ interface VenueCardProps {
   availableOn?: string | null;
 }
 
-export function VenueCard({ venue, imageIndex, availableOn }: VenueCardProps) {
+export function VenueCard({ venue, availableOn }: VenueCardProps) {
   const { locale, t } = useLocale();
   const { isSignedIn, isLoaded } = useUser();
   const name = getLocalized(venue, "name", locale);
   const showPrice = isLoaded && isSignedIn;
-  const fallbackIndex = imageIndex ?? venue.id;
-  const image = venue.coverImageUrl || `/images/venues/hall-${(fallbackIndex % 6) + 1}.jpg`;
+  const image = venue.coverImageUrl || "/images/venues/placeholder.svg";
 
   return (
     <Link

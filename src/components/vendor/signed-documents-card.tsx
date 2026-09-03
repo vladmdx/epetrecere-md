@@ -39,7 +39,7 @@ interface Acceptance {
 }
 
 export function SignedDocumentsCard() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [openDoc, setOpenDoc] = useState<number | null>(null);
   const [items, setItems] = useState<Acceptance[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -66,7 +66,7 @@ export function SignedDocumentsCard() {
   // the same grouping the admin panel uses.
   const groups = new Map<string, Acceptance[]>();
   for (const it of items ?? []) {
-    const key = `${it.signatureName}|${it.acceptedAt.slice(0, 16)}`;
+    const key = `${it.subjectType}|${it.packVersion}|${it.signatureName}|${it.acceptedAt}`;
     const arr = groups.get(key);
     if (arr) arr.push(it);
     else groups.set(key, [it]);
@@ -148,6 +148,9 @@ export function SignedDocumentsCard() {
                           <span className="text-muted-foreground">
                             v{d.documentVersion}
                           </span>
+                          {d.documentBlocks?.length ? <a href={`/api/legal/accept/${d.id}/copy`} className="ml-3 text-gold underline">
+                            {locale === "ru" ? "Скачать договор" : locale === "en" ? "Download contract" : "Descarcă contractul"}
+                          </a> : null}
                           <span className="block break-all font-mono text-[11px] text-muted-foreground/70">
                             {t("vendor.signedDocs.hash")}: {d.contentHash ?? "—"}
                           </span>

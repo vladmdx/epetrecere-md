@@ -46,6 +46,7 @@ import {
 import { getLocalized } from "@/i18n";
 import { useLocale } from "@/hooks/use-locale";
 import { ESignature, type ESignatureValue } from "@/components/legal/e-signature";
+import { LEGAL_PACK_VERSION } from "@/lib/legal";
 
 interface Category {
   id: number;
@@ -266,12 +267,15 @@ export default function OnboardingPage() {
       // 1. Create the artist row (same endpoint as before).
       // Record the electronic acceptance first: if the profile were created
       // and this failed, we'd have a live vendor with no signed contract.
-      if (signature?.accepted) {
-        await fetch("/api/legal/accept", {
+      if (!signature?.accepted) throw new Error(t("legal.signIntro"));
+      {
+        const acceptance = await fetch("/api/legal/accept", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             subjectType: "artist",
+            accepted: true,
+            packVersion: LEGAL_PACK_VERSION,
             signatureName: signature.signatureName,
             signatureImage: signature.signatureImage,
             documents: signature.documents,
@@ -279,6 +283,10 @@ export default function OnboardingPage() {
             locale: document.documentElement.lang || "ro",
           }),
         });
+        if (!acceptance.ok) {
+          const error = await acceptance.json().catch(() => ({}));
+          throw new Error(error.error || t("legal.signIntro"));
+        }
       }
 
       const res = await fetch("/api/auth/register-artist", {

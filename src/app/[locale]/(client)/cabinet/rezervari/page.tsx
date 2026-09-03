@@ -49,6 +49,7 @@ interface BookingRequest {
   guestCount: number | null;
   message: string | null;
   status: string;
+  clientConfirmedAt?: string | null;
   artistReply: string | null;
   artistName: string | null;
   artistSlug: string | null;
@@ -151,7 +152,8 @@ export default function ReservationsPage() {
         toast.error(err.error || t("cabinet.reservations.confirmError"));
         return;
       }
-      toast.success(t("cabinet.reservations.confirmed"));
+      const result = await res.json();
+      toast.success(t(result.awaitingVenue ? "booking.awaitingVenue" : "cabinet.reservations.confirmed"));
       await refresh();
     } finally {
       setBusy(null);
@@ -428,7 +430,7 @@ export default function ReservationsPage() {
 
     const offers = b.priceOffers ?? [];
     const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
-    const canConfirmAccepted = b.status === "accepted";
+    const canConfirmAccepted = b.status === "accepted" && !b.clientConfirmedAt;
 
     return (
       <Card key={b.id} className="transition-all hover:border-gold/30">
@@ -556,6 +558,7 @@ export default function ReservationsPage() {
 
             {/* Actions */}
             <div className="flex flex-col items-stretch gap-2 shrink-0 min-w-[140px]">
+              {b.status === "accepted" && b.clientConfirmedAt && <p className="text-sm text-gold">{t("booking.awaitingVenue")}</p>}
               {/* Accept partner's offer (when status = accepted) */}
               {canConfirmAccepted && (
                 <Button

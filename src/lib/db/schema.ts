@@ -3,6 +3,7 @@ import {
   text,
   timestamp,
   integer,
+  numeric,
   boolean,
   pgEnum,
   uuid,
@@ -1092,7 +1093,7 @@ export const commissions = pgTable(
     /** Rate in basis points (500 = 5%). Null when a flat fee was applied. */
     rateBps: integer("rate_bps"),
     /** The fee itself, same currency as baseAmount. */
-    amount: integer("amount").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2, mode: "number" }).notNull(),
     /** Snapshot for audit — venue tiers depend on it and it can change later. */
     guestCount: integer("guest_count"),
     /** Which rule produced this row: artist_flat | venue_below | venue_above. */
@@ -1172,6 +1173,10 @@ export const bookingRequests = pgTable("booking_requests", {
    *  client signs the contract. Empty = not signed yet. */
   clientSignature: text("client_signature"),
   clientSignedAt: timestamp("client_signed_at"),
+  /** Client accepted the venue offer; a venue must still confirm afterwards. */
+  clientConfirmedAt: timestamp("client_confirmed_at", { withTimezone: true }),
+  /** Final bilateral confirmation, used as the fee's due-date origin. */
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
   /** Generated PDF URL (Vercel Blob) with both parties' details + signature. */
   contractPdfUrl: text("contract_pdf_url"),
   /** Who created the row.

@@ -50,9 +50,7 @@ export default async function VenuesPage({ params, searchParams }: Props) {
 
   // M0a #8 — gate price per person behind login at the server layer.
   const { userId } = await auth();
-  const items = userId
-    ? result.items
-    : result.items.map((v) => ({ ...v, pricePerPerson: null }));
+  const items = publicCatalogData(result.items, Boolean(userId));
 
   // Extract unique cities from results for filter pills
   const allCities = Array.from(new Set(result.items.map((v) => v.city).filter(Boolean) as string[])).sort();
@@ -93,3 +91,4 @@ export default async function VenuesPage({ params, searchParams }: Props) {
     </>
   );
 }
+import { publicCatalogData } from "@/lib/privacy/public-catalog";

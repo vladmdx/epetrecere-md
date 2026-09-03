@@ -69,6 +69,7 @@ export default async function VenueBookingsPage({
       initialTab={currentTab}
       initialBookings={bookings.map((b) => ({
         ...b,
+        clientConfirmedAt: b.clientConfirmedAt?.toISOString() ?? null,
         createdAt: b.createdAt.toISOString(),
         updatedAt: b.updatedAt.toISOString(),
       }))}

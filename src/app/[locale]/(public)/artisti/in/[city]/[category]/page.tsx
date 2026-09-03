@@ -119,9 +119,7 @@ export default async function CityCategoryPage({ params, searchParams }: Props) 
 
   // M0a #8 price gating at SSR.
   const { userId } = await auth();
-  const safeArtists = userId
-    ? artistsList
-    : artistsList.map((a) => ({ ...a, priceFrom: null, phone: null, email: null, instagram: null }));
+  const safeArtists = publicCatalogData(artistsList, Boolean(userId));
 
   const breadcrumbs = [
     { name: t("nav.home", locale), url: "/" },
@@ -231,3 +229,4 @@ export default async function CityCategoryPage({ params, searchParams }: Props) 
     </>
   );
 }
+import { publicCatalogData } from "@/lib/privacy/public-catalog";

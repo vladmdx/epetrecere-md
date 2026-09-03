@@ -3370,6 +3370,9 @@
     "enable": "Activează notificări"
   },
   "booking": {
+    "awaitingVenue": "Se așteaptă confirmarea sălii",
+    "awaitingClient": "Se așteaptă acceptarea clientului",
+    "venueConfirm": "Confirmă rezervarea",
     "card": {
       "sendError": "Eroare la trimitere",
       "sentTo": "Cerere trimisă către {name}!",

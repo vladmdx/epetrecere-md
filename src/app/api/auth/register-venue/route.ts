@@ -3,7 +3,7 @@
 // (we don't have a "venue" enum value — ownership is detected via venues.userId)
 // and notifies admins for approval.
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
 import { and, eq, ne } from "drizzle-orm";
@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { artists, venues, users, notifications } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { validatePhone } from "@/lib/phone/validate";
+import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 
 // Each day is `{ open: HH:mm, close: HH:mm }` or null (closed). Mirrors
 // venues.workingHours so we can pass it straight through.
@@ -28,13 +29,13 @@ const registerSchema = z.object({
   city: z.string().optional(),
   // Address is now REQUIRED in the onboarding wizard. Server still accepts
   // missing for legacy compatibility — onboarding UI enforces it.
-  address: z.string().optional(),
+  address: z.string().trim().min(5).max(300),
   capacityMin: z.number().int().positive().optional(),
   capacityMax: z.number().int().positive().optional(),
   description: z.string().optional(),
   // Required: at least one image. Onboarding uploads to /api/upload and
   // passes URL(s) here. First one becomes the cover photo.
-  imageUrls: z.array(z.string().url()).max(10).optional(),
+  imageUrls: z.array(z.string().url()).min(1).max(10),
   // Optional extras — venue can fill any combination during onboarding;
   // missing ones can be edited later from /dashboard/sala/profil.
   menuPdfUrl: z.string().url().optional(),
@@ -139,6 +140,9 @@ export async function POST(req: Request) {
         appUser = existing;
       }
     }
+
+    const missing = await missingRegistrationDocuments(appUser.id, "venue");
+    if (missing.length) return NextResponse.json({ error: "current_signed_contract_required", missing }, { status: 409 });
 
     const [existingArtist] = await db
       .select({ id: artists.id })
@@ -324,7 +328,7 @@ export async function POST(req: Request) {
     // either way, polishing it gives the public page launch-ready copy.
     if (data.description && data.description.trim().length >= 40) {
       const seed = data.description.trim();
-      void (async () => {
+      after(async () => {
         try {
           const { generateVenueDescription } = await import("@/lib/ai");
           const html = await generateVenueDescription({
@@ -346,11 +350,11 @@ export async function POST(req: Request) {
         } catch (err) {
           console.error("[register-venue] auto AI rewrite failed:", err);
         }
-      })();
+      });
     }
 
     // Referral milestone — non-blocking, dedupes server-side.
-    void (async () => {
+    after(async () => {
       try {
         const { triggerReferral } = await import("@/lib/referrals/trigger");
         await triggerReferral(appUser.id, "onboarded", {
@@ -360,13 +364,13 @@ export async function POST(req: Request) {
       } catch (err) {
         console.error("[referral] venue onboarded trigger failed", err);
       }
-    })();
+    });
 
     // Notify admins (in-app + email) — fire-and-forget. Awaiting these
     // sends caused the venue registration POST to hang for ~1 minute when
     // the email provider was slow, leaving the user staring at a stuck
     // "Trimite pentru aprobare" button.
-    void (async () => {
+    after(async () => {
       try {
     // Attach the vendor's signed contract (drawn signature) to the admin
     // notification, so whoever approves the request sees what was signed
@@ -434,7 +438,7 @@ export async function POST(req: Request) {
       } catch (err) {
         console.error("[register-venue] admin notify failed:", err);
       }
-    })();
+    });
 
     return NextResponse.json({ success: true, venueId: venue.id, slug });
   } catch (err) {

@@ -214,8 +214,9 @@ export function computeCommission(
     : undefined;
   if (schedule?.length) {
     // Bands are ordered lowest first and their upper bounds are INCLUSIVE.
-    // An unknown guest count takes the lowest band — the cheaper assumption,
-    // and the one that cannot overcharge a venue on missing data.
+    // Missing guest counts require clarification, not an assumed lower fee.
+    const unboundedFlat = schedule.length === 1 && schedule[0].maxGuests === null;
+    if (!unboundedFlat && (!Number.isInteger(input.guestCount) || (input.guestCount ?? 0) <= 0)) return null;
     const guests = input.guestCount ?? 0;
     const idx = schedule.findIndex(
       (b) => b.maxGuests == null || guests <= b.maxGuests,
@@ -236,7 +237,8 @@ export function computeCommission(
 
   // Legacy single-threshold path, kept for a stored override that predates
   // the per-event schedules.
-  const guests = input.guestCount ?? 0;
+  if (!Number.isInteger(input.guestCount) || (input.guestCount ?? 0) <= 0) return null;
+  const guests = input.guestCount!;
   const atOrAbove = guests >= rules.venue.guestThreshold;
   const tierCfg = atOrAbove ? rules.venue.atOrAbove : rules.venue.below;
 
@@ -266,7 +268,7 @@ export function computeCommission(
 }
 
 function bps(base: number, rateBps: number): number {
-  return Math.round((base * rateBps) / 10_000);
+  return Math.round((base * rateBps) / 100) / 100;
 }
 
 /** Human label for a rate, e.g. 500 → "5%". */

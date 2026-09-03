@@ -70,7 +70,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const redirectTarget = await resolveRedirect(slug);
   if (redirectTarget) return {};
 
-  const artist = await getArtistBySlug(slug);
+  const artist = publicCatalogData(await getArtistBySlug(slug), true);
   if (!artist) return {};
 
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
@@ -81,11 +81,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // this language; the sentence below is what a profile without one gets,
   // instead of the Romanian excerpt every locale used to receive. Admin
   // seo_desc_* still wins — generateMeta applies it for this locale only.
-  const excerpt = {
+  const excerpt = plainText({
     ro: artist.descriptionRo,
     ru: artist.descriptionRu,
     en: artist.descriptionEn,
-  }[locale]?.substring(0, 155);
+  }[locale]).substring(0, 155);
 
   const fallback = {
     ro: {
@@ -105,7 +105,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return generateMeta({
     title: fallback.title,
     description: excerpt || fallback.description,
-    entity: artist,
+    entity: publicCatalogData(artist, true),
     path: `/artisti/${slug}`,
     locale,
   });
@@ -129,26 +129,16 @@ export default async function ArtistPage({ params }: Props) {
   //
   // Phone and e-mail stay null for everyone: they are admin-only, and
   // clients are meant to reach an artist through the platform.
-  const gatedArtist = {
-    ...artist,
-    priceFrom: null,
-    phone: null,
-    email: null,
-    instagram: null,
-    facebook: null,
-    tiktok: null,
-    youtube: null,
-    website: null,
-  };
+  const gatedArtist = publicCatalogData(artist);
 
   const [similar, ugcPhotos] = await Promise.all([
     getSimilarArtists(artist.id, artist.categoryIds ?? [], 4),
     getUgcPhotosForArtist(artist.id, 12),
   ]);
-  const gatedSimilar = similar.map((a) => ({ ...a, priceFrom: null }));
+  const gatedSimilar = publicCatalogData(similar);
 
-  const name = getLocalized(artist, "name", "ro");
-  const desc = getLocalized(artist, "description", "ro");
+  const name = getLocalized(gatedArtist, "name", locale);
+  const desc = getLocalized(gatedArtist, "description", locale);
 
   const breadcrumbs = [
     { name: t("nav.home", locale), url: "/" },
@@ -187,3 +177,5 @@ export default async function ArtistPage({ params }: Props) {
     </>
   );
 }
+import { plainText } from "@/lib/content/plain-text";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";

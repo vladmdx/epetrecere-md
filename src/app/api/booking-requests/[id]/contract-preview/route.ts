@@ -71,6 +71,9 @@ export async function GET(
   if (!hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  if (!["confirmed_by_client", "completed"].includes(b.status)) {
+    return NextResponse.json({ error: "booking_confirmation_required" }, { status: 403 });
+  }
 
   const vendorKind: "artist" | "sala" = b.artistId ? "artist" : "sala";
   const vendorName = b.artistId

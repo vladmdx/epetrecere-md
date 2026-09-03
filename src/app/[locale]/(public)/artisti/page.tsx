@@ -58,9 +58,7 @@ export default async function ArtistsPage({ params, searchParams }: Props) {
 
   // M0a #8 — redact price for unauthenticated visitors at the server layer.
   const { userId } = await auth();
-  const items = userId
-    ? result.items
-    : result.items.map((a) => ({ ...a, priceFrom: null }));
+  const items = publicCatalogData(result.items, Boolean(userId));
 
   const jsonLdItems = result.items.slice(0, 20).map((a) => ({
     name: locale === "ru" ? a.nameRu || a.nameRo : locale === "en" ? a.nameEn || a.nameRo : a.nameRo,
@@ -99,3 +97,4 @@ export default async function ArtistsPage({ params, searchParams }: Props) {
     </>
   );
 }
+import { publicCatalogData } from "@/lib/privacy/public-catalog";

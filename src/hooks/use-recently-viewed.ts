@@ -68,10 +68,29 @@ export function useRecentlyViewed(type: RecentEntity) {
   const [items, setItems] = useState<RecentItem[]>([]);
   useEffect(() => {
     load();
-    setItems(caches[type].slice());
-    const sync = () => setItems(caches[type].slice());
+    let active = true;
+    let revision = 0;
+    const sync = async () => {
+      const run = ++revision;
+      const snapshot = caches[type].slice(0, MAX);
+      if (!snapshot.length) { setItems([]); return; }
+      try {
+        const res = await fetch(`/api/public/catalog-status?type=${type}&slugs=${encodeURIComponent(snapshot.map(x=>x.slug).join(","))}`);
+        if (!res.ok) throw new Error("catalog_status_unavailable");
+        const data = await res.json();
+        if (!active || run !== revision) return;
+        const valid = snapshot.filter(x=>Array.isArray(data.slugs) && data.slugs.includes(x.slug));
+        caches[type] = valid;
+        persist(type);
+        setItems(valid);
+      } catch {
+        if (active && run === revision) setItems([]);
+      }
+    };
+    void sync();
     listeners.add(sync);
     return () => {
+      active = false;
       listeners.delete(sync);
     };
   }, [type]);

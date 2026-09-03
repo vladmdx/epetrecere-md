@@ -106,9 +106,7 @@ export default async function VenuesByCityPage({ params, searchParams }: Props) 
 
   // M0a #8 — redact pricePerPerson for anonymous visitors.
   const { userId } = await auth();
-  const safeVenues = userId
-    ? items
-    : items.map((v) => ({ ...v, pricePerPerson: null }));
+  const safeVenues = publicCatalogData(items, Boolean(userId));
 
   const breadcrumbs = [
     { name: t("nav.home", locale), url: "/" },
@@ -194,3 +192,4 @@ export default async function VenuesByCityPage({ params, searchParams }: Props) 
     </>
   );
 }
+import { publicCatalogData } from "@/lib/privacy/public-catalog";

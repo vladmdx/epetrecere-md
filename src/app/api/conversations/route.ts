@@ -130,11 +130,7 @@ async function attachLinkedBookings<
     });
   }
 
-  const contactSharedStatuses = new Set([
-    "accepted",
-    "confirmed_by_client",
-    "completed",
-  ]);
+  const contactSharedStatuses = new Set(["confirmed_by_client", "completed"]);
 
   return rows.map((r) => {
     const key = r.artistId

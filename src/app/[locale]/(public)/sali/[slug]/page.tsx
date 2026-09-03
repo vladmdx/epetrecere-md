@@ -71,7 +71,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const redirectTarget = await resolveLegacySlug(slug);
   if (redirectTarget) return { alternates: { canonical: redirectTarget } };
 
-  const venue = await getVenueBySlug(slug);
+  const venue = publicCatalogData(await getVenueBySlug(slug), true);
   if (!venue) return {};
 
   // Prefer explicit OG URL; fall back to the cover image from the gallery.
@@ -85,11 +85,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // language; the sentence below is what a venue without one gets, instead of
   // the Romanian excerpt every locale used to receive. Admin seo_desc_* still
   // wins — generateMeta applies it for this locale only.
-  const excerpt = {
+  const excerpt = plainText({
     ro: venue.descriptionRo,
     ru: venue.descriptionRu,
     en: venue.descriptionEn,
-  }[locale]?.substring(0, 155);
+  }[locale]).substring(0, 155);
 
   const fallback = {
     ro: {
@@ -109,7 +109,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return generateMeta({
     title: fallback.title,
     description: excerpt || fallback.description,
-    entity: venue,
+    entity: publicCatalogData(venue, true),
     path: `/sali/${slug}`,
     image,
     type: "profile",
@@ -132,15 +132,9 @@ export default async function VenuePage({ params }: Props) {
   // Always the anonymous shape — see the note on the artist page. Reading
   // the session here would keep this route out of the prerender, and the
   // signed-in extras arrive from /api/public/gated-details in the browser.
-  const gatedVenue = {
-    ...venue,
-    pricePerPerson: null,
-    phone: null,
-    email: null,
-    website: null,
-  };
+  const gatedVenue = publicCatalogData(venue);
 
-  const name = getLocalized(venue, "name", "ro");
+  const name = getLocalized(gatedVenue, "name", locale);
 
   // Load digital menu data (packages, categories, items)
   const [menuCategories, menuPackages, relatedResult] = await Promise.all([
@@ -187,11 +181,10 @@ export default async function VenuePage({ params }: Props) {
         dangerouslySetInnerHTML={{
           __html: safeJsonLd(venueJsonLd({
             name,
-            description: venue.descriptionRo || "",
+            description: getLocalized(gatedVenue, "description", locale),
             slug,
             address: venue.address ?? undefined,
             city: venue.city ?? undefined,
-            pricePerPerson: venue.pricePerPerson ?? undefined,
           })),
         }}
       />
@@ -207,17 +200,19 @@ export default async function VenuePage({ params }: Props) {
       />
       <VenueDetailClient
         venue={gatedVenue}
-        menu={{
+        menu={publicCatalogData({
           categories: menuCategories,
           items: menuItems,
           packages: menuPackages,
-        }}
+        })}
         similar={relatedResult.items
           .filter((item) => item.id !== venue.id)
           .slice(0, 4)
-          .map((item) => ({ ...item, pricePerPerson: null }))}
+          .map((item) => publicCatalogData(item))}
       />
       <ViewTracker kind="venue" id={venue.id} />
     </>
   );
 }
+import { plainText } from "@/lib/content/plain-text";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";

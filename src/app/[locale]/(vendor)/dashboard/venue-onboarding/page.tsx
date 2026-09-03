@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { MOLDOVA_CITIES, DEFAULT_CITY } from "@/lib/moldova-cities";
 import { MapsAutofill } from "@/components/vendor/maps-autofill";
 import { ESignature, type ESignatureValue } from "@/components/legal/e-signature";
+import { LEGAL_PACK_VERSION } from "@/lib/legal";
 import { useLocale } from "@/hooks/use-locale";
 
 const STEP_LABEL_KEYS = [
@@ -239,12 +240,15 @@ export default function VenueOnboardingPage() {
     try {
       // Record the electronic acceptance first: if the profile were created
       // and this failed, we'd have a live vendor with no signed contract.
-      if (signature?.accepted) {
-        await fetch("/api/legal/accept", {
+      if (!signature?.accepted) throw new Error(t("legal.signIntro"));
+      {
+        const acceptance = await fetch("/api/legal/accept", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             subjectType: "venue",
+            accepted: true,
+            packVersion: LEGAL_PACK_VERSION,
             signatureName: signature.signatureName,
             signatureImage: signature.signatureImage,
             documents: signature.documents,
@@ -252,6 +256,10 @@ export default function VenueOnboardingPage() {
             locale: document.documentElement.lang || "ro",
           }),
         });
+        if (!acceptance.ok) {
+          const error = await acceptance.json().catch(() => ({}));
+          throw new Error(error.error || t("legal.signIntro"));
+        }
       }
 
       const res = await fetch("/api/auth/register-venue", {

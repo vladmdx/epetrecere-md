@@ -1,4 +1,5 @@
 import { HeroSection } from "@/components/public/sections/hero";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
 import { FeatureHighlightsSection } from "@/components/public/sections/feature-highlights";
 import { CategoriesSection } from "@/components/public/sections/categories";
 import { FeaturedArtistsSection } from "@/components/public/sections/featured-artists";
@@ -81,8 +82,8 @@ export default async function HomePage() {
       getFeaturedVenues(3),
       getSupplyCounts(),
     ]);
-    featuredArtists = artists;
-    featuredVenues = venues;
+    featuredArtists = publicCatalogData(artists);
+    featuredVenues = publicCatalogData(venues);
     supply = counts;
   } catch {
     // DB unreachable or too slow — sections still render, featured lists stay

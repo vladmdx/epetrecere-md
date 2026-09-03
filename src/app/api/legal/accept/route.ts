@@ -15,7 +15,11 @@
  * acceptance with no record leaving the database.
  */
 
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
+import { isIP } from "node:net";
+import { acceptanceSchema } from "@/lib/legal/acceptance";
+import { validSignatureImage } from "@/lib/legal/signature-image";
+import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createHash } from "node:crypto";
 import { describeDevice } from "@/lib/legal/device";
@@ -25,10 +29,8 @@ import { legalAcceptances, notifications, users, artists, venues } from "@/lib/d
 import {
   LEGAL_PACK_VERSION,
   getLegalDocument,
-  legalBlocks,
   legalBlocksFor,
   legalTitle,
-  type PartnerType,
   PARTNER_REQUIRED_DOCS,
   VENUE_REQUIRED_DOCS,
 } from "@/lib/legal";
@@ -37,9 +39,10 @@ export const dynamic = "force-dynamic";
 
 /** Best-effort client IP behind Vercel's proxy. */
 function clientIp(req: NextRequest): string | null {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0]!.trim();
-  return req.headers.get("x-real-ip");
+  // Trust the deployment proxy, not arbitrary caller-supplied headers locally.
+  if (!process.env.VERCEL) return null;
+  const value = (req.headers.get("x-vercel-forwarded-for") ?? req.headers.get("x-forwarded-for"))?.split(",")[0]?.trim();
+  return value && isIP(value) ? value : null;
 }
 
 export async function GET() {
@@ -89,76 +92,43 @@ export async function GET() {
       documentTitle: doc ? legalTitle(doc, r.locale) : r.documentSlug,
     };
   });
-  return NextResponse.json({ items, packVersion: LEGAL_PACK_VERSION });
+  return NextResponse.json({ items, packVersion: LEGAL_PACK_VERSION }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as {
-    subjectType?: "artist" | "venue";
-    signatureName?: string;
-    /** Handwritten signature as a PNG data URL. */
-    signatureImage?: string;
-    representativeRole?: string;
-    locale?: string;
-    documents?: string[];
-    /** The party details shown in the contract's Annex 5. Frozen onto the
-     *  acceptance row so the signed document stays reproducible exactly as
-     *  it was on screen. */
-    identity?: {
-      partnerType?: "individual" | "sole_trader" | "company";
-      legalName?: string;
-      idNumber?: string | null;
-      legalAddress?: string | null;
-      representativeName?: string | null;
-    };
-  };
-
-  // Trimmed and length-capped: these get printed into a contract, so an
-  // over-long value is either a mistake or an attempt to stuff the row.
-  const cap = (v: unknown, n: number) =>
-    typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null;
-  const identity = {
-    partnerType: ["individual", "sole_trader", "company"].includes(
-      body.identity?.partnerType ?? "",
-    )
-      ? (body.identity!.partnerType as string)
-      : null,
-    legalName: cap(body.identity?.legalName, 200),
-    idNumber: cap(body.identity?.idNumber, 40),
-    legalAddress: cap(body.identity?.legalAddress, 300),
-    representativeName: cap(body.identity?.representativeName, 200),
-  };
-
-  const subjectType = body.subjectType === "venue" ? "venue" : "artist";
-  const signatureName = (body.signatureName ?? "").trim();
-  // Only accept a real PNG data URL, and cap it: a signature is a few KB, so
-  // anything large is either a mistake or an attempt to stuff the row.
-  const rawImage = body.signatureImage ?? null;
-  const signatureImage =
-    typeof rawImage === "string" &&
-    rawImage.startsWith("data:image/png;base64,") &&
-    rawImage.length <= 400_000
-      ? rawImage
-      : null;
-  if (signatureName.length < 3) {
-    return NextResponse.json(
-      { error: "signature_name_required" },
-      { status: 400 },
-    );
+  const parsed = acceptanceSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({
+    error: "invalid_contract_acceptance",
+    details: parsed.error.issues.map(i => ({ field: i.path.join("."), message: i.message })),
+  }, { status: 400 });
+  const body = parsed.data;
+  const { subjectType, signatureName, signatureImage, identity } = body;
+  if (!await validSignatureImage(signatureImage)) {
+    return NextResponse.json({ error: "valid_handwritten_signature_required" }, { status: 400 });
   }
 
-  const [u] = await db
-    .select({ id: users.id, email: users.email })
+  const cu = await currentUser();
+  if (!cu?.primaryEmailAddress || cu.primaryEmailAddress.verification?.status !== "verified") {
+    return NextResponse.json({ error: "verified_email_required" }, { status: 403 });
+  }
+  let [u] = await db
+    .select({ id: users.id, email: users.email, phone: users.phone })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
-  if (!u) return NextResponse.json({ error: "User not found" }, { status: 401 });
-
-  const cu = await currentUser();
-  const phone = cu?.phoneNumbers?.[0]?.phoneNumber ?? null;
+  if (!u) {
+    await db.insert(users).values({ clerkId, email: cu.primaryEmailAddress.emailAddress,
+      name: [cu.firstName, cu.lastName].filter(Boolean).join(" ") || null,
+      phone: cu.phoneNumbers[0]?.phoneNumber ?? null, role: "user",
+    }).onConflictDoNothing();
+    [u] = await db.select({ id: users.id, email: users.email, phone: users.phone })
+      .from(users).where(eq(users.clerkId, clerkId)).limit(1);
+  }
+  if (!u) return NextResponse.json({ error: "account_sync_required" }, { status: 409 });
+  const phone = u.phone ?? cu.phoneNumbers?.[0]?.phoneNumber ?? null;
 
   // Link the signature to the vendor profile when one already exists. During
   // onboarding it does NOT: the profile is created only after this call
@@ -179,116 +149,46 @@ export async function POST(req: NextRequest) {
         .limit(1)
     : [];
 
-  const locale = ["ro", "ru", "en"].includes(body.locale ?? "") ? body.locale! : "ro";
-  const required =
-    subjectType === "venue" ? VENUE_REQUIRED_DOCS : PARTNER_REQUIRED_DOCS;
-  const slugs = body.documents?.length ? body.documents : [...required];
-
+  const locale = body.locale;
+  const slugs = body.documents;
   const ip = clientIp(req);
-  const ua = req.headers.get("user-agent");
-
-  // One row per document, each carrying the hash of the exact text shown.
-  const recordedDocs: {
-    slug: string;
-    title: string;
-    version: string;
-    contentHash: string;
-    /** The row's own accepted_at, so the mailed evidence and the stored
-     *  record state the same moment. */
-    acceptedAt: Date;
-  }[] = [];
-
+  const ua = req.headers.get("user-agent")?.slice(0, 1000) ?? null;
   const device = describeDevice(ua, req.headers.get("x-client"));
-
-  for (const slug of slugs) {
-    const doc = getLegalDocument(slug);
-    if (!doc) continue;
-
-    /**
-     * The blocks the signer actually saw — annex included.
-     *
-     * This used to hash `legalBlocks`, the base text, while the signing screen
-     * rendered `legalBlocksFor`, which appends the partner's own Annex 5 built
-     * from the identity they had just typed. The attestation was therefore
-     * narrower than the display: the one part of the document unique to this
-     * signer sat outside the thing that proves what they signed.
-     */
-    // Only when the party details are actually there. legalBlocksFor falls
-    // back to the plain document otherwise, which is the right answer for a
-    // signer who gave none.
-    const shown =
-      identity.partnerType && identity.legalName
-        ? legalBlocksFor(doc, locale, {
-            partnerType: identity.partnerType as PartnerType,
-            legalName: identity.legalName,
-            idNumber: identity.idNumber,
-            legalAddress: identity.legalAddress,
-            representativeName: identity.representativeName,
-          })
-        : legalBlocks(doc, locale);
-    const text = shown.map((b) => b.text).join("\n");
-    const contentHash = createHash("sha256").update(text).digest("hex");
-
-    const [inserted] = await db
-      .insert(legalAcceptances)
-      .values({
-        userId: u.id,
-        subjectType,
-        artistId: a?.id ?? null,
-        venueId: v?.id ?? null,
-        documentSlug: doc.slug,
-        documentVersion: doc.version,
-        packVersion: LEGAL_PACK_VERSION,
-        locale,
-        signatureName,
-        signatureImage,
-        representativeRole: body.representativeRole ?? null,
-        // Frozen with the signature. documents.json keeps one version per
-        // slug, so without this the wording a person agreed to disappears the
-        // moment the document is superseded — which is exactly what replacing
-        // the partner agreement with v2.0 just did to every earlier signature.
-        documentTitle: legalTitle(doc, locale),
-        documentBlocks: shown,
-        deviceSummary: device,
-        partnerType: identity.partnerType,
-        legalName: identity.legalName,
-        idNumber: identity.idNumber,
-        legalAddress: identity.legalAddress,
-        representativeName: identity.representativeName,
-        ipAddress: ip,
-        userAgent: ua,
-        email: u.email,
-        phone,
-        contentHash,
-      })
-      // Re-signing the same version is a no-op rather than an error; the
-      // original signature (and its timestamp) is what counts.
-      .onConflictDoNothing()
-      .returning();
-
-    // Nothing written means this version was already signed, and the
-    // announcement below already went out for it. Announcing again mailed
-    // every admin a second "contract signed" with the signature attached and
-    // wrote them a second notification row — reachable whenever registration
-    // fails after the acceptance lands (a phone already in use, a duplicate
-    // name), because the page keeps the signature and re-POSTs here on the
-    // next press. Worse, each re-announcement carried a fresh timestamp, IP
-    // and user agent, so the "proof" in the mailbox described no row in the
-    // table and disagreed with what /admin/contracte showed.
-    if (!inserted) continue;
-    recordedDocs.push({
-      slug: doc.slug,
-      title: legalTitle(doc, locale),
-      version: doc.version,
-      contentHash,
-      acceptedAt: inserted.acceptedAt,
-    });
+  const acceptedAt = new Date();
+  const values = slugs.map(slug => {
+    const doc = getLegalDocument(slug)!;
+    const shown = legalBlocksFor(doc, locale, identity);
+    return {
+      userId: u.id, subjectType, artistId: a?.id ?? null, venueId: v?.id ?? null,
+      documentSlug: slug, documentVersion: doc.version, packVersion: LEGAL_PACK_VERSION,
+      locale, signatureName, signatureImage, representativeRole: body.representativeRole ?? null,
+      documentTitle: legalTitle(doc, locale), documentBlocks: shown, deviceSummary: device,
+      ...identity, ipAddress: ip, userAgent: ua, email: u.email, phone, acceptedAt,
+      contentHash: createHash("sha256").update(shown.map(b => b.text).join("\n")).digest("hex"),
+    };
+  });
+  const previous = await db.select().from(legalAcceptances).where(and(
+    eq(legalAcceptances.userId, u.id), eq(legalAcceptances.subjectType, subjectType),
+  ));
+  // A retry may reuse the same immutable acceptance, never silently substitute
+  // a different party, language or document underneath an existing signature.
+  if (values.some(v => previous.some(p => p.documentSlug === v.documentSlug &&
+      p.documentVersion === v.documentVersion &&
+      (p.contentHash !== v.contentHash || p.signatureName !== signatureName)))) {
+    return NextResponse.json({ error: "signed_document_is_immutable" }, { status: 409 });
   }
+  // All documents are inserted by ONE statement: either the whole pack lands
+  // or none of it does. Existing signatures remain append-only.
+  const inserted = await db.insert(legalAcceptances).values(values).onConflictDoNothing().returning();
+  const recordedDocs = inserted.map(r => ({
+    slug: r.documentSlug, title: r.documentTitle!, version: r.documentVersion,
+    contentHash: r.contentHash!, acceptedAt: r.acceptedAt,
+  }));
 
   const recorded = recordedDocs.map((d) => d.slug);
 
-  // Everything below is fire-and-forget: a mail failure must never undo a
-  // recorded signature.
+  // The dashboard reads the durable acceptance itself. Emails run with Next
+  // after(), which keeps serverless work alive after the HTTP response.
   if (recordedDocs.length > 0) {
     // The stored timestamp, not a fresh one: this value is printed in the
     // signer's copy and the admin mail as the moment of acceptance, and it
@@ -296,7 +196,15 @@ export async function POST(req: NextRequest) {
     const acceptedAt = recordedDocs[0].acceptedAt;
     const subjectName = (subjectType === "venue" ? v?.name : a?.name) ?? null;
 
-    void (async () => {
+    const { getAdminRecipients } = await import("@/lib/email/recipients");
+    const recipients = await getAdminRecipients();
+    if (recipients.length) await db.insert(notifications).values(recipients.map(admin => ({
+      userId: admin.id, type: "legal_signed",
+      title: subjectType === "venue" ? "Contract semnat - sală" : "Contract semnat - partener",
+      message: signatureName + " a acceptat pachetul legal v" + LEGAL_PACK_VERSION + ".",
+      actionUrl: "/admin/contracte",
+    }))).catch(err => console.error("[legal] in-app notification failed", err));
+    after(async () => {
       const { sendEmail, dataUrlToAttachment } = await import("@/lib/email/send");
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
       const attachment = dataUrlToAttachment(signatureImage, "semnatura.png");
@@ -315,7 +223,7 @@ export async function POST(req: NextRequest) {
             documents: recordedDocs.map((d) => ({
               title: d.title,
               version: d.version,
-              url: `/legal/${d.slug}`,
+              url: subjectType === "venue" ? "/dashboard/sala/setari" : "/dashboard/setari",
             })),
             acceptedAt,
             ipAddress: ip,
@@ -360,21 +268,6 @@ export async function POST(req: NextRequest) {
         });
 
         for (const admin of admins) {
-          await db
-            .insert(notifications)
-            .values({
-              userId: admin.id,
-              type: "legal_signed",
-              title:
-                subjectType === "venue"
-                  ? "Contract semnat — sală"
-                  : "Contract semnat — artist",
-              message: `${signatureName} (${u.email}) a acceptat pachetul legal v${LEGAL_PACK_VERSION}.`,
-              actionUrl: "/admin/contracte",
-            })
-            .catch((err) =>
-              console.error("[legal] admin in-app notification failed", err),
-            );
           if (admin.email) {
             await sendEmail({
               to: admin.email,
@@ -389,7 +282,7 @@ export async function POST(req: NextRequest) {
       } catch (err) {
         console.error("[legal] admin notification failed", err);
       }
-    })();
+    });
   }
 
   return NextResponse.json({ success: true, recorded, packVersion: LEGAL_PACK_VERSION });
@@ -407,18 +300,7 @@ export async function PUT(req: NextRequest) {
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
-  if (!u) return NextResponse.json({ missing: [] });
-
-  const signed = await db
-    .select({ slug: legalAcceptances.documentSlug })
-    .from(legalAcceptances)
-    .where(
-      and(
-        eq(legalAcceptances.userId, u.id),
-        eq(legalAcceptances.subjectType, subjectType),
-      ),
-    );
-  const have = new Set(signed.map((s) => s.slug));
   const required = subjectType === "venue" ? VENUE_REQUIRED_DOCS : PARTNER_REQUIRED_DOCS;
-  return NextResponse.json({ missing: required.filter((s) => !have.has(s)) });
+  const missing = u ? await missingRegistrationDocuments(u.id, subjectType) : [...required];
+  return NextResponse.json({ missing, packVersion: LEGAL_PACK_VERSION });
 }

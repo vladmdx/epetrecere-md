@@ -1,8 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { artists, venues } from "@/lib/db/schema";
+import { artists, venues, artistPackages, venueMenuCategories, venueMenuItems, venueMenuPackages } from "@/lib/db/schema";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
 
 /**
  * The handful of fields an artist or venue profile shows only to signed-in
@@ -41,33 +42,33 @@ export async function GET(req: NextRequest) {
   if (type === "artist") {
     const [row] = await db
       .select({
+        id: artists.id,
         priceFrom: artists.priceFrom,
         priceCurrency: artists.priceCurrency,
-        instagram: artists.instagram,
-        facebook: artists.facebook,
-        tiktok: artists.tiktok,
-        youtube: artists.youtube,
-        website: artists.website,
       })
       .from(artists)
-      .where(eq(artists.slug, slug))
+      .where(and(eq(artists.slug, slug), eq(artists.isActive, true)))
       .limit(1);
     if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
-    return NextResponse.json(row, {
+    const packages = await db.select().from(artistPackages).where(and(eq(artistPackages.artistId, row.id), eq(artistPackages.isVisible, true)));
+    return NextResponse.json(publicCatalogData({ ...row, packages }, true), {
       headers: { "Cache-Control": "private, no-store" },
     });
   }
 
   const [row] = await db
     .select({
+      id: venues.id,
       pricePerPerson: venues.pricePerPerson,
-      website: venues.website,
     })
     .from(venues)
-    .where(eq(venues.slug, slug))
+    .where(and(eq(venues.slug, slug), eq(venues.isActive, true)))
     .limit(1);
   if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  return NextResponse.json(row, {
+  const categories = await db.select().from(venueMenuCategories).where(eq(venueMenuCategories.venueId, row.id));
+  const packages = await db.select().from(venueMenuPackages).where(eq(venueMenuPackages.venueId, row.id));
+  const items = categories.length ? await db.select().from(venueMenuItems).where(inArray(venueMenuItems.categoryId, categories.map(c => c.id))) : [];
+  return NextResponse.json(publicCatalogData({ ...row, menu: { categories, packages, items } }, true), {
     headers: { "Cache-Control": "private, no-store" },
   });
 }

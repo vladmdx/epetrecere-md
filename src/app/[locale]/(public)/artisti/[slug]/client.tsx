@@ -124,11 +124,13 @@ interface Props {
   }>;
 }
 
-export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
+export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos = [] }: Props) {
   const { locale, t } = useLocale();
   const lp = useLocalizePath();
   const { isSignedIn, isLoaded } = useUser();
   const searchParams = useSearchParams();
+  const gated = useGatedDetails<Partial<ArtistData>>("artist", initialArtist.slug);
+  const artist = gated ? { ...initialArtist, ...gated } : initialArtist;
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
   const [avatarOpen, setAvatarOpen] = useState(false);
@@ -176,32 +178,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
         durationHours: pkg.durationHours,
         isReal: true,
       }))
-    : [
-        {
-          id: -1,
-          name: "Essential",
-          description: t("artist.profile.fallbackPkg.essential"),
-          price: null,
-          durationHours: 2,
-          isReal: false,
-        },
-        {
-          id: -2,
-          name: "Signature",
-          description: t("artist.profile.fallbackPkg.signature"),
-          price: null,
-          durationHours: 4,
-          isReal: false,
-        },
-        {
-          id: -3,
-          name: "Full Event",
-          description: t("artist.profile.fallbackPkg.fullEvent"),
-          price: null,
-          durationHours: 6,
-          isReal: false,
-        },
-      ];
+    : [];
 
   // Track recent views so the homepage/cabinet "Recently viewed" widget has data
   useEffect(() => {
@@ -237,16 +214,7 @@ export function ArtistDetailClient({ artist, similar, ugcPhotos = [] }: Props) {
   // The page is prerendered in its anonymous shape, so the price and the
   // artist's own links are not in the HTML. Fetch them once we know there
   // is a session, and read through this object from here on.
-  const gated = useGatedDetails<{
-    priceFrom: number | null;
-    priceCurrency: string | null;
-    instagram: string | null;
-    facebook: string | null;
-    tiktok: string | null;
-    youtube: string | null;
-    website: string | null;
-  }>("artist", artist.slug);
-  const shown = gated ? { ...artist, ...gated } : artist;
+  const shown = artist;
 
   return (
     <div className="-mt-16 min-h-screen bg-[#05080d] pt-16 text-[#f5efe4]">

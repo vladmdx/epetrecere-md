@@ -4,6 +4,7 @@ import { getVenues } from "@/lib/db/queries/venues";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
 
 async function isAdmin(clerkId: string | null): Promise<boolean> {
   if (!clerkId) return false;
@@ -49,15 +50,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(result);
   }
 
-  const redacted = userId
-    ? result.items.map((v) => ({ ...v, phone: null, email: null }))
-    : result.items.map((v) => ({
-        ...v,
-        pricePerPerson: null,
-        phone: null,
-        email: null,
-        website: null,
-      }));
+  const redacted = publicCatalogData(result.items, Boolean(userId));
 
   return NextResponse.json({ ...result, items: redacted });
 }

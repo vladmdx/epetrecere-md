@@ -649,17 +649,16 @@ function WizardStepHeading({
 // /public/images/event-types/[slug].jpg — admin can replace any without
 // touching this code.
 // Order and membership follow ALL_EVENT_TYPES; only the photo lives here.
-// event-cununie.webp and event-kids-birthday.webp currently reuse the wedding
-// and birthday photographs — replace those two files with their own pictures
-// and nothing here needs to change.
+// Each event uses a distinct, relevant photo. Versioned paths also invalidate
+// previously cached copies of the three duplicated photographs.
 const eventTypes = [
   { value: "wedding", image: "/images/redesign/event-wedding.webp" },
-  { value: "proposal", image: "/images/redesign/event-proposal.webp" },
-  { value: "cununie", image: "/images/redesign/event-cununie.webp" },
+  { value: "proposal", image: "/images/redesign/event-proposal-2026.webp" },
+  { value: "cununie", image: "/images/redesign/event-cununie-2026.webp" },
   { value: "baptism", image: "/images/redesign/event-baptism.webp" },
-  { value: "cumatrie", image: "/images/redesign/event-cumatrie.webp" },
+  { value: "cumatrie", image: "/images/redesign/event-cumatrie-2026.webp" },
   { value: "birthday", image: "/images/redesign/event-birthday.webp" },
-  { value: "kids_birthday", image: "/images/redesign/event-kids-birthday.webp" },
+  { value: "kids_birthday", image: "/images/redesign/event-kids-birthday-2026.webp" },
   { value: "corporate", image: "/images/redesign/event-corporate.webp" },
   { value: "concert", image: "/images/redesign/event-concert.webp" },
   { value: "other", image: "/images/redesign/event-other.webp" },

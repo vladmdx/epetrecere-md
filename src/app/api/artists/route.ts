@@ -4,6 +4,7 @@ import { getArtists, getFeaturedArtists } from "@/lib/db/queries/artists";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
 
 async function isAdmin(clerkId: string | null): Promise<boolean> {
   if (!clerkId) return false;
@@ -89,18 +90,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(result);
   }
 
-  const redacted = userId
-    ? result.items.map((a) => ({ ...a, phone: null, email: null }))
-    : result.items.map((a) => ({
-        ...a,
-        priceFrom: null,
-        phone: null,
-        email: null,
-        instagram: null,
-        facebook: null,
-        youtube: null,
-        tiktok: null,
-      }));
+  const redacted = publicCatalogData(result.items, Boolean(userId));
 
   return NextResponse.json({ ...result, items: redacted });
 }

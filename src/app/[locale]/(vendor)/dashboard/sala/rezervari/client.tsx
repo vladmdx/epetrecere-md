@@ -64,6 +64,7 @@ interface Booking {
   agreedPrice: number | null;
   message: string | null;
   status: string;
+  clientConfirmedAt?: string | null;
   source: string | null;
   artistReply: string | null;
   createdAt: string;
@@ -798,6 +799,16 @@ export function VenueBookingsClient({
 
                     {isAccepted && (
                       <div className="flex flex-col gap-2">
+                        {b.status === "accepted" && b.clientConfirmedAt && <Button disabled={busy === b.id} onClick={async () => {
+                          setBusy(b.id);
+                          try {
+                            const res = await fetch(`/api/booking-requests/${b.id}`, {method: "PUT", headers: {"Content-Type":"application/json"}, body: JSON.stringify({action:"venue_confirm"})});
+                            if (!res.ok) throw new Error((await res.json()).error);
+                            router.refresh();
+                          } catch (err) { toast.error(err instanceof Error ? err.message : "Error"); }
+                          finally { setBusy(null); }
+                        }} className="bg-gold text-black">{t("booking.venueConfirm")}</Button>}
+                        {b.status === "accepted" && !b.clientConfirmedAt && <p className="text-xs text-muted-foreground">{t("booking.awaitingClient")}</p>}
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-medium text-emerald-400">
                           <CheckCircle className="h-3 w-3" />
                           {b.status === "confirmed_by_client"
@@ -807,7 +818,7 @@ export function VenueBookingsClient({
                         <Button
                           size="sm"
                           onClick={() => setCompleteDialog(b)}
-                          disabled={busy === b.id}
+                          disabled={busy === b.id || b.status !== "confirmed_by_client"}
                           className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
                         >
                           <CheckCircle className="h-4 w-4" />
