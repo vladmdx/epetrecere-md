@@ -118,6 +118,7 @@ export async function POST(req: Request) {
         .limit(1);
       vendorArtistId = artist?.id;
     }
+    if (!vendorArtistId) return NextResponse.json({ error: "Artist profile not found" }, { status: 404 });
   }
 
   const messages: Anthropic.MessageParam[] = parsed.data.messages.map((m) => ({
@@ -150,11 +151,15 @@ export async function POST(req: Request) {
       // Execute tools and add results
       const toolResults: Anthropic.ToolResultBlockParam[] = [];
       for (const block of toolBlocks) {
-        const result = await executeTool(block.name, block.input as Record<string, unknown>, vendorArtistId);
+        const permitted = tools.some(tool => tool.name === block.name);
+        const result = permitted
+          ? await executeTool(block.name, block.input as Record<string, unknown>, vendorArtistId)
+          : JSON.stringify({ error: "Tool not permitted in this context" });
         toolResults.push({
           type: "tool_result",
           tool_use_id: block.id,
           content: result,
+          is_error: !permitted,
         });
       }
 

@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
-import { artists, leads, bookings, venues, calendarEvents } from "@/lib/db/schema";
+import { artists, leads, bookings, bookingRequests, venues, calendarEvents } from "@/lib/db/schema";
+import { redactContact } from "@/lib/privacy/contact-redaction";
 import { eq, and, sql, desc, gte, count } from "drizzle-orm";
 
 // Tool definitions for Claude
@@ -70,7 +71,7 @@ export const vendorTools: Anthropic.Tool[] = [
     input_schema: {
       type: "object" as const,
       properties: {
-        status: { type: "string", description: "Filter by status: pending, accepted, confirmed, completed" },
+        status: { type: "string", description: "Filter by status: pending, accepted, confirmed_by_client, completed, rejected, cancelled" },
       },
     },
   },
@@ -105,6 +106,10 @@ export async function executeTool(
   input: Record<string, unknown>,
   _vendorArtistId?: number,
 ): Promise<string> {
+  // Enforce role boundaries here as well as in the chat route; model output is untrusted.
+  if (_vendorArtistId !== undefined && !vendorTools.some(tool => tool.name === name)) {
+    return JSON.stringify({ error: "Tool not permitted for vendor context" });
+  }
   try {
     switch (name) {
       case "get_artists": {
@@ -185,20 +190,30 @@ export async function executeTool(
 
       case "get_my_bookings": {
         if (!_vendorArtistId) return JSON.stringify({ error: "No artist context" });
-        const conditions = [eq(bookings.artistId, _vendorArtistId)];
+        const conditions = [eq(bookingRequests.artistId, _vendorArtistId)];
         if (input.status) {
-          const validBookingStatuses = ["pending", "accepted", "confirmed_by_client", "rejected", "cancelled"];
+          const validBookingStatuses = ["pending", "accepted", "confirmed_by_client", "completed", "rejected", "cancelled"];
           if (validBookingStatuses.includes(input.status as string)) {
-            conditions.push(sql`${bookings.status} = ${input.status as string}`);
+            conditions.push(sql`${bookingRequests.status} = ${input.status as string}`);
           }
         }
         const result = await db
-          .select()
-          .from(bookings)
+          .select({
+            id: bookingRequests.id,
+            eventDate: bookingRequests.eventDate,
+            startTime: bookingRequests.startTime,
+            endTime: bookingRequests.endTime,
+            eventType: bookingRequests.eventType,
+            guestCount: bookingRequests.guestCount,
+            agreedPrice: bookingRequests.agreedPrice,
+            status: bookingRequests.status,
+            paidStatus: bookingRequests.paidStatus,
+          })
+          .from(bookingRequests)
           .where(and(...conditions))
           .limit(20)
-          .orderBy(desc(bookings.createdAt));
-        return JSON.stringify(result);
+          .orderBy(desc(bookingRequests.createdAt));
+        return JSON.stringify(result.map(row => ({...row, eventType: row.eventType ? redactContact(row.eventType) : null})));
       }
 
       case "get_my_calendar": {

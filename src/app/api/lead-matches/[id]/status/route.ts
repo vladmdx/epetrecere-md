@@ -5,9 +5,7 @@ import { db } from "@/lib/db";
 import { leadMatches, users, artists } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-// M3 — POST /api/lead-matches/[id]/status
-// Lets an artist move an already-unlocked lead through the funnel
-// (contacted → won / lost). Cannot go back to "matched".
+// Workflow labels do not grant access to the lead's contact details.
 
 const statusSchema = z.object({
   status: z.enum(["seen", "contacted", "won", "lost"]),
@@ -58,19 +56,6 @@ export async function POST(
     .limit(1);
   if (!match || match.artistId !== artist.id) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  // Contacted / won / lost require an unlocked lead
-  if (
-    (parsed.data.status === "contacted" ||
-      parsed.data.status === "won" ||
-      parsed.data.status === "lost") &&
-    match.status === "matched"
-  ) {
-    return NextResponse.json(
-      { error: "Lead must be unlocked before changing status" },
-      { status: 400 },
-    );
   }
 
   await db

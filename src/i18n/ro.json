@@ -1417,6 +1417,7 @@
       "title": "Sincronizează cu calendarul tău"
     },
     "leadsPage": {
+      "contactsPrivate": "Datele de contact sunt disponibile în Rezervări doar după confirmarea rezervării de către ambele părți.",
       "alreadyUnlocked": "Deja deblocat",
       "budget": "Buget:",
       "empty": "Niciun lead în această categorie încă.",

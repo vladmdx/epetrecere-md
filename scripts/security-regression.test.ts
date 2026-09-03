@@ -11,6 +11,14 @@ import { computeCommission, DEFAULT_RULES } from "../src/lib/commissions/rules";
 import { acceptanceSchema, missingCurrentDocuments } from "../src/lib/legal/acceptance";
 import { LEGAL_PACK_VERSION, PARTNER_REQUIRED_DOCS, VENUE_REQUIRED_DOCS, getLegalDocument } from "../src/lib/legal";
 import { validSignatureImage } from "../src/lib/legal/signature-image";
+import { privateLeadSummary } from "../src/lib/privacy/lead-summary";
+
+test("legacy lead summaries never expose identity or contact prose",()=>{
+  const summary=privateLeadSummary({id:42,name:"Private Person",phone:"+37369123456",email:"private@example.com",eventType:"wedding",eventDate:"2027-09-01",location:"Chișinău, https://vendor.md",guestCount:100,budget:1000,source:"form",message:"<p>Sună +373 69 123 456 sau private&#64;example.com</p>"});
+  assert.equal(summary.name,"#42"); assert.equal(summary.phone,null); assert.equal(summary.email,null);
+  assert.equal(containsContact(summary.message!),false); assert.equal(containsContact(summary.location!),false);
+  assert.equal(summary.guestCount,100); assert.equal(summary.budget,1000);
+});
 
 test("public catalogue removes nested contacts, contact prose and anonymous prices", () => {
   const data = {phone:"+37369123456", userId:"private", descriptionRo:"<p>Scrie la test@example.com, https://vendor.md</p>", packages:[{price:450, includes:"Sună +373 69 123 456", email:"a@b.md"}], images:[{url:"https://cdn.example.com/photo.webp"}]};

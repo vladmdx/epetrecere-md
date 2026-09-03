@@ -1417,6 +1417,7 @@
       "title": "Sync with your calendar"
     },
     "leadsPage": {
+      "contactsPrivate": "Contact details are available in Reservations only after both parties confirm the booking.",
       "alreadyUnlocked": "Already unlocked",
       "budget": "Budget:",
       "empty": "No leads in this category yet.",

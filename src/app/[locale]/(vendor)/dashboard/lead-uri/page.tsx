@@ -10,8 +10,6 @@ import {
   MapPin,
   Users,
   Wallet,
-  Phone,
-  Mail,
   Loader2,
   TrendingUp,
   CheckCircle2,
@@ -21,9 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 
-// M3 #8 — Vendor "Lead-uri noi" dashboard.
-// Lists matches produced by the lead engine, with credit balance + unlock /
-// status-change actions.
+// Matched leads stay anonymous; confirmed booking contacts live in Reservations.
 
 interface LeadMatch {
   id: number;
@@ -48,18 +44,10 @@ interface LeadMatch {
   };
 }
 
-interface Credits {
-  balance: number;
-  totalPurchased: number;
-  totalSpent: number;
-}
-
 export default function LeadMatchesPage() {
   const { t } = useLocale();
   const [matches, setMatches] = useState<LeadMatch[]>([]);
-  const [_credits, setCredits] = useState<Credits | null>(null);
   const [loading, setLoading] = useState(true);
-  const [unlocking, setUnlocking] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "new" | "unlocked" | "won">("all");
 
   async function load() {
@@ -69,7 +57,6 @@ export default function LeadMatchesPage() {
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
       setMatches(data.matches ?? []);
-      setCredits(data.credits ?? null);
     } catch {
       toast.error(t("vendor.leadsPage.loadError"));
     } finally {
@@ -80,32 +67,6 @@ export default function LeadMatchesPage() {
   useEffect(() => {
     load();
   }, []);
-
-  async function handleUnlock(id: number) {
-    setUnlocking(id);
-    try {
-      const res = await fetch(`/api/lead-matches/${id}/unlock`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) {
-        if (res.status === 402) {
-          toast.error(t("vendor.leadsPage.noCredits"));
-        } else {
-          toast.error(data.error || t("vendor.leadsPage.unlockFailed"));
-        }
-        return;
-      }
-      toast.success(
-        data.alreadyUnlocked
-          ? t("vendor.leadsPage.alreadyUnlocked")
-          : t("vendor.leadsPage.unlocked"),
-      );
-      await load();
-    } catch {
-      toast.error(t("vendor.leadsPage.unlockError"));
-    } finally {
-      setUnlocking(null);
-    }
-  }
 
   async function handleStatus(id: number, status: "contacted" | "won" | "lost") {
     try {
@@ -184,8 +145,6 @@ export default function LeadMatchesPage() {
             <LeadMatchCard
               key={m.id}
               match={m}
-              unlocking={unlocking === m.id}
-              onUnlock={() => handleUnlock(m.id)}
               onStatus={(status) => handleStatus(m.id, status)}
             />
           ))}
@@ -200,8 +159,6 @@ function LeadMatchCard({
   onStatus,
 }: {
   match: LeadMatch;
-  unlocking?: boolean;
-  onUnlock?: () => void;
   onStatus: (status: "contacted" | "won" | "lost") => void;
 }) {
   const { t } = useLocale();
@@ -232,7 +189,7 @@ function LeadMatchCard({
         </span>
       </div>
 
-      {/* Client name (masked or full) */}
+      {/* Anonymous reference, not personal identity */}
       <h3 className="mb-2 font-heading text-lg font-semibold">
         {match.lead.name}
       </h3>
@@ -294,25 +251,9 @@ function LeadMatchCard({
         </div>
       )}
 
-      {/* Contact — always visible (free platform) */}
-      <div className="mb-4 space-y-1.5">
-        {match.lead.phone && (
-          <div className="flex items-center gap-2 text-sm">
-            <Phone className="h-3.5 w-3.5 text-gold" />
-            <a href={`tel:${match.lead.phone}`} className="font-medium hover:text-gold">
-              {match.lead.phone}
-            </a>
-          </div>
-        )}
-        {match.lead.email && (
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="h-3.5 w-3.5 text-gold" />
-            <a href={`mailto:${match.lead.email}`} className="hover:text-gold">
-              {match.lead.email}
-            </a>
-          </div>
-        )}
-      </div>
+      <p className="mb-4 text-xs text-muted-foreground">
+        {t("vendor.leadsPage.contactsPrivate")}
+      </p>
 
       {/* Actions */}
       <div className="flex flex-wrap gap-2">

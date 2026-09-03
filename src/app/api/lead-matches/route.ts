@@ -8,14 +8,12 @@ import {
   artists,
   vendorCredits,
 } from "@/lib/db/schema";
-import {  desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
+import { privateLeadSummary } from "@/lib/privacy/lead-summary";
+import { redactContact } from "@/lib/privacy/contact-redaction";
+import { plainText } from "@/lib/content/plain-text";
 
-// M3 — GET /api/lead-matches
-//
-// Returns the signed-in artist's lead feed. Client contact details (phone,
-// email, full name) are REDACTED unless the match has been unlocked by
-// spending a credit. Score, reasons, event date/location, budget, guest
-// count and category hints are always visible so the vendor can decide.
+// Contacts are only shared in a confirmed booking, never through lead status or credits.
 
 export async function GET() {
   const { userId: clerkId } = await auth();
@@ -62,33 +60,15 @@ export async function GET() {
     .limit(1);
 
   const payload = rows.map(({ match, lead }) => {
-    const unlocked = match.status === "unlocked" ||
-      match.status === "contacted" ||
-      match.status === "won" ||
-      match.status === "lost";
     return {
       id: match.id,
       score: match.score,
-      reasons: match.reasons ?? [],
+      reasons: (match.reasons ?? []).map(reason => redactContact(plainText(reason))),
       status: match.status,
       seenAt: match.seenAt,
       unlockedAt: match.unlockedAt,
       createdAt: match.createdAt,
-      lead: {
-        id: lead.id,
-        // Public fields
-        eventType: lead.eventType,
-        eventDate: lead.eventDate,
-        location: lead.location,
-        guestCount: lead.guestCount,
-        budget: lead.budget,
-        source: lead.source,
-        message: lead.message,
-        // Gated fields
-        name: unlocked ? lead.name : maskName(lead.name),
-        phone: unlocked ? `${lead.phonePrefix ?? "+373"} ${lead.phone}` : null,
-        email: unlocked ? lead.email : null,
-      },
+      lead: privateLeadSummary(lead),
     };
   });
 
@@ -99,13 +79,5 @@ export async function GET() {
       totalPurchased: credits?.totalPurchased ?? 0,
       totalSpent: credits?.totalSpent ?? 0,
     },
-  });
-}
-
-function maskName(name: string): string {
-  // "Ion Popescu" → "I. P***"
-  const parts = name.trim().split(/\s+/);
-  return parts
-    .map((p, i) => (i === 0 ? `${p[0]}.` : `${p[0]}***`))
-    .join(" ");
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }

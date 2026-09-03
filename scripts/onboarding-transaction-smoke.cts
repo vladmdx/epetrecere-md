@@ -132,6 +132,31 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
     assert.equal((await txDb.select().from(schema.commissions).where(eq(schema.commissions.bookingRequestId,booking.id))).length,1);
     ok(kind+": bilateral confirmation records exactly one correct fee; retry is safe");
    }
+   current=personas.artist;
+   const feed=require("../src/app/api/lead-matches/route");
+   const unlock=require("../src/app/api/lead-matches/[id]/unlock/route");
+   const leadStatus=require("../src/app/api/lead-matches/[id]/status/route");
+   const [lead]=await txDb.insert(schema.leads).values({name:"Private Client",phone:"+15555550183",email:"private@example.invalid",message:"Call +15555550183 or private@example.invalid",eventType:"wedding",eventDate:"2027-09-01"}).returning();
+   const [match]=await txDb.insert(schema.leadMatches).values({leadId:lead.id,artistId:ids.artist,reasons:["Email private@example.invalid"],status:"matched"}).returning();
+   response=await leadStatus.POST(req("/status",{status:"contacted"}),{params:Promise.resolve({id:String(match.id)})});
+   assert.equal(response.status,200);
+   for(const status of ["matched","seen","unlocked","contacted","won","lost"]) {
+    await txDb.update(schema.leadMatches).set({status}).where(eq(schema.leadMatches.id,match.id));
+    response=await feed.GET(); assert.equal(response.status,200);
+    const body=await response.json(); const item=body.matches.find(m=>m.id===match.id);
+    assert.equal(item.lead.phone,null); assert.equal(item.lead.email,null); assert.equal(item.lead.name,"#"+lead.id);
+    assert.ok(!JSON.stringify(item).includes("private@example.invalid")); assert.ok(!JSON.stringify(item).includes("+15555550183"));
+   }
+   ok("every legacy lead status keeps contacts and message/reason prose private");
+   response=await unlock.POST(); assert.equal(response.status,410);
+   assert.equal((await txDb.select().from(schema.vendorCredits).where(eq(schema.vendorCredits.artistId,ids.artist))).length,0);
+   ok("obsolete contact unlock is retired without charging or creating a wallet");
+   const {executeTool}=require("../src/lib/ai/tools");
+   assert.match(await executeTool("get_leads",{},ids.artist),/not permitted/);
+   const aiBookings=JSON.parse(await executeTool("get_my_bookings",{},ids.artist));
+   assert.equal(aiBookings.length,1); assert.equal(aiBookings[0].agreedPrice,450);
+   assert.equal(aiBookings[0].status,"confirmed_by_client"); assert.equal(aiBookings[0].clientPhone,undefined);
+   ok("vendor AI sees current scoped bookings and cannot invoke administrator tools");
    throw rollback;
   });
  } catch(e) { if(e!==rollback) throw e; }
