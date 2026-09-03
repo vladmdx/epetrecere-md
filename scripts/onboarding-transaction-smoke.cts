@@ -49,15 +49,16 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
    txDb=transaction;
    const legal=require("../src/lib/legal");
    const accept=require("../src/app/api/legal/accept/route");
+   const nativeAccept=require("../src/app/api/v1/legal/accept/route");
    const artistRoute=require("../src/app/api/auth/register-artist/route");
    const venueRoute=require("../src/app/api/auth/register-venue/route");
    const bookingRoute=require("../src/app/api/booking-requests/[id]/route");
    const copy=require("../src/app/api/legal/accept/[id]/copy/route");
    const signatureImage="data:image/png;base64,"+(await sharp(Buffer.from('<svg width="200" height="80"><rect width="200" height="80" fill="white"/><path d="M10 50 Q40 5 60 50T150 30" fill="none" stroke="black" stroke-width="3"/></svg>')).png().toBuffer()).toString("base64");
    const personas={};
-   for(const kind of ["artist","venue","client"]) {
+   for(const kind of ["artist","venue","client","admin"]) {
     const id=randomUUID(); const clerkId="qa_rollback_"+id;
-    const [row]=await txDb.insert(schema.users).values({clerkId,email:id+"@example.invalid",name:"QA "+kind,role:"user"}).returning();
+    const [row]=await txDb.insert(schema.users).values({clerkId,email:id+"@example.invalid",name:"QA "+kind,role:kind==="admin"?"admin":"user"}).returning();
     personas[kind]={...row,kind};
    }
    const [category]=await txDb.select().from(schema.categories).where(eq(schema.categories.isActive,true)).limit(1);
@@ -80,6 +81,11 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
     assert.equal(rows.length,body.documents.length);
     for(const row of rows) assert.equal(row.contentHash,createHash("sha256").update(row.documentBlocks.map(b=>b.text).join("\n")).digest("hex"));
     acceptanceIds[kind]=rows[0].id; ok(kind+": complete immutable snapshot, signature, timestamp and hash saved");
+    const nativeBody={...body}; delete nativeBody.packVersion; delete nativeBody.documents; delete nativeBody.accepted;
+    response=await nativeAccept.POST(req("/api/v1/legal/accept",nativeBody));
+    assert.equal(response.status,legal.LEGAL_PACK_VERSION==="2.0"?200:400); ok(kind+": legacy native submission is pinned to its actual legal version");
+    response=await accept.POST(req("/api/legal/accept",{...body,identity:{...body.identity,legalAddress:"Changed party address"}}));
+    assert.equal(response.status,409); ok(kind+": signed snapshot cannot be substituted on retry");
     response=await accept.POST(req("/api/legal/accept",body)); assert.equal(response.status,200);
     assert.equal((await txDb.select().from(schema.legalAcceptances).where(eq(schema.legalAcceptances.userId,current.id))).length,rows.length); ok(kind+": signing retry does not duplicate evidence");
     response=await route.POST(req("/api/auth/register-"+kind,payloads[kind])); const result=await response.json();
@@ -97,6 +103,15 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
    current=personas.client;
    let response=await copy.GET(req("/copy",{}),{params:Promise.resolve({id:String(acceptanceIds.artist)})});
    assert.equal(response.status,404); ok("client cannot download another account's signed contract");
+   current=personas.admin;
+   response=await copy.GET(req("/copy",{}),{params:Promise.resolve({id:String(acceptanceIds.artist)})});
+   assert.equal(response.status,200);
+   const adminNotices=await txDb.select().from(schema.notifications).where(eq(schema.notifications.userId,personas.admin.id));
+   assert.ok(adminNotices.filter(n=>n.type==="legal_signed").length>=2); ok("administrator receives both contract notifications and may read signed copies");
+   await assert.rejects(txDb.transaction(async savepoint=>{
+     await savepoint.update(schema.legalAcceptances).set({signatureName:"Modified"}).where(eq(schema.legalAcceptances.id,acceptanceIds.artist));
+   }),e=>e.cause?.code==="42501");
+   ok("database itself rejects modification of signature evidence");
    for(const kind of ["artist","venue"]) {
     const [booking]=await txDb.insert(schema.bookingRequests).values({artistId:kind==="artist"?ids.artist:null,venueId:kind==="venue"?ids.venue:null,clientUserId:personas.client.id,clientName:"QA Client",clientPhone:"+15555550183",clientEmail:personas.client.email,eventType:"wedding",eventDate:"2027-09-01",guestCount:100,agreedPrice:450,status:"pending",source:"platform"}).returning();
     const put=async(action,extra={})=>bookingRoute.PUT(req("/api/booking-requests/"+booking.id,{action,...extra}),{params:Promise.resolve({id:String(booking.id)})});
