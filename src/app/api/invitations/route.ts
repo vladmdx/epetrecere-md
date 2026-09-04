@@ -13,6 +13,8 @@ import { eq, desc, and } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 import { requireAppUser, requirePlanOwnership } from "@/lib/planner/ownership";
 import { slugify } from "@/lib/utils/slugify";
+import { generateGuestToken, guestTokenExpiry } from "@/lib/invitations/access";
+import { protectInvitationGuestRecord, revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 
 /** Identity of a guest across the planner's list and an invitation's own
  *  rows. There is no FK between the two tables, so a contact match is what
@@ -78,7 +80,10 @@ export async function GET(req: NextRequest) {
       })
       .from(invitationGuests)
       .where(eq(invitationGuests.invitationId, invitation.id));
-    return NextResponse.json({ invitation, guests });
+    return NextResponse.json({
+      invitation,
+      guests: guests.map(revealInvitationGuestRecord),
+    });
   }
 
   const rows = await db
@@ -126,18 +131,13 @@ const createSchema = z.object({
 
 type IncomingGuest = NonNullable<z.infer<typeof createSchema>["guests"]>[number];
 
-function genToken(): string {
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 /** Insert only the guests the invitation doesn't already hold. Returns what
  *  it did so the caller can tell the host "3 added, 12 already on the list"
  *  rather than implying everyone was freshly invited. */
 async function addMissingGuests(
   invitationId: number,
   incoming: IncomingGuest[],
+  eventDate?: string | null,
 ): Promise<{ added: number; skipped: number }> {
   if (incoming.length === 0) return { added: 0, skipped: 0 };
 
@@ -150,7 +150,7 @@ async function addMissingGuests(
     .from(invitationGuests)
     .where(eq(invitationGuests.invitationId, invitationId));
 
-  const known = new Set(existing.map(contactKey));
+  const known = new Set(existing.map(revealInvitationGuestRecord).map(contactKey));
   const toInsert: IncomingGuest[] = [];
   for (const g of incoming) {
     const key = contactKey(g);
@@ -163,7 +163,7 @@ async function addMissingGuests(
 
   if (toInsert.length > 0) {
     await db.insert(invitationGuests).values(
-      toInsert.map((g) => ({
+      toInsert.map((g) => protectInvitationGuestRecord({
         invitationId,
         name: g.name,
         email: g.email,
@@ -171,7 +171,8 @@ async function addMissingGuests(
         whatsapp: g.whatsapp,
         group: g.group,
         guestType: g.guestType ?? "single",
-        rsvpToken: genToken(),
+        rsvpToken: generateGuestToken(),
+        rsvpTokenExpiresAt: guestTokenExpiry(eventDate),
       })),
     );
   }
@@ -279,7 +280,11 @@ export async function POST(req: NextRequest) {
           .set({ ...content, updatedAt: new Date() })
           .where(eq(invitations.id, existing.id))
           .returning();
-        const result = await addMissingGuests(existing.id, data.guests ?? []);
+        const result = await addMissingGuests(
+          existing.id,
+          data.guests ?? [],
+          updated.eventDate,
+        );
         return NextResponse.json({
           ...updated,
           reused: true,
@@ -294,7 +299,7 @@ export async function POST(req: NextRequest) {
   const baseSlug = slugify(
     data.coupleNames || data.hostName || data.eventType,
   );
-  const slug = `${baseSlug}-${genToken().slice(0, 6)}`;
+  const slug = `${baseSlug}-${generateGuestToken().slice(0, 8)}`;
 
   const [invitation] = await db
     .insert(invitations)
@@ -311,7 +316,11 @@ export async function POST(req: NextRequest) {
     .returning();
 
   // Bulk insert guests (if provided at creation time)
-  const result = await addMissingGuests(invitation.id, data.guests ?? []);
+  const result = await addMissingGuests(
+    invitation.id,
+    data.guests ?? [],
+    invitation.eventDate,
+  );
 
   if (plan) {
     await db

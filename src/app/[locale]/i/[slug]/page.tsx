@@ -7,6 +7,7 @@ import { generateMeta } from "@/lib/seo/generate-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { t } from "@/i18n";
 import { PublicInvitationView } from "./view";
+import { revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 
 interface PageProps {
   params: Promise<{ locale: string; slug: string }>;
@@ -24,22 +25,24 @@ export async function generateMetadata({
     .where(eq(invitations.slug, slug))
     .limit(1);
   if (!inv)
-    return generateMeta({
+    return { ...(await generateMeta({
       title: t("invite.fallbackTitle", locale),
       path: `/i/${slug}`,
       locale,
-    });
+      noindex: true,
+    })), referrer: "no-referrer" };
 
   const title =
     inv.coupleNames || inv.hostName || t("invite.meta.defaultTitle", locale);
-  return generateMeta({
+  return { ...(await generateMeta({
     title,
     description:
       inv.message ||
       `${title}${inv.eventDate ? ` · ${inv.eventDate}` : ""}${inv.ceremonyLocation ? ` · ${inv.ceremonyLocation}` : ""}`,
     path: `/i/${slug}`,
     locale,
-  });
+    noindex: true,
+  })), referrer: "no-referrer" };
 }
 
 export default async function PublicInvitationPage({
@@ -67,8 +70,13 @@ export default async function PublicInvitationPage({
       .from(invitationGuests)
       .where(eq(invitationGuests.rsvpToken, sp.rsvp))
       .limit(1);
-    if (row && row.invitationId === invitation.id) {
-      guest = row;
+    if (
+      row &&
+      row.invitationId === invitation.id &&
+      !row.rsvpTokenRevokedAt &&
+      (!row.rsvpTokenExpiresAt || row.rsvpTokenExpiresAt > new Date())
+    ) {
+      guest = revealInvitationGuestRecord(row);
     }
   }
 

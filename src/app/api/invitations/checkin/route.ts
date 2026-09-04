@@ -22,6 +22,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { invitationGuests, invitations } from "@/lib/db/schema";
 import { requireAppUser } from "@/lib/planner/ownership";
+import { isGuestTokenActive } from "@/lib/invitations/access";
+import { decryptGuestValue, revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 
 const schema = z.object({
   token: z.string().min(8).max(200),
@@ -47,6 +49,8 @@ export async function POST(req: NextRequest) {
       invitationId: invitationGuests.invitationId,
       invitationSlug: invitations.slug,
       eventDate: invitations.eventDate,
+      rsvpTokenExpiresAt: invitationGuests.rsvpTokenExpiresAt,
+      rsvpTokenRevokedAt: invitationGuests.rsvpTokenRevokedAt,
     })
     .from(invitationGuests)
     .innerJoin(invitations, eq(invitations.id, invitationGuests.invitationId))
@@ -59,6 +63,13 @@ export async function POST(req: NextRequest) {
       { status: 404 },
     );
   }
+  if (!isGuestTokenActive(row)) {
+    return NextResponse.json(
+      { error: "Codul a expirat sau a fost revocat" },
+      { status: 410 },
+    );
+  }
+  const visibleRow = revealInvitationGuestRecord(row);
 
   // Sanity: event must be today or in the past few days (prevent
   // accidental pre-check-ins from curious guests reading the QR a week early).
@@ -70,9 +81,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       guest: {
         id: row.guestId,
-        name: row.guestName,
+        name: decryptGuestValue(visibleRow.guestName),
         plusOne: row.plusOne,
-        plusOneName: row.plusOneName,
+        plusOneName: visibleRow.plusOneName,
       },
       alreadyCheckedIn: true,
       checkedInAt: row.checkedInAt,
@@ -88,9 +99,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     guest: {
       id: row.guestId,
-      name: row.guestName,
+      name: decryptGuestValue(visibleRow.guestName),
       plusOne: row.plusOne,
-      plusOneName: row.plusOneName,
+      plusOneName: visibleRow.plusOneName,
     },
     alreadyCheckedIn: false,
     checkedInAt: now.toISOString(),
@@ -158,6 +169,6 @@ export async function GET(req: NextRequest) {
       checkedIn,
       expectedWithPlusOnes,
     },
-    guests,
+    guests: guests.map(revealInvitationGuestRecord),
   });
 }

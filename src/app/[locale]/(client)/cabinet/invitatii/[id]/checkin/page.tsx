@@ -7,6 +7,7 @@ import { redirect, notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, invitations, invitationGuests } from "@/lib/db/schema";
+import { revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 import { CheckinClient } from "./client";
 
 export const dynamic = "force-dynamic";
@@ -53,7 +54,9 @@ export default async function CheckinDashboardPage({ params }: Props) {
   // Precompute the check-in URL per guest so the client can render QR codes
   // without a second API call. rsvpToken is required — those without one
   // fall back to "manual check-in only" (rare, legacy rows).
-  const guestsWithUrls = guests.map((g) => ({
+  const guestsWithUrls = guests.map((storedGuest) => {
+    const g = revealInvitationGuestRecord(storedGuest);
+    return ({
     id: g.id,
     name: g.name,
     rsvpStatus: g.rsvpStatus,
@@ -63,7 +66,8 @@ export default async function CheckinDashboardPage({ params }: Props) {
     checkInUrl: g.rsvpToken
       ? `${base}/i/${invitation.slug}/check?token=${g.rsvpToken}`
       : null,
-  }));
+    });
+  });
 
   return (
     <CheckinClient

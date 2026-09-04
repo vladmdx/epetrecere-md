@@ -180,6 +180,7 @@ export function invitationEmailHtml(opts: {
   const titleAlign = custom?.titleAlign ?? "center";
   const iconSize = Number(custom?.iconSize ?? 32);
   const iconAlign = custom?.iconAlign ?? "center";
+  const privacyUrl = `${new URL(rsvpUrl).origin}/confidentialitate#liste-invitati`;
 
   // Singular / plural greeting line. Host can override with their own
   // text via custom.headerText.
@@ -257,7 +258,7 @@ ${custom?.fontHeading ? `<link href="https://fonts.googleapis.com/css2?family=${
     </div>
 
     <p style="font-size:11px;color:${design.cssVars["--inv-muted"]};margin-top:32px;text-align:center;">
-      Creat cu ePetrecere.md
+      Creat cu ePetrecere.md · <a href="${privacyUrl}" style="color:${accent};">Cum sunt protejate datele invitaților</a>
     </p>
   </div>
 </body></html>`;

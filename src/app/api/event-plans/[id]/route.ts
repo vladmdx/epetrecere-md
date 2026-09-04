@@ -10,6 +10,7 @@ import {
 } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
+import { revealGuestListRecord } from "@/lib/privacy/guest-encryption";
 
 // M4 — /api/event-plans/[id]
 //
@@ -60,7 +61,7 @@ export async function GET(
   return NextResponse.json({
     plan: owned.plan,
     checklist,
-    guests,
+    guests: guests.map(revealGuestListRecord),
     tables,
     seats,
   });

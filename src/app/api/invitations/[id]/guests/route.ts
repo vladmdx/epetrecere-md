@@ -5,8 +5,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { invitations, invitationGuests } from "@/lib/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { requireAppUser } from "@/lib/planner/ownership";
+import { generateGuestToken, guestTokenExpiry } from "@/lib/invitations/access";
+import { protectInvitationGuestRecord, revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 
 async function requireOwner(id: number) {
   // `invitations.userId` is the app-user UUID — resolve from Clerk session
@@ -22,13 +24,6 @@ async function requireOwner(id: number) {
   return { userId: appUser.userId, invitation: row };
 }
 
-function genToken(): string {
-  return (
-    Math.random().toString(36).slice(2, 10) +
-    Math.random().toString(36).slice(2, 10)
-  );
-}
-
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -41,7 +36,7 @@ export async function GET(
     .select()
     .from(invitationGuests)
     .where(eq(invitationGuests.invitationId, invId));
-  return NextResponse.json(guests);
+  return NextResponse.json(guests.map(revealInvitationGuestRecord));
 }
 
 const addGuestSchema = z.object({
@@ -70,21 +65,6 @@ export async function POST(
     );
   }
 
-  // Require at least one contact method (email/phone/whatsapp)
-  const hasContact =
-    !!(parsed.data.email && parsed.data.email.trim()) ||
-    !!(parsed.data.phone && parsed.data.phone.trim()) ||
-    !!(parsed.data.whatsapp && parsed.data.whatsapp.trim());
-  if (!hasContact) {
-    return NextResponse.json(
-      {
-        error:
-          "Adaugă cel puțin un contact (email, telefon sau WhatsApp) pentru ca invitatul să poată confirma prezența.",
-      },
-      { status: 400 },
-    );
-  }
-
   // A second row for the same address is a second invitation email to the
   // same person — the exact complaint this feature set is fixing. The new
   // row would also read as never-sent, so the next bulk send would mail
@@ -92,16 +72,14 @@ export async function POST(
   const email = parsed.data.email?.trim().toLowerCase();
   if (email) {
     const existing = await db
-      .select({ id: invitationGuests.id })
+      .select({ id: invitationGuests.id, email: invitationGuests.email })
       .from(invitationGuests)
-      .where(
-        and(
-          eq(invitationGuests.invitationId, invId),
-          sql`lower(${invitationGuests.email}) = ${email}`,
-        ),
-      )
-      .limit(1);
-    if (existing.length > 0) {
+      .where(eq(invitationGuests.invitationId, invId));
+    if (
+      existing
+        .map(revealInvitationGuestRecord)
+        .some((row) => row.email?.trim().toLowerCase() === email)
+    ) {
       return NextResponse.json(
         { error: "Acest email este deja pe lista de invitați." },
         { status: 409 },
@@ -111,15 +89,16 @@ export async function POST(
 
   const [guest] = await db
     .insert(invitationGuests)
-    .values({
+    .values(protectInvitationGuestRecord({
       invitationId: invId,
       name: parsed.data.name,
       email: parsed.data.email,
       phone: parsed.data.phone,
       whatsapp: parsed.data.whatsapp,
       group: parsed.data.group,
-      rsvpToken: genToken(),
-    })
+      rsvpToken: generateGuestToken(),
+      rsvpTokenExpiresAt: guestTokenExpiry(owner.invitation.eventDate),
+    }))
     .returning();
-  return NextResponse.json(guest, { status: 201 });
+  return NextResponse.json(revealInvitationGuestRecord(guest), { status: 201 });
 }

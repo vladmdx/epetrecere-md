@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { eventPlans } from "@/lib/db/schema";
 import { and, eq, lt, isNotNull } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 export const runtime = "nodejs";
 // Opt out of caching so each cron tick hits the DB.
@@ -49,25 +50,49 @@ export async function GET(req: NextRequest) {
       ),
     );
 
-  if (toArchive.length === 0) {
-    return NextResponse.json({ archived: 0, cutoff: cutoffIso });
+  if (toArchive.length > 0) {
+    const now = new Date();
+    await db
+      .update(eventPlans)
+      .set({ status: "completed", archivedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(eventPlans.status, "active"),
+          isNotNull(eventPlans.eventDate),
+          lt(eventPlans.eventDate, cutoffIso),
+        ),
+      );
   }
 
-  const now = new Date();
-  await db
-    .update(eventPlans)
-    .set({ status: "completed", archivedAt: now, updatedAt: now })
-    .where(
-      and(
-        eq(eventPlans.status, "active"),
-        isNotNull(eventPlans.eventDate),
-        lt(eventPlans.eventDate, cutoffIso),
-      ),
-    );
+  // Personal guest details are useful around the event, not forever. Keep
+  // the event plan and its aggregate budget/checklist, but erase both guest
+  // stores 90 days after the event. Seat assignments cascade from guest_list.
+  const purgedPlannerGuests = await db.execute(sql`
+    DELETE FROM guest_list g
+    USING event_plans p
+    WHERE g.plan_id = p.id
+      AND p.event_date IS NOT NULL
+      AND p.event_date::date < (CURRENT_DATE - INTERVAL '90 days')
+    RETURNING g.id
+  `);
+  const purgedInvitationGuests = await db.execute(sql`
+    DELETE FROM invitation_guests g
+    USING invitations i
+    WHERE g.invitation_id = i.id
+      AND i.event_date IS NOT NULL
+      AND i.event_date::date < (CURRENT_DATE - INTERVAL '90 days')
+    RETURNING g.id
+  `);
+  const countRows = (result: unknown) =>
+    Array.isArray(result)
+      ? result.length
+      : ((result as { rows?: unknown[] } | null)?.rows?.length ?? 0);
 
   return NextResponse.json({
     archived: toArchive.length,
     cutoff: cutoffIso,
     ids: toArchive.map((r) => r.id),
+    purgedPlannerGuests: countRows(purgedPlannerGuests),
+    purgedInvitationGuests: countRows(purgedInvitationGuests),
   });
 }

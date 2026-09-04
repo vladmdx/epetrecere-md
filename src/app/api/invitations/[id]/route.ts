@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { invitations, invitationGuests } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireAppUser } from "@/lib/planner/ownership";
+import { revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 
 async function requireOwner(id: number) {
   // `invitations.userId` is the app-user UUID, not the Clerk ID — resolve
@@ -36,7 +37,10 @@ export async function GET(
     .select()
     .from(invitationGuests)
     .where(eq(invitationGuests.invitationId, invId));
-  return NextResponse.json({ invitation: auth.invitation, guests });
+  return NextResponse.json({
+    invitation: auth.invitation,
+    guests: guests.map(revealInvitationGuestRecord),
+  });
 }
 
 const patchSchema = z.object({

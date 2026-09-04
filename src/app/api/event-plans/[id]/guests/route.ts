@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { guestList } from "@/lib/db/schema";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
+import { protectGuestListRecord, revealGuestListRecord } from "@/lib/privacy/guest-encryption";
 
 // M4 — POST /api/event-plans/[id]/guests
 // Add a guest to the plan's guest list.
@@ -33,7 +34,6 @@ const createGuestSchema = z.object({
   contactValue: z.string().optional(),
   /** Legacy: existing imports still send this. */
   plusOnes: z.number().int().min(0).max(20).optional(),
-  dietary: z.string().optional(),
   rsvp: z.enum(["pending", "accepted", "declined", "maybe"]).optional(),
   notes: z.string().optional(),
 });
@@ -116,7 +116,7 @@ export async function POST(
 
   const [guest] = await db
     .insert(guestList)
-    .values({
+    .values(protectGuestListRecord({
       planId,
       fullName: parsed.data.fullName,
       phone,
@@ -128,11 +128,10 @@ export async function POST(
       contactChannel: parsed.data.contactChannel ?? "whatsapp",
       contactValue: parsed.data.contactValue ?? null,
       plusOnes: parsed.data.plusOnes ?? 0,
-      dietary: parsed.data.dietary,
       rsvp: parsed.data.rsvp ?? "pending",
       notes: parsed.data.notes,
-    })
+    }))
     .returning();
 
-  return NextResponse.json({ guest }, { status: 201 });
+  return NextResponse.json({ guest: revealGuestListRecord(guest) }, { status: 201 });
 }

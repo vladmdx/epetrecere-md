@@ -16,9 +16,14 @@ import {
   conversations,
   invitations,
   invitationGuests,
+  guestList,
   eventPhotos,
 } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
+import {
+  revealGuestListRecord,
+  revealInvitationGuestRecord,
+} from "@/lib/privacy/guest-encryption";
 
 export async function GET() {
   const { userId: clerkId } = await auth();
@@ -74,7 +79,18 @@ export async function GET() {
       .select()
       .from(invitationGuests)
       .where(eq(invitationGuests.invitationId, inv.id));
-    guestsByInvitation[inv.id] = g;
+    guestsByInvitation[inv.id] = g.map(revealInvitationGuestRecord);
+  }
+
+  // The planner list is separate from electronic invitations. Include it in
+  // the portability export as well, after decrypting it for its owner.
+  const plannerGuestsByPlan: Record<number, unknown[]> = {};
+  for (const plan of userPlans) {
+    const rows = await db
+      .select()
+      .from(guestList)
+      .where(eq(guestList.planId, plan.id));
+    plannerGuestsByPlan[plan.id] = rows.map(revealGuestListRecord);
   }
 
   const payload = {
@@ -90,7 +106,10 @@ export async function GET() {
       createdAt: user.createdAt,
     },
     leads: userLeads,
-    eventPlans: userPlans,
+    eventPlans: userPlans.map((plan) => ({
+      ...plan,
+      guests: plannerGuestsByPlan[plan.id] ?? [],
+    })),
     reviews: userReviews,
     messages: userMessages,
     conversations: userConversations,

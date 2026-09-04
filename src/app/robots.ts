@@ -18,6 +18,7 @@ const PRIVATE_ROUTES = [
   "/sign-up",
   "/auth-redirect",
   "/test-login",
+  "/i",
 ];
 
 /** Never locale-prefixed by the router, so these need no prefixed twins. */

@@ -22,6 +22,8 @@ import {
   invitationEmailHtml,
 } from "@/lib/invitations/templates";
 import { sendEmail } from "@/lib/email/send";
+import { guestTokenExpiry, isGuestTokenActive } from "@/lib/invitations/access";
+import { revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 
 const sendSchema = z.object({
   /** Explicit targets — a deliberate re-send to specific people,
@@ -68,6 +70,8 @@ type GuestRow = {
   guestType: string;
   rsvpToken: string | null;
   invitationSentAt: Date | null;
+  rsvpTokenExpiresAt: Date | null;
+  rsvpTokenRevokedAt: Date | null;
 };
 
 export async function POST(
@@ -161,6 +165,8 @@ export async function POST(
     email: invitationGuests.email,
     guestType: invitationGuests.guestType,
     rsvpToken: invitationGuests.rsvpToken,
+    rsvpTokenExpiresAt: invitationGuests.rsvpTokenExpiresAt,
+    rsvpTokenRevokedAt: invitationGuests.rsvpTokenRevokedAt,
   };
   const tracksDelivery = await hasSentColumn();
   let guests: GuestRow[];
@@ -180,7 +186,10 @@ export async function POST(
     guests = rows.map((g) => ({ ...g, invitationSentAt: null }));
   }
 
-  const withEmail = guests.filter((g) => g.email);
+  guests = guests.map(revealInvitationGuestRecord);
+  const withEmail = guests.filter(
+    (g) => g.email && g.rsvpToken && isGuestTokenActive(g),
+  );
   if (withEmail.length === 0) {
     return NextResponse.json(
       { error: "Niciun invitat nu are email" },
@@ -258,7 +267,10 @@ export async function POST(
         try {
           await db
             .update(invitationGuests)
-            .set({ invitationSentAt: new Date() })
+            .set({
+              invitationSentAt: new Date(),
+              rsvpTokenExpiresAt: guestTokenExpiry(inv.eventDate),
+            })
             .where(eq(invitationGuests.id, guest.id));
         } catch (markErr) {
           // The mail is out; losing the stamp only risks a duplicate later.

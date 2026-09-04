@@ -8,7 +8,7 @@ const copy = {
   ro: {
     home: "Acasă",
     title: "Politica de Confidențialitate",
-    updated: "Ultima actualizare: 31 iulie 2026",
+    updated: "Ultima actualizare: 4 septembrie 2026",
     metaTitle: "Confidențialitate și date personale ePetrecere.md",
     metaDescription:
       "Află cum ePetrecere.md colectează, folosește și protejează datele personale în Moldova și cum îți poți exercita drepturile.",
@@ -35,7 +35,7 @@ const copy = {
       },
       {
         title: "6. Păstrare și ștergere",
-        body: "Datele active sunt păstrate cât timp contul sau evenimentul necesită serviciul. La ștergerea contului, înregistrările personale principale sunt eliminate, iar datele păstrate legitim sunt anonimizate ori reținute numai pe perioada obligatorie. Copiile tehnice de siguranță urmează ciclurile procesatorilor.",
+        body: "Pentru lista de invitați, organizatorul introduce numai datele necesare planificării și trimiterii invitației. Câmpurile nominale și de contact sunt criptate în baza de date, nu sunt afișate furnizorilor evenimentului și sunt accesibile organizatorului autentificat numai în propriul eveniment. Fiecare link RSVP este individual, expirabil și poate fi revocat. Alergiile ori restricțiile alimentare sunt salvate numai după acordul explicit al invitatului. Datele nominale din liste și invitații sunt șterse automat la 90 de zile după data evenimentului; organizatorul poate exporta lista înainte. Datele active de cont sunt păstrate cât timp serviciul este necesar, iar copiile tehnice de siguranță urmează ciclurile procesatorilor.",
       },
       {
         title: "7. Drepturile tale",
@@ -61,7 +61,7 @@ const copy = {
   ru: {
     home: "Главная",
     title: "Политика конфиденциальности",
-    updated: "Последнее обновление: 31 июля 2026",
+    updated: "Последнее обновление: 4 сентября 2026 года",
     metaTitle: "Конфиденциальность и персональные данные ePetrecere.md",
     metaDescription:
       "Узнайте, как ePetrecere.md собирает, использует и защищает персональные данные в Молдове и как реализовать свои права.",
@@ -88,7 +88,7 @@ const copy = {
       },
       {
         title: "6. Хранение и удаление",
-        body: "Активные данные хранятся, пока аккаунту или событию необходим сервис. При удалении аккаунта основные персональные записи удаляются, а законно сохраняемые данные анонимизируются или остаются только на обязательный срок. Резервные копии следуют циклам обработчиков.",
+        body: "Для списка гостей организатор вводит только сведения, необходимые для планирования и отправки приглашения. Именные и контактные поля зашифрованы в базе данных, не показываются поставщикам мероприятия и доступны авторизованному организатору только в рамках собственного события. Каждая ссылка RSVP индивидуальна, имеет срок действия и может быть отозвана. Аллергии и пищевые ограничения сохраняются только после явного согласия гостя. Именные данные в списках и приглашениях автоматически удаляются через 90 дней после даты мероприятия; до этого организатор может экспортировать список. Активные данные аккаунта хранятся, пока необходим сервис, а технические резервные копии следуют циклам обработчиков.",
       },
       {
         title: "7. Ваши права",
@@ -114,7 +114,7 @@ const copy = {
   en: {
     home: "Home",
     title: "Privacy Policy",
-    updated: "Last updated: 31 July 2026",
+    updated: "Last updated: 4 September 2026",
     metaTitle: "Privacy and Personal Data at ePetrecere.md",
     metaDescription:
       "Learn how ePetrecere.md collects, uses and protects personal data in Moldova and how you can exercise your rights.",
@@ -141,7 +141,7 @@ const copy = {
       },
       {
         title: "6. Retention and deletion",
-        body: "Active data is kept while the account or event requires the service. When an account is deleted, primary personal records are removed, while lawfully retained data is anonymized or kept only for a mandatory period. Technical backups follow processor deletion cycles.",
+        body: "For a guest list, the organizer enters only data needed for planning and sending the invitation. Named and contact fields are encrypted in the database, are not shown to event suppliers, and are available to the authenticated organizer only within their own event. Each RSVP link is individual, expires and can be revoked. Allergies or dietary restrictions are stored only after the guest's explicit consent. Named data in guest lists and invitations is deleted automatically 90 days after the event date; the organizer can export the list beforehand. Active account data is kept while the service is needed, and technical backups follow processor deletion cycles.",
       },
       {
         title: "7. Your rights",
@@ -204,7 +204,11 @@ export default async function PrivacyPage({
 
       <div className="mt-8 space-y-7 text-sm leading-relaxed">
         {labels.sections.map((section, index) => (
-          <section key={section.title}>
+          <section
+            key={section.title}
+            id={index === 5 ? "liste-invitati" : undefined}
+            className="scroll-mt-28"
+          >
             <h2 className="font-heading text-xl font-semibold">{section.title}</h2>
             <p className="mt-2 text-muted-foreground">
               {section.body}

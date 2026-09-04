@@ -35,6 +35,7 @@ interface Guest {
   plusOne: boolean;
   plusOneName: string | null;
   dietaryNotes: string | null;
+  dietaryConsentAt: string | Date | null;
   message: string | null;
   rsvpToken: string | null;
 }
@@ -53,11 +54,15 @@ export function PublicInvitationView({
   const [plusOne, setPlusOne] = useState(guest?.plusOne ?? false);
   const [plusOneName, setPlusOneName] = useState(guest?.plusOneName ?? "");
   const [dietaryNotes, setDietaryNotes] = useState(guest?.dietaryNotes ?? "");
+  const [dietaryConsent, setDietaryConsent] = useState(
+    Boolean(guest?.dietaryConsentAt),
+  );
   const [message, setMessage] = useState(guest?.message ?? "");
   const [submitted, setSubmitted] = useState(
     guest?.rsvpStatus && guest.rsvpStatus !== "pending",
   );
   const [loading, setLoading] = useState(false);
+  const [deleted, setDeleted] = useState(false);
 
   const title =
     invitation.coupleNames || invitation.hostName || t("invite.fallbackTitle");
@@ -100,6 +105,7 @@ export function PublicInvitationView({
         plusOne,
         plusOneName,
         dietaryNotes,
+        dietaryConsent,
         message,
       }),
     });
@@ -108,7 +114,25 @@ export function PublicInvitationView({
       setRsvpStatus(status);
       setSubmitted(true);
     } else {
-      alert(t("invite.view.saveError"));
+      const payload = await res.json().catch(() => null);
+      alert(payload?.error || t("invite.view.saveError"));
+    }
+  }
+
+  async function deleteMyGuestData() {
+    if (!guest?.rsvpToken || !confirm(t("invite.view.deleteConfirm"))) return;
+    setLoading(true);
+    const res = await fetch("/api/rsvp", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: guest.rsvpToken }),
+    });
+    setLoading(false);
+    if (res.ok) {
+      setDeleted(true);
+    } else {
+      const payload = await res.json().catch(() => null);
+      alert(payload?.error || t("invite.view.deleteError"));
     }
   }
 
@@ -236,6 +260,12 @@ export function PublicInvitationView({
 
       {/* RSVP */}
       <section className="mx-auto max-w-2xl px-4 py-10 lg:px-8">
+        {deleted ? (
+          <div className="rounded-2xl border border-success/30 bg-success/10 p-8 text-center">
+            <Check className="mx-auto h-8 w-8 text-success" />
+            <p className="mt-3 font-medium">{t("invite.view.deleted")}</p>
+          </div>
+        ) : (
         <div className="rounded-2xl border border-gold/30 bg-card p-6 shadow-lg md:p-8">
           <div className="text-center">
             <h2 className="font-heading text-2xl font-bold">
@@ -327,6 +357,17 @@ export function PublicInvitationView({
                     onChange={(e) => setDietaryNotes(e.target.value)}
                     rows={2}
                   />
+                  {dietaryNotes.trim() && (
+                    <label className="flex items-start gap-2 rounded-lg border border-gold/25 bg-gold/5 p-3 text-xs leading-relaxed">
+                      <input
+                        type="checkbox"
+                        checked={dietaryConsent}
+                        onChange={(e) => setDietaryConsent(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 shrink-0 accent-gold"
+                      />
+                      <span>{t("invite.view.dietaryConsent")}</span>
+                    </label>
+                  )}
                 </div>
               )}
 
@@ -343,7 +384,10 @@ export function PublicInvitationView({
                   rsvpStatus !== "pending" && submitRsvp(rsvpStatus as "yes" | "no" | "maybe")
                 }
                 disabled={
-                  !guest || rsvpStatus === "pending" || loading
+                  !guest ||
+                  rsvpStatus === "pending" ||
+                  loading ||
+                  (Boolean(dietaryNotes.trim()) && !dietaryConsent)
                 }
                 className="mt-6 w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
@@ -352,10 +396,28 @@ export function PublicInvitationView({
             </>
           )}
         </div>
+        )}
       </section>
 
       {/* Footer */}
       <footer className="border-t border-border/40 py-8 text-center text-xs text-muted-foreground">
+        <p className="mx-auto mb-3 max-w-2xl px-4">
+          {t("invite.view.privacyNotice")} {" "}
+          <Link href="/confidentialitate#liste-invitati" className="text-gold underline">
+            {t("invite.view.privacyLink")}
+          </Link>
+        </p>
+        {guest && !deleted && (
+          <button
+            type="button"
+            onClick={deleteMyGuestData}
+            disabled={loading}
+            className="mb-3 text-xs text-muted-foreground underline hover:text-destructive"
+          >
+            {t("invite.view.deleteMyData")}
+          </button>
+        )}
+        <br />
         {t("invite.view.createdWith")}{" "}
         <Link
           href="/cabinet/invitatii/nou"

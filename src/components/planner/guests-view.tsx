@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Trash2, Loader2, Users, UserCheck, UserX, UserMinus, FileUp, Send, Mail, Check } from "lucide-react";
+import { Plus, Trash2, Loader2, Users, UserCheck, UserX, UserMinus, FileUp, FileDown, Send, Mail, Check, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { INVITATION_DESIGN_LIST, type InvitationDesignId } from "@/lib/invitations/templates";
@@ -30,6 +30,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { useLocale } from "@/hooks/use-locale";
+import Link from "@/components/shared/locale-link";
 
 export type GuestType = "single" | "couple" | "family";
 export type ContactChannel =
@@ -591,6 +592,27 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
     }
   }
 
+  /** Export happens in the browser from the owner's already-decrypted view.
+   *  No second plaintext copy is created on the server. */
+  function exportToFile() {
+    const rows = guests.map((guest) => ({
+      [t("cabinet.guests.exportName")]: guest.fullName,
+      [t("cabinet.guests.exportType")]: guest.guestType ?? "single",
+      [t("cabinet.guests.exportAdults")]: guest.partySize ?? 1,
+      [t("cabinet.guests.exportChildren")]: guest.kidsCount ?? 0,
+      [t("cabinet.guests.exportPhone")]: guest.phone ?? "",
+      [t("cabinet.guests.exportEmail")]: guest.email ?? "",
+      [t("cabinet.guests.exportGroup")]: guest.group ?? "",
+      [t("cabinet.guests.exportRsvp")]: guest.rsvp,
+      [t("cabinet.guests.exportDietary")]: guest.dietary ?? "",
+      [t("cabinet.guests.exportNotes")]: guest.notes ?? "",
+    }));
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, sheet, "Invitati");
+    XLSX.writeFile(workbook, `epetrecere-invitati-${planId}.xlsx`);
+  }
+
   const stats = useMemo(() => {
     let total = 0;
     const byRsvp = { pending: 0, accepted: 0, declined: 0, maybe: 0 };
@@ -702,6 +724,16 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         <StatCard icon={UserMinus} label={t("cabinet.guests.rsvpPending")} value={stats.pending} />
         <StatCard icon={UserMinus} label={t("cabinet.guests.rsvpMaybe")} value={stats.maybe} color="text-amber-500" />
         <StatCard icon={UserX} label={t("cabinet.guests.statDeclined")} value={stats.declined} color="text-red-500" />
+      </div>
+
+      <div className="flex items-start gap-3 rounded-xl border border-gold/25 bg-gold/5 p-4 text-sm">
+        <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
+        <p className="text-muted-foreground">
+          {t("cabinet.guests.retentionNotice")}{" "}
+          <Link href="/confidentialitate#liste-invitati" className="text-gold underline">
+            {t("cabinet.guests.privacyDetails")}
+          </Link>
+        </p>
       </div>
 
       {/* Inline design picker + customization editor. The 4 baseline
@@ -1522,6 +1554,16 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
               <FileUp className="h-4 w-4" />
             )}
             {t("cabinet.guests.importExcel")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={exportToFile}
+            disabled={guests.length === 0}
+            className="gap-1"
+          >
+            <FileDown className="h-4 w-4" />
+            {t("cabinet.guests.exportExcel")}
           </Button>
           <Button
             onClick={addGuest}

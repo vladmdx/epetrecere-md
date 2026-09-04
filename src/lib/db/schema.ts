@@ -1959,9 +1959,14 @@ export const invitationGuests = pgTable("invitation_guests", {
   plusOne: boolean("plus_one").default(false).notNull(),
   plusOneName: text("plus_one_name"),
   dietaryNotes: text("dietary_notes"),
+  /** Health-related dietary details are accepted only from the guest, with
+   * a separate explicit acknowledgement. */
+  dietaryConsentAt: timestamp("dietary_consent_at", { withTimezone: true }),
   message: text("message"), // message from guest to host
   // Unique token for one-click RSVP links (sent via email/SMS)
   rsvpToken: text("rsvp_token").unique(),
+  rsvpTokenExpiresAt: timestamp("rsvp_token_expires_at", { withTimezone: true }),
+  rsvpTokenRevokedAt: timestamp("rsvp_token_revoked_at", { withTimezone: true }),
   /** When this guest was actually mailed their invitation. NULL = never
    *  sent. Without it the bulk send had nothing to exclude on, so every
    *  press re-mailed the whole list — a host who added one guest on day

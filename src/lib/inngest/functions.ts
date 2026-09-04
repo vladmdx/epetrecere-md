@@ -19,6 +19,8 @@ import {
   fetchUpcomingEvents,
   expandDays,
 } from "@/lib/google/calendar";
+import { revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
+import { isGuestTokenActive } from "@/lib/invitations/access";
 
 // Trigger 1: New lead → emails
 export const onLeadCreated = inngest.createFunction(
@@ -208,8 +210,13 @@ export const invitationRsvpReminders = inngest.createFunction(
             ),
           );
 
-        for (const { guest, invitation } of rows) {
-          if (!guest.email || !guest.rsvpToken) continue;
+        for (const { guest: storedGuest, invitation } of rows) {
+          const guest = revealInvitationGuestRecord(storedGuest);
+          if (
+            !guest.email ||
+            !guest.rsvpToken ||
+            !isGuestTokenActive(storedGuest)
+          ) continue;
           const title =
             invitation.coupleNames || invitation.hostName || "Eveniment";
           const rsvpUrl = `${appUrl}/i/${invitation.slug}?rsvp=${guest.rsvpToken}`;
