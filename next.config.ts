@@ -91,6 +91,26 @@ const nextConfig: NextConfig = {
       "date-fns",
     ],
   },
+  async redirects() {
+    // One authoritative URL per legal policy. Route-level redirects can be
+    // optimized into stale static pages when the old legal-pack slugs are in
+    // generateStaticParams, so enforce the canonical mapping at the platform
+    // edge as well.
+    return [
+      { source: "/legal/termeni-generali", destination: "/termeni", permanent: true },
+      { source: "/legal/politica-confidentialitate", destination: "/confidentialitate", permanent: true },
+      { source: "/legal/politica-cookie", destination: "/cookies", permanent: true },
+      { source: "/ro/legal/termeni-generali", destination: "/termeni", permanent: true },
+      { source: "/ro/legal/politica-confidentialitate", destination: "/confidentialitate", permanent: true },
+      { source: "/ro/legal/politica-cookie", destination: "/cookies", permanent: true },
+      { source: "/ru/legal/termeni-generali", destination: "/ru/termeni", permanent: true },
+      { source: "/ru/legal/politica-confidentialitate", destination: "/ru/confidentialitate", permanent: true },
+      { source: "/ru/legal/politica-cookie", destination: "/ru/cookies", permanent: true },
+      { source: "/en/legal/termeni-generali", destination: "/en/termeni", permanent: true },
+      { source: "/en/legal/politica-confidentialitate", destination: "/en/confidentialitate", permanent: true },
+      { source: "/en/legal/politica-cookie", destination: "/en/cookies", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

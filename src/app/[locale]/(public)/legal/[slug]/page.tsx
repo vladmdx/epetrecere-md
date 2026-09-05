@@ -6,7 +6,12 @@ import { LEGAL_DOCUMENTS, getLegalDocument, legalTitle } from "@/lib/legal";
 import { LegalDocumentView } from "./view";
 
 export function generateStaticParams() {
-  return LEGAL_DOCUMENTS.map((d) => ({ slug: d.slug }));
+  const canonicalPolicies = new Set([
+    "termeni-generali",
+    "politica-confidentialitate",
+    "politica-cookie",
+  ]);
+  return LEGAL_DOCUMENTS.filter((document) => !canonicalPolicies.has(document.slug)).map((d) => ({ slug: d.slug }));
 }
 
 export async function generateMetadata({
