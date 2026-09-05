@@ -18,6 +18,7 @@ import { isCategoryAllowedForEvent } from "@/lib/wizard/categories-meta";
 import { localizeMoldovaCity, MOLDOVA_CITIES } from "@/lib/moldova-cities";
 import { useLocalizedRouter } from "@/components/shared/locale-link";
 import { useLocalizePath } from "@/components/shared/locale-link";
+import { PrivacyNotice } from "@/components/shared/privacy-notice";
 
 // ═══════════════════════════════════════════════
 // TYPES
@@ -552,8 +553,11 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
             viewport bottom — Safari/Chrome's UI bar covered the
             Continuă button. Pad with `pb-28` + safe-area inset so the
             CTA always clears the browser chrome. */}
+        {step === SUMMARY_INDEX ? (
+          <PrivacyNotice context="planner" className="mt-6 rounded-lg border border-white/10 bg-white/[0.03] p-3 text-white/55" />
+        ) : null}
         <div
-          className="mt-8 flex items-center justify-between gap-3 pb-28 sm:pb-10"
+          className="mt-5 flex items-center justify-between gap-3 pb-28 sm:pb-10"
           style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom))" }}
         >
           <Button

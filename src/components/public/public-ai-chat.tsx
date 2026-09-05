@@ -12,6 +12,7 @@ import { Bot, X, Send, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { PrivacyNotice } from "@/components/shared/privacy-notice";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -253,36 +254,35 @@ export function PublicAiChat() {
           </div>
 
           {/* Input */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              send();
-            }}
-            className="flex items-center gap-2 border-t border-border/40 px-3 py-2"
-          >
-            <input
-              ref={inputRef}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={t("aiChat.inputPlaceholder")}
-              className="flex-1 rounded-lg border border-border/40 bg-background px-3 py-2 text-sm outline-none focus:border-gold"
-              maxLength={500}
-              disabled={sending}
-            />
-            <Button
-              type="submit"
-              size="icon"
-              aria-label={t("aiChat.sendLabel")}
-              disabled={sending || !draft.trim()}
-              className="h-9 w-9 shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+          <div className="border-t border-border/40 px-3 py-2">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                send();
+              }}
+              className="flex items-center gap-2"
             >
-              {sending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </form>
+              <input
+                ref={inputRef}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder={t("aiChat.inputPlaceholder")}
+                className="flex-1 rounded-lg border border-border/40 bg-background px-3 py-2 text-sm outline-none focus:border-gold"
+                maxLength={500}
+                disabled={sending}
+              />
+              <Button
+                type="submit"
+                size="icon"
+                aria-label={t("aiChat.sendLabel")}
+                disabled={sending || !draft.trim()}
+                className="h-9 w-9 shrink-0 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+              >
+                {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              </Button>
+            </form>
+            <PrivacyNotice context="ai" className="mt-2" />
+          </div>
         </div>
       )}
     </>

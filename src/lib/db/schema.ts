@@ -1413,7 +1413,7 @@ export const eventPlans = pgTable("event_plans", {
    *  after the owner approves it from the moderation queue. Default
    *  false so existing films keep their auto-approve behavior. */
   momentsRequireApproval: boolean("moments_require_approval")
-    .default(false)
+    .default(true)
     .notNull(),
   /** Phase 5/C1 — direct audio URL (mp3/wav/m4a/ogg) the projector
    *  slideshow loops in the background. NULL = silent slideshow.
@@ -1567,6 +1567,18 @@ export const eventPhotos = pgTable("event_photos", {
    *  collage / ZIP download to a curated subset, and to highlight
    *  hero photos in the slideshow. */
   isFavorite: boolean("is_favorite").default(false).notNull(),
+  /** Evidence that the anonymous uploader actively confirmed they own the
+   * image rights and, for a child's image, are the parent/guardian or have
+   * their authorization. The exact copy is versioned so the proof remains
+   * intelligible after the public notice changes. */
+  uploadConsentAt: timestamp("upload_consent_at"),
+  uploadConsentVersion: text("upload_consent_version"),
+  /** HMAC of the source IP, never the raw IP. Useful only for abuse and
+   * incident correlation and automatically removed with the photo. */
+  uploaderIpHash: text("uploader_ip_hash"),
+  /** A public report immediately hides the image pending organizer review. */
+  reportedAt: timestamp("reported_at"),
+  reportReason: text("report_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

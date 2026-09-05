@@ -11,12 +11,20 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { eventPlans } from "@/lib/db/schema";
 import { MomentsUploadClient } from "./client";
+import { MomentsAccessGate } from "./access-gate";
+import { cookies } from "next/headers";
+import { isValidMomentsAccessToken, momentsCookieName } from "@/lib/moments/access";
+import type { Metadata } from "next";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  robots: { index: false, follow: false, noarchive: true, nosnippet: true },
+  referrer: "no-referrer",
+};
 
 export default async function MomentsPage({ params }: Props) {
   const { slug } = await params;
@@ -40,6 +48,13 @@ export default async function MomentsPage({ params }: Props) {
     .limit(1);
 
   if (!plan || !plan.momentsEnabled) notFound();
+
+  const cookieStore = await cookies();
+  const unlocked = isValidMomentsAccessToken(
+    cookieStore.get(momentsCookieName(slug))?.value,
+    slug,
+  );
+  if (!unlocked) return <MomentsAccessGate slug={slug} />;
 
   return (
     <MomentsUploadClient

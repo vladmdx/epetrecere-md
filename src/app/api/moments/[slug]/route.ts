@@ -13,10 +13,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, photoReactions } from "@/lib/db/schema";
-import { rateLimit } from "@/lib/rate-limit";
+import { requestHasMomentsAccess } from "@/lib/moments/access";
 
 interface MomentsPlan {
   id: number;
@@ -69,6 +68,9 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
+  if (!requestHasMomentsAccess(req, slug)) {
+    return NextResponse.json({ error: "Access code required" }, { status: 401, headers: { "Cache-Control": "no-store" } });
+  }
   const plan = await findPlan(slug);
   if (!plan || !plan.momentsEnabled) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -116,6 +118,7 @@ export async function GET(
           guestName: eventPhotos.guestName,
           guestMessage: eventPhotos.guestMessage,
           prompt: eventPhotos.prompt,
+          deviceId: eventPhotos.deviceId,
           createdAt: eventPhotos.createdAt,
         })
         .from(eventPhotos)
@@ -173,7 +176,7 @@ export async function GET(
       .filter((p): p is string => typeof p === "string" && p.length > 0);
   }
 
-  return NextResponse.json({
+  const response = NextResponse.json({
     plan: {
       title: plan.title,
       eventDate: plan.eventDate,
@@ -193,144 +196,30 @@ export async function GET(
       ...p,
       reactions: reactionsByPhoto[p.id] ?? {},
       myReactions: myReactions[p.id] ?? [],
+      canDelete: Boolean(deviceId && p.deviceId === deviceId),
+      deviceId: undefined,
     })),
     promptsDone,
   });
+  response.headers.set("Cache-Control", "private, no-store");
+  response.headers.set("Referrer-Policy", "no-referrer");
+  return response;
 }
-
-const uploadSchema = z.object({
-  url: z.string().url(),
-  guestName: z.string().min(1).max(60),
-  guestMessage: z.string().max(280).optional(),
-  /** Anonymous fingerprint generated client-side and stored in
-   *  localStorage. We trust it for shot-limit accounting because the
-   *  threat model is "polite guests at a wedding," not adversaries.
-   *  Wipe the browser → fresh allowance, and that's fine. */
-  deviceId: z.string().min(6).max(80).optional(),
-  /** Phase 4A — which prompt label this upload answers. Owner-defined
-   *  list lives on the plan; the client picks one and sends it back.
-   *  We store the label rather than an id so the schema stays simple
-   *  and renames don't orphan history. */
-  prompt: z.string().max(80).optional(),
-  /** Phase 5/C3 — which table label this upload was scanned from.
-   *  Same validation pattern as prompt: stored only if it matches
-   *  the owner's declared list. */
-  tableLabel: z.string().max(40).optional(),
-});
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
-  const ip = req.headers.get("x-forwarded-for") || "anon";
-  const { success } = await rateLimit(`moments:${ip}:${slug}`, 20, 60_000);
-  if (!success) {
-    return NextResponse.json({ error: "Too many uploads" }, { status: 429 });
+  if (!requestHasMomentsAccess(req, slug)) {
+    return NextResponse.json({ error: "Access code required" }, { status: 401 });
   }
-
-  const plan = await findPlan(slug);
-  if (!plan || !plan.momentsEnabled) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // Gate by upload window first — surfacing a clear "filmul nu e încă
-  // deschis" beats a 400 with a generic validation error.
-  const now = new Date();
-  const state = uploadState(plan, now);
-  if (state === "before") {
-    return NextResponse.json(
-      {
-        error: "Filmul se deschide mai târziu.",
-        opensAt: plan.momentsOpenAt?.toISOString() ?? null,
-      },
-      { status: 403 },
-    );
-  }
-  if (state === "after") {
-    return NextResponse.json(
-      { error: "Filmul s-a închis. Mulțumim pentru participare!" },
-      { status: 403 },
-    );
-  }
-
-  const body = await req.json().catch(() => null);
-  const parsed = uploadSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json(
-      { error: "Validation failed", details: parsed.error.issues },
-      { status: 400 },
-    );
-  }
-
-  // Per-device shot limit. We rely on the device_id the client sends;
-  // when it's missing we skip the cap so legacy clients without the
-  // new JS still work (they just bypass the limit, which matches the
-  // pre-Phase-1 behaviour).
-  if (plan.momentsShotLimit && parsed.data.deviceId) {
-    const [row] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(eventPhotos)
-      .where(
-        and(
-          eq(eventPhotos.planId, plan.id),
-          eq(eventPhotos.deviceId, parsed.data.deviceId),
-        ),
-      );
-    if ((row?.count ?? 0) >= plan.momentsShotLimit) {
-      return NextResponse.json(
-        {
-          error: `Ai folosit toate cele ${plan.momentsShotLimit} cadre alocate pe acest dispozitiv.`,
-          shotLimit: plan.momentsShotLimit,
-        },
-        { status: 429 },
-      );
-    }
-  }
-
-  // Phase 4A — validate the prompt label against the owner's list
-  // when prompts mode is on. Out-of-list prompts get silently
-  // dropped (we still save the photo, just without the prompt tag) so
-  // an attacker can't poison the dashboard with fake mission labels.
-  let promptToSave: string | null = null;
-  if (parsed.data.prompt) {
-    const trimmed = parsed.data.prompt.trim();
-    if (plan.momentsPrompts && plan.momentsPrompts.includes(trimmed)) {
-      promptToSave = trimmed;
-    }
-  }
-
-  // Phase 5/C3 — same allowlist treatment for table_label. Out-of-list
-  // tables get silently dropped so QR-card mods can't seed bogus rooms.
-  let tableLabelToSave: string | null = null;
-  if (parsed.data.tableLabel) {
-    const trimmed = parsed.data.tableLabel.trim();
-    if (plan.momentsTables && plan.momentsTables.includes(trimmed)) {
-      tableLabelToSave = trimmed;
-    }
-  }
-
-  const [photo] = await db
-    .insert(eventPhotos)
-    .values({
-      planId: plan.id,
-      url: parsed.data.url,
-      guestName: parsed.data.guestName,
-      guestMessage: parsed.data.guestMessage ?? null,
-      source: "guest",
-      deviceId: parsed.data.deviceId ?? null,
-      prompt: promptToSave,
-      tableLabel: tableLabelToSave,
-      // Auto-approve unless the owner explicitly turned on the
-      // moderation queue (Phase 4B). In that mode every guest upload
-      // sits hidden until the owner clicks "Aprobă" — useful for
-      // family-friendly events / corporate. Reveal-based gating is a
-      // separate axis: a photo can be approved but still hidden until
-      // revealAt passes.
-      isApproved: !plan.momentsRequireApproval,
-      isPublic: false,
-    })
-    .returning({ id: eventPhotos.id });
-
-  return NextResponse.json({ id: photo.id }, { status: 201 });
+  // URL-only inserts could attach an arbitrary public image and bypass EXIF
+  // stripping and the rights confirmation. New clients use the atomic
+  // multipart /upload endpoint, which performs all privacy checks before a
+  // database row is created.
+  return NextResponse.json(
+    { error: "Use the protected Moments upload endpoint" },
+    { status: 410 },
+  );
 }

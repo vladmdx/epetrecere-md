@@ -15,6 +15,7 @@ import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, photoReactions } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
+import { requestHasMomentsAccess } from "@/lib/moments/access";
 
 const ALLOWED_EMOJI = ["❤️", "🔥", "😂", "🥺", "🎉"] as const;
 
@@ -29,6 +30,9 @@ export async function POST(
   { params }: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await params;
+  if (!requestHasMomentsAccess(req, slug)) {
+    return NextResponse.json({ error: "Access code required" }, { status: 401 });
+  }
   const ip = req.headers.get("x-forwarded-for") || "anon";
   // 60 toggles per minute per IP — generous for a wedding crowd
   // tap-dancing on a popular photo, tight enough to stop a bot.

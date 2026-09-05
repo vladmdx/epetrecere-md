@@ -8,7 +8,7 @@ const copy = {
   ro: {
     home: "Acasă",
     title: "Politica de Confidențialitate",
-    updated: "Ultima actualizare: 4 septembrie 2026",
+    updated: "Ultima actualizare: 5 septembrie 2026",
     metaTitle: "Confidențialitate și date personale ePetrecere.md",
     metaDescription:
       "Află cum ePetrecere.md colectează, folosește și protejează datele personale în Moldova și cum îți poți exercita drepturile.",
@@ -31,11 +31,11 @@ const copy = {
       },
       {
         title: "5. Destinatari și transferuri",
-        body: "Datele nu sunt vândute. Ele sunt comunicate furnizorilor când inițiezi o cerere sau rezervare și procesatorilor necesari pentru autentificare, baze de date, stocare, email și funcții AI. Pentru prelucrarea în afara Republicii Moldova folosim mecanisme contractuale și măsuri de protecție adecvate situației.",
+        body: "Datele nu sunt vândute. În funcție de funcția folosită, procesatorii noștri sunt Clerk pentru autentificare, Neon pentru baza de date, Vercel și Vercel Blob pentru găzduire și fișiere, Cloudflare și R2 pentru securitate și stocare, Upstash pentru limitarea abuzurilor, Resend pentru email, Sentry pentru diagnosticarea erorilor, OpenAI și Anthropic pentru funcții AI, Google Maps pentru hărți și Meta pentru mesajele WhatsApp solicitate. Furnizorii evenimentului primesc date numai când inițiezi o cerere sau rezervare și nu primesc lista nominală a invitaților. Prelucrarea în afara Republicii Moldova este limitată la serviciul necesar și se bazează pe garanțiile contractuale și mecanismele de transfer permise de lege.",
       },
       {
         title: "6. Păstrare și ștergere",
-        body: "Pentru lista de invitați, organizatorul introduce numai datele necesare planificării și trimiterii invitației. Câmpurile nominale și de contact sunt criptate în baza de date, nu sunt afișate furnizorilor evenimentului și sunt accesibile organizatorului autentificat numai în propriul eveniment. Fiecare link RSVP este individual, expirabil și poate fi revocat. Alergiile ori restricțiile alimentare sunt salvate numai după acordul explicit al invitatului. Datele nominale din liste și invitații sunt șterse automat la 90 de zile după data evenimentului; organizatorul poate exporta lista înainte. Datele active de cont sunt păstrate cât timp serviciul este necesar, iar copiile tehnice de siguranță urmează ciclurile procesatorilor.",
+        body: "Lista nominală a invitaților și răspunsurile RSVP sunt șterse automat la 90 de zile după eveniment. Fotografiile Moments și identificatorii aferenți sunt șterși la 180 de zile după eveniment sau, pentru galeriile fără dată, la 180 de zile după încărcare. Solicitările de contact fără relație contractuală se păstrează maximum 24 de luni; mesajele și rezervările se păstrează maximum 36 de luni după finalizarea relației, dacă nu există litigiu ori obligație legală. Dovezile contractelor și evidențele financiar-contabile se păstrează pe perioada cerută de lege și pentru apărarea drepturilor. Datele active de cont se păstrează până la ștergerea contului. Datele eliminate din sistemele active pot rămâne temporar în copiile de siguranță până la expirarea ciclului tehnic al procesatorului și nu sunt restaurate în utilizarea curentă.",
       },
       {
         title: "7. Drepturile tale",
@@ -43,7 +43,7 @@ const copy = {
       },
       {
         title: "8. AI și decizii automate",
-        body: "Asistentul și recomandările pot procesa detaliile oferite de tine pentru a genera răspunsuri sau potriviri. Nu folosim aceste funcții pentru decizii exclusiv automate care produc efecte juridice. Nu introduce date sensibile care nu sunt necesare solicitării.",
+        body: "Asistentul și recomandările transmit textul necesar către OpenAI sau Anthropic, în funcție de disponibilitate. Istoricul asistentului public rămâne în localStorage pe dispozitiv, iar endpointul ePetrecere nu creează un dosar persistent al conversației. Furnizorul AI poate păstra jurnale de siguranță până la 30 de zile conform setărilor API; datele API nu sunt folosite pentru antrenare implicită. Nu folosim funcțiile AI pentru decizii exclusiv automate cu efect juridic și nu trebuie introduse date sensibile ori datele altor persoane.",
       },
       {
         title: "9. Securitate și incidente",
@@ -61,7 +61,7 @@ const copy = {
   ru: {
     home: "Главная",
     title: "Политика конфиденциальности",
-    updated: "Последнее обновление: 4 сентября 2026 года",
+    updated: "Последнее обновление: 5 сентября 2026 года",
     metaTitle: "Конфиденциальность и персональные данные ePetrecere.md",
     metaDescription:
       "Узнайте, как ePetrecere.md собирает, использует и защищает персональные данные в Молдове и как реализовать свои права.",
@@ -84,11 +84,11 @@ const copy = {
       },
       {
         title: "5. Получатели и передача",
-        body: "Данные не продаются. Они передаются поставщикам, когда вы создаете запрос или бронирование, и обработчикам, необходимым для входа, базы данных, хранения, электронной почты и функций AI. При обработке за пределами Молдовы используются договорные механизмы и подходящие меры защиты.",
+        body: "Данные не продаются. В зависимости от функции обработчиками являются Clerk (вход), Neon (база данных), Vercel и Vercel Blob (хостинг и файлы), Cloudflare и R2 (безопасность и хранение), Upstash (защита от злоупотреблений), Resend (email), Sentry (диагностика), OpenAI и Anthropic (AI), Google Maps (карты) и Meta (заказанные сообщения WhatsApp). Поставщики мероприятия получают данные только после запроса или бронирования и не получают именной список гостей. Передача за пределы Молдовы ограничена необходимым сервисом и опирается на договорные гарантии и разрешенные законом механизмы.",
       },
       {
         title: "6. Хранение и удаление",
-        body: "Для списка гостей организатор вводит только сведения, необходимые для планирования и отправки приглашения. Именные и контактные поля зашифрованы в базе данных, не показываются поставщикам мероприятия и доступны авторизованному организатору только в рамках собственного события. Каждая ссылка RSVP индивидуальна, имеет срок действия и может быть отозвана. Аллергии и пищевые ограничения сохраняются только после явного согласия гостя. Именные данные в списках и приглашениях автоматически удаляются через 90 дней после даты мероприятия; до этого организатор может экспортировать список. Активные данные аккаунта хранятся, пока необходим сервис, а технические резервные копии следуют циклам обработчиков.",
+        body: "Именные списки гостей и RSVP удаляются через 90 дней после события. Фото Moments и связанные идентификаторы удаляются через 180 дней после события или загрузки для галереи без даты. Контактные обращения без договора хранятся не более 24 месяцев; сообщения и бронирования не более 36 месяцев после завершения отношений, если нет спора или юридической обязанности. Договорные и финансовые доказательства хранятся в установленный законом срок. Данные аккаунта хранятся до его удаления. Удаленные активные данные могут временно оставаться в резервных копиях до завершения технического цикла поставщика и не возвращаются в обычное использование.",
       },
       {
         title: "7. Ваши права",
@@ -96,7 +96,7 @@ const copy = {
       },
       {
         title: "8. AI и автоматические решения",
-        body: "Ассистент и рекомендации могут обрабатывать предоставленные вами сведения, чтобы создавать ответы или совпадения. Эти функции не используются для исключительно автоматических решений с юридическими последствиями. Не вводите чувствительные данные, которые не нужны для запроса.",
+        body: "Ассистент и рекомендации передают необходимый текст OpenAI или Anthropic в зависимости от доступности. История публичного чата остается в localStorage на устройстве, а endpoint ePetrecere не создает постоянное досье разговора. AI-поставщик может хранить журналы безопасности до 30 дней согласно API-настройкам; API-данные по умолчанию не используются для обучения. AI не принимает исключительно автоматические решения с юридическими последствиями. Не вводите чувствительные данные или данные других лиц.",
       },
       {
         title: "9. Безопасность и инциденты",
@@ -114,7 +114,7 @@ const copy = {
   en: {
     home: "Home",
     title: "Privacy Policy",
-    updated: "Last updated: 4 September 2026",
+    updated: "Last updated: 5 September 2026",
     metaTitle: "Privacy and Personal Data at ePetrecere.md",
     metaDescription:
       "Learn how ePetrecere.md collects, uses and protects personal data in Moldova and how you can exercise your rights.",
@@ -137,11 +137,11 @@ const copy = {
       },
       {
         title: "5. Recipients and transfers",
-        body: "Personal data is not sold. It is shared with suppliers when you start an enquiry or booking and with processors required for authentication, databases, storage, email and AI features. Processing outside Moldova uses contractual mechanisms and safeguards suitable for the situation.",
+        body: "Personal data is not sold. Depending on the feature used, our processors are Clerk for authentication, Neon for the database, Vercel and Vercel Blob for hosting and files, Cloudflare and R2 for security and storage, Upstash for abuse prevention, Resend for email, Sentry for error diagnostics, OpenAI and Anthropic for AI, Google Maps for maps, and Meta for requested WhatsApp messages. Event suppliers receive data only when you start an enquiry or booking and never receive the named guest list. Processing outside Moldova is limited to the necessary service and relies on contractual safeguards and transfer mechanisms permitted by law.",
       },
       {
         title: "6. Retention and deletion",
-        body: "For a guest list, the organizer enters only data needed for planning and sending the invitation. Named and contact fields are encrypted in the database, are not shown to event suppliers, and are available to the authenticated organizer only within their own event. Each RSVP link is individual, expires and can be revoked. Allergies or dietary restrictions are stored only after the guest's explicit consent. Named data in guest lists and invitations is deleted automatically 90 days after the event date; the organizer can export the list beforehand. Active account data is kept while the service is needed, and technical backups follow processor deletion cycles.",
+        body: "Named guest lists and RSVP responses are deleted 90 days after the event. Moments photos and related identifiers are deleted 180 days after the event or, for an undated gallery, 180 days after upload. Contact enquiries without a contract are kept for no more than 24 months; messages and bookings for no more than 36 months after the relationship ends, unless a dispute or legal duty applies. Contract evidence and financial records are kept for the legally required period. Active account data is kept until account deletion. Data removed from active systems may remain temporarily in backups until the processor's technical rotation ends and is not restored into ordinary use.",
       },
       {
         title: "7. Your rights",
@@ -149,7 +149,7 @@ const copy = {
       },
       {
         title: "8. AI and automated decisions",
-        body: "The assistant and recommendations may process details you provide to generate answers or matches. These features are not used for solely automated decisions with legal effects. Do not enter sensitive data that is unnecessary for your request.",
+        body: "The assistant and recommendations send the necessary text to OpenAI or Anthropic, depending on availability. Public-chat history remains in localStorage on the device and the ePetrecere endpoint does not create a persistent conversation file. The AI provider may retain safety logs for up to 30 days under its API settings; API data is not used for training by default. AI is not used for solely automated decisions with legal effect. Do not enter sensitive data or another person's data.",
       },
       {
         title: "9. Security and incidents",

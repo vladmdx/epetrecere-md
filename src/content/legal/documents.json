@@ -3633,7 +3633,7 @@
   },
   {
     "slug": "politica-confidentialitate",
-    "version": "1.0",
+    "version": "1.1",
     "order": 4,
     "title": {
       "ro": "Politica de Confidențialitate",
@@ -3644,7 +3644,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE POLITICA DE CONFIDENȚIALITATE PRIVACY POLICY Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE POLITICA DE CONFIDENȚIALITATE PRIVACY POLICY Versiunea 1.1 Republica Moldova Data actualizării: 5 septembrie 2026 Prezentul document face parte din EPETRECERE Legal Pack și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
         },
         {
           "type": "h2",
@@ -3716,7 +3716,7 @@
         },
         {
           "type": "p",
-          "text": "Pentru transferurile în afara Republicii Moldova se aplică mecanismele și garanțiile cerute de lege. Lista reală a furnizorilor internaționali trebuie completată după auditul infrastructurii production."
+          "text": "Pentru transferurile în afara Republicii Moldova se aplică mecanismele și garanțiile cerute de lege. Furnizorii tehnici utilizați, în funcție de funcție, includ Clerk, Neon, Vercel și Vercel Blob, Cloudflare și R2, Upstash, Resend, Sentry, OpenAI, Anthropic, Google Maps și Meta. Datele sunt limitate la serviciul necesar, iar lista și garanțiile sunt revizuite la schimbarea infrastructurii."
         },
         {
           "type": "h2",
@@ -3812,13 +3812,13 @@
         },
         {
           "type": "p",
-          "text": "Utilizatorul poate sesiza autoritatea competentă din Republica Moldova. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.0, în vigoare din 20 iulie 2026. Textul român este versiunea oficială."
+          "text": "Utilizatorul poate sesiza autoritatea competentă din Republica Moldova. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.1, actualizată la 5 septembrie 2026. Textul român este versiunea oficială."
         }
       ],
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ PRIVACY POLICY Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ PRIVACY POLICY Версия 1.1 Республика Молдова Дата обновления: 5 сентября 2026 г. Настоящий документ является частью EPETRECERE Legal Pack и применяется совместно с другими документами пакета в пределах своего предмета."
         },
         {
           "type": "h2",
@@ -3890,7 +3890,7 @@
         },
         {
           "type": "p",
-          "text": "При передаче данных за пределы Республики Молдова EPETRECERE применяет предусмотренные законодательством механизмы и гарантии. Фактический перечень международных поставщиков должен быть указан после технического аудита production- инфраструктуры."
+          "text": "При передаче данных за пределы Республики Молдова EPETRECERE применяет предусмотренные законом механизмы и гарантии. В зависимости от функции используются Clerk, Neon, Vercel и Vercel Blob, Cloudflare и R2, Upstash, Resend, Sentry, OpenAI, Anthropic, Google Maps и Meta. Передаются только необходимые данные, а перечень и гарантии пересматриваются при изменении инфраструктуры."
         },
         {
           "type": "h2",
@@ -3986,13 +3986,13 @@
         },
         {
           "type": "p",
-          "text": "Пользователь вправе обратиться в компетентный надзорный орган Республики Молдова. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.0, действует с 20 июля 2026 г. Официальной версией является румынский текст."
+          "text": "Пользователь вправе обратиться в компетентный надзорный орган Республики Молдова. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.1, обновлена 5 сентября 2026 г. Официальной версией является румынский текст."
         }
       ],
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE PRIVACY POLICY Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of the pack within the limits of its subject matter."
+          "text": "EPETRECERE PRIVACY POLICY Version 1.1 Republic of Moldova Updated: 5 September 2026 This document forms part of the EPETRECERE Legal Pack and applies together with the other documents of the pack within the limits of its subject matter."
         },
         {
           "type": "h2",
@@ -4064,7 +4064,7 @@
         },
         {
           "type": "p",
-          "text": "Transfers outside the Republic of Moldova are subject to the mechanisms and safeguards required by law. The actual list of international providers must be completed following the audit of the production infrastructure."
+          "text": "Transfers outside the Republic of Moldova use the mechanisms and safeguards required by law. Depending on the feature, technical providers include Clerk, Neon, Vercel and Vercel Blob, Cloudflare and R2, Upstash, Resend, Sentry, OpenAI, Anthropic, Google Maps and Meta. Data is limited to what the service requires, and the list and safeguards are reviewed when infrastructure changes."
         },
         {
           "type": "h2",
@@ -4160,14 +4160,14 @@
         },
         {
           "type": "p",
-          "text": "The User may lodge a complaint with the competent authority of the Republic of Moldova. Operator's details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.0, in force as of 20 July 2026. The Romanian text is the official version."
+          "text": "The User may lodge a complaint with the competent authority of the Republic of Moldova. Operator's details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.1, updated 5 September 2026. The Romanian text is the official version."
         }
       ]
     }
   },
   {
     "slug": "politica-cookie",
-    "version": "1.0",
+    "version": "1.1",
     "order": 5,
     "title": {
       "ro": "Politica Cookie",
@@ -4178,7 +4178,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE POLITICA PRIVIND COOKIE-URILE COOKIE POLICY Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE POLITICA PRIVIND COOKIE-URILE COOKIE POLICY Versiunea 1.1 Republica Moldova Data actualizării: 5 septembrie 2026 Prezentul document face parte din EPETRECERE Legal Pack și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
         },
         {
           "type": "h2",
@@ -4234,7 +4234,7 @@
         },
         {
           "type": "p",
-          "text": "EPETRECERE poate utiliza tehnologii proprii și ale terților. Furnizorii externi se indică după auditul tehnic real."
+          "text": "EPETRECERE utilizează tehnologii proprii și tehnologii strict necesare ale Clerk și Cloudflare. Registrul actualizat al tehnologiilor, furnizorilor, scopurilor și duratelor este publicat la /cookies."
         },
         {
           "type": "h2",
@@ -4258,7 +4258,7 @@
         },
         {
           "type": "p",
-          "text": "Înainte de lansare trebuie întocmit registrul real cu denumire, furnizor, categorie, scop și durată. Nu se includ servicii presupuse care nu sunt instalate efectiv."
+          "text": "Registrul tehnic actual este publicat la /cookies și include denumirea tehnologiei, furnizorul, categoria, scopul și durata. Registrul se actualizează înainte de activarea unei tehnologii noi."
         },
         {
           "type": "h2",
@@ -4266,13 +4266,13 @@
         },
         {
           "type": "p",
-          "text": "Politica se actualizează la schimbarea legislației, tehnologiilor sau furnizorilor. Data ultimei actualizări se publică în document. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.0, în vigoare din 20 iulie 2026. Textul român este versiunea oficială."
+          "text": "Politica se actualizează la schimbarea legislației, tehnologiilor sau furnizorilor. Data ultimei actualizări se publică în document. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.1, actualizată la 5 septembrie 2026. Textul român este versiunea oficială."
         }
       ],
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ПОЛИТИКА ИСПОЛЬЗОВАНИЯ COOKIE COOKIE POLICY Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE ПОЛИТИКА ИСПОЛЬЗОВАНИЯ COOKIE COOKIE POLICY Версия 1.1 Республика Молдова Дата обновления: 5 сентября 2026 г. Настоящий документ является частью EPETRECERE Legal Pack и применяется совместно с другими документами пакета в пределах своего предмета."
         },
         {
           "type": "h2",
@@ -4328,7 +4328,7 @@
         },
         {
           "type": "p",
-          "text": "EPETRECERE может использовать собственные cookie и технологии сторонних поставщиков. Сторонние сервисы указываются по результатам фактического технического аудита."
+          "text": "EPETRECERE использует собственные технологии и строго необходимые технологии Clerk и Cloudflare. Актуальный реестр технологий, поставщиков, целей и сроков опубликован по адресу /cookies."
         },
         {
           "type": "h2",
@@ -4352,7 +4352,7 @@
         },
         {
           "type": "p",
-          "text": "До запуска необходимо сформировать актуальный реестр с названием технологии, поставщиком, категорией, целью и сроком хранения. Нельзя включать в реестр предполагаемые, но фактически не установленные сервисы."
+          "text": "Актуальный технический реестр опубликован в основной Политике cookies по адресу /cookies. Он включает название технологии, поставщика, категорию, цель и срок хранения и обновляется при изменении реализации."
         },
         {
           "type": "h2",
@@ -4360,13 +4360,13 @@
         },
         {
           "type": "p",
-          "text": "Политика обновляется при изменении законодательства, технологий или подключенных поставщиков. Дата последнего обновления публикуется в документе. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.0, действует с 20 июля 2026 г. Официальной версией является румынский текст."
+          "text": "Политика обновляется при изменении законодательства, технологий или подключенных поставщиков. Дата последнего обновления публикуется в документе. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.1, обновлена 5 сентября 2026 г. Официальной версией является румынский текст."
         }
       ],
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE COOKIE POLICY COOKIE POLICY Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of the pack within the limits of its subject matter."
+          "text": "EPETRECERE COOKIE POLICY Version 1.1 Republic of Moldova Updated: 5 September 2026 This document forms part of the EPETRECERE Legal Pack and applies together with the other documents of the pack within the limits of its subject matter."
         },
         {
           "type": "h2",
@@ -4422,7 +4422,7 @@
         },
         {
           "type": "p",
-          "text": "EPETRECERE may use its own technologies and those of third parties. External providers shall be indicated following the actual technical audit."
+          "text": "EPETRECERE uses its own technologies and strictly necessary technologies supplied by Clerk and Cloudflare. The current register of technologies, providers, purposes and durations is published at /cookies."
         },
         {
           "type": "h2",
@@ -4446,7 +4446,7 @@
         },
         {
           "type": "p",
-          "text": "Before launch, the actual register must be drawn up, setting out the name, provider, category, purpose and duration. Presumed services that are not in fact installed shall not be included."
+          "text": "The current technical register is published at /cookies and lists each technology, provider, category, purpose and duration. The register is updated before a new technology is enabled."
         },
         {
           "type": "h2",
@@ -4454,7 +4454,7 @@
         },
         {
           "type": "p",
-          "text": "The Policy shall be updated upon any change of legislation, technologies or providers. The date of the last update shall be published in the document. Operator's Details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.0, in force as of 20 July 2026. The Romanian text is the official version."
+          "text": "The Policy shall be updated upon any change of legislation, technologies or providers. The date of the last update shall be published in the document. Operator's Details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.1, updated 5 September 2026. The Romanian text is the official version."
         }
       ]
     }
@@ -6510,7 +6510,7 @@
         },
         {
           "type": "p",
-          "text": "Documentele principale sunt publicate în română și rusă. Înainte de lansare trebuie indicată expres versiunea lingvistică prioritară în caz de diferențe."
+          "text": "Documentele principale sunt publicate în română, rusă și engleză. Textul român este versiunea oficială și prevalează în caz de diferențe între traduceri."
         },
         {
           "type": "h2",
@@ -6608,7 +6608,7 @@
         },
         {
           "type": "p",
-          "text": "Все основные документы публикуются на румынском и русском языках. До запуска необходимо прямо определить приоритетную языковую версию при расхождениях."
+          "text": "Все основные документы публикуются на румынском, русском и английском языках. При расхождениях преимущественную силу имеет румынская версия, если обязательное законодательство не требует иного."
         },
         {
           "type": "h2",
@@ -6694,7 +6694,7 @@
         },
         {
           "type": "p",
-          "text": "The principal documents are published in Romanian and Russian. Before launch, the language version that prevails in the event of discrepancies must be expressly indicated."
+          "text": "The principal documents are published in Romanian, Russian and English. The Romanian text is the official version and prevails if translations differ."
         },
         {
           "type": "h2",

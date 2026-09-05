@@ -67,6 +67,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   const { t } = useLocale();
   const [slug, setSlug] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
+  const [accessCode, setAccessCode] = useState<string | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,7 +87,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
   const [promptsInput, setPromptsInput] = useState("");
   /** Phase 4B — when true, guest uploads land hidden until the owner
    *  approves them. */
-  const [requireApprovalInput, setRequireApprovalInput] = useState(false);
+  const [requireApprovalInput, setRequireApprovalInput] = useState(true);
   /** Phase 5/C1 — direct audio URL the slideshow loops. */
   const [musicUrlInput, setMusicUrlInput] = useState("");
   /** Phase 5/C3 — comma- or newline-separated table labels. We split
@@ -123,6 +124,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
         const j = await statusRes.json();
         setSlug(j.slug);
         setEnabled(j.enabled);
+        setAccessCode(typeof j.accessCode === "string" ? j.accessCode : null);
         // Mirror window/reveal/limit settings into the form. Owner can
         // tweak them once the gallery is enabled.
         setOpenAtInput(isoToLocalInput(j.openAt));
@@ -139,7 +141,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
             ? (j.prompts as string[]).join("\n")
             : "",
         );
-        setRequireApprovalInput(Boolean(j.requireApproval));
+        setRequireApprovalInput(true);
         setMusicUrlInput(typeof j.musicUrl === "string" ? j.musicUrl : "");
         setTablesInput(
           Array.isArray(j.tables) && j.tables.length > 0
@@ -173,6 +175,7 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
       const j = await res.json();
       setSlug(j.slug);
       setEnabled(true);
+      setAccessCode(typeof j.accessCode === "string" ? j.accessCode : null);
       toast.success(t("moments.owner.enabled"));
     }
     setSaving(false);
@@ -610,6 +613,26 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
                 >
                   <ExternalLink className="h-3 w-3" /> {t("moments.owner.viewPage")}
                 </Link>
+                {accessCode ? (
+                  <div className="mt-4 rounded-xl border border-gold/30 bg-gold/5 p-3">
+                    <div className="text-xs font-medium text-gold">{t("moments.owner.accessCodeLabel")}</div>
+                    <div className="mt-1 flex items-center gap-3">
+                      <code className="flex-1 text-2xl font-bold tracking-[0.25em] text-foreground">{accessCode}</code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(accessCode);
+                          toast.success(t("moments.owner.copied"));
+                        }}
+                        className="rounded-lg border border-gold/30 p-2 text-gold hover:bg-gold/10"
+                        aria-label={t("moments.owner.copyAccessCode")}
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">{t("moments.owner.accessCodeHint")}</p>
+                  </div>
+                ) : null}
               </div>
 
               <div className="rounded-2xl border border-border/40 bg-card p-5">
@@ -765,7 +788,8 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
               <input
                 type="checkbox"
                 checked={requireApprovalInput}
-                onChange={(e) => setRequireApprovalInput(e.target.checked)}
+                disabled
+                aria-readonly="true"
                 className="mt-1 h-4 w-4 shrink-0 accent-gold"
               />
               <span className="min-w-0 text-sm">

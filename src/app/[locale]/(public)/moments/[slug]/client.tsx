@@ -18,11 +18,12 @@
 // every guest's phone, including the older ones.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { Camera, Upload, Check, Loader2, Image as ImageIcon, Lock, Clock, Eye, Sparkles, SkipForward, Trophy } from "lucide-react";
+import { Camera, Upload, Check, Loader2, Image as ImageIcon, Lock, Clock, Eye, Sparkles, SkipForward, Trophy, Flag, Trash2, ShieldCheck } from "lucide-react";
 import { applyVintage } from "@/lib/moments/vintage-filter";
 import { useLocale } from "@/hooks/use-locale";
 import { plural, type AllForms } from "@/lib/i18n/plural";
 import type { Locale } from "@/types";
+import Link from "@/components/shared/locale-link";
 
 interface Photo {
   id: number;
@@ -32,6 +33,7 @@ interface Photo {
   prompt?: string | null;
   reactions?: Record<string, number>;
   myReactions?: string[];
+  canDelete?: boolean;
 }
 
 interface Props {
@@ -208,6 +210,28 @@ export function MomentsUploadClient({
   const [uploading, setUploading] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [subjectCapacity, setSubjectCapacity] = useState<"adult" | "guardian" | "">("");
+
+  async function removeOwnPhoto(photoId: number) {
+    if (!confirm(t("moments.deleteOwnConfirm"))) return;
+    const res = await fetch(`/api/moments/${slug}/photos/${photoId}`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId }),
+    });
+    if (res.ok) setState((s) => ({ ...s, photos: s.photos.filter((p) => p.id !== photoId), totalPhotos: Math.max(0, s.totalPhotos - 1) }));
+  }
+
+  async function reportPhoto(photoId: number) {
+    if (!confirm(t("moments.reportConfirm"))) return;
+    const res = await fetch(`/api/moments/${slug}/photos/${photoId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: "Reported by a gallery guest" }),
+    });
+    if (res.ok) setState((s) => ({ ...s, photos: s.photos.filter((p) => p.id !== photoId), totalPhotos: Math.max(0, s.totalPhotos - 1) }));
+  }
 
   async function toggleReaction(photoId: number, emoji: string) {
     // Optimistic update — flip locally first so the tap feels
@@ -308,6 +332,10 @@ export function MomentsUploadClient({
       setError(t("moments.errNameAndPhoto"));
       return;
     }
+    if (!rightsConfirmed || !subjectCapacity) {
+      setError(t("moments.errConsentRequired"));
+      return;
+    }
     if (limitReached) {
       setError(t("moments.errAllShotsUsed", { count: shotLimit ?? 0 }));
       return;
@@ -331,36 +359,19 @@ export function MomentsUploadClient({
             : original;
         const fd = new FormData();
         fd.append("file", file);
-        fd.append("folder", `moments/${slug}`);
-        const upRes = await fetch("/api/upload", { method: "POST", body: fd });
-        if (!upRes.ok) {
-          const j = await upRes.json().catch(() => ({}));
-          throw new Error(j.error || t("moments.errUploadFailed"));
-        }
-        const { url } = await upRes.json();
-
-        const saveRes = await fetch(`/api/moments/${slug}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url,
-            guestName: guestName.trim(),
-            guestMessage: guestMessage.trim() || undefined,
-            deviceId,
-            // When the film runs in prompts mode, every upload is
-            // tagged with the prompt currently shown to the guest so
-            // the owner can later see who answered what.
-            prompt: currentPrompt ?? undefined,
-            // Phase 5/C3 — table label sourced from the QR query
-            // param so the owner sees per-table breakdowns.
-            tableLabel: tableLabel ?? undefined,
-          }),
-        });
+        fd.append("guestName", guestName.trim());
+        if (guestMessage.trim()) fd.append("guestMessage", guestMessage.trim());
+        fd.append("deviceId", deviceId);
+        fd.append("rightsConfirmed", "true");
+        fd.append("subjectCapacity", subjectCapacity);
+        if (currentPrompt) fd.append("prompt", currentPrompt);
+        if (tableLabel) fd.append("tableLabel", tableLabel);
+        const saveRes = await fetch(`/api/moments/${slug}/upload`, { method: "POST", body: fd });
         if (!saveRes.ok) {
           const j = await saveRes.json().catch(() => ({}));
-          throw new Error(j.error || t("moments.errSaveFailed"));
+          throw new Error(j.error || t("moments.errUploadFailed"));
         }
-        const { id } = await saveRes.json();
+        const { id, url } = await saveRes.json();
         newPhotos.push({
           id,
           url,
@@ -388,6 +399,7 @@ export function MomentsUploadClient({
       }));
       setFiles([]);
       setGuestMessage("");
+      setRightsConfirmed(false);
       setDone(true);
       setTimeout(() => setDone(false), 3000);
     } catch (err) {
@@ -561,6 +573,32 @@ export function MomentsUploadClient({
             disabled={limitReached}
           />
 
+          <div className="mt-4 space-y-3 rounded-xl border border-gold/25 bg-gold/5 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-gold">
+              <ShieldCheck className="h-4 w-4" /> {t("moments.privacyTitle")}
+            </div>
+            <label className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+              <input type="checkbox" checked={rightsConfirmed} onChange={(e) => setRightsConfirmed(e.target.checked)} className="mt-0.5 h-4 w-4 accent-gold" />
+              <span>{t("moments.rightsConsent")}</span>
+            </label>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <label className="flex items-start gap-2 rounded-lg border border-border/50 p-2 text-xs text-muted-foreground">
+                <input type="radio" name="subject-capacity" checked={subjectCapacity === "adult"} onChange={() => setSubjectCapacity("adult")} className="mt-0.5 accent-gold" />
+                <span>{t("moments.subjectAdult")}</span>
+              </label>
+              <label className="flex items-start gap-2 rounded-lg border border-border/50 p-2 text-xs text-muted-foreground">
+                <input type="radio" name="subject-capacity" checked={subjectCapacity === "guardian"} onChange={() => setSubjectCapacity("guardian")} className="mt-0.5 accent-gold" />
+                <span>{t("moments.subjectGuardian")}</span>
+              </label>
+            </div>
+            <p className="text-[10px] leading-relaxed text-muted-foreground">
+              {t("moments.photoRetention")}{" "}
+              <Link href="/confidentialitate" target="_blank" className="text-gold underline underline-offset-2">
+                {t("moments.privacyDetails")}
+              </Link>
+            </p>
+          </div>
+
           <label className="mt-4 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {t("moments.message")}
           </label>
@@ -613,7 +651,7 @@ export function MomentsUploadClient({
           <button
             type="submit"
             disabled={
-              uploading || files.length === 0 || !guestName.trim() || limitReached
+              uploading || files.length === 0 || !guestName.trim() || limitReached || !rightsConfirmed || !subjectCapacity
             }
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-gold px-4 py-3 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark disabled:opacity-50"
           >
@@ -734,6 +772,10 @@ export function MomentsUploadClient({
                         </button>
                       );
                     })}
+                    <span className="ml-auto flex items-center gap-1">
+                      <button type="button" onClick={() => void reportPhoto(p.id)} className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={t("moments.reportPhoto")}><Flag className="h-3.5 w-3.5" /></button>
+                      {p.canDelete ? <button type="button" onClick={() => void removeOwnPhoto(p.id)} className="rounded-full p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={t("moments.deleteOwnPhoto")}><Trash2 className="h-3.5 w-3.5" /></button> : null}
+                    </span>
                   </figcaption>
                 </figure>
               );

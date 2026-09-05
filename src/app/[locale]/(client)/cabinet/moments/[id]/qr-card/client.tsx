@@ -42,6 +42,7 @@ interface Plan {
   eventDate: string | null;
   slug: string | null;
   enabled: boolean;
+  accessCode: string | null;
 }
 
 export function QrCardClient({ planId }: { planId: number }) {
@@ -68,6 +69,7 @@ export function QrCardClient({ planId }: { planId: number }) {
           eventDate: planData.plan.eventDate,
           slug: momentsData?.slug ?? null,
           enabled: momentsData?.enabled ?? false,
+          accessCode: momentsData?.accessCode ?? null,
         });
       } finally {
         if (alive) setLoading(false);
@@ -241,6 +243,11 @@ export function QrCardClient({ planId }: { planId: number }) {
             <p className="mt-0.5 text-xs">
               {t("moments.qrCard.scanHint")}
             </p>
+            {plan.accessCode ? (
+              <p className="mt-2 rounded border px-3 py-1 text-sm font-bold tracking-[0.2em]" style={{ borderColor: templateStyle(template).accent, color: templateStyle(template).accent }}>
+                PIN {plan.accessCode}
+              </p>
+            ) : null}
             <p
               className="mt-2 text-[10px] uppercase tracking-[3px]"
               style={{ color: templateStyle(template).accent }}

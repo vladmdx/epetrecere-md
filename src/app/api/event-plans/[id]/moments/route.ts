@@ -12,6 +12,7 @@ import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { eventPlans } from "@/lib/db/schema";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
+import { momentsAccessPin } from "@/lib/moments/access";
 
 function randomSlug(): string {
   // 10-char base36 — plenty of entropy for event galleries and easy to scan.
@@ -68,9 +69,11 @@ export async function GET(
     shotLimit: plan?.momentsShotLimit ?? null,
     vintage: plan?.momentsVintage ?? false,
     prompts: plan?.momentsPrompts ?? [],
-    requireApproval: plan?.momentsRequireApproval ?? false,
+    requireApproval: plan?.momentsRequireApproval ?? true,
     musicUrl: plan?.momentsMusicUrl ?? null,
     tables: plan?.momentsTables ?? [],
+    accessCode:
+      plan?.momentsSlug ? momentsAccessPin(planId, plan.momentsSlug) : null,
   });
 }
 
@@ -97,7 +100,11 @@ export async function POST(
     .set({ momentsSlug: slug, momentsEnabled: true, updatedAt: new Date() })
     .where(eq(eventPlans.id, planId));
 
-  return NextResponse.json({ slug, enabled: true });
+  return NextResponse.json({
+    slug,
+    enabled: true,
+    accessCode: momentsAccessPin(planId, slug),
+  });
 }
 
 /** Partial settings update — open window, reveal time, shot limit.
@@ -166,8 +173,11 @@ export async function PATCH(
   if (parsed.data.vintage !== undefined) {
     update.momentsVintage = parsed.data.vintage;
   }
+  // Anonymous uploads always enter moderation. Keeping this server-side
+  // prevents an old client or a crafted request from publishing a guest or
+  // minor's image immediately.
   if (parsed.data.requireApproval !== undefined) {
-    update.momentsRequireApproval = parsed.data.requireApproval;
+    update.momentsRequireApproval = true;
   }
   if (parsed.data.musicUrl !== undefined) {
     update.momentsMusicUrl =

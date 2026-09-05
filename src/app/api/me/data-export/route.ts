@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   users,
@@ -18,6 +18,18 @@ import {
   invitationGuests,
   guestList,
   eventPhotos,
+  artists,
+  artistImages,
+  artistVideos,
+  venues,
+  venueImages,
+  bookingRequests,
+  aiConversations,
+  notifications,
+  wishlistItems,
+  legalAcceptances,
+  pushSubscriptions,
+  pushTokens,
 } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
 import {
@@ -49,6 +61,15 @@ export async function GET() {
     userConversations,
     userInvitations,
     userPhotos,
+    artistProfiles,
+    venueProfiles,
+    clientBookings,
+    userAiConversations,
+    userNotifications,
+    userWishlist,
+    userLegalAcceptances,
+    userPushSubscriptions,
+    userPushTokens,
   ] = await Promise.all([
     user.email
       ? db.select().from(leads).where(eq(leads.email, user.email))
@@ -61,16 +82,63 @@ export async function GET() {
       .where(eq(conversations.clientUserId, user.id)),
     db.select().from(invitations).where(eq(invitations.userId, user.id)),
     db.select().from(eventPhotos).where(eq(eventPhotos.userId, user.id)),
+    db.select().from(artists).where(eq(artists.userId, user.id)),
+    db.select().from(venues).where(eq(venues.userId, user.id)),
+    db.select().from(bookingRequests).where(eq(bookingRequests.clientUserId, user.id)),
+    db.select().from(aiConversations).where(eq(aiConversations.userId, user.id)),
+    db.select().from(notifications).where(eq(notifications.userId, user.id)),
+    db.select().from(wishlistItems).where(eq(wishlistItems.userId, user.id)),
+    db.select().from(legalAcceptances).where(eq(legalAcceptances.userId, user.id)),
+    db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id)),
+    db.select().from(pushTokens).where(eq(pushTokens.userId, user.id)),
   ]);
+
+  const artistIds = artistProfiles.map((profile) => profile.id);
+  const venueIds = venueProfiles.map((profile) => profile.id);
+  const [ownedArtistImages, ownedArtistVideos, ownedVenueImages, vendorBookings] =
+    await Promise.all([
+      artistIds.length
+        ? db.select().from(artistImages).where(inArray(artistImages.artistId, artistIds))
+        : Promise.resolve([]),
+      artistIds.length
+        ? db.select().from(artistVideos).where(inArray(artistVideos.artistId, artistIds))
+        : Promise.resolve([]),
+      venueIds.length
+        ? db.select().from(venueImages).where(inArray(venueImages.venueId, venueIds))
+        : Promise.resolve([]),
+      artistIds.length || venueIds.length
+        ? db
+            .select()
+            .from(bookingRequests)
+            .where(
+              artistIds.length > 0 && venueIds.length > 0
+                ? or(
+                    inArray(bookingRequests.artistId, artistIds),
+                    inArray(bookingRequests.venueId, venueIds),
+                  )
+                : artistIds.length > 0
+                  ? inArray(bookingRequests.artistId, artistIds)
+                  : inArray(bookingRequests.venueId, venueIds),
+            )
+        : Promise.resolve([]),
+    ]);
 
   // Chat messages are scoped via conversations (no direct user FK).
   const conversationIds = userConversations.map((c) => c.id);
-  const userMessages = conversationIds.length
-    ? await db
-        .select()
-        .from(chatMessages)
-        .where(inArray(chatMessages.conversationId, conversationIds))
-    : [];
+  const bookingIds = Array.from(
+    new Set([...clientBookings, ...vendorBookings].map((booking) => booking.id)),
+  );
+  const [conversationMessages, bookingMessages] = await Promise.all([
+    conversationIds.length
+      ? db.select().from(chatMessages).where(inArray(chatMessages.conversationId, conversationIds))
+      : Promise.resolve([]),
+    bookingIds.length
+      ? db.select().from(chatMessages).where(inArray(chatMessages.bookingRequestId, bookingIds))
+      : Promise.resolve([]),
+  ]);
+  const userMessages = Array.from(
+    new Map([...conversationMessages, ...bookingMessages].map((message) => [message.id, message])).values(),
+  );
 
   // Fetch guests for each invitation.
   const guestsByInvitation: Record<number, unknown[]> = {};
@@ -118,6 +186,26 @@ export async function GET() {
       guests: guestsByInvitation[i.id] ?? [],
     })),
     eventPhotos: userPhotos,
+    vendorProfiles: {
+      artists: artistProfiles.map((profile) => ({
+        ...profile,
+        images: ownedArtistImages.filter((image) => image.artistId === profile.id),
+        videos: ownedArtistVideos.filter((video) => video.artistId === profile.id),
+      })),
+      venues: venueProfiles.map((profile) => ({
+        ...profile,
+        images: ownedVenueImages.filter((image) => image.venueId === profile.id),
+      })),
+    },
+    bookingRequests: Array.from(
+      new Map([...clientBookings, ...vendorBookings].map((booking) => [booking.id, booking])).values(),
+    ),
+    legalAcceptances: userLegalAcceptances,
+    notifications: userNotifications,
+    aiConversations: userAiConversations,
+    wishlist: userWishlist,
+    pushSubscriptions: userPushSubscriptions,
+    pushTokens: userPushTokens,
   };
 
   return new NextResponse(JSON.stringify(payload, null, 2), {

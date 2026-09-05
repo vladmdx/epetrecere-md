@@ -46,6 +46,8 @@ export default async function LegalIndexPage({
 }) {
   const { locale: raw } = await params;
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
+  const canonicalPolicies = new Set(["termeni-generali", "politica-confidentialitate", "politica-cookie"]);
+  const documents = LEGAL_DOCUMENTS.filter((doc) => !canonicalPolicies.has(doc.slug));
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 lg:px-8">
       <nav className="mb-4 text-xs text-muted-foreground">
@@ -64,7 +66,12 @@ export default async function LegalIndexPage({
       </p>
 
       <ul className="mt-8 space-y-2">
-        {LEGAL_DOCUMENTS.map((doc) => (
+        <li className="grid gap-2 sm:grid-cols-3">
+          <Link href="/termeni" className="rounded-xl border border-gold/30 bg-gold/5 p-3 text-center text-sm text-gold hover:bg-gold/10">{t("footer.terms", locale)}</Link>
+          <Link href="/confidentialitate" className="rounded-xl border border-gold/30 bg-gold/5 p-3 text-center text-sm text-gold hover:bg-gold/10">{t("footer.privacy", locale)}</Link>
+          <Link href="/cookies" className="rounded-xl border border-gold/30 bg-gold/5 p-3 text-center text-sm text-gold hover:bg-gold/10">{t("footer.cookies", locale)}</Link>
+        </li>
+        {documents.map((doc) => (
           <li key={doc.slug}>
             <Link
               href={`/legal/${doc.slug}`}

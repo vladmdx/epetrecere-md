@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useLocale } from "@/hooks/use-locale";
 import { MapPin, Phone, Mail, Clock, Loader2, CheckCircle } from "lucide-react";
+import { PrivacyNotice } from "@/components/shared/privacy-notice";
 
 export function ContactPageClient() {
   const { t } = useLocale();
@@ -134,6 +135,7 @@ export function ContactPageClient() {
             {formError && (
               <p className="text-sm text-destructive">{formError}</p>
             )}
+            <PrivacyNotice context="contact" />
             <Button
               type="submit"
               className="w-full bg-gold text-[#0D0D0D] hover:bg-gold-dark"

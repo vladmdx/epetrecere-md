@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { LEGAL_DOCUMENTS, getLegalDocument, legalTitle } from "@/lib/legal";
@@ -48,6 +48,12 @@ export default async function LegalDocumentPage({
   params: Promise<{ locale: string; slug: string }>;
 }) {
   const { slug } = await params;
+  const canonical: Record<string, string> = {
+    "termeni-generali": "/termeni",
+    "politica-confidentialitate": "/confidentialitate",
+    "politica-cookie": "/cookies",
+  };
+  if (canonical[slug]) redirect(canonical[slug]);
   const doc = getLegalDocument(slug);
   if (!doc) notFound();
   return <LegalDocumentView doc={doc} />;

@@ -1,45 +1,23 @@
-import { SignUp } from "@clerk/nextjs";
+import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { SignupConsentGate } from "./signup-consent-gate";
 
-export default function SignUpPage() {
+export default async function SignUpPage({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}) {
+  const { locale: raw } = await params;
+  const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
+
   return (
     // Clerk ships its own translations (LocalizedClerkProvider feeds it the
     // active locale), so the legacy DOM translator must keep its hands off
     // this subtree — rewriting Clerk's text phrase by phrase corrupts it.
     <div
       data-no-auto-translate
-      className="flex min-h-screen items-center justify-center bg-[#0D0D0D]"
+      className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#0D0D0D] px-4 py-8"
     >
-      <SignUp
-        appearance={{
-          variables: {
-            colorPrimary: "#C9A84C",
-            colorBackground: "#1A1A2E",
-            colorForeground: "#FAF8F2",
-            colorMutedForeground: "#B0B0C0",
-            colorInput: "#141428",
-            colorInputForeground: "#FAF8F2",
-          },
-          elements: {
-            formButtonPrimary:
-              "!bg-[#C9A84C] hover:!bg-[#A08839] !text-[#0D0D0D] !font-semibold",
-            card: "!bg-[#1A1A2E] !border !border-[#2A2A3E] !shadow-xl",
-            headerTitle: "!text-[#C9A84C]",
-            headerSubtitle: "!text-[#B0B0C0]",
-            socialButtonsBlockButton:
-              "!border-[#2A2A3E] !text-[#FAF8F2] !bg-[#141428] hover:!bg-[#1E1E38]",
-            socialButtonsBlockButtonText: "!text-[#FAF8F2]",
-            formFieldLabel: "!text-[#FAF8F2]",
-            formFieldInput: "!bg-[#141428] !border-[#2A2A3E] !text-[#FAF8F2]",
-            footerActionLink: "!text-[#C9A84C] hover:!text-[#A08839]",
-            footer: "!text-[#B0B0C0]",
-            footerActionText: "!text-[#B0B0C0]",
-            dividerLine: "!bg-[#2A2A3E]",
-            dividerText: "!text-[#B0B0C0]",
-            identityPreviewEditButton: "!text-[#C9A84C]",
-            formFieldInputShowPasswordButton: "!text-[#B0B0C0]",
-          },
-        }}
-      />
+      <SignupConsentGate locale={locale} />
     </div>
   );
 }

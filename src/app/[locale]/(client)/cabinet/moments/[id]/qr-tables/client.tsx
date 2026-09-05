@@ -19,6 +19,7 @@ interface State {
   eventDate: string | null;
   slug: string | null;
   tables: string[];
+  accessCode: string | null;
 }
 
 export function QrTablesClient({ planId }: { planId: number }) {
@@ -44,6 +45,7 @@ export function QrTablesClient({ planId }: { planId: number }) {
           eventDate: planData.plan.eventDate,
           slug: momentsData.slug,
           tables: Array.isArray(momentsData.tables) ? momentsData.tables : [],
+          accessCode: momentsData.accessCode ?? null,
         });
       } catch {
         toast.error(t("cabinet.qrTables.loadError"));
@@ -196,6 +198,9 @@ export function QrTablesClient({ planId }: { planId: number }) {
                 <p className="mt-1 text-[9px] text-black/60">
                   {t("cabinet.qrTables.scanHint")}
                 </p>
+                {state.accessCode ? (
+                  <p className="mt-1 text-[10px] font-bold tracking-[0.18em] text-[#9c7721]">PIN {state.accessCode}</p>
+                ) : null}
               </div>
             );
           })}

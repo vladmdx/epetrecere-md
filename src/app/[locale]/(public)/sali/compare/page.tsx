@@ -108,8 +108,6 @@ export default async function VenueComparePage({ params, searchParams }: Props) 
         ratingAvg: venues.ratingAvg,
         ratingCount: venues.ratingCount,
         facilities: venues.facilities,
-        phone: venues.phone,
-        email: venues.email,
         virtualTourUrl: venues.virtualTourUrl,
         menuUrl: venues.menuUrl,
         menuPdfUrl: venues.menuPdfUrl,

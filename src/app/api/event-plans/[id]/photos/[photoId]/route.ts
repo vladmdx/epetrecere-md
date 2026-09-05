@@ -71,11 +71,21 @@ export async function DELETE(
     return NextResponse.json({ error: owned.error }, { status: owned.status });
   }
 
-  await db
+  const [deleted] = await db
     .delete(eventPhotos)
     .where(
       and(eq(eventPhotos.id, photoIdNum), eq(eventPhotos.planId, planId)),
-    );
+    )
+    .returning({ url: eventPhotos.url });
+
+  if (deleted?.url?.startsWith("https://") && process.env.BLOB_READ_WRITE_TOKEN) {
+    try {
+      const { del } = await import("@vercel/blob");
+      await del(deleted.url);
+    } catch (error) {
+      console.error("[moments-owner-delete] blob cleanup failed", error);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
