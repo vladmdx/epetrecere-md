@@ -71,4 +71,13 @@ Mac-ul a fost deblocat. Testele folosesc acum browserul separat din Codex, făr�
 - Helperul pentru cele patru identități QA poate neutraliza telefonul/notificările și închide numai sesiunile persoanei QA verificate prin marker, email, ID aplicație și ID Clerk. Cinci teste de siguranță trecute. Comenzile mutante nu au fost încă executate.
 - Reexecutate 76 teste de regresie pentru onboarding și recuperarea pachetului contractual; toate trecute. Typecheck și verificarea diff-ului au trecut.
 
-Aceste corecții suplimentare nu sunt încă declarate publicate sau verificate manual după publicare. Fluxurile de aprobare, rezervare, negociere, confirmare și recenzie rămân pe lista manuală până la înregistrarea efectivă a ambilor furnizori QA.
+### Publicare și reverificare
+
+- Build local și Vercel reușite, 459 pagini. Commit sursă `c35ded7`.
+- Publicat pe `https://epetrecere.md`: deployment `dpl_3tKRvrcXvPqy53QxjfcGbnTzk8cq`, stare `READY`, URL de deployment `https://epetrecere-djep1zupy-vladstalker96-7582s-projects.vercel.app`.
+- HTTP live după publicare: homepage, artiști, săli, acord parteneri EN/RU răspund 200; `/api/legal/accept`, `/api/me/artist`, `/api/me/venue` răspund 401 fără autentificare.
+- Verificat manual contractul public EN/RU după încărcare: nota privind limba română este afișată, conținutul are protecțiile de traducere și `lang="ro"`; fragmentele `5% din valoarea finală` și `partener din aceeași categorie` rămân intacte. Fără erori/avertizări în consola verificată EN.
+- Reexecutat manual onboardingul artistului după publicare, de la categorie până la pasul final: fotografie încărcată, Bălți, 150 km, supliment 20 EUR, nuntă 300 EUR. Butonul contractului se deschide, nota de limbă este afișată, textul taxei rămâne intact, iar explicația dovezii nu mai trimite la Anexa 2 inexistentă în acel document.
+- Reverificat vizual finalul formularului la 390 × 844: lista cu o singură bifă, canvasul și butoanele sunt accesibile prin scroll, fără decupare în starea nesemnată. Viewportul temporar a fost resetat; fila cu formularul pregătit este păstrată pentru continuare.
+
+Fluxurile manuale de semnare, aprobare, rezervare, negociere, confirmare și recenzie rămân de parcurs pentru ambii furnizori QA. Confirmarea expresă pentru semnăturile fictive este încă în așteptare; nu s-a trimis niciun contract QA și nu s-au creat profiluri publice în această continuare. Corecțiile negocierii/ștergerii au verificări automate, nu sunt prezentate drept scenarii manuale live finalizate.
