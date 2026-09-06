@@ -5,8 +5,8 @@
  *
  * The vendor explicitly accepts the listed documents together, identifies
  * the contracting party and draws their signature.
- * On submit the server records the technical fixation required by Venue
- * Agreement Anexa 2 (version, timestamp, IP, user-agent, content hash).
+ * On submit the server records the technical evidence of acceptance
+ * (version, timestamp, IP, user-agent, content hash).
  *
  * Submission still requires complete identity details, the contract review,
  * an unchecked-by-default acceptance and a matching drawn signature.
@@ -158,7 +158,7 @@ export function ESignature({
   }
 
   return (
-    <div className="rounded-2xl border border-gold/25 bg-gold/[0.04] p-5">
+    <div data-no-auto-translate translate="no" className="rounded-2xl border border-gold/25 bg-gold/[0.04] p-5">
       <div className="mb-4 flex items-start gap-3">
         <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" />
         <div>

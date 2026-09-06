@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   CheckCircle,
   XCircle,
@@ -21,12 +21,14 @@ import {
   Filter,
   ArrowUpDown,
   Ban,
+  HandCoins,
 } from "lucide-react";
-import Link from "next/link";
+import Link, { useLocalizedRouter } from "@/components/shared/locale-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +49,7 @@ import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import type { VenueBookingTab } from "@/lib/db/queries/venue-bookings";
 import { useLocale } from "@/hooks/use-locale";
+import { canNegotiate, parseOfferAmount, type PriceOffer } from "@/lib/booking/negotiation";
 
 interface Booking {
   id: number;
@@ -62,6 +65,7 @@ interface Booking {
   endTime: string | null;
   guestCount: number | null;
   agreedPrice: number | null;
+  priceOffers: PriceOffer[] | null;
   message: string | null;
   status: string;
   clientConfirmedAt?: string | null;
@@ -191,8 +195,8 @@ export function VenueBookingsClient({
   initialBookings,
   counts,
 }: Props) {
-  const { t } = useLocale();
-  const router = useRouter();
+  const { t, locale } = useLocale();
+  const router = useLocalizedRouter();
   const searchParams = useSearchParams();
   const [bookings, setBookings] = useState<Booking[]>(initialBookings);
   const [acceptDialog, setAcceptDialog] = useState<Booking | null>(null);
@@ -201,10 +205,41 @@ export function VenueBookingsClient({
   const [cancelDialog, setCancelDialog] = useState<Booking | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [acceptReply, setAcceptReply] = useState("");
+  const [proposeDialog, setProposeDialog] = useState<Booking | null>(null);
+  const [proposeAmount, setProposeAmount] = useState("");
+  const [proposeMessage, setProposeMessage] = useState("");
   const [declineReason, setDeclineReason] = useState(DECLINE_REASONS[0]);
   const [declineMessage, setDeclineMessage] = useState("");
   const [busy, setBusy] = useState<number | null>(null);
   const [reviewRequested, setReviewRequested] = useState<Set<number>>(new Set());
+
+  // Server refreshes and tab navigation preserve this client component.
+  // Reconcile the new props so offers and confirmations do not stay stale.
+  useEffect(() => { setBookings(initialBookings); }, [initialBookings]);
+
+  async function confirmPropose() {
+    if (!proposeDialog) return;
+    const amount = parseOfferAmount(proposeAmount);
+    if (amount === null) { toast.error(t("planner.negotiation.invalidAmount")); return; }
+    setBusy(proposeDialog.id);
+    try {
+      const res = await fetch(`/api/booking-requests/${proposeDialog.id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "propose_price", agreedPrice: amount, reply: proposeMessage.trim() || undefined }),
+      });
+      if (!res.ok) {
+        toast.error(t("planner.negotiation.offerError"));
+        router.refresh();
+        return;
+      }
+      toast.success(t("planner.negotiation.offerSent"));
+      setProposeDialog(null);
+      setProposeAmount("");
+      setProposeMessage("");
+      router.refresh();
+    } catch { toast.error(t("planner.negotiation.networkError")); }
+    finally { setBusy(null); }
+  }
 
   // Toolbar state — spec 3.1
   const [search, setSearch] = useState("");
@@ -724,6 +759,22 @@ export function VenueBookingsClient({
                         </div>
                       )}
 
+                      {/* Price negotiation history, redacted server-side until confirmation. */}
+                      {!!b.priceOffers?.length && (
+                        <div className="space-y-2 rounded-lg border border-gold/20 bg-gold/5 p-3">
+                          <p className="flex items-center gap-1.5 text-xs font-semibold text-gold"><HandCoins className="h-3.5 w-3.5" />{t("planner.negotiation.history")}</p>
+                          {b.priceOffers.map((offer, index) => (
+                            <div key={index} className="min-w-0 rounded-md border border-border/30 p-2 text-xs">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span>{t(offer.from === "artist" ? "planner.negotiation.yourOffer" : "planner.negotiation.theirOffer")} <strong className="text-gold">{offer.amount}€</strong></span>
+                                <time dateTime={offer.at} className="text-muted-foreground">{new Date(offer.at).toLocaleString(locale === "ro" ? "ro-MD" : locale === "ru" ? "ru-RU" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</time>
+                              </div>
+                              {offer.message && <p className="mt-1 break-words text-muted-foreground">{offer.message}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Linked artists from the same event plan */}
                       {b.linkedArtists.length > 0 && (
                         <div className="rounded-lg border border-purple-500/30 bg-purple-500/5 p-3">
@@ -770,6 +821,11 @@ export function VenueBookingsClient({
                     {/* Actions column */}
                     {isNew && (
                       <div className="flex flex-col gap-2">
+                        {canNegotiate(b.status) && <Button variant="outline" disabled={busy === b.id} className="gap-1.5 border-gold/30 text-gold" onClick={() => {
+                          setProposeDialog(b);
+                          setProposeAmount(String(b.priceOffers?.at(-1)?.amount ?? b.agreedPrice ?? ""));
+                          setProposeMessage("");
+                        }}><HandCoins className="h-4 w-4" />{t(b.priceOffers?.length ? "planner.negotiation.counterOffer" : "planner.negotiation.proposePrice")}</Button>}
                         <Button
                           onClick={() => {
                             setAcceptDialog(b);
@@ -871,6 +927,18 @@ export function VenueBookingsClient({
         </div>
       )}
 
+      {/* Price offer dialog */}
+      <Dialog open={!!proposeDialog} onOpenChange={(open) => !open && busy !== proposeDialog?.id && setProposeDialog(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t("planner.negotiation.proposeTitle")}</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1"><Label htmlFor="venue-offer-amount">{t("planner.negotiation.amountLabel")}</Label><Input id="venue-offer-amount" type="number" min="1" max="10000000" step="1" value={proposeAmount} onChange={(event) => setProposeAmount(event.target.value)} disabled={busy === proposeDialog?.id} /></div>
+            <div className="space-y-1"><Label htmlFor="venue-offer-message">{t("planner.negotiation.messageOptional")}</Label><Textarea id="venue-offer-message" rows={3} maxLength={4000} value={proposeMessage} onChange={(event) => setProposeMessage(event.target.value)} disabled={busy === proposeDialog?.id} /></div>
+          </div>
+          <DialogFooter><Button variant="outline" onClick={() => setProposeDialog(null)} disabled={busy === proposeDialog?.id}>{t("common.cancel")}</Button><Button className="bg-gold text-black" onClick={confirmPropose} disabled={busy === proposeDialog?.id || parseOfferAmount(proposeAmount) === null}>{busy === proposeDialog?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : t("planner.negotiation.sendOffer")}</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Accept dialog */}
       <Dialog
         open={!!acceptDialog}
@@ -900,6 +968,9 @@ export function VenueBookingsClient({
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {acceptDialog && (acceptDialog.priceOffers?.at(-1)?.amount ?? acceptDialog.agreedPrice) != null && (
+              <p className="rounded-lg border border-gold/20 bg-gold/5 p-3 text-sm">{t("planner.negotiation.amountLabel")}: <strong className="text-gold">{acceptDialog.priceOffers?.at(-1)?.amount ?? acceptDialog.agreedPrice}€</strong></p>
+            )}
             <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
               <CalendarIcon className="mr-1.5 inline h-3.5 w-3.5 text-emerald-400" />
               {t("vendorSalaBookings.calendarNotePrefix")}{" "}

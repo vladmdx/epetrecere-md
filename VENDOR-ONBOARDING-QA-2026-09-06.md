@@ -46,3 +46,29 @@
 - Publicarea finală este `dpl_CJMaBKVyTHUvG1SFkjF7mQeCjuHW`, stare `READY`, alias `https://epetrecere.md`. Include commitul `555920b`, recuperarea înregistrării și meniurile localizate. Nu mai există blocaj de publicare Vercel; rămân accesul GitHub și Mac-ul blocat pentru testele manuale.
 
 Acest raport separă verificările automate de testarea manuală live. Nu afirmă că toate funcțiile platformei sunt lipsite de buguri.
+
+## Continuare: 7 septembrie 2026
+
+Mac-ul a fost deblocat. Testele folosesc acum browserul separat din Codex, fără a interfera cu altă sarcină care controlează Chrome.
+
+### Verificări manuale live efectuate
+
+- Autentificare în contul sintetic al artistului, categoria Foto & Video vizibilă și selectabilă.
+- Încărcarea fotografiei din formular a reușit, cu mesajul de confirmare.
+- Nume și descriere QA, oraș Bălți, deplasare 150 km și supliment 20 EUR; toate etichetele distanței s-au actualizat din Chișinău în Bălți.
+- Tarif de nuntă per eveniment, 300 EUR; pasul următor rămâne blocat cât tariful adăugat este gol.
+- Pasul final prezintă corect categoria, orașul, deplasarea, suplimentul și tariful.
+- Contractul se deschide și înainte de completarea identității. Completarea identității regenerează documentul afișat și invalidează citirea anterioară; deschiderea tuturor secțiunilor marchează citirea, păstrată după închiderea panoului.
+- La viewport 390 × 844: o singură bifă, lista documentelor fără versiuni în etichete, canvas de semnătură și butoane finale accesibile prin scroll; fără depășire orizontală sau decuparea jumătății inferioare în starea încă nesemnată. Consola nu a raportat erori/avertizări în această verificare.
+- Semnarea și trimiterea live nu sunt încă efectuate: s-a cerut confirmarea expresă pentru cele două semnături fictive QA, fără reprezentarea unei persoane reale.
+
+### Probleme suplimentare găsite și corecții în lucru
+
+- Lipsa negocierii și a istoricului ofertelor în dashboardul sălii; clientul nu avea contraofertă accesibilă în cabinet. Implementare adăugată, inclusiv sincronizarea după refresh, numele/linkul sălii și protecția contactelor. 12 teste trecute.
+- Ștergerea profilurilor/conturilor nu invalida consecvent catalogul public. Invalidare adăugată după operația reușită, cu validarea ID-urilor și păstrarea dovezilor contractuale. 13 verificări izolate ale handlerelor trecute, fără operații externe.
+- Traducătorul automat modifica fragmente ale contractului românesc afișat pe interfața EN, de exemplu înlocuia cuvinte în interiorul propozițiilor. Textul juridic și datele dovezilor sunt acum excluse explicit din traducerea automată, în onboarding, documentele publice, contul furnizorului și administrare. Sunt protejate și mutațiile atributelor. 24 verificări de integritate trecute, fără modificarea documentelor/versionării/dovezilor.
+- Acordul partenerului v2.1 nu are încă un corp publicat RU/EN. Interfața indică explicit versiunea română disponibilă, fără să pretindă că este o traducere. Referirea greșită la Anexa 2 a fost scoasă numai din textele ajutătoare; numerotarea anexelor și conținutul juridic nu au fost schimbate.
+- Helperul pentru cele patru identități QA poate neutraliza telefonul/notificările și închide numai sesiunile persoanei QA verificate prin marker, email, ID aplicație și ID Clerk. Cinci teste de siguranță trecute. Comenzile mutante nu au fost încă executate.
+- Reexecutate 76 teste de regresie pentru onboarding și recuperarea pachetului contractual; toate trecute. Typecheck și verificarea diff-ului au trecut.
+
+Aceste corecții suplimentare nu sunt încă declarate publicate sau verificate manual după publicare. Fluxurile de aprobare, rezervare, negociere, confirmare și recenzie rămân pe lista manuală până la înregistrarea efectivă a ambilor furnizori QA.

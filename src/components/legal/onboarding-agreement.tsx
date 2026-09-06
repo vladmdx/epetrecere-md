@@ -35,7 +35,7 @@ export function OnboardingAgreement({ subjectType, agreement, onChange }: {
     [text.signedAt, new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short", timeZone: "Europe/Chisinau" }).format(new Date(saved.acceptedAt))],
     [text.language, { ro: "Română", ru: "Русский", en: "English" }[saved.locale]],
   ];
-  return <section aria-label={text.title} className="min-w-0 space-y-5 rounded-2xl border border-gold/30 bg-gold/[0.04] p-4 sm:p-5">
+  return <section data-no-auto-translate translate="no" aria-label={text.title} className="min-w-0 space-y-5 rounded-2xl border border-gold/30 bg-gold/[0.04] p-4 sm:p-5">
     <div className="flex items-start gap-3"><ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" /><div>
       <h3 className="font-semibold">{text.title}</h3><p className="mt-2 text-sm text-muted-foreground">{text.intro}</p>
     </div></div>

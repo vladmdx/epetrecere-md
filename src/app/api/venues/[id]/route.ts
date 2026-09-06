@@ -262,7 +262,7 @@ export async function DELETE(
 
   const { id } = await params;
   const venueId = Number(id);
-  if (!Number.isFinite(venueId)) {
+  if (!Number.isSafeInteger(venueId) || venueId <= 0) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
@@ -276,5 +276,6 @@ export async function DELETE(
   }
 
   await db.delete(venues).where(eq(venues.id, venueId));
+  revalidateVendorCatalog("venue");
   return NextResponse.json({ success: true });
 }

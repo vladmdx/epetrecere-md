@@ -2102,7 +2102,7 @@
       "ip": "Adresa IP",
       "device": "Dispozitiv (user-agent)",
       "contact": "Contact confirmat",
-      "retention": "Păstrăm aceste date ca dovadă a acceptării contractului, conform Anexei 2. Le poți solicita sau contesta la privacy@epetrecere.md."
+      "retention": "Păstrăm aceste date ca dovadă a acceptării contractului. Le poți solicita sau contesta la privacy@epetrecere.md."
     }
   },
   "calendar": {
@@ -2347,7 +2347,7 @@
     "untickAll": "Deselectează tot",
     "fullName": "Nume și prenume (semnătură electronică)",
     "nameHint": "Introdu numele complet (nume și prenume).",
-    "fixationNote": "La acceptare se înregistrează versiunea documentelor, data și ora, adresa IP și dispozitivul, conform Anexei 2 din Acord.",
+    "fixationNote": "La acceptare se înregistrează versiunea și textul documentelor, data și ora, adresa IP și dispozitivul, ca dovadă a semnării.",
     "readyToSign": "Gata de semnare",
     "docsTitle": "Documente legale",
     "drawSignature": "Semnează aici",
@@ -5092,7 +5092,7 @@
       "signedBy": "Semnat de",
       "subjectArtist": "Artist",
       "subjectVenue": "Sală",
-      "subtitle": "Acceptările electronice ale furnizorilor, cu fixarea tehnică cerută de Anexa 2. Înregistrările nu pot fi modificate sau șterse.",
+      "subtitle": "Acceptările electronice ale furnizorilor și dovezile tehnice ale semnării. Înregistrările semnate sunt păstrate fără modificări.",
       "technical": "Fixare tehnică",
       "title": "Contracte semnate",
       "partnerDetails": "Rechizitele Partenerului",

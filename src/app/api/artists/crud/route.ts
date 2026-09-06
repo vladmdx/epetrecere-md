@@ -259,6 +259,12 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "ID required" }, { status: 400 });
   }
 
-  await db.delete(artists).where(eq(artists.id, Number(id)));
+  const artistId = Number(id);
+  if (!Number.isSafeInteger(artistId) || artistId <= 0) {
+    return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+  }
+  const [deleted] = await db.delete(artists).where(eq(artists.id, artistId)).returning({ id: artists.id });
+  if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  revalidateVendorCatalog("artist");
   return NextResponse.json({ success: true });
 }

@@ -1,5 +1,5 @@
 // Admin view of every signed contract: who signed, which documents and
-// versions, the full technical fixation (Anexa 2) and the handwritten
+// versions, the full technical evidence and the handwritten
 // signature.
 //
 // Read-only on purpose — legal_acceptances is append-only in the database
@@ -127,7 +127,7 @@ export default async function AdminContractsPage({
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div data-no-auto-translate translate="no" className="space-y-6 p-6">
       <div>
         <h1 className="font-heading text-2xl font-bold">{t("adminUi.contracts.title", locale)}</h1>
         <p className="text-sm text-muted-foreground">
@@ -180,7 +180,7 @@ export default async function AdminContractsPage({
                         {t("adminUi.contracts.signedBy", locale)}{" "}
                         <strong>{g.signatureName}</strong>
                         {g.representativeRole ? ` (${g.representativeRole})` : ""} ·{" "}
-                        {new Date(g.acceptedAt).toLocaleString("ro-RO")}
+                        {new Date(g.acceptedAt).toLocaleString(locale)}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {g.email ?? "—"}
@@ -203,7 +203,7 @@ export default async function AdminContractsPage({
                                 rel="noreferrer"
                                 className="text-gold hover:underline"
                               >
-                                {doc?.title.ro ?? d.documentSlug}
+                                {d.documentTitleStored ?? doc?.title[locale] ?? d.documentSlug}
                               </a>{" "}
                               <span className="text-muted-foreground">v{d.documentVersion}</span>
                               <span className="block break-all font-mono text-[11px] text-muted-foreground/70">
@@ -212,18 +212,17 @@ export default async function AdminContractsPage({
                               </span>
                               {/*
                                 The document as signed, frozen on the row.
-                                The link above points at whatever the pack
-                                says today — which, once a document is
-                                superseded, is not what this person agreed to.
+                                The link above downloads that same frozen
+                                snapshot, not the current published template.
                                 Collapsed by default: a contract is long and
                                 an administrator is usually scanning a list.
                               */}
                               {d.documentBlocks?.length ? (
                                 <details className="mt-1">
                                   <summary className="cursor-pointer text-[11px] text-gold">
-                                    Textul semnat ({d.documentBlocks.length} blocuri)
+                                    {locale === "ru" ? `Подписанный текст (${d.documentBlocks.length} блоков)` : locale === "en" ? `Signed text (${d.documentBlocks.length} blocks)` : `Textul semnat (${d.documentBlocks.length} blocuri)`}
                                   </summary>
-                                  <div className="mt-2 max-h-[28rem] space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-3">
+                                  <div data-no-auto-translate translate="no" className="mt-2 max-h-[28rem] space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-3">
                                     {d.documentBlocks.map((b, bi) =>
                                       b.type === "h2" ? (
                                         <p key={bi} className="pt-2 font-heading text-[12px] font-bold">
@@ -239,7 +238,7 @@ export default async function AdminContractsPage({
                                 </details>
                               ) : (
                                 <span className="block text-[11px] text-muted-foreground/70">
-                                  Semnat înainte ca textul să fie păstrat pe acceptare.
+                                  {locale === "ru" ? "Подписано до сохранения текстовых копий." : locale === "en" ? "Signed before text snapshots were stored." : "Semnat înainte de păstrarea copiilor textului."}
                                 </span>
                               )}
                             </li>

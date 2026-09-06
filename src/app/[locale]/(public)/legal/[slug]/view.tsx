@@ -5,16 +5,15 @@ import { useLocale } from "@/hooks/use-locale";
 import { legalBlocks, legalTitle, type LegalDocument } from "@/lib/legal";
 
 /**
- * Renders a legal document in the reader's language. All eleven documents now
- * ship in RO, RU and EN. Romanian remains the version that prevails in case of
- * divergence (Venue Agreement §35.4) — said on the page, because a reader
- * relying on a translation is entitled to know which text binds them.
+ * Renders the published language, or explicitly identifies the Romanian
+ * fallback. Legal text is never passed through the legacy UI translator.
  */
 export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
   const { locale, t } = useLocale();
   const blocks = legalBlocks(doc, locale);
   const title = legalTitle(doc, locale);
-  const isTranslation = locale !== "ro";
+  const isTranslation = locale !== "ro" && Boolean(doc.blocks[locale]?.length);
+  const isRomanianFallback = locale !== "ro" && !isTranslation;
   const prevailingNote = {
     ro: "",
     ru: " · перевод; преобладает румынский текст",
@@ -22,7 +21,7 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
   }[locale];
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-12 lg:px-8">
+    <div data-no-auto-translate translate="no" className="mx-auto max-w-3xl px-4 py-12 lg:px-8">
       <nav className="mb-4 text-xs text-muted-foreground">
         <Link href="/" className="hover:text-gold">
           {t("nav.home")}
@@ -40,8 +39,13 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
         EPETRECERE Legal Pack v{doc.version}
         {isTranslation && prevailingNote}
       </p>
+      {isRomanianFallback && <p className="mt-2 text-sm text-muted-foreground">
+        {locale === "ru"
+          ? "Этот документ опубликован на румынском языке. Перевод пока недоступен. Ниже показан опубликованный текст без автоматического перевода."
+          : "This document is published in Romanian. A translation is not yet available. The published text is shown below without automatic translation."}
+      </p>}
 
-      <article className="mt-8 space-y-4">
+      <article lang={isRomanianFallback ? "ro" : locale} className="mt-8 space-y-4">
         {blocks.map((b, i) =>
           b.type === "h2" ? (
             <h2
@@ -60,7 +64,7 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
 
       <div className="mt-10 border-t border-border/60 pt-6 text-xs text-muted-foreground">
         <Link href="/legal" className="hover:text-gold">
-          ← Toate documentele legale
+          {locale === "ru" ? "← Все юридические документы" : locale === "en" ? "← All legal documents" : "← Toate documentele legale"}
         </Link>
       </div>
     </div>

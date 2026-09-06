@@ -5,7 +5,7 @@
  * partner goes on to finish registration — an abandoned registration still
  * produced a legally binding acceptance, and the evidence for it has to leave
  * the database. Unlike the signer's copy, this one carries the whole
- * technical fixation required by the Venue Agreement, Anexa 2: IP,
+ * technical evidence of acceptance: IP,
  * user-agent, the SHA-256 of the exact text shown per document, versions and
  * timestamp. The drawn signature travels as an attachment.
  */
@@ -70,7 +70,7 @@ export function signedContractAdminEmail(d: SignedContractAdminEmailData): {
     <p style="margin:0 0 20px;color:#D4D4E0;font-size:14px;">
       <strong>${escapeHtml(d.signerName)}</strong> a acceptat electronic pachetul legal
       v${escapeHtml(d.packVersion)}${d.subjectName ? ` pentru <strong>${escapeHtml(d.subjectName)}</strong>` : ""}.
-      Mai jos este fixarea tehnică integrală (Anexa 2). Păstreaz-o — este proba acceptării.
+      Mai jos este înregistrarea tehnică a semnării. Păstreaz-o: este dovada acceptării.
     </p>
 
     <h3 style="color:#FAF8F2;font-size:14px;margin:0 0 8px;">Documente acceptate</h3>

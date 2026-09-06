@@ -73,7 +73,7 @@ export function SignedDocumentsCard() {
   }
 
   return (
-    <Card>
+    <Card data-no-auto-translate translate="no">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
           <FileSignature className="h-4 w-4 text-gold" />
@@ -107,7 +107,7 @@ export function SignedDocumentsCard() {
                       <strong>{g.signatureName}</strong>
                       {g.representativeRole ? ` (${g.representativeRole})` : ""}
                       {" · "}
-                      {new Date(g.acceptedAt).toLocaleString("ro-RO")}
+                      {new Date(g.acceptedAt).toLocaleString(locale)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {t("vendor.signedDocs.pack", { v: g.packVersion })} ·{" "}
@@ -140,7 +140,7 @@ export function SignedDocumentsCard() {
                               target="_blank"
                               rel="noreferrer"
                               className="text-gold hover:underline"
-                              title="Semnat înainte ca textul să fie păstrat pe acceptare — se deschide versiunea publicată."
+                              title={locale === "ru" ? "Подписано до сохранения текста. Откроется опубликованная версия." : locale === "en" ? "Signed before text snapshots were stored. Opens the published version." : "Semnat înainte de păstrarea textului. Se deschide versiunea publicată."}
                             >
                               {d.documentTitle}
                             </a>
@@ -155,7 +155,7 @@ export function SignedDocumentsCard() {
                             {t("vendor.signedDocs.hash")}: {d.contentHash ?? "—"}
                           </span>
                           {openDoc === d.id && d.documentBlocks?.length ? (
-                            <div className="mt-2 max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-3">
+                            <div data-no-auto-translate translate="no" className="mt-2 max-h-96 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-background/60 p-3">
                               {d.documentBlocks.map((b, bi) =>
                                 b.type === "h2" ? (
                                   <p
@@ -175,14 +175,14 @@ export function SignedDocumentsCard() {
                               )}
                               <div className="mt-3 border-t border-border pt-2">
                                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                                  Semnat de
+                                  {locale === "ru" ? "Подписано" : locale === "en" ? "Signed by" : "Semnat de"}
                                 </p>
                                 <p className="text-[12px] font-semibold">
                                   {g.signatureName}
                                 </p>
                                 <p className="text-[11px] text-muted-foreground">
                                   {new Date(g.acceptedAt).toLocaleDateString(
-                                    "ro-RO",
+                                    locale,
                                     { day: "numeric", month: "long", year: "numeric" },
                                   )}
                                 </p>
@@ -190,7 +190,7 @@ export function SignedDocumentsCard() {
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={g.signatureImage}
-                                    alt="Semnătura"
+                                    alt={t("vendor.signedDocs.signature")}
                                     className="mt-1 h-14 rounded bg-white p-1"
                                   />
                                 )}

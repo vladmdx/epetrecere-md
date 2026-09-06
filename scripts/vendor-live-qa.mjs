@@ -4,6 +4,7 @@ import { createClerkClient } from '@clerk/backend';
 import postgres from 'postgres';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { assertQaFixture, assertQaAppUser, assertQaClerkUser, assertQaSessions, safeQaNotificationPrefs } from './vendor-qa-safety.mjs';
 
 config({ path: '.env.production.local', quiet: true });
 const statePath = '/tmp/epetrecere-vendor-qa-20260906.json';
@@ -12,6 +13,15 @@ const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
 const action = process.argv[2] || 'inspect';
 let state = existsSync(statePath) ? JSON.parse(readFileSync(statePath, 'utf8')) : { marker: randomUUID(), users: {} };
 const save = () => writeFileSync(statePath, JSON.stringify(state, null, 2), { mode: 0o600 });
+
+async function resolveExactFixture(persona) {
+  const user = assertQaFixture(state, persona);
+  const rows = await sql`SELECT id, clerk_id, email, notification_prefs FROM users
+    WHERE id = ${user.id} AND clerk_id = ${user.clerkId} AND email = ${user.email}`;
+  const appUser = assertQaAppUser(rows, user);
+  assertQaClerkUser(await clerk.users.getUser(user.clerkId), user);
+  return { user, appUser };
+}
 
 try {
   if (action === 'create') {
@@ -35,6 +45,41 @@ try {
     if (!state.users[persona]) throw new Error('Unknown QA persona');
     const ticket = await clerk.signInTokens.createSignInToken({ userId: state.users[persona].clerkId, expiresInSeconds: 90 });
     console.log(`https://epetrecere.md/ro/sign-in?__clerk_ticket=${encodeURIComponent(ticket.token)}`);
+  } else if (action === 'safe-contact') {
+    const persona = process.argv[3];
+    const { user, appUser } = await resolveExactFixture(persona);
+    const prefs = safeQaNotificationPrefs(appUser.notification_prefs);
+    // WhatsApp strips non-digits; QA TEST therefore cannot become a recipient.
+    // The triple predicate is repeated on UPDATE to fail closed if identity changed.
+    const updated = await sql`UPDATE users SET phone = 'QA TEST', notification_prefs = ${sql.json(prefs)}::jsonb
+      WHERE id = ${user.id} AND clerk_id = ${user.clerkId} AND email = ${user.email}
+      RETURNING id, clerk_id, email, phone`;
+    assertQaAppUser(updated, user);
+    if (updated[0].phone !== 'QA TEST') throw new Error('QA contact safety verification failed');
+    console.log(JSON.stringify({ persona, safeContact: true, optionalNotificationsDisabled: true }));
+  } else if (action === 'signout') {
+    const persona = process.argv[3];
+    const { user } = await resolveExactFixture(persona);
+    const sessions = [];
+    let offset = 0;
+    // Capture and validate the complete list BEFORE revoking anything, so
+    // pagination cannot skip rows as the active-session collection shrinks.
+    while (true) {
+      const page = await clerk.sessions.getSessionList({ userId: user.clerkId, status: 'active', limit: 100, offset });
+      assertQaSessions(page.data, user);
+      if (!Number.isSafeInteger(page.totalCount) || page.totalCount < 0 || page.totalCount > 1000) throw new Error('Unexpected QA session count');
+      sessions.push(...page.data);
+      offset += page.data.length;
+      if (offset >= page.totalCount) break;
+      if (!page.data.length || offset >= 1000) throw new Error('Incomplete QA session listing');
+    }
+    assertQaSessions(sessions, user);
+    const unique = [...new Map(sessions.map(session => [session.id, session])).values()];
+    for (const session of unique) {
+      const revoked = await clerk.sessions.revokeSession(session.id);
+      if (revoked.userId !== user.clerkId || revoked.id !== session.id || revoked.status !== 'revoked') throw new Error('QA session revocation could not be verified');
+    }
+    console.log(JSON.stringify({ persona, revokedSessions: unique.length }));
   } else if (action === 'inspect') {
     for (const [persona, u] of Object.entries(state.users)) {
       const user = await sql`SELECT id, role, onboarding_complete, name, phone FROM users WHERE clerk_id = ${u.clerkId}`;
@@ -44,6 +89,6 @@ try {
       console.log(JSON.stringify({ persona, user, artist, venue, contracts }));
     }
   } else {
-    throw new Error('Use create, ticket <persona>, or inspect');
+    throw new Error('Use create, ticket <persona>, safe-contact <persona>, signout <persona>, or inspect');
   }
 } finally { await sql.end(); }

@@ -2102,7 +2102,7 @@
       "ip": "IP address",
       "device": "Device (user-agent)",
       "contact": "Confirmed contact",
-      "retention": "We keep this data as proof that the contract was accepted, per Annex 2 of the agreement. You can request or contest it at privacy@epetrecere.md."
+      "retention": "We keep this data as proof that the contract was accepted. You can request or contest it at privacy@epetrecere.md."
     }
   },
   "calendar": {
@@ -2347,7 +2347,7 @@
     "untickAll": "Untick all",
     "fullName": "Full name (electronic signature)",
     "nameHint": "Enter your full name (first and last).",
-    "fixationNote": "On acceptance we record the document version, date and time, IP address and device, per Annex 2 of the Agreement.",
+    "fixationNote": "On acceptance we store the document version and text, date and time, IP address and device as evidence of signing.",
     "readyToSign": "Ready to sign",
     "docsTitle": "Legal documents",
     "drawSignature": "Sign here",
@@ -5092,7 +5092,7 @@
       "signedBy": "Signed by",
       "subjectArtist": "Artist",
       "subjectVenue": "Venue",
-      "subtitle": "The vendors' electronic acceptances, with the technical record required by Annex 2. The entries cannot be modified or deleted.",
+      "subtitle": "Vendors' electronic acceptances and technical evidence of signing. Signed records are preserved without alteration.",
       "technical": "Technical record",
       "title": "Signed contracts",
       "partnerDetails": "Partner details",

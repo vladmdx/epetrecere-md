@@ -16,7 +16,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import {
   Calendar,
   Loader2,
@@ -30,16 +30,19 @@ import {
   Send,
   XCircle,
   Euro,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type { BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
 import { useLocale } from "@/hooks/use-locale";
 import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
+import { canNegotiate, parseOfferAmount } from "@/lib/booking/negotiation";
 
 interface BookingRequest {
   id: number;
-  artistId: number;
+  artistId: number | null;
+  venueId?: number | null;
   clientName: string;
   clientEmail: string | null;
   eventDate: string;
@@ -53,6 +56,8 @@ interface BookingRequest {
   artistReply: string | null;
   artistName: string | null;
   artistSlug: string | null;
+  venueName?: string | null;
+  venueSlug?: string | null;
   categoryNames?: string[] | null;
   agreedPrice: number | null;
   priceOffers: BookingPriceOffer[] | null;
@@ -183,8 +188,8 @@ export default function ReservationsPage() {
 
   async function confirmPropose() {
     if (!proposeDialog) return;
-    const amt = Number(proposeAmount);
-    if (!Number.isFinite(amt) || amt <= 0) {
+    const amt = parseOfferAmount(proposeAmount);
+    if (amt === null) {
       toast.error(t("cabinet.reservations.invalidAmount"));
       return;
     }
@@ -209,6 +214,8 @@ export default function ReservationsPage() {
       setProposeAmount("");
       setProposeMessage("");
       await refresh();
+    } catch {
+      toast.error(t("planner.negotiation.networkError"));
     } finally {
       setBusy(null);
     }
@@ -334,16 +341,21 @@ export default function ReservationsPage() {
       </Tabs>
 
       {/* Propose price dialog */}
-      <Dialog open={!!proposeDialog} onOpenChange={(o) => !o && setProposeDialog(null)}>
+      <Dialog open={!!proposeDialog} onOpenChange={(o) => !o && busy !== proposeDialog?.id && setProposeDialog(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{t("cabinet.reservations.proposeTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label>{t("cabinet.reservations.priceLabel")}</Label>
+              <Label htmlFor="client-offer-amount">{t("cabinet.reservations.priceLabel")}</Label>
               <Input
+                id="client-offer-amount"
                 type="number"
+                min="1"
+                max="10000000"
+                step="1"
+                disabled={busy === proposeDialog?.id}
                 value={proposeAmount}
                 onChange={(e) => setProposeAmount(e.target.value)}
                 placeholder={t("cabinet.reservations.pricePlaceholder")}
@@ -351,8 +363,11 @@ export default function ReservationsPage() {
               />
             </div>
             <div>
-              <Label>{t("cabinet.reservations.messageOptional")}</Label>
+              <Label htmlFor="client-offer-message">{t("cabinet.reservations.messageOptional")}</Label>
               <Textarea
+                id="client-offer-message"
+                maxLength={4000}
+                disabled={busy === proposeDialog?.id}
                 value={proposeMessage}
                 onChange={(e) => setProposeMessage(e.target.value)}
                 placeholder={t("cabinet.reservations.messagePlaceholder")}
@@ -361,8 +376,8 @@ export default function ReservationsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setProposeDialog(null)}>{t("common.cancel")}</Button>
-            <Button onClick={confirmPropose} disabled={busy === proposeDialog?.id} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
+            <Button variant="outline" onClick={() => setProposeDialog(null)} disabled={busy === proposeDialog?.id}>{t("common.cancel")}</Button>
+            <Button onClick={confirmPropose} disabled={busy === proposeDialog?.id || parseOfferAmount(proposeAmount) === null} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark">
               {busy === proposeDialog?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : t("cabinet.reservations.sendOffer")}
             </Button>
           </DialogFooter>
@@ -377,6 +392,7 @@ export default function ReservationsPage() {
               {t("cabinet.reservations.chatTitle", {
                 name:
                   messageDialog?.artistName ??
+                  messageDialog?.venueName ??
                   t("cabinet.reservations.partnerFallback"),
               })}
             </DialogTitle>
@@ -431,6 +447,9 @@ export default function ReservationsPage() {
     const offers = b.priceOffers ?? [];
     const lastOffer = offers.length > 0 ? offers[offers.length - 1] : null;
     const canConfirmAccepted = b.status === "accepted" && !b.clientConfirmedAt;
+    const vendorName = b.artistName ?? b.venueName;
+    const vendorHref = b.artistSlug ? `/artisti/${b.artistSlug}` : b.venueSlug ? `/sali/${b.venueSlug}` : null;
+    const VendorIcon = b.venueId ? Building2 : Music;
 
     return (
       <Card key={b.id} className="transition-all hover:border-gold/30">
@@ -454,16 +473,16 @@ export default function ReservationsPage() {
               </div>
 
               {/* Artist info */}
-              {b.artistName && (
+              {vendorName && (
                 <div className="flex items-center gap-2 text-sm">
-                  <Music className="h-3.5 w-3.5 text-gold" />
-                  {b.artistSlug ? (
-                    <Link href={`/artisti/${b.artistSlug}`} className="font-medium hover:text-gold flex items-center gap-1">
-                      {b.artistName}
+                  <VendorIcon className="h-3.5 w-3.5 text-gold" />
+                  {vendorHref ? (
+                    <Link href={vendorHref} className="font-medium hover:text-gold flex items-center gap-1">
+                      {vendorName}
                       <ExternalLink className="h-3 w-3 opacity-50" />
                     </Link>
                   ) : (
-                    <span className="font-medium">{b.artistName}</span>
+                    <span className="font-medium">{vendorName}</span>
                   )}
                 </div>
               )}
@@ -576,12 +595,11 @@ export default function ReservationsPage() {
                 </Button>
               )}
 
-              {/* "Propune preț" / "Negociază" removed from the client
-                  side — pricing is the partner's responsibility. The
-                  client either confirms the partner's offer or waits.
-                  Keeps the conversation cleaner: no back-and-forth
-                  counter-offers from someone who shouldn't be quoting
-                  the gig in the first place. */}
+              {canNegotiate(b.status) && <Button size="sm" variant="outline" disabled={busy === b.id} className="gap-1 border-gold/30 text-gold" onClick={() => {
+                setProposeDialog(b);
+                setProposeAmount(String(lastOffer?.amount ?? b.agreedPrice ?? ""));
+                setProposeMessage("");
+              }}><HandCoins className="h-3.5 w-3.5" />{t(lastOffer ? "planner.negotiation.counterOffer" : "planner.negotiation.proposePrice")}</Button>}
 
               {/* Message */}
               <Button
@@ -616,10 +634,10 @@ export default function ReservationsPage() {
                 <PendingCountdown createdAt={b.createdAt} />
               )}
 
-              {b.artistSlug && (
-                <Link href={`/artisti/${b.artistSlug}`}>
+              {vendorHref && (
+                <Link href={vendorHref}>
                   <Button variant="ghost" size="sm" className="gap-1 text-xs w-full">
-                    <Music className="h-3.5 w-3.5" /> {t("cabinet.reservations.profile")}
+                    <VendorIcon className="h-3.5 w-3.5" /> {t("cabinet.reservations.profile")}
                   </Button>
                 </Link>
               )}

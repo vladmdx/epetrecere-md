@@ -115,9 +115,10 @@ export function ContractReader({
   }
 
   const signedOn = signature?.date ?? new Date();
+  const isRomanianFallback = locale !== "ro" && !doc.blocks[locale === "ru" ? "ru" : "en"]?.length;
 
   return (
-    <div className="rounded-xl border border-border bg-background/60">
+    <div data-no-auto-translate translate="no" className="rounded-xl border border-border bg-background/60">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-4 py-3">
         <h3 className="font-heading text-base font-bold">
           {legalTitle(doc, locale)}{" "}
@@ -129,6 +130,12 @@ export function ContractReader({
           {seen.length} {copy.of} {sections.length} {copy.sections}
         </p>
       </div>
+
+      {isRomanianFallback && <p className="border-b border-border px-4 py-3 text-xs text-muted-foreground">
+        {locale === "ru"
+          ? "Опубликованная версия этого документа доступна на румынском языке. Перевод пока недоступен. Ниже показан точный текст, который будет сохранён при подписании."
+          : "This document is currently published in Romanian. A translation is not yet available. The exact text below will be stored when you sign."}
+      </p>}
 
       <div
         className="h-1 bg-border"

@@ -175,7 +175,7 @@ const attributeState = new WeakMap<Element, Map<string, TranslationState>>();
 function shouldSkip(element: Element | null): boolean {
   if (!element) return true;
   if (blockedParents.has(element.tagName)) return true;
-  if (element.closest("[data-no-auto-translate], [contenteditable='true']")) return true;
+  if (element.closest("[data-no-auto-translate], [translate='no'], .notranslate, [contenteditable='true']")) return true;
   return false;
 }
 
@@ -207,6 +207,9 @@ function applyText(node: Text, locale: Locale) {
 }
 
 function applyAttribute(element: Element, attribute: string, locale: Locale) {
+  // Attribute mutations arrive directly from the observer, not only through
+  // applyElement. They must respect the same legal/evidence exclusion.
+  if (shouldSkip(element)) return;
   const current = element.getAttribute(attribute);
   if (!current) return;
   let states = attributeState.get(element);

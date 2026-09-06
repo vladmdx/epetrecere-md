@@ -40,6 +40,7 @@ import {
   reviews,
 } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
+import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 
 export async function DELETE() {
   const { userId: clerkId } = await auth();
@@ -164,6 +165,12 @@ export async function DELETE() {
   if (venueIds.length > 0) {
     await db.delete(venueImages).where(inArray(venueImages.venueId, venueIds));
   }
+
+  // The profile was already minimized above. Expire its public pages now,
+  // even if a later account/media cleanup step needs a retry. Signed legal
+  // evidence is unrelated to the public catalog and remains untouched.
+  if (artistIds.length > 0) revalidateVendorCatalog("artist");
+  if (venueIds.length > 0) revalidateVendorCatalog("venue");
 
   // 4. Delete the user row — cascades to event plans, messages,
   //    conversations, invitations and photos.

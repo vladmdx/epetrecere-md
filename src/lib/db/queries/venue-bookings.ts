@@ -5,6 +5,7 @@ import { redactContact } from "@/lib/privacy/contact-redaction";
 import { db } from "@/lib/db";
 import { bookingRequests, users, eventPlans, artists } from "@/lib/db/schema";
 import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { visiblePriceOffers, type PriceOffer } from "@/lib/booking/negotiation";
 
 export type VenueBookingTab = "noi" | "acceptate" | "finalizate" | "anulate";
 
@@ -37,6 +38,7 @@ export type VenueBooking = {
   endTime: string | null;
   guestCount: number | null;
   agreedPrice: number | null;
+  priceOffers: PriceOffer[] | null;
   message: string | null;
   status: string;
   clientConfirmedAt: Date | null;
@@ -77,6 +79,7 @@ export async function getVenueBookings(
       endTime: bookingRequests.endTime,
       guestCount: bookingRequests.guestCount,
       agreedPrice: bookingRequests.agreedPrice,
+      priceOffers: bookingRequests.priceOffers,
       message: bookingRequests.message,
       status: bookingRequests.status,
       clientConfirmedAt: bookingRequests.clientConfirmedAt,
@@ -166,6 +169,7 @@ export async function getVenueBookings(
     const canSeeContact = contactSharedStatuses.has(r.status);
     return {
       ...r,
+      priceOffers: visiblePriceOffers(r.priceOffers, r.status),
       message: !canSeeContact && r.message ? redactContact(r.message) : r.message,
       artistReply: !canSeeContact && r.artistReply ? redactContact(r.artistReply) : r.artistReply,
       clientPhone: canSeeContact ? r.clientPhone : null,
