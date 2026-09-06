@@ -20,7 +20,7 @@
 
 ## Verificări efectuate
 
-- Build de producție reușit, 459 pagini, înaintea ultimei îmbunătățiri de reluare a înregistrării.
+- Build de producție reușit, 459 pagini, inclusiv îmbunătățirea de reluare a înregistrării.
 - 44 verificări de integrare cu handler-ele reale și constrângerile PostgreSQL, inclusiv reluarea pe baza contractului salvat; tranzacția de test a fost anulată integral.
 - 16 callback-uri deferred executate și 20 invalidări de cache în testul de integrare; zero mesaje externe în acel test.
 - 14 teste de securitate, validarea deplasării, sincronizarea orașului, protejarea activării sălii și acțiunile administratorului.
@@ -42,6 +42,7 @@
 
 - Mac blocat în timpul testelor; browserul nu mai poate fi controlat până la deblocarea manuală.
 - GitHub CLI are acreditare invalidă. Connectorul poate citi, dar operația de scriere a fost refuzată cu 403. Commitul local `fb5e139` este păstrat, `main` remote era încă `f87f8d8` la verificare.
-- Prima încercare Vercel a răspuns `Not authorized`; reîncercarea a publicat cu succes deploymentul `dpl_8o3Vkbive38WwSh66iphYcnBHm6S` pe `https://epetrecere.md`, la 19:31 UTC. Include commitul `fb5e139`, nu încă îmbunătățirea suplimentară de reluare.
+- Prima încercare Vercel a răspuns `Not authorized`; reîncercarea a publicat cu succes deploymentul `dpl_8o3Vkbive38WwSh66iphYcnBHm6S` pe `https://epetrecere.md`, la 19:31 UTC.
+- Publicarea finală este `dpl_CJMaBKVyTHUvG1SFkjF7mQeCjuHW`, stare `READY`, alias `https://epetrecere.md`. Include commitul `555920b`, recuperarea înregistrării și meniurile localizate. Nu mai există blocaj de publicare Vercel; rămân accesul GitHub și Mac-ul blocat pentru testele manuale.
 
 Acest raport separă verificările automate de testarea manuală live. Nu afirmă că toate funcțiile platformei sunt lipsite de buguri.
