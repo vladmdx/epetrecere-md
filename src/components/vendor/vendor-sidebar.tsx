@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { BrandMark } from "@/components/public/brand-mark";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -97,7 +97,7 @@ function NavList({
 
 export function VendorSidebar() {
   const { locale, t } = useLocale();
-  const pathname = usePathname();
+  const pathname = usePathname().replace(/^\/(ro|ru|en)(?=\/|$)/, "") || "/";
   const [isVenue, setIsVenue] = useState(false);
   const [profileSlug, setProfileSlug] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -125,7 +125,7 @@ export function VendorSidebar() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [pathname]);
 
   const navItems = isVenue ? venueNav : artistNav;
   const roleLabel = isVenue
@@ -142,7 +142,7 @@ export function VendorSidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex h-screen w-64 flex-col border-r border-border/40 bg-sidebar">
+      <aside className="hidden lg:flex h-dvh w-64 shrink-0 flex-col border-r border-border/40 bg-sidebar">
         <div className="flex h-16 items-center border-b border-border/40 px-4">
           <Link href="/dashboard" className="flex items-center gap-2">
             <BrandMark className="h-6 w-6" />

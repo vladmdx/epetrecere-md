@@ -35,8 +35,9 @@ import { MOLDOVA_CITIES, DEFAULT_CITY, canonicalMoldovaCity, localizeMoldovaCity
 import { localizePath } from "@/lib/i18n/routing";
 import { validatePhone } from "@/lib/phone/validate";
 import { MapsAutofill } from "@/components/vendor/maps-autofill";
-import { ESignature, type ESignatureValue } from "@/components/legal/e-signature";
-import { LEGAL_PACK_VERSION } from "@/lib/legal";
+import type { ESignatureValue } from "@/components/legal/e-signature";
+import { OnboardingAgreement } from "@/components/legal/onboarding-agreement";
+import { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
 import { useLocale } from "@/hooks/use-locale";
 
 const STEP_LABEL_KEYS = [
@@ -54,6 +55,7 @@ export default function VenueOnboardingPage() {
   const [step, setStep] = useState(0);
   // Vendors must sign the Legal Pack before their profile is submitted.
   const [signature, setSignature] = useState<ESignatureValue | null>(null);
+  const agreement = useOnboardingAgreement("venue", user?.id, locale);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
@@ -245,29 +247,7 @@ export default function VenueOnboardingPage() {
     if (submitting || uploading) return;
     setSubmitting(true);
     try {
-      // Record the electronic acceptance first: if the profile were created
-      // and this failed, we'd have a live vendor with no signed contract.
-      if (!signature?.accepted) throw new Error(t("legal.signIntro"));
-      {
-        const acceptance = await fetch("/api/legal/accept", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            subjectType: "venue",
-            accepted: true,
-            packVersion: LEGAL_PACK_VERSION,
-            signatureName: signature.signatureName,
-            signatureImage: signature.signatureImage,
-            documents: signature.documents,
-            identity: signature.identity,
-            locale: document.documentElement.lang || "ro",
-          }),
-        });
-        if (!acceptance.ok) {
-          const error = await acceptance.json().catch(() => ({}));
-          throw new Error(error.error || t("legal.signIntro"));
-        }
-      }
+      await agreement.prepare(signature);
 
       const res = await fetch("/api/auth/register-venue", {
         method: "POST",
@@ -738,7 +718,7 @@ export default function VenueOnboardingPage() {
           Back and Submit. */}
       {step === STEP_LABEL_KEYS.length - 1 && (
         <div className="mt-8">
-          <ESignature subjectType="venue" onChange={setSignature} />
+          <OnboardingAgreement subjectType="venue" agreement={agreement} onChange={setSignature} />
         </div>
       )}
 
@@ -762,7 +742,8 @@ export default function VenueOnboardingPage() {
         ) : (
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !signature?.accepted}
+            disabled={submitting || agreement.loading || agreement.error ||
+              (agreement.value?.status !== "resumable" && !(agreement.value?.status === "unsigned" && signature?.accepted))}
             className="h-auto min-h-10 min-w-0 whitespace-normal gap-2 bg-gold py-2 text-[#0D0D0D] hover:bg-gold-dark"
           >
             {submitting ? (

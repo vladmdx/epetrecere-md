@@ -20,6 +20,7 @@ import { isIP } from "node:net";
 import { acceptanceSchema } from "@/lib/legal/acceptance";
 import { validSignatureImage } from "@/lib/legal/signature-image";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
+import { onboardingAgreementStatus } from "@/lib/legal/onboarding-agreement";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { createHash } from "node:crypto";
 import { describeDevice } from "@/lib/legal/device";
@@ -53,7 +54,9 @@ export async function GET() {
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
-  if (!u) return NextResponse.json({ items: [], packVersion: LEGAL_PACK_VERSION });
+  if (!u) return NextResponse.json({ items: [], packVersion: LEGAL_PACK_VERSION,
+    onboarding: { artist: onboardingAgreementStatus([], "artist"), venue: onboardingAgreementStatus([], "venue") },
+  }, { headers: { "Cache-Control": "private, no-store" } });
 
   const rows = await db
     .select({
@@ -66,6 +69,11 @@ export async function GET() {
       signatureName: legalAcceptances.signatureName,
       signatureImage: legalAcceptances.signatureImage,
       representativeRole: legalAcceptances.representativeRole,
+      partnerType: legalAcceptances.partnerType,
+      legalName: legalAcceptances.legalName,
+      idNumber: legalAcceptances.idNumber,
+      legalAddress: legalAcceptances.legalAddress,
+      representativeName: legalAcceptances.representativeName,
       // The frozen copy, so a partner re-reads what they signed rather than
       // whatever the pack says today.
       documentTitleStored: legalAcceptances.documentTitle,
@@ -92,7 +100,9 @@ export async function GET() {
       documentTitle: r.documentTitleStored || (doc ? legalTitle(doc, r.locale) : r.documentSlug),
     };
   });
-  return NextResponse.json({ items, packVersion: LEGAL_PACK_VERSION }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ items, packVersion: LEGAL_PACK_VERSION,
+    onboarding: { artist: onboardingAgreementStatus(items, "artist"), venue: onboardingAgreementStatus(items, "venue") },
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(req: NextRequest) {

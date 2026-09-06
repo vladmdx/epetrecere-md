@@ -49,8 +49,9 @@ import {
 import { localizePath } from "@/lib/i18n/routing";
 import { getLocalized } from "@/i18n";
 import { useLocale } from "@/hooks/use-locale";
-import { ESignature, type ESignatureValue } from "@/components/legal/e-signature";
-import { LEGAL_PACK_VERSION } from "@/lib/legal";
+import type { ESignatureValue } from "@/components/legal/e-signature";
+import { OnboardingAgreement } from "@/components/legal/onboarding-agreement";
+import { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
 
 interface Category {
   id: number;
@@ -93,6 +94,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0);
   // Vendors must sign the Legal Pack before their profile is submitted.
   const [signature, setSignature] = useState<ESignatureValue | null>(null);
+  const agreement = useOnboardingAgreement("artist", user?.id, locale);
   const [categories, setCategories] = useState<Category[]>([]);
   const [data, setData] = useState({
     name: "",
@@ -293,30 +295,9 @@ export default function OnboardingPage() {
             p.pricingMode === "per_event" && p.eventType ? p.eventType : null,
         }));
 
-      // 1. Create the artist row (same endpoint as before).
-      // Record the electronic acceptance first: if the profile were created
-      // and this failed, we'd have a live vendor with no signed contract.
-      if (!signature?.accepted) throw new Error(t("legal.signIntro"));
-      {
-        const acceptance = await fetch("/api/legal/accept", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            subjectType: "artist",
-            accepted: true,
-            packVersion: LEGAL_PACK_VERSION,
-            signatureName: signature.signatureName,
-            signatureImage: signature.signatureImage,
-            documents: signature.documents,
-            identity: signature.identity,
-            locale: document.documentElement.lang || "ro",
-          }),
-        });
-        if (!acceptance.ok) {
-          const error = await acceptance.json().catch(() => ({}));
-          throw new Error(error.error || t("legal.signIntro"));
-        }
-      }
+      // A server-verified saved agreement can resume a failed registration
+      // without attempting to overwrite the immutable signed party/locale.
+      await agreement.prepare(signature);
 
       const res = await fetch("/api/auth/register-artist", {
         method: "POST",
@@ -998,7 +979,7 @@ export default function OnboardingPage() {
           looked fine. */}
       {step === STEP_LABELS.length - 1 && (
         <div className="mt-8">
-          <ESignature subjectType="artist" onChange={setSignature} />
+          <OnboardingAgreement subjectType="artist" agreement={agreement} onChange={setSignature} />
         </div>
       )}
 
@@ -1023,7 +1004,8 @@ export default function OnboardingPage() {
         ) : (
           <Button
             onClick={handleSubmit}
-            disabled={submitting || !signature?.accepted}
+            disabled={submitting || agreement.loading || agreement.error ||
+              (agreement.value?.status !== "resumable" && !(agreement.value?.status === "unsigned" && signature?.accepted))}
             className="h-auto min-h-10 min-w-0 whitespace-normal bg-gold py-2 text-[#0D0D0D] hover:bg-gold-dark gap-2"
           >
             {submitting ? (

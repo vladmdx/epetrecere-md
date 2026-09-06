@@ -6,7 +6,7 @@
 // by a hamburger in the topbar (via `VenueSidebarMobileTrigger`).
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -89,7 +89,7 @@ export function VenueSidebar({
   // doesn't have a slug yet (mid-onboarding) so we never produce a broken
   // link.
   const profileHref = venueSlug ? `/sali/${venueSlug}` : "/";
-  const pathname = usePathname();
+  const pathname = usePathname().replace(/^\/(ro|ru|en)(?=\/|$)/, "") || "/";
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
