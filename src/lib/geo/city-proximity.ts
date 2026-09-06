@@ -6,6 +6,8 @@
 // Distances are approximate (rounded to the nearest 5 km) and meant to
 // drive bucketed filtering (≤ 25 / ≤ 50 / ≤ 100), not precise navigation.
 
+import { canonicalMoldovaCity } from "@/lib/moldova-cities";
+
 export type CityName =
   | "Chișinău"
   | "Bălți"
@@ -100,6 +102,53 @@ const NEIGHBORS: Record<CityName, Array<{ city: string; km: number }>> = {
   ],
 };
 
+// The same declared road distance applies in either direction. Build a small
+// graph once so a partner based in Ialoveni or Glodeni has the same coverage
+// as one based in a main wizard city. No request-time geocoding is needed.
+const ROAD_GRAPH = new Map<string, Map<string, number>>();
+for (const [origin, destinations] of Object.entries(NEIGHBORS)) {
+  for (const { city, km } of destinations) {
+    const from = canonicalMoldovaCity(origin) ?? origin;
+    const to = canonicalMoldovaCity(city) ?? city;
+    if (!ROAD_GRAPH.has(from)) ROAD_GRAPH.set(from, new Map());
+    if (!ROAD_GRAPH.has(to)) ROAD_GRAPH.set(to, new Map());
+    const knownDistance = ROAD_GRAPH.get(from)!.get(to) ?? Infinity;
+    const distance = Math.min(knownDistance, km);
+    ROAD_GRAPH.get(from)!.set(to, distance);
+    ROAD_GRAPH.get(to)!.set(from, distance);
+  }
+}
+
+/** Approximate road distances through the existing locality table. Unknown
+ * routes are omitted, never treated as zero km. These are search estimates,
+ * not a source for navigation or automatic per-kilometre billing. */
+export function cityTravelDistances(originCity: string): Array<{ city: string; km: number }> {
+  const origin = canonicalMoldovaCity(originCity) ?? originCity.trim();
+  if (!origin) return [];
+  const distances = new Map<string, number>([[origin, 0]]);
+  const visited = new Set<string>();
+  while (true) {
+    let nearest: string | undefined;
+    let nearestDistance = Infinity;
+    for (const [city, km] of distances) {
+      if (!visited.has(city) && km < nearestDistance) {
+        nearest = city;
+        nearestDistance = km;
+      }
+    }
+    if (!nearest) break;
+    visited.add(nearest);
+    for (const [destination, roadKm] of ROAD_GRAPH.get(nearest) ?? []) {
+      const distance = nearestDistance + roadKm;
+      if (distance < (distances.get(destination) ?? Infinity)) {
+        distances.set(destination, distance);
+      }
+    }
+  }
+  return Array.from(distances, ([city, km]) => ({ city, km }))
+    .sort((a, b) => a.km - b.km || a.city.localeCompare(b.city));
+}
+
 /** Return the list of town names within `radiusKm` of the given wizard
  *  city (inclusive). The origin city is always first. If radiusKm is 0
  *  or missing, returns just the origin city. */
@@ -107,23 +156,10 @@ export function citiesWithinRadius(
   originCity: string,
   radiusKm: number | null | undefined,
 ): string[] {
-  const key = originCity as CityName;
-  const entries = NEIGHBORS[key];
-  if (!entries) return originCity ? [originCity] : [];
-  if (!radiusKm || radiusKm <= 0) {
-    return [originCity];
-  }
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const { city, km } of entries) {
-    if (km > radiusKm) continue;
-    if (seen.has(city)) continue;
-    seen.add(city);
-    result.push(city);
-  }
-  // Ensure the origin is always first even if it slipped somehow.
-  if (!seen.has(originCity)) result.unshift(originCity);
-  return result;
+  const radius = radiusKm && radiusKm > 0 ? radiusKm : 0;
+  return cityTravelDistances(originCity)
+    .filter(({ km }) => km <= radius)
+    .map(({ city }) => city);
 }
 
 /** Preset radius buckets shown in the wizard step 4. 0 means "only my

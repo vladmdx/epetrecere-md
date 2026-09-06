@@ -31,7 +31,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { MOLDOVA_CITIES, DEFAULT_CITY } from "@/lib/moldova-cities";
+import { MOLDOVA_CITIES, DEFAULT_CITY, canonicalMoldovaCity, localizeMoldovaCity } from "@/lib/moldova-cities";
+import { localizePath } from "@/lib/i18n/routing";
+import { validatePhone } from "@/lib/phone/validate";
 import { MapsAutofill } from "@/components/vendor/maps-autofill";
 import { ESignature, type ESignatureValue } from "@/components/legal/e-signature";
 import { LEGAL_PACK_VERSION } from "@/lib/legal";
@@ -46,7 +48,7 @@ const STEP_LABEL_KEYS = [
 ];
 
 export default function VenueOnboardingPage() {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const router = useRouter();
   const { user } = useUser();
   const [step, setStep] = useState(0);
@@ -104,7 +106,7 @@ export default function VenueOnboardingPage() {
         if (v.isActive) {
           // Already approved — bounce them into the dashboard. They can edit
           // through /dashboard/sala/profil from there.
-          router.replace("/dashboard/sala");
+          router.replace(localizePath("/dashboard/sala", locale));
           return;
         }
         // Pending — pre-fill the wizard so they can finish/correct + re-submit.
@@ -145,7 +147,7 @@ export default function VenueOnboardingPage() {
     return () => {
       alive = false;
     };
-  }, [router]);
+  }, [router, locale]);
 
   function update(partial: Partial<typeof data>) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -188,7 +190,7 @@ export default function VenueOnboardingPage() {
         if (url) newUrls.push(url);
       }
       if (newUrls.length > 0) {
-        update({ imageUrls: [...data.imageUrls, ...newUrls] });
+        setData((prev) => ({ ...prev, imageUrls: [...prev.imageUrls, ...newUrls].slice(0, 10) }));
         toast.success(
           `${newUrls.length} ${
             newUrls.length === 1
@@ -197,6 +199,8 @@ export default function VenueOnboardingPage() {
           }`,
         );
       }
+    } catch {
+      toast.error(t("moments.errUploadFailed"));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -217,6 +221,8 @@ export default function VenueOnboardingPage() {
         update({ menuPdfUrl: url });
         toast.success(t("vendor.venueOnboarding.menuUploaded"));
       }
+    } catch {
+      toast.error(t("moments.errUploadFailed"));
     } finally {
       setUploading(false);
       if (menuInputRef.current) menuInputRef.current.value = "";
@@ -236,6 +242,7 @@ export default function VenueOnboardingPage() {
   }
 
   async function handleSubmit() {
+    if (submitting || uploading) return;
     setSubmitting(true);
     try {
       // Record the electronic acceptance first: if the profile were created
@@ -292,7 +299,7 @@ export default function VenueOnboardingPage() {
         throw new Error(err.error || t("vendor.venueOnboarding.registerError"));
       }
       toast.success(t("vendor.venueOnboarding.submitted"));
-      router.push("/dashboard/sala");
+      router.push(localizePath("/dashboard/sala", locale));
     } catch (e) {
       toast.error(
         e instanceof Error ? e.message : t("vendor.venueOnboarding.registerError"),
@@ -303,11 +310,14 @@ export default function VenueOnboardingPage() {
   }
 
   function canContinue(): boolean {
+    if (uploading || submitting) return false;
     switch (step) {
       case 0:
-        return !!data.name.trim() && !!data.phone.trim() && !!data.address.trim();
+        return data.name.trim().length >= 2 && validatePhone(data.phone).ok &&
+          data.address.trim().length >= 5 && data.address.trim().length <= 300;
       case 1:
-        return data.capacityMin > 0 && data.capacityMax >= data.capacityMin;
+        return Number.isInteger(data.capacityMin) && Number.isInteger(data.capacityMax) &&
+          data.capacityMin > 0 && data.capacityMax >= data.capacityMin;
       case 2:
         return data.imageUrls.length >= 1; // at least one photo required
       case 3:
@@ -382,10 +392,21 @@ export default function VenueOnboardingPage() {
           <div>
             <Label>{t("vendor.venueOnboarding.phone")}</Label>
             <Input
+              type="tel"
+              autoComplete="tel"
               value={data.phone}
               onChange={(e) => update({ phone: e.target.value })}
               placeholder="+373 69 ..."
             />
+            {data.phone.trim() && !validatePhone(data.phone).ok && (
+              <p className="mt-1 text-xs text-destructive">
+                {{
+                  ro: "Introdu numărul complet, de exemplu +373 69 123 456.",
+                  ru: "Введите полный номер, например +373 69 123 456.",
+                  en: "Enter the complete number, for example +373 69 123 456.",
+                }[locale]}
+              </p>
+            )}
           </div>
           {/* Google Maps autofill — paste the venue's Maps URL and we
               pre-fill name, address, city, phone, website and (when
@@ -398,8 +419,8 @@ export default function VenueOnboardingPage() {
                 phone: data.phone || r.phone || data.phone,
                 address: r.address || data.address,
                 city:
-                  r.city && MOLDOVA_CITIES.includes(r.city)
-                    ? r.city
+                  r.city && canonicalMoldovaCity(r.city)
+                    ? canonicalMoldovaCity(r.city)!
                     : data.city,
                 websiteUrl: data.websiteUrl || r.website || data.websiteUrl,
                 description: data.description || r.summary || data.description,
@@ -421,7 +442,7 @@ export default function VenueOnboardingPage() {
                 className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
               >
                 {MOLDOVA_CITIES.map((c) => (
-                  <option key={c} value={c}>{c}</option>
+                  <option key={c} value={c}>{localizeMoldovaCity(c, locale)}</option>
                 ))}
               </select>
             </div>
@@ -672,11 +693,11 @@ export default function VenueOnboardingPage() {
           <div className="space-y-2 text-sm">
             <Row k={t("form.name")} v={data.name} />
             <Row k={t("form.phone")} v={data.phone} />
-            <Row k={t("compare.row.city")} v={data.city} />
+            <Row k={t("compare.row.city")} v={localizeMoldovaCity(data.city, locale)} />
             <Row k={t("contactPage.address")} v={data.address} />
             <Row
               k={t("venue.capacity")}
-              v={`${data.capacityMin} — ${data.capacityMax} ${t("common.guests")}`}
+              v={`${data.capacityMin} - ${data.capacityMax} ${t("common.guests")}`}
             />
             <Row
               k={t("vendor.venueOnboarding.images")}
@@ -721,12 +742,12 @@ export default function VenueOnboardingPage() {
         </div>
       )}
 
-      <div className="mt-8 flex items-center justify-between">
+      <div className="mt-8 flex items-center justify-between gap-3">
         <Button
           variant="outline"
-          disabled={step === 0}
+          disabled={step === 0 || submitting || uploading}
           onClick={() => setStep(step - 1)}
-          className="gap-2"
+          className="shrink-0 gap-2"
         >
           <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </Button>
@@ -734,7 +755,7 @@ export default function VenueOnboardingPage() {
           <Button
             onClick={() => setStep(step + 1)}
             disabled={!canContinue()}
-            className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+            className="h-auto min-h-10 whitespace-normal gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           >
             {t("common.next")} <ArrowRight className="h-4 w-4" />
           </Button>
@@ -742,7 +763,7 @@ export default function VenueOnboardingPage() {
           <Button
             onClick={handleSubmit}
             disabled={submitting || !signature?.accepted}
-            className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
+            className="h-auto min-h-10 min-w-0 whitespace-normal gap-2 bg-gold py-2 text-[#0D0D0D] hover:bg-gold-dark"
           >
             {submitting ? (
               t("vendor.venueOnboarding.sending")
@@ -762,7 +783,7 @@ function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between gap-4">
       <span className="text-muted-foreground">{k}:</span>
-      <span className="font-medium text-right">{v}</span>
+      <span className="min-w-0 break-words font-medium text-right">{v}</span>
     </div>
   );
 }

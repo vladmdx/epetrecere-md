@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { reviews } from "@/lib/db/schema";
 import { eq, and, gte, desc } from "drizzle-orm";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
 
 // GET — return top-rated approved reviews for homepage testimonials
 export async function GET() {
@@ -18,5 +19,5 @@ export async function GET() {
     .orderBy(desc(reviews.rating), desc(reviews.createdAt))
     .limit(8);
 
-  return NextResponse.json(result);
+  return NextResponse.json(publicCatalogData(result));
 }

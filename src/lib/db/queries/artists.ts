@@ -11,6 +11,8 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, desc, asc, sql, ilike, gte, lte, arrayContains, or } from "drizzle-orm";
 import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
+import { cityTravelDistances } from "@/lib/geo/city-proximity";
+import { moldovaCitySpellings } from "@/lib/moldova-cities";
 
 export interface ArtistFilters {
   categoryId?: number;
@@ -102,29 +104,29 @@ export async function getArtists(filters: ArtistFilters = {}) {
   if (filters.featured) {
     conditions.push(eq(artists.isFeatured, true));
   }
-  // City filter — matches an artist when:
-  //   1. their base_city equals the requested city (case-insensitive), OR
-  //   2. their travel_distance_km is "all Moldova" (sentinel 999).
-  //
-  // We deliberately DO NOT fall back to ILIKE on the legacy `location`
-  // free-text field. That worked for SEO auto-pages but caused false
-  // positives once base_city was introduced — an artist whose admin set
-  // base_city=Bălți but whose stale location was "Chișinău" would show up
-  // in BOTH cities. base_city is the authoritative declaration now.
-  //
-  // For SEO auto-pages (/artisti/in/[city]/[category]) the city slug is
-  // expanded to known spellings via filters.cityKeywords, and we still
-  // check base_city against each one — so "Chișinău", "Chisinau" and
-  // "Кишинёв" all match correctly without needing the legacy field.
+  // Apply travel eligibility before counting and pagination. Intermediate
+  // radii used to be ignored, so e.g. a Bălți artist willing to travel 150 km
+  // could never appear for a Chișinău event. Use the declared base city and
+  // the shared approximate road distances, with 999 meaning all Moldova.
   const locationNeedles: string[] = [];
   if (filters.cityKeywords?.length) locationNeedles.push(...filters.cityKeywords);
   if (filters.city) locationNeedles.push(filters.city);
   if (locationNeedles.length) {
-    const unique = Array.from(new Set(locationNeedles.map((s) => s.trim()).filter(Boolean)));
+    const coverage = new Map<string, number>();
+    for (const needle of locationNeedles) {
+      for (const { city, km } of cityTravelDistances(needle)) {
+        if (km > 999) continue;
+        coverage.set(city, Math.min(km, coverage.get(city) ?? Infinity));
+      }
+    }
     const conds = [
-      // base_city case-insensitive equality with any spelling
-      ...unique.map((needle) => ilike(artists.baseCity, needle)),
-      // "all Moldova" travel preference — always shown
+      ...Array.from(coverage, ([city, km]) => and(
+        or(...moldovaCitySpellings(city).map((spelling) =>
+          // Escape LIKE metacharacters to keep a city name an exact match.
+          ilike(artists.baseCity, spelling.replace(/[\\%_]/g, "\\$&")),
+        )),
+        gte(artists.travelDistanceKm, km),
+      )),
       gte(artists.travelDistanceKm, 999),
     ];
     const combined = conds.length === 1 ? conds[0] : or(...conds);

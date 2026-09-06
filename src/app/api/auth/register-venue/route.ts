@@ -58,6 +58,8 @@ const registerSchema = z.object({
       sun: dayWindowSchema,
     })
     .optional(),
+}).refine(data => data.capacityMin == null || data.capacityMax == null || data.capacityMin <= data.capacityMax, {
+  path: ["capacityMax"], message: "Maximum capacity must not be lower than minimum capacity",
 });
 
 export async function POST(req: Request) {
@@ -345,7 +347,7 @@ export async function POST(req: Request) {
             await db
               .update(venues)
               .set({ descriptionRo: html, updatedAt: new Date() })
-              .where(eq(venues.id, venue.id));
+              .where(and(eq(venues.id, venue.id), eq(venues.descriptionRo, data.description!)));
           }
         } catch (err) {
           console.error("[register-venue] auto AI rewrite failed:", err);
@@ -384,7 +386,7 @@ export async function POST(req: Request) {
         acceptedAt: legalAcceptances.acceptedAt,
       })
       .from(legalAcceptances)
-      .where(eq(legalAcceptances.userId, appUser.id))
+      .where(and(eq(legalAcceptances.userId, appUser.id), eq(legalAcceptances.subjectType, "venue")))
       .orderBy(descOrder(legalAcceptances.acceptedAt))
       .limit(1);
     const signed = signedRows[0] ?? null;

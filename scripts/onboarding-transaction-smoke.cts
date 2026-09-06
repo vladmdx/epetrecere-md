@@ -23,6 +23,9 @@ const server = require("next/server");
 const schema = require("../src/lib/db/schema");
 let txDb, current;
 let queued = 0;
+const deferred = [];
+const revalidated = [];
+const flushEffects = async () => { while (deferred.length) await deferred.shift()(); };
 const forbiddenFetch = global.fetch;
 global.fetch = async () => { throw Error("Outbound HTTP disabled in smoke test"); };
 Module._load = function (request, parent, isMain) {
@@ -32,11 +35,14 @@ Module._load = function (request, parent, isMain) {
       primaryEmailAddress:{emailAddress:current.email, verification:{status:"verified"}},
       phoneNumbers:[], imageUrl:null}) : null,
   };
-  if (request === "next/server") return {...server, after:()=>{queued++;}};
+  if (request === "next/server") return {...server, after:callback=>{queued++;deferred.push(callback);}};
+  if (request === "next/cache") return {revalidatePath:route=>revalidated.push(route)};
   let resolved; try { resolved = Module._resolveFilename(request,parent); } catch {}
   if (request === "@/lib/db" || resolved === path.join(root,"src/lib/db/index.ts")) return {db:txDb};
   if (request === "@/lib/email/send" || resolved === path.join(root,"src/lib/email/send.ts")) return {sendEmail:async()=>({}),dataUrlToAttachment:()=>null};
   if (request === "@/lib/push/expo" || resolved === path.join(root,"src/lib/push/expo.ts")) return {sendPushToUser:async()=>({})};
+  if (request === "@/lib/push/send" || resolved === path.join(root,"src/lib/push/send.ts")) return {sendPushToUser:async()=>({})};
+  if (request === "@/lib/whatsapp/send" || resolved === path.join(root,"src/lib/whatsapp/send.ts")) return {sendWhatsAppToUser:async()=>({})};
   return originalLoad.call(this,request,parent,isMain);
 };
 const rollback = new Error("EXPECTED_SMOKE_ROLLBACK");
@@ -52,6 +58,9 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
    const nativeAccept=require("../src/app/api/v1/legal/accept/route");
    const artistRoute=require("../src/app/api/auth/register-artist/route");
    const venueRoute=require("../src/app/api/auth/register-venue/route");
+   const artistEdit=require("../src/app/api/artists/crud/route");
+   const venueEdit=require("../src/app/api/venues/[id]/route");
+   const registrationAdmin=require("../src/app/api/admin/registration-requests/route");
    const bookingRoute=require("../src/app/api/booking-requests/[id]/route");
    const copy=require("../src/app/api/legal/accept/[id]/copy/route");
    const signatureImage="data:image/png;base64,"+(await sharp(Buffer.from('<svg width="200" height="80"><rect width="200" height="80" fill="white"/><path d="M10 50 Q40 5 60 50T150 30" fill="none" stroke="black" stroke-width="3"/></svg>')).png().toBuffer()).toString("base64");
@@ -64,8 +73,8 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
    const [category]=await txDb.select().from(schema.categories).where(eq(schema.categories.isActive,true)).limit(1);
    const req=(route,body)=>new server.NextRequest("https://epetrecere.md"+route,{method:"POST",headers:{"content-type":"application/json","user-agent":"QA rollback fixture"},body:JSON.stringify(body)});
    const payloads={
-    artist:{name:"QA Artist Rollback",phone:"+15555550181",categoryId:category.id,location:"Chișinău",imageUrl:"https://example.invalid/photo.webp",packages:[{hours:2,minutes:0,price:450}]},
-    venue:{name:"QA Venue Rollback",phone:"+15555550182",city:"Chișinău",address:"Adresă fictivă pentru test, 1",capacityMin:20,capacityMax:100,imageUrls:["https://example.invalid/hall.webp"]},
+    artist:{name:"QA Artist Rollback",phone:"+15555550181",categoryId:category.id,location:"Bălți",baseCity:"Bălți",travelDistanceKm:150,travelSurchargeEnabled:true,travelSurchargeAmount:75,priceHidden:true,imageUrl:"https://example.invalid/photo.webp",packages:[{hours:2,minutes:0,price:450}]},
+    venue:{name:"QA Venue Rollback",phone:"+15555550182",city:"Chișinău",address:"Adresă fictivă pentru test, 1",capacityMin:20,capacityMax:100,websiteUrl:"https://example.invalid",imageUrls:["https://example.invalid/hall.webp"]},
    };
    const ids={};
    const acceptanceIds={};
@@ -96,12 +105,17 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
     const table=kind==="artist"?schema.artists:schema.venues;
     const [profile]=await txDb.select().from(table).where(eq(table.id,ids[kind]));
     assert.equal(profile.isActive,false);
+    if(kind==="artist") {
+      for(const field of ["baseCity","location","travelDistanceKm","travelSurchargeEnabled","travelSurchargeAmount","priceHidden"]) assert.equal(profile[field],payloads.artist[field]);
+      ok("artist: city, travel and price visibility persist in the registration request");
+    }
     const linked=await txDb.select().from(schema.legalAcceptances).where(eq(schema.legalAcceptances.userId,current.id));
     assert.ok(linked.every(x=>(kind==="artist"?x.artistId:x.venueId)===ids[kind])); ok(kind+": onboarding saves profile for moderation and links signed documents");
     response=await copy.GET(req("/copy",{}),{params:Promise.resolve({id:String(rows[0].id)})});
     assert.equal(response.status,200); assert.equal(response.headers.get("Cache-Control"),"private, no-store");
     const html=await response.text(); assert.ok(html.includes(rows[0].contentHash)); ok(kind+": owner downloads exact signed copy");
    }
+   await flushEffects();
    current=personas.client;
    let response=await copy.GET(req("/copy",{}),{params:Promise.resolve({id:String(acceptanceIds.artist)})});
    assert.equal(response.status,404); ok("client cannot download another account's signed contract");
@@ -110,6 +124,44 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
    assert.equal(response.status,200);
    const adminNotices=await txDb.select().from(schema.notifications).where(eq(schema.notifications.userId,personas.admin.id));
    assert.ok(adminNotices.filter(n=>n.type==="legal_signed").length>=2); ok("administrator receives both contract notifications and may read signed copies");
+   assert.ok(adminNotices.some(n=>n.type==="artist_registered"));
+   assert.ok(adminNotices.some(n=>n.type==="venue_registered"));
+   ok("deferred registration effects deliver both moderation notifications");
+   response=await registrationAdmin.GET(); assert.equal(response.status,200);
+   const requests=await response.json();
+   const artistRequest=requests.find(r=>r.type==="artist"&&r.id===ids.artist);
+   const venueRequest=requests.find(r=>r.type==="venue"&&r.id===ids.venue);
+   assert.equal(artistRequest.baseCity,"Bălți"); assert.equal(artistRequest.packages[0].price,450);
+   assert.ok(artistRequest.contracts.length===legal.PARTNER_REQUIRED_DOCS.length);
+   assert.equal(venueRequest.address,payloads.venue.address); assert.equal(venueRequest.images.length,1);
+   assert.ok(venueRequest.contracts.every(c=>c.copyUrl.includes("/copy")));
+   ok("administrator receives registration details, prices, photos and signed contract links");
+   response=await registrationAdmin.POST(req("/api/admin/registration-requests",{id:ids.artist,type:"artist",action:"approved"}));
+   assert.equal(response.status,400);
+   assert.equal((await txDb.select().from(schema.artists).where(eq(schema.artists.id,ids.artist))).length,1);
+   ok("invalid admin decision cannot delete a registration");
+   current=personas.venue;
+   response=await venueEdit.PUT(req("/edit",{isActive:true,isFeatured:false,website:""}),{params:Promise.resolve({id:String(ids.venue)})});
+   assert.equal(response.status,200,await response.clone().text());
+   let edited=await response.json(); assert.equal(edited.isActive,false); assert.equal(edited.isFeatured,true); assert.equal(edited.website,null);
+   ok("venue owner cannot self-approve and can remove an optional URL");
+   response=await venueEdit.PUT(req("/edit",{capacityMin:200}),{params:Promise.resolve({id:String(ids.venue)})});
+   assert.equal(response.status,400); ok("inconsistent venue capacity edits are rejected");
+   current=personas.artist;
+   response=await artistEdit.PUT(req("/edit",{id:ids.artist,location:"Оргеев",travelSurchargeEnabled:false,isActive:true,ratingAvg:5}));
+   assert.equal(response.status,200,await response.clone().text()); edited=await response.json();
+   assert.equal(edited.baseCity,"Orhei"); assert.equal(edited.location,"Orhei"); assert.equal(edited.travelSurchargeAmount,null); assert.equal(edited.isActive,false); assert.equal(edited.ratingAvg,0);
+   ok("artist edits synchronize city and cannot forge publication or rating");
+   current=personas.admin;
+   for(const kind of ["artist","venue"]) {
+     response=await registrationAdmin.POST(req("/api/admin/registration-requests",{id:ids[kind],type:kind,action:"approve"}));
+     assert.equal(response.status,200,await response.text());
+     const table=kind==="artist"?schema.artists:schema.venues;
+     assert.equal((await txDb.select().from(table).where(eq(table.id,ids[kind])))[0].isActive,true);
+   }
+   assert.ok(revalidated.some(route=>route.includes("artisti/[slug]")));
+   assert.ok(revalidated.some(route=>route.includes("sali/[slug]")));
+   ok("admin approval activates both signed profiles and invalidates public cached pages");
    await assert.rejects(txDb.transaction(async savepoint=>{
      await savepoint.update(schema.legalAcceptances).set({signatureName:"Modified"}).where(eq(schema.legalAcceptances.id,acceptanceIds.artist));
    }),e=>e.cause?.code==="42501");
@@ -188,9 +240,10 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
    const [otherFee]=await txDb.select().from(schema.commissions).where(eq(schema.commissions.bookingRequestId,otherBooking.id));
    assert.equal(otherFee.amount,50); assert.equal(otherFee.currency,"EUR");
    ok("other venue event with 100 guests confirms successfully and costs exactly 50 EUR, with no added VAT");
+   await flushEffects();
    throw rollback;
   });
  } catch(e) { if(e!==rollback) throw e; }
- console.log(JSON.stringify({checks:checks.length,rolledBack:true,externalEffectsSkipped:queued}));
+ console.log(JSON.stringify({checks:checks.length,rolledBack:true,deferredEffectsExercised:queued,revalidatedPaths:revalidated.length,externalMessagesSent:0}));
  } finally {Module._load=originalLoad;global.fetch=forbiddenFetch;await sql.end();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

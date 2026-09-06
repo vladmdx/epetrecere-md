@@ -15,6 +15,7 @@ import { and, eq, ne } from "drizzle-orm";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { validatePhone } from "@/lib/phone/validate";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
+import { artistLocationUpdate, artistTravelShape } from "@/lib/validation/vendor-profile";
 
 /** A single duration → price tier the onboarding wizard can submit
  *  alongside the artist row. Mirrors the artist_packages columns. */
@@ -87,6 +88,7 @@ const registerSchema = z.object({
     })
     .optional(),
   location: z.string().optional(),
+  ...artistTravelShape,
   imageUrl: z.string().url().max(2000),
   /** Legacy single "preț de start". Still supported for backwards
    *  compatibility but new clients should send the packages array
@@ -282,7 +284,11 @@ export async function POST(req: Request) {
         email: appUser.email,
         photoUrl: data.imageUrl || null,
         descriptionRo: data.description || null,
-        location: data.location || "Chișinău",
+        ...artistLocationUpdate({ baseCity: data.baseCity, location: data.location || "Chișinău" }),
+        travelDistanceKm: data.travelDistanceKm ?? 30,
+        travelSurchargeEnabled: data.travelSurchargeEnabled ?? false,
+        travelSurchargeAmount: data.travelSurchargeEnabled ? data.travelSurchargeAmount ?? null : null,
+        priceHidden: data.priceHidden ?? false,
         priceFrom: resolvedPriceFrom,
         categoryIds: [data.categoryId],
         isActive: false,
@@ -318,7 +324,7 @@ export async function POST(req: Request) {
             await db
               .update(artists)
               .set({ descriptionRo: polished, updatedAt: new Date() })
-              .where(eq(artists.id, artist.id));
+              .where(and(eq(artists.id, artist.id), eq(artists.descriptionRo, data.description!)));
           }
         } catch (err) {
           console.error("[register-artist] auto AI rewrite failed:", err);
@@ -398,6 +404,10 @@ export async function POST(req: Request) {
       console.error("[register-artist] linking signature to artist failed", err);
     }
 
+    // Keep serverless notification work alive without delaying a successful
+    // registration or returning an error after the profile already exists.
+    after(async () => {
+      try {
     // Notify admins (in-app + email)
     // Attach the vendor's signed contract (drawn signature) to the admin
     // notification, so whoever approves the request sees what was signed
@@ -409,7 +419,7 @@ export async function POST(req: Request) {
         acceptedAt: legalAcceptances.acceptedAt,
       })
       .from(legalAcceptances)
-      .where(eq(legalAcceptances.userId, appUser.id))
+      .where(and(eq(legalAcceptances.userId, appUser.id), eq(legalAcceptances.subjectType, "artist")))
       .orderBy(descOrder(legalAcceptances.acceptedAt))
       .limit(1);
     const signed = signedRows[0] ?? null;
@@ -460,6 +470,10 @@ export async function POST(req: Request) {
         }).catch((err) => console.error("[register-artist] Email failed:", err));
       }
     }
+      } catch (err) {
+        console.error("[register-artist] admin notification failed:", err);
+      }
+    });
 
     return NextResponse.json({ success: true, artistId: artist.id });
   } catch (err) {

@@ -5,7 +5,7 @@
 // review tied to that booking (Trustpilot-style).
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { useUser } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +28,11 @@ interface ReviewableBooking {
   artistId: number | null;
   artistName: string | null;
   artistSlug: string | null;
+  venueId: number | null;
+  venueName: string | null;
+  venueSlug: string | null;
+  vendorName: string | null;
+  vendorHref: string | null;
 }
 
 export default function ReviewsCabinetPage() {
@@ -127,7 +132,10 @@ function ReviewCard({
   booking: ReviewableBooking;
   onSubmitted: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const vendorName = booking.vendorName || booking.artistName || booking.venueName ||
+    (booking.venueId ? t("nav.venues") : t("cabinet.reviews.artistFallback"));
+  const vendorHref = booking.vendorHref || (booking.artistSlug ? `/artisti/${booking.artistSlug}` : booking.venueSlug ? `/sali/${booking.venueSlug}` : null);
   const [rating, setRating] = useState(0);
   const [hover, setHover] = useState(0);
   const [text, setText] = useState("");
@@ -162,6 +170,8 @@ function ReviewCard({
       }
       toast.success(t("cabinet.reviews.submitSuccess"));
       onSubmitted();
+    } catch {
+      toast.error(t("cabinet.reviews.submitError"));
     } finally {
       setSubmitting(false);
     }
@@ -173,18 +183,18 @@ function ReviewCard({
         <div>
           <p className="text-xs uppercase text-muted-foreground">
             {booking.eventType || t("cabinet.reviews.eventFallback")} ·{" "}
-            {new Date(booking.eventDate).toLocaleDateString("ro-MD")}
+            {new Date(`${booking.eventDate.slice(0, 10)}T12:00:00`).toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-MD")}
           </p>
-          {booking.artistSlug ? (
+          {vendorHref ? (
             <Link
-              href={`/artisti/${booking.artistSlug}`}
+              href={vendorHref}
               className="font-heading text-lg font-semibold hover:text-gold"
             >
-              {booking.artistName || t("cabinet.reviews.artistFallback")}
+              {vendorName}
             </Link>
           ) : (
             <h3 className="font-heading text-lg font-semibold">
-              {booking.artistName || t("cabinet.reviews.artistFallback")}
+              {vendorName}
             </h3>
           )}
         </div>

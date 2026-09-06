@@ -66,6 +66,7 @@ export function ContractReader({
   partner,
   onReachedEnd,
   signature,
+  showVersion = true,
 }: {
   doc: LegalDocument;
   locale: string;
@@ -74,6 +75,8 @@ export function ContractReader({
   onReachedEnd?: () => void;
   /** When present, rendered at the foot of the document. */
   signature?: ContractSignature | null;
+  /** Versions remain on signed evidence, but need not clutter onboarding. */
+  showVersion?: boolean;
 }) {
   const blocks = legalBlocksFor(doc, locale, partner);
   const sections = useMemo(() => toSections(blocks), [blocks]);
@@ -82,18 +85,33 @@ export function ContractReader({
   const [open, setOpen] = useState<number[]>([0]);
   const [seen, setSeen] = useState<number[]>([0]);
   const [reported, setReported] = useState(false);
+  const copy = locale === "ru"
+    ? { preamble: "Преамбула", opened: "открыто", open: "открыть", sections: "разделов открыто", of: "из", signedBy: "Подписано", signature: "Подпись", expand: "Открыть все разделы", collapse: "Свернуть разделы" }
+    : locale === "en"
+      ? { preamble: "Preamble", opened: "opened", open: "open", sections: "sections opened", of: "of", signedBy: "Signed by", signature: "Signature of", expand: "Open all sections", collapse: "Collapse sections" }
+      : { preamble: "Preambul", opened: "deschis", open: "deschide", sections: "secțiuni deschise", of: "din", signedBy: "Semnat de", signature: "Semnătura lui", expand: "Deschide toate secțiunile", collapse: "Restrânge secțiunile" };
+
+  function recordSeen(next: number[]) {
+    setSeen(next);
+    if (next.length >= sections.length && !reported) {
+      setReported(true);
+      onReachedEnd?.();
+    }
+  }
 
   function toggle(i: number) {
     setOpen((o) => (o.includes(i) ? o.filter((x) => x !== i) : [...o, i]));
-    setSeen((s) => {
-      if (s.includes(i)) return s;
-      const next = [...s, i];
-      if (next.length >= sections.length && !reported) {
-        setReported(true);
-        onReachedEnd?.();
-      }
-      return next;
-    });
+    if (!seen.includes(i)) recordSeen([...seen, i]);
+  }
+
+  function toggleAll() {
+    if (open.length === sections.length) {
+      setOpen([]);
+      return;
+    }
+    const all = sections.map((_, index) => index);
+    setOpen(all);
+    recordSeen(all);
   }
 
   const signedOn = signature?.date ?? new Date();
@@ -103,12 +121,12 @@ export function ContractReader({
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-4 py-3">
         <h3 className="font-heading text-base font-bold">
           {legalTitle(doc, locale)}{" "}
-          <span className="text-xs font-normal text-muted-foreground">
+          {showVersion && <span className="text-xs font-normal text-muted-foreground">
             v{doc.version}
-          </span>
+          </span>}
         </h3>
         <p className="text-xs text-muted-foreground">
-          {seen.length} din {sections.length} secțiuni deschise
+          {seen.length} {copy.of} {sections.length} {copy.sections}
         </p>
       </div>
 
@@ -116,18 +134,26 @@ export function ContractReader({
         className="h-1 bg-border"
         role="progressbar"
         aria-valuenow={seen.length}
+        aria-valuemin={0}
         aria-valuemax={sections.length}
+        aria-label={copy.sections}
       >
         <div
           className="h-full bg-gold transition-all"
-          style={{ width: `${(seen.length / sections.length) * 100}%` }}
+          style={{ width: `${sections.length ? (seen.length / sections.length) * 100 : 0}%` }}
         />
+      </div>
+
+      <div className="border-b border-border px-4 py-2">
+        <button type="button" onClick={toggleAll} className="text-xs font-medium text-gold hover:underline">
+          {open.length === sections.length ? copy.collapse : copy.expand}
+        </button>
       </div>
 
       <div className="divide-y divide-border">
         {sections.map((s, i) => {
           const isOpen = open.includes(i);
-          const label = s.title ?? "Preambul";
+          const label = s.title ?? copy.preamble;
           return (
             <div key={i}>
               <button
@@ -138,7 +164,7 @@ export function ContractReader({
               >
                 <span className="font-medium">{label}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {seen.includes(i) ? "citit" : "deschide"}
+                  {seen.includes(i) ? copy.opened : copy.open}
                 </span>
               </button>
               {isOpen && (
@@ -158,7 +184,7 @@ export function ContractReader({
       {signature && (
         <div className="border-t border-border px-4 py-4">
           <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
-            Semnat de
+            {copy.signedBy}
           </p>
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
@@ -166,7 +192,7 @@ export function ContractReader({
                 {signature.name}
               </p>
               <p className="text-xs text-muted-foreground">
-                {signedOn.toLocaleDateString("ro-RO", {
+                {signedOn.toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-RO", {
                   day: "numeric",
                   month: "long",
                   year: "numeric",
@@ -174,10 +200,9 @@ export function ContractReader({
               </p>
             </div>
             {signature.image && (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={signature.image}
-                alt={`Semnătura lui ${signature.name}`}
+                alt={`${copy.signature} ${signature.name}`}
                 className="h-16 rounded-md bg-white p-1"
               />
             )}

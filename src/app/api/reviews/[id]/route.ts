@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { reviews, artists, venues, users } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
+import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 
 /**
  * Recompute rating_avg + rating_count for the artist or venue this review
@@ -28,6 +29,7 @@ async function refreshRatingAggregate(review: {
       ), 0)
       WHERE id = ${review.artistId}
     `);
+    revalidateVendorCatalog("artist");
   }
   if (review.venueId) {
     await db.execute(sql`
@@ -43,6 +45,7 @@ async function refreshRatingAggregate(review: {
       ), 0)
       WHERE id = ${review.venueId}
     `);
+    revalidateVendorCatalog("venue");
   }
 }
 
@@ -52,8 +55,13 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const body = await req.json();
+  if (!Number.isSafeInteger(Number(id)) || Number(id) < 1) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body !== "object") return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const { action, reply } = body;
+  if (reply !== undefined && (typeof reply !== "string" || reply.trim().length < 1 || reply.length > 5000)) {
+    return NextResponse.json({ error: "Reply must contain 1 to 5000 characters" }, { status: 400 });
+  }
 
   // If action is "approve" or "reject", require admin
   if (action === "approve" || action === "reject") {
@@ -92,7 +100,10 @@ export async function PUT(
     // Check if admin
     const adminCheck = await requireAdmin();
     if (adminCheck.ok) {
-      await db.update(reviews).set({ reply }).where(eq(reviews.id, Number(id)));
+      const [updated] = await db.update(reviews).set({ reply: reply.trim(), replyAt: new Date() }).where(eq(reviews.id, Number(id)))
+        .returning({ artistId: reviews.artistId, venueId: reviews.venueId });
+      if (!updated) return NextResponse.json({ error: "Review not found" }, { status: 404 });
+      revalidateVendorCatalog(updated.venueId ? "venue" : "artist");
       return NextResponse.json({ success: true });
     }
 
@@ -129,8 +140,9 @@ export async function PUT(
 
     await db
       .update(reviews)
-      .set({ reply, replyAt: new Date() })
+      .set({ reply: reply.trim(), replyAt: new Date() })
       .where(eq(reviews.id, Number(id)));
+    revalidateVendorCatalog(review.venueId ? "venue" : "artist");
     return NextResponse.json({ success: true });
   }
 

@@ -6,6 +6,7 @@ import {
   reviews,
   users,
   artists,
+  venues,
 } from "@/lib/db/schema";
 import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getLocalized } from "@/i18n";
@@ -42,10 +43,12 @@ export async function GET() {
     .select({
       booking: bookingRequests,
       artist: artists,
+      venue: venues,
       reviewId: reviews.id,
     })
     .from(bookingRequests)
     .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
+    .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
     .leftJoin(reviews, eq(reviews.bookingRequestId, bookingRequests.id))
     .where(
       and(
@@ -62,13 +65,18 @@ export async function GET() {
     );
 
   return NextResponse.json({
-    bookings: rows.map(({ booking, artist }) => ({
+    bookings: rows.map(({ booking, artist, venue }) => ({
       id: booking.id,
       eventDate: booking.eventDate,
       eventType: booking.eventType,
       artistId: booking.artistId,
       artistName: artist ? getLocalized(artist, "name", "ro") : null,
       artistSlug: artist?.slug ?? null,
+      venueId: booking.venueId,
+      venueName: venue ? getLocalized(venue, "name", "ro") : null,
+      venueSlug: venue?.slug ?? null,
+      vendorName: artist ? getLocalized(artist, "name", "ro") : venue ? getLocalized(venue, "name", "ro") : null,
+      vendorHref: artist ? `/artisti/${artist.slug}` : venue ? `/sali/${venue.slug}` : null,
     })),
   });
 }

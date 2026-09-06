@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { artists, venues, users, categories, notifications, venueImages } from "@/lib/db/schema";
+import { artists, venues, users, categories, notifications, venueImages, artistPackages, legalAcceptances } from "@/lib/db/schema";
 import { eq, and, sql, inArray, asc, desc } from "drizzle-orm";
 import { sendEmail } from "@/lib/email/send";
 import { registrationStatusEmail } from "@/lib/email/templates/registration-status";
+import { registrationDecisionSchema } from "@/lib/validation/vendor-profile";
+import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
+import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 
 async function requireAdmin() {
   const { userId: clerkId } = await auth();
@@ -36,6 +39,12 @@ export async function GET() {
       description: artists.descriptionRo,
       categoryIds: artists.categoryIds,
       photoUrl: artists.photoUrl,
+      baseCity: artists.baseCity,
+      travelDistanceKm: artists.travelDistanceKm,
+      travelSurchargeEnabled: artists.travelSurchargeEnabled,
+      travelSurchargeAmount: artists.travelSurchargeAmount,
+      priceHidden: artists.priceHidden,
+      priceFrom: artists.priceFrom,
       createdAt: artists.createdAt,
       userId: artists.userId,
     })
@@ -55,6 +64,13 @@ export async function GET() {
       description: venues.descriptionRo,
       capacityMin: venues.capacityMin,
       capacityMax: venues.capacityMax,
+      website: venues.website,
+      menuUrl: venues.menuUrl,
+      menuPdfUrl: venues.menuPdfUrl,
+      virtualTourUrl: venues.virtualTourUrl,
+      workingHours: venues.workingHours,
+      lat: venues.lat,
+      lng: venues.lng,
       createdAt: venues.createdAt,
       userId: venues.userId,
     })
@@ -98,9 +114,25 @@ export async function GET() {
       ? await db
           .select({ id: users.id, name: users.name, email: users.email })
           .from(users)
-          .where(sql`${users.id} IN ${userIds}`)
+          .where(inArray(users.id, userIds))
       : [];
   const userMap = new Map(userRows.map((u) => [u.id, u]));
+  const signedRows = userIds.length ? await db.select({
+    id: legalAcceptances.id,
+    userId: legalAcceptances.userId,
+    subjectType: legalAcceptances.subjectType,
+    documentSlug: legalAcceptances.documentSlug,
+    documentTitle: legalAcceptances.documentTitle,
+    signatureName: legalAcceptances.signatureName,
+    acceptedAt: legalAcceptances.acceptedAt,
+  }).from(legalAcceptances).where(inArray(legalAcceptances.userId, userIds))
+    .orderBy(desc(legalAcceptances.acceptedAt)) : [];
+  const contractsFor = (userId: string | null, subjectType: "artist" | "venue") => signedRows
+    .filter(row => row.userId === userId && row.subjectType === subjectType)
+    .map(row => ({ ...row, copyUrl: `/api/legal/accept/${row.id}/copy` }));
+  const artistIds = pendingArtists.map(a => a.id);
+  const packageRows = artistIds.length ? await db.select().from(artistPackages)
+    .where(inArray(artistPackages.artistId, artistIds)) : [];
 
   // Combine into unified list
   const result = [
@@ -121,6 +153,14 @@ export async function GET() {
         categoryName: catName,
         capacity: null,
         photoUrl: a.photoUrl ?? null,
+        baseCity: a.baseCity,
+        travelDistanceKm: a.travelDistanceKm,
+        travelSurchargeEnabled: a.travelSurchargeEnabled,
+        travelSurchargeAmount: a.travelSurchargeAmount,
+        priceHidden: a.priceHidden,
+        priceFrom: a.priceFrom,
+        packages: packageRows.filter(p => p.artistId === a.id),
+        contracts: contractsFor(a.userId, "artist"),
         createdAt: a.createdAt?.toISOString() ?? new Date().toISOString(),
         userId: a.userId,
         userName: u?.name ?? null,
@@ -146,6 +186,16 @@ export async function GET() {
         categoryName: null,
         capacity: cap,
         photoUrl: venueCoverMap.get(v.id) ?? null,
+        address: v.address,
+        website: v.website,
+        menuUrl: v.menuUrl,
+        menuPdfUrl: v.menuPdfUrl,
+        virtualTourUrl: v.virtualTourUrl,
+        workingHours: v.workingHours,
+        lat: v.lat,
+        lng: v.lng,
+        images: venueImageRows.filter(image => image.venueId === v.id),
+        contracts: contractsFor(v.userId, "venue"),
         createdAt: v.createdAt?.toISOString() ?? new Date().toISOString(),
         userId: v.userId,
         userName: u?.name ?? null,
@@ -154,7 +204,7 @@ export async function GET() {
     }),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  return NextResponse.json(result);
+  return NextResponse.json(result, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 // POST — approve or reject a registration
@@ -164,16 +214,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
-  const { id, type, action } = body as {
-    id: number;
-    type: "artist" | "venue";
-    action: "approve" | "reject";
-  };
-
-  if (!id || !type || !action) {
-    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-  }
+  const parsed = registrationDecisionSchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) return NextResponse.json({ error: "Invalid registration decision" }, { status: 400 });
+  const { id, type, action } = parsed.data;
 
   try {
     if (type === "artist") {
@@ -193,6 +236,10 @@ export async function POST(req: Request) {
       }
 
       if (action === "approve") {
+        if (artist.userId) {
+          const missing = await missingRegistrationDocuments(artist.userId, "artist");
+          if (missing.length) return NextResponse.json({ error: "current_signed_contract_required", missing }, { status: 409 });
+        }
         await db
           .update(artists)
           .set({ isActive: true, updatedAt: new Date() })
@@ -227,7 +274,7 @@ export async function POST(req: Request) {
         if (artist.userId) {
           await db
             .update(users)
-            .set({ role: "user" })
+            .set({ role: "user", onboardingComplete: false, updatedAt: new Date() })
             .where(eq(users.id, artist.userId));
 
           await db.insert(notifications).values({
@@ -272,6 +319,10 @@ export async function POST(req: Request) {
       }
 
       if (action === "approve") {
+        if (venue.userId) {
+          const missing = await missingRegistrationDocuments(venue.userId, "venue");
+          if (missing.length) return NextResponse.json({ error: "current_signed_contract_required", missing }, { status: 409 });
+        }
         await db
           .update(venues)
           .set({ isActive: true, updatedAt: new Date() })
@@ -302,6 +353,7 @@ export async function POST(req: Request) {
         }
       } else {
         if (venue.userId) {
+          await db.update(users).set({ onboardingComplete: false, updatedAt: new Date() }).where(eq(users.id, venue.userId));
           await db.insert(notifications).values({
             userId: venue.userId,
             type: "registration_rejected",
@@ -329,6 +381,7 @@ export async function POST(req: Request) {
       }
     }
 
+    revalidateVendorCatalog(type);
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[registration-requests] Error:", err);

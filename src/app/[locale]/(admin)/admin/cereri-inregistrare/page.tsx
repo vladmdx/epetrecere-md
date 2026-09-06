@@ -16,9 +16,10 @@ import {
   MapPin,
   Calendar,
   Users,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { useLocale } from "@/hooks/use-locale";
 
 interface RegistrationRequest {
@@ -36,13 +37,23 @@ interface RegistrationRequest {
   userId: string | null;
   userName: string | null;
   userEmail: string | null;
+  baseCity?: string | null;
+  travelDistanceKm?: number | null;
+  priceFrom?: string | number | null;
+  address?: string | null;
+  contracts?: { id: number; documentTitle: string | null; signatureName: string; acceptedAt: string; copyUrl: string }[];
 }
 
 export default function RegistrationRequestsPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const copy = locale === "ru"
+    ? { contracts: "Подписанные документы", missing: "Подписанные документы отсутствуют", signedBy: "Подписант", travel: "Выезд из", price: "Цена от" }
+    : locale === "en"
+      ? { contracts: "Signed documents", missing: "No signed documents", signedBy: "Signed by", travel: "Travel from", price: "Price from" }
+      : { contracts: "Documente semnate", missing: "Lipsesc documentele semnate", signedBy: "Semnat de", travel: "Deplasare din", price: "Preț de la" };
   const [requests, setRequests] = useState<RegistrationRequest[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState<number | null>(null);
+  const [processing, setProcessing] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "artist" | "venue">("all");
 
   async function loadRequests() {
@@ -63,7 +74,7 @@ export default function RegistrationRequestsPage() {
   }, []);
 
   async function handleAction(id: number, type: "artist" | "venue", action: "approve" | "reject") {
-    setProcessing(id);
+    setProcessing(`${type}-${id}`);
     try {
       const res = await fetch("/api/admin/registration-requests", {
         method: "POST",
@@ -137,7 +148,7 @@ export default function RegistrationRequestsPage() {
               <CardContent className="p-0">
                 <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-start sm:justify-between">
                   {/* Info */}
-                  <div className="flex gap-4">
+                  <div className="flex min-w-0 gap-4">
                     {req.photoUrl ? (
 
                       <img
@@ -166,8 +177,8 @@ export default function RegistrationRequestsPage() {
                         )}
                       </div>
                     )}
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 space-y-1 break-words">
+                      <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-heading text-lg font-bold">{req.name}</h3>
                         <span
                           className={cn(
@@ -224,6 +235,27 @@ export default function RegistrationRequestsPage() {
                           {req.description}
                         </p>
                       )}
+                      {req.address && <p className="text-sm text-muted-foreground">{req.address}</p>}
+                      {req.type === "artist" && req.baseCity && (
+                        <p className="text-sm text-muted-foreground">{copy.travel} {req.baseCity}: {req.travelDistanceKm === 999 ? t("common.all") : `${req.travelDistanceKm ?? 30} km`}</p>
+                      )}
+                      {req.priceFrom != null && <p className="text-sm text-gold">{copy.price}: {req.priceFrom} €</p>}
+                      <div className="pt-2">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{copy.contracts}</p>
+                        {req.contracts?.length ? (
+                          <ul className="mt-1 space-y-1">
+                            {req.contracts.map(contract => (
+                              <li key={contract.id} className="text-xs">
+                                <a href={contract.copyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-gold hover:underline">
+                                  <FileText className="h-3.5 w-3.5 shrink-0" />
+                                  {contract.documentTitle || copy.contracts}
+                                </a>
+                                <span className="ml-2 text-muted-foreground">{copy.signedBy}: {contract.signatureName} · {new Date(contract.acceptedAt).toLocaleString(locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-MD")}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : <p className="text-xs text-amber-500">{copy.missing}</p>}
+                      </div>
                     </div>
                   </div>
 
@@ -232,10 +264,10 @@ export default function RegistrationRequestsPage() {
                     <Button
                       size="sm"
                       onClick={() => handleAction(req.id, req.type, "approve")}
-                      disabled={processing === req.id}
+                      disabled={processing === `${req.type}-${req.id}` || !req.contracts?.length}
                       className="gap-1.5 bg-green-600 hover:bg-green-700"
                     >
-                      {processing === req.id ? (
+                      {processing === `${req.type}-${req.id}` ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <CheckCircle className="h-3.5 w-3.5" />
@@ -246,7 +278,7 @@ export default function RegistrationRequestsPage() {
                       size="sm"
                       variant="outline"
                       onClick={() => handleAction(req.id, req.type, "reject")}
-                      disabled={processing === req.id}
+                      disabled={processing === `${req.type}-${req.id}`}
                       className="gap-1.5 border-red-500/30 text-red-400 hover:bg-red-500/10"
                     >
                       <XCircle className="h-3.5 w-3.5" />

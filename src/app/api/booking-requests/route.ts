@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
@@ -21,14 +21,15 @@ import { redactContact } from "@/lib/privacy/contact-redaction";
 
 const bookingSchema = z.object({
   /** Either artistId or venueId must be set. */
-  artistId: z.number().optional(),
-  venueId: z.number().optional(),
+  artistId: z.number().int().positive().optional(),
+  venueId: z.number().int().positive().optional(),
   clientName: z.string().min(2),
   clientPhone: z.string().min(6),
   clientEmail: z.string().optional(),
   eventDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "eventDate must be YYYY-MM-DD")
+    .refine(d => { const date = new Date(`${d}T00:00:00Z`); return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === d; }, "Invalid event date")
     .refine((d) => {
       // Reject dates strictly before today (event can still be booked for "today").
       // Compared against UTC date so a client in +3 doesn't accidentally reject
@@ -37,8 +38,8 @@ const bookingSchema = z.object({
       const todayStr = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
       return d >= todayStr;
     }, "Event date cannot be in the past"),
-  startTime: z.string().optional(),
-  endTime: z.string().optional(),
+  startTime: z.preprocess(value => value === "" || value === null ? undefined : value, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional()),
+  endTime: z.preprocess(value => value === "" || value === null ? undefined : value, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional()),
   eventType: z.string().optional(),
   guestCount: z.number().int().positive().max(10000).optional(),
   message: z.string().optional(),
@@ -51,7 +52,7 @@ const bookingSchema = z.object({
   packageId: z.number().int().positive().optional(),
   /** Optional — duration in hours (from the selected package). */
   durationHours: z.number().positive().optional(),
-});
+}).refine(data => Boolean(data.artistId) !== Boolean(data.venueId), { message: "Exactly one artist or venue is required" });
 
 // GET booking requests — requires auth; scoped to caller's own data.
 // Admins can query any artist_id or client_email. Regular users can only
@@ -65,7 +66,7 @@ export async function GET(req: NextRequest) {
   // cron also does this hourly, but doing it on read means a user
   // refreshing their dashboard never sees a stale blocker. No-op
   // when nothing matches.
-  void (async () => {
+  after(async () => {
     try {
       await db
         .update(bookingRequests)
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       console.error("[bookings.GET] expire sweep failed:", err);
     }
-  })();
+  });
 
   const artistId = req.nextUrl.searchParams.get("artist_id");
   const clientEmail = req.nextUrl.searchParams.get("client_email");
@@ -655,7 +656,7 @@ export async function POST(req: NextRequest) {
 
   // M5 — fire-and-forget notifications. Looks up the vendor owner (artist
   // or venue) so the dashboard bell lights up immediately.
-  void (async () => {
+  after(async () => {
     try {
       let artist: {
         userId: string | null;
@@ -875,7 +876,7 @@ export async function POST(req: NextRequest) {
     } catch (err) {
       console.error("[notifications] booking-request POST", err);
     }
-  })();
+  });
 
   return NextResponse.json(booking, { status: 201 });
 }

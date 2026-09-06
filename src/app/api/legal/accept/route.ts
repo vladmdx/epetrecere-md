@@ -89,7 +89,7 @@ export async function GET() {
     const doc = getLegalDocument(r.documentSlug);
     return {
       ...r,
-      documentTitle: doc ? legalTitle(doc, r.locale) : r.documentSlug,
+      documentTitle: r.documentTitleStored || (doc ? legalTitle(doc, r.locale) : r.documentSlug),
     };
   });
   return NextResponse.json({ items, packVersion: LEGAL_PACK_VERSION }, { headers: { "Cache-Control": "private, no-store" } });

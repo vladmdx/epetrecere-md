@@ -5,6 +5,8 @@ import { db } from "@/lib/db";
 import { artists, redirects, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { slugify } from "@/lib/utils/slugify";
+import { artistLocationUpdate, artistTravelShape } from "@/lib/validation/vendor-profile";
+import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 
 // F-A4 auth lockdown — until this fix the endpoint accepted anonymous
 // POST/PUT/DELETE against any artist row. Ownership model is:
@@ -68,11 +70,7 @@ const artistSchema = z.object({
   calendarEnabled: z.boolean().default(false),
   bufferHours: z.number().default(2),
   bufferMinutes: z.number().min(15).max(180).optional(),
-  baseCity: z.string().optional(),
-  travelDistanceKm: z.number().min(0).max(999).optional(),
-  travelSurchargeEnabled: z.boolean().optional(),
-  travelSurchargeAmount: z.number().min(0).max(10000).nullable().optional(),
-  priceHidden: z.boolean().optional(),
+  ...artistTravelShape,
   autoReplyEnabled: z.boolean().optional(),
   autoReplyMessage: z.string().optional(),
   photoUrl: z.string().nullable().optional(),
@@ -92,6 +90,10 @@ const OWNER_PROTECTED_FIELDS = [
   "isVerified",
   "isPremium",
   "userId",
+  "ratingAvg",
+  "ratingCount",
+  "sortOrder",
+  "createdAt",
 ] as const;
 
 // CREATE artist — admin only. Regular signup goes through
@@ -207,10 +209,18 @@ export async function PUT(req: Request) {
   // SEO auto-pages and any other code still reading `location` stay in sync.
   // baseCity is the authoritative source; location is kept around for back-
   // compat (city-keyword search on /artisti, OG meta, etc.).
-  const setData: Partial<typeof artists.$inferInsert> = { ...data, updatedAt: new Date() };
-  if (typeof data.baseCity === "string" && data.baseCity.trim()) {
-    setData.location = data.baseCity.trim();
-  }
+  const travel = z.object(artistTravelShape).safeParse(data);
+  if (!travel.success) return NextResponse.json({ error: "Validation failed", details: travel.error.issues }, { status: 400 });
+  const setData: Partial<typeof artists.$inferInsert> = {
+    ...data,
+    ...travel.data,
+    ...artistLocationUpdate({
+      baseCity: typeof data.baseCity === "string" ? data.baseCity : undefined,
+      location: typeof data.location === "string" ? data.location : undefined,
+    }),
+    updatedAt: new Date(),
+  };
+  if (travel.data.travelSurchargeEnabled === false) setData.travelSurchargeAmount = null;
 
   await db
     .update(artists)
@@ -229,6 +239,7 @@ export async function PUT(req: Request) {
     .from(artists)
     .where(eq(artists.id, Number(id)))
     .limit(1);
+  revalidateVendorCatalog("artist");
   return NextResponse.json(updated);
 }
 

@@ -6,6 +6,8 @@ import { venues, venueImages, reviews, users, redirects } from "@/lib/db/schema"
 import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
+import { venueOwnerFields } from "@/lib/validation/vendor-profile";
+import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 
 export async function GET(
   _req: Request,
@@ -144,7 +146,7 @@ export async function PUT(
   }
 
   const [venue] = await db
-    .select({ id: venues.id, userId: venues.userId })
+    .select({ id: venues.id, userId: venues.userId, capacityMin: venues.capacityMin, capacityMax: venues.capacityMax })
     .from(venues)
     .where(eq(venues.id, venueId))
     .limit(1);
@@ -171,7 +173,12 @@ export async function PUT(
   }
 
   // Strip empty strings to null for URL/email columns so we don't persist "".
-  const data = { ...parsed.data };
+  const data: Partial<typeof venues.$inferInsert> = venueOwnerFields(parsed.data, isAdmin);
+  const capacityMin = data.capacityMin === undefined ? venue.capacityMin : data.capacityMin;
+  const capacityMax = data.capacityMax === undefined ? venue.capacityMax : data.capacityMax;
+  if (capacityMin != null && capacityMax != null && capacityMin > capacityMax) {
+    return NextResponse.json({ error: "Maximum capacity must not be lower than minimum capacity" }, { status: 400 });
+  }
   for (const k of [
     "email",
     "website",
@@ -179,7 +186,7 @@ export async function PUT(
     "menuPdfUrl",
     "virtualTourUrl",
   ] as const) {
-    if (data[k] === "") data[k] = undefined;
+    if (data[k] === "") data[k] = null;
   }
 
   // If the slug is changing, (1) block conflicts with a friendly error and
@@ -233,6 +240,7 @@ export async function PUT(
     .from(venues)
     .where(eq(venues.id, venueId))
     .limit(1);
+  revalidateVendorCatalog("venue");
   return NextResponse.json(updated);
 }
 

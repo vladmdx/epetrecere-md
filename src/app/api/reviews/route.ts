@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { reviews } from "@/lib/db/schema";
 import { and, desc, eq } from "drizzle-orm";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
 
 // Public reads expose approved reviews only.
 export async function GET(req: NextRequest) {
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(reviews.createdAt))
     .limit(50);
 
-  return NextResponse.json(result);
+  return NextResponse.json(publicCatalogData(result));
 }
 
 // Unlinked public reviews are intentionally disabled. Reviews are created by

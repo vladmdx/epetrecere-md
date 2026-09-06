@@ -8,9 +8,8 @@
 //   Step 4: Pricing (priceFrom + travel surcharge)
 //   Step 5: Confirmation
 //
-// Phone is captured at registration. The submit endpoint
-// (/api/auth/register-artist) creates the artist row in the DB and the
-// follow-up PATCH (/api/artists/crud PUT) saves the extended fields.
+// Phone is captured at registration. The submit endpoint saves the profile,
+// packages and travel settings together so a partial request cannot lose data.
 
 import { useState, useEffect, useRef } from "react";
 import {
@@ -41,8 +40,13 @@ import {
 } from "lucide-react";
 import {
   MOLDOVA_CITIES,
-  TRAVEL_DISTANCE_OPTIONS,
+  DEFAULT_CITY,
+  DEFAULT_TRAVEL_KM,
+  getTravelDistanceOptions,
+  localizeMoldovaCity,
+  travelDistanceLabel,
 } from "@/lib/moldova-cities";
+import { localizePath } from "@/lib/i18n/routing";
 import { getLocalized } from "@/i18n";
 import { useLocale } from "@/hooks/use-locale";
 import { ESignature, type ESignatureValue } from "@/components/legal/e-signature";
@@ -92,12 +96,11 @@ export default function OnboardingPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [data, setData] = useState({
     name: "",
-    location: "Chișinău",
     categoryId: 0,
     imageUrl: "",
     description: "",
-    baseCity: "Chișinău",
-    travelDistanceKm: 30,
+    baseCity: DEFAULT_CITY,
+    travelDistanceKm: DEFAULT_TRAVEL_KM,
     travelSurchargeEnabled: false,
     travelSurchargeAmount: 0,
     /** Legacy single "preț de start" — kept around for back-compat
@@ -126,6 +129,25 @@ export default function OnboardingPage() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const seededUserId = useRef<string | null>(null);
+  const travelOptions = getTravelDistanceOptions(data.baseCity, locale);
+  const validTravelAmount = !data.travelSurchargeEnabled || (
+    Number.isInteger(data.travelSurchargeAmount) &&
+    data.travelSurchargeAmount >= 0 && data.travelSurchargeAmount <= 10000
+  );
+  const isValidPackage = (p: (typeof data.pricePackages)[number]) =>
+    Number.isInteger(p.price) && p.price > 0 && p.price <= 100000 &&
+    (p.pricingMode === "per_event" || (
+      Number.isInteger(p.hours) && p.hours >= 0 && p.hours <= 24 &&
+      Number.isInteger(p.minutes) && p.minutes >= 0 && p.minutes <= 59 &&
+      (p.hours > 0 || p.minutes > 0)
+    ));
+  const validPackages = data.priceHidden || data.pricePackages.every(isValidPackage);
+  const pricingHint = {
+    ro: "Completează fiecare tarif cu un preț întreg între 1 și 100 000 €, iar la tarifele pe durată adaugă orele sau minutele. Șterge rândurile de care nu ai nevoie.",
+    ru: "Укажите для каждого тарифа целую сумму от 1 до 100 000 €, а для почасового тарифа добавьте часы или минуты. Удалите ненужные строки.",
+    en: "Enter a whole amount from €1 to €100,000 for each rate and add hours or minutes for duration rates. Remove any rows you do not need.",
+  }[locale];
 
   useEffect(() => {
     fetch("/api/categories")
@@ -143,10 +165,13 @@ export default function OnboardingPage() {
       )
       .catch(() => toast.error(t("vendor.onboarding.errCategories")));
 
-    if (user) {
-      // Only seed Clerk values when the local fields are still empty.
-      // Without this guard, useUser re-emits (focus, tab switch, HMR)
-      // would clobber any photo the partner just uploaded.
+  }, [t]);
+
+  useEffect(() => {
+    if (user && seededUserId.current !== user.id) {
+      // Seed once per account, including when a deleted photo leaves the
+      // input empty. Later Clerk refreshes must not undo the user's edits.
+      seededUserId.current = user.id;
       setData((d) => ({
         ...d,
         name: d.name || user.fullName || "",
@@ -215,13 +240,13 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type: "description",
-          name: data.name || "Artistul",
-          category: category.nameRo,
+          name: data.name,
+          category: getLocalized(category, "name", locale),
           location: data.baseCity,
           // The /api/ai/generate schema reads `description`, not `existing`.
           // It feeds Claude as the seed text for the rewrite pass.
           description: data.description,
-          language: "ro",
+          language: locale,
         }),
       });
       if (!res.ok) {
@@ -246,6 +271,12 @@ export default function OnboardingPage() {
   }
 
   async function handleSubmit() {
+    if (submitting || uploadingPhoto || generatingAi) return;
+    if (!checkName(data.name).ok || !data.imageUrl || !checkDescription(data.description).ok ||
+        !data.categoryId || !data.baseCity || !validTravelAmount || !validPackages) {
+      toast.error(t("vendor.onboarding.errSubmit"));
+      return;
+    }
     setSubmitting(true);
     try {
       // Drop empty / zero-priced tiers before submit. Server validates
@@ -253,13 +284,11 @@ export default function OnboardingPage() {
       // An event tier has no duration by design, so requiring one here would
       // throw away exactly the prices the partner came to set.
       const cleanPackages = (data.pricePackages || [])
-        .filter(
-          (p) =>
-            p.price > 0 &&
-            (p.pricingMode === "per_event" || p.hours > 0 || p.minutes > 0),
-        )
+        .filter(isValidPackage)
         .map((p) => ({
           ...p,
+          hours: p.pricingMode === "per_event" ? 0 : p.hours,
+          minutes: p.pricingMode === "per_event" ? 0 : p.minutes,
           eventType:
             p.pricingMode === "per_event" && p.eventType ? p.eventType : null,
         }));
@@ -296,7 +325,12 @@ export default function OnboardingPage() {
           name: data.name,
           phone: "",
           categoryId: data.categoryId,
-          location: data.location,
+          location: data.baseCity,
+          baseCity: data.baseCity,
+          travelDistanceKm: data.travelDistanceKm,
+          travelSurchargeEnabled: data.travelSurchargeEnabled,
+          travelSurchargeAmount: data.travelSurchargeEnabled ? data.travelSurchargeAmount : null,
+          priceHidden: data.priceHidden,
           imageUrl: data.imageUrl,
           description: data.description || undefined,
           priceFrom: data.priceFrom > 0 ? data.priceFrom : undefined,
@@ -307,34 +341,8 @@ export default function OnboardingPage() {
         const err = await res.json().catch(() => ({ error: "Unknown error" }));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      const { artistId } = await res.json();
-
-      // 2. PATCH the extended fields (travel + base city) via the artist
-      // crud endpoint. Fire-and-forget so a transient failure here doesn't
-      // block the success toast — admins can fix from /admin/artisti later.
-      if (artistId) {
-        try {
-          await fetch("/api/artists/crud", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              id: artistId,
-              baseCity: data.baseCity,
-              travelDistanceKm: data.travelDistanceKm,
-              travelSurchargeEnabled: data.travelSurchargeEnabled,
-              travelSurchargeAmount: data.travelSurchargeEnabled
-                ? data.travelSurchargeAmount
-                : null,
-              priceHidden: data.priceHidden,
-            }),
-          });
-        } catch {
-          /* ignore — non-critical */
-        }
-      }
-
       toast.success(t("vendor.onboarding.submitted"));
-      router.push("/dashboard");
+      router.push(localizePath("/dashboard", locale));
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : t("vendor.onboarding.errSubmit"),
@@ -350,15 +358,15 @@ export default function OnboardingPage() {
         return !!data.categoryId;
       case 1:
         // Presence was the only rule, so "kk" walked straight through.
-        return checkName(data.name).ok;
+        return checkName(data.name).ok && Boolean(data.imageUrl) && !uploadingPhoto;
       case 2:
         // Still optional — but if something was typed, it has to say
         // something. "000" used to reach an admin for approval.
-        return checkDescription(data.description).ok;
+        return checkDescription(data.description).ok && !generatingAi;
       case 3:
-        return !!data.baseCity;
+        return !!data.baseCity && validTravelAmount;
       case 4:
-        return true; // price is optional
+        return validPackages; // pricing is optional, unfinished rows are not
       default:
         return false;
     }
@@ -433,7 +441,7 @@ export default function OnboardingPage() {
           </h2>
 
           <div>
-            <Label>{t("vendor.onboarding.profilePhoto")}</Label>
+            <Label>{t("vendor.onboarding.profilePhoto")} *</Label>
             <div className="mt-2 flex items-center gap-4">
               <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-border/40 bg-muted">
                 {data.imageUrl ? (
@@ -586,12 +594,12 @@ export default function OnboardingPage() {
             <Label>{t("vendor.onboarding.baseCityRequired")}</Label>
             <select
               value={data.baseCity}
-              onChange={(e) => update({ baseCity: e.target.value, location: e.target.value })}
+              onChange={(e) => update({ baseCity: e.target.value })}
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
             >
               {MOLDOVA_CITIES.map((c) => (
                 <option key={c} value={c}>
-                  {c}
+                  {localizeMoldovaCity(c, locale)}
                 </option>
               ))}
             </select>
@@ -607,7 +615,7 @@ export default function OnboardingPage() {
               onChange={(e) => update({ travelDistanceKm: Number(e.target.value) })}
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
             >
-              {TRAVEL_DISTANCE_OPTIONS.map((o) => (
+              {travelOptions.map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
                 </option>
@@ -641,12 +649,23 @@ export default function OnboardingPage() {
                 <Input
                   type="number"
                   min={0}
+                  max={10000}
+                  step={1}
                   value={data.travelSurchargeAmount || ""}
                   onChange={(e) => update({ travelSurchargeAmount: Number(e.target.value) })}
                   className="w-32"
                   placeholder={t("vendor.settings.travelAmountPlaceholder")}
                 />
               </div>
+            )}
+            {!validTravelAmount && (
+              <p className="text-xs text-destructive">
+                {{
+                  ro: "Introdu o sumă întreagă între 0 și 10 000 €.",
+                  ru: "Введите целую сумму от 0 до 10 000 €.",
+                  en: "Enter a whole amount between €0 and €10,000.",
+                }[locale]}
+              </p>
             )}
           </div>
         </div>
@@ -834,6 +853,7 @@ export default function OnboardingPage() {
               ))}
               <button
                 type="button"
+                disabled={data.pricePackages.length >= 20}
                 onClick={() =>
                   update({
                     pricePackages: [
@@ -849,10 +869,11 @@ export default function OnboardingPage() {
                     ],
                   })
                 }
-                className="w-full rounded-lg border border-dashed border-border/40 px-3 py-2 text-xs text-muted-foreground hover:border-gold/40 hover:text-gold"
+                className="w-full rounded-lg border border-dashed border-border/40 px-3 py-2 text-xs text-muted-foreground hover:border-gold/40 hover:text-gold disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t("vendor.onboarding.addRate")}
               </button>
+              {!validPackages && <p className="text-xs text-destructive">{pricingHint}</p>}
             </div>
           )}
           {/* Toggle "ascunde prețul" — for artists with negotiated pricing.
@@ -914,11 +935,11 @@ export default function OnboardingPage() {
             />
             <SummaryRow
               label={t("vendor.settings.baseCity")}
-              value={data.baseCity}
+              value={localizeMoldovaCity(data.baseCity, locale)}
             />
             <SummaryRow
               label={t("vendor.onboarding.sumTravel")}
-              value={TRAVEL_DISTANCE_OPTIONS.find((o) => o.value === data.travelDistanceKm)?.label ?? "—"}
+              value={travelDistanceLabel(data.travelDistanceKm, data.baseCity, locale)}
             />
             {data.travelSurchargeEnabled && (
               <SummaryRow
@@ -934,7 +955,7 @@ export default function OnboardingPage() {
             )}
             {(() => {
               const tiers = data.pricePackages.filter(
-                (p) => p.price > 0 && (p.hours > 0 || p.minutes > 0),
+                (p) => p.price > 0 && (p.pricingMode === "per_event" || p.hours > 0 || p.minutes > 0),
               );
               if (tiers.length === 0) return null;
               return (
@@ -943,7 +964,9 @@ export default function OnboardingPage() {
                   value={tiers
                     .map((p) => {
                       const dur =
-                        p.hours > 0
+                        p.pricingMode === "per_event"
+                          ? (p.eventType ? eventTypeLabel(p.eventType as EventTypeKey, locale) : t("vendor.onboarding.eventTypeAny"))
+                          : p.hours > 0
                           ? `${p.hours}h${p.minutes ? ` ${p.minutes}m` : ""}`
                           : `${p.minutes} min`;
                       return `${dur} = ${p.price}€`;
@@ -980,12 +1003,12 @@ export default function OnboardingPage() {
       )}
 
       {/* Navigation */}
-      <div className="mt-8 flex items-center justify-between">
+      <div className="mt-8 flex items-center justify-between gap-3">
         <Button
           variant="outline"
-          disabled={step === 0}
+          disabled={step === 0 || submitting}
           onClick={() => setStep(step - 1)}
-          className="gap-2"
+          className="shrink-0 gap-2"
         >
           <ArrowLeft className="h-4 w-4" /> {t("common.back")}
         </Button>
@@ -993,7 +1016,7 @@ export default function OnboardingPage() {
           <Button
             onClick={() => setStep(step + 1)}
             disabled={!canContinue()}
-            className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
+            className="h-auto min-h-10 whitespace-normal bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
           >
             {t("common.next")} <ArrowRight className="h-4 w-4" />
           </Button>
@@ -1001,7 +1024,7 @@ export default function OnboardingPage() {
           <Button
             onClick={handleSubmit}
             disabled={submitting || !signature?.accepted}
-            className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
+            className="h-auto min-h-10 min-w-0 whitespace-normal bg-gold py-2 text-[#0D0D0D] hover:bg-gold-dark gap-2"
           >
             {submitting ? (
               t("vendor.onboarding.sending")

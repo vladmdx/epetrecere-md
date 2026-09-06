@@ -107,26 +107,80 @@ export function localizeMoldovaCity(city: string, locale: Locale): string {
   return locale === "ru" ? CITY_NAMES_RU[city] ?? city : city;
 }
 
-/** Normalized lowercase set for membership checks (case-insensitive). */
-const CITY_SET = new Set(MOLDOVA_CITIES.map((c) => c.toLowerCase()));
+function normalizeCitySpelling(city: string): string {
+  return city.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+const CITY_BY_SPELLING = new Map<string, string>();
+for (const city of MOLDOVA_CITIES) {
+  CITY_BY_SPELLING.set(normalizeCitySpelling(city), city);
+  const russian = CITY_NAMES_RU[city];
+  if (russian) CITY_BY_SPELLING.set(normalizeCitySpelling(russian), city);
+}
+const CITY_ALIASES: Record<string, string> = {
+  "Hâncești": "Hîncești",
+  "Sângerei": "Sîngerei",
+  "Râșcani": "Rîșcani",
+  "Râbnița": "Rîbnița",
+  "Bender": "Tighina (Bender)",
+  "Tighina": "Tighina (Bender)",
+};
+for (const [alias, city] of Object.entries(CITY_ALIASES)) {
+  CITY_BY_SPELLING.set(normalizeCitySpelling(alias), city);
+}
+
+/** Store one canonical city value regardless of the interface language. */
+export function canonicalMoldovaCity(city: string): string | undefined {
+  return CITY_BY_SPELLING.get(normalizeCitySpelling(city));
+}
+
+/** Known local spellings, including Russian, for legacy city records. */
+export function moldovaCitySpellings(city: string): string[] {
+  const canonical = canonicalMoldovaCity(city) ?? city.trim();
+  return Array.from(new Set([
+    canonical,
+    ...(CITY_NAMES_RU[canonical] ? [CITY_NAMES_RU[canonical]] : []),
+    ...Object.keys(CITY_ALIASES).filter((alias) => CITY_ALIASES[alias] === canonical),
+    ...Array.from(CITY_BY_SPELLING.entries())
+      .filter(([, value]) => value === canonical)
+      .map(([spelling]) => spelling),
+  ]));
+}
 
 export function isKnownCity(city: string | null | undefined): boolean {
   if (!city) return false;
-  return CITY_SET.has(city.toLowerCase());
+  return Boolean(canonicalMoldovaCity(city));
 }
 
 // Distance options for "max travel km" picker. 30 = base city + suburbs,
-// then 20km steps to 160, then "all Moldova" (sentinel = 999).
-export const TRAVEL_DISTANCE_OPTIONS = [
-  { value: 30, label: "Doar Chișinău + suburbii" },
-  { value: 50, label: "50 km" },
-  { value: 70, label: "70 km" },
-  { value: 90, label: "90 km" },
-  { value: 110, label: "110 km" },
-  { value: 130, label: "130 km" },
-  { value: 150, label: "150 km" },
-  { value: 999, label: "Toată Moldova" },
-];
+// then 20km steps to 150, then "all Moldova" (sentinel = 999).
+export const TRAVEL_DISTANCE_VALUES = [30, 50, 70, 90, 110, 130, 150, 999] as const;
+
+export function travelDistanceLabel(distanceKm: number, baseCity: string, locale: Locale): string {
+  const city = localizeMoldovaCity(canonicalMoldovaCity(baseCity) ?? baseCity, locale);
+  if (distanceKm >= 999) {
+    return { ro: "Toată Moldova", ru: "Вся Молдова", en: "All of Moldova" }[locale];
+  }
+  if (distanceKm === 30) {
+    return {
+      ro: `${city} și împrejurimi (30 km)`,
+      ru: `${city} и окрестности (30 км)`,
+      en: `${city} and nearby areas (30 km)`,
+    }[locale];
+  }
+  return {
+    ro: `Până la ${distanceKm} km de ${city}`,
+    ru: `До ${distanceKm} км от ${city}`,
+    en: `Up to ${distanceKm} km from ${city}`,
+  }[locale];
+}
+
+export function getTravelDistanceOptions(baseCity: string, locale: Locale) {
+  return TRAVEL_DISTANCE_VALUES.map((value) => ({
+    value,
+    label: travelDistanceLabel(value, baseCity, locale),
+  }));
+}
 
 export const DEFAULT_TRAVEL_KM = 30;
 

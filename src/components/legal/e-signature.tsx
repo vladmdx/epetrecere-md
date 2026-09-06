@@ -3,16 +3,16 @@
 /**
  * Electronic signature block for vendor registration.
  *
- * The vendor ticks each required document and types their full name — that
- * typed name IS the signature (Partner Agreement §4 "acceptarea electronică").
+ * The vendor explicitly accepts the listed documents together, identifies
+ * the contracting party and draws their signature.
  * On submit the server records the technical fixation required by Venue
  * Agreement Anexa 2 (version, timestamp, IP, user-agent, content hash).
  *
- * Deliberately blocks submission until every document is ticked and the name
- * looks real: an un-ticked box would make the acceptance unprovable.
+ * Submission still requires complete identity details, the contract review,
+ * an unchecked-by-default acceptance and a matching drawn signature.
  */
 
-import { useMemo, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/shared/locale-link";
 import { Check, ChevronDown, FileText, ShieldCheck } from "lucide-react";
 import { SignaturePad, type SignatureValue } from "./signature-pad";
@@ -49,6 +49,10 @@ export function ESignature({
   defaultName?: string;
 }) {
   const { t, locale } = useLocale();
+  const acceptanceId = useId();
+  const documentsId = useId();
+  const contractId = useId();
+  const signerId = useId();
   const required = subjectType === "venue" ? VENUE_REQUIRED_DOCS : PARTNER_REQUIRED_DOCS;
 
   const docs = useMemo(
@@ -59,7 +63,7 @@ export function ESignature({
     [required],
   );
 
-  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [acceptedDocuments, setAcceptedDocuments] = useState(false);
   const [name, setName] = useState(defaultName);
   const [signatureKey, setSignatureKey] = useState(0);
   const [signature, setSignature] = useState<SignatureValue>({
@@ -75,6 +79,19 @@ export function ESignature({
   const [representativeName, setRepresentativeName] = useState("");
   const [contractOpen, setContractOpen] = useState(false);
   const [contractRead, setContractRead] = useState(false);
+  // Returning to this onboarding step mounts a blank form. The parent must
+  // not keep the accepted signature from the instance that was left behind.
+  const initialChange = useRef(onChange);
+  const initialValue = useRef<ESignatureValue>({
+    signatureName: defaultName.trim(),
+    signatureImage: null,
+    accepted: false,
+    documents: docs.map((doc) => doc.slug),
+    identity: { partnerType: "individual", legalName: "", idNumber: null, legalAddress: null, representativeName: null },
+  });
+  useLayoutEffect(() => {
+    initialChange.current?.(initialValue.current);
+  }, []);
 
   const isEntity = partnerType !== "individual";
   const identity: PartnerIdentity = {
@@ -84,7 +101,7 @@ export function ESignature({
     legalAddress: legalAddress.trim() || null,
     representativeName: isEntity ? representativeName.trim() || null : null,
   };
-  /** Enough to render the contract's Annex 5 with something meaningful in it. */
+  /** Required for signing, never a condition for opening the document. */
   const identityOk =
     legalName.trim().length >= 3 &&
     idNumber.trim().length >= 4 &&
@@ -94,17 +111,16 @@ export function ESignature({
   /** The agreement itself — the one document that gets read in full. */
   const mainDoc = docs[0];
 
-  const allTicked = docs.length > 0 && docs.every((d) => ticked.has(d.slug));
   const matchesSigner = (n: string, party: PartnerIdentity) => n.trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase() === (party.partnerType === "individual" ? party.legalName : party.representativeName ?? "").trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase();
   const nameOk = name.trim().length >= 3 && name.trim().includes(" ") && matchesSigner(name, identity);
   // All three are required: the tick is what the Partner Agreement §4.2 asks
   // for, the typed name identifies the signer, and the drawing is the
   // handwritten signature itself.
   const valid =
-    allTicked && nameOk && signature.isValid && identityOk && contractRead;
+    acceptedDocuments && docs.length > 0 && nameOk && signature.isValid && identityOk && contractRead;
 
   function emit(
-    nextTicked: Set<string>,
+    nextAccepted: boolean,
     nextName: string,
     nextSig: SignatureValue = signature,
     nextRead: boolean = contractRead,
@@ -115,9 +131,9 @@ export function ESignature({
       setSignatureKey(k => k + 1);
       setContractRead(false);
       setSignature({ dataUrl: null, isValid: false });
-      setTicked(new Set());
+      setAcceptedDocuments(false);
       nextRead = false;
-      nextTicked = new Set();
+      nextAccepted = false;
       nextSig = { dataUrl: null, isValid: false };
     }
     const entity = nextIdentity.partnerType !== "individual";
@@ -130,7 +146,7 @@ export function ESignature({
       signatureName: nextName.trim(),
       signatureImage: nextSig.dataUrl,
       accepted:
-        docs.every((d) => nextTicked.has(d.slug)) &&
+        nextAccepted && docs.length > 0 &&
         nextName.trim().length >= 3 &&
         nextName.trim().includes(" ") && matchesSigner(nextName, nextIdentity) &&
         nextSig.isValid &&
@@ -138,25 +154,6 @@ export function ESignature({
         nextRead,
       documents: docs.map((d) => d.slug),
       identity: nextIdentity,
-    });
-  }
-
-  function toggle(slug: string) {
-    setTicked((prev) => {
-      const next = new Set(prev);
-      if (next.has(slug)) next.delete(slug);
-      else next.add(slug);
-      emit(next, name);
-      return next;
-    });
-  }
-
-  function toggleAll() {
-    setTicked((prev) => {
-      const next =
-        prev.size === docs.length ? new Set<string>() : new Set(docs.map((d) => d.slug));
-      emit(next, name);
-      return next;
     });
   }
 
@@ -169,7 +166,7 @@ export function ESignature({
             {t("legal.signTitle")}
           </p>
           <p className="text-sm text-muted-foreground">
-            {t("legal.signIntro")}
+            {locale === "ru" ? "Прочитайте перечисленные документы, подтвердите согласие с ними и поставьте подпись ниже." : locale === "en" ? "Read the listed documents, confirm your agreement and add your signature below." : "Citește documentele enumerate, confirmă acordul tău și semnează mai jos."}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             {locale === "ru" ? "Электронное принятие условий с подписью на экране. Это не квалифицированная электронная подпись. Имя подписанта должно совпадать с ФИО стороны или её представителя." : locale === "en" ? "Electronic acceptance with an on-screen signature. This is not a qualified electronic signature. The signer must be the named party or its representative." : "Acceptare electronică cu semnătură desenată pe ecran. Nu este o semnătură electronică calificată. Semnatarul trebuie să fie persoana indicată în contract sau reprezentantul ei."}
@@ -198,9 +195,10 @@ export function ESignature({
               type="button"
               onClick={() => {
                 setPartnerType(value);
-                emit(ticked, name, signature, contractRead, {
+                emit(acceptedDocuments, name, signature, contractRead, {
                   ...identity,
                   partnerType: value,
+                  representativeName: value === "individual" ? null : representativeName.trim() || null,
                 });
               }}
               className={`rounded-md px-2.5 py-1 text-xs transition-colors ${
@@ -222,7 +220,7 @@ export function ESignature({
             value={legalName}
             onChange={(v) => {
               setLegalName(v);
-              emit(ticked, name, signature, contractRead, {
+              emit(acceptedDocuments, name, signature, contractRead, {
                 ...identity,
                 legalName: v.trim(),
               });
@@ -235,7 +233,7 @@ export function ESignature({
             value={idNumber}
             onChange={(v) => {
               setIdNumber(v);
-              emit(ticked, name, signature, contractRead, {
+              emit(acceptedDocuments, name, signature, contractRead, {
                 ...identity,
                 idNumber: v.trim() || null,
               });
@@ -250,7 +248,7 @@ export function ESignature({
             value={legalAddress}
             onChange={(v) => {
               setLegalAddress(v);
-              emit(ticked, name, signature, contractRead, {
+              emit(acceptedDocuments, name, signature, contractRead, {
                 ...identity,
                 legalAddress: v.trim() || null,
               });
@@ -263,7 +261,7 @@ export function ESignature({
               value={representativeName}
               onChange={(v) => {
                 setRepresentativeName(v);
-                emit(ticked, name, signature, contractRead, {
+                emit(acceptedDocuments, name, signature, contractRead, {
                   ...identity,
                   representativeName: v.trim() || null,
                 });
@@ -274,55 +272,41 @@ export function ESignature({
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={toggleAll}
-        className="mb-3 text-xs font-medium text-gold hover:underline"
-      >
-        {ticked.size === docs.length
-          ? t("legal.untickAll")
-          : t("legal.tickAll")}
-      </button>
-
-      <ul className="space-y-2">
-        {docs.map((d) => {
-          const on = ticked.has(d.slug);
-          return (
-            <li key={d.slug}>
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border/50 bg-background/40 p-3 transition-colors hover:border-gold/40">
-                <span
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
-                    on ? "border-gold bg-gold text-[#0D0D0D]" : "border-border"
-                  }`}
-                >
-                  {on && <Check className="h-3.5 w-3.5" />}
-                </span>
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={on}
-                  onChange={() => toggle(d.slug)}
-                />
-                <span className="flex-1 text-sm">
-                  <span className="text-muted-foreground">
-                    {t("legal.iAccept")}{" "}
-                  </span>
-                  <Link
-                    href={`/legal/${d.slug}`}
-                    target="_blank"
-                    className="font-medium text-gold hover:underline"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {legalTitle(d, locale)}
-                  </Link>
-                  <span className="ml-1 text-xs text-muted-foreground">v{d.version}</span>
-                </span>
-                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-              </label>
+      <div className="rounded-xl border border-border/50 bg-background/40 p-3 sm:p-4">
+        <label htmlFor={acceptanceId} className="flex cursor-pointer items-start gap-3 text-sm font-medium">
+          <input
+            id={acceptanceId}
+            type="checkbox"
+            checked={acceptedDocuments}
+            aria-describedby={documentsId}
+            onChange={(event) => {
+              const checked = event.target.checked;
+              setAcceptedDocuments(checked);
+              emit(checked, name);
+            }}
+            className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[#C9A84C] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gold"
+          />
+          <span>
+            {locale === "ru" ? "Я прочитал(а) и согласен(на) со следующими документами:" : locale === "en" ? "I have read and agree to the following documents:" : "Am citit și sunt de acord cu următoarele documente:"}
+          </span>
+        </label>
+        <ol id={documentsId} className="mt-3 space-y-2 pl-8 text-sm">
+          {docs.map((doc, index) => (
+            <li key={doc.slug} className="flex items-start gap-2">
+              <span className="shrink-0 text-muted-foreground">{index + 1}.</span>
+              <Link
+                href={`/legal/${doc.slug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-0 flex-1 font-medium text-gold hover:underline"
+              >
+                {legalTitle(doc, locale)}
+              </Link>
+              <FileText aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             </li>
-          );
-        })}
-      </ul>
+          ))}
+        </ol>
+      </div>
 
       {/* 2 — the agreement itself, with their details in it, before any
              signing happens. */}
@@ -330,9 +314,10 @@ export function ESignature({
         <div className="mt-4">
           <button
             type="button"
-            disabled={!identityOk}
             onClick={() => setContractOpen((v) => !v)}
-            className="flex w-full items-center justify-between rounded-xl border border-gold/30 bg-gold/[0.06] px-4 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-50"
+            aria-expanded={contractOpen}
+            aria-controls={contractId}
+            className="flex w-full items-center justify-between rounded-xl border border-gold/30 bg-gold/[0.06] px-4 py-3 text-sm font-medium text-gold transition-colors hover:bg-gold/10"
           >
             <span>
               {contractOpen ? t("legal.hideContract") : t("legal.readContract")}
@@ -343,33 +328,33 @@ export function ESignature({
           </button>
           {!identityOk && (
             <p className="mt-1.5 text-xs text-muted-foreground">
-              {t("legal.fillIdentityFirst")}
+              {locale === "ru" ? "Договор доступен для чтения сейчас. Перед подписанием заполните все реквизиты выше: они автоматически появятся в договоре." : locale === "en" ? "You can read the contract now. Before signing, complete the details above: they will appear in the contract automatically." : "Poți citi contractul acum. Înainte de semnare, completează datele de mai sus: acestea vor apărea automat în contract."}
             </p>
           )}
-          {contractOpen && (
-            <div className="mt-3">
-              <p className="mb-2 text-xs text-muted-foreground">
-                {t("legal.contractWithYourData")}
-              </p>
-              <ContractReader
-                doc={mainDoc}
-                locale={locale}
-                partner={identity}
-                onReachedEnd={() => {
-                  setContractRead(true);
-                  emit(ticked, name, signature, true);
-                }}
-                // Shown at the foot of the document as it is given, so the
-                // page reads as a signed contract rather than a form sitting
-                // next to one.
-                signature={
-                  name.trim()
-                    ? { name: name.trim(), image: signature.dataUrl }
-                    : null
-                }
-              />
-            </div>
-          )}
+          <div id={contractId} hidden={!contractOpen} className="mt-3">
+            <p className="mb-2 text-xs text-muted-foreground">
+              {t("legal.contractWithYourData")}
+            </p>
+            <ContractReader
+              key={`${subjectType}-${signatureKey}`}
+              doc={mainDoc}
+              locale={locale}
+              partner={identity}
+              showVersion={false}
+              onReachedEnd={() => {
+                setContractRead(true);
+                emit(acceptedDocuments, name, signature, true);
+              }}
+              // Shown at the foot of the document as it is given, so the
+              // page reads as a signed contract rather than a form sitting
+              // next to one.
+              signature={
+                nameOk && signature.isValid
+                  ? { name: name.trim(), image: signature.dataUrl }
+                  : null
+              }
+            />
+          </div>
           {contractRead ? (
             <p className="mt-2 flex items-center gap-1.5 text-xs text-green-500">
               <Check className="h-3.5 w-3.5" />
@@ -387,14 +372,15 @@ export function ESignature({
 
       {/* 3 — and only now, the signature. */}
       <div className="mt-4">
-        <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <label htmlFor={signerId} className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {t("legal.fullName")}
         </label>
         <input
+          id={signerId}
           value={name}
           onChange={(e) => {
             setName(e.target.value);
-            emit(ticked, e.target.value);
+            emit(acceptedDocuments, e.target.value);
           }}
           placeholder="Ion Popescu"
           className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-gold"
@@ -410,7 +396,7 @@ export function ESignature({
         <SignaturePad key={signatureKey}
           onChange={(v) => {
             setSignature(v);
-            emit(ticked, name, v);
+            emit(acceptedDocuments, name, v);
           }}
         />
       </div>
@@ -440,12 +426,14 @@ function IdField({
   onChange: (v: string) => void;
   className?: string;
 }) {
+  const inputId = useId();
   return (
     <div className={className}>
-      <label className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      <label htmlFor={inputId} className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
         {label}
       </label>
       <input
+        id={inputId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-gold"

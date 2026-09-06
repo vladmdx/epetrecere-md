@@ -11,7 +11,7 @@ import { useLocale } from "@/hooks/use-locale";
 export function AdminTopbar() {
   const { t } = useLocale();
   return (
-    <header className="flex h-16 items-center justify-between border-b border-border/40 bg-background px-4 pl-16 lg:px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border/40 bg-background px-4 pl-16 lg:px-6">
       <div className="flex flex-1 items-center gap-4">
         <div className="relative hidden max-w-md flex-1 sm:block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

@@ -31,7 +31,14 @@ import { Save, Loader2, SettingsIcon } from "lucide-react";
 import { toast } from "sonner";
 import { IcalSubscribeCard } from "@/components/vendor/ical-subscribe-card";
 import { AppearanceSettings } from "@/components/shared/appearance-settings";
-import { MOLDOVA_CITIES, TRAVEL_DISTANCE_OPTIONS } from "@/lib/moldova-cities";
+import {
+  MOLDOVA_CITIES,
+  DEFAULT_CITY,
+  canonicalMoldovaCity,
+  getTravelDistanceOptions,
+  localizeMoldovaCity,
+  travelDistanceLabel,
+} from "@/lib/moldova-cities";
 import { ReferralCard } from "@/components/shared/referral-card";
 import { NotificationPrefsGrid } from "@/components/shared/notification-prefs-grid";
 import { SignedDocumentsCard } from "@/components/vendor/signed-documents-card";
@@ -67,7 +74,7 @@ const DEFAULT_AUTO_REPLY =
   "Mulțumim pentru cerere! Am primit-o și revin cu un răspuns în cel mai scurt timp posibil.";
 
 export default function VendorSettingsPage() {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [state, setState] = useState<Loaded>({ kind: "none" });
@@ -89,7 +96,8 @@ export default function VendorSettingsPage() {
               calendarEnabled: Boolean(a.calendarEnabled),
               bufferHours: Number(a.bufferHours ?? 2),
               bufferMinutes: Number(a.bufferMinutes ?? 15),
-              baseCity: (a.baseCity as string) || "Chișinău",
+              baseCity: canonicalMoldovaCity(String(a.baseCity || a.location || DEFAULT_CITY))
+                ?? String(a.baseCity || a.location || DEFAULT_CITY),
               travelDistanceKm: Number(a.travelDistanceKm ?? 30),
               travelSurchargeEnabled: Boolean(a.travelSurchargeEnabled),
               travelSurchargeAmount: a.travelSurchargeAmount == null ? null : Number(a.travelSurchargeAmount),
@@ -138,6 +146,17 @@ export default function VendorSettingsPage() {
       toast.error(t("vendor.settings.errNoProfile"));
       return;
     }
+    if (state.kind === "artist" && state.travelSurchargeEnabled && (
+      state.travelSurchargeAmount == null || !Number.isInteger(state.travelSurchargeAmount) ||
+      state.travelSurchargeAmount < 0 || state.travelSurchargeAmount > 10000
+    )) {
+      toast.error({
+        ro: "Introdu o sumă de deplasare întreagă între 0 și 10 000 €.",
+        ru: "Введите целую сумму за выезд от 0 до 10 000 €.",
+        en: "Enter a whole travel fee between €0 and €10,000.",
+      }[locale]);
+      return;
+    }
     setSaving(true);
     try {
       if (state.kind === "artist") {
@@ -152,7 +171,7 @@ export default function VendorSettingsPage() {
             baseCity: state.baseCity,
             travelDistanceKm: state.travelDistanceKm,
             travelSurchargeEnabled: state.travelSurchargeEnabled,
-            travelSurchargeAmount: state.travelSurchargeAmount,
+            travelSurchargeAmount: state.travelSurchargeEnabled ? state.travelSurchargeAmount : null,
             priceHidden: state.priceHidden,
             autoReplyEnabled: state.autoReplyEnabled,
             autoReplyMessage: state.autoReplyMessage,
@@ -315,7 +334,7 @@ export default function VendorSettingsPage() {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <div className="flex-1">
                 <Label>{t("vendor.settings.baseCity")}</Label>
                 <p className="text-xs text-muted-foreground">
@@ -331,16 +350,19 @@ export default function VendorSettingsPage() {
                       : prev,
                   )
                 }
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[200px]"
+                className="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm sm:w-64"
               >
+                {!MOLDOVA_CITIES.includes(state.baseCity) && (
+                  <option value={state.baseCity}>{state.baseCity}</option>
+                )}
                 {MOLDOVA_CITIES.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {localizeMoldovaCity(c, locale)}
                   </option>
                 ))}
               </select>
             </div>
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <div className="flex-1">
                 <Label>{t("vendor.settings.maxDistance")}</Label>
                 <p className="text-xs text-muted-foreground">
@@ -356,9 +378,14 @@ export default function VendorSettingsPage() {
                       : prev,
                   )
                 }
-                className="rounded-md border border-input bg-background px-3 py-2 text-sm min-w-[200px]"
+                className="w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm sm:w-64"
               >
-                {TRAVEL_DISTANCE_OPTIONS.map((o) => (
+                {!getTravelDistanceOptions(state.baseCity, locale).some((o) => o.value === state.travelDistanceKm) && (
+                  <option value={state.travelDistanceKm}>
+                    {travelDistanceLabel(state.travelDistanceKm, state.baseCity, locale)}
+                  </option>
+                )}
+                {getTravelDistanceOptions(state.baseCity, locale).map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>
@@ -391,7 +418,8 @@ export default function VendorSettingsPage() {
                 <Input
                   type="number"
                   min={0}
-                  max={1000}
+                  max={10000}
+                  step={1}
                   value={state.travelSurchargeAmount ?? ""}
                   onChange={(e) =>
                     setState((prev) =>

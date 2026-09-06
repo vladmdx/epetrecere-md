@@ -6,10 +6,9 @@ import { finalConfirmationEffects, notifyConfirmationStep } from "@/lib/booking/
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
-import { sendPushToUser } from "@/lib/push/expo";
 
 /**
  * Raise the platform fee for a booking that has just reached a fee-bearing
@@ -367,10 +366,14 @@ export async function PUT(
         { status: 409 },
       );
     }
-    await db.update(bookingRequests).set({
+    if (booking.eventDate > new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Chisinau" })) {
+      return NextResponse.json({ error: "Evenimentul nu poate fi finalizat înainte de data rezervată." }, { status: 409 });
+    }
+    const [completed] = await db.update(bookingRequests).set({
       status: "completed",
       updatedAt: new Date(),
-    }).where(eq(bookingRequests.id, Number(id)));
+    }).where(and(eq(bookingRequests.id, Number(id)), eq(bookingRequests.status, "confirmed_by_client"))).returning({ id: bookingRequests.id });
+    if (!completed) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
     raiseCommission(Number(id));
   } else if (action === "vendor_cancel") {
     // Vendor-initiated cancellation of an accepted/confirmed booking. Frees
@@ -582,22 +585,19 @@ export async function PUT(
         { status: 409 },
       );
     }
-    const existingOffers = (booking.priceOffers ?? []) as Array<{
-      from: "artist" | "client";
-      amount: number;
-      message?: string;
-      at: string;
-    }>;
-    existingOffers.push({
+    const offer = {
       from: isClient ? "client" : "artist",
       amount: agreedPrice,
       message: reply,
       at: new Date().toISOString(),
-    });
-    await db.update(bookingRequests).set({
-      priceOffers: existingOffers,
+    };
+    // Append in PostgreSQL so simultaneous counteroffers do not erase one
+    // another, and never append after the vendor has already accepted.
+    const [changed] = await db.update(bookingRequests).set({
+      priceOffers: sql`COALESCE(${bookingRequests.priceOffers}, '[]'::jsonb) || ${JSON.stringify([offer])}::jsonb`,
       updatedAt: new Date(),
-    }).where(eq(bookingRequests.id, Number(id)));
+    }).where(and(eq(bookingRequests.id, Number(id)), eq(bookingRequests.status, "pending"))).returning({ id: bookingRequests.id });
+    if (!changed) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
   } else {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }

@@ -47,14 +47,14 @@ export default async function VenueDashboardLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-dvh overflow-hidden">
       <VenueSidebar
         venueName={venueRecord?.nameRo ?? null}
         venueSlug={venueRecord?.slug ?? null}
       />
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <AdminTopbar />
-        <main className="flex-1 overflow-y-auto p-3 sm:p-6">{children}</main>
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto p-3 sm:p-6">{children}</main>
       </div>
     </div>
   );

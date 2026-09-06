@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { reviews, bookingRequests, users, artists } from "@/lib/db/schema";
+import { reviews, bookingRequests, users, artists, venues } from "@/lib/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
 
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
       .returning();
 
     // M5 — fire-and-forget notifications to admin + artist
-    void (async () => {
+    after(async () => {
       try {
         await dispatchToAdmins({
           type: "admin_review_pending",
@@ -144,11 +144,21 @@ export async function POST(req: NextRequest) {
               actionUrl: "/dashboard/recenzii",
             });
           }
+        } else if (booking.venueId) {
+          const [venue] = await db.select({ userId: venues.userId }).from(venues)
+            .where(eq(venues.id, booking.venueId)).limit(1);
+          if (venue?.userId) await dispatchNotification({
+            userId: venue.userId,
+            type: "review_new",
+            title: "Ai o recenzie verificată nouă",
+            message: `${parsed.data.rating}★ de la un client real`,
+            actionUrl: "/dashboard/sala/recenzii",
+          });
         }
       } catch (err) {
         console.error("[notifications] verified review", err);
       }
-    })();
+    });
 
     return NextResponse.json({ review }, { status: 201 });
   } catch (e: unknown) {

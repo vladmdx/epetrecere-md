@@ -6,7 +6,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { and, desc, eq, isNull, lte, inArray } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   users,
@@ -59,7 +59,7 @@ export default async function VenueReviewsPage() {
       .where(eq(reviews.venueId, venue.id))
       .orderBy(desc(reviews.createdAt)),
 
-    // Past bookings (accepted/confirmed/completed) with no review yet
+    // Only bilaterally confirmed past bookings can expose client contacts.
     db
       .select({
         id: bookingRequests.id,
@@ -75,9 +75,8 @@ export default async function VenueReviewsPage() {
       .where(
         and(
           eq(bookingRequests.venueId, venue.id),
-          lte(bookingRequests.eventDate, today),
+          lt(bookingRequests.eventDate, today),
           inArray(bookingRequests.status, [
-            "accepted",
             "confirmed_by_client",
             "completed",
           ]),

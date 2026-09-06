@@ -4,7 +4,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { and, desc, eq, isNull, lte, inArray } from "drizzle-orm";
+import { and, desc, eq, isNull, lt, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   users,
@@ -75,9 +75,8 @@ export default async function ArtistReviewsPage() {
       .where(
         and(
           eq(bookingRequests.artistId, artist.id),
-          lte(bookingRequests.eventDate, today),
+          lt(bookingRequests.eventDate, today),
           inArray(bookingRequests.status, [
-            "accepted",
             "confirmed_by_client",
             "completed",
           ]),
