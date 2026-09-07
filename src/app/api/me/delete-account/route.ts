@@ -25,7 +25,7 @@
 
 import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   users,
@@ -41,6 +41,7 @@ import {
 } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
+import { erasePhotoBatch, photoErasureError, PHOTO_ERASURE_BATCH_SIZE } from "@/lib/moments/erase-photo";
 
 export async function DELETE() {
   const { userId: clerkId } = await auth();
@@ -59,15 +60,20 @@ export async function DELETE() {
   }
 
   const ownedPlans = await db
-    .select({ id: eventPlans.id })
+    .select({ id: eventPlans.id, momentsSlug: eventPlans.momentsSlug })
     .from(eventPlans)
     .where(eq(eventPlans.userId, user.id));
   const ownedPhotoUrls = ownedPlans.length
     ? await db
-        .select({ url: eventPhotos.url })
+        .select({ id: eventPhotos.id, url: eventPhotos.url, planId: eventPhotos.planId })
         .from(eventPhotos)
         .where(inArray(eventPhotos.planId, ownedPlans.map((p) => p.id)))
+        .orderBy(asc(eventPhotos.id)).limit(PHOTO_ERASURE_BATCH_SIZE + 1)
     : [];
+  const cleanup = await erasePhotoBatch(ownedPhotoUrls.map(photo => ({ ...photo, plan: ownedPlans.find(plan => plan.id === photo.planId)! })), async photo => {
+    await db.delete(eventPhotos).where(and(eq(eventPhotos.id, photo.id), eq(eventPhotos.planId, photo.plan.id), eq(eventPhotos.url, photo.url)));
+  });
+  if (!cleanup.complete) return NextResponse.json(photoErasureError(cleanup.reason!), { status: cleanup.reason === "unverified" ? 409 : 503 });
   const [ownedArtists, ownedVenues] = await Promise.all([
     db.select({ id: artists.id, photoUrl: artists.photoUrl }).from(artists).where(eq(artists.userId, user.id)),
     db.select({ id: venues.id, menuPdfUrl: venues.menuPdfUrl, ogImageUrl: venues.ogImageUrl }).from(venues).where(eq(venues.userId, user.id)),
@@ -83,104 +89,114 @@ export async function DELETE() {
       : Promise.resolve([]),
   ]);
 
-  // 1. Anonymize leads (vendors legitimately kept them as business records).
-  if (user.email) {
-    await db
-      .update(leads)
+  const deleted = await db.transaction(async tx => {
+    await tx.execute(sql`SET LOCAL lock_timeout = '3s'`);
+    await tx.execute(sql`SET LOCAL statement_timeout = '8s'`);
+    const [current] = await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for("update");
+    if (!current) return true;
+    // Lock parents and recheck before any profile minimization. A concurrent
+    // upload must not make a retry lose the vendor's original media URLs.
+    const plans = await tx.select({ id: eventPlans.id }).from(eventPlans).where(eq(eventPlans.userId, user.id)).for("update");
+    if (plans.length) {
+      const remaining = await tx.select({ id: eventPhotos.id }).from(eventPhotos).where(inArray(eventPhotos.planId, plans.map(plan => plan.id))).limit(1);
+      if (remaining.length) return false;
+    }
+
+    // 1. Anonymize leads (vendors legitimately kept them as business records).
+    if (user.email) {
+      await tx
+        .update(leads)
+        .set({
+          name: "Utilizator șters",
+          phone: "deleted",
+          email: null,
+          message: null,
+          wizardData: null,
+        })
+        .where(eq(leads.email, user.email));
+    }
+
+    // 2. Reviews remain useful to the marketplace, but the deleted account's
+    // public identity does not. Preserve the verified transaction signal while
+    // removing the author's name and account linkage on the subsequent delete.
+    await tx
+      .update(reviews)
+      .set({ authorName: "Utilizator verificat" })
+      .where(eq(reviews.authorUserId, user.id));
+
+    // 3. Take any vendor profile out of the public listings and minimize the
+    // personal data left on the dormant business record. Contract evidence is
+    // kept separately in the append-only legal_acceptances table.
+    await tx
+      .update(artists)
       .set({
-        name: "Utilizator șters",
-        phone: "deleted",
+        isActive: false,
+        nameRo: "Profil dezactivat",
+        nameRu: null,
+        nameEn: null,
+        descriptionRo: null,
+        descriptionRu: null,
+        descriptionEn: null,
+        phone: null,
         email: null,
-        message: null,
-        wizardData: null,
+        website: null,
+        instagram: null,
+        facebook: null,
+        youtube: null,
+        tiktok: null,
+        photoUrl: null,
+        videoTestimonials: [],
+        autoReplyEnabled: false,
+        autoReplyMessage: null,
+        updatedAt: new Date(),
       })
-      .where(eq(leads.email, user.email));
-  }
+      .where(eq(artists.userId, user.id));
+    await tx
+      .update(venues)
+      .set({
+        isActive: false,
+        nameRo: "Profil dezactivat",
+        nameRu: null,
+        nameEn: null,
+        descriptionRo: null,
+        descriptionRu: null,
+        descriptionEn: null,
+        address: null,
+        lat: null,
+        lng: null,
+        phone: null,
+        email: null,
+        website: null,
+        menuUrl: null,
+        menuPdfUrl: null,
+        virtualTourUrl: null,
+        ogImageUrl: null,
+        videoTestimonials: [],
+        autoReplyEnabled: false,
+        autoReplyMessage: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(venues.userId, user.id));
+    if (artistIds.length > 0) {
+      await tx.delete(artistImages).where(inArray(artistImages.artistId, artistIds));
+      await tx.delete(artistVideos).where(inArray(artistVideos.artistId, artistIds));
+    }
+    if (venueIds.length > 0) {
+      await tx.delete(venueImages).where(inArray(venueImages.venueId, venueIds));
+    }
 
-  // 2. Reviews remain useful to the marketplace, but the deleted account's
-  // public identity does not. Preserve the verified transaction signal while
-  // removing the author's name and account linkage on the subsequent delete.
-  await db
-    .update(reviews)
-    .set({ authorName: "Utilizator verificat" })
-    .where(eq(reviews.authorUserId, user.id));
-
-  // 3. Take any vendor profile out of the public listings and minimize the
-  // personal data left on the dormant business record. Contract evidence is
-  // kept separately in the append-only legal_acceptances table.
-  await db
-    .update(artists)
-    .set({
-      isActive: false,
-      nameRo: "Profil dezactivat",
-      nameRu: null,
-      nameEn: null,
-      descriptionRo: null,
-      descriptionRu: null,
-      descriptionEn: null,
-      phone: null,
-      email: null,
-      website: null,
-      instagram: null,
-      facebook: null,
-      youtube: null,
-      tiktok: null,
-      photoUrl: null,
-      videoTestimonials: [],
-      autoReplyEnabled: false,
-      autoReplyMessage: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(artists.userId, user.id));
-  await db
-    .update(venues)
-    .set({
-      isActive: false,
-      nameRo: "Profil dezactivat",
-      nameRu: null,
-      nameEn: null,
-      descriptionRo: null,
-      descriptionRu: null,
-      descriptionEn: null,
-      address: null,
-      lat: null,
-      lng: null,
-      phone: null,
-      email: null,
-      website: null,
-      menuUrl: null,
-      menuPdfUrl: null,
-      virtualTourUrl: null,
-      ogImageUrl: null,
-      videoTestimonials: [],
-      autoReplyEnabled: false,
-      autoReplyMessage: null,
-      updatedAt: new Date(),
-    })
-    .where(eq(venues.userId, user.id));
-  if (artistIds.length > 0) {
-    await db.delete(artistImages).where(inArray(artistImages.artistId, artistIds));
-    await db.delete(artistVideos).where(inArray(artistVideos.artistId, artistIds));
-  }
-  if (venueIds.length > 0) {
-    await db.delete(venueImages).where(inArray(venueImages.venueId, venueIds));
-  }
-
-  // The profile was already minimized above. Expire its public pages now,
-  // even if a later account/media cleanup step needs a retry. Signed legal
+    // 4. Delete the user row — cascades to event plans, messages,
+    //    conversations, invitations and photos.
+    await tx.delete(users).where(eq(users.id, user.id));
+    return true;
+  }).catch(() => false);
+  if (!deleted) return NextResponse.json(photoErasureError("remaining"), { status: 503 });
+  // Invalidate only after the atomic local erasure committed. Signed legal
   // evidence is unrelated to the public catalog and remains untouched.
   if (artistIds.length > 0) revalidateVendorCatalog("artist");
   if (venueIds.length > 0) revalidateVendorCatalog("venue");
-
-  // 4. Delete the user row — cascades to event plans, messages,
-  //    conversations, invitations and photos.
-  await db.delete(users).where(eq(users.id, user.id));
-
-  // Database cascades remove photo records. Remove matching Vercel Blob
-  // objects as well so account deletion is not limited to the relational DB.
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const urls = [
-      ...ownedPhotoUrls.map((p) => p.url),
       ...ownedArtistImages.map((image) => image.url),
       ...ownedVenueImages.map((image) => image.url),
       ...ownedArtists.map((profile) => profile.photoUrl),

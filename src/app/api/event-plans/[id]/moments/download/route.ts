@@ -15,7 +15,7 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { eventPhotos, eventPlans } from "@/lib/db/schema";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
-import { fetchManagedPhotoBytes, verifyManagedPhoto } from "@/lib/moments/managed-photo";
+import { readManagedPhotoBytes } from "@/lib/moments/managed-photo";
 
 const MAX_PHOTO_BYTES = 3.5 * 1024 * 1024;
 const MAX_ARCHIVE_BYTES = 4 * 1024 * 1024;
@@ -106,13 +106,8 @@ export async function GET(
       skipped.push(photo.id);
       continue;
     }
-    const verified = await verifyManagedPhoto(photo.url, owned.plan);
     const remaining = MAX_PHOTO_BYTES - totalBytes;
-    if (!verified || verified.size > remaining || Date.now() >= deadline) {
-      skipped.push(photo.id);
-      continue;
-    }
-    const buf = await fetchManagedPhotoBytes(verified.url, remaining, Math.min(8_000, deadline - Date.now()));
+    const buf = await readManagedPhotoBytes(photo.url, owned.plan, remaining, Math.max(1, Math.min(8_000, deadline - Date.now())));
     if (!buf) {
       skipped.push(photo.id);
       continue;

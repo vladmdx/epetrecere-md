@@ -16,6 +16,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { eventPhotos, eventPlans, photoReactions } from "@/lib/db/schema";
 import { requestHasMomentsAccess } from "@/lib/moments/access";
+import { serializePhoto } from "@/lib/moments/photo-url";
 
 interface MomentsPlan {
   id: number;
@@ -193,7 +194,7 @@ export async function GET(
     totalPhotos: total,
     deviceUsed,
     photos: photos.map((p) => ({
-      ...p,
+      ...serializePhoto(p),
       reactions: reactionsByPhoto[p.id] ?? {},
       myReactions: myReactions[p.id] ?? [],
       canDelete: Boolean(deviceId && p.deviceId === deviceId),

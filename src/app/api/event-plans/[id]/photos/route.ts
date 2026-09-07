@@ -4,10 +4,9 @@ import { db } from "@/lib/db";
 import { eventPhotos } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
-import { randomUUID } from "node:crypto";
 import sharp from "sharp";
-import { put } from "@vercel/blob";
-import { deleteManagedPhoto } from "@/lib/moments/managed-photo";
+import { deleteManagedPhoto, storePrivatePhoto } from "@/lib/moments/managed-photo";
+import { serializePhoto } from "@/lib/moments/photo-url";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -36,7 +35,7 @@ export async function GET(
     .where(eq(eventPhotos.planId, planId))
     .orderBy(desc(eventPhotos.createdAt));
 
-  return NextResponse.json({ photos }, { headers: { "Cache-Control": "private, no-store" } });
+  return NextResponse.json({ photos: photos.map(serializePhoto) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 const createPhotoSchema = z.object({
@@ -68,19 +67,17 @@ export async function POST(
   }
   // Multipart overhead also counts toward Vercel's 4.5 MB request limit.
   if (file.size > 4 * 1024 * 1024) return NextResponse.json({ error: "Image must be at most 4 MB" }, { status: 413 });
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return NextResponse.json({ error: "Photo storage unavailable" }, { status: 503 });
+  if (!process.env.MOMENTS_BLOB_READ_WRITE_TOKEN) return NextResponse.json({ error: "Private photo storage unavailable" }, { status: 503 });
   let cleaned: Buffer;
   try {
     cleaned = await sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: 40_000_000 })
       .rotate().resize({ width: 3000, height: 3000, fit: "inside", withoutEnlargement: true })
       .webp({ quality: 88 }).toBuffer();
   } catch { return NextResponse.json({ error: "Image could not be processed" }, { status: 400 }); }
+  if (cleaned.byteLength > 4 * 1024 * 1024) return NextResponse.json({ error: "Processed image must be at most 4 MB" }, { status: 413 });
   let url: string;
   try {
-    const blob = await put(`event-photos/${planId}/${randomUUID()}.webp`, cleaned, {
-      token: process.env.BLOB_READ_WRITE_TOKEN, access: "public", contentType: "image/webp", addRandomSuffix: false,
-    });
-    url = blob.url;
+    url = await storePrivatePhoto(cleaned, planId);
   } catch { return NextResponse.json({ error: "Photo storage unavailable" }, { status: 503 }); }
   try {
     const [photo] = await db
@@ -95,7 +92,7 @@ export async function POST(
     })
     .returning();
 
-    return NextResponse.json({ photo }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
+    return NextResponse.json({ photo: serializePhoto(photo) }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
   } catch {
     await deleteManagedPhoto(url, owned.plan);
     return NextResponse.json({ error: "Photo could not be saved" }, { status: 503 });

@@ -1,6 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
+import { createHmac } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import sharp from "sharp";
@@ -9,6 +7,8 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans } from "@/lib/db/schema";
 import { requestHasMomentsAccess } from "@/lib/moments/access";
 import { rateLimit } from "@/lib/rate-limit";
+import { deleteManagedPhoto, storePrivatePhoto } from "@/lib/moments/managed-photo";
+import { photoContentUrl } from "@/lib/moments/photo-url";
 
 export const runtime = "nodejs";
 const CONSENT_VERSION = "moments-photo-2026-09-05.1";
@@ -28,23 +28,6 @@ const fieldsSchema = z.object({
 function ipHash(ip: string): string {
   const key = process.env.MOMENTS_ACCESS_SECRET || process.env.GUEST_DATA_ENCRYPTION_KEY || "local";
   return createHmac("sha256", key).update(ip).digest("hex");
-}
-
-async function storeImage(buffer: Buffer, slug: string): Promise<string> {
-  const filename = `${Date.now()}-${randomUUID()}.webp`;
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const { put } = await import("@vercel/blob");
-    const blob = await put(`moments/${slug}/${filename}`, buffer, {
-      access: "public",
-      contentType: "image/webp",
-      addRandomSuffix: false,
-    });
-    return blob.url;
-  }
-  const directory = path.join(process.cwd(), "public", "uploads", "moments", slug);
-  await fs.mkdir(directory, { recursive: true });
-  await fs.writeFile(path.join(directory, filename), buffer);
-  return `/uploads/moments/${slug}/${filename}`;
 }
 
 export async function POST(
@@ -123,6 +106,7 @@ export async function POST(
   } catch {
     return NextResponse.json({ error: "Image could not be processed" }, { status: 400 });
   }
+  if (cleaned.byteLength > MAX_BYTES) return NextResponse.json({ error: "Photo must be at most 4 MB", code: "PHOTO_TOO_LARGE" }, { status: 413 });
 
   const prompt = parsed.data.prompt && plan.prompts?.includes(parsed.data.prompt)
     ? parsed.data.prompt
@@ -130,8 +114,11 @@ export async function POST(
   const tableLabel = parsed.data.tableLabel && plan.tables?.includes(parsed.data.tableLabel)
     ? parsed.data.tableLabel
     : null;
-  const url = await storeImage(cleaned, slug);
-  const [photo] = await db
+  let url: string;
+  try { url = await storePrivatePhoto(cleaned, plan.id); }
+  catch { return NextResponse.json({ error: "Private photo storage unavailable" }, { status: 503 }); }
+  try {
+    const [photo] = await db
     .insert(eventPhotos)
     .values({
       planId: plan.id,
@@ -151,7 +138,11 @@ export async function POST(
     .returning({ id: eventPhotos.id });
 
   return NextResponse.json(
-    { id: photo.id, url, pendingModeration: true, canDelete: true },
+    { id: photo.id, url: photoContentUrl(photo.id), pendingModeration: true, canDelete: true },
     { status: 201, headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } },
   );
+  } catch {
+    await deleteManagedPhoto(url, { id: plan.id, momentsSlug: slug });
+    return NextResponse.json({ error: "Photo could not be saved" }, { status: 503 });
+  }
 }

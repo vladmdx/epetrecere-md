@@ -1635,7 +1635,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
                           className={cn("h-8 w-[140px] gap-1", cfg.color)}
                         >
                           <Icon className="h-3.5 w-3.5" />
-                          <SelectValue />
+                          <SelectValue>{t(cfg.labelKey)}</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="pending">

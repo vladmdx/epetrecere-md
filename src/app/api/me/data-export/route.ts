@@ -38,6 +38,7 @@ import {
 } from "@/lib/privacy/guest-encryption";
 import { bookingForDataExport, dataExportChatProjection } from "@/lib/privacy/export-contact";
 import { notificationsForUser } from "@/lib/privacy/notification-view";
+import { photoContentUrl } from "@/lib/moments/photo-url";
 
 export async function GET() {
   const { userId: clerkId } = await auth();
@@ -199,7 +200,7 @@ export async function GET() {
       ...i,
       guests: guestsByInvitation[i.id] ?? [],
     })),
-    eventPhotos: userPhotos,
+    eventPhotos: userPhotos.map((photo) => ({ ...photo, url: photoContentUrl(photo.id) })),
     vendorProfiles: {
       artists: artistProfiles.map((profile) => ({
         ...profile,

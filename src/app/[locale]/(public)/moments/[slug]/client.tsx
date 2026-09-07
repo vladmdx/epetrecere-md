@@ -358,7 +358,7 @@ export function MomentsUploadClient({
         ? files.slice(0, remainingShots)
         : files;
     setUploading(true);
-    const newPhotos: Photo[] = [];
+    let uploadedCount = 0;
     try {
       const prepared: File[] = [];
       for (const original of batch) {
@@ -391,24 +391,16 @@ export function MomentsUploadClient({
             ? t("moments.errTooLarge")
             : j.error || t("moments.errUploadFailed"));
         }
-        const { id, url } = await saveRes.json();
-        newPhotos.push({
-          id,
-          url,
-          guestName: guestName.trim(),
-          guestMessage: guestMessage.trim() || null,
-        });
+        await saveRes.json();
+        uploadedCount++;
       }
-      // Optimistically show the newly added photos (they only render
-      // pre-reveal if we're past reveal time). The next poll will sync
-      // counters from the server.
+      // Upload success is not organizer approval. Keep pending private
+      // thumbnails out of the gallery; the next poll adds approved photos.
       setState((s) => ({
         ...s,
-        photos: s.revealed ? [...newPhotos, ...s.photos] : s.photos,
-        totalPhotos: s.totalPhotos + newPhotos.length,
         deviceUsed:
           typeof s.deviceUsed === "number"
-            ? s.deviceUsed + newPhotos.length
+            ? s.deviceUsed + uploadedCount
             : s.deviceUsed,
         // Mark the current prompt as completed so the walker advances
         // immediately, before the next 12s poll catches up.

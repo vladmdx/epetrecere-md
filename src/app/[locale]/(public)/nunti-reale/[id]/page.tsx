@@ -11,6 +11,7 @@ import { t } from "@/i18n";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Calendar, MapPin, ArrowLeft, Users } from "lucide-react";
 import { RealWeddingGallery } from "./gallery";
+import { photoContentUrl } from "@/lib/moments/photo-url";
 
 // M10 Intern #3 — Real Wedding detail page.
 // Server component: fetches all public+approved photos for a plan plus
@@ -21,7 +22,7 @@ interface Props {
   params: Promise<{ locale: string; id: string }>;
 }
 
-export const revalidate = 3600;
+export const revalidate = 0;
 
 async function getWedding(id: number) {
   const [plan] = await db
@@ -208,7 +209,7 @@ export default async function RealWeddingPage({ params }: Props) {
         <RealWeddingGallery
           photos={photos.map((p) => ({
             id: p.id,
-            url: p.url,
+            url: photoContentUrl(p.id),
             caption: p.caption,
           }))}
         />

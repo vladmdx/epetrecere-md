@@ -45,6 +45,7 @@ export async function executeAdminReadTool(name: string, input: unknown, verifie
       id: bookingRequests.id, artistId: bookingRequests.artistId, venueId: bookingRequests.venueId,
       status: bookingRequests.status, eventDate: bookingRequests.eventDate,
       startTime: bookingRequests.startTime, endTime: bookingRequests.endTime,
+      agreedPrice: bookingRequests.agreedPrice,
     }).from(bookingRequests).where(inArray(bookingRequests.id, ids)).orderBy(asc(bookingRequests.id));
     return { matches, notFoundIds: ids.filter(id => !matches.some(booking => booking.id === id)) };
   }

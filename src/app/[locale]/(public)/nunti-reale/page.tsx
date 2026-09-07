@@ -9,6 +9,7 @@ import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Camera, Calendar, MapPin, ArrowRight } from "lucide-react";
+import { photoContentUrl } from "@/lib/moments/photo-url";
 
 // M10 Intern #3 — Real Weddings Gallery (Feature 10).
 // Pulls approved + public event photos and groups them by plan, showing a
@@ -47,7 +48,7 @@ export async function generateMetadata({
   });
 }
 
-export const revalidate = 3600; // ISR: refresh every hour
+export const revalidate = 0; // Publication consent must be rechecked on each visit.
 
 interface RealWeddingCard {
   planId: number;
@@ -68,8 +69,8 @@ async function getRealWeddings(): Promise<RealWeddingCard[]> {
       title: eventPlans.title,
       eventDate: eventPlans.eventDate,
       location: eventPlans.location,
-      coverUrl: sql<string>`(
-        SELECT url FROM ${eventPhotos} ep2
+      coverPhotoId: sql<number>`(
+        SELECT id FROM ${eventPhotos} ep2
         WHERE ep2.plan_id = ${eventPlans.id}
           AND ep2.is_public = true AND ep2.is_approved = true
         ORDER BY ep2.created_at ASC
@@ -143,13 +144,13 @@ async function getRealWeddings(): Promise<RealWeddingCard[]> {
   }
 
   return rows
-    .filter((r) => r.coverUrl)
+    .filter((r) => r.coverPhotoId)
     .map((r) => ({
       planId: r.planId,
       title: r.title,
       eventDate: r.eventDate,
       location: r.location,
-      coverUrl: r.coverUrl,
+      coverUrl: photoContentUrl(r.coverPhotoId),
       photoCount: r.photoCount ?? 0,
       taggedArtists: Array.from(artistMap.get(r.planId) ?? []),
       taggedVenues: Array.from(venueMap.get(r.planId) ?? []),
@@ -245,6 +246,7 @@ export default async function RealWeddingsPage({
                 <div className="relative aspect-[4/3] overflow-hidden bg-muted">
                   <Image
                     src={w.coverUrl}
+                    unoptimized
                     alt={w.title}
                     fill
                     sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

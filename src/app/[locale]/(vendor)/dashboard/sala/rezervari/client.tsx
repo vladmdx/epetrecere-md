@@ -1137,7 +1137,7 @@ export function VenueBookingsClient({
                 onValueChange={(v) => setDeclineReason(v ?? DECLINE_REASONS[0])}
               >
                 <SelectTrigger className="mt-1">
-                  <SelectValue />
+                  <SelectValue>{t(declineReason)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {DECLINE_REASONS.map((r) => (

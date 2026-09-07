@@ -87,13 +87,31 @@ import {
 } from "@/components/planner/price-negotiation-panel";
 import { AIArtistPickerChat } from "@/components/planner/ai-artist-picker-chat";
 import { cn } from "@/lib/utils";
-import { normalizeEventType } from "@/lib/events/normalize";
+import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { formatPrice } from "@/lib/format/price";
 import { useLocale } from "@/hooks/use-locale";
 import { venueRequestInterval } from "@/lib/planner/venue-request-interval";
 import { planTabFromQuery, planTabHref, type PlanTabKey } from "@/lib/planner/tab-navigation";
 import { guestHeadcount, assignedHeadcount } from "@/lib/planner/guest-headcount";
 import { checklistDisplayTitle } from "@/lib/planner/checklist-copy";
+const DATE_LOCALES = { ro: "ro-MD", ru: "ru-RU", en: "en-GB" } as const;
+
+function eventRateLabel(tier: PricingTier | undefined, locale: keyof typeof DATE_LOCALES, fallback: string): string {
+  const name = tier?.nameRo;
+  const eventType = normalizeEventType(tier?.eventType);
+  if (!tier || tierMode(tier) !== "per_event" || !eventType) return name || fallback;
+  // register-artist stores these default names when no custom name was given.
+  // Only exact defaults for the matching event type are presentation labels.
+  const onboardingNames: Partial<Record<string, string>> = {
+    kids_birthday: "Zi de naștere pentru copii",
+    corporate: "Eveniment corporativ",
+    other: "Alt eveniment",
+  };
+  const onboardingName = onboardingNames[eventType] ?? eventTypeLabel(eventType, "ro");
+  return !name || name === onboardingName || name === eventTypeLabel(eventType, "ro")
+    ? eventTypeLabel(eventType, locale)
+    : name;
+}
 
 interface Plan {
   id: number;
@@ -779,7 +797,7 @@ function OverviewTab({
               {plan.eventDate && (
                 <p className="text-sm text-muted-foreground flex items-center gap-1.5 mb-3">
                   <Calendar className="h-3.5 w-3.5" />
-                  {new Date(plan.eventDate).toLocaleDateString("ro-MD", {
+                  {new Date(plan.eventDate).toLocaleDateString(DATE_LOCALES[locale], {
                     day: "numeric",
                     month: "long",
                     year: "numeric",
@@ -1910,7 +1928,7 @@ function DiscoverySection({
 }) {
   // Columns preference — persisted per user in localStorage so the layout
   // stays consistent between plan visits.
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [columns, setColumns] = useState<ColumnCount>(4);
   const [mobileColumns, setMobileColumns] =
     useState<MobileColumnCount>(2);
@@ -1976,7 +1994,7 @@ function DiscoverySection({
             {t("cabinet.plan.discovery.title")}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", {
+            {new Date(plan.eventDate + "T00:00:00").toLocaleDateString(DATE_LOCALES[locale], {
               day: "numeric",
               month: "long",
               year: "numeric",
@@ -2461,7 +2479,7 @@ function BookingListCard({
   booking: BookingRequest;
   onRefresh: () => Promise<void> | void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const cfg = STATUS_CONFIG[b.status] || STATUS_CONFIG.pending;
   const isPending = b.status === "pending";
   return (
@@ -2483,7 +2501,7 @@ function BookingListCard({
               )}
               <p className="text-xs text-muted-foreground">
                 {b.eventDate &&
-                  new Date(b.eventDate).toLocaleDateString("ro-MD")}
+                  new Date(b.eventDate).toLocaleDateString(DATE_LOCALES[locale])}
                 {b.startTime && b.endTime && (
                   <span className="text-gold">
                     {" · "}
@@ -2695,7 +2713,7 @@ function PlanArtistCard({
   viewMode?: ViewMode;
   onRefresh: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [modalOpen, setModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -3023,7 +3041,7 @@ function PlanArtistCard({
         selectedDurationMinutes != null && computedPrice != null
           ? `${formatDuration(selectedDurationMinutes)} · ${formatPrice(computedPrice)}`
           : selectedEventTierId != null && computedPrice != null
-            ? `${resolvedForSelection?.tier.nameRo ?? t("cabinet.plan.modal.perEventPrice")} · ${formatPrice(computedPrice)}`
+            ? `${eventRateLabel(resolvedForSelection?.tier, locale, t("cabinet.plan.modal.perEventPrice"))} · ${formatPrice(computedPrice)}`
             : `${startTime}–${endTime}`;
       toast.success(
         t("cabinet.plan.requestSentTo", { name: artist.nameRo, summary }),
@@ -3143,7 +3161,7 @@ function PlanArtistCard({
                         {t("cabinet.plan.modal.dateLabel")}
                       </span>{" "}
                       {new Date(plan.eventDate + "T00:00:00").toLocaleDateString(
-                        "ro-RO",
+                        DATE_LOCALES[locale],
                         { day: "numeric", month: "long", year: "numeric" },
                       )}
                     </p>
@@ -3267,7 +3285,7 @@ function PlanArtistCard({
                                   selected ? "text-gold" : "text-foreground",
                                 )}
                               >
-                                {offer.tier.nameRo || t("cabinet.plan.modal.perEventPrice")}
+                                {eventRateLabel(offer.tier, locale, t("cabinet.plan.modal.perEventPrice"))}
                               </span>
                               <span
                                 className={cn(
@@ -3694,7 +3712,7 @@ function PlanArtistCard({
             <p className="text-xs font-semibold text-muted-foreground">
               {t("cabinet.plan.card.availableOn", {
                 date: plan.eventDate
-                  ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", { day: "numeric", month: "short" })
+                  ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString(DATE_LOCALES[locale], { day: "numeric", month: "short" })
                   : t("cabinet.plan.card.eventDateFallback"),
               })}
             </p>
@@ -3821,7 +3839,7 @@ function VenuesTab({
   bookings: BookingRequest[];
   onRefresh: () => Promise<void> | void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [venues, setVenues] = useState<DiscoveryVenue[]>([]);
   const [loading, setLoading] = useState(true);
   const [radius, setRadius] = useState<number>(plan.venueRadiusKm ?? 25);
@@ -3890,7 +3908,7 @@ function VenuesTab({
         <p className="text-sm text-muted-foreground">
           {plan.eventDate && (
             <>
-              {new Date(plan.eventDate).toLocaleDateString("ro-MD", {
+              {new Date(plan.eventDate).toLocaleDateString(DATE_LOCALES[locale], {
                 day: "numeric",
                 month: "long",
                 year: "numeric",
@@ -4019,7 +4037,7 @@ function SettingsTab({
   onUpdate: (p: Plan) => void;
   onDelete: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [title, setTitle] = useState(plan.title);
   const [eventType, setEventType] = useState(plan.eventType || "wedding");
   const [eventDate, setEventDate] = useState(plan.eventDate || "");
@@ -4041,7 +4059,7 @@ function SettingsTab({
     plan.selectedCategories ?? [],
   );
   const [allCategories, setAllCategories] = useState<
-    Array<{ id: number; nameRo: string; type: string }>
+    Array<{ id: number; nameRo: string; nameRu?: string | null; nameEn?: string | null; type: string }>
   >([]);
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -4139,7 +4157,7 @@ function SettingsTab({
           <div className="space-y-2">
             <Label>{t("cabinet.plan.settings.eventType")}</Label>
             <Select value={eventType} onValueChange={(v) => { if (v) setEventType(v); }}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue>{EVENT_TYPE_KEYS[eventType] ? t(EVENT_TYPE_KEYS[eventType]) : eventType}</SelectValue></SelectTrigger>
               <SelectContent>
                 {EVENT_TYPE_VALUES.map((v) => (
                   <SelectItem key={v} value={v}>{t(EVENT_TYPE_KEYS[v])}</SelectItem>
@@ -4210,7 +4228,7 @@ function SettingsTab({
                         : "border-border/40 text-muted-foreground hover:border-gold/40 hover:text-foreground",
                     )}
                   >
-                    {c.nameRo}
+                    {locale === "ru" ? c.nameRu || c.nameRo : locale === "en" ? c.nameEn || c.nameRo : c.nameRo}
                   </button>
                 );
               })
@@ -4667,7 +4685,7 @@ function AllCategoriesBookedPanel({
   bookings: BookingRequest[];
 }) {
   const router = useRouter();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const pendingCount = bookings.filter((b) => b.status === "pending").length;
   const confirmedCount = bookings.filter(
     (b) => b.status === "accepted" || b.status === "confirmed_by_client",
@@ -4692,7 +4710,7 @@ function AllCategoriesBookedPanel({
   // Catalogue of artist/service categories user could ADD. Strips
   // anything already on the plan so the picker only offers extras.
   const [allCats, setAllCats] = useState<
-    Array<{ id: number; nameRo: string; type: string }>
+    Array<{ id: number; nameRo: string; nameRu?: string | null; nameEn?: string | null; type: string }>
   >([]);
   const [adding, setAdding] = useState(false);
   useEffect(() => {
@@ -4700,7 +4718,7 @@ function AllCategoriesBookedPanel({
       .then((r) => (r.ok ? r.json() : []))
       .then((rows: unknown) => {
         const list = Array.isArray(rows)
-          ? (rows as Array<{ id: number; nameRo: string; type: string }>)
+          ? (rows as Array<{ id: number; nameRo: string; nameRu?: string | null; nameEn?: string | null; type: string }>)
           : [];
         setAllCats(
           list.filter(
@@ -4908,7 +4926,7 @@ function AllCategoriesBookedPanel({
                   onClick={() => void addCategory(c.id)}
                   className="rounded-full border border-border/40 bg-card/60 px-3 py-1.5 text-xs hover:border-gold/40 hover:text-gold disabled:opacity-50"
                 >
-                  + {c.nameRo}
+                  + {locale === "ru" ? c.nameRu || c.nameRo : locale === "en" ? c.nameEn || c.nameRo : c.nameRo}
                 </button>
               ))}
             </div>
@@ -4934,7 +4952,7 @@ function AllCategoriesBookedPanel({
  * still live on /cabinet/rezervari for now.
  */
 function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const ACTIVE_STATUSES = new Set([
     "accepted",
     "confirmed_by_client",
@@ -4965,7 +4983,7 @@ function MyBookingsTab({ bookings }: { bookings: BookingRequest[] }) {
                 : t("cabinet.plan.artistFallback")}
             {b.eventDate &&
               ` · ${new Date(b.eventDate + "T00:00:00").toLocaleDateString(
-                "ro-MD",
+                DATE_LOCALES[locale],
                 { day: "numeric", month: "long" },
               )}`}
             {b.startTime && ` · ${b.startTime}`}

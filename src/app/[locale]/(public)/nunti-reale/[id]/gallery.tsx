@@ -62,6 +62,7 @@ export function RealWeddingGallery({ photos }: { photos: Photo[] }) {
           >
             <Image
               src={p.url}
+              unoptimized
               alt={p.caption || t("gallery.photo", { index: i + 1 })}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"

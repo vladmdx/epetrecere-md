@@ -7,10 +7,12 @@ import {
   guestList,
   seatingTables,
   seatAssignments,
+  eventPhotos,
 } from "@/lib/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
 import { revealGuestListRecord } from "@/lib/privacy/guest-encryption";
+import { erasePhotoBatch, photoErasureError, PHOTO_ERASURE_BATCH_SIZE } from "@/lib/moments/erase-photo";
 
 // M4 — /api/event-plans/[id]
 //
@@ -161,9 +163,25 @@ export async function DELETE(
     return NextResponse.json({ error: owned.error }, { status: owned.status });
   }
 
-  await db
-    .delete(eventPlans)
-    .where(and(eq(eventPlans.id, planId), eq(eventPlans.userId, owned.userId)));
-
+  const photos = await db.select({ id: eventPhotos.id, url: eventPhotos.url }).from(eventPhotos)
+    .where(eq(eventPhotos.planId, planId)).orderBy(asc(eventPhotos.id)).limit(PHOTO_ERASURE_BATCH_SIZE + 1);
+  const cleanup = await erasePhotoBatch(photos.map(photo => ({ ...photo, plan: owned.plan })), async photo => {
+    await db.delete(eventPhotos).where(and(eq(eventPhotos.id, photo.id), eq(eventPhotos.planId, planId), eq(eventPhotos.url, photo.url)));
+  });
+  if (!cleanup.complete) return NextResponse.json(photoErasureError(cleanup.reason!), { status: cleanup.reason === "unverified" ? 409 : 503 });
+  // No network calls while locked. FK inserts take a key-share lock on the
+  // plan, so a concurrent upload cannot be silently lost by the cascade.
+  const deleted = await db.transaction(async tx => {
+    await tx.execute(sql`SET LOCAL lock_timeout = '3s'`);
+    await tx.execute(sql`SET LOCAL statement_timeout = '8s'`);
+    const [current] = await tx.select({ id: eventPlans.id }).from(eventPlans)
+      .where(and(eq(eventPlans.id, planId), eq(eventPlans.userId, owned.userId))).for("update");
+    if (!current) return true;
+    const remaining = await tx.select({ id: eventPhotos.id }).from(eventPhotos).where(eq(eventPhotos.planId, planId)).limit(1);
+    if (remaining.length) return false;
+    await tx.delete(eventPlans).where(and(eq(eventPlans.id, planId), eq(eventPlans.userId, owned.userId)));
+    return true;
+  }).catch(() => false);
+  if (!deleted) return NextResponse.json(photoErasureError("remaining"), { status: 503 });
   return NextResponse.json({ ok: true });
 }

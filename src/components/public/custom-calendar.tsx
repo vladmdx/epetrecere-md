@@ -189,7 +189,7 @@ export function CustomCalendar({
           </div>
 
           {/* Day names */}
-          <div className="grid grid-cols-7 mb-1">
+          <div className="grid grid-cols-7 mb-1" data-no-auto-translate="" translate="no">
             {dayNames.map((d) => (
               <div key={d} className="text-center text-[10px] font-medium uppercase tracking-wider text-gold/50 py-1">
                 {d}

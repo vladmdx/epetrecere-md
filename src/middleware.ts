@@ -1,6 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
+import { isPhotoFileOptimizerTarget } from "@/lib/moments/photo-url";
 import {
   DEFAULT_LOCALE,
   LOCALE_HEADER,
@@ -292,6 +293,14 @@ function resolveLegacySeoSlug(pathname: string): string | null {
 
 export default clerkMiddleware(async (auth, req) => {
   const rawPathname = req.nextUrl.pathname;
+  if (rawPathname === "/_next/image") {
+    // A manually crafted optimizer request must not cache formerly public UGC
+    // beyond a later withdrawal. Other optimized catalog images are unchanged.
+    if (isPhotoFileOptimizerTarget(req.nextUrl.searchParams.get("url"))) {
+      return new NextResponse("Use the protected photo endpoint", { status: 400, headers: { "Cache-Control": "no-store" } });
+    }
+    return NextResponse.next();
+  }
 
   // ── i18n routing ───────────────────────────────────────────────────────
   // Each language now has its own URL (/sali, /ru/sali, /en/sali) so search
@@ -408,6 +417,7 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
+    "/_next/image",
     // Skip Next.js internals and static files
     "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     // Always run for API routes

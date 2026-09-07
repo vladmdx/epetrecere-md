@@ -13,6 +13,7 @@ import { eq, and, desc, asc, sql, ilike, gte, lte, arrayContains, or } from "dri
 import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
 import { cityTravelDistances } from "@/lib/geo/city-proximity";
 import { moldovaCitySpellings } from "@/lib/moldova-cities";
+import { photoContentUrl } from "@/lib/moments/photo-url";
 
 export interface ArtistFilters {
   categoryId?: number;
@@ -398,7 +399,6 @@ export async function getUgcPhotosForArtist(artistId: number, limit = 12) {
   const rows = await db
     .select({
       id: eventPhotos.id,
-      url: eventPhotos.url,
       caption: eventPhotos.caption,
       createdAt: eventPhotos.createdAt,
     })
@@ -412,7 +412,7 @@ export async function getUgcPhotosForArtist(artistId: number, limit = 12) {
     )
     .orderBy(desc(eventPhotos.createdAt))
     .limit(limit);
-  return rows;
+  return rows.map((photo) => ({ ...photo, url: photoContentUrl(photo.id) }));
 }
 
 export async function getSimilarArtists(artistId: number, categoryIds: number[], limit = 4) {

@@ -8,9 +8,10 @@ const ANTHROPIC_RETRY_MS = 5 * 60 * 1000;
 let anthropicClient: Anthropic | null = null;
 let anthropicUnavailableUntil = 0;
 
+type OpenAiContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 type OpenAiMessage = {
   role: "system" | "user" | "assistant" | "tool";
-  content: string | null;
+  content: string | OpenAiContentPart[] | null;
   tool_call_id?: string;
   tool_calls?: Array<{
     id: string;
@@ -97,12 +98,27 @@ function toOpenAiMessages(
       continue;
     }
 
+    const images = message.content.filter((block) => block.type === "image");
+    // Vision fallback must not silently classify text without the photograph.
+    // Only inline bytes are accepted here; raw/private storage URLs stay server-side.
+    if (images.length) {
+      const content: OpenAiContentPart[] = [];
+      for (const block of message.content) {
+        if (block.type === "text") content.push({ type: "text", text: block.text });
+        if (block.type === "image") {
+          if (block.source.type !== "base64" || !/^image\/(?:jpeg|png|webp|gif)$/.test(block.source.media_type)
+            || !/^[A-Za-z0-9+/]+={0,2}$/.test(block.source.data)) throw new Error("Inline image content required");
+          content.push({ type: "image_url", image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` } });
+        }
+      }
+      result.push({ role: "user", content });
+    }
     const userText = message.content
       .filter((block) => block.type === "text")
       .map((block) => (block.type === "text" ? block.text : ""))
       .filter(Boolean)
       .join("\n");
-    if (userText) result.push({ role: "user", content: userText });
+    if (userText && !images.length) result.push({ role: "user", content: userText });
 
     for (const block of message.content) {
       if (block.type !== "tool_result") continue;

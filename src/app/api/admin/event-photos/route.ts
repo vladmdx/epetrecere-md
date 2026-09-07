@@ -9,6 +9,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/admin";
+import { serializePhoto } from "@/lib/moments/photo-url";
 
 // M5 — GET /api/admin/event-photos?status=pending|approved|all
 //
@@ -51,5 +52,5 @@ export async function GET(req: NextRequest) {
         ? await baseQuery
         : await baseQuery.where(eq(eventPhotos.isApproved, false));
 
-  return NextResponse.json({ photos: rows });
+  return NextResponse.json({ photos: rows.map(row => ({ ...row, photo: serializePhoto(row.photo) })) }, { headers: { "Cache-Control": "private, no-store" } });
 }

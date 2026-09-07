@@ -41,6 +41,7 @@ import { useLocale } from "@/hooks/use-locale";
 /** What `useLocale().t` looks like — sub-components and helpers take it as a
  *  parameter instead of each calling the hook a second time. */
 type Translate = (key: string, vars?: Record<string, string | number>) => string;
+const DATE_LOCALES = { ro: "ro-MD", ru: "ru-RU", en: "en-GB" } as const;
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -518,9 +519,9 @@ function HeroCard({
   progressPrefix: string;
   progressSuffix: string;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const dateLabel = plan.eventDate
-    ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString("ro-MD", {
+    ? new Date(plan.eventDate + "T00:00:00").toLocaleDateString(DATE_LOCALES[locale], {
         day: "numeric",
         month: "long",
         year: "numeric",
@@ -851,7 +852,7 @@ function BottomRow({
   plan: PlanSummary;
   conversations: Conversation[];
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const recent = conversations.slice(0, 3);
   const totalUnread = conversations.reduce(
     (n, c) => n + (c.clientUnread ?? 0),
@@ -894,7 +895,7 @@ function BottomRow({
                         {c.vendorName ?? t("cabinet.dashboard.vendorFallback")}
                       </p>
                       <p className="shrink-0 text-[11px] text-muted-foreground">
-                        {relativeTime(c.lastMessageAt, t)}
+                        {relativeTime(c.lastMessageAt, t, locale)}
                       </p>
                     </div>
                     <p className="truncate text-xs text-muted-foreground">
@@ -1020,7 +1021,7 @@ function stripEventPrefix(title: string, eventLabel: string): string {
   return title;
 }
 
-function relativeTime(iso: string, t: Translate): string {
+function relativeTime(iso: string, t: Translate, locale: keyof typeof DATE_LOCALES): string {
   const then = new Date(iso).getTime();
   if (!Number.isFinite(then)) return "";
   const diff = Date.now() - then;
@@ -1035,7 +1036,7 @@ function relativeTime(iso: string, t: Translate): string {
       day === 1 ? "cabinet.time.daysAgoOne" : "cabinet.time.daysAgoMany",
       { n: day },
     );
-  return new Date(iso).toLocaleDateString("ro-MD", {
+  return new Date(iso).toLocaleDateString(DATE_LOCALES[locale], {
     day: "numeric",
     month: "short",
   });

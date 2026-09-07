@@ -299,7 +299,17 @@ export const PHOTO_CATEGORIES = [
 ] as const;
 export type PhotoCategory = (typeof PHOTO_CATEGORIES)[number];
 
-export async function classifyPhoto(imageUrl: string): Promise<PhotoCategory> {
+export async function classifyPhoto(image: Uint8Array): Promise<PhotoCategory> {
+  if (!(image instanceof Uint8Array) || image.byteLength < 12 || image.byteLength > 4 * 1024 * 1024) {
+    throw new Error("Unsupported photo content");
+  }
+  const bytes = Buffer.from(image);
+  const mediaType = bytes.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ? "image/jpeg"
+    : bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ? "image/png"
+    : ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii")) ? "image/gif"
+    : bytes.subarray(0, 4).toString("ascii") === "RIFF" && bytes.subarray(8, 12).toString("ascii") === "WEBP" ? "image/webp"
+    : null;
+  if (!mediaType) throw new Error("Unsupported photo content");
   const message = await getClient().messages.create({
     model: "claude-haiku-4-5",
     max_tokens: 20,
@@ -311,7 +321,7 @@ export async function classifyPhoto(imageUrl: string): Promise<PhotoCategory> {
         content: [
           {
             type: "image",
-            source: { type: "url", url: imageUrl },
+            source: { type: "base64", media_type: mediaType, data: bytes.toString("base64") },
           },
           {
             type: "text",

@@ -4,7 +4,8 @@ import { db } from "@/lib/db";
 import { eventPhotos } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
-import { deleteManagedPhoto } from "@/lib/moments/managed-photo";
+import { eraseManagedPhoto, photoErasureError, photoErasureSucceeded } from "@/lib/moments/erase-photo";
+import { serializePhoto } from "@/lib/moments/photo-url";
 
 // M4 — PATCH / DELETE /api/event-plans/[id]/photos/[photoId]
 
@@ -56,7 +57,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Photo not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ photo });
+  return NextResponse.json({ photo: serializePhoto(photo) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function DELETE(
@@ -72,13 +73,16 @@ export async function DELETE(
     return NextResponse.json({ error: owned.error }, { status: owned.status });
   }
 
-  const [deleted] = await db
-    .delete(eventPhotos)
+  const [photo] = await db
+    .select({ url: eventPhotos.url })
+    .from(eventPhotos)
     .where(
       and(eq(eventPhotos.id, photoIdNum), eq(eventPhotos.planId, planId)),
     )
-    .returning({ url: eventPhotos.url });
-
-  const storageDeleted = deleted ? await deleteManagedPhoto(deleted.url, owned.plan) : false;
-  return NextResponse.json({ ok: true, storagePreserved: Boolean(deleted && !storageDeleted) });
+    .limit(1);
+  if (!photo) return NextResponse.json({ ok: true });
+  const result = await eraseManagedPhoto(photo.url, owned.plan);
+  if (!photoErasureSucceeded(result)) return NextResponse.json(photoErasureError(result as "retry" | "unverified"), { status: result === "unverified" ? 409 : 503 });
+  await db.delete(eventPhotos).where(and(eq(eventPhotos.id, photoIdNum), eq(eventPhotos.planId, planId), eq(eventPhotos.url, photo.url)));
+  return NextResponse.json({ ok: true });
 }

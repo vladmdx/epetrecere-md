@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans } from "@/lib/db/schema";
 import { requestHasMomentsAccess } from "@/lib/moments/access";
 import { rateLimit } from "@/lib/rate-limit";
-import { deleteManagedPhoto } from "@/lib/moments/managed-photo";
+import { eraseManagedPhoto, photoErasureError, photoErasureSucceeded } from "@/lib/moments/erase-photo";
 
 const deleteSchema = z.object({ deviceId: z.string().min(6).max(80) });
 const reportSchema = z.object({ reason: z.string().trim().min(2).max(240) });
@@ -33,9 +33,10 @@ export async function DELETE(
   if (!photo || !photo.deviceId || photo.deviceId !== parsed.data.deviceId) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  await db.delete(eventPhotos).where(eq(eventPhotos.id, photo.id));
-  const storageDeleted = await deleteManagedPhoto(photo.url, { id: photo.planId, momentsSlug: slug });
-  return NextResponse.json({ deleted: true, storagePreserved: !storageDeleted });
+  const result = await eraseManagedPhoto(photo.url, { id: photo.planId, momentsSlug: slug });
+  if (!photoErasureSucceeded(result)) return NextResponse.json(photoErasureError(result as "retry" | "unverified"), { status: result === "unverified" ? 409 : 503 });
+  await db.delete(eventPhotos).where(and(eq(eventPhotos.id, photo.id), eq(eventPhotos.planId, photo.planId), eq(eventPhotos.deviceId, parsed.data.deviceId), eq(eventPhotos.url, photo.url)));
+  return NextResponse.json({ deleted: true });
 }
 
 export async function POST(

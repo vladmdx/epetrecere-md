@@ -4,17 +4,19 @@ const assert = require("node:assert/strict");
 const Module = require("node:module");
 const path = require("node:path");
 const { getTableName } = require("drizzle-orm");
+const { PgDialect } = require("drizzle-orm/pg-core");
 const { NextRequest } = require("next/server");
 const root = path.resolve(__dirname, "..");
 const originalLoad = Module._load;
 const originalFetch = global.fetch;
 const originalBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+const dialect = new PgDialect();
 delete process.env.BLOB_READ_WRITE_TOKEN;
 global.fetch = async () => { throw Error("External HTTP forbidden in deletion regression"); };
 let state;
 const reset = (overrides = {}) => {
   state = { signedIn: true, role: "admin", userExists: true, artistExists: true,
-    venueExists: true, ownedKinds: [], failDelete: false, trace: [], ...overrides };
+    venueExists: true, ownedKinds: [], failDelete: false, inTx: false, trace: [], ...overrides };
 };
 reset();
 const db = {
@@ -27,15 +29,21 @@ const db = {
       if (name === "venues") return state.venueExists && (state.ownedKinds.includes("venue") || !state.accountDelete) ? [{ id: 202, menuPdfUrl: null, ogImageUrl: null }] : [];
       return [];
     };
-    const builder = { from(value) { table = value; return builder; }, where() { return builder; }, limit() { return Promise.resolve(rows()); }, then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
+    const builder = { from(value) { table = value; return builder; }, where() { return builder; }, limit() { return Promise.resolve(rows()); },
+      for(value) { assert.equal(value, "update"); assert.equal(state.inTx, true); state.trace.push(`lock:${getTableName(table)}`); return builder; },
+      then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
     return builder;
   },
-  update(table) { return { set() { return { where: async () => { state.trace.push(`update:${getTableName(table)}`); } }; } }; },
+  update(table) { return { set() { return { where: async () => {
+    if (state.accountDelete) assert.equal(state.inTx, true, "account minimization remains in the atomic erasure transaction");
+    state.trace.push(`update:${getTableName(table)}`);
+  } }; } }; },
   delete(table) {
     const name = getTableName(table);
     let executed = false;
     const execute = async () => {
       if (state.failDelete) throw Error("synthetic delete failure");
+      if (state.accountDelete) assert.equal(state.inTx, true);
       if (!executed) state.trace.push(`delete:${name}`);
       executed = true;
       return name === "artists" && state.artistExists ? [{ id: 101 }] : [];
@@ -43,13 +51,30 @@ const db = {
     const builder = { where() { return builder; }, returning: execute, then(resolve, reject) { return execute().then(resolve, reject); } };
     return builder;
   },
+  execute: async query => {
+    assert.equal(state.inTx, true);
+    assert.match(dialect.sqlToQuery(query).sql, /SET LOCAL (lock_timeout|statement_timeout)/);
+  },
+  transaction: async callback => {
+    assert.equal(state.inTx, false);
+    const before = [...state.trace];
+    state.inTx = true; state.trace.push("tx:begin");
+    try {
+      const result = await callback(db);
+      state.trace.push("tx:commit"); return result;
+    } catch (error) {
+      state.trace = [...before, "tx:rollback"]; throw error;
+    } finally { state.inTx = false; }
+  },
 };
 Module._load = function(request, parent, isMain) {
   if (request === "@clerk/nextjs/server") return {
     auth: async () => ({ userId: state.signedIn ? "qa-private-clerk" : null }),
     clerkClient: async () => ({ users: { deleteUser: async id => { assert.equal(id, "qa-private-clerk"); state.trace.push("delete:clerk"); } } }),
   };
-  if (request === "next/cache") return { revalidatePath: (route, type) => { assert.equal(type, "page"); state.trace.push(`cache:${route}`); } };
+  if (request === "next/cache") return { revalidatePath: (route, type) => {
+    assert.equal(type, "page"); assert.equal(state.inTx, false, "cache invalidation waits for commit"); state.trace.push(`cache:${route}`);
+  } };
   let resolved; try { resolved = Module._resolveFilename(request, parent); } catch {}
   if (request === "@/lib/db" || resolved === path.join(root, "src/lib/db/index.ts")) return { db };
   return originalLoad.call(this, request, parent, isMain);
@@ -99,7 +124,9 @@ Module._load = function(request, parent, isMain) {
       for (const kind of ownedKinds) {
         const route = `cache:/[locale]/(public)/${kind === "artist" ? "artisti" : "sali"}/[slug]`;
         assert.ok(state.trace.indexOf(route) > state.trace.indexOf(`update:${kind === "artist" ? "artists" : "venues"}`));
-        assert.ok(state.trace.indexOf(route) < state.trace.indexOf("delete:users"), "public minimization is visible even if later cleanup needs retry");
+        assert.ok(state.trace.indexOf(route) > state.trace.indexOf("delete:users"), "catalog refresh follows atomic local account erasure");
+        assert.ok(state.trace.indexOf(route) > state.trace.indexOf("tx:commit"), "rolled-back minimization must never invalidate catalog pages");
+        assert.ok(state.trace.indexOf(route) < state.trace.indexOf("delete:clerk"), "local catalog erasure is visible before external identity cleanup");
       }
       assert.ok(!state.trace.some(entry => entry.includes("legal_acceptances")), "signed evidence is never altered");
       assert.ok(state.trace.includes("delete:clerk"));
@@ -107,6 +134,11 @@ Module._load = function(request, parent, isMain) {
     }
     reset({ signedIn: false }); assert.equal((await account.DELETE()).status, 401); assert.deepEqual(state.trace, []);
     passed("account: anonymous request is read-only and rejected");
+    reset({ ownedKinds: ["artist", "venue"], accountDelete: true, failDelete: true });
+    assert.equal((await account.DELETE()).status, 503);
+    assert.ok(state.trace.includes("tx:rollback"));
+    assert.ok(!state.trace.some(entry => /^(cache:|update:|delete:)/.test(entry)), "failed atomic erasure leaves no minimization, catalog refresh or Clerk deletion");
+    passed("account: failed local erasure rolls back and never invalidates catalogs or deletes Clerk identity");
     console.log(`${checks} deletion/cache regression checks passed; zero external operations`);
   } finally {
     Module._load = originalLoad; global.fetch = originalFetch;

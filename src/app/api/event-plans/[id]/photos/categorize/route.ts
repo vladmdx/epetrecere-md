@@ -13,6 +13,7 @@ import { eventPhotos } from "@/lib/db/schema";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
 import { classifyPhoto } from "@/lib/ai";
 import { rateLimit } from "@/lib/rate-limit";
+import { readManagedPhotoBytes } from "@/lib/moments/managed-photo";
 
 /** Per-call cap so an owner triggering this on a 500-photo gallery
  *  doesn't accidentally burn through their quota in one tap. They can
@@ -37,6 +38,7 @@ export async function POST(
   if (!owned.ok) {
     return NextResponse.json({ error: owned.error }, { status: owned.status });
   }
+  const ownedPlan = owned.plan;
 
   const ip = req.headers.get("x-forwarded-for") || "anon";
   // 5 bulk runs per hour per IP is generous — even a 500-photo gallery
@@ -77,14 +79,17 @@ export async function POST(
   async function worker(slice: typeof candidates) {
     for (const photo of slice) {
       try {
-        const category = await classifyPhoto(photo.url);
+        const image = await readManagedPhotoBytes(photo.url, ownedPlan, 4 * 1024 * 1024);
+        if (!image) throw new Error("Photo content unavailable");
+        const category = await classifyPhoto(image);
         await db
           .update(eventPhotos)
           .set({ category })
-          .where(eq(eventPhotos.id, photo.id));
+          .where(and(eq(eventPhotos.id, photo.id), eq(eventPhotos.planId, planId)));
         tally[category] = (tally[category] ?? 0) + 1;
-      } catch (err) {
-        console.error("[categorize] failed for", photo.id, err);
+      } catch {
+        // Storage/model errors can contain private URLs or image content.
+        console.error("[categorize] failed for photo", photo.id);
         tally["error"] = (tally["error"] ?? 0) + 1;
       }
     }

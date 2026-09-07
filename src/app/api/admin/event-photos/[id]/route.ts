@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { eventPhotos } from "@/lib/db/schema";
+import { eventPhotos, eventPlans } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/admin";
+import { serializePhoto } from "@/lib/moments/photo-url";
+import { eraseManagedPhoto, photoErasureError, photoErasureSucceeded } from "@/lib/moments/erase-photo";
 
 // M5 — PATCH / DELETE /api/admin/event-photos/[id]
 //
@@ -51,7 +53,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Photo not found" }, { status: 404 });
   }
 
-  return NextResponse.json({ photo });
+  return NextResponse.json({ photo: serializePhoto(photo) }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function DELETE(
@@ -69,6 +71,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  await db.delete(eventPhotos).where(eq(eventPhotos.id, photoId));
+  const [photo] = await db.select({ url: eventPhotos.url, planId: eventPlans.id, momentsSlug: eventPlans.momentsSlug })
+    .from(eventPhotos).innerJoin(eventPlans, eq(eventPlans.id, eventPhotos.planId)).where(eq(eventPhotos.id, photoId)).limit(1);
+  if (!photo) return NextResponse.json({ ok: true });
+  const result = await eraseManagedPhoto(photo.url, { id: photo.planId, momentsSlug: photo.momentsSlug });
+  if (!photoErasureSucceeded(result)) return NextResponse.json(photoErasureError(result as "retry" | "unverified"), { status: result === "unverified" ? 409 : 503 });
+  await db.delete(eventPhotos).where(and(eq(eventPhotos.id, photoId), eq(eventPhotos.planId, photo.planId), eq(eventPhotos.url, photo.url)));
   return NextResponse.json({ ok: true });
 }

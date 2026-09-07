@@ -9,7 +9,7 @@
 // ImagePicker returns a local URI passed as a native multipart file. We
 // then refetch the photo list to show the new entry.
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { mediaUrl } from "../../../lib/links";
 import {
   View,
@@ -60,11 +60,32 @@ export default function MomentsScreen() {
   const planId = Number(id);
   const router = useRouter();
   const api = useApi();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
+  const [photoAuth, setPhotoAuth] = useState<{ userId: string; token: string } | null>(null);
+  const photoToken = photoAuth && photoAuth.userId === userId ? photoAuth.token : null;
   const qc = useQueryClient();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [uploading, setUploading] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
+
+  useEffect(() => {
+    let current = true;
+    setPhotoAuth(null);
+    const refresh = async () => {
+      try {
+        const token = userId ? await getToken() : null;
+        if (current) setPhotoAuth(userId && token ? { userId, token } : null);
+      } catch { if (current) setPhotoAuth(null); }
+    };
+    void refresh();
+    const timer = setInterval(() => { void refresh(); }, 45_000);
+    return () => { current = false; clearInterval(timer); };
+  }, [getToken, userId]);
+
+  // Never attach the Clerk credential to a database-provided external URL.
+  const photoSource = (photoId: number) => photoToken && Number.isSafeInteger(photoId) && photoId > 0
+    ? { uri: mediaUrl(`/api/event-photos/${photoId}/file`)!, headers: { Authorization: `Bearer ${photoToken}` } }
+    : undefined;
 
   const photosQuery = useQuery({
     queryKey: ["plan", planId, "photos"],
@@ -226,7 +247,8 @@ export default function MomentsScreen() {
             className="overflow-hidden rounded-lg"
           >
             <Image
-              source={{ uri: mediaUrl(item.url)! }}
+              source={photoSource(item.id)}
+              cachePolicy="none"
               style={{ width: "100%", height: "100%" }}
               contentFit="cover"
               transition={150}
@@ -301,7 +323,8 @@ export default function MomentsScreen() {
                   }}
                 >
                   <Image
-                    source={{ uri: mediaUrl(item.url)! }}
+                    source={photoSource(item.id)}
+                    cachePolicy="none"
                     style={{ width: SCREEN_WIDTH, aspectRatio: 1 }}
                     contentFit="contain"
                     transition={200}

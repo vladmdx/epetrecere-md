@@ -18,8 +18,10 @@ const profiles = {
   venues: [{ id: 45, nameRo: "QA Sală Bălți", nameRu: "QA Зал Бельцы", nameEn: "QA Venue Balti", city: "Bălți", isActive: false, email: "venue@example.invalid", phone: "+12025550123", contract: "DO NOT EXPORT" }],
 };
 const bookings = [
-  { id: 256, artistId: null, venueId: 45, status: "awaiting_venue", eventDate: "2026-09-20", startTime: "14:00", endTime: "00:00", clientEmail: "client@example.invalid", clientSignature: "PRIVATE SIGNATURE", guestNames: "PRIVATE GUESTS" },
-  { id: 257, artistId: 561, venueId: null, status: "accepted", eventDate: "2026-09-20", startTime: "14:00", endTime: "00:00", clientEmail: "client@example.invalid", clientSignature: "PRIVATE SIGNATURE", guestNames: "PRIVATE GUESTS" },
+  { id: 256, artistId: null, venueId: 45, status: "awaiting_venue", eventDate: "2026-09-20", startTime: "14:00", endTime: "00:00", agreedPrice: null, clientEmail: "client@example.invalid", clientSignature: "PRIVATE SIGNATURE", guestNames: "PRIVATE GUESTS" },
+  { id: 257, artistId: 561, venueId: null, status: "accepted", eventDate: "2026-09-20", startTime: "14:00", endTime: "00:00", agreedPrice: 300, clientEmail: "client@example.invalid", clientSignature: "PRIVATE SIGNATURE", guestNames: "PRIVATE GUESTS" },
+  { id: 258, artistId: 561, venueId: null, status: "rejected", eventDate: "2026-09-20", startTime: "14:00", endTime: "00:00", agreedPrice: null, clientEmail: "client@example.invalid", clientSignature: "PRIVATE SIGNATURE", guestNames: "PRIVATE GUESTS" },
+  { id: 259, artistId: 561, venueId: null, status: "cancelled", eventDate: "2026-09-20", startTime: "14:00", endTime: "21:00", agreedPrice: 300, clientEmail: "client@example.invalid", clientSignature: "PRIVATE SIGNATURE", guestNames: "PRIVATE GUESTS" },
 ];
 function reset(extra = {}) { state = { role: "admin", languagePref: "ro", authed: true, calls: [], modelCalls: [], vendorAttempt: false, ...extra }; }
 const db = { select(projection) {
@@ -43,7 +45,7 @@ const db = { select(projection) {
       }
     } else if (name === "booking_requests") {
       assert.match(query.sql, /"booking_requests"\."id" in/);
-      assert.deepEqual(columns.sort(), ["id", "artistId", "venueId", "status", "eventDate", "startTime", "endTime"].sort());
+      assert.deepEqual(columns.sort(), ["id", "artistId", "venueId", "status", "eventDate", "startTime", "endTime", "agreedPrice"].sort());
       selected = bookings.filter(row => query.params.includes(row.id));
     } else throw Error(`Unexpected query ${name}`);
     return selected.map(row => Object.fromEntries(columns.map(key => [key, row[key]])));
@@ -68,6 +70,7 @@ const model = { messages: { create: async params => {
     assert.equal(JSON.parse(result[0].content).matches[0].isActive, true);
     assert.equal(JSON.parse(result[1].content).matches[0].isActive, false);
     assert.deepEqual(JSON.parse(result[2].content).matches.map(row => row.status), ["awaiting_venue", "accepted"]);
+    assert.deepEqual(JSON.parse(result[2].content).matches.map(row => row.agreedPrice), [null, 300]);
     assert.doesNotMatch(JSON.stringify(result), /@example\.invalid|12025550123|PRIVATE|DO NOT EXPORT/);
   }
   return { stop_reason: "end_turn", content: [{ type: "text", text: "Fixture response based on exact tool results" }] };
@@ -88,6 +91,7 @@ Module._load = function(request, parent, isMain) {
     for (const role of [undefined, "artist", "user", "editor", "venue"]) {
       reset();
       assert.ok((await executeAdminReadTool("get_vendor_profile_status", { type: "venue", id: 45, role: "admin" }, role)).error);
+      assert.ok((await executeAdminReadTool("get_booking_status_by_id", { booking_ids: [259], role: "admin" }, role)).error);
       assert.equal(state.calls.length, 0);
     }
     reset();
@@ -110,6 +114,17 @@ Module._load = function(request, parent, isMain) {
     assert.deepEqual(missing.notFoundIds, [999]); assert.equal(missing.matches.length, 1);
     assert.deepEqual((await executeAdminReadTool("get_vendor_profile_status", { type: "venue", id: 999 }, "admin")).matches, []);
     console.log("PASS bounded input validation, literal wildcard escaping, deduplicated IDs and explicit not-found output");
+    for (const role of ["admin", "super_admin"]) {
+      reset({ role });
+      const result = await executeAdminReadTool("get_booking_status_by_id", { booking_ids: [258, 259] }, role);
+      assert.deepEqual(result.matches.map(({ id, status, startTime, endTime, agreedPrice }) => ({ id, status, startTime, endTime, agreedPrice })), [
+        { id: 258, status: "rejected", startTime: "14:00", endTime: "00:00", agreedPrice: null },
+        { id: 259, status: "cancelled", startTime: "14:00", endTime: "21:00", agreedPrice: 300 },
+      ]);
+      assert.doesNotMatch(JSON.stringify(result), /@example\.invalid|PRIVATE|clientEmail|clientSignature|guestNames/);
+      assert.ok(state.calls.every(call => call.name === "booking_requests"));
+    }
+    console.log("PASS authorized booking DTO preserves actual agreed price and null without contacts, contracts or guest data");
     for (const [locale, language] of [["ro", "Romanian"], ["ru", "Russian"], ["en", "English"]]) {
       reset({ languagePref: "ro" });
       const response = await POST(request("admin", locale));
@@ -135,7 +150,7 @@ Module._load = function(request, parent, isMain) {
     assert.match(ui, /const \{ locale, t \} = useLocale\(\)/);
     assert.match(ui, /context,\s+locale,/);
     console.log("PASS UI sends selected locale; vendor allowlist and existing write-tool surface unchanged");
-    console.log("5 admin AI regression groups passed; zero external operations");
+    console.log("6 admin AI regression groups passed; zero external operations");
   } finally {
     Module._load = oldLoad; global.fetch = oldFetch;
     if (oldKey === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = oldKey;

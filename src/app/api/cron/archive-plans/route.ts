@@ -15,8 +15,9 @@ import {
   eventPhotos,
   eventPlans,
 } from "@/lib/db/schema";
-import { and, eq, lt, isNotNull, inArray } from "drizzle-orm";
+import { and, eq, lt, isNotNull, inArray, or } from "drizzle-orm";
 import { sql } from "drizzle-orm";
+import { eraseManagedPhoto, photoErasureSucceeded } from "@/lib/moments/erase-photo";
 
 export const runtime = "nodejs";
 // Opt out of caching so each cron tick hits the DB.
@@ -98,7 +99,7 @@ export async function GET(req: NextRequest) {
   // 180 days after upload. Work in bounded batches so the nightly function
   // cannot time out on an old, large gallery.
   const expiredPhotos = await db
-    .select({ id: eventPhotos.id, url: eventPhotos.url })
+    .select({ id: eventPhotos.id, url: eventPhotos.url, planId: eventPlans.id, momentsSlug: eventPlans.momentsSlug })
     .from(eventPhotos)
     .innerJoin(eventPlans, eq(eventPlans.id, eventPhotos.planId))
     .where(sql`(
@@ -107,20 +108,21 @@ export async function GET(req: NextRequest) {
       (${eventPlans.eventDate} IS NULL AND ${eventPhotos.createdAt} < (NOW() - INTERVAL '180 days'))
     )`)
     .limit(500);
-  if (expiredPhotos.length > 0) {
-    if (process.env.BLOB_READ_WRITE_TOKEN) {
-      const urls = expiredPhotos.map((p) => p.url).filter((url) => url.startsWith("https://"));
-      if (urls.length > 0) {
-        try {
-          const { del } = await import("@vercel/blob");
-          await del(urls);
-        } catch (error) {
-          console.error("[cron/archive-plans] expired photo blob cleanup failed", error);
-        }
-      }
-    }
-    await db.delete(eventPhotos).where(inArray(eventPhotos.id, expiredPhotos.map((p) => p.id)));
+  const erasedPhotos: { id: number; planId: number; url: string }[] = [];
+  const photoCleanupDeadline = Date.now() + 20_000;
+  for (const photo of expiredPhotos) {
+    if (Date.now() >= photoCleanupDeadline) break;
+    // Keep provenance and retry on a later sweep if storage fails. Never
+    // delete an arbitrary legacy object with the global public-store token.
+    if (photoErasureSucceeded(await eraseManagedPhoto(photo.url, { id: photo.planId, momentsSlug: photo.momentsSlug }))) erasedPhotos.push(photo);
   }
+  // A migration/replacement may have changed the URL while storage was being
+  // cleaned. Never discard provenance for a different, unprocessed object.
+  const purgedPhotos = erasedPhotos.length > 0
+    ? await db.delete(eventPhotos).where(or(...erasedPhotos.map(photo => and(
+        eq(eventPhotos.id, photo.id), eq(eventPhotos.planId, photo.planId), eq(eventPhotos.url, photo.url),
+      )))).returning({ id: eventPhotos.id })
+    : [];
 
   // Operational retention. Every sweep is bounded so one old dataset cannot
   // exhaust a serverless invocation. Legal/financial proof is deliberately
@@ -217,7 +219,8 @@ export async function GET(req: NextRequest) {
     ids: toArchive.map((r) => r.id),
     purgedPlannerGuests: countRows(purgedPlannerGuests),
     purgedInvitationGuests: countRows(purgedInvitationGuests),
-    purgedEventPhotos: expiredPhotos.length,
+    purgedEventPhotos: purgedPhotos.length,
+    deferredEventPhotos: expiredPhotos.length - purgedPhotos.length,
     purgedAiConversations: expiredAi.length,
     purgedChatMessages: expiredMessages.length,
     anonymizedContactLeads: countRows(anonymizedContactLeads),

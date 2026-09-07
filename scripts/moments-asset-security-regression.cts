@@ -13,7 +13,9 @@ const dialect = new PgDialect();
 const originalLoad = Module._load;
 const originalFetch = global.fetch;
 const originalToken = process.env.BLOB_READ_WRITE_TOKEN;
-process.env.BLOB_READ_WRITE_TOKEN = "test-blob-token-no-network";
+const originalPrivateToken = process.env.MOMENTS_BLOB_READ_WRITE_TOKEN;
+process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_fixture_test-public-no-network";
+process.env.MOMENTS_BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_fixture_test-private-no-network";
 const store = "https://fixture.public.blob.vercel-storage.com";
 const scope = { id: 99, momentsSlug: "qa-plan-99" };
 const ownUrl = `${store}/event-photos/99/owned.webp`;
@@ -25,23 +27,23 @@ function reset(extra = {}) {
 function metadata(url, size = 3) { return { url, pathname: new URL(url).pathname.slice(1), size }; }
 const blob = {
   put: async (pathname, bytes, options) => {
-    assert.equal(options.token, "test-blob-token-no-network");
-    assert.equal(options.access, "public");
+    assert.equal(options.token, "vercel_blob_rw_fixture_test-private-no-network");
+    assert.equal(options.access, "private");
     assert.equal(options.contentType, "image/webp");
     state.puts.push({ pathname, bytes, options });
-    const result = metadata(`${store}/${pathname}`, bytes.length);
+    const result = metadata(`${store.replace(".public.", ".private.")}/${pathname}`, bytes.length);
     state.blobs.push(result);
     return result;
   },
   list: async (options) => {
-    assert.equal(options.token, "test-blob-token-no-network");
+    assert.ok(["vercel_blob_rw_fixture_test-public-no-network", "vercel_blob_rw_fixture_test-private-no-network"].includes(options.token));
     assert.equal(options.limit, 1);
     assert.ok(options.abortSignal);
     state.lists.push(options.prefix);
     return { blobs: state.blobs.filter(item => item.pathname.startsWith(options.prefix)).slice(0, 1), hasMore: false };
   },
   del: async (url, options) => {
-    assert.equal(options.token, "test-blob-token-no-network");
+    assert.equal(options.token, url.includes(".private.") ? "vercel_blob_rw_fixture_test-private-no-network" : "vercel_blob_rw_fixture_test-public-no-network");
     assert.ok(options.abortSignal);
     state.dels.push(url);
   },
@@ -109,7 +111,7 @@ Module._load = function(request, parent, isMain) {
       `${store}/event-photos/99/owned.webp?redirect=http://127.0.0.1`, `${store}/event-photos/99/owned.webp#x`,
       "https://fixture.public.blob.vercel-storage.com.evil.invalid/event-photos/99/x.webp",
       "https://user:pass@fixture.public.blob.vercel-storage.com/event-photos/99/x.webp",
-      "https://fixture.private.blob.vercel-storage.com/event-photos/99/x.webp",
+      "https://fixture.private.blob.vercel-storage.com/event-photos/100/x.webp",
     ];
     reset();
     for (const url of unsafe) assert.equal(await helpers.verifyManagedPhoto(url, scope), null, url);
@@ -148,6 +150,7 @@ Module._load = function(request, parent, isMain) {
     const uploaded = await owner.POST(multipart(), context);
     assert.equal(uploaded.status, 201);
     assert.equal(state.puts.length, 1);
+    assert.equal((await uploaded.json()).photo.url, "/api/event-photos/500/file");
     assert.match(state.puts[0].pathname, /^event-photos\/99\/[\da-f-]+\.webp$/);
     const imageMeta = await sharp(state.puts[0].bytes).metadata();
     assert.equal(imageMeta.format, "webp"); assert.equal(imageMeta.exif, undefined);
@@ -163,12 +166,12 @@ Module._load = function(request, parent, isMain) {
     for (const url of [...unsafe, ownUrl.replace("fixture.public", "foreign.public")]) {
       reset({ rows: [row(url)], blobs: [metadata(ownUrl)] });
       const response = await ownerPhoto.DELETE(json({}, "DELETE"), context);
-      assert.equal(response.status, 200);
-      assert.equal((await response.json()).storagePreserved, true);
-      assert.equal(state.deletes, 1); assert.deepEqual(state.dels, []);
+      assert.equal(response.status, 409);
+      assert.equal((await response.json()).code, "PHOTO_ERASURE_REVIEW_REQUIRED");
+      assert.equal(state.deletes, 0); assert.deepEqual(state.dels, []);
     }
     reset({ rows: [row(ownUrl)], blobs: [metadata(ownUrl)] });
-    assert.equal((await (await ownerPhoto.DELETE(json({}, "DELETE"), context)).json()).storagePreserved, false);
+    assert.equal((await (await ownerPhoto.DELETE(json({}, "DELETE"), context)).json()).ok, true);
     assert.deepEqual(state.dels, [ownUrl]);
     reset({ access: false });
     assert.equal((await guestPhoto.DELETE(json({ deviceId: "qa-device" }, "DELETE"), context)).status, 401);
@@ -179,7 +182,7 @@ Module._load = function(request, parent, isMain) {
     reset({ rows: [row(guestUrl)], blobs: [metadata(guestUrl)] });
     assert.equal((await guestPhoto.DELETE(json({ deviceId: "qa-device" }, "DELETE"), context)).status, 200);
     assert.deepEqual(state.dels, [guestUrl]);
-    console.log("PASS legacy/foreign files are unlinked only; owner and exact uploader delete only verified store files");
+    console.log("PASS legacy/foreign provenance is retained for review; owner and exact uploader delete only verified store files");
 
     for (const url of [...unsafe, ownUrl.replace("fixture.public", "foreign.public")]) {
       reset({ rows: [row(url)], blobs: [metadata(ownUrl)] });
@@ -243,5 +246,7 @@ Module._load = function(request, parent, isMain) {
     Module._load = originalLoad; global.fetch = originalFetch;
     if (originalToken === undefined) delete process.env.BLOB_READ_WRITE_TOKEN;
     else process.env.BLOB_READ_WRITE_TOKEN = originalToken;
+    if (originalPrivateToken === undefined) delete process.env.MOMENTS_BLOB_READ_WRITE_TOKEN;
+    else process.env.MOMENTS_BLOB_READ_WRITE_TOKEN = originalPrivateToken;
   }
 })().catch(error => { console.error(error); process.exitCode = 1; });
