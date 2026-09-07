@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,6 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
+import { saveReviewReply } from "@/lib/reviews/save-reply";
 
 /** Dates were pinned to ro-RO regardless of the language being browsed. */
 const INTL_TAG: Record<string, string> = {
@@ -86,6 +87,7 @@ export function VenueReviewsClient({
   const [replyingTo, setReplyingTo] = useState<number | null>(null);
   const [replyText, setReplyText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uncertainReplyIds, setUncertainReplyIds] = useState<Set<number>>(new Set());
   const [requestedIds, setRequestedIds] = useState<Set<number>>(new Set());
   const [requestingId, setRequestingId] = useState<number | null>(null);
   const [bulkRequesting, setBulkRequesting] = useState(false);
@@ -140,22 +142,27 @@ export function VenueReviewsClient({
   }, [reviewsState]);
 
   async function handleReply(reviewId: number) {
-    if (!replyText.trim()) return;
+    if (!replyText.trim() || submitting) return;
+    const submittedReply = replyText.trim();
     setSubmitting(true);
     try {
-      const res = await fetch(`/api/reviews/${reviewId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reply: replyText.trim() }),
+      const result = await saveReviewReply(reviewId, submittedReply, {
+        verifyBeforeWrite: uncertainReplyIds.has(reviewId),
       });
-      if (!res.ok) {
+      if (result.status === "unknown") {
+        setUncertainReplyIds(prev => new Set(prev).add(reviewId));
+        toast.warning(t("vendor.venueReviews.replyUncertain"), { duration: 10_000 });
+        return;
+      }
+      if (result.status === "rejected") {
         toast.error(t("vendor.venueReviews.errSaveReply"));
         return;
       }
+      setUncertainReplyIds(prev => { const next = new Set(prev); next.delete(reviewId); return next; });
       setReviewsState((prev) =>
         prev.map((r) =>
           r.id === reviewId
-            ? { ...r, reply: replyText.trim(), replyAt: new Date().toISOString() }
+            ? { ...r, reply: submittedReply, replyAt: result.review?.replyAt ?? new Date().toISOString() }
             : r,
         ),
       );
@@ -163,7 +170,8 @@ export function VenueReviewsClient({
       setReplyText("");
       toast.success(t("vendor.venueReviews.replySaved"));
     } catch {
-      toast.error(t("vendor.venueReviews.errReply"));
+      setUncertainReplyIds(prev => new Set(prev).add(reviewId));
+      toast.warning(t("vendor.venueReviews.replyUncertain"), { duration: 10_000 });
     } finally {
       setSubmitting(false);
     }
@@ -292,7 +300,7 @@ export function VenueReviewsClient({
           </p>
         </div>
         <Link
-          href={`/${entityKind === "sala" ? "sali" : "artisti"}/${entitySlug}#reviews`}
+          href={`/${entityKind === "sala" ? "sali" : "artisti"}/${entitySlug}#recenzii`}
           target="_blank"
           rel="noopener"
           className="inline-flex items-center gap-1 text-xs text-gold hover:underline"

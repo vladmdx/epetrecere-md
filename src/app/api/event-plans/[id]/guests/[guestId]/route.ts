@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { guestList, invitationGuests } from "@/lib/db/schema";
+import { guestList, invitationGuests, seatAssignments, seatingTables } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
+import { fitsAtTable, guestHeadcount } from "@/lib/planner/guest-headcount";
+import { lockSeatingPlan, tableOccupants } from "@/lib/planner/seating-capacity";
 import {
   protectGuestListRecord,
   revealGuestListRecord,
@@ -64,17 +66,33 @@ export async function PATCH(
     );
   }
 
-  const [guest] = await db
-    .update(guestList)
-    .set(protectGuestListRecord(parsed.data))
-    .where(and(eq(guestList.id, guestIdNum), eq(guestList.planId, planId)))
-    .returning();
-
-  if (!guest) {
-    return NextResponse.json({ error: "Guest not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ guest: revealGuestListRecord(guest) });
+  return db.transaction(async (tx) => {
+    if (!await lockSeatingPlan(tx, planId, owned.userId)) {
+      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+    }
+    const [current] = await tx.select().from(guestList)
+      .where(and(eq(guestList.id, guestIdNum), eq(guestList.planId, planId))).limit(1);
+    if (!current) return NextResponse.json({ error: "Guest not found" }, { status: 404 });
+    const patch = { ...parsed.data };
+    if (patch.guestType != null || patch.partySize != null) {
+      const type = patch.guestType ?? current.guestType;
+      patch.partySize = type === "couple" ? 2 : type === "family"
+        ? Math.max(2, patch.partySize ?? current.partySize) : 1;
+      patch.plusOnes = 0; // An explicit modern party edit replaces legacy +1s.
+    }
+    const next = { ...current, ...patch };
+    if (guestHeadcount(next) > guestHeadcount(current)) {
+      const [placement] = await tx.select({ tableId: seatingTables.id, seats: seatingTables.seats })
+        .from(seatAssignments).innerJoin(seatingTables, eq(seatingTables.id, seatAssignments.tableId))
+        .where(and(eq(seatAssignments.guestId, guestIdNum), eq(seatingTables.planId, planId))).limit(1);
+      if (placement && !fitsAtTable(placement.seats, await tableOccupants(tx, planId, placement.tableId), next)) {
+        return NextResponse.json({ error: "Table is full", code: "TABLE_FULL" }, { status: 400 });
+      }
+    }
+    const [guest] = await tx.update(guestList).set(protectGuestListRecord(patch))
+      .where(and(eq(guestList.id, guestIdNum), eq(guestList.planId, planId))).returning();
+    return NextResponse.json({ guest: revealGuestListRecord(guest) });
+  });
 }
 
 export async function DELETE(
@@ -112,7 +130,10 @@ export async function DELETE(
       )?.id ?? null;
   }
 
-  await db.transaction(async (tx) => {
+  return db.transaction(async (tx) => {
+    if (!await lockSeatingPlan(tx, planId, owned.userId)) {
+      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+    }
     await tx
       .delete(guestList)
       .where(and(eq(guestList.id, guestIdNum), eq(guestList.planId, planId)));
@@ -121,7 +142,6 @@ export async function DELETE(
         .delete(invitationGuests)
         .where(eq(invitationGuests.id, linkedInvitationGuestId));
     }
+    return NextResponse.json({ ok: true });
   });
-
-  return NextResponse.json({ ok: true });
 }

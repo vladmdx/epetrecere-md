@@ -39,6 +39,8 @@ import { eventTypeLabel, type EventTypeKey } from "@/lib/events/normalize";
 import { formatDuration } from "@/lib/pricing/resolve";
 import { useGatedDetails } from "@/hooks/use-gated-details";
 import { useLocalizePath } from "@/components/shared/locale-link";
+import { profileDescriptionSummary } from "@/lib/content/profile-description-summary";
+import { PublicReviewReply } from "@/components/public/review-reply";
 
 interface ArtistData {
   id: number;
@@ -90,6 +92,7 @@ interface ArtistData {
     text: string | null;
     eventType: string | null;
     reply: string | null;
+    isApproved: boolean;
     photos: string[] | null;
     createdAt: Date;
   }>;
@@ -133,6 +136,7 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
   const artist = gated ? { ...initialArtist, ...gated } : initialArtist;
   const name = getLocalized(artist, "name", locale);
   const description = getLocalized(artist, "description", locale);
+  const descriptionText = profileDescriptionSummary(description);
   const [avatarOpen, setAvatarOpen] = useState(false);
   // One portfolio, resolved by the query layer. The hero is part of it, not a
   // separate thing to be subtracted — deriving the cover here a second time is
@@ -321,9 +325,9 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
                 ) : null}
               </div>
 
-              {description && (
+              {descriptionText && (
                 <p className="mt-4 line-clamp-4 text-sm leading-relaxed text-white/58">
-                  {description.replace(/<[^>]+>/g, "")}
+                  {descriptionText}
                 </p>
               )}
 
@@ -356,9 +360,9 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
             </TabsList>
 
             <TabsContent value="description" className="mt-4 rounded-xl border border-white/8 bg-white/[.025] p-5">
-              {description ? (
+              {descriptionText ? (
                 <div className="prose prose-sm dark:prose-invert max-w-none text-white/62">
-                  <p>{description}</p>
+                  <p>{descriptionText}</p>
                 </div>
               ) : (
                 <p className="text-muted-foreground">{t("artist.profile.noDescription")}</p>
@@ -539,11 +543,7 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
                           ))}
                         </div>
                       )}
-                      {review.reply && (
-                        <div className="mt-3 rounded bg-accent/50 p-3 text-xs text-muted-foreground">
-                          <span className="font-medium">{t("artist.profile.replyLabel")}</span> {review.reply}
-                        </div>
-                      )}
+                      <PublicReviewReply reply={review.reply} isApproved={review.isApproved} label={t("artist.profile.replyLabel")} />
                     </div>
                   ))}
                 </div>
@@ -729,6 +729,7 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
                     </div>
                     {review.eventType && <p className="mt-1 text-[10px] uppercase tracking-wider text-[#e6b84d]">{review.eventType}</p>}
                     {review.text && <p className="mt-3 text-sm leading-6 text-white/55">{review.text}</p>}
+                    <PublicReviewReply reply={review.reply} isApproved={review.isApproved} label={t("artist.profile.replyLabel")} />
                   </article>
                 ))}
               </div>

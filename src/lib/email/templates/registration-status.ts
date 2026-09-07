@@ -15,7 +15,7 @@ export function registrationStatusEmail(props: RegistrationStatusProps): string 
     : `Din păcate, profilul <strong>${props.name}</strong> nu a fost aprobat de echipa noastră. Dacă consideri că este o greșeală, te rugăm să ne contactezi.`;
 
   const ctaUrl = props.approved
-    ? "https://epetrecere.md/dashboard"
+    ? `https://epetrecere.md${props.type === "venue" ? "/dashboard/sala" : "/dashboard"}`
     : "https://epetrecere.md/contact";
   const ctaText = props.approved ? "Deschide Dashboard →" : "Contactează-ne →";
 

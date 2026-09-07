@@ -34,6 +34,7 @@ import { plural, NOUNS } from "@/lib/i18n/plural";
 import { formatPrice, currencySymbol } from "@/lib/format/price";
 import { useGatedDetails } from "@/hooks/use-gated-details";
 import { useLocalizePath } from "@/components/shared/locale-link";
+import { PublicReviewReply } from "@/components/public/review-reply";
 
 interface VenueData {
   id: number;
@@ -77,6 +78,7 @@ interface VenueData {
     rating: number;
     text: string | null;
     reply: string | null;
+    isApproved: boolean;
     photos: string[] | null;
     createdAt: Date;
   }>;
@@ -505,6 +507,7 @@ export function VenueDetailClient({
                       </div>
                     </div>
                     {review.text && <p className="mt-2 text-sm text-muted-foreground">{review.text}</p>}
+                    <PublicReviewReply reply={review.reply} isApproved={review.isApproved} label={t("artist.profile.replyLabel")} />
                     {review.photos && review.photos.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {review.photos.map((url, i) => (

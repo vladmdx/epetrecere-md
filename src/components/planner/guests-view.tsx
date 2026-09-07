@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { useLocale } from "@/hooks/use-locale";
 import Link from "@/components/shared/locale-link";
+import { guestHeadcount } from "@/lib/planner/guest-headcount";
 
 export type GuestType = "single" | "couple" | "family";
 export type ContactChannel =
@@ -617,14 +618,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
     let total = 0;
     const byRsvp = { pending: 0, accepted: 0, declined: 0, maybe: 0 };
     for (const g of guests) {
-      // New shape: partySize (adults) + kidsCount. Legacy rows fall back
-      // to 1 + plusOnes so historical data still shows reasonable counts.
-      const ps = g.partySize ?? 1;
-      const kids = g.kidsCount ?? 0;
-      const headcount =
-        g.partySize != null || g.kidsCount != null
-          ? ps + kids
-          : 1 + (g.plusOnes || 0);
+      const headcount = guestHeadcount(g);
       total += headcount;
       byRsvp[g.rsvp] += headcount;
     }

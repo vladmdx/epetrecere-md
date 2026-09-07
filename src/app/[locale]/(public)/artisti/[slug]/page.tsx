@@ -81,7 +81,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // this language; the sentence below is what a profile without one gets,
   // instead of the Romanian excerpt every locale used to receive. Admin
   // seo_desc_* still wins — generateMeta applies it for this locale only.
-  const excerpt = plainText({
+  const excerpt = profileDescriptionSummary({
     ro: artist.descriptionRo,
     ru: artist.descriptionRu,
     en: artist.descriptionEn,
@@ -177,5 +177,5 @@ export default async function ArtistPage({ params }: Props) {
     </>
   );
 }
-import { plainText } from "@/lib/content/plain-text";
+import { profileDescriptionSummary } from "@/lib/content/profile-description-summary";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";

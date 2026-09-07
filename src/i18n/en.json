@@ -139,7 +139,7 @@
     "profile": {
       "viewLargePhoto": "See large photo of {name}",
       "eyebrow": "Event artist",
-      "tagline": "Live music • premium show • personalized program",
+      "tagline": "Event services • portfolio • online booking",
       "reviewsWord": "reviews",
       "priceOnRequest": "Price on request",
       "fact": {
@@ -149,7 +149,7 @@
         "programValue": "Customized",
         "languagesLabel": "Languages",
         "formatLabel": "Format",
-        "formatValue": "Live & interactive"
+        "formatValue": "Depends on the service"
       },
       "realMoments": "Real moments",
       "noDescription": "No description available.",
@@ -1072,6 +1072,8 @@
       "toastEmptyMessage": "Write a message before sending.",
       "toastInvalidAmount": "Enter a valid amount.",
       "toastMessageError": "Failed to send message",
+      "toastContactLocked": "Contact details and attachments can only be shared after both parties confirm the booking. Your message has been kept so you can edit it.",
+      "chatLoadError": "Could not load the conversation. Close and reopen the chat to try again.",
       "toastMessageFailed": "Error sending message",
       "toastMessageSent": "Message sent",
       "toastOfferError": "Failed to send offer",
@@ -1989,6 +1991,7 @@
       "replyFilter": "Answer:",
       "replyPlaceholder": "Write your reply...",
       "replySaved": "Answer saved!",
+      "replyUncertain": "We cannot confirm yet whether your reply was saved. Your text has been kept. On your next attempt, we will check its saved state first, without automatically resending it.",
       "reset": "Reset",
       "searchPlaceholder": "Search by author, text, reply...",
       "sent": "Sent",

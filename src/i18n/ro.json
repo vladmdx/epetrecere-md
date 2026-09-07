@@ -139,7 +139,7 @@
     "profile": {
       "viewLargePhoto": "Vezi poza mare a lui {name}",
       "eyebrow": "Artist pentru evenimente",
-      "tagline": "Muzică live • show premium • program personalizat",
+      "tagline": "Servicii pentru evenimente • portofoliu • rezervări online",
       "reviewsWord": "recenzii",
       "priceOnRequest": "Preț la cerere",
       "fact": {
@@ -149,7 +149,7 @@
         "programValue": "Personalizat",
         "languagesLabel": "Limbi",
         "formatLabel": "Format",
-        "formatValue": "Live & interactiv"
+        "formatValue": "În funcție de serviciu"
       },
       "realMoments": "Momente reale",
       "noDescription": "Nu există descriere momentan.",
@@ -1072,6 +1072,8 @@
       "toastEmptyMessage": "Scrie un mesaj înainte să trimiți.",
       "toastInvalidAmount": "Introdu o sumă validă.",
       "toastMessageError": "Nu s-a putut trimite mesajul",
+      "toastContactLocked": "Datele de contact și atașamentele pot fi trimise doar după confirmarea rezervării de către ambele părți. Mesajul tău a fost păstrat pentru a-l putea modifica.",
+      "chatLoadError": "Conversația nu a putut fi încărcată. Închide și redeschide chatul pentru a încerca din nou.",
       "toastMessageFailed": "Eroare la trimiterea mesajului",
       "toastMessageSent": "Mesaj trimis",
       "toastOfferError": "Nu s-a putut trimite oferta",
@@ -1989,6 +1991,7 @@
       "replyFilter": "Răspuns:",
       "replyPlaceholder": "Scrie răspunsul tău...",
       "replySaved": "Răspunsul a fost salvat!",
+      "replyUncertain": "Nu putem confirma încă salvarea răspunsului. Textul a fost păstrat. La următoarea încercare vom verifica mai întâi dacă a fost salvat, fără să îl retrimitem automat.",
       "reset": "Resetează",
       "searchPlaceholder": "Caută în autor, text, răspuns...",
       "sent": "Trimis",

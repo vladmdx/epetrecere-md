@@ -335,7 +335,7 @@ export async function POST(req: Request) {
             title: "Sala ta a fost aprobată! 🎉",
             message:
               "Sala ta este acum vizibilă pe ePetrecere.md. Bine ai venit!",
-            actionUrl: "/dashboard",
+            actionUrl: "/dashboard/sala",
           });
         }
 

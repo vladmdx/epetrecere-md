@@ -9,6 +9,7 @@ import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema
 import { and, eq, sql } from "drizzle-orm";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
+import { vendorBookingNotificationPath } from "@/lib/notifications/venue-routing";
 
 /**
  * Raise the platform fee for a booking that has just reached a fee-bearing
@@ -642,18 +643,19 @@ export async function PUT(
 
           if (isClient && vendorInfo?.userId) {
             // Client proposed — notify vendor
+            const vendorDashboardPath = vendorBookingNotificationPath(booking.venueId);
             await dispatchNotification({
               userId: vendorInfo.userId,
               type: "booking_request_new",
               title: `${booking.clientName} a propus un preț`,
               message: `${priceText}${reply ? ` — ${reply}` : ""}`,
-              actionUrl: "/dashboard/rezervari",
+              actionUrl: vendorDashboardPath,
               email: vendorInfo.email ?? undefined,
               emailSubject: `💰 Contraofertă: ${priceText} de la ${booking.clientName}`,
               emailHtml: notificationEmail({
                 title: "Contraofertă Nouă",
                 message: `<strong>${booking.clientName}</strong> a propus prețul <strong>${priceText}</strong> pentru evenimentul din ${booking.eventDate}.${reply ? `<br><br>"${reply}"` : ""}`,
-                ctaUrl: "https://epetrecere.md/dashboard/rezervari",
+                ctaUrl: `https://epetrecere.md${vendorDashboardPath}`,
                 ctaText: "Vezi oferta →",
                 emoji: "💰",
               }),

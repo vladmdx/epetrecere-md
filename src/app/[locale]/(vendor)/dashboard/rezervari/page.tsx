@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,8 +22,10 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 import { formatBookingDate } from "@/lib/format/booking-date";
 import { canCompleteBooking } from "@/lib/booking/completion-eligibility";
+import { artistBookingDeepLink, bookingChatErrorKey, parseBookingDeepLinkId, type ArtistBookingTab } from "@/lib/vendors/booking-deep-link";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
+import Link from "@/components/shared/locale-link";
 
 import { type BookingPriceOffer } from "@/components/planner/price-negotiation-panel";
 
@@ -146,14 +148,16 @@ export default function VendorBookingsPage() {
   // scroll it into view so the partner lands on the right entry.
   const searchParams = useSearchParams();
   const expandParam = searchParams.get("expand");
-  const expandId = expandParam ? Number(expandParam) : null;
+  const expandId = parseBookingDeepLinkId(expandParam);
   const [loading, setLoading] = useState(true);
   const [artistId, setArtistId] = useState<number | null>(null);
   const [bookings, setBookings] = useState<BookingRequest[]>([]);
-  const [expandedId, setExpandedId] = useState<number | null>(
-    Number.isFinite(expandId) ? expandId : null,
-  );
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<ArtistBookingTab>("active");
+  const appliedDeepLink = useRef<{ key: string; applied: boolean } | null>(null);
   const [chats, setChats] = useState<Record<number, ChatMessage[]>>({});
+  const [chatLoading, setChatLoading] = useState<Record<number, boolean>>({});
+  const [chatErrors, setChatErrors] = useState<Record<number, boolean>>({});
   const [newMsg, setNewMsg] = useState<Record<number, string>>({});
   const [busy, setBusy] = useState<number | null>(null);
 
@@ -178,6 +182,22 @@ export default function VendorBookingsPage() {
 
   // Load artistId for the signed-in user
   const [error, setError] = useState<string | null>(null);
+  const loadChat = useCallback(async (bookingId: number) => {
+    setChatLoading(prev => ({ ...prev, [bookingId]: true }));
+    setChatErrors(prev => ({ ...prev, [bookingId]: false }));
+    try {
+      const response = await fetch(`/api/chat?booking_request_id=${bookingId}`);
+      if (!response.ok) throw new Error("chat_load_failed");
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error("invalid_chat_response");
+      setChats(prev => ({ ...prev, [bookingId]: data }));
+    } catch {
+      setChatErrors(prev => ({ ...prev, [bookingId]: true }));
+    } finally {
+      setChatLoading(prev => ({ ...prev, [bookingId]: false }));
+    }
+  }, []);
+
   useEffect(() => {
     if (!isLoaded) return;
     (async () => {
@@ -218,16 +238,31 @@ export default function VendorBookingsPage() {
     })();
   }, [artistId]);
 
-  // Once bookings have rendered, scroll the deep-linked one into view.
+  // Resolve only after the owner-scoped list arrives. Apply once per URL /
+  // account target so chat-state changes or failed requests never retry-loop
+  // or override a tab the artist selects manually afterwards.
+  useEffect(() => {
+    const key = `${artistId}:${expandParam ?? ""}`;
+    if (appliedDeepLink.current?.key !== key) appliedDeepLink.current = { key, applied: false };
+    if (loading || artistId === null || appliedDeepLink.current.applied) return;
+    const target = artistBookingDeepLink(expandParam, bookings);
+    if (!target) return;
+    appliedDeepLink.current.applied = true;
+    setActiveTab(target.tab);
+    setExpandedId(target.id);
+    void loadChat(target.id);
+  }, [artistId, bookings, expandParam, loading, loadChat]);
+
+  // Once the correct tab and booking have rendered, scroll it into view.
   // Wrapped in a small timeout so the layout has time to mount the card.
   useEffect(() => {
-    if (!expandId || loading || bookings.length === 0) return;
+    if (!expandId || expandedId !== expandId || loading) return;
     const t = setTimeout(() => {
       const el = document.getElementById(`booking-${expandId}`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 200);
     return () => clearTimeout(t);
-  }, [expandId, loading, bookings.length]);
+  }, [expandId, expandedId, activeTab, loading]);
 
   async function requestReview(bookingId: number) {
     setBusy(bookingId);
@@ -452,7 +487,7 @@ export default function VendorBookingsPage() {
         }),
       });
       if (!res.ok) {
-        toast.error(t("vendor.bookingsPage.toastMessageError"));
+        toast.error(t(bookingChatErrorKey(await res.json().catch(() => null))));
         return;
       }
       toast.success(t("vendor.bookingsPage.toastMessageSent"));
@@ -475,17 +510,6 @@ export default function VendorBookingsPage() {
     }
   }
 
-  async function loadChat(bookingId: number) {
-    try {
-      const r = await fetch(`/api/chat?booking_request_id=${bookingId}`);
-      if (!r.ok) return;
-      const data = await r.json();
-      setChats((prev) => ({ ...prev, [bookingId]: Array.isArray(data) ? data : [] }));
-    } catch {
-      // Silent — chat is secondary
-    }
-  }
-
   async function sendMessage(bookingId: number) {
     const msg = newMsg[bookingId]?.trim();
     if (!msg) return;
@@ -499,7 +523,7 @@ export default function VendorBookingsPage() {
         }),
       });
       if (!res.ok) {
-        toast.error(t("vendor.bookingsPage.toastMessageError"));
+        toast.error(t(bookingChatErrorKey(await res.json().catch(() => null))));
         return;
       }
       setNewMsg((prev) => ({ ...prev, [bookingId]: "" }));
@@ -572,7 +596,9 @@ export default function VendorBookingsPage() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="active">
+        <Tabs value={activeTab} onValueChange={value => {
+          if (value === "active" || value === "accepted" || value === "past") setActiveTab(value);
+        }}>
           <TabsList>
             <TabsTrigger value="active" className="gap-1.5">
               {t("vendor.bookingsPage.tabActive")}
@@ -752,7 +778,7 @@ export default function VendorBookingsPage() {
                         {booking.guestCount != null && <span>{booking.guestCount} {t("common.guests")}</span>}
                       </div>
                       {booking.linkedVenue && (
-                        <a
+                        <Link
                           href={`/sali/${booking.linkedVenue.slug}`}
                           target="_blank"
                           rel="noopener"
@@ -762,7 +788,7 @@ export default function VendorBookingsPage() {
                           <strong className="underline">
                             {booking.linkedVenue.nameRo}
                           </strong>
-                        </a>
+                        </Link>
                       )}
                       {booking.message && (
                         <p className="text-sm text-muted-foreground italic">&ldquo;{booking.message}&rdquo;</p>
@@ -954,7 +980,11 @@ export default function VendorBookingsPage() {
                       {isExpanded && (
                         <div className="space-y-2 rounded-lg border border-border/40 bg-background/50 p-3">
                           <div className="max-h-64 space-y-2 overflow-y-auto">
-                            {chatMessages.length === 0 ? (
+                            {chatLoading[booking.id] ? (
+                              <p className="flex items-center justify-center gap-2 py-4 text-xs text-muted-foreground" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin" />{t("common.loading")}</p>
+                            ) : chatErrors[booking.id] ? (
+                              <p className="py-4 text-center text-xs text-destructive" role="alert">{t("vendor.bookingsPage.chatLoadError")}</p>
+                            ) : chatMessages.length === 0 ? (
                               <p className="py-4 text-center text-xs text-muted-foreground">{t("vendor.bookingsPage.noMessagesYet")}</p>
                             ) : (
                               chatMessages.map((m) => (
@@ -968,7 +998,7 @@ export default function VendorBookingsPage() {
                                   )}
                                 >
                                   <span className="text-xs font-semibold opacity-80">
-                                    {m.senderName} · {new Date(m.createdAt).toLocaleString("ro-RO")}
+                                    {m.senderName} · {formatBookingDate(m.createdAt, locale, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                                   </span>
                                   <span>{m.message}</span>
                                 </div>

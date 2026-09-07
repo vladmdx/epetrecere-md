@@ -92,6 +92,7 @@ import { formatPrice } from "@/lib/format/price";
 import { useLocale } from "@/hooks/use-locale";
 import { venueRequestInterval } from "@/lib/planner/venue-request-interval";
 import { planTabFromQuery, planTabHref, type PlanTabKey } from "@/lib/planner/tab-navigation";
+import { guestHeadcount, assignedHeadcount } from "@/lib/planner/guest-headcount";
 
 interface Plan {
   id: number;
@@ -401,9 +402,9 @@ export default function PlanDetailPage({
   // Computed stats
   const checklistDone = checklist.filter((c) => c.done).length;
   const checklistTotal = checklist.length;
-  const guestTotal = guests.reduce((sum, g) => sum + 1 + (g.plusOnes || 0), 0);
-  const guestAccepted = guests.filter((g) => g.rsvp === "accepted").reduce((sum, g) => sum + 1 + (g.plusOnes || 0), 0);
-  const seatedGuests = new Set(seats.map((s) => s.guestId)).size;
+  const guestTotal = guests.reduce((sum, g) => sum + guestHeadcount(g), 0);
+  const guestAccepted = guests.filter((g) => g.rsvp === "accepted").reduce((sum, g) => sum + guestHeadcount(g), 0);
+  const seatedGuests = assignedHeadcount(seats, guests);
   const activeBookings = bookings.filter((b) => ["pending", "accepted", "confirmed_by_client"].includes(b.status));
 
   // Each optional tab is gated on a wizard-time opt-in flag stored on
@@ -527,7 +528,11 @@ export default function PlanDetailPage({
               plan={plan}
               guestCountTarget={plan.guestCountTarget}
               guests={guests}
-              onChange={setGuests}
+              onChange={(next) => {
+                setGuests(next);
+                const ids = new Set(next.map(guest => guest.id));
+                setSeats(current => current.filter(seat => ids.has(seat.guestId)));
+              }}
             />
           )}
 

@@ -6,6 +6,32 @@ import { eq, and, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 
+/** Minimal, uncached owner read for reconciling a reply whose write response was lost. */
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { userId: clerkId } = await auth();
+  if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { id } = await params;
+  if (!Number.isSafeInteger(Number(id)) || Number(id) < 1) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+  const [appUser] = await db.select({ id: users.id, role: users.role }).from(users).where(eq(users.clerkId, clerkId)).limit(1);
+  if (!appUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const [review] = await db.select({ id: reviews.id, reply: reviews.reply, replyAt: reviews.replyAt, artistId: reviews.artistId, venueId: reviews.venueId })
+    .from(reviews).where(eq(reviews.id, Number(id))).limit(1);
+  if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
+  let owns = appUser.role === "admin" || appUser.role === "super_admin";
+  if (!owns && review.artistId) {
+    const [artist] = await db.select({ id: artists.id }).from(artists)
+      .where(and(eq(artists.id, review.artistId), eq(artists.userId, appUser.id))).limit(1);
+    owns = !!artist;
+  }
+  if (!owns && review.venueId) {
+    const [venue] = await db.select({ id: venues.id }).from(venues)
+      .where(and(eq(venues.id, review.venueId), eq(venues.userId, appUser.id))).limit(1);
+    owns = !!venue;
+  }
+  if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  return NextResponse.json({ id: review.id, reply: review.reply, replyAt: review.replyAt }, { headers: { "Cache-Control": "private, no-store" } });
+}
+
 /**
  * Recompute rating_avg + rating_count for the artist or venue this review
  * belongs to, based on ONLY approved reviews. Called after approve / delete

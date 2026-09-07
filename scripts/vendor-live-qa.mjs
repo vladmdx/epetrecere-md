@@ -8,6 +8,7 @@ import { assertQaFixture, assertQaAppUser, assertQaClerkUser, assertQaSessions, 
 import { inspectQaLifecycle } from './vendor-qa-lifecycle.mjs';
 import { simulateQaCompletionDate } from './vendor-qa-completion-date.mjs';
 import { testWizardRollback } from './vendor-qa-wizard-rollback.mjs';
+import { cancelQaFees } from './vendor-qa-cancel-fees.mjs';
 
 config({ path: '.env.production.local', quiet: true });
 const statePath = '/tmp/epetrecere-vendor-qa-20260906.json';
@@ -99,6 +100,8 @@ try {
       if (revoked.userId !== user.clerkId || revoked.id !== session.id || revoked.status !== 'revoked') throw new Error('QA session revocation could not be verified');
     }
     console.log(JSON.stringify({ persona, revokedSessions: unique.length }));
+  } else if (action === 'cancel-fees') {
+    console.log(JSON.stringify(await cancelQaFees({ sql, state, resolveExactFixture, persistState: save }), null, 2));
   } else if (action === 'wizard-rollback') {
     console.log(JSON.stringify(await testWizardRollback({ sql, state, resolveExactFixture }), null, 2));
   } else if (action === 'simulate-completion-date') {
@@ -115,6 +118,6 @@ try {
       console.log(JSON.stringify({ persona, user, artist, venue, contracts }));
     }
   } else {
-    throw new Error('Use create, ticket <persona>, booking-contact client, safe-contact <persona>, signout <persona>, inspect, inspect-lifecycle, wizard-rollback, or simulate-completion-date');
+    throw new Error('Use create, ticket <persona>, booking-contact client, safe-contact <persona>, signout <persona>, inspect, inspect-lifecycle, wizard-rollback, simulate-completion-date, or cancel-fees');
   }
 } finally { await sql.end(); }

@@ -3,14 +3,25 @@ import { db } from "../db";
 import { artists, bookingRequests, conversations, users, venues } from "../db/schema";
 import { contactsAreShared } from "./booking-contact";
 import { conversationPartyKey, notificationContext, notificationForViewer, notificationHasContact, type NotificationText } from "./notification-context";
+import { legacyVenueNotificationUrl, notificationForVenue } from "../notifications/venue-routing";
 
 /** Read projection only: never rewrites notification/chat history or sends mail. */
 export async function notificationsForUser<T extends NotificationText>(items: T[], userId: string): Promise<T[]> {
-  if (!items.some(notificationHasContact)) return items;
+  const hasContact = items.some(notificationHasContact);
+  const hasLegacyVenueLink = items.some(item => legacyVenueNotificationUrl(item));
+  if (!hasContact && !hasLegacyVenueLink) return items;
   const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
   if (user?.role === "admin" || user?.role === "super_admin") return items;
+  // Venue owners use the regular "user" role. Check actual ownership rather
+  // than guessing from roles or message text; dual-profile history is ambiguous.
+  const [ownedVenue, ownedArtist] = hasLegacyVenueLink && user ? await Promise.all([
+    db.select({ id: venues.id }).from(venues).where(eq(venues.userId, userId)).limit(1),
+    db.select({ id: artists.id }).from(artists).where(eq(artists.userId, userId)).limit(1),
+  ]) : [[], []];
+  const routed = ownedVenue.length && !ownedArtist.length ? items.map(notificationForVenue) : items;
+  if (!hasContact) return routed;
 
-  const contexts = items.map(item => notificationContext(item.actionUrl));
+  const contexts = routed.map(item => notificationContext(item.actionUrl));
   const conversationIds = [...new Set(contexts.filter(c => c?.kind === "conversation").map(c => c!.id))];
   const bookingIds = [...new Set(contexts.filter(c => c?.kind === "booking").map(c => c!.id))];
   const ownedConversations = conversationIds.length ? await db.select({
@@ -51,7 +62,7 @@ export async function notificationsForUser<T extends NotificationText>(items: T[
     conv.id,
     latestPairStatus.get(conversationPartyKey(conv.clientUserId, conv.artistId, conv.venueId) ?? "") ?? "",
   ]));
-  return items.map((item, index) => {
+  return routed.map((item, index) => {
     const context = contexts[index];
     const status = context?.kind === "booking" ? bookingStatus.get(context.id)
       : context?.kind === "conversation" ? conversationStatus.get(context.id) : null;

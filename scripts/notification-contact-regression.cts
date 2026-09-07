@@ -13,7 +13,7 @@ global.fetch = async () => { throw Error("No external requests allowed"); };
 const dialect = new PgDialect();
 let state;
 const note = (actionUrl) => ({ id: 10, userId: "viewer", type: "booking_request_new", title: "Mesaj de la qa@example.invalid", message: "QA phone +12025550123", actionUrl, isRead: false, createdAt: new Date() });
-function reset(extra = {}) { state = { role: "user", status: "pending", ownsRelation: true, authed: true, calls: [], items: [note("/en/dashboard/mesaje?conversation=50")], ...extra }; }
+function reset(extra = {}) { state = { role: "user", ownsVenue: false, ownsArtist: false, status: "pending", ownsRelation: true, authed: true, calls: [], items: [note("/en/dashboard/mesaje?conversation=50")], ...extra }; }
 const db = {
   select(projection) {
     let table, condition;
@@ -22,6 +22,10 @@ const db = {
       const params = condition ? dialect.sqlToQuery(condition).params : [];
       state.calls.push({ name, params });
       if (name === "users") { assert.ok(params.includes("viewer")); return [{ role: state.role }]; }
+      if (name === "venues" || name === "artists") {
+        assert.ok(params.includes("viewer"), "actual profile ownership is checked");
+        return (name === "venues" ? state.ownsVenue : state.ownsArtist) ? [{ id: 45 }] : [];
+      }
       if (name === "notifications") { assert.ok(params.includes("viewer")); return projection?.count ? [{ count: 1 }] : state.items; }
       if (name === "conversations") {
         assert.ok(params.includes("viewer"), "conversation ownership enforced in SQL");
@@ -80,6 +84,27 @@ Module._load = function(request, parent, isMain) {
     reset({ status: "completed", ownsRelation: false });
     assert.ok(!JSON.stringify(await notificationsForUser(state.items, "viewer")).includes("qa@example.invalid"));
     passed("unrelated or ambiguous legacy links fail closed; no global confirmed-booking unlock");
+    const legacy = [
+      { ...note("/en/dashboard/rezervari?expand=257"), type: "booking_request_new", title: "QA a propus un preț", message: "300 EUR" },
+      { ...note("/en/dashboard"), type: "registration_approved", title: "Sala ta a fost aprobată", message: "Bine ai venit" },
+    ];
+    reset({ ownsVenue: true, items: legacy });
+    const originalLinks = JSON.stringify(legacy);
+    const routed = await notificationsForUser(legacy, "viewer");
+    assert.deepEqual(routed.map(item => item.actionUrl), ["/en/dashboard/sala/rezervari?expand=257", "/en/dashboard/sala"]);
+    assert.equal(JSON.stringify(legacy), originalLinks, "historical rows remain unchanged");
+    for (const role of ["artist", "user", "admin", "super_admin"]) {
+      reset({ role, items: legacy });
+      assert.deepEqual(await notificationsForUser(legacy, "viewer"), legacy);
+    }
+    reset({ ownsVenue: true, ownsArtist: true, items: legacy });
+    assert.deepEqual(await notificationsForUser(legacy, "viewer"), legacy, "dual-profile history is not guessed");
+    reset({ ownsVenue: true, items: legacy });
+    const routedGet = await api.GET(req);
+    assert.equal((await routedGet.json()).notifications[0].actionUrl, "/en/dashboard/sala/rezervari?expand=257");
+    const routedPatch = await single.PATCH(req, { params: Promise.resolve({ id: "10" }) });
+    assert.match(JSON.stringify(await routedPatch.json()), /\/en\/dashboard\/sala/);
+    passed("verified venue ownership gets corrected historical links in GET/PATCH; other/ambiguous profiles and stored history unchanged");
     for (const role of ["admin", "super_admin"]) {
       reset({ role });
       assert.deepEqual(await notificationsForUser(state.items, "viewer"), state.items);

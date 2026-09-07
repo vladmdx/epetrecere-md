@@ -19,7 +19,7 @@ interface AIChatProps {
 }
 
 export function AIChat({ context }: AIChatProps) {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -52,6 +52,7 @@ export function AIChat({ context }: AIChatProps) {
         body: JSON.stringify({
           messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
           context,
+          locale,
         }),
       });
 

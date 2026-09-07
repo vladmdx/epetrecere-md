@@ -3,9 +3,34 @@ import { db } from "@/lib/db";
 import { artists, leads, bookings, bookingRequests, venues, calendarEvents } from "@/lib/db/schema";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { eq, and, sql, desc, gte, count } from "drizzle-orm";
+import { executeAdminReadTool } from "./admin-read-tools";
 
 // Tool definitions for Claude
 export const adminTools: Anthropic.Tool[] = [
+  {
+    name: "get_vendor_profile_status",
+    description: "Read-only lookup of an artist or venue by exact ID or name in any supported language. Returns minimal profile names, city and isActive publication flag. false means not published, not necessarily rejected. No contacts or legal data.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        type: { type: "string", enum: ["artist", "venue"] },
+        id: { type: "integer", minimum: 1, description: "Exact profile ID; takes precedence over name" },
+        name: { type: "string", minLength: 2, maxLength: 120, description: "Name or a specific name fragment; required when id is omitted" },
+      },
+      required: ["type"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "get_booking_status_by_id",
+    description: "Read-only status of 1–10 exact booking request IDs, with vendor IDs and event interval. accepted is an offer accepted by vendor, NOT final bilateral confirmation; confirmed_by_client is final confirmation. No client contacts, legal documents or guest data.",
+    input_schema: {
+      type: "object" as const,
+      properties: { booking_ids: { type: "array", minItems: 1, maxItems: 10, items: { type: "integer", minimum: 1 } } },
+      required: ["booking_ids"],
+      additionalProperties: false,
+    },
+  },
   {
     name: "get_artists",
     description: "Get list of artists with optional filters. Returns id, name, category, price, rating, isActive.",
@@ -105,6 +130,7 @@ export async function executeTool(
   name: string,
   input: Record<string, unknown>,
   _vendorArtistId?: number,
+  verifiedAdminRole?: "admin" | "super_admin",
 ): Promise<string> {
   // Enforce role boundaries here as well as in the chat route; model output is untrusted.
   if (_vendorArtistId !== undefined && !vendorTools.some(tool => tool.name === name)) {
@@ -112,6 +138,9 @@ export async function executeTool(
   }
   try {
     switch (name) {
+      case "get_vendor_profile_status":
+      case "get_booking_status_by_id":
+        return JSON.stringify(await executeAdminReadTool(name, input, verifiedAdminRole));
       case "get_artists": {
         const conditions = [];
         if (input.active_only) conditions.push(eq(artists.isActive, true));

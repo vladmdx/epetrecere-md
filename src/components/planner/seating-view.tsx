@@ -26,6 +26,8 @@ import {
 import type { Guest } from "./guests-view";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { assignedHeadcount, fitsAtTable, guestHeadcount } from "@/lib/planner/guest-headcount";
+import { escapeHtml } from "@/lib/email/escape";
 import {
   Dialog,
   DialogContent,
@@ -118,7 +120,7 @@ export function SeatingView({
   onTablesChange,
   onSeatsChange,
 }: Props) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [adding, setAdding] = useState<TableShape | null>(null);
   const [search, setSearch] = useState("");
   const [autoPlacing, setAutoPlacing] = useState(false);
@@ -168,17 +170,18 @@ export function SeatingView({
     return m;
   }, [seats]);
 
-  const placedCount = seats.length;
+  const placedCount = assignedHeadcount(seats, guests);
   const totalGuests = guests.reduce(
-    (sum, g) => sum + 1 + (g.plusOnes || 0),
+    (sum, g) => sum + guestHeadcount(g),
     0,
   );
   const acceptedTotal = acceptedGuests.reduce(
-    (sum, g) => sum + 1 + (g.plusOnes || 0),
+    (sum, g) => sum + guestHeadcount(g),
     0,
   );
   const acceptedPct = totalGuests > 0 ? Math.round((acceptedTotal / totalGuests) * 100) : 0;
-  const placedPct = acceptedTotal > 0 ? Math.round((placedCount / acceptedTotal) * 100) : 0;
+  const placedAccepted = assignedHeadcount(seats, acceptedGuests);
+  const placedPct = acceptedTotal > 0 ? Math.round((placedAccepted / acceptedTotal) * 100) : 0;
 
   async function addTable(shape: TableShape) {
     const config = SHAPE_CONFIG[shape];
@@ -275,8 +278,11 @@ export function SeatingView({
   async function assignGuest(guestId: number, tableId: number) {
     const table = tables.find((t) => t.id === tableId);
     if (!table) return;
-    const current = seatsByTable.get(tableId)?.length ?? 0;
-    if (current >= table.seats) {
+    const incoming = guestById.get(guestId);
+    if (!incoming) return;
+    const occupants = (seatsByTable.get(tableId) ?? [])
+      .flatMap(seat => { const guest = guestById.get(seat.guestId); return guest ? [guest] : []; });
+    if (!fitsAtTable(table.seats, occupants, incoming)) {
       toast.error(t("cabinet.seating.err.tableFull", { name: table.name }));
       return;
     }
@@ -287,7 +293,9 @@ export function SeatingView({
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      toast.error(err.error || t("cabinet.seating.err.assign"));
+      toast.error(err.code === "TABLE_FULL"
+        ? t("cabinet.seating.err.tableFull", { name: table.name })
+        : err.error || t("cabinet.seating.err.assign"));
       return;
     }
     const data = await res.json();
@@ -327,14 +335,17 @@ export function SeatingView({
       const freeSeats = tables.map((t) => ({
         id: t.id,
         name: t.name,
-        free: t.seats - (seatsByTable.get(t.id)?.length ?? 0),
+        free: t.seats - assignedHeadcount(seatsByTable.get(t.id) ?? [], guests),
       }));
 
       let assigned = 0;
+      const nextSeats = [...seats];
       for (const [, guestList] of groupedUnassigned) {
         for (const guest of guestList) {
-          const target = freeSeats.find((t) => t.free > 0);
-          if (!target) break;
+          const people = guestHeadcount(guest);
+          const target = freeSeats.find((t) => t.free >= people);
+          // Keep the household together; a later smaller party may still fit.
+          if (!target) continue;
           const res = await fetch(`/api/event-plans/${planId}/seats`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -342,13 +353,15 @@ export function SeatingView({
           });
           if (res.ok) {
             const data = await res.json();
-            seats.push(data.assignment);
-            target.free -= 1;
-            assigned += 1;
+            const priorIndex = nextSeats.findIndex(seat => seat.guestId === guest.id);
+            if (priorIndex >= 0) nextSeats.splice(priorIndex, 1);
+            nextSeats.push(data.assignment);
+            target.free -= people;
+            assigned += people;
           }
         }
       }
-      onSeatsChange([...seats]);
+      onSeatsChange(nextSeats);
       toast.success(t("cabinet.seating.autoDone", { count: assigned }));
     } finally {
       setAutoPlacing(false);
@@ -361,23 +374,23 @@ export function SeatingView({
       const guestNames = assigned.map((s) => {
         const g = guests.find((gg) => gg.id === s.guestId);
         return g
-          ? g.fullName + (g.plusOnes > 0 ? ` (+${g.plusOnes})` : "")
+          ? g.fullName + (guestHeadcount(g) > 1 ? ` (+${guestHeadcount(g) - 1})` : "")
           : t("cabinet.seating.pdfGuestFallback", { id: s.guestId });
       });
       return `<div style="background:#fff;border:1px solid #ddd;border-radius:8px;padding:16px;break-inside:avoid;margin-bottom:16px">
-        <h3 style="color:#A08839;margin:0 0 8px;font-size:16px">${table.name}</h3>
-        <p style="color:#666;font-size:12px;margin:0 0 8px">${t("cabinet.seating.pdfSeats", { assigned: assigned.length, total: table.seats })}</p>
+        <h3 style="color:#A08839;margin:0 0 8px;font-size:16px">${escapeHtml(table.name)}</h3>
+        <p style="color:#666;font-size:12px;margin:0 0 8px">${escapeHtml(t("cabinet.seating.pdfSeats", { assigned: assignedHeadcount(assigned, guests), total: table.seats }))}</p>
         ${guestNames.length > 0
-          ? `<ul style="margin:0;padding-left:18px;font-size:13px">${guestNames.map((n) => `<li style="margin-bottom:2px">${n}</li>`).join("")}</ul>`
-          : `<p style="color:#999;font-size:12px;font-style:italic">${t("cabinet.seating.pdfNoGuests")}</p>`}
+          ? `<ul style="margin:0;padding-left:18px;font-size:13px">${guestNames.map((n) => `<li style="margin-bottom:2px">${escapeHtml(n)}</li>`).join("")}</ul>`
+          : `<p style="color:#999;font-size:12px;font-style:italic">${escapeHtml(t("cabinet.seating.pdfNoGuests"))}</p>`}
       </div>`;
     });
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${t("cabinet.seating.pdfTitle")}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${escapeHtml(t("cabinet.seating.pdfTitle"))}</title>
       <style>body{font-family:system-ui,sans-serif;padding:40px;background:#fff;color:#222}
       h1{color:#A08839}h2{color:#666;font-size:14px;font-weight:normal}
       .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-top:20px}
       @media print{@page{margin:20mm}}</style></head>
-      <body><h1>${t("cabinet.seating.pdfTitle")}</h1><h2>ePetrecere.md · ${new Date().toLocaleDateString("ro-RO")} · ${t("cabinet.seating.pdfSummary", { placed: placedCount, total: totalGuests })}</h2>
+      <body><h1>${escapeHtml(t("cabinet.seating.pdfTitle"))}</h1><h2>ePetrecere.md · ${escapeHtml(new Date().toLocaleDateString(locale === "ru" ? "ru-RU" : locale === "en" ? "en-GB" : "ro-RO"))} · ${escapeHtml(t("cabinet.seating.pdfSummary", { placed: placedCount, total: totalGuests }))}</h2>
       <div class="grid">${tableRows.join("")}</div></body></html>`;
     const w = window.open("", "_blank");
     if (w) { w.document.write(html); w.document.close(); setTimeout(() => w.print(), 400); }
@@ -462,7 +475,7 @@ export function SeatingView({
                 {t("cabinet.seating.seatedLabel")}
               </span>
               <span className="font-medium">
-                <strong>{placedCount}</strong>
+                <strong>{placedAccepted}</strong>
                 <span className="text-muted-foreground"> {t("cabinet.seating.ofConfirmed", { total: acceptedTotal })}</span>
                 <span className="ml-2 text-gold">({placedPct}%)</span>
               </span>
@@ -657,7 +670,7 @@ export function SeatingView({
                   >
                     <span className="min-w-0 flex-1 truncate">
                       {g.fullName}
-                      {g.plusOnes > 0 && ` +${g.plusOnes}`}
+                      {guestHeadcount(g) > 1 && ` +${guestHeadcount(g) - 1}`}
                     </span>
                   </li>
                 );
@@ -680,9 +693,10 @@ export function SeatingView({
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {tables.map((table) => {
                 const assigned = seatsByTable.get(table.id) ?? [];
-                const fillRatio = assigned.length / table.seats;
+                const occupiedPeople = assignedHeadcount(assigned, guests);
+                const fillRatio = occupiedPeople / table.seats;
                 const isEmpty = assigned.length === 0;
-                const isFull = assigned.length >= table.seats;
+                const isFull = occupiedPeople >= table.seats;
                 const isPartial = !isEmpty && !isFull;
 
                 return (
@@ -714,7 +728,7 @@ export function SeatingView({
                             isEmpty && "text-muted-foreground",
                           )}
                         >
-                          {t("cabinet.seating.tableSeats", { assigned: assigned.length, total: table.seats })}
+                          {t("cabinet.seating.tableSeats", { assigned: occupiedPeople, total: table.seats })}
                           {isFull && t("cabinet.seating.fullSuffix")}
                         </p>
                       </div>
@@ -769,7 +783,7 @@ export function SeatingView({
                             >
                               <span className="truncate">
                                 {g.fullName}
-                                {g.plusOnes > 0 && ` +${g.plusOnes}`}
+                                {guestHeadcount(g) > 1 && ` +${guestHeadcount(g) - 1}`}
                               </span>
                               <button
                                 onClick={() => unassign(g.id)}
