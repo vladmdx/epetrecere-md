@@ -217,3 +217,22 @@ Aceste ultime corecții așteaptă verificarea completă și publicarea comună.
 - La reluarea controlului browserului, instrumentul a raportat explicit că Mac-ul este blocat și deblocarea automată nu a reușit. Utilizatorului i s-a cerut deblocarea. Această blocare curentă este distinctă de dialogul nativ anterior; nu se pretinde că vreun test UI ulterior a trecut.
 - Buildul local al pachetului complet a trecut și a generat 459 pagini. Review-ul independent final al limitei de upload și al compatibilității formei meselor nu a găsit blocaje de publicare.
 - Reverificare DB strict read-only la 2026-09-07 21:22 UTC: 7 mese, aceeași amprentă `54878ad4b42633275fd9615f6270f3b8`; contractele QA au în continuare toate cele 11 dovezi valide; rezervările 256/257 sunt Completed, taxele 25/26 Cancelled, ambele răspunsuri la recenzii sunt salvate. Profilurile QA rămân active pentru testele manuale neîncheiate.
+
+### Ce rămâne de reverificat manual după deblocare
+
+1. Planul 99: repartizarea grupurilor 1 + 2 + 4, refuzul unei mese cu locuri insuficiente, păstrarea formei după reload, anularea/confirmarea repartizării automate și a ștergerii mesei. Nu s-a confirmat încă nicio repartizare a celor 7 persoane.
+2. Checklist: traducerile EN/RU în interfața live, adăugare, bifare, reload și eliminarea exclusivă a sarcinii QA. Importul XLSX/CSV trebuie probat manual pe un plan QA separat, fiind append, nu deduplicare.
+3. Moments: încărcare sintetică proprietar/invitat, accesul privat al galeriei, aprobare, favorite, export și ștergerea doar a propriului fișier QA. Limita uploadului și protecțiile storage au teste automate; fluxul manual nou nu este încă verificat.
+4. Artist/sală: o cerere QA nouă pentru verificarea conversației în curs prin deep-link, a intervalului sălii și a tarifului per-eveniment. Cererile se anulează fără comisioane după verificare; nu se reiau simulările de dată sau anulările deja executate.
+5. Admin: răspunsul AI cu noile instrumente read-only și limba EN trebuie reverificat manual. Copiile contractelor și aprobarea ambelor profiluri au fost deja verificate prin UI.
+6. Cleanup final: reverificarea dependențelor și ștergerea doar a duplicatului QA 100; dezactivarea profilurilor QA 561/24 și a linkurilor Moments. Conturile și dovezile contractuale semnate se păstrează. Nu s-au executat aceste operații în lipsa confirmării stării prin fluxul de test.
+
+Sesiunea activă a clientului QA a fost revocată prin helperul cu verificarea identității exacte: o sesiune revocată. Sesiunile utilizatorilor reali nu au fost atinse. Testarea pe Safari/iPhone fizic, livrarea emailurilor reale, OAuth, plățile și distribuirea aplicației mobile native nu sunt declarate verificate.
+
+### Publicarea pachetului suplimentar, confirmată
+
+- Sursa publicată: commit `c76ce20`, `Fix planner accessibility, imports and Moments asset security`.
+- Vercel: `dpl_FTJBsC6bHMSV48q9dwJe9eENUPuz`, starea READY, build final reușit cu 459 pagini. Deployment `https://epetrecere-gqpicxr50-vladstalker96-7582s-projects.vercel.app`, alias de producție confirmat `https://epetrecere.md`.
+- Smoke HTTP anonim după publicare: `/en`, `/en/planifica`, profilul artistului QA și profilul sălii QA răspund 200. GET-urile pentru planul 99, fotografiile sale, ZIP-ul Moments și varianta mobilă `/api/v1/event-plans/99/photos` răspund 401 JSON fără autentificare. Nu s-a citit sau imprimat conținut privat și nu s-au executat scrieri prin aceste verificări.
+- După publicare, o nouă verificare a controlului browserului a confirmat că Mac-ul este încă blocat. Lista manuală de mai sus rămâne deschisă; verificările HTTP și cele 386 teste locale nu sunt substituite verificărilor de interfață.
+- Nu s-a făcut push către GitHub; publicarea a folosit proiectul Vercel existent prin CLI, cu snapshotul commitului local. Ultima actualizare a acestui raport este numai documentară și nu necesită o nouă publicare a aplicației.
