@@ -10,6 +10,11 @@ import {
   venues,
 } from "@/lib/db/schema";
 import { eq, and, sql, isNull, or } from "drizzle-orm";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
+import { containsContact, redactContact } from "@/lib/privacy/contact-redaction";
+import { chatMessageForViewer } from "@/lib/privacy/chat-message";
+import { escapeHtml } from "@/lib/email/escape";
+import { plainText } from "@/lib/content/plain-text";
 
 // Verify the signed-in user is either the client or the artist/venue on this booking
 async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
@@ -25,13 +30,14 @@ async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
       clientUserId: bookingRequests.clientUserId,
       artistId: bookingRequests.artistId,
       venueId: bookingRequests.venueId,
+      status: bookingRequests.status,
     })
     .from(bookingRequests)
     .where(eq(bookingRequests.id, bookingRequestId))
     .limit(1);
   if (!booking) return false;
 
-  if (booking.clientUserId === appUser.id) return true;
+  if (booking.clientUserId === appUser.id) return { status: booking.status };
 
   if (booking.artistId) {
     const [artist] = await db
@@ -39,7 +45,7 @@ async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
       .from(artists)
       .where(and(eq(artists.id, booking.artistId), eq(artists.userId, appUser.id)))
       .limit(1);
-    if (artist) return true;
+    if (artist) return { status: booking.status };
   }
   if (booking.venueId) {
     const [venue] = await db
@@ -47,7 +53,7 @@ async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
       .from(venues)
       .where(and(eq(venues.id, booking.venueId), eq(venues.userId, appUser.id)))
       .limit(1);
-    if (venue) return true;
+    if (venue) return { status: booking.status };
   }
   return false;
 }
@@ -108,6 +114,9 @@ export async function GET(req: NextRequest) {
 
   const bookingRequestId = req.nextUrl.searchParams.get("booking_request_id");
   if (!bookingRequestId) return NextResponse.json({ error: "booking_request_id required" }, { status: 400 });
+  if (!Number.isSafeInteger(Number(bookingRequestId)) || Number(bookingRequestId) <= 0) {
+    return NextResponse.json({ error: "Invalid booking_request_id" }, { status: 400 });
+  }
 
   const hasAccess = await verifyBookingAccess(clerkId, Number(bookingRequestId));
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -176,7 +185,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json(dedup);
+  return NextResponse.json(dedup.map(message => chatMessageForViewer(message, contactsAreShared(hasAccess.status))));
 }
 
 // SEND chat message
@@ -196,15 +205,23 @@ export async function POST(req: Request) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json();
-  const { bookingRequestId, message } = body;
+  const body = await req.json().catch(() => null);
+  const bookingRequestId = Number(body?.bookingRequestId);
+  const message = typeof body?.message === "string" ? body.message.trim() : "";
 
-  if (!bookingRequestId || !message) {
+  if (!Number.isSafeInteger(bookingRequestId) || bookingRequestId <= 0 || !message || message.length > 10000) {
     return NextResponse.json({ error: "bookingRequestId and message required" }, { status: 400 });
   }
 
   const hasAccess = await verifyBookingAccess(clerkId, Number(bookingRequestId));
   if (!hasAccess) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const contactUnlocked = contactsAreShared(hasAccess.status);
+  if (!contactUnlocked && (containsContact(message) || containsContact(plainText(message)))) {
+    return NextResponse.json({
+      error: "Datele de contact și atașamentele devin disponibile după confirmarea rezervării.",
+      code: "CONTACT_LOCKED",
+    }, { status: 422 });
+  }
 
   const [appUser] = await db
     .select({ id: users.id, name: users.name, role: users.role })
@@ -251,6 +268,7 @@ export async function POST(req: Request) {
       }
     }
   }
+  if (!contactUnlocked) senderName = redactContact(senderName);
 
   // Bridge: ensure a conversation exists and tag the message with both FKs
   const conversationId = await findOrCreateConversationForBooking(
@@ -317,7 +335,7 @@ export async function POST(req: Request) {
             emailSubject: `💬 Mesaj nou de la ${senderName}`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
-              message: `<em>"${message}"</em>`,
+              message: `<em>"${escapeHtml(message)}"</em>`,
               ctaUrl: conversationId
                 ? `https://epetrecere.md/cabinet/mesaje?conversation=${conversationId}`
                 : "https://epetrecere.md/cabinet/rezervari",
@@ -362,7 +380,7 @@ export async function POST(req: Request) {
             emailSubject: `💬 Mesaj nou de la ${senderName}`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
-              message: `<em>"${message}"</em>`,
+              message: `<em>"${escapeHtml(message)}"</em>`,
               ctaUrl: conversationId
                 ? `https://epetrecere.md${vendorDashboardUrl}?conversation=${conversationId}`
                 : "https://epetrecere.md/dashboard/rezervari",
@@ -377,5 +395,5 @@ export async function POST(req: Request) {
     }
   })();
 
-  return NextResponse.json(msg, { status: 201 });
+  return NextResponse.json(chatMessageForViewer(msg, contactUnlocked), { status: 201 });
 }

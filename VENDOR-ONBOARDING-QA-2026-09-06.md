@@ -81,3 +81,61 @@ Mac-ul a fost deblocat. Testele folosesc acum browserul separat din Codex, făr�
 - Reverificat vizual finalul formularului la 390 × 844: lista cu o singură bifă, canvasul și butoanele sunt accesibile prin scroll, fără decupare în starea nesemnată. Viewportul temporar a fost resetat; fila cu formularul pregătit este păstrată pentru continuare.
 
 Fluxurile manuale de semnare, aprobare, rezervare, negociere, confirmare și recenzie rămân de parcurs pentru ambii furnizori QA. Confirmarea expresă pentru semnăturile fictive este încă în așteptare; nu s-a trimis niciun contract QA și nu s-au creat profiluri publice în această continuare. Corecțiile negocierii/ștergerii au verificări automate, nu sunt prezentate drept scenarii manuale live finalizate.
+
+## Continuare după confirmarea semnăturilor QA: 7 septembrie 2026
+
+Utilizatorul a confirmat explicit semnarea fictivă pentru ambele conturi. Această secțiune actualizează stările intermediare de mai sus, fără a le prezenta retroactiv drept teste finalizate.
+
+### Onboarding, contracte și aprobare manuală live
+
+- Artistul QA, profil 561, `qa-test-foto-video-balti`: Foto & Video, Bălți, 150 km, supliment 20 EUR, tarif nuntă per eveniment 300 EUR. Fotografia a fost încărcată din formular.
+- Semnătura fictivă QA Test Artist a fost desenată și trimisă la 2026-09-07 15:28:43 UTC. Cele cinci acceptări 258-262 sunt legate de artistul 561. Identitatea, semnătura PNG, data, IP-ul, dispozitivul și hash-urile copiilor sunt prezente și consistente. Verificarea automată PNG confirmă antetul; desenul a fost văzut manual în interfață.
+- Sala QA, profil 24, `qa-test-venue`: QA Test Sală Bălți, adresă explicit fictivă, 30-150 invitați, fotografie încărcată. Persoană juridică fictivă, reprezentant QA Test Venue, semnare la 2026-09-07 15:43:02 UTC, acceptări 263-268.
+- Pentru ambele formulare la 390 × 844, după bifare și desenarea semnăturii: contractul se deschide, o singură bifă, butoanele finale și canvasul sunt accesibile prin scroll, fără jumătate inferioară decupată. Viewportul a fost resetat după test.
+- În setările ambilor furnizori apar documentele, semnătura și informațiile de acceptare. Contractul artistului și acordul sălii au fost expandate și descărcate manual cu eveniment de download confirmat.
+- Adminul QA a văzut ambele cereri, fotografia, orașul, capacitatea/deplasarea, descrierea și linkurile copiilor. Descărcarea autentificată a copiilor 258 și 264 a fost verificată. Aprobarea manuală a ambelor cereri a reușit; `is_active` a devenit true numai după această acțiune.
+- Contractele nu au fost modificate, suprascrise sau traduse automat după semnare. Datele tehnice brute, semnăturile și linkurile secrete de calendar nu sunt reproduse în acest raport.
+
+### Probleme găsite în testarea manuală și prima publicare
+
+- Dashboardul artistului declara greșit profilul online înaintea aprobării. Acum ambele roluri afișează starea reală a publicării; linkurile publice sunt ascunse cât profilul este inactiv.
+- Navigarea din dashboardurile artistului, sălii, adminului și clientului putea reseta EN/RU la RO. Legăturile și redirecturile din zonele remediate păstrează limba.
+- Calendarul sălii avea tipuri de eveniment netraduse și abrevierea engleză Tuesday tradusă greșit în „You”. Etichetele sunt localizate și protejate de traducere repetată.
+- Cererile admin afișau descrierile HTML/Markdown literal. Rezumatul este acum text sigur, fără modificarea documentelor juridice.
+- Mesajul de la telefon explică acum corect că datele nu sunt publice, dar devin accesibile celeilalte părți după confirmarea finală bilaterală.
+- Commit `94524d1`, build local reușit, 459 pagini; 41 teste de publicare/calendar/admin/client trecute. Publicat pe epetrecere.md: `dpl_DTCnmJU3FetETZwfAoGqvGAGRRp1`, READY, `https://epetrecere-4qletk61a-vladstalker96-7582s-projects.vercel.app`.
+- Vercel a refuzat prima încercare cu Not authorized, dar contul a fost verificat prin whoami, iar reîncercarea pe același canal a reușit. Nu s-a schimbat găzduirea și nu s-a ocolit refuzul GitHub.
+- Reverificat live dashboardul artistului aprobat: starea Profile published, cererea nouă și toate linkurile inspectate folosesc /en/.
+
+### Scenarii client în curs
+
+- Planificare manuală completă: plan 99, QA Test Nuntă Bălți 20 septembrie, data 2026-09-20, Bălți, 14:00-00:00, 60 invitați, sală în oraș și categoria Foto & Video; checklist, invitați și Photo Moments activate.
+- Sala QA apare corect în filtrul Bălți/capacitate. Profilul public nou a fost deschis; nu afișează telefonul sau emailul furnizorului. Headerul mobil era însă prea lat pentru client autentificat, iar butoanele din dreapta erau decupate. Corecție suplimentară în lucru, nu încă inclusă în prima publicare.
+- Artistul QA apare în categoria Photo & Video și în recomandările pentru data planului.
+- Cererea sălii 256 și cererea artistului 257 sunt create prin UI, pending, legate de planul 99 și exclusiv de conturile QA. Artistul primește intervalul 14:00-21:00 și mesajul explicit de test. Telefonul/emailul clientului nu sunt afișate în dashboardul artistului înainte de confirmare.
+- Telefonul neutralizat QA TEST este corect respins de validatorul cererii. Pentru crearea celor două cereri s-a folosit temporar numărul fictiv rezervat +12025550123, din intervalul [NANPA 555-0100-0199](https://nanpa.com/numbering/555-line-numbers), apoi telefonul utilizatorului QA a fost imediat neutralizat din nou înaintea schimbărilor de status. Nu s-au schimbat validările sau notificările produsului pentru a permite testul.
+- Probleme reale suplimentare: cererea rapidă a sălii nu prelua orele planului; URL-ul se schimba spre tabul artiștilor fără actualizarea conținutului; pachetul per-eveniment fără durată al artistului era eliminat din modal, afișând greșit lipsa tarifelor. Corecțiile și regresiile sunt în lucru, urmează publicare și reverificare.
+
+Rămân de încheiat negocierea, confirmările, finalizarea simulată după data evenimentului, recenziile, editarea și reverificările după a doua publicare, plus curățarea exactă a datelor QA. Dovezile contractuale semnate trebuie păstrate.
+
+### Continuare: negociere, editare și remedieri suplimentare
+
+- Negociere manuală artist 257: ofertă furnizor 320 EUR, contraofertă client 300 EUR, acceptată de artist. Sală 256: 2000 EUR, contraofertă 1800 EUR, acceptată de sală. La acest punct ambele sunt `accepted`, nu confirmate bilateral, fără comisioane sau recenzii.
+- Calendarul sălii afișează corect cererea pe 20 septembrie, 60 persoane, 1800 EUR, starea Accepted. Detaliile calendarului nu afișează telefonul sau emailul clientului. La 390 × 844 lățimea documentului este 390 px, fără overflow orizontal.
+- Editare manuală sală: nume EN/RU, capacitate maximă 160, preț 35 EUR/persoană și telefon de profil fictiv rezervat. Salvarea și afișarea publică a numelui EN/capacității/prețului au fost reverificate. Dovezile contractuale rămân cu identitatea exactă de la semnare, nu sunt rescrise prin editarea profilului.
+- Asistentul sălii a răspuns la o cerere explicit doar-citire cu numele propriei săli, capacitatea 30-160 și starea acceptată a rezervării, fără a divulga contacte sau a modifica date.
+- Bug confirmat manual în ambele sensuri: mesajul inline al rezervării folosea `/api/chat`, care permitea și returna contactele înainte de confirmare, deși mesageria principală avea protecție. A fost trimis exclusiv textul fictiv `qa@example.invalid +12025550123`, văzut apoi și în contul artistului. Corecție pregătită pentru GET/POST legacy și mesagerie, inclusiv numele expeditorului, atașamentele și notificările. Reverificarea live după deploy rămâne obligatorie. Nu s-au rescris mesajele istorice sau contractele.
+- Bug manual: reautentificarea clientului a creat planul duplicat 100 din autosalvarea planului 99. Protocolul nou separă autosalvarea de trimiterea explicită și păstrează aceeași cheie la retry/StrictMode. Migrarea aditivă `20260907161706_wizard_submission_idempotency.sql` a fost aplicată cu tranzacție și timeout: 36 planuri înainte și după, inclusiv aceleași două planuri QA. Două coloane nullable și index unic per proprietar, fără rescrierea datelor existente.
+- Proba DB a indexului/idempotency/atomicității a folosit numai clientul QA, ID-uri temporare negative și rollback obligatoriu: planuri QA 2→2, checklist 54→54, amprente existente identice, zero rânduri temporare rămase și fără consum de secvențe. Aceasta nu este prezentată ca test HTTP concurent 200/409.
+- Remedieri pregătite: header mobil și meniu cont accesibil prin click/touch/tastatură; polling notificări păstrat; statistici sală din cererile actuale cu istoricul vechi separat; aceeași lună Moldova în calendar/statistici; intervalul cererii rapide; taburi sincronizate cu URL; tarif artist per-eveniment; termen vizual 72h sală/24h artist; date localizate; finalizare disponibilă numai după confirmare și data permisă; moderarea recenziilor raportează succes numai după răspuns HTTP reușit; dublurile concurente de recenzii recunosc codul SQLSTATE inclusiv în eroarea Drizzle.
+
+Aceste remedieri suplimentare sunt încă în pregătirea celei de-a doua publicări; nu sunt confundate cu versiunea live `94524d1`. Autentificarea QA folosește identități izolate și bilete temporare, nu verifică livrarea emailurilor reale sau OAuth. Nicio plată nu a fost executată.
+
+### Verificarea finală a pachetului înainte de publicare
+
+- Extinsă protecția contactelor la notificările istorice, feedul sălii, preview-urile conversațiilor și exportul din setări. Exportul păstrează exact datele proprii și acceptările juridice ale titularului; elimină notele administrative și protejează contactele, semnăturile și PDF-urile celeilalte părți cât rezervarea nu este confirmată bilateral.
+- Proiecțiile pentru rezervări, dashboard și calendar/iCal neutralizează și contactele introduse în nume sau texte codificate HTML. Calendarul public expune disponibilitatea, nu notele private ale furnizorului. Datele valide precum 20.09.2026 14:00 nu mai sunt confundate cu numere de telefon.
+- Manual artist: schimbare Bălți→Orhei, salvare, apoi setările afișează explicit `Up to 150 km from Orhei`. Orașul a fost readus în Bălți prin profil. Telefonul profilului este fictiv rezervat, iar telefonul contului pentru notificări este neutralizat.
+- Manual AI artist: rezervarea era citită corect, dar profilul propriu lipsea din context. Patch-ul adaugă numai numele localizate, orașul și categoriile profilului autentificat, fără contacte/contracte și fără permisiuni noi. AI sală a răspuns deja corect la nume/capacitate/stare; AI artist trebuie reverificat după publicare.
+- Suita completă locală `npx tsx --test scripts/*.test.ts scripts/*.test.mjs scripts/*regression.cts`: 308 teste raportate, toate trecute, zero eșecuri. Include teste de handler cu servicii simulate, nu este prezentată ca 308 scenarii manuale sau operații externe.
+- Tentativa de acces la copia artistului din sesiunea sălii a fost blocată de browser cu `ERR_BLOCKED_BY_CLIENT`. Aceasta nu este pretinsă drept dovadă HTTP 403; nu s-a încercat ocolirea blocării prin alt canal. Accesul propriului titular și al adminului a fost verificat anterior prin UI.

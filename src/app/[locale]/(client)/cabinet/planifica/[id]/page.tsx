@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback, useMemo, use } from "react";
 import { citiesWithinRadius } from "@/lib/geo/city-proximity";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useLocalizedRouter } from "@/components/shared/locale-link";
 import { useUser } from "@clerk/nextjs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,6 +63,7 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { TimePicker } from "@/components/ui/time-picker";
+import { plannerBookingTiers, plannerDurationHint } from "@/lib/planner/artist-booking-pricing";
 import {
   resolvePriceForDuration,
   perEventOffers,
@@ -88,6 +90,8 @@ import { cn } from "@/lib/utils";
 import { normalizeEventType } from "@/lib/events/normalize";
 import { formatPrice } from "@/lib/format/price";
 import { useLocale } from "@/hooks/use-locale";
+import { venueRequestInterval } from "@/lib/planner/venue-request-interval";
+import { planTabFromQuery, planTabHref, type PlanTabKey } from "@/lib/planner/tab-navigation";
 
 interface Plan {
   id: number;
@@ -167,18 +171,7 @@ const EVENT_TYPE_VALUES = [
   "other",
 ];
 
-type TabKey =
-  | "overview"
-  | "bookings"
-  | "my-bookings"
-  | "venues"
-  | "checklist"
-  | "budget"
-  | "guests"
-  | "seating"
-  | "timeline"
-  | "photos"
-  | "settings";
+type TabKey = PlanTabKey;
 
 type NavItem = {
   key: TabKey;
@@ -219,7 +212,7 @@ export default function PlanDetailPage({
 }) {
   const { id } = use(params);
   const planId = Number(id);
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const { user } = useUser();
   const { t } = useLocale();
 
@@ -236,8 +229,12 @@ export default function PlanDetailPage({
   // tab — used after the wizard completes so the user lands directly on
   // the artist discovery list for their event date.
   const searchParams = useSearchParams();
-  const initialTab = (searchParams?.get("tab") as TabKey) || "overview";
-  const [activeTab, setActiveTab] = useState<TabKey>(initialTab);
+  // Use the URL as the single source of truth. Keeping a second local tab
+  // state left the halls visible after a successful booking changed the URL.
+  const activeTab = planTabFromQuery(searchParams?.get("tab"));
+  const setActiveTab = useCallback((tab: TabKey) => {
+    router.replace(planTabHref(planId, tab, searchParams?.toString()), { scroll: false });
+  }, [planId, router, searchParams]);
 
   // Load plan data
   useEffect(() => {
@@ -2782,9 +2779,7 @@ function PlanArtistCard({
       .then((r) => (r.ok ? r.json() : []))
       .then((data: PricingTier[]) => {
         if (cancelled) return;
-        const valid = (Array.isArray(data) ? data : []).filter(
-          (p) => p.price != null && tierDurationMinutes(p) != null,
-        );
+        const valid = plannerBookingTiers(Array.isArray(data) ? data : []);
         setPackages(valid);
       })
       .catch(() => {
@@ -2967,10 +2962,12 @@ function PlanArtistCard({
   // per event: their rows are packages, but they produce no duration options.
   const hasPricedOffer = durationOptions.length > 0 || eventOffers.length > 0;
 
-  const canSubmit =
+  const canSubmit = !packagesLoading && (
     (selectedDurationMinutes != null && !!startTime) ||
-    (selectedEventTierId != null && !!startTime) ||
-    (timesValid() && !hasPricedOffer);
+    (selectedEventOffer != null && timesValid()) ||
+    (timesValid() && !hasPricedOffer)
+  );
+  const showDurationOptions = durationOptions.length > 0 && selectedEventOffer == null;
 
   async function submit() {
     if (submitting) return;
@@ -3291,22 +3288,18 @@ function PlanArtistCard({
                 {/* Duration picker — the resolver picks the right price */}
                 <div>
                   <Label>
-                    {t("cabinet.plan.modal.participationDuration")}{" "}
-                    {eventOffers.length > 0 && selectedEventTierId != null
-                      ? t("cabinet.plan.modal.replacedByPerEvent")
-                      : "*"}
+                    {t(showDurationOptions ? "cabinet.plan.modal.participationDuration" : "cabinet.plan.modal.endTime")} *
                   </Label>
                   <p className="mb-2 text-xs text-muted-foreground">
-                    {durationOptions.length > 0
-                      ? t("cabinet.plan.modal.durationHint")
-                      : t("cabinet.plan.modal.noTariffs")}
+                    {t(plannerDurationHint({ loading: packagesLoading, durationCount: durationOptions.length,
+                      eventOfferCount: eventOffers.length, eventSelected: selectedEventOffer != null }))}
                   </p>
                   {packagesLoading ? (
                     <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       {t("cabinet.plan.modal.loadingPackages")}
                     </div>
-                  ) : durationOptions.length > 0 ? (
+                  ) : showDurationOptions ? (
                     <div className="grid grid-cols-2 gap-2">
                       {durationOptions.map(({ durationMinutes, tiers }) => {
                         const selected =
@@ -5058,7 +5051,7 @@ function VenueDiscoveryCard({
   onRefresh: () => Promise<void> | void;
 }) {
   const { user } = useUser();
-  const router = useRouter();
+  const router = useLocalizedRouter();
   const { t } = useLocale();
   const [submitting, setSubmitting] = useState(false);
 
@@ -5088,6 +5081,7 @@ function VenueDiscoveryCard({
           clientPhone: user?.phoneNumbers?.[0]?.phoneNumber?.trim() || "000000",
           clientEmail: user?.primaryEmailAddress?.emailAddress,
           eventDate: plan.eventDate,
+          ...venueRequestInterval(plan),
           eventType: plan.eventType ?? undefined,
           guestCount: plan.guestCountTarget ?? undefined,
           message: `Cerere din planul ${plan.title}`,
@@ -5104,7 +5098,7 @@ function VenueDiscoveryCard({
       // 2.5s delay lets the success toast register before the tab
       // switches under the user.
       setTimeout(() => {
-        router.replace(`/cabinet/planifica/${plan.id}?tab=bookings`);
+        router.replace(planTabHref(plan.id, "bookings"), { scroll: false });
       }, 2500);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("cabinet.plan.genericError"));

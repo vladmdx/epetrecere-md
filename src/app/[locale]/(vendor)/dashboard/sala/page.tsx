@@ -6,16 +6,18 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues, calendarEvents } from "@/lib/db/schema";
 import {
   getVenueStats,
   getVenueActivity,
   getVenueRecentBookings,
+  getVenueLegacyRecentBookings,
 } from "@/lib/db/queries/venue-stats";
 import { VenueHomeDashboard } from "./home-client";
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
+import { venueDashboardMonths } from "@/lib/vendors/dashboard-bookings";
 
 export const dynamic = "force-dynamic";
 
@@ -40,13 +42,10 @@ export default async function VenueHomePage({ params }: { params: Promise<{ loca
   if (!venue) redirect(localizePath("/dashboard", locale));
 
   const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const monthStartIso = monthStart.toISOString().split("T")[0];
-  const monthEndIso = monthEnd.toISOString().split("T")[0];
+  const { monthStart, nextMonthStart, monthYear, monthIndex } = venueDashboardMonths(now);
 
-  const [stats, activity, recentBookings, monthCalendar] = await Promise.all([
-    getVenueStats(venue.id),
+  const [stats, activity, recentBookings, monthCalendar, legacyBookings] = await Promise.all([
+    getVenueStats(venue.id, now),
     getVenueActivity(appUser.id, 10),
     getVenueRecentBookings(venue.id, 5),
     // Scope to this venue only — the previous query fetched events for ALL
@@ -62,10 +61,11 @@ export default async function VenueHomePage({ params }: { params: Promise<{ loca
         and(
           eq(calendarEvents.entityType, "venue"),
           eq(calendarEvents.entityId, venue.id),
-          gte(calendarEvents.date, monthStartIso),
-          lte(calendarEvents.date, monthEndIso),
+          gte(calendarEvents.date, monthStart),
+          lt(calendarEvents.date, nextMonthStart),
         ),
       ),
+    getVenueLegacyRecentBookings(venue.id, 5),
   ]);
 
   return (
@@ -79,9 +79,10 @@ export default async function VenueHomePage({ params }: { params: Promise<{ loca
         createdAt: a.createdAt.toISOString(),
       }))}
       recentBookings={recentBookings}
+      legacyBookings={legacyBookings}
       monthCalendar={monthCalendar}
-      monthYear={now.getFullYear()}
-      monthIndex={now.getMonth()}
+      monthYear={monthYear}
+      monthIndex={monthIndex}
     />
   );
 }

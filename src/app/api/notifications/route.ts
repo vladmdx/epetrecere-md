@@ -3,6 +3,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { requireAppUser } from "@/lib/planner/ownership";
+import { notificationsForUser } from "@/lib/privacy/notification-view";
 
 // M5 — GET /api/notifications
 //
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest) {
   ]);
 
   return NextResponse.json({
-    notifications: items,
+    notifications: await notificationsForUser(items, gate.userId),
     unreadCount: unreadRows[0]?.count ?? 0,
   });
 }

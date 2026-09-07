@@ -4,7 +4,10 @@ import { createClerkClient } from '@clerk/backend';
 import postgres from 'postgres';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-import { assertQaFixture, assertQaAppUser, assertQaClerkUser, assertQaSessions, safeQaNotificationPrefs } from './vendor-qa-safety.mjs';
+import { assertQaFixture, assertQaAppUser, assertQaClerkUser, assertQaSessions, qaBookingContact, safeQaNotificationPrefs } from './vendor-qa-safety.mjs';
+import { inspectQaLifecycle } from './vendor-qa-lifecycle.mjs';
+import { simulateQaCompletionDate } from './vendor-qa-completion-date.mjs';
+import { testWizardRollback } from './vendor-qa-wizard-rollback.mjs';
 
 config({ path: '.env.production.local', quiet: true });
 const statePath = '/tmp/epetrecere-vendor-qa-20260906.json';
@@ -45,6 +48,22 @@ try {
     if (!state.users[persona]) throw new Error('Unknown QA persona');
     const ticket = await clerk.signInTokens.createSignInToken({ userId: state.users[persona].clerkId, expiresInSeconds: 90 });
     console.log(`https://epetrecere.md/ro/sign-in?__clerk_ticket=${encodeURIComponent(ticket.token)}`);
+  } else if (action === 'booking-contact') {
+    const persona = process.argv[3];
+    // Fail closed before any DB/Clerk lookup for non-client or malformed state.
+    const phone = qaBookingContact(state, persona);
+    const { user, appUser } = await resolveExactFixture(persona);
+    const prefs = safeQaNotificationPrefs(appUser.notification_prefs);
+    // Exact app ID + Clerk ID + marker email, checked again at the write.
+    // Create both QA requests, then immediately run safe-contact client before
+    // any status change. This never changes product validators or delivery.
+    const updated = await sql`UPDATE users SET phone = ${phone}, notification_prefs = ${sql.json(prefs)}::jsonb
+      WHERE id = ${user.id} AND clerk_id = ${user.clerkId} AND email = ${user.email}
+      RETURNING id, clerk_id, email, phone`;
+    assertQaAppUser(updated, user);
+    if (updated[0].phone !== phone) throw new Error('QA booking contact verification failed');
+    console.log(JSON.stringify({ persona, reservedBookingContact: true, optionalNotificationsDisabled: true,
+      restoreBeforeStatusChanges: 'node scripts/vendor-live-qa.mjs safe-contact client' }));
   } else if (action === 'safe-contact') {
     const persona = process.argv[3];
     const { user, appUser } = await resolveExactFixture(persona);
@@ -80,6 +99,13 @@ try {
       if (revoked.userId !== user.clerkId || revoked.id !== session.id || revoked.status !== 'revoked') throw new Error('QA session revocation could not be verified');
     }
     console.log(JSON.stringify({ persona, revokedSessions: unique.length }));
+  } else if (action === 'wizard-rollback') {
+    console.log(JSON.stringify(await testWizardRollback({ sql, state, resolveExactFixture }), null, 2));
+  } else if (action === 'simulate-completion-date') {
+    console.log(JSON.stringify(await simulateQaCompletionDate({ sql, state, resolveExactFixture, persistState: save }), null, 2));
+  } else if (action === 'inspect-lifecycle') {
+    // DB read-only transaction; identity guards are rechecked inside it.
+    console.log(JSON.stringify(await inspectQaLifecycle(sql, state), null, 2));
   } else if (action === 'inspect') {
     for (const [persona, u] of Object.entries(state.users)) {
       const user = await sql`SELECT id, role, onboarding_complete, name, phone FROM users WHERE clerk_id = ${u.clerkId}`;
@@ -89,6 +115,6 @@ try {
       console.log(JSON.stringify({ persona, user, artist, venue, contracts }));
     }
   } else {
-    throw new Error('Use create, ticket <persona>, safe-contact <persona>, signout <persona>, or inspect');
+    throw new Error('Use create, ticket <persona>, booking-contact client, safe-contact <persona>, signout <persona>, inspect, inspect-lifecycle, wizard-rollback, or simulate-completion-date');
   }
 } finally { await sql.end(); }

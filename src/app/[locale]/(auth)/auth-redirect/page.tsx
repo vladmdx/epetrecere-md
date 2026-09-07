@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Loader2, Music, Building2, PartyPopper, Phone } from "lucide-react";
 import { useLocalizedRouter } from "@/components/shared/locale-link";
 import { useLocale } from "@/hooks/use-locale";
+import { hasPendingWizardSubmission, submitPendingWizard } from "@/lib/wizard/submission";
 
 /**
  * If the user just came through the public /planifica wizard, their answers
@@ -13,34 +14,13 @@ import { useLocale } from "@/hooks/use-locale";
  * into that plan. Returns `null` if no wizard data (or on failure) so the
  * caller falls back to the default routing.
  */
-async function consumeWizardData(): Promise<string | null> {
+async function consumeWizardData(ownerId: string): Promise<string | null> {
   try {
-    const raw = sessionStorage.getItem("wizard-data");
-    if (!raw) return null;
-    const wizard = JSON.parse(raw);
-    // Only treat wizard data as a real submission if it has at least one
-    // meaningful field filled in. Browsing /planifica without filling
-    // anything used to populate sessionStorage with empty defaults, which
-    // then silently bypassed the role picker after signup.
-    const hasContent =
-      (wizard.eventType && wizard.eventType !== "") ||
-      (wizard.eventDate && wizard.eventDate !== "") ||
-      (Array.isArray(wizard.services) && wizard.services.length > 0) ||
-      (typeof wizard.guestCount === "number" && wizard.guestCount > 0) ||
-      (typeof wizard.budget === "number" && wizard.budget > 0);
-    if (!hasContent) {
-      sessionStorage.removeItem("wizard-data");
-      return null;
-    }
-    const res = await fetch("/api/event-plans/from-wizard", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(wizard),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    sessionStorage.removeItem("wizard-data");
-    return data?.plan?.id ? `/cabinet/planifica/${data.plan.id}?tab=bookings` : null;
+    // Draft autosave (including old completed wizard-data) is not submission
+    // intent. Only an explicit final submit may create a plan after sign-in.
+    if (!hasPendingWizardSubmission(ownerId)) return null;
+    const planId = await submitPendingWizard(ownerId);
+    return planId ? `/cabinet/planifica/${planId}?tab=bookings` : null;
   } catch {
     return null;
   }
@@ -202,7 +182,7 @@ export default function AuthRedirectPage() {
             router.replace(intended);
             return;
           }
-          const planUrl = await consumeWizardData();
+          const planUrl = await consumeWizardData(user!.id);
           router.replace(planUrl ?? "/cabinet");
         }
       } catch {
@@ -279,7 +259,7 @@ export default function AuthRedirectPage() {
       } catch {
         /* ignore — fall through to wizard / default */
       }
-      const planUrl = await consumeWizardData();
+      const planUrl = user?.id ? await consumeWizardData(user.id) : null;
       router.replace(planUrl ?? "/cabinet");
     } else if (selectedRole === "artist") {
       router.replace("/dashboard/onboarding");

@@ -8,6 +8,7 @@ import { Star, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { moderateReview } from "@/lib/reviews/moderation";
 
 interface Review {
   id: number;
@@ -25,6 +26,7 @@ export default function AdminReviewsPage() {
   const { t } = useLocale();
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<number | null>(null);
   const [filter, setFilter] = useState<"all" | "pending" | "approved">("pending");
 
   useEffect(() => {
@@ -36,12 +38,10 @@ export default function AdminReviewsPage() {
   }, [t]);
 
   async function handleAction(id: number, action: "approve" | "reject") {
+    if (busy !== null) return;
+    setBusy(id);
     try {
-      await fetch(`/api/reviews/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
+      await moderateReview(id, action);
       if (action === "approve") {
         setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, isApproved: true } : r)));
         toast.success(t("admin.reviews.approved"));
@@ -51,6 +51,8 @@ export default function AdminReviewsPage() {
       }
     } catch {
       toast.error(t("admin.reviews.actionError"));
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -129,6 +131,7 @@ export default function AdminReviewsPage() {
                         size="sm"
                         className="bg-success text-white hover:bg-success/90 gap-1"
                         onClick={() => handleAction(review.id, "approve")}
+                        disabled={busy !== null}
                       >
                         <CheckCircle className="h-3.5 w-3.5" /> {t("admin.reviews.approve")}
                       </Button>
@@ -138,6 +141,7 @@ export default function AdminReviewsPage() {
                       variant="outline"
                       className="text-destructive gap-1"
                       onClick={() => handleAction(review.id, "reject")}
+                      disabled={busy !== null}
                     >
                       <XCircle className="h-3.5 w-3.5" />{" "}
                       {review.isApproved

@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
+import { calendarEventForViewer } from "@/lib/privacy/booking-text";
 import {
   getCalendarEvents,
   bulkSetCalendarEvents,
@@ -53,13 +54,31 @@ export async function GET(req: NextRequest) {
     parsed.data.month,
   );
 
+  // Public availability never includes private notes or free-text event names.
+  // Keep those fields for the entity owner/admin's calendar editing surface.
+  let privileged = false;
+  const { userId: clerkId } = await auth();
+  if (clerkId) {
+    const [user] = await db.select({ id: users.id, role: users.role }).from(users)
+      .where(eq(users.clerkId, clerkId)).limit(1);
+    if (user) {
+      privileged = user.role === "admin" || user.role === "super_admin";
+      if (!privileged) {
+        const entity = parsed.data.entity_type === "artist" ? artists : venues;
+        const [owner] = await db.select({ userId: entity.userId }).from(entity)
+          .where(eq(entity.id, parsed.data.entity_id)).limit(1);
+        privileged = owner?.userId === user.id;
+      }
+    }
+  }
+
   // Normalize dates to YYYY-MM-DD to avoid timezone issues
   const normalized = events.map((e) => ({
-    ...e,
+    ...calendarEventForViewer(e, privileged),
     date: normalizeDate(e.date),
   }));
 
-  return NextResponse.json(normalized);
+  return NextResponse.json(normalized, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(req: Request) {

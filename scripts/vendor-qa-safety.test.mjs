@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { assertQaFixture, assertQaAppUser, assertQaClerkUser, assertQaSessions, safeQaNotificationPrefs } from './vendor-qa-safety.mjs';
+import { readFileSync } from 'node:fs';
+import { assertQaFixture, assertQaAppUser, assertQaClerkUser, assertQaSessions, qaBookingContact, safeQaNotificationPrefs } from './vendor-qa-safety.mjs';
 const marker = 'bf3071fe-6487-4668-a756-24ceea64e4ea';
 const user = { id: 'c661e658-4e4b-4b01-9879-6199a4b4240b', clerkId: 'user_QAFixture', email: `qa-artist-${marker}@invalid.epetrecere.md` };
 const state = { marker, users: { artist: user } };
@@ -18,6 +19,35 @@ test('all three application identity fields must match exactly one result', () =
   for (const rows of [[], [row, row], [{ ...row, id: 'other' }], [{ ...row, clerk_id: 'user_Other' }], [{ ...row, email: 'other@example.invalid' }]]) {
     assert.throws(() => assertQaAppUser(rows, user), /Refusing/);
   }
+});
+
+test('booking contact is fixed to the NANPA fictitious interval and exact QA client only', () => {
+  const client = { ...user, email: `qa-client-${marker}@invalid.epetrecere.md` };
+  const clientState = { marker, users: { client } };
+  assert.equal(qaBookingContact(clientState, 'client'), '+12025550123');
+  assert.match(qaBookingContact(clientState, 'client'), /^\+120255501\d{2}$/);
+  for (const persona of ['artist', 'venue', 'admin', 'stranger', undefined]) {
+    assert.throws(() => qaBookingContact(clientState, persona), /only the isolated QA client/);
+  }
+  for (const candidate of [state, { marker, users: {} },
+    { ...clientState, marker: 'invalid' },
+    { ...clientState, users: { client: { ...client, email: 'real@example.com' } } },
+    { ...clientState, users: { client: { ...client, clerkId: '' } } }]) {
+    assert.throws(() => qaBookingContact(candidate, 'client'), /invalid isolated QA identity/);
+  }
+});
+
+test('booking-contact action keeps triple identity, Clerk verification, muted prefs and restore reminder', () => {
+  const source = readFileSync(new URL('./vendor-live-qa.mjs', import.meta.url), 'utf8');
+  const branch = source.split("action === 'booking-contact'")[1].split("action === 'safe-contact'")[0];
+  assert.ok(branch.indexOf('qaBookingContact(state, persona)') < branch.indexOf('await resolveExactFixture(persona)'));
+  assert.match(source, /assertQaClerkUser\(await clerk\.users\.getUser\(user\.clerkId\), user\)/);
+  assert.match(branch, /safeQaNotificationPrefs\(appUser\.notification_prefs\)/);
+  assert.match(branch, /WHERE id = \$\{user\.id\} AND clerk_id = \$\{user\.clerkId\} AND email = \$\{user\.email\}/);
+  assert.match(branch, /assertQaAppUser\(updated, user\)/);
+  assert.match(branch, /updated\[0\]\.phone !== phone/);
+  assert.match(branch, /safe-contact client/);
+  assert.doesNotMatch(branch, /dispatchNotification|sendWhatsApp|sendEmail/);
 });
 
 test('Clerk primary identity must match the fixture, not just one secondary email', () => {

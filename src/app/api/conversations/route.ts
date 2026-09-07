@@ -10,6 +10,8 @@ import {
 } from "@/lib/db/schema";
 import { and, eq, desc, isNull, inArray } from "drizzle-orm";
 import { redactContact } from "@/lib/privacy/contact-redaction";
+import { plainText } from "@/lib/content/plain-text";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
 
 /** Shape we attach to each conversation so the UI can show "Re: Nuntă 20 sept". */
 type LinkedBooking = {
@@ -31,6 +33,8 @@ async function attachLinkedBookings<
     artistId: number | null;
     venueId: number | null;
     lastMessagePreview: string | null;
+    clientName?: string | null;
+    vendorName?: string | null;
   },
 >(rows: T[]): Promise<(T & { linkedBooking: LinkedBooking | null })[]> {
   if (rows.length === 0) return [];
@@ -65,7 +69,7 @@ async function attachLinkedBookings<
               inArray(bookingRequests.artistId, artistIds),
             ),
           )
-          .orderBy(desc(bookingRequests.eventDate))
+          .orderBy(desc(bookingRequests.updatedAt), desc(bookingRequests.id))
       : Promise.resolve([] as Array<{
           id: number;
           clientUserId: string | null;
@@ -95,7 +99,7 @@ async function attachLinkedBookings<
               inArray(bookingRequests.venueId, venueIds),
             ),
           )
-          .orderBy(desc(bookingRequests.eventDate))
+          .orderBy(desc(bookingRequests.updatedAt), desc(bookingRequests.id))
       : Promise.resolve([] as Array<{
           id: number;
           clientUserId: string | null;
@@ -111,7 +115,7 @@ async function attachLinkedBookings<
   const all = [...artistBookings, ...venueBookings];
 
   // Key → most-recent booking. Since each query is already ordered by
-  // eventDate DESC, the first hit wins.
+  // updatedAt DESC, the first hit wins, matching the message endpoint.
   const byKey = new Map<string, LinkedBooking>();
   for (const b of all) {
     if (!b.clientUserId) continue;
@@ -130,8 +134,6 @@ async function attachLinkedBookings<
     });
   }
 
-  const contactSharedStatuses = new Set(["confirmed_by_client", "completed"]);
-
   return rows.map((r) => {
     const key = r.artistId
       ? `${r.clientUserId}|a${r.artistId}`
@@ -140,13 +142,15 @@ async function attachLinkedBookings<
         : "";
     const linkedBooking = byKey.get(key) ?? null;
     const contactUnlocked = linkedBooking
-      ? contactSharedStatuses.has(linkedBooking.status)
+      ? contactsAreShared(linkedBooking.status)
       : false;
     return {
       ...r,
+      ...(!contactUnlocked && typeof r.clientName === "string" ? { clientName: redactContact(plainText(r.clientName)) } : {}),
+      ...(!contactUnlocked && typeof r.vendorName === "string" ? { vendorName: redactContact(plainText(r.vendorName)) } : {}),
       lastMessagePreview:
         !contactUnlocked && r.lastMessagePreview
-          ? redactContact(r.lastMessagePreview)
+          ? redactContact(plainText(r.lastMessagePreview))
           : r.lastMessagePreview,
       linkedBooking,
     };

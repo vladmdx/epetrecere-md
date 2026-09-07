@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { reviews, bookingRequests, users, artists, venues } from "@/lib/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
+import { isUniqueViolation } from "@/lib/reviews/duplicate-error";
 
 // M4 — POST /api/reviews/from-booking
 //
@@ -163,8 +164,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ review }, { status: 201 });
   } catch (e: unknown) {
     // Race safety: catch the unique constraint violation
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg.includes("unique") || msg.includes("duplicate")) {
+    if (isUniqueViolation(e)) {
       return NextResponse.json(
         { error: "Deja ai trimis o recenzie pentru această rezervare" },
         { status: 409 },

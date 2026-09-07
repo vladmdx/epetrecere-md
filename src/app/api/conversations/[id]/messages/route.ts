@@ -16,6 +16,10 @@ import {
   containsContact,
   redactContact,
 } from "@/lib/privacy/contact-redaction";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
+import { chatMessageForViewer } from "@/lib/privacy/chat-message";
+import { plainText } from "@/lib/content/plain-text";
+import { escapeHtml } from "@/lib/email/escape";
 
 // M0b #10 — Messages for a persistent client↔artist conversation.
 // GET  lists messages (oldest → newest, capped at 200) and resets the caller's
@@ -61,7 +65,6 @@ async function loadContext(conversationId: number, clerkId: string) {
   return { appUser, conv, side } as const;
 }
 
-const CONTACT_SHARED_STATUSES = new Set(["confirmed_by_client", "completed"]);
 async function contactIsUnlocked(conv: typeof conversations.$inferSelect) {
   const vendorCondition = conv.artistId
     ? eq(bookingRequests.artistId, conv.artistId)
@@ -79,10 +82,10 @@ async function contactIsUnlocked(conv: typeof conversations.$inferSelect) {
         vendorCondition,
       ),
     )
-    .orderBy(desc(bookingRequests.updatedAt))
+    .orderBy(desc(bookingRequests.updatedAt), desc(bookingRequests.id))
     .limit(1);
 
-  return booking ? CONTACT_SHARED_STATUSES.has(booking.status) : false;
+  return booking ? contactsAreShared(booking.status) : false;
 }
 
 export async function GET(
@@ -130,17 +133,7 @@ export async function GET(
   }
 
   return NextResponse.json(
-    contactUnlocked
-      ? messages
-      : messages.map((message) => ({
-          ...message,
-          message: redactContact(message.message),
-          attachmentUrl: null,
-          attachmentName: message.attachmentUrl
-            ? "Atașament disponibil după confirmare"
-            : message.attachmentName,
-          attachmentMime: null,
-        })),
+    messages.map(message => chatMessageForViewer(message, contactUnlocked)),
   );
 }
 
@@ -192,7 +185,7 @@ export async function POST(
   }
 
   const contactUnlocked = await contactIsUnlocked(ctx.conv);
-  if (!contactUnlocked && (containsContact(message) || attachmentUrl)) {
+  if (!contactUnlocked && (containsContact(message) || containsContact(plainText(message)) || attachmentUrl)) {
     return NextResponse.json(
       {
         error:
@@ -209,13 +202,14 @@ export async function POST(
     .from(users)
     .where(eq(users.id, ctx.appUser.id))
     .limit(1);
-  const senderName =
+  const rawSenderName =
     appUserFull?.name ||
     (ctx.side === "artist"
       ? "Artist"
       : ctx.side === "venue"
         ? "Sală"
         : "Client");
+  const senderName = contactUnlocked ? rawSenderName : redactContact(plainText(rawSenderName));
 
   const [inserted] = await db
     .insert(chatMessages)
@@ -299,6 +293,7 @@ export async function POST(
         }
       }
 
+      if (!contactUnlocked) vendorName = redactContact(plainText(vendorName));
       if (ctx.side === "artist" || ctx.side === "venue") {
         // Vendor sent a message → notify the client
         const [clientUser] = await db
@@ -318,7 +313,7 @@ export async function POST(
             emailSubject: `💬 Mesaj nou de la ${vendorName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${vendorName}`,
-              message: `<strong>${vendorName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
+              message: `<strong>${escapeHtml(vendorName)}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${escapeHtml(preview)}</div>`,
               ctaUrl: `https://epetrecere.md/cabinet/mesaje?conversation=${conversationId}`,
               ctaText: "Răspunde →",
               emoji: "💬",
@@ -345,7 +340,7 @@ export async function POST(
             emailSubject: `💬 Mesaj nou de la ${senderName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
-              message: `<strong>${senderName}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${preview}</div>`,
+              message: `<strong>${escapeHtml(senderName)}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${escapeHtml(preview)}</div>`,
               ctaUrl: `https://epetrecere.md${vendorDashboardUrl}?conversation=${conversationId}`,
               ctaText: "Răspunde →",
               emoji: "💬",
@@ -365,5 +360,5 @@ export async function POST(
     }
   })();
 
-  return NextResponse.json(inserted, { status: 201 });
+  return NextResponse.json(chatMessageForViewer(inserted, contactUnlocked), { status: 201 });
 }

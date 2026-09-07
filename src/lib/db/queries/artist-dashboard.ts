@@ -9,6 +9,8 @@
 // page. Same shape can be replicated there later.
 
 import { db } from "@/lib/db";
+import { bookingTextForViewer } from "@/lib/privacy/booking-text";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
 import {
   artists,
   bookingRequests,
@@ -123,14 +125,14 @@ export async function getArtistNextEvent(
 
   return {
     id: next.id,
-    eventType: next.eventType,
-    clientName: next.clientName,
+    eventType: bookingTextForViewer(next.eventType, contactsAreShared(next.status)),
+    clientName: bookingTextForViewer(next.clientName, contactsAreShared(next.status)),
     eventDate: next.eventDate,
     startTime: next.startTime,
     endTime: next.endTime,
-    location: next.planLocation,
+    location: bookingTextForViewer(next.planLocation, contactsAreShared(next.status)),
     guestCount: next.guestCount,
-    venueName,
+    venueName: bookingTextForViewer(venueName, contactsAreShared(next.status)),
     venueImage,
     status: next.status,
   };
@@ -163,10 +165,10 @@ export async function getArtistRecentRequests(
 
   return rows.map((r) => ({
     id: r.id,
-    eventType: r.eventType,
-    clientName: r.clientName,
+    eventType: bookingTextForViewer(r.eventType, contactsAreShared(r.status)),
+    clientName: bookingTextForViewer(r.clientName, contactsAreShared(r.status)),
     eventDate: r.eventDate,
-    location: r.planLocation,
+    location: bookingTextForViewer(r.planLocation, contactsAreShared(r.status)),
     guestCount: r.guestCount,
     status: r.status,
     createdAt: r.createdAt,

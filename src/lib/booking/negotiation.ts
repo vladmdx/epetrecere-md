@@ -1,4 +1,4 @@
-import { redactContact } from "@/lib/privacy/contact-redaction";
+import { bookingTextForViewer } from "@/lib/privacy/booking-text";
 
 export type PriceOffer = {
   from: "artist" | "client";
@@ -25,6 +25,6 @@ export function visiblePriceOffers(offers: PriceOffer[] | null, status: string):
   if (!offers || status === "confirmed_by_client" || status === "completed") return offers;
   return offers.map((offer) => ({
     ...offer,
-    ...(offer.message ? { message: redactContact(offer.message) } : {}),
+    ...(offer.message ? { message: bookingTextForViewer(offer.message, false) } : {}),
   }));
 }

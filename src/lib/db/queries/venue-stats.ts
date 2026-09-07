@@ -1,19 +1,32 @@
 // Venue dashboard stats + activity feed helpers.
 //
-// Venues don't yet flow through `booking_requests` (artist-only) — they
-// use the legacy `bookings` table. When we migrate venues to
-// booking_requests (Phase 2), swap the source here.
+// The public venue flow, booking tabs and all quick actions share
+// booking_requests. The retired bookings table has independent IDs and must
+// not be mixed into this actionable dashboard.
 
 import { db } from "@/lib/db";
+import { bookingTextForViewer } from "@/lib/privacy/booking-text";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
 import {
+  bookingRequests,
   bookings,
+  leads,
   profileViews,
   venues,
   calendarEvents,
   notifications,
-  leads,
 } from "@/lib/db/schema";
-import { and, count, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { finalizedLegacyVenueBookingsInMonth, finalizedVenueBookingsInMonth, venueDashboardMonths } from "@/lib/vendors/dashboard-bookings";
+import { notificationsForUser } from "@/lib/privacy/notification-view";
+
+export type VenueLegacySummary = {
+  totalBookings: number;
+  pendingBookings: number;
+  confirmedThisMonth: number;
+  revenueThisMonth: number;
+  revenueLastMonth: number;
+};
 
 export type VenueStats = {
   pendingBookings: number;
@@ -29,20 +42,16 @@ export type VenueStats = {
   revenueThisMonth: number;
   /** Change vs last month for revenue (absolute EUR). */
   revenueLastMonth: number;
+  /** Separately reported legacy history. Not added to unified totals because
+   * the schemas have no reliable cross-model identifier for deduplication. */
+  legacy: VenueLegacySummary;
 };
 
-export async function getVenueStats(venueId: number): Promise<VenueStats> {
-  const now = new Date();
+export async function getVenueStats(venueId: number, now = new Date()): Promise<VenueStats> {
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0); // last day of month
-  const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
-
-  const monthStartIso = monthStart.toISOString().split("T")[0];
-  const monthEndIso = monthEnd.toISOString().split("T")[0];
-
-  const daysInMonth = monthEnd.getDate();
+  const { monthStart, nextMonthStart, lastMonthStart, daysInMonth } = venueDashboardMonths(now);
+  const currentMonthBookings = finalizedVenueBookingsInMonth(venueId, monthStart, nextMonthStart);
+  const lastMonthBookings = finalizedVenueBookingsInMonth(venueId, lastMonthStart, monthStart);
 
   const [
     pendingRow,
@@ -52,12 +61,13 @@ export async function getVenueStats(venueId: number): Promise<VenueStats> {
     occupancyRow,
     revenueRow,
     revenueLastRow,
+    legacyRow,
   ] = await Promise.all([
     db
       .select({ value: count() })
-      .from(bookings)
+      .from(bookingRequests)
       .where(
-        and(eq(bookings.venueId, venueId), eq(bookings.status, "pending")),
+        and(eq(bookingRequests.venueId, venueId), eq(bookingRequests.status, "pending")),
       ),
     db
       .select({ value: count() })
@@ -78,14 +88,8 @@ export async function getVenueStats(venueId: number): Promise<VenueStats> {
       .limit(1),
     db
       .select({ value: count() })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.venueId, venueId),
-          inArray(bookings.status, ["confirmed", "completed"]),
-          gte(bookings.updatedAt, monthStart),
-        ),
-      ),
+      .from(bookingRequests)
+      .where(currentMonthBookings),
     // Occupancy: distinct busy days in current month from calendar_events
     db
       .select({ value: count(sql`DISTINCT ${calendarEvents.date}`) })
@@ -94,38 +98,35 @@ export async function getVenueStats(venueId: number): Promise<VenueStats> {
         and(
           eq(calendarEvents.entityType, "venue"),
           eq(calendarEvents.entityId, venueId),
-          gte(calendarEvents.date, monthStartIso),
-          lte(calendarEvents.date, monthEndIso),
+          gte(calendarEvents.date, monthStart),
+          lt(calendarEvents.date, nextMonthStart),
           inArray(calendarEvents.status, ["booked", "blocked"]),
         ),
       ),
     // Revenue this month: sum of agreed prices for confirmed/completed
     db
       .select({
-        value: sql<number>`COALESCE(SUM(${bookings.priceAgreed}), 0)`,
+        value: sql<number>`COALESCE(SUM(${bookingRequests.agreedPrice}), 0)`,
       })
-      .from(bookings)
-      .where(
-        and(
-          eq(bookings.venueId, venueId),
-          inArray(bookings.status, ["confirmed", "completed"]),
-          gte(bookings.updatedAt, monthStart),
-        ),
-      ),
+      .from(bookingRequests)
+      .where(currentMonthBookings),
     // Revenue last month
     db
       .select({
-        value: sql<number>`COALESCE(SUM(${bookings.priceAgreed}), 0)`,
+        value: sql<number>`COALESCE(SUM(${bookingRequests.agreedPrice}), 0)`,
+      })
+      .from(bookingRequests)
+      .where(lastMonthBookings),
+    db
+      .select({
+        totalBookings: count(),
+        pendingBookings: sql<number>`count(*) filter (where ${bookings.status} = 'pending')`,
+        confirmedThisMonth: sql<number>`count(*) filter (where ${finalizedLegacyVenueBookingsInMonth(monthStart, nextMonthStart)})`,
+        revenueThisMonth: sql<number>`coalesce(sum(${bookings.priceAgreed}) filter (where ${finalizedLegacyVenueBookingsInMonth(monthStart, nextMonthStart)}), 0)`,
+        revenueLastMonth: sql<number>`coalesce(sum(${bookings.priceAgreed}) filter (where ${finalizedLegacyVenueBookingsInMonth(lastMonthStart, monthStart)}), 0)`,
       })
       .from(bookings)
-      .where(
-        and(
-          eq(bookings.venueId, venueId),
-          inArray(bookings.status, ["confirmed", "completed"]),
-          gte(bookings.updatedAt, lastMonthStart),
-          lte(bookings.updatedAt, lastMonthEnd),
-        ),
-      ),
+      .where(eq(bookings.venueId, venueId)),
   ]);
 
   const occupancyBusyDays = Number(occupancyRow[0]?.value ?? 0);
@@ -143,6 +144,13 @@ export async function getVenueStats(venueId: number): Promise<VenueStats> {
     occupancyTotalDays: daysInMonth,
     revenueThisMonth: Number(revenueRow[0]?.value ?? 0),
     revenueLastMonth: Number(revenueLastRow[0]?.value ?? 0),
+    legacy: {
+      totalBookings: Number(legacyRow[0]?.totalBookings ?? 0),
+      pendingBookings: Number(legacyRow[0]?.pendingBookings ?? 0),
+      confirmedThisMonth: Number(legacyRow[0]?.confirmedThisMonth ?? 0),
+      revenueThisMonth: Number(legacyRow[0]?.revenueThisMonth ?? 0),
+      revenueLastMonth: Number(legacyRow[0]?.revenueLastMonth ?? 0),
+    },
   };
 }
 
@@ -177,7 +185,7 @@ export async function getVenueActivity(
     .orderBy(desc(notifications.createdAt))
     .limit(limit);
 
-  return rows;
+  return notificationsForUser(rows, userId);
 }
 
 export type VenueRecentBooking = {
@@ -190,12 +198,36 @@ export type VenueRecentBooking = {
   priceAgreed: number | null;
 };
 
-/** Most recent bookings (any status) for quick action on the home page.
- *  Client info comes from the linked lead row. */
+/** Most recent unified requests (any status) for quick action on the home
+ * page. IDs are the same ones accepted by /api/booking-requests/:id. */
 export async function getVenueRecentBookings(
   venueId: number,
   limit = 5,
 ): Promise<VenueRecentBooking[]> {
+  const rows = await db
+    .select({
+      id: bookingRequests.id,
+      clientName: bookingRequests.clientName,
+      eventType: bookingRequests.eventType,
+      eventDate: bookingRequests.eventDate,
+      guestCount: bookingRequests.guestCount,
+      status: bookingRequests.status,
+      priceAgreed: bookingRequests.agreedPrice,
+    })
+    .from(bookingRequests)
+    .where(eq(bookingRequests.venueId, venueId))
+    .orderBy(desc(bookingRequests.createdAt), desc(bookingRequests.id))
+    .limit(limit);
+
+  return rows.map(row => ({ ...row,
+    clientName: bookingTextForViewer(row.clientName, contactsAreShared(row.status)),
+    eventType: bookingTextForViewer(row.eventType, contactsAreShared(row.status)),
+  }));
+}
+
+/** Read-only historical rows, kept separate so legacy numeric IDs cannot be
+ * mistaken for actionable booking_requests IDs with the same value. */
+export async function getVenueLegacyRecentBookings(venueId: number, limit = 5): Promise<VenueRecentBooking[]> {
   const rows = await db
     .select({
       id: bookings.id,
@@ -209,11 +241,10 @@ export async function getVenueRecentBookings(
     .from(bookings)
     .leftJoin(leads, eq(bookings.leadId, leads.id))
     .where(eq(bookings.venueId, venueId))
-    .orderBy(desc(bookings.createdAt))
+    .orderBy(desc(bookings.createdAt), desc(bookings.id))
     .limit(limit);
-
-  return rows.map((r) => ({
-    ...r,
-    clientName: r.clientName ?? "Client necunoscut",
+  return rows.map((row) => ({ ...row,
+    clientName: bookingTextForViewer(row.clientName ?? "", ["confirmed", "completed"].includes(row.status)),
+    eventType: bookingTextForViewer(row.eventType, ["confirmed", "completed"].includes(row.status)),
   }));
 }

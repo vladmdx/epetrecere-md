@@ -24,6 +24,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
+import { clearWizardSubmission } from "@/lib/wizard/submission";
 
 const EVENT_TYPE_LABEL_KEYS: Record<string, string> = {
   wedding: "cabinet.planner.eventTypes.wedding",
@@ -48,6 +49,7 @@ function startFreshWizard() {
   // Clear any stale wizard data so the user sees a blank 7-step form.
   sessionStorage.removeItem("wizard-data");
   sessionStorage.removeItem("wizard-plan-id");
+  clearWizardSubmission();
 }
 
 export default function PlannerIndexPage() {

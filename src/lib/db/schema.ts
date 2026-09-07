@@ -1322,6 +1322,9 @@ export const eventPlanStatusEnum = pgEnum("event_plan_status", [
 
 export const eventPlans = pgTable("event_plans", {
   id: serial("id").primaryKey(),
+  /** Stable identity of one explicitly submitted wizard, safe across retries. */
+  wizardSubmissionId: uuid("wizard_submission_id"),
+  wizardSubmissionHash: text("wizard_submission_hash"),
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "cascade" })
     .notNull(),
@@ -1429,6 +1432,7 @@ export const eventPlans = pgTable("event_plans", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [
   index("idx_event_plan_user_status").on(t.userId, t.status),
+  uniqueIndex("event_plans_user_wizard_submission_uidx").on(t.userId, t.wizardSubmissionId),
 ]);
 
 // Planning checklist — seed from template on plan creation.

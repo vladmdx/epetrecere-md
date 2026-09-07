@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { notifications } from "@/lib/db/schema";
 import { requireAppUser } from "@/lib/planner/ownership";
+import { notificationsForUser } from "@/lib/privacy/notification-view";
 
 // M5 — PATCH / DELETE /api/notifications/[id]
 //
@@ -42,7 +43,8 @@ export async function PATCH(
     );
   }
 
-  return NextResponse.json({ notification: updated });
+  const [visible] = await notificationsForUser([updated], gate.userId);
+  return NextResponse.json({ notification: visible });
 }
 
 export async function DELETE(

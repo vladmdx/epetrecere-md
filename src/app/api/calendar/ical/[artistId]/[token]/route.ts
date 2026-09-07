@@ -1,4 +1,4 @@
-import { redactContact } from "@/lib/privacy/contact-redaction";
+import { bookingTextForViewer } from "@/lib/privacy/booking-text";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -104,6 +104,9 @@ export async function GET(
   ];
 
   for (const b of bookings) {
+    const shared = b.status === "confirmed_by_client";
+    const clientName = bookingTextForViewer(b.clientName, shared);
+    const eventType = bookingTextForViewer(b.eventType, shared) ?? "Eveniment";
     const uid = `booking-${b.id}@epetrecere.md`;
     const start = formatDate(b.eventDate);
     // iCal all-day DTEND is exclusive (next day)
@@ -112,14 +115,14 @@ export async function GET(
     const end = formatDate(endDate);
     const title =
       b.status === "confirmed_by_client"
-        ? `✅ ${b.eventType ?? "Eveniment"} — ${b.clientName}`
-        : `🟡 ${b.eventType ?? "Eveniment"} — ${b.clientName}`;
+        ? `✅ ${eventType} — ${clientName}`
+        : `🟡 ${eventType} — ${clientName}`;
     const descParts = [
-      `Client: ${b.clientName}`,
+      `Client: ${clientName}`,
       b.status === "confirmed_by_client" && b.clientPhone ? `Telefon: ${b.clientPhone}` : "",
       b.guestCount ? `Invitați: ${b.guestCount}` : "",
       b.startTime && b.endTime ? `Ora: ${b.startTime}–${b.endTime}` : "",
-      b.message ? `Mesaj: ${b.status === "confirmed_by_client" ? b.message : redactContact(b.message)}` : "",
+      b.message ? `Mesaj: ${bookingTextForViewer(b.message, shared)}` : "",
     ].filter(Boolean);
 
     lines.push(

@@ -12,6 +12,18 @@ export function assertQaFixture(state, persona) {
   return user;
 }
 
+/** Temporary input for creating bookings only, never a delivery test.
+ * NANPA reserves 555-0100 through 555-0199 as fictitious, non-working numbers:
+ * https://nanpa.com/numbering/555-line-numbers
+ * Restore `safe-contact client` immediately after creation, BEFORE any vendor
+ * status changes: critical WhatsApp delivery ignores optional channel prefs.
+ */
+export function qaBookingContact(state, persona) {
+  if (persona !== 'client') throw new Error('Refusing booking contact: only the isolated QA client is allowed');
+  assertQaFixture(state, persona);
+  return '+12025550123';
+}
+
 export function assertQaAppUser(rows, user) {
   if (!Array.isArray(rows) || rows.length !== 1 || rows[0].id !== user.id ||
       rows[0].clerk_id !== user.clerkId || rows[0].email !== user.email) {

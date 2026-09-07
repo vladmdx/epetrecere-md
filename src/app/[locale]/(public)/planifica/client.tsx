@@ -19,6 +19,7 @@ import { localizeMoldovaCity, MOLDOVA_CITIES } from "@/lib/moldova-cities";
 import { useLocalizedRouter } from "@/components/shared/locale-link";
 import { useLocalizePath } from "@/components/shared/locale-link";
 import { PrivacyNotice } from "@/components/shared/privacy-notice";
+import { beginWizardSubmission, clearWizardSubmission, submitPendingWizard } from "@/lib/wizard/submission";
 
 // ═══════════════════════════════════════════════
 // TYPES
@@ -203,6 +204,7 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
   const [step, setStep] = useState(0);
   const [data, setData] = useState<WizardData>(initialData);
   const [submitting, setSubmitting] = useState(false);
+  const [draftRestored, setDraftRestored] = useState(false);
   /** Why "Continuă" refused, shown next to the button. */
   const [stepError, setStepError] = useState<string | null>(null);
   const stepErrorRef = useRef<HTMLDivElement | null>(null);
@@ -225,6 +227,7 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
       }
     } else {
       sessionStorage.removeItem(planIdKey);
+      clearWizardSubmission(adminMode);
     }
     const eventType = searchParams.get("eventType");
     if (eventType) {
@@ -255,14 +258,16 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
       setStep((s) => (s === 0 && eventType ? 1 : s));
     }
     setData(next);
+    setDraftRestored(true);
     // Run only on mount — search params change after navigation should
     // not silently rewrite the wizard mid-edit.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storageKey, planIdKey]);
 
   useEffect(() => {
+    if (!draftRestored) return;
     sessionStorage.setItem(storageKey, JSON.stringify(data));
-  }, [data, storageKey]);
+  }, [data, storageKey, draftRestored]);
 
   // Pre-fill email/phone when user is signed in. We DO NOT pre-fill `name`
   // — that field is the *event* title (e.g. "Nunta Ana & Ion"), not the
@@ -399,6 +404,7 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
       toast.error(t("wizard.toastNameRequired"));
       return;
     }
+    beginWizardSubmission(data, user?.id ?? null, adminMode);
 
     // Public login gate (M0a #5). Admin mode skips this — admin is already
     // authenticated via the admin layout. Unauthenticated public users are
@@ -455,25 +461,13 @@ export function WizardClient({ adminMode = false, categories: initialCategories 
         }),
       }).catch(() => { /* non-fatal */ });
 
-      const planRes = await fetch("/api/event-plans/from-wizard", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
-
-      if (planRes.ok) {
-        const payload = await planRes.json();
-        const planId = payload?.plan?.id;
-        if (planId) {
-          sessionStorage.setItem(planIdKey, String(planId));
-          toast.success(t("form.submit_success"));
-          // Land on Săli first if the user said they need a venue — that
-          // matches the new tab order (Săli before Rezervări Artiști).
-          // Otherwise jump straight to Rezervări Artiști.
-          const initialTab = data.venueNeeded === "yes" ? "venues" : "bookings";
-          router.push(`/cabinet/planifica/${planId}?tab=${initialTab}`);
-          return;
-        }
+      const planId = user?.id ? await submitPendingWizard(user.id) : null;
+      if (planId) {
+        toast.success(t("form.submit_success"));
+        // Land on Săli first when the submitted plan needs a venue.
+        const initialTab = data.venueNeeded === "yes" ? "venues" : "bookings";
+        router.push(`/cabinet/planifica/${planId}?tab=${initialTab}`);
+        return;
       }
 
       // Fallback — couldn't create plan, still show the old results page.

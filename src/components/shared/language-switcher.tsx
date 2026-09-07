@@ -4,6 +4,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { useRouter, usePathname } from "next/navigation";
 import { localizePath, splitLocale, type AppLocale } from "@/lib/i18n/routing";
 import { locales, localeNames } from "@/i18n";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +18,7 @@ const localeFlags = {
   en: "🇬🇧",
 } as const;
 
-export function LanguageSwitcher() {
+export function LanguageSwitcher({ compactOnMobile = false }: { compactOnMobile?: boolean } = {}) {
   const { locale, setLocale, t } = useLocale();
   const router = useRouter();
   const pathname = usePathname() || "/";
@@ -44,7 +45,10 @@ export function LanguageSwitcher() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="inline-flex items-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium hover:bg-accent"
+        className={cn(
+          "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium hover:bg-accent",
+          compactOnMobile && "h-9 w-9 gap-0 p-0 sm:h-10 sm:w-auto sm:gap-1.5 sm:px-2 sm:py-2",
+        )}
         aria-label={`${t("a11y.currentLanguage")}: ${localeNames[locale]}`}
       >
         <span
@@ -53,7 +57,7 @@ export function LanguageSwitcher() {
         >
           {localeFlags[locale]}
         </span>
-        <span className="uppercase text-xs font-medium">{locale}</span>
+        <span className={cn("uppercase text-xs font-medium", compactOnMobile && "hidden sm:inline")}>{locale}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {locales.map((l) => (

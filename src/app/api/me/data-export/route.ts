@@ -36,6 +36,8 @@ import {
   revealGuestListRecord,
   revealInvitationGuestRecord,
 } from "@/lib/privacy/guest-encryption";
+import { bookingForDataExport, dataExportChatProjection } from "@/lib/privacy/export-contact";
+import { notificationsForUser } from "@/lib/privacy/notification-view";
 
 export async function GET() {
   const { userId: clerkId } = await auth();
@@ -58,7 +60,7 @@ export async function GET() {
     userLeads,
     userPlans,
     userReviews,
-    userConversations,
+    clientConversations,
     userInvitations,
     userPhotos,
     artistProfiles,
@@ -95,7 +97,7 @@ export async function GET() {
 
   const artistIds = artistProfiles.map((profile) => profile.id);
   const venueIds = venueProfiles.map((profile) => profile.id);
-  const [ownedArtistImages, ownedArtistVideos, ownedVenueImages, vendorBookings] =
+  const [ownedArtistImages, ownedArtistVideos, ownedVenueImages, vendorBookings, vendorConversations] =
     await Promise.all([
       artistIds.length
         ? db.select().from(artistImages).where(inArray(artistImages.artistId, artistIds))
@@ -121,9 +123,18 @@ export async function GET() {
                   : inArray(bookingRequests.venueId, venueIds),
             )
         : Promise.resolve([]),
+      artistIds.length || venueIds.length
+        ? db.select().from(conversations).where(or(
+            ...(artistIds.length ? [inArray(conversations.artistId, artistIds)] : []),
+            ...(venueIds.length ? [inArray(conversations.venueId, venueIds)] : []),
+          ))
+        : Promise.resolve([]),
     ]);
 
   // Chat messages are scoped via conversations (no direct user FK).
+  const userConversations = Array.from(new Map(
+    [...clientConversations, ...vendorConversations].map(conversation => [conversation.id, conversation]),
+  ).values());
   const conversationIds = userConversations.map((c) => c.id);
   const bookingIds = Array.from(
     new Set([...clientBookings, ...vendorBookings].map((booking) => booking.id)),
@@ -139,6 +150,9 @@ export async function GET() {
   const userMessages = Array.from(
     new Map([...conversationMessages, ...bookingMessages].map((message) => [message.id, message])).values(),
   );
+  const allBookings = Array.from(new Map([...clientBookings, ...vendorBookings].map(booking => [booking.id, booking])).values());
+  const exportOwner = { userId: user.id, artistIds, venueIds };
+  const visibleChat = dataExportChatProjection(userConversations, userMessages, allBookings, exportOwner);
 
   // Fetch guests for each invitation.
   const guestsByInvitation: Record<number, unknown[]> = {};
@@ -179,8 +193,8 @@ export async function GET() {
       guests: plannerGuestsByPlan[plan.id] ?? [],
     })),
     reviews: userReviews,
-    messages: userMessages,
-    conversations: userConversations,
+    messages: visibleChat.messages,
+    conversations: visibleChat.conversations,
     invitations: userInvitations.map((i) => ({
       ...i,
       guests: guestsByInvitation[i.id] ?? [],
@@ -197,11 +211,9 @@ export async function GET() {
         images: ownedVenueImages.filter((image) => image.venueId === profile.id),
       })),
     },
-    bookingRequests: Array.from(
-      new Map([...clientBookings, ...vendorBookings].map((booking) => [booking.id, booking])).values(),
-    ),
+    bookingRequests: allBookings.map(booking => bookingForDataExport(booking, exportOwner)),
     legalAcceptances: userLegalAcceptances,
-    notifications: userNotifications,
+    notifications: await notificationsForUser(userNotifications, user.id),
     aiConversations: userAiConversations,
     wishlist: userWishlist,
     pushSubscriptions: userPushSubscriptions,

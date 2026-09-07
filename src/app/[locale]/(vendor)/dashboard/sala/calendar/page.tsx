@@ -16,6 +16,8 @@ import {
 } from "@/lib/db/schema";
 import { getVenueIcalToken } from "@/lib/calendar/ical-token";
 import { VenueCalendarClient } from "./client";
+import { bookingTextForViewer } from "@/lib/privacy/booking-text";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -118,7 +120,10 @@ export default async function VenueCalendarPage({
       monthYear={monthYear}
       monthIndex={monthIndex}
       events={events}
-      bookings={bookingsRows}
+      bookings={bookingsRows.map(booking => ({ ...booking,
+        clientName: bookingTextForViewer(booking.clientName, contactsAreShared(booking.status)),
+        eventType: bookingTextForViewer(booking.eventType, contactsAreShared(booking.status)),
+      }))}
       initialDate={sp.date || null}
       icalUrl={icalUrl}
       googleConnected={!!appUser.googleRefreshToken}

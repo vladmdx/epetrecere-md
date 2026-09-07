@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "@/components/shared/locale-link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useId } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -160,12 +160,23 @@ function UserMenu() {
   const [open, setOpen] = useState(false);
   const { userRole } = useUserRole();
   const { t } = useLocale();
+  const menuRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+
+  useEffect(() => {
+    if (!open) return;
+    function dismissOutside(event: PointerEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", dismissOutside);
+    return () => document.removeEventListener("pointerdown", dismissOutside);
+  }, [open]);
 
   if (!isSignedIn) {
     return (
       <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
         <Link href="/sign-in">
-          <Button variant="ghost" size="icon" aria-label={t("header.signIn")}>
+          <Button variant="ghost" size="icon" className="h-9 w-9" aria-label={t("header.signIn")}>
             <User className="h-5 w-5" />
           </Button>
         </Link>
@@ -189,8 +200,12 @@ function UserMenu() {
   }
 
   return (
-    <div className="relative" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
-      <Button variant="ghost" size="icon" aria-label={t("header.myAccount")} className="relative">
+    <div
+      ref={menuRef}
+      className="relative shrink-0"
+      onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
+    >
+      <Button variant="ghost" size="icon" aria-label={t("header.myAccount")} aria-expanded={open} aria-controls={menuId} className="relative h-9 w-9" onClick={() => setOpen((value) => !value)}>
         {user?.imageUrl ? (
           <img src={user.imageUrl} alt="" className="h-7 w-7 rounded-full" />
         ) : (
@@ -200,6 +215,7 @@ function UserMenu() {
       <AnimatePresence>
         {open && (
           <motion.div
+            id={menuId}
             initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 4 }}
             className="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-border/40 bg-popover p-2 shadow-lg"
           >
@@ -237,6 +253,15 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => { const h = () => setScrolled(window.scrollY > 50); window.addEventListener("scroll", h); return () => window.removeEventListener("scroll", h); }, []);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [wideActions, setWideActions] = useState(false);
+  const { isSignedIn } = useUser();
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setWideActions(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
   const { t } = useLocale();
   const { userRole } = useUserRole();
   // Hide the "Plan event" CTA for vendors and admins — it's a client-
@@ -249,14 +274,14 @@ export function Header() {
     // over anything see-through it reads as a black rectangle sliding across
     // the page. Matching the colour exactly makes the edges disappear.
     <header className={`fixed top-0 z-50 w-full bg-[#070707] transition-all duration-300 ${scrolled ? "border-b border-gold/10 shadow-lg" : "border-b border-transparent"}`}>
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 lg:px-8">
+      <div data-header-bar className="mx-auto flex h-16 min-w-0 max-w-7xl items-center justify-between gap-2 px-3 sm:gap-4 sm:px-4 lg:px-8">
         {/* Logo */}
         <Link
           href="/"
-          className="flex shrink-0 items-center text-white"
+          className="flex min-w-0 shrink items-center text-white"
           aria-label="ePetrecere.md"
         >
-          <BrandLogo priority className="h-8 w-auto sm:h-9" />
+          <BrandLogo priority className="h-auto w-[120px] max-w-full min-[375px]:w-[144px] min-[430px]:w-[168px] sm:h-9 sm:w-auto" />
         </Link>
 
         {/* Desktop navigation */}
@@ -280,12 +305,12 @@ export function Header() {
         </nav>
 
         {/* Right Actions — always on dark header bg, so force light icon/text in both themes */}
-        <div className="flex items-center gap-2 text-white/90">
+        <div data-header-actions className="flex shrink-0 items-center gap-0.5 text-white/90 sm:gap-2">
           {showPlannerCta && (
             <Link href="/planifica" aria-label={t("nav.planner")} title={t("nav.planner")}>
-              <Button className="h-9 min-w-9 rounded-full bg-gold px-2 text-[#0D0D0D] shadow-[0_4px_18px_rgba(201,168,76,.22)] hover:bg-gold-dark sm:rounded-lg sm:px-4">
-                <CalendarPlus className="h-4 w-4 sm:mr-2" aria-hidden />
-                <span className="hidden whitespace-nowrap text-sm font-semibold sm:inline">
+              <Button className="h-9 w-9 rounded-full bg-gold p-0 text-[#0D0D0D] shadow-[0_4px_18px_rgba(201,168,76,.22)] hover:bg-gold-dark md:w-auto md:rounded-lg md:px-4">
+                <CalendarPlus className="h-4 w-4 md:mr-2" aria-hidden />
+                <span className="hidden whitespace-nowrap text-sm font-semibold md:inline">
                   {t("nav.planner")}
                 </span>
               </Button>
@@ -293,16 +318,15 @@ export function Header() {
           )}
           {/* Bells self-gate to signed-in users, so the signed-out marketing
               header stays clean (matches the design). */}
-          <ChatBell />
-          <NotificationBell />
-          <LanguageSwitcher />
+          {wideActions && <><ChatBell /><NotificationBell /></>}
+          <LanguageSwitcher compactOnMobile />
           <UserMenu />
           <Button
             variant="ghost"
             size="icon"
             aria-label={mobileOpen ? t("header.closeMenu") : t("header.openMenu")}
             aria-expanded={mobileOpen}
-            className="text-white/90 hover:bg-white/10 hover:text-white xl:hidden"
+            className="h-9 w-9 text-white/90 hover:bg-white/10 hover:text-white xl:hidden"
             onClick={() => setMobileOpen(!mobileOpen)}
           >
             {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -310,16 +334,30 @@ export function Header() {
         </div>
       </div>
 
-      {/* Mobile Nav */}
-      <AnimatePresence>
-        {mobileOpen && (
+      {/* Keep the mobile bells mounted while the menu is closed so their
+          unread polling and notification sounds continue. Inert + visibility
+          also hide fixed-position bell popovers and remove all focus targets. */}
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="max-h-[calc(100vh-4rem)] overflow-y-auto border-t border-white/10 bg-[#090c12]/98 xl:hidden"
+            data-mobile-nav
+            initial={false}
+            animate={{ opacity: mobileOpen ? 1 : 0, height: mobileOpen ? "auto" : 0 }}
+            aria-hidden={!mobileOpen}
+            inert={!mobileOpen}
+            className={`max-h-[calc(100dvh-4rem)] overflow-y-auto border-white/10 bg-[#090c12]/98 xl:hidden ${mobileOpen ? "visible border-t" : "invisible pointer-events-none"}`}
           >
             <nav className="flex flex-col gap-1 px-4 py-4">
+              {!wideActions && isSignedIn && (
+                <div data-mobile-communications className="mb-3 grid grid-cols-2 gap-3 border-b border-white/10 pb-3">
+                  <div className="flex min-w-0 items-center justify-between gap-1 text-xs text-white/80">
+                    <span className="min-w-0 break-words">{t("chat.bell.title")}</span>
+                    <ChatBell />
+                  </div>
+                  <div className="flex min-w-0 items-center justify-between gap-1 text-xs text-white/80">
+                    <span className="min-w-0 break-words">{t("notifications.title")}</span>
+                    <NotificationBell />
+                  </div>
+                </div>
+              )}
               <div className="mb-3 lg:hidden"><SearchAutocomplete /></div>
               <Link href="/sali" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-white/76 hover:bg-white/[.05] hover:text-gold">{t("nav.locations")}</Link>
               <Link href="/artisti" onClick={() => setMobileOpen(false)} className="rounded-lg px-3 py-2 text-sm text-white/76 hover:bg-white/[.05] hover:text-gold">{t("nav.artists")}</Link>
@@ -355,8 +393,6 @@ export function Header() {
               )}
             </nav>
           </motion.div>
-        )}
-      </AnimatePresence>
     </header>
   );
 }

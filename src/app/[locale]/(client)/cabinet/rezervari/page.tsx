@@ -38,6 +38,8 @@ import type { BookingPriceOffer } from "@/components/planner/price-negotiation-p
 import { useLocale } from "@/hooks/use-locale";
 import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
 import { canNegotiate, parseOfferAmount } from "@/lib/booking/negotiation";
+import { pendingBookingWindow } from "@/lib/booking/response-window";
+import { formatBookingDate } from "@/lib/format/booking-date";
 
 interface BookingRequest {
   id: number;
@@ -491,7 +493,7 @@ export default function ReservationsPage() {
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5" />
-                  {new Date(b.eventDate).toLocaleDateString("ro-MD", { day: "numeric", month: "long", year: "numeric" })}
+                  {formatBookingDate(b.eventDate, locale)}
                 </span>
                 {b.startTime && (
                   <span className="flex items-center gap-1">
@@ -554,7 +556,7 @@ export default function ReservationsPage() {
                           )}
                         </div>
                         <span className="shrink-0 text-[10px] text-muted-foreground/60 whitespace-nowrap">
-                          {new Date(offer.at).toLocaleDateString("ro-MD", { day: "numeric", month: "short" })}
+                          {formatBookingDate(offer.at, locale, { day: "numeric", month: "short" })}
                         </span>
                       </div>
                     ))}
@@ -570,7 +572,7 @@ export default function ReservationsPage() {
 
               <p className="text-[10px] text-muted-foreground/60">
                 {t("cabinet.reservations.sentOn", {
-                  date: new Date(b.createdAt).toLocaleDateString("ro-MD"),
+                  date: formatBookingDate(b.createdAt, locale, { day: "numeric", month: "numeric", year: "numeric" }),
                 })}
               </p>
             </div>
@@ -614,7 +616,7 @@ export default function ReservationsPage() {
 
               {/* Cancel — only after the partner has actually accepted.
                   While the request is "pending" the client has to wait
-                  out the 24h response window. Cancelling pre-acceptance
+                  out the applicable response window. Cancelling pre-acceptance
                   rewards no-one and racks up cancelled-by-client noise
                   in the partner's CRM. After acceptance the client can
                   still back out. */}
@@ -631,7 +633,7 @@ export default function ReservationsPage() {
                 </Button>
               )}
               {b.status === "pending" && (
-                <PendingCountdown createdAt={b.createdAt} />
+                <PendingCountdown booking={b} />
               )}
 
               {vendorHref && (
@@ -650,44 +652,31 @@ export default function ReservationsPage() {
 }
 
 /**
- * Live 24-hour countdown for pending bookings. Replaces the old "you
- * can cancel any time" affordance — the client sees how long the
- * partner has left to respond instead. Auto-expiry happens server-side
- * via the cron sweep; this is purely UI feedback.
+ * Pending requests expire after 24h for artists and 72h for venues.
+ * The last offer determines whose answer is expected, not the deadline.
+ * The server performs expiry; this component only displays the countdown.
  */
-function PendingCountdown({ createdAt }: { createdAt: string }) {
+function PendingCountdown({ booking }: { booking: BookingRequest }) {
   const { t } = useLocale();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
-  const created = new Date(createdAt).getTime();
-  const expiresAt = created + 24 * 60 * 60 * 1000;
-  const remaining = Math.max(0, expiresAt - now);
-  const hours = Math.floor(remaining / (60 * 60 * 1000));
-  const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
-  const expired = remaining === 0;
+  const { hours, minutes, expiryDue, awaitingClient } = pendingBookingWindow(booking, now);
   return (
     <div
       className={cn(
         "rounded-lg border px-3 py-1.5 text-center text-xs font-medium",
-        expired
+        expiryDue
           ? "border-destructive/40 bg-destructive/5 text-destructive"
           : "border-amber-500/40 bg-amber-500/5 text-amber-500",
       )}
     >
-      {expired ? (
-        t("cabinet.reservations.expired")
-      ) : (
-        <>
-          {t("cabinet.reservations.countdownPrefix")}{" "}
-          <strong>
-            {hours}h {String(minutes).padStart(2, "0")}m
-          </strong>{" "}
-          {t("cabinet.reservations.countdownSuffix")}
-        </>
-      )}
+      {awaitingClient && !expiryDue && <p className="mb-1">{t("cabinet.reservations.awaitingYourReply")}</p>}
+      {expiryDue ? t("cabinet.reservations.pendingExpiryDue")
+        : hours == null || minutes == null ? t("cabinet.reservations.pendingExpiryUnavailable")
+        : t("cabinet.reservations.pendingExpiresIn", { hours, minutes: String(minutes).padStart(2, "0") })}
     </div>
   );
 }
@@ -725,7 +714,7 @@ function BookingsByEvent({
         const headerLabel =
           dateKey === "fără-dată"
             ? t("cabinet.reservations.noDate")
-            : new Date(dateKey + "T00:00:00").toLocaleDateString("ro-MD", {
+            : formatBookingDate(dateKey, locale, {
                 weekday: "long",
                 day: "numeric",
                 month: "long",

@@ -1,4 +1,4 @@
-import { redactContact } from "@/lib/privacy/contact-redaction";
+import { bookingTextForViewer } from "@/lib/privacy/booking-text";
 // Venue bookings queries — the venue's view of incoming requests.
 // Uses the unified booking_requests table with venueId set.
 
@@ -123,7 +123,6 @@ export async function getVenueBookings(
           inArray(bookingRequests.eventPlanId, planIds),
           isNotNull(bookingRequests.artistId),
           inArray(bookingRequests.status, [
-            "accepted",
             "confirmed_by_client",
             "completed",
           ]),
@@ -169,13 +168,17 @@ export async function getVenueBookings(
     const canSeeContact = contactSharedStatuses.has(r.status);
     return {
       ...r,
+      clientName: bookingTextForViewer(r.clientName, canSeeContact),
+      planTitle: bookingTextForViewer(r.planTitle, canSeeContact),
+      eventType: bookingTextForViewer(r.eventType, canSeeContact),
       priceOffers: visiblePriceOffers(r.priceOffers, r.status),
-      message: !canSeeContact && r.message ? redactContact(r.message) : r.message,
-      artistReply: !canSeeContact && r.artistReply ? redactContact(r.artistReply) : r.artistReply,
+      message: bookingTextForViewer(r.message, canSeeContact),
+      artistReply: bookingTextForViewer(r.artistReply, canSeeContact),
       clientPhone: canSeeContact ? r.clientPhone : null,
       clientEmail: canSeeContact ? r.clientEmail : null,
       userEmail: canSeeContact ? r.userEmail : null,
-      linkedArtists: r.eventPlanId ? linkedMap.get(r.eventPlanId) ?? [] : [],
+      linkedArtists: (r.eventPlanId ? linkedMap.get(r.eventPlanId) ?? [] : [])
+        .map(artist => ({ ...artist, name: bookingTextForViewer(artist.name, canSeeContact) })),
       sameDayBookingsCount: sameDateCounts.get(r.eventDate) ?? 0,
     };
   });

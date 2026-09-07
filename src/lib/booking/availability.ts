@@ -6,6 +6,7 @@
 
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { bookingTextForViewer } from "@/lib/privacy/booking-text";
 import {
   artists,
   bookingRequests,
@@ -238,7 +239,7 @@ export async function checkArtistAvailability(opts: {
           eventDate: b.eventDate,
           startTime: b.startTime,
           endTime: b.endTime,
-          clientName: b.clientName,
+          clientName: bookingTextForViewer(b.clientName, false),
           status: b.status,
         },
       };
@@ -343,7 +344,7 @@ export async function checkVenueAvailability(opts: {
           eventDate: b.eventDate,
           startTime: b.startTime,
           endTime: b.endTime,
-          clientName: b.clientName,
+          clientName: bookingTextForViewer(b.clientName, false),
           status: b.status,
         },
       };

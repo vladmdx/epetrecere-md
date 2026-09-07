@@ -26,6 +26,7 @@ import { plural, NOUNS } from "@/lib/i18n/plural";
 import { useLocale } from "@/hooks/use-locale";
 import { useLocalizedRouter } from "@/components/shared/locale-link";
 import { useLocalizePath } from "@/components/shared/locale-link";
+import { submitPendingWizard } from "@/lib/wizard/submission";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,9 +68,8 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
   const router = useLocalizedRouter();
   const { t } = useLocale();
   const lp = useLocalizePath();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
   const storageKey = adminMode ? "admin-wizard-data" : "wizard-data";
-  const planIdKey = adminMode ? "admin-wizard-plan-id" : "wizard-plan-id";
   const backRoute = adminMode ? "/admin/eveniment-nou" : "/planifica";
   const [wizard, setWizard] = useState<WizardData | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -117,38 +117,23 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
     if (!isLoaded || !wizard) return;
     if (!adminMode && !isSignedIn) return;
 
-    const cached = sessionStorage.getItem(planIdKey);
-    if (cached) {
-      if (!adminMode) {
-        router.replace(`/cabinet/planifica/${cached}?tab=bookings`);
-        return;
-      }
-      setPlanId(Number(cached));
-      return;
-    }
+    if (!user?.id) return;
 
     (async () => {
       try {
-        const res = await fetch("/api/event-plans/from-wizard", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(wizard),
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data?.plan?.id) {
-          sessionStorage.setItem(planIdKey, String(data.plan.id));
+        const createdPlanId = await submitPendingWizard(user.id, adminMode);
+        if (createdPlanId) {
           if (!adminMode) {
-            router.replace(`/cabinet/planifica/${data.plan.id}?tab=bookings`);
+            router.replace(`/cabinet/planifica/${createdPlanId}?tab=bookings`);
             return;
           }
-          setPlanId(data.plan.id);
+          setPlanId(createdPlanId);
         }
       } catch {
         /* non-fatal */
       }
     })();
-  }, [isLoaded, isSignedIn, wizard, adminMode, planIdKey, router]);
+  }, [isLoaded, isSignedIn, wizard, adminMode, user?.id, router]);
 
   // Load categories
   useEffect(() => {

@@ -49,6 +49,8 @@ import { cn } from "@/lib/utils";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import type { VenueBookingTab } from "@/lib/db/queries/venue-bookings";
 import { useLocale } from "@/hooks/use-locale";
+import { formatBookingDate } from "@/lib/format/booking-date";
+import { canCompleteBooking } from "@/lib/booking/completion-eligibility";
 import { canNegotiate, parseOfferAmount, type PriceOffer } from "@/lib/booking/negotiation";
 
 interface Booking {
@@ -530,7 +532,7 @@ export function VenueBookingsClient({
                 <option value="all">{t("common.all")}</option>
                 {availableEventTypes.map((t) => (
                   <option key={t} value={t}>
-                    {eventTypeLabel(normalizeEventType(t))}
+                    {eventTypeLabel(normalizeEventType(t), locale)}
                   </option>
                 ))}
               </select>
@@ -615,7 +617,7 @@ export function VenueBookingsClient({
           {visibleBookings.map((b) => {
             const eventKey = (b.eventType || "other").toLowerCase();
             const eventTypeKey = normalizeEventType(b.eventType);
-            const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey) : t("vendorSalaBookings.eventFallback");
+            const eventLabel = eventTypeKey ? eventTypeLabel(eventTypeKey, locale) : t("vendorSalaBookings.eventFallback");
             const borderColor = EVENT_TYPE_BORDER[eventKey] || "border-l-muted-foreground";
             const overCapacity =
               venueCapacityMax !== null &&
@@ -667,7 +669,7 @@ export function VenueBookingsClient({
                       {/* Event date (big) */}
                       <div>
                         <h3 className="font-heading text-xl font-bold">
-                          {new Date(b.eventDate).toLocaleDateString("ro-RO", {
+                          {formatBookingDate(b.eventDate, locale, {
                             weekday: "long",
                             day: "numeric",
                             month: "long",
@@ -874,7 +876,7 @@ export function VenueBookingsClient({
                         <Button
                           size="sm"
                           onClick={() => setCompleteDialog(b)}
-                          disabled={busy === b.id || b.status !== "confirmed_by_client"}
+                          disabled={busy === b.id || !canCompleteBooking(b)}
                           className="gap-1.5 bg-emerald-600 text-white hover:bg-emerald-700"
                         >
                           <CheckCircle className="h-4 w-4" />
@@ -955,9 +957,9 @@ export function VenueBookingsClient({
                     : "vendorSalaBookings.acceptDialogDescription",
                   {
                     type: acceptDialog.eventType
-                      ? eventTypeLabel(normalizeEventType(acceptDialog.eventType))
+                      ? eventTypeLabel(normalizeEventType(acceptDialog.eventType), locale)
                       : t("vendorSalaBookings.eventWord"),
-                    date: new Date(acceptDialog.eventDate).toLocaleDateString("ro-RO", {
+                    date: formatBookingDate(acceptDialog.eventDate, locale, {
                       day: "numeric",
                       month: "long",
                       year: "numeric",
@@ -1027,7 +1029,7 @@ export function VenueBookingsClient({
               {completeDialog &&
                 t("vendorSalaBookings.completeDialogDescription", {
                   name: completeDialog.clientName,
-                  date: new Date(completeDialog.eventDate).toLocaleDateString("ro-RO", {
+                  date: formatBookingDate(completeDialog.eventDate, locale, {
                     day: "numeric",
                     month: "long",
                     year: "numeric",

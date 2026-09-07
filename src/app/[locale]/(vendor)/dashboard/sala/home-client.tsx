@@ -3,10 +3,11 @@
 // Home dashboard for the venue — KPI cards + mini calendar + activity feed
 // + recent bookings table. Server wrapper passes pre-computed data.
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "@/components/shared/locale-link";
 import { PublicationStatusNotice } from "@/components/vendor/publication-status-notice";
 import { CalendarWeekdays } from "@/components/shared/calendar-weekdays";
+import { LegacyVenueHistory } from "@/components/vendor/legacy-venue-history";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -76,6 +77,7 @@ interface Props {
   stats: VenueStats;
   activity: ActivityItem[];
   recentBookings: RecentBooking[];
+  legacyBookings: RecentBooking[];
   monthCalendar: CalendarDay[];
   monthYear: number;
   monthIndex: number;
@@ -137,6 +139,7 @@ export function VenueHomeDashboard({
   stats,
   activity,
   recentBookings: initialBookings,
+  legacyBookings,
   monthCalendar,
   monthYear,
   monthIndex,
@@ -146,6 +149,7 @@ export function VenueHomeDashboard({
   const [recentBookings, setRecentBookings] =
     useState<RecentBooking[]>(initialBookings);
   const [actioning, setActioning] = useState<number | null>(null);
+  useEffect(() => { setRecentBookings(initialBookings); }, [initialBookings]);
 
   async function quickAccept(id: number) {
     setActioning(id);
@@ -180,7 +184,7 @@ export function VenueHomeDashboard({
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          action: "decline",
+          action: "reject",
           reply: t("vendor.venueHome.quickDeclineReply"),
         }),
       });
@@ -571,6 +575,7 @@ export function VenueHomeDashboard({
           )}
         </CardContent>
       </Card>
+      <LegacyVenueHistory summary={stats.legacy} rows={legacyBookings} locale={locale} />
     </div>
   );
 }
@@ -699,7 +704,7 @@ function StatusBadge({ status }: { status: string }) {
       icon: CheckCircle2,
     },
   };
-  const c = cfg[status] || cfg.pending;
+  const c = cfg[status === "confirmed_by_client" ? "confirmed" : status === "rejected" ? "declined" : status] || cfg.pending;
   const Icon = c.icon;
   return (
     <span

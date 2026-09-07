@@ -18,6 +18,7 @@ import { sendPushToUser } from "@/lib/push/expo";
 import { sendEmail } from "@/lib/email/send";
 import { bookingRequestNewEmail } from "@/lib/email/templates/booking-request-new";
 import { redactContact } from "@/lib/privacy/contact-redaction";
+import { bookingTextForViewer } from "@/lib/privacy/booking-text";
 
 const bookingSchema = z.object({
   /** Either artistId or venueId must be set. */
@@ -307,22 +308,26 @@ export async function GET(req: NextRequest) {
   const payload = result.map((row) => {
     const showContact =
       !redactByDefault || SHARED_CONTACT_STATUSES.has(row.status);
+    const textShared = isAdmin || SHARED_CONTACT_STATUSES.has(row.status);
+    const linkedVenue = row.eventPlanId ? planToVenue.get(row.eventPlanId) ?? null : null;
     const cats =
       (row.artistCategoryIds ?? [])
         .map((id) => catNameById.get(id))
         .filter((n): n is string => Boolean(n));
     return {
       ...row,
+      clientName: bookingTextForViewer(row.clientName, showContact),
+      artistName: bookingTextForViewer(row.artistName, textShared),
+      venueName: bookingTextForViewer(row.venueName, textShared),
+      eventType: bookingTextForViewer(row.eventType, textShared),
       adminNotes: isAdmin ? row.adminNotes : null,
-      message: !SHARED_CONTACT_STATUSES.has(row.status) && row.message ? redactContact(row.message) : row.message,
-      artistReply: !SHARED_CONTACT_STATUSES.has(row.status) && row.artistReply ? redactContact(row.artistReply) : row.artistReply,
-      priceOffers: !SHARED_CONTACT_STATUSES.has(row.status) ? row.priceOffers?.map(o => ({ ...o, message: o.message ? redactContact(o.message) : o.message })) : row.priceOffers,
+      message: bookingTextForViewer(row.message, textShared),
+      artistReply: bookingTextForViewer(row.artistReply, textShared),
+      priceOffers: !textShared ? row.priceOffers?.map(o => ({ ...o, message: bookingTextForViewer(o.message, false) })) : row.priceOffers,
       clientPhone: showContact ? row.clientPhone : null,
       clientEmail: showContact ? row.clientEmail : null,
       categoryNames: cats,
-      linkedVenue: row.eventPlanId
-        ? planToVenue.get(row.eventPlanId) ?? null
-        : null,
+      linkedVenue: linkedVenue ? { ...linkedVenue, nameRo: bookingTextForViewer(linkedVenue.nameRo, textShared) } : null,
     };
   });
 

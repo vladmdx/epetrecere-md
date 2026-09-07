@@ -15,12 +15,14 @@ import {
 import { and, eq, gte, sql } from "drizzle-orm";
 import { getPlannerTemplate } from "@/lib/planner/templates";
 import { requireClientUser } from "@/lib/planner/ownership";
+import { createHash } from "node:crypto";
 
 const MAX_PLANS_PER_WEEK = 3;
 
 import { SERVICE_TO_CATEGORY_SLUG } from "@/lib/wizard/service-mapping";
 
 const wizardSchema = z.object({
+  submissionId: z.string().uuid().optional(),
   eventType: z.string().optional(),
   eventDate: z.string().optional(),
   location: z.string().optional(),
@@ -87,12 +89,30 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const w = parsed.data;
+  const { submissionId, ...w } = parsed.data;
+  const submissionHash = createHash("sha256").update(JSON.stringify(w)).digest("hex");
+
+  // Serialize submissions for this authenticated owner. The idempotency
+  // lookup, weekly limit, plan and checklist seed share one transaction, so
+  // concurrent effects and retries after a lost response cannot duplicate it.
+  return db.transaction(async (tx) => {
+    await tx.select({ id: users.id }).from(users).where(eq(users.id, auth.userId)).for("update");
+    if (submissionId) {
+      const [existing] = await tx.select().from(eventPlans).where(and(
+        eq(eventPlans.userId, auth.userId), eq(eventPlans.wizardSubmissionId, submissionId),
+      )).limit(1);
+      if (existing) {
+        if (existing.wizardSubmissionHash !== submissionHash) {
+          return NextResponse.json({ error: "This submission key belongs to a different wizard draft." }, { status: 409 });
+        }
+        return NextResponse.json({ plan: existing }, { status: 200 });
+      }
+    }
 
   // Per-week rate limit on plan creation. Mirrors the gate in
   // /api/event-plans POST so users hitting the wizard funnel can't
   // bypass by going through the from-wizard path.
-  const [me] = await db
+  const [me] = await tx
     .select({ role: users.role })
     .from(users)
     .where(eq(users.id, auth.userId))
@@ -100,7 +120,7 @@ export async function POST(req: NextRequest) {
   const isAdmin = me?.role === "admin" || me?.role === "super_admin";
   if (!isAdmin) {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const [recent] = await db
+    const [recent] = await tx
       .select({ count: sql<number>`count(*)::int` })
       .from(eventPlans)
       .where(
@@ -126,7 +146,7 @@ export async function POST(req: NextRequest) {
       .map((s) => SERVICE_TO_CATEGORY_SLUG[s])
       .filter(Boolean);
     if (slugs.length > 0) {
-      const found = await db
+      const found = await tx
         .select({ id: categories.id, slug: categories.slug })
         .from(categories);
       categoryIds = found.filter((c) => slugs.includes(c.slug)).map((c) => c.id);
@@ -143,10 +163,12 @@ export async function POST(req: NextRequest) {
     : "Eveniment";
   const title = w.name?.trim() || eventLabel;
 
-  const [plan] = await db
+  const [plan] = await tx
     .insert(eventPlans)
     .values({
       userId: auth.userId,
+      wizardSubmissionId: submissionId ?? null,
+      wizardSubmissionHash: submissionId ? submissionHash : null,
       title: title.slice(0, 120),
       eventType: w.eventType || null,
       eventDate: w.eventDate || null,
@@ -184,7 +206,7 @@ export async function POST(req: NextRequest) {
   if (w.checklistEnabled) {
     const template = getPlannerTemplate(plan.eventType);
     if (template.length > 0) {
-      await db.insert(checklistItems).values(
+      await tx.insert(checklistItems).values(
         template.map((item, idx) => ({
           planId: plan.id,
           title: item.title,
@@ -198,4 +220,5 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ plan }, { status: 201 });
+  });
 }

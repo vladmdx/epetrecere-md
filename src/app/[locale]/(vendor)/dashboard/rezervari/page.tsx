@@ -20,6 +20,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { formatBookingDate } from "@/lib/format/booking-date";
+import { canCompleteBooking } from "@/lib/booking/completion-eligibility";
 import { normalizeEventType, eventTypeLabel } from "@/lib/events/normalize";
 import { toast } from "sonner";
 
@@ -134,15 +136,10 @@ const statusConfig: Record<string, { labelKey: string; color: string }> = {
   completed: { labelKey: "vendor.bookingsPage.status.completed", color: "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" },
 };
 
-function formatDate(d: string | null): string {
-  if (!d) return "—";
-  const dt = new Date(d.includes("T") ? d : d + "T00:00:00");
-  return dt.toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" });
-}
-
 export default function VendorBookingsPage() {
   const { user, isLoaded } = useUser();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const formatDate = (date: string | null) => formatBookingDate(date, locale);
   // Deep-link support: the partner dashboard sends users here with
   // ?expand=<bookingId> when they click "Deschide cererea" or a row in
   // the recent-requests list. We pre-open that booking on mount and
@@ -644,7 +641,7 @@ export default function VendorBookingsPage() {
               const headerLabel =
                 dateKey === "fără-dată"
                   ? t("vendor.bookingsPage.noDateSet")
-                  : new Date(dateKey + "T00:00:00").toLocaleDateString("ro-MD", {
+                  : formatBookingDate(dateKey, locale, {
                       weekday: "long",
                       day: "numeric",
                       month: "long",
@@ -702,7 +699,7 @@ export default function VendorBookingsPage() {
                           </span>
                         )}
                         <span className="font-heading font-bold">
-                          {eventTypeKey ? eventTypeLabel(eventTypeKey) : t("vendor.bookingsPage.eventFallback")}
+                          {eventTypeKey ? eventTypeLabel(eventTypeKey, locale) : t("vendor.bookingsPage.eventFallback")}
                         </span>
                         {(() => {
                           const offers = booking.priceOffers ?? [];
@@ -934,7 +931,7 @@ export default function VendorBookingsPage() {
                       </Button>
                       <Button
                         size="sm"
-                        disabled={busy === booking.id}
+                        disabled={busy === booking.id || !canCompleteBooking(booking)}
                         onClick={() => handleComplete(booking.id)}
                         className="gap-1 bg-emerald-600 text-white hover:bg-emerald-700"
                       >
@@ -1030,7 +1027,7 @@ export default function VendorBookingsPage() {
                   <span className="text-muted-foreground">{t("vendor.bookingsPage.eventLabel")}</span>
                   <span>
                     {acceptDialog.eventType
-                      ? eventTypeLabel(normalizeEventType(acceptDialog.eventType))
+                      ? eventTypeLabel(normalizeEventType(acceptDialog.eventType), locale)
                       : "—"}
                   </span>
 
