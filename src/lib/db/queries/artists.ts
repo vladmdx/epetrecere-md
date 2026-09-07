@@ -293,7 +293,7 @@ export async function getArtistBySlug(slug: string) {
   const results = await db
     .select()
     .from(artists)
-    .where(eq(artists.slug, slug))
+    .where(and(eq(artists.slug, slug), eq(artists.isActive, true)))
     .limit(1);
 
   const artist = results[0];

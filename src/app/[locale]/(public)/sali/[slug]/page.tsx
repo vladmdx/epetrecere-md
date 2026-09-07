@@ -35,32 +35,9 @@ interface Props {
 }
 
 
-/**
- * Prerender the venue profiles at build time, one page per language. New rows
- * added after a deploy still work — dynamicParams defaults to true, so an
- * unknown slug renders on demand and is cached from then on.
- */
-export async function generateStaticParams() {
-  // Deliberately empty: nothing in this route is enumerated at build time.
-  //
-  // Building every one of these up front meant 1537 pages, each opening
-  // queries against a database in another region, on a two-core builder.
-  // Whichever page happened to be rendering when the shared connection pool
-  // ran dry would wait rather than fail — postgres.js queues instead of
-  // erroring — and Next.js would eventually kill it and take the whole
-  // deploy with it. The page that died moved every attempt, which is how the
-  // contention gave itself away.
-  //
-  // `dynamicParams` defaults to true, so every slug still resolves; the page
-  // is simply rendered on its first request and then cached under the
-  // `revalidate` below, which is where all but the first visitor was already
-  // being served from. What this costs is one slow request per page after a
-  // deploy. What it buys is a build that finishes.
-  return [];
-}
-
-/** Rebuild a profile at most hourly; owners edit these rarely. */
-export const revalidate = 3600;
+/** Publication can be withdrawn immediately. Do not serve an hour-old
+ * profile, booking CTA or metadata after the active flag changes. */
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale: rawLocale, slug } = await params;
@@ -72,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (redirectTarget) return { alternates: { canonical: redirectTarget } };
 
   const venue = publicCatalogData(await getVenueBySlug(slug), true);
-  if (!venue) return {};
+  if (!venue?.isActive) return { robots: { index: false, follow: false } };
 
   // Prefer explicit OG URL; fall back to the cover image from the gallery.
   const coverImage = venue.images?.find((i) => i.isCover) ?? venue.images?.[0];
@@ -127,11 +104,10 @@ export default async function VenuePage({ params }: Props) {
   if (redirectTarget) permanentRedirect(redirectTarget);
 
   const venue = await getVenueBySlug(slug);
-  if (!venue) notFound();
+  if (!venue?.isActive) notFound();
 
-  // Always the anonymous shape — see the note on the artist page. Reading
-  // the session here would keep this route out of the prerender, and the
-  // signed-in extras arrive from /api/public/gated-details in the browser.
+  // Always the anonymous shape. Signed-in extras arrive from
+  // /api/public/gated-details in the browser.
   const gatedVenue = publicCatalogData(venue);
 
   const name = getLocalized(gatedVenue, "name", locale);

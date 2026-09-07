@@ -118,7 +118,7 @@ export async function getVenueBySlug(slug: string) {
   const results = await db
     .select()
     .from(venues)
-    .where(eq(venues.slug, slug))
+    .where(and(eq(venues.slug, slug), eq(venues.isActive, true)))
     .limit(1);
 
   const venue = results[0];

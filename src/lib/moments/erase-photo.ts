@@ -1,5 +1,5 @@
 import { del, list } from "@vercel/blob";
-import { managedPhotoPath, type PhotoPlanScope } from "./managed-photo";
+import { canonicalBlobResultUrl, managedPhotoPath, type PhotoPlanScope } from "./managed-photo";
 
 export type PhotoErasure = "deleted" | "already_missing" | "retry" | "unverified";
 export const PHOTO_ERASURE_BATCH_SIZE = 20;
@@ -21,9 +21,9 @@ export async function eraseManagedPhoto(raw: string, plan: PhotoPlanScope): Prom
   try {
     const result = await list({ token, prefix: pathname, limit: 1, abortSignal: AbortSignal.timeout(OPERATION_TIMEOUT_MS) });
     if (result.blobs.length === 0 && !result.hasMore) return "already_missing";
-    const exact = result.blobs.find(blob => blob.pathname === pathname && blob.url === raw);
+    const exact = result.blobs.find(blob => blob.pathname === pathname && canonicalBlobResultUrl(blob.url) === raw);
     if (!exact) return "unverified";
-    await del(exact.url, { token, abortSignal: AbortSignal.timeout(OPERATION_TIMEOUT_MS) });
+    await del(raw, { token, abortSignal: AbortSignal.timeout(OPERATION_TIMEOUT_MS) });
     return "deleted";
   } catch { return "retry"; }
 }

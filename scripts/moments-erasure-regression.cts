@@ -26,7 +26,8 @@ const blob = {
     assert.equal(state.tx, false, "no Blob I/O while DB transaction holds locks");
     assert.ok(options.abortSignal); state.lists.push(options.prefix);
     if (state.listFail) throw Error("Synthetic outage");
-    return { blobs: [...state.blobs].filter(url => new URL(url).pathname.slice(1).startsWith(options.prefix)).map(url => ({ url, pathname: new URL(url).pathname.slice(1), size: 1 })).slice(0, 1), hasMore: false };
+    return { blobs: [...state.blobs].filter(url => new URL(url).pathname.slice(1).startsWith(options.prefix))
+      .map(url => ({ url: state.sdkMixedCase ? url.replace("fixture.", "FiXtUrE.") : url, pathname: new URL(url).pathname.slice(1), size: 1 })).slice(0, 1), hasMore: false };
   },
   del: async (url, options) => {
     assert.equal(state.tx, false); assert.ok(options.abortSignal); state.dels.push(url);
@@ -115,6 +116,8 @@ Module._load = function(request, parent, isMain) {
     }
     reset({ listFail: true }); assert.equal(await erasure.eraseManagedPhoto(urlFor(500), plan), "retry");
     assert.equal(state.dels.length, 0);
+    reset({ sdkMixedCase: true }); assert.equal(await erasure.eraseManagedPhoto(urlFor(500), plan), "deleted");
+    assert.deepEqual(state.dels, [urlFor(500)], "SDK host casing is normalized, deletion uses the canonical verified URL");
     console.log("PASS already-missing requires successful exact-store listing; foreign, wrong-plan, generic legacy and outage never authorize erasure");
 
     for (const [handler, context] of [[owner, ctx], [guest, ctx], [admin, { params: Promise.resolve({ id: "500" }) }]]) {

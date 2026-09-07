@@ -36,32 +36,9 @@ interface Props {
   params: Promise<{ locale: string; slug: string }>;
 }
 
-/**
- * Prerender the artist profiles at build time, one page per language. New rows
- * added after a deploy still work — dynamicParams defaults to true, so an
- * unknown slug renders on demand and is cached from then on.
- */
-export async function generateStaticParams() {
-  // Deliberately empty: nothing in this route is enumerated at build time.
-  //
-  // Building every one of these up front meant 1537 pages, each opening
-  // queries against a database in another region, on a two-core builder.
-  // Whichever page happened to be rendering when the shared connection pool
-  // ran dry would wait rather than fail — postgres.js queues instead of
-  // erroring — and Next.js would eventually kill it and take the whole
-  // deploy with it. The page that died moved every attempt, which is how the
-  // contention gave itself away.
-  //
-  // `dynamicParams` defaults to true, so every slug still resolves; the page
-  // is simply rendered on its first request and then cached under the
-  // `revalidate` below, which is where all but the first visitor was already
-  // being served from. What this costs is one slow request per page after a
-  // deploy. What it buys is a build that finishes.
-  return [];
-}
-
-/** Rebuild a profile at most hourly; owners edit these rarely. */
-export const revalidate = 3600;
+/** Publication can be withdrawn immediately. Do not serve an hour-old
+ * profile, booking CTA or metadata after the active flag changes. */
+export const revalidate = 0;
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale: rawLocale, slug } = await params;
@@ -71,7 +48,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (redirectTarget) return {};
 
   const artist = publicCatalogData(await getArtistBySlug(slug), true);
-  if (!artist) return {};
+  if (!artist?.isActive) return { robots: { index: false, follow: false } };
 
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   // The artist's name is data — only the words around it are translated.
@@ -120,11 +97,9 @@ export default async function ArtistPage({ params }: Props) {
   if (redirectTarget) permanentRedirect(redirectTarget);
 
   const artist = await getArtistBySlug(slug);
-  if (!artist) notFound();
+  if (!artist?.isActive) notFound();
 
-  // Always the anonymous shape. Reading the session here would opt this
-  // route out of prerendering, and it is one of the two most-crawled pages
-  // on the site; signed-in visitors get the withheld fields from
+  // Always the anonymous shape. Signed-in visitors get withheld fields from
   // /api/public/gated-details once the page is interactive.
   //
   // Phone and e-mail stay null for everyone: they are admin-only, and

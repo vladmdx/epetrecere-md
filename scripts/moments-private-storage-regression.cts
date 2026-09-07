@@ -32,12 +32,13 @@ const blob = {
   put: async (pathname, bytes, options) => {
     assert.equal(options.token, "test-private-no-network"); assert.equal(options.access, "private");
     assert.ok(options.abortSignal); state.put.push(pathname);
-    return { url: `https://fixture.private.blob.vercel-storage.com/${pathname}` };
+    return { url: `https://${state.sdkMixedCase ? "FiXtUrE" : "fixture"}.private.blob.vercel-storage.com/${pathname}` };
   },
   list: async options => {
     assert.ok(["test-private-no-network", "test-public-no-network"].includes(options.token));
     state.listed.push(options);
-    return { blobs: state.blobs.filter(b => b.pathname.startsWith(options.prefix)).slice(0, 1) };
+    return { blobs: state.blobs.filter(b => b.pathname.startsWith(options.prefix)).slice(0, 1)
+      .map(b => ({ ...b, url: state.sdkMixedCase ? b.url.replace("fixture.", "FiXtUrE.") : b.url })) };
   },
   get: async (pathname, options) => {
     assert.equal(options.access, "private"); assert.equal(options.token, "test-private-no-network");
@@ -45,7 +46,8 @@ const blob = {
     assert.ok(!pathname.includes("://")); state.got.push(pathname);
     const metadata = state.blobs.find(b => b.pathname === pathname);
     if (!metadata) return null;
-    return { statusCode: 200, blob: metadata, stream: new ReadableStream({ start(c) { c.enqueue(state.bytes); c.close(); } }) };
+    return { statusCode: 200, blob: { ...metadata, url: state.sdkGetUrl ?? (state.sdkMixedCase ? metadata.url.replace("fixture.", "FiXtUrE.") : metadata.url) },
+      stream: new ReadableStream({ start(c) { c.enqueue(state.bytes); c.close(); } }) };
   },
   del: async (url, options) => {
     assert.equal(options.token, url.includes(".private.") ? "test-private-no-network" : "test-public-no-network");
@@ -123,7 +125,27 @@ Module._load = function(request, parent, isMain) {
     reset({ bytes: new Uint8Array(20) }); assert.equal(await storage.readManagedPhotoBytes(privateUrl, { id: 99 }, 10), null);
     console.log("PASS exact namespace/store and private token check, verified pathname-only get, bounded actual private response stream");
 
+    reset({ sdkMixedCase: true, clerk: "qa", actor: { id: "owner", role: "user" } });
+    assert.deepEqual(await storage.readManagedPhotoBytes(privateUrl, { id: 99 }), state.bytes);
+    assert.equal((await route.GET(request(), context)).status, 200);
+    assert.match(await storage.storePrivatePhoto(Buffer.from([1]), 99), /^https:\/\/fixture\.private\./);
+    assert.equal(await storage.deleteManagedPhoto(privateUrl, { id: 99 }), true);
+    assert.deepEqual(state.deleted, [privateUrl]);
+    const priorCalls = state.listed.length + state.got.length;
+    assert.equal(await storage.readManagedPhotoBytes(privateUrl.replace("fixture.", "FiXtUrE."), { id: 99 }), null);
+    assert.equal(state.listed.length + state.got.length, priorCalls, "user/DB URLs must remain strict canonical");
+    for (const sdkGetUrl of [privateUrl.replace("fixture", "foreign"), privateUrl.replace("/99/", "/100/"), `${privateUrl}?download=1`]) {
+      reset({ sdkGetUrl }); assert.equal(await storage.readManagedPhotoBytes(privateUrl, { id: 99 }), null);
+    }
+    for (const raw of [privateUrl.replace("https:", "HTTPS:"), privateUrl.replace("/99/", "/98/../99/"),
+      privateUrl.replace(".com/", ".com:443/"), privateUrl.replace("https://", "https://user@"), `${privateUrl}#x`]) {
+      assert.equal(storage.canonicalBlobResultUrl(raw), null, "SDK normalization must change only store hostname casing");
+    }
+    console.log("PASS mixed-case SDK store hosts normalize for put/list/get/delete; raw inputs, foreign store/path and query changes stay rejected");
+
     reset({ row: { ...base, url: legacyUrl }, clerk: "qa", actor: { id: "owner", role: "user" }, blobs: [meta(legacyUrl)] });
+    assert.equal((await route.GET(request(), context)).status, 200);
+    state.sdkMixedCase = true;
     assert.equal((await route.GET(request(), context)).status, 200);
     assert.equal(await storage.readManagedPhotoBytes(legacyUrl, { id: 99 }), null);
     assert.equal(await storage.deleteManagedPhoto(legacyUrl, { id: 99 }), false);
@@ -143,7 +165,7 @@ Module._load = function(request, parent, isMain) {
     const guestUi = readFileSync(path.join(project, "src/app/[locale]/(public)/moments/[slug]/client.tsx"), "utf8");
     assert.doesNotMatch(guestUi, /newPhotos|photos: s\.revealed/);
     console.log("PASS ID-only serializers, narrow optimizer cache bypass prevention, no offline SW caching, pending guest uploads never render broken thumbnails");
-    console.log("7 private storage/access groups passed; zero external operations");
+    console.log("8 private storage/access groups passed; zero external operations");
   } finally {
     Module._load = originalLoad; global.fetch = originalFetch;
     if (originalPrivate === undefined) delete process.env.MOMENTS_BLOB_READ_WRITE_TOKEN; else process.env.MOMENTS_BLOB_READ_WRITE_TOKEN = originalPrivate;

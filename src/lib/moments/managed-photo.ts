@@ -17,16 +17,29 @@ function storageToken(url: URL): string | undefined {
     ? process.env.MOMENTS_BLOB_READ_WRITE_TOKEN : process.env.BLOB_READ_WRITE_TOKEN;
 }
 
+/** SDK outputs only: get(pathname) constructs a URL from the token's store
+ * ID, whose hostname may contain uppercase letters. DB/user URLs still go
+ * through photoBlobUrl unchanged and must already be canonical. */
+export function canonicalBlobResultUrl(raw: string): string | null {
+  // Only normalize the SDK store-ID host segment, not scheme, credentials,
+  // ports, path traversal, escapes or any query/hash supplied in the result.
+  const normalized = raw.replace(/^https:\/\/[a-zA-Z0-9]+(?=\.(?:public|private)\.blob\.vercel-storage\.com\/)/,
+    host => host.toLowerCase());
+  return photoBlobUrl(normalized)?.href ?? null;
+}
+
 /** Fail closed: a missing private store never turns personal photos public. */
 export async function storePrivatePhoto(bytes: Buffer, planId: number): Promise<string> {
   const token = process.env.MOMENTS_BLOB_READ_WRITE_TOKEN;
   if (!token || !Number.isSafeInteger(planId) || planId < 1) throw new Error("Private photo storage unavailable");
-  const blob = await put(`event-photos/${planId}/${randomUUID()}.webp`, bytes, {
+  const pathname = `event-photos/${planId}/${randomUUID()}.webp`;
+  const blob = await put(pathname, bytes, {
     token, access: "private", contentType: "image/webp", addRandomSuffix: false,
     abortSignal: AbortSignal.timeout(15_000),
   });
-  if (!photoBlobUrl(blob.url)?.hostname.includes(".private.")) throw new Error("Private photo storage unavailable");
-  return blob.url;
+  const url = canonicalBlobResultUrl(blob.url);
+  if (!url || !new URL(url).hostname.includes(".private.") || new URL(url).pathname !== `/${pathname}`) throw new Error("Private photo storage unavailable");
+  return url;
 }
 
 /** A database URL alone is not ownership evidence. Only server-created photo
@@ -52,8 +65,8 @@ export async function verifyManagedPhoto(raw: string, plan: PhotoPlanScope) {
   if (!pathname || !token) return null;
   try {
     const result = await list({ prefix: pathname, limit: 1, token, abortSignal: AbortSignal.timeout(5_000) });
-    const blob = result.blobs.find(item => item.pathname === pathname && item.url === raw);
-    return blob ? { url: blob.url, size: blob.size } : null;
+    const blob = result.blobs.find(item => item.pathname === pathname && canonicalBlobResultUrl(item.url) === raw);
+    return blob ? { url: raw, size: blob.size } : null;
   } catch { return null; }
 }
 
@@ -78,7 +91,8 @@ async function verifyLegacyPhoto(raw: string) {
   try {
     const pathname = url.pathname.slice(1);
     const result = await list({ prefix: pathname, limit: 1, token, abortSignal: AbortSignal.timeout(5_000) });
-    return result.blobs.find(item => item.pathname === pathname && item.url === raw) ?? null;
+    const blob = result.blobs.find(item => item.pathname === pathname && canonicalBlobResultUrl(item.url) === raw);
+    return blob ? { ...blob, url: raw } : null;
   } catch { return null; }
 }
 
@@ -91,7 +105,7 @@ async function privatePhotoBytes(url: string, maxBytes: number, timeoutMs: numbe
   const work = async () => {
     // Pathname avoids ever forwarding storage credentials to a supplied host.
     const result = await get(new URL(url).pathname.slice(1), { token, access: "private", useCache: false, abortSignal: controller.signal });
-    if (result?.statusCode !== 200 || result.blob.url !== url || result.blob.size > maxBytes
+    if (result?.statusCode !== 200 || canonicalBlobResultUrl(result.blob.url) !== url || result.blob.size > maxBytes
       || !/^image\/(?:webp|png|jpeg|gif)$/.test(result.blob.contentType)) return null;
     reader = result.stream.getReader();
     const chunks: Uint8Array[] = [];
