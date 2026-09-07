@@ -12,7 +12,8 @@
 // shadow, click scale-down, icon scale on hover) — same vocabulary used
 // on the client cabinet so the two sides feel like one product.
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
+import { PublicationStatusNotice } from "@/components/vendor/publication-status-notice";
 import {
   ArrowRight,
   BookOpen,
@@ -40,6 +41,7 @@ import type {
 
 interface Props {
   profile: ArtistProfileSnapshot;
+  isActive: boolean;
   stats: ArtistStats;
   nextEvent: NextEvent | null;
   recentRequests: RecentRequest[];
@@ -76,6 +78,7 @@ type T = (key: string, vars?: Record<string, string | number>) => string;
 
 export function DashboardClient({
   profile,
+  isActive,
   stats,
   nextEvent,
   recentRequests,
@@ -113,6 +116,7 @@ export function DashboardClient({
 
       {/* ── Hero: artist + plan + profile completion ───── */}
       <HeroCard profile={profile} />
+      <PublicationStatusNotice isActive={isActive} locale={locale} />
 
       {/* ── 4 stat tiles ───────────────────────────────── */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -655,4 +659,3 @@ function statusPill(status: string): {
       };
   }
 }
-

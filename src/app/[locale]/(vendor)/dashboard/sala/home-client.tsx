@@ -4,7 +4,9 @@
 // + recent bookings table. Server wrapper passes pre-computed data.
 
 import { useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
+import { PublicationStatusNotice } from "@/components/vendor/publication-status-notice";
+import { CalendarWeekdays } from "@/components/shared/calendar-weekdays";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -70,6 +72,7 @@ interface CalendarDay {
 interface Props {
   venueName: string;
   venueSlug: string;
+  isActive: boolean;
   stats: VenueStats;
   activity: ActivityItem[];
   recentBookings: RecentBooking[];
@@ -101,7 +104,7 @@ const STATUS_COLORS: Record<string, string> = {
   blocked: "bg-slate-500/30 border-slate-500/50",
 };
 
-function formatRelativeTime(iso: string, t: Translate): string {
+function formatRelativeTime(iso: string, t: Translate, locale: string): string {
   const then = new Date(iso).getTime();
   const now = Date.now();
   const diffMin = Math.round((now - then) / 60000);
@@ -111,7 +114,7 @@ function formatRelativeTime(iso: string, t: Translate): string {
   const diffDays = Math.floor(diffMin / (24 * 60));
   if (diffDays === 1) return t("vendor.venueHome.yesterday");
   if (diffDays < 7) return t("vendor.venueHome.daysAgo", { count: diffDays });
-  return new Date(iso).toLocaleDateString("ro-RO", {
+  return new Date(iso).toLocaleDateString(locale, {
     day: "numeric",
     month: "short",
   });
@@ -130,6 +133,7 @@ function activityIcon(type: string) {
 export function VenueHomeDashboard({
   venueName,
   venueSlug,
+  isActive,
   stats,
   activity,
   recentBookings: initialBookings,
@@ -138,7 +142,7 @@ export function VenueHomeDashboard({
   monthIndex,
 }: Props) {
   const router = useRouter();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const [recentBookings, setRecentBookings] =
     useState<RecentBooking[]>(initialBookings);
   const [actioning, setActioning] = useState<number | null>(null);
@@ -236,15 +240,16 @@ export function VenueHomeDashboard({
             {t("vendor.venueHome.welcome")} <strong>{venueName}</strong>
           </p>
         </div>
-        <Link
+        {isActive && <Link
           href={`/sali/${venueSlug}`}
           target="_blank"
           className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-4 py-2 text-sm font-medium text-muted-foreground hover:border-gold/40 hover:text-gold"
         >
           <ExternalLink className="h-3.5 w-3.5" />
           {t("vendor.venueHome.viewPublicProfile")}
-        </Link>
+        </Link>}
       </div>
+      <PublicationStatusNotice isActive={isActive} locale={locale} />
 
       {/* KPI cards */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -316,11 +321,7 @@ export function VenueHomeDashboard({
                 {t("vendor.venueHome.fullCalendar")}
               </Link>
             </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] uppercase tracking-wider text-muted-foreground">
-              {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-                <div key={d} className="pb-2">{t(`vendor.venueHome.weekday${d}`)}</div>
-              ))}
-            </div>
+            <CalendarWeekdays locale={locale} className="gap-1 text-[10px] uppercase tracking-wider text-muted-foreground" dayClassName="pb-2" />
             <div className="grid grid-cols-7 gap-1">
               {cells.map((c, i) => {
                 if (c.day === null) return <div key={i} />;
@@ -371,7 +372,7 @@ export function VenueHomeDashboard({
                   <LegendDot
                     key={k}
                     color={EVENT_TYPE_COLORS[k] ?? "bg-slate-500/80"}
-                    label={eventTypeLabel(k)}
+                    label={eventTypeLabel(k, locale)}
                   />
                 ))}
               </div>
@@ -423,7 +424,7 @@ export function VenueHomeDashboard({
                           </p>
                         )}
                         <p className="mt-0.5 text-[10px] text-muted-foreground/70">
-                          {formatRelativeTime(item.createdAt, t)}
+                          {formatRelativeTime(item.createdAt, t, locale)}
                         </p>
                       </div>
                     </div>
@@ -497,12 +498,12 @@ export function VenueHomeDashboard({
                         <td className="py-3 pr-3 font-medium">{b.clientName}</td>
                         <td className="py-3 pr-3 text-muted-foreground">
                           {b.eventType
-                            ? eventTypeLabel(normalizeEventType(b.eventType))
+                            ? eventTypeLabel(normalizeEventType(b.eventType), locale)
                             : "—"}
                         </td>
                         <td className="py-3 pr-3 text-muted-foreground">
                           {b.eventDate
-                            ? new Date(b.eventDate).toLocaleDateString("ro-RO", {
+                            ? new Date(b.eventDate).toLocaleDateString(locale, {
                                 day: "numeric",
                                 month: "short",
                                 year: "numeric",
@@ -715,7 +716,7 @@ function StatusBadge({ status }: { status: string }) {
 
 function LegendDot({ color, label }: { color: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1">
+    <span data-no-auto-translate className="inline-flex items-center gap-1">
       <span className={cn("h-2 w-2 rounded-full", color)} />
       {label}
     </span>

@@ -11,7 +11,7 @@
 // for the redesigned UI (hero card, 4 stat tiles with deltas, next
 // event card with cover image, recent requests list, bottom shortcuts).
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
@@ -27,7 +27,7 @@ import {
 } from "@/lib/db/queries/artist-dashboard";
 import { DashboardClient } from "@/components/vendor/dashboard-client";
 import { t } from "@/i18n";
-import { DEFAULT_LOCALE, isLocale, type AppLocale } from "@/lib/i18n/routing";
+import { DEFAULT_LOCALE, isLocale, localizePath, type AppLocale } from "@/lib/i18n/routing";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +55,7 @@ export default async function VendorDashboard({
   if (!appUser) return null;
 
   const [artist] = await db
-    .select({ id: artists.id })
+    .select({ id: artists.id, isActive: artists.isActive })
     .from(artists)
     .where(eq(artists.userId, appUser.id))
     .limit(1);
@@ -67,12 +67,12 @@ export default async function VendorDashboard({
       .where(eq(venues.userId, appUser.id))
       .limit(1);
     if (venue) {
-      redirect("/dashboard/sala");
+      redirect(localizePath("/dashboard/sala", locale));
     }
     // No vendor record at all — artists mid-onboarding stay; everyone
     // else goes back to the client cabinet.
     if (appUser.role !== "artist") {
-      redirect("/cabinet");
+      redirect(localizePath("/cabinet", locale));
     }
     // Pending shell for new artists who haven't filled the profile yet.
     return <ArtistPendingShell locale={locale} />;
@@ -92,6 +92,7 @@ export default async function VendorDashboard({
   return (
     <DashboardClient
       profile={profile}
+      isActive={artist.isActive}
       stats={stats}
       nextEvent={nextEvent}
       recentRequests={recentRequests}

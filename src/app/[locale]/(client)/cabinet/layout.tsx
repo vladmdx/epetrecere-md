@@ -6,12 +6,17 @@ import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { signInPath } from "@/lib/i18n/server-redirect";
+import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 
 export default async function ClientLayout({
   children,
+  params,
 }: {
   children: React.ReactNode;
+  params: Promise<{ locale: string }>;
 }) {
+  const { locale: rawLocale } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const { userId } = await auth();
   if (!userId) {
     redirect(await signInPath());
@@ -43,7 +48,7 @@ export default async function ClientLayout({
             .where(eq(venues.userId, appUser.id))
             .limit(1);
       if (artistOwn || venueOwn || appUser.role === "artist") {
-        redirect("/dashboard");
+        redirect(localizePath("/dashboard", locale));
       }
     }
   }

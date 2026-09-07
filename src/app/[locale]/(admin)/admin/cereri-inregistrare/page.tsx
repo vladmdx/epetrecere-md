@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import Link from "@/components/shared/locale-link";
 import { useLocale } from "@/hooks/use-locale";
+import { profileDescriptionSummary } from "@/lib/content/profile-description-summary";
 
 interface RegistrationRequest {
   id: number;
@@ -232,7 +233,7 @@ export default function RegistrationRequestsPage() {
                       </div>
                       {req.description && (
                         <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
-                          {req.description}
+                          {profileDescriptionSummary(req.description)}
                         </p>
                       )}
                       {req.address && <p className="text-sm text-muted-foreground">{req.address}</p>}

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { publishedVendorProfileHref } from "@/lib/vendors/publication";
 
 const NAV_ITEMS = [
   { href: "/dashboard/sala", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
@@ -80,15 +81,14 @@ function NavList({
 export function VenueSidebar({
   venueName,
   venueSlug,
+  isActive = false,
 }: {
   venueName?: string | null;
   venueSlug?: string | null;
+  isActive?: boolean;
 }) {
   const { t } = useLocale();
-  // "Vezi profil" link target — defaults to the homepage when the venue
-  // doesn't have a slug yet (mid-onboarding) so we never produce a broken
-  // link.
-  const profileHref = venueSlug ? `/sali/${venueSlug}` : "/";
+  const profileHref = publishedVendorProfileHref({ slug: venueSlug, isActive }, "venue");
   const pathname = usePathname().replace(/^\/(ro|ru|en)(?=\/|$)/, "") || "/";
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -118,7 +118,7 @@ export function VenueSidebar({
 
         <NavList pathname={pathname} />
 
-        <div className="border-t border-border/20 p-3">
+        {profileHref && <div className="border-t border-border/20 p-3">
           <Link
             href={profileHref}
             target="_blank"
@@ -127,7 +127,7 @@ export function VenueSidebar({
             <Globe className="h-4 w-4 shrink-0" />
             <span>{t("dashboard.viewProfile")}</span>
           </Link>
-        </div>
+        </div>}
       </aside>
 
       {/* Mobile hamburger — sits in the top-left, only below `lg` */}
@@ -186,7 +186,7 @@ export function VenueSidebar({
               onNavigate={() => setMobileOpen(false)}
             />
 
-            <div className="border-t border-border/20 p-3">
+            {profileHref && <div className="border-t border-border/20 p-3">
               <Link
                 href={profileHref}
                 target="_blank"
@@ -196,7 +196,7 @@ export function VenueSidebar({
                 <Globe className="h-4 w-4 shrink-0" />
                 <span>{t("dashboard.viewProfile")}</span>
               </Link>
-            </div>
+            </div>}
           </aside>
         </div>
       )}

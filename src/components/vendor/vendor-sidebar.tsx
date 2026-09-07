@@ -14,7 +14,6 @@ import {
   Star,
   Bot,
   Globe,
-  Sparkles,
   Building2,
   BarChart3,
   Settings,
@@ -26,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
+import { publishedVendorProfileHref } from "@/lib/vendors/publication";
 
 const artistNav = [
   { href: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
@@ -99,7 +99,7 @@ export function VendorSidebar() {
   const { locale, t } = useLocale();
   const pathname = usePathname().replace(/^\/(ro|ru|en)(?=\/|$)/, "") || "/";
   const [isVenue, setIsVenue] = useState(false);
-  const [profileSlug, setProfileSlug] = useState<string | null>(null);
+  const [profileHref, setProfileHref] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -110,7 +110,7 @@ export function VendorSidebar() {
         if (cancelled) return;
         if (data.artist) {
           setIsVenue(false);
-          setProfileSlug(data.artist.slug ?? null);
+          setProfileHref(publishedVendorProfileHref(data.artist, "artist"));
           return;
         }
         return fetch("/api/me/venue")
@@ -118,10 +118,10 @@ export function VendorSidebar() {
           .then((venueData) => {
             if (cancelled) return;
             setIsVenue(!!venueData.venue);
-            setProfileSlug(venueData.venue?.slug ?? null);
+            setProfileHref(publishedVendorProfileHref(venueData.venue, "venue"));
           });
       })
-      .catch(() => {});
+      .catch(() => { if (!cancelled) setProfileHref(null); });
     return () => {
       cancelled = true;
     };
@@ -131,14 +131,6 @@ export function VendorSidebar() {
   const roleLabel = isVenue
     ? locale === "ru" ? "Зал" : locale === "en" ? "Venue" : "Sală"
     : locale === "ru" ? "Партнёр" : locale === "en" ? "Partner" : "Partener";
-  // "Vezi profil" link target — falls back to homepage when slug isn't
-  // resolved yet (mid-onboarding) so the link is never broken.
-  const profileHref = profileSlug
-    ? isVenue
-      ? `/sali/${profileSlug}`
-      : `/artisti/${profileSlug}`
-    : "/";
-
   return (
     <>
       {/* Desktop sidebar */}
@@ -156,14 +148,14 @@ export function VendorSidebar() {
 
         <div className="border-t border-border/40 p-2">
           <LanguageSwitcher />
-          <Link
+          {profileHref && <Link
             href={profileHref}
             target="_blank"
             className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
           >
             <Globe className="h-4 w-4 shrink-0" />
             <span>{t("dashboard.viewProfile")}</span>
-          </Link>
+          </Link>}
         </div>
       </aside>
 
@@ -213,7 +205,7 @@ export function VendorSidebar() {
             />
             <div className="border-t border-border/40 p-2">
               <LanguageSwitcher />
-              <Link
+              {profileHref && <Link
                 href={profileHref}
                 target="_blank"
                 onClick={() => setMobileOpen(false)}
@@ -221,7 +213,7 @@ export function VendorSidebar() {
               >
                 <Globe className="h-4 w-4 shrink-0" />
                 <span>{t("dashboard.viewProfile")}</span>
-              </Link>
+              </Link>}
             </div>
           </aside>
         </div>

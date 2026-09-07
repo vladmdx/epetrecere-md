@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { BrandMark } from "@/components/public/brand-mark";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useLocale } from "@/hooks/use-locale";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
+import { splitLocale } from "@/lib/i18n/routing";
 
 const navItems = [
   { href: "/admin", icon: LayoutDashboard, labelKey: "admin.sidebar.dashboard" },
@@ -85,6 +86,7 @@ function NavList({
             key={item.href}
             href={item.href}
             onClick={onNavigate}
+            aria-current={isActive ? "page" : undefined}
             className={cn(
               "mb-0.5 flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
               isActive
@@ -105,7 +107,7 @@ function NavList({
 
 export function AdminSidebar() {
   const { t } = useLocale();
-  const pathname = usePathname();
+  const pathname = splitLocale(usePathname() || "/").pathname;
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 

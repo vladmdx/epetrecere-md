@@ -53,7 +53,7 @@
     "welcome": "Welcome to ePetrecere!",
     "phoneIntro": "Add your phone number to finish signing up.",
     "phoneLabel": "Phone number *",
-    "phoneHint": "Used to send you booking confirmations. Not shown publicly — only you and the administrators can see it.",
+    "phoneHint": "Used for booking confirmations. It is not displayed publicly. Authorized administrators can access it, and it is shared with the other party only after final confirmation of the booking by both parties.",
     "phoneTooShort": "That phone number is too short",
     "phoneSaveFailed": "We couldn't save your number. Please try again.",
     "roleQuestion": "How would you like to use the platform?",
@@ -1386,7 +1386,7 @@
       "metaClient": "Client: {value}",
       "metaEventType": "Event type: {value}",
       "nextEvent": "Next event",
-      "noRequests": "You have no requests yet. Your profile is online — clients can find you anytime.",
+      "noRequests": "You have no requests yet. New requests will appear here.",
       "openRequest": "Open request",
       "planPremium": "Premium plan",
       "planStandard": "Standard plan",
@@ -1510,6 +1510,12 @@
       "updated": "Package updated.",
       "visibilityError": "Could not update visibility.",
       "visible": "Visible"
+    },
+    "publication": {
+      "publishedTitle": "Profile published",
+      "publishedDescription": "Your profile is visible in the public catalog. Clients can find you and send booking requests.",
+      "unpublishedTitle": "Profile not published",
+      "unpublishedDescription": "Your profile is not visible in the public catalog. New profiles become visible only after administrator approval. You can edit your details and view your signed contract in Settings."
     },
     "pending": {
       "cta": "Complete profile",

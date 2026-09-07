@@ -15,26 +15,29 @@ import {
   getVenueRecentBookings,
 } from "@/lib/db/queries/venue-stats";
 import { VenueHomeDashboard } from "./home-client";
+import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 
 export const dynamic = "force-dynamic";
 
-export default async function VenueHomePage() {
+export default async function VenueHomePage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale: rawLocale } = await params;
+  const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
   const { userId: clerkId } = await auth();
-  if (!clerkId) redirect("/sign-in?redirect_url=/dashboard/sala");
+  if (!clerkId) redirect(`${localizePath("/sign-in", locale)}?redirect_url=${encodeURIComponent(localizePath("/dashboard/sala", locale))}`);
 
   const [appUser] = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
-  if (!appUser) redirect("/");
+  if (!appUser) redirect(localizePath("/", locale));
 
   const [venue] = await db
-    .select({ id: venues.id, nameRo: venues.nameRo, slug: venues.slug })
+    .select({ id: venues.id, nameRo: venues.nameRo, slug: venues.slug, isActive: venues.isActive })
     .from(venues)
     .where(eq(venues.userId, appUser.id))
     .limit(1);
-  if (!venue) redirect("/dashboard");
+  if (!venue) redirect(localizePath("/dashboard", locale));
 
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -69,6 +72,7 @@ export default async function VenueHomePage() {
     <VenueHomeDashboard
       venueName={venue.nameRo}
       venueSlug={venue.slug}
+      isActive={venue.isActive}
       stats={stats}
       activity={activity.map((a) => ({
         ...a,

@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import {
   ArrowRight,
   Building2,

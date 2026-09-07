@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import Link, { useLocalizedRouter } from "@/components/shared/locale-link";
+import { CalendarWeekdays } from "@/components/shared/calendar-weekdays";
+import type { AppLocale } from "@/lib/i18n/routing";
 import {
   ChevronLeft,
   ChevronRight,
@@ -75,16 +76,10 @@ interface Props {
 /** Spec 2.8: calendar window capped at 18 months ahead of today. */
 const MAX_FUTURE_MONTHS = 18;
 
-/** Month and weekday captions come from the shared `calendar.months` /
- *  `calendar.days` arrays so every locale gets its own spelling. */
-const WEEKDAY_INDEXES = [0, 1, 2, 3, 4, 5, 6];
-
 /** Colour per event type, keyed by the canonical key — the labels themselves
  *  come from lib/events/normalize. A type with no entry here keeps the old
  *  generic "Rezervat" red so nothing regresses when the list grows. */
-const EVENT_TYPE_STYLE: Partial<
-  Record<EventTypeKey, { bg: string; text: string; chip: string }>
-> = {
+const EVENT_TYPE_STYLE: Record<EventTypeKey, { bg: string; text: string; chip: string }> = {
   wedding: { bg: "bg-red-500/25 border-red-500/60", text: "text-red-400", chip: "bg-red-500/40" },
   proposal: { bg: "bg-fuchsia-500/25 border-fuchsia-500/60", text: "text-fuchsia-400", chip: "bg-fuchsia-500/40" },
   cununie: { bg: "bg-pink-500/25 border-pink-500/60", text: "text-pink-400", chip: "bg-pink-500/40" },
@@ -93,15 +88,17 @@ const EVENT_TYPE_STYLE: Partial<
   birthday: { bg: "bg-orange-500/25 border-orange-500/60", text: "text-orange-400", chip: "bg-orange-500/40" },
   kids_birthday: { bg: "bg-amber-500/25 border-amber-500/60", text: "text-amber-400", chip: "bg-amber-500/40" },
   corporate: { bg: "bg-purple-500/25 border-purple-500/60", text: "text-purple-400", chip: "bg-purple-500/40" },
+  concert: { bg: "bg-violet-500/25 border-violet-500/60", text: "text-violet-400", chip: "bg-violet-500/40" },
+  other: { bg: "bg-slate-500/25 border-slate-500/60", text: "text-slate-400", chip: "bg-slate-500/40" },
 };
 
 /** Colour + label for a raw event_type value, whatever spelling it was stored
  *  in (English key, Romanian slug or a hand-typed label). Undefined for a type
  *  we don't colour, which the callers already render as a generic booking. */
-function eventTypeVisual(raw: string | null | undefined) {
+function eventTypeVisual(raw: string | null | undefined, locale: AppLocale) {
   const key = normalizeEventType(raw);
   const style = key ? EVENT_TYPE_STYLE[key] : undefined;
-  return style ? { ...style, label: eventTypeLabel(key) } : undefined;
+  return style ? { ...style, label: eventTypeLabel(key, locale) } : undefined;
 }
 
 const TENTATIVE_STYLE = { bg: "bg-yellow-500/25 border-yellow-500/60", text: "text-yellow-400" };
@@ -143,8 +140,8 @@ export function VenueCalendarClient({
   icalUrl,
   googleConnected,
 }: Props) {
-  const { t } = useLocale();
-  const router = useRouter();
+  const { t, locale } = useLocale();
+  const router = useLocalizedRouter();
   const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
   const [showIcalSheet, setShowIcalSheet] = useState(false);
   const [dayDialog, setDayDialog] = useState<string | null>(initialDate);
@@ -516,7 +513,7 @@ export function VenueCalendarClient({
           {ALL_EVENT_TYPES.map((k) => {
             const style = EVENT_TYPE_STYLE[k];
             return style ? (
-              <LegendChip key={k} color={style.chip} label={eventTypeLabel(k)} />
+              <LegendChip key={k} color={style.chip} label={eventTypeLabel(k, locale)} />
             ) : null;
           })}
           <LegendChip color="bg-yellow-500/40" label={t("vendorSalaCalendar.legendTentative")} />
@@ -532,13 +529,7 @@ export function VenueCalendarClient({
             {t(`calendar.months.${monthIndex}`)} {monthYear}
           </h2>
 
-          <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] uppercase tracking-wider text-muted-foreground">
-            {WEEKDAY_INDEXES.map((d) => (
-              <div key={d} className="pb-2 font-medium">
-                {t(`calendar.days.${d}`)}
-              </div>
-            ))}
-          </div>
+          <CalendarWeekdays locale={locale} className="gap-1.5 text-[11px] uppercase tracking-wider text-muted-foreground" dayClassName="pb-2 font-medium" />
 
           <div className="grid grid-cols-7 gap-1.5 select-none">
             {cells.map((c, i) => {
@@ -557,7 +548,7 @@ export function VenueCalendarClient({
               let labelText = "";
 
               if (confirmed) {
-                const cfg = eventTypeVisual(confirmed.eventType);
+                const cfg = eventTypeVisual(confirmed.eventType, locale);
                 if (cfg) {
                   cellClass = cfg.bg;
                   labelText = cfg.label;
@@ -573,7 +564,7 @@ export function VenueCalendarClient({
                 const cfg = STATUS_CONFIG[event.status];
                 if (cfg) cellClass = cfg.bg;
                 if (event.eventType) {
-                  const ec = eventTypeVisual(event.eventType);
+                  const ec = eventTypeVisual(event.eventType, locale);
                   if (ec) {
                     cellClass = ec.bg;
                     labelText = ec.label;
@@ -706,7 +697,7 @@ export function VenueCalendarClient({
           <DialogHeader>
             <DialogTitle>
               {dayDialog
-                ? new Date(dayDialog).toLocaleDateString("ro-RO", {
+                ? new Date(dayDialog).toLocaleDateString(locale, {
                     weekday: "long",
                     day: "numeric",
                     month: "long",
@@ -734,7 +725,7 @@ export function VenueCalendarClient({
                 const typeKey = normalizeEventType(b.eventType);
                 const cfg = isPending
                   ? TENTATIVE_STYLE
-                  : eventTypeVisual(b.eventType);
+                  : eventTypeVisual(b.eventType, locale);
                 return (
                   <div
                     key={b.id}
@@ -752,10 +743,10 @@ export function VenueCalendarClient({
                               {isPending
                                 ? typeKey
                                   ? t("vendorSalaCalendar.tentativeWithType", {
-                                      type: eventTypeLabel(typeKey),
+                                      type: eventTypeLabel(typeKey, locale),
                                     })
                                   : t("common.tentative")
-                                : eventTypeVisual(b.eventType)?.label}
+                                : eventTypeVisual(b.eventType, locale)?.label}
                             </span>
                           )}
                           {b.startTime && (
@@ -900,11 +891,11 @@ export function VenueCalendarClient({
               {rangeDialog
                 ? t("vendorSalaCalendar.rangeDialogDescription", {
                     count: enumerateRange(rangeDialog.start, rangeDialog.end).length,
-                    from: new Date(rangeDialog.start).toLocaleDateString("ro-RO", {
+                    from: new Date(rangeDialog.start).toLocaleDateString(locale, {
                       day: "numeric",
                       month: "short",
                     }),
-                    to: new Date(rangeDialog.end).toLocaleDateString("ro-RO", {
+                    to: new Date(rangeDialog.end).toLocaleDateString(locale, {
                       day: "numeric",
                       month: "short",
                       year: "numeric",
@@ -1005,7 +996,7 @@ export function VenueCalendarClient({
 
 function LegendChip({ color, label }: { color: string; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span data-no-auto-translate className="inline-flex items-center gap-1.5">
       <span className={cn("h-2.5 w-2.5 rounded-sm", color)} />
       <span className="text-muted-foreground">{label}</span>
     </span>
@@ -1026,7 +1017,7 @@ function ListView({
   bookingsByDate: Map<string, Booking[]>;
   onRowClick: (dateStr: string) => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const monthStart = new Date(monthYear, monthIndex, 1);
   const monthEnd = new Date(monthYear, monthIndex + 1, 0);
   const days: Array<{
@@ -1051,7 +1042,7 @@ function ListView({
     const event = eventsByDate.get(dateStr);
 
     if (confirmed) {
-      const cfg = eventTypeVisual(confirmed.eventType);
+      const cfg = eventTypeVisual(confirmed.eventType, locale);
       days.push({
         dateStr,
         statusLabel: cfg?.label || t("vendorSalaCalendar.booked"),
@@ -1068,7 +1059,7 @@ function ListView({
       days.push({
         dateStr,
         statusLabel: pendingKey
-          ? t("vendorSalaCalendar.tentativeWithType", { type: eventTypeLabel(pendingKey) })
+          ? t("vendorSalaCalendar.tentativeWithType", { type: eventTypeLabel(pendingKey, locale) })
           : t("common.tentative"),
         statusClass: "text-yellow-400",
         eventType: pending.eventType,
@@ -1129,7 +1120,7 @@ function ListView({
         <tbody>
           {days.map((d) => {
             const dateObj = new Date(d.dateStr + "T00:00:00");
-            const label = dateObj.toLocaleDateString("ro-RO", {
+            const label = dateObj.toLocaleDateString(locale, {
               weekday: "short",
               day: "numeric",
               month: "short",

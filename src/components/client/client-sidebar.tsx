@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/shared/locale-link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 import { LanguageSwitcher } from "@/components/shared/language-switcher";
+import { splitLocale } from "@/lib/i18n/routing";
 
 // Static nav items rendered above the dynamic "Evenimente" section.
 const topNav = [
@@ -94,6 +95,7 @@ function NavBody({
         <Link
           href="/cabinet/planifica"
           onClick={onNavigate}
+          aria-current={pathname === "/cabinet/planifica" ? "page" : undefined}
           className={cn(
             "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
             pathname === "/cabinet/planifica"
@@ -114,6 +116,7 @@ function NavBody({
                 key={plan.id}
                 href={href}
                 onClick={onNavigate}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
                   isActive
@@ -133,6 +136,7 @@ function NavBody({
             <Link
               href="/cabinet/arhiva"
               onClick={onNavigate}
+              aria-current={pathname.startsWith("/cabinet/arhiva") ? "page" : undefined}
               className={cn(
                 "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
                 pathname.startsWith("/cabinet/arhiva")
@@ -151,6 +155,7 @@ function NavBody({
           <Link
             href="/cabinet/planifica"
             onClick={onNavigate}
+            aria-current={pathname === "/cabinet/planifica" ? "page" : undefined}
             className={cn(
               "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
               pathname === "/cabinet/planifica"
@@ -190,7 +195,7 @@ function NavBody({
 
 export function ClientSidebar() {
   const { t } = useLocale();
-  const pathname = usePathname();
+  const pathname = splitLocale(usePathname() || "/").pathname;
   const [activePlans, setActivePlans] = useState<PlanSummary[]>([]);
   const [archivedCount, setArchivedCount] = useState(0);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -338,6 +343,7 @@ function CalculatorsAccordion({
                 key={c.href}
                 href={c.href}
                 onClick={onNavigate}
+                aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "block rounded-lg px-3 py-1.5 text-xs transition-colors",
                   isActive
@@ -368,11 +374,12 @@ function NavLink({
   const Icon = item.icon;
   const isActive =
     pathname === item.href ||
-    (item.href !== "/cabinet" && pathname.startsWith(item.href));
+    (item.href !== "/cabinet" && pathname.startsWith(item.href + "/"));
   return (
     <Link
       href={item.href}
       onClick={onClick}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
         "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
         isActive

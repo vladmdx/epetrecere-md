@@ -53,7 +53,7 @@
     "welcome": "Bine ai venit pe ePetrecere!",
     "phoneIntro": "Adaugă numărul tău de telefon pentru a finaliza înregistrarea.",
     "phoneLabel": "Număr de telefon *",
-    "phoneHint": "Folosit pentru a primi confirmări de rezervare. Nu este vizibil public — doar tu și administratorii îl pot vedea.",
+    "phoneHint": "Folosit pentru confirmările rezervărilor. Nu este afișat public. Administratorii autorizați îl pot accesa, iar cealaltă parte îl primește doar după confirmarea finală a rezervării de către ambele părți.",
     "phoneTooShort": "Numărul de telefon e prea scurt",
     "phoneSaveFailed": "Nu s-a putut salva numărul. Încearcă din nou.",
     "roleQuestion": "Cum dorești să folosești platforma?",
@@ -1386,7 +1386,7 @@
       "metaClient": "Client: {value}",
       "metaEventType": "Tip eveniment: {value}",
       "nextEvent": "Următorul eveniment",
-      "noRequests": "Încă nu ai cereri. Profilul tău e online — clienții te pot găsi oricând.",
+      "noRequests": "Încă nu ai cereri. Cererile noi vor apărea aici.",
       "openRequest": "Deschide cererea",
       "planPremium": "Plan Premium",
       "planStandard": "Plan Standard",
@@ -1510,6 +1510,12 @@
       "updated": "Pachet actualizat.",
       "visibilityError": "Nu am putut actualiza vizibilitatea.",
       "visible": "Vizibil"
+    },
+    "publication": {
+      "publishedTitle": "Profil publicat",
+      "publishedDescription": "Profilul tău este vizibil în catalogul public. Clienții te pot găsi și trimite cereri de rezervare.",
+      "unpublishedTitle": "Profilul nu este publicat",
+      "unpublishedDescription": "Profilul tău nu este vizibil în catalogul public. Profilurile noi devin vizibile doar după aprobarea administratorului. Poți edita informațiile și consulta contractul semnat în Setări."
     },
     "pending": {
       "cta": "Completează profilul",

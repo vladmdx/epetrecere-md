@@ -33,6 +33,8 @@ import {
 } from "@/lib/events/normalize";
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/use-locale";
+import { CalendarWeekdays } from "@/components/shared/calendar-weekdays";
+import Link from "@/components/shared/locale-link";
 import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
 
 /** Monday-first, matching the grid layout. Labels come from the dictionary. */
@@ -189,7 +191,6 @@ interface Entity {
 export default function VendorCalendarPage() {
   const { t, locale } = useLocale();
   const DAYS = DAY_KEYS.map((k) => t(`date.weekday.${k}`));
-  const DAYS_SHORT = DAY_KEYS.map((k) => t(`date.weekdayShort.${k}`));
   const MONTHS = MONTH_KEYS.map((k) => t(`date.monthCap.${k}`));
 
   // F-S6 — resolve the current owner's entity (venue or artist) on mount so
@@ -916,16 +917,7 @@ export default function VendorCalendarPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="mb-2 grid grid-cols-7 text-center">
-                  {DAYS_SHORT.map((d, i) => (
-                    <div
-                      key={DAY_KEYS[i]}
-                      className="py-2 text-xs font-medium text-muted-foreground"
-                    >
-                      {d}
-                    </div>
-                  ))}
-                </div>
+                <CalendarWeekdays locale={locale} className="mb-2" dayClassName="py-2 text-xs font-medium text-muted-foreground" />
                 <div className="grid grid-cols-7 gap-1">
                   {Array.from({ length: startDay }).map((_, i) => (
                     <div key={`e-${i}`} />
@@ -1549,12 +1541,12 @@ export default function VendorCalendarPage() {
                 {packages.length === 0 ? (
                   <p className="mt-1 rounded-md border border-dashed border-border/40 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
                     {t("vendor.calPage.noPackages")}{" "}
-                    <a
+                    <Link
                       href="/dashboard/tarife"
                       className="text-gold underline"
                     >
                       /dashboard/tarife
-                    </a>
+                    </Link>
                     .
                   </p>
                 ) : (
