@@ -1,16 +1,13 @@
 // Phase 3 — bulk ZIP download of every photo on a Photo Moments film.
 //
-// Endpoint streams a single ZIP archive back to the owner so they can
-// keep a permanent backup of the night in one click. Owner-gated via
+// Endpoint returns a bounded ZIP archive to the owner so they can
+// back up eligible photos. Owner-gated via
 // requirePlanOwnership; guests never see this.
 //
-// JSZip generates the archive in-memory. For a typical wedding (~150
-// photos × ~3MB each) we're looking at ~450MB of buffered data — fine
-// on Vercel's 50MB response limit? Actually NO. To stay under the
-// 50MB Lambda response cap we cap the included photos and skip any
-// that fail to fetch quickly. For larger galleries the owner gets a
-// best-effort archive with a `_README.txt` listing skipped ones; we
-// can graduate to a streaming worker if this becomes a real bottleneck.
+// Vercel Functions buffered responses are limited to 4.5 MB:
+// https://vercel.com/docs/functions/limitations#request-body-size
+// Reserve ZIP/README overhead and check the final size. This is a bounded
+// best-effort export, not an unbounded fetch proxy or a streaming archive.
 
 import { NextRequest, NextResponse } from "next/server";
 import JSZip from "jszip";
@@ -18,27 +15,11 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { eventPhotos, eventPlans } from "@/lib/db/schema";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
+import { fetchManagedPhotoBytes, verifyManagedPhoto } from "@/lib/moments/managed-photo";
 
-/** How long a single photo fetch may take before we give up and skip
- *  it. Keeps a slow CDN node from blocking the whole archive. */
-const FETCH_TIMEOUT_MS = 12_000;
-
-/** Hard cap on bytes packed into one archive — close to the 50MB
- *  Vercel response ceiling with headroom. Galleries above this get
- *  the README warning. */
-const MAX_ARCHIVE_BYTES = 40 * 1024 * 1024;
-
-async function fetchWithTimeout(url: string): Promise<ArrayBuffer | null> {
-  try {
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) return null;
-    return await res.arrayBuffer();
-  } catch {
-    return null;
-  }
-}
+const MAX_PHOTO_BYTES = 3.5 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES = 4 * 1024 * 1024;
+const MAX_PHOTOS = 500;
 
 /** Turn a guest name + photo id into a filesystem-safe filename so
  *  the ZIP unpacks cleanly on Windows/macOS/Linux. We keep the id at
@@ -49,8 +30,7 @@ function safeFilename(
   url: string,
 ): string {
   // Pull the extension from the URL — falls back to .jpg if we can't
-  // tell. Photos come from our own /api/upload which always serves
-  // jpg/png/webp.
+  // tell. Only verified managed photo URLs reach this function.
   const dot = url.lastIndexOf(".");
   const qmark = url.indexOf("?", dot);
   const ext =
@@ -104,7 +84,8 @@ export async function GET(
     })
     .from(eventPhotos)
     .where(eq(eventPhotos.planId, planId))
-    .orderBy(desc(eventPhotos.createdAt));
+    .orderBy(desc(eventPhotos.createdAt))
+    .limit(MAX_PHOTOS + 1);
 
   if (photos.length === 0) {
     return NextResponse.json(
@@ -119,17 +100,20 @@ export async function GET(
 
   let totalBytes = 0;
   const skipped: number[] = [];
+  const deadline = Date.now() + 20_000;
   for (const photo of photos) {
-    if (totalBytes >= MAX_ARCHIVE_BYTES) {
+    if (totalBytes >= MAX_PHOTO_BYTES || Date.now() >= deadline || photo === photos[MAX_PHOTOS]) {
       skipped.push(photo.id);
       continue;
     }
-    const buf = await fetchWithTimeout(photo.url);
+    const verified = await verifyManagedPhoto(photo.url, owned.plan);
+    const remaining = MAX_PHOTO_BYTES - totalBytes;
+    if (!verified || verified.size > remaining || Date.now() >= deadline) {
+      skipped.push(photo.id);
+      continue;
+    }
+    const buf = await fetchManagedPhotoBytes(verified.url, remaining, Math.min(8_000, deadline - Date.now()));
     if (!buf) {
-      skipped.push(photo.id);
-      continue;
-    }
-    if (totalBytes + buf.byteLength > MAX_ARCHIVE_BYTES) {
       skipped.push(photo.id);
       continue;
     }
@@ -137,8 +121,8 @@ export async function GET(
     folder.file(name, buf);
     totalBytes += buf.byteLength;
     captions.push(
-      `${name}\t${photo.guestName ?? "(necunoscut)"}\t${
-        photo.guestMessage ? `"${photo.guestMessage.replace(/"/g, "'")}"` : ""
+      `${name}\t${(photo.guestName ?? "(necunoscut)").slice(0, 60)}\t${
+        photo.guestMessage ? `"${photo.guestMessage.slice(0, 280).replace(/"/g, "'")}"` : ""
       }`,
     );
   }
@@ -146,15 +130,23 @@ export async function GET(
   if (skipped.length > 0) {
     captions.push(
       "",
-      `# ${skipped.length} poze au depășit limita de 40MB sau nu au putut fi descărcate.`,
+      `# ${skipped.length} poze au fost omise: proveniență neverificată, limită de dimensiune sau indisponibilitate.`,
       `# Acestea sunt: ${skipped.join(", ")}`,
       `# Le poți descărca individual din /cabinet/moments/${planId}.`,
     );
   }
+  zip.file("_README.txt", [
+    "Photo Moments - export parțial / partial export / частичный экспорт",
+    "Fișierele vechi cu proveniență neverificată sunt păstrate în galerie, dar nu sunt descărcate de server.",
+    "Legacy files with unverified ownership remain in the gallery but are not fetched by the server.",
+    "Старые файлы с неподтвержденным происхождением остаются в галерее, но не скачиваются сервером.",
+    "ZIP < 4 MiB; photos <= 3.5 MiB; maximum 500 records; time-limited export.",
+    `Skipped record IDs: ${skipped.join(", ") || "none"}`,
+    photos.length > MAX_PHOTOS ? "Additional records beyond the first 500 were not inspected." : "",
+  ].join("\n"));
   zip.file("CREDITS.txt", captions.join("\n"));
 
-  // Streamed generation — slightly slower than a single buffer but
-  // keeps memory bounded for big galleries.
+  // Buffered generation is safe only because inputs and final output are capped.
   const blob = await zip.generateAsync({
     // ArrayBuffer is the cleanest payload to hand to Response — Edge
     // and Node runtimes both accept it without further conversion,
@@ -162,6 +154,9 @@ export async function GET(
     type: "arraybuffer",
     compression: "STORE", // JPEGs are already compressed; STORE is faster.
   });
+  if (blob.byteLength > MAX_ARCHIVE_BYTES) {
+    return NextResponse.json({ error: "Archive exceeds the safe download limit" }, { status: 413 });
+  }
 
   const slugifyTitle = (s: string) =>
     s

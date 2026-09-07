@@ -12,7 +12,8 @@ import { rateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 const CONSENT_VERSION = "moments-photo-2026-09-05.1";
-const MAX_BYTES = 10 * 1024 * 1024;
+// Leave multipart overhead below Vercel Functions' 4.5 MB request cap.
+const MAX_BYTES = 4 * 1024 * 1024;
 
 const fieldsSchema = z.object({
   guestName: z.string().trim().min(1).max(60),
@@ -92,8 +93,11 @@ export async function POST(
   if (!parsed.success || !(file instanceof File)) {
     return NextResponse.json({ error: "Consent and image are required" }, { status: 400 });
   }
-  if (file.size <= 0 || file.size > MAX_BYTES || !file.type.startsWith("image/")) {
-    return NextResponse.json({ error: "Unsupported image or file too large" }, { status: 400 });
+  if (file.size > MAX_BYTES) {
+    return NextResponse.json({ error: "Photo must be at most 4 MB", code: "PHOTO_TOO_LARGE" }, { status: 413 });
+  }
+  if (file.size <= 0 || !file.type.startsWith("image/")) {
+    return NextResponse.json({ error: "Unsupported image" }, { status: 400 });
   }
 
   if (plan.shotLimit) {

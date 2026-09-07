@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
 import { guestHeadcount } from "@/lib/planner/guest-headcount";
 import { lockSeatingPlan, tableOccupants } from "@/lib/planner/seating-capacity";
+import { TABLE_SHAPES } from "@/lib/planner/table-shape";
 
 // M4 — PATCH / DELETE /api/event-plans/[id]/tables/[tableId]
 // Rename, resize, move (drag-to-arrange), or remove a table.
@@ -13,7 +14,8 @@ import { lockSeatingPlan, tableOccupants } from "@/lib/planner/seating-capacity"
 
 const patchTableSchema = z.object({
   name: z.string().min(1).max(80).optional(),
-  seats: z.number().int().min(2).max(30).optional(),
+  seats: z.number().int().min(1).max(30).optional(),
+  shape: z.enum(TABLE_SHAPES).optional(),
   posX: z.number().int().optional().nullable(),
   posY: z.number().int().optional().nullable(),
   sortOrder: z.number().int().optional(),

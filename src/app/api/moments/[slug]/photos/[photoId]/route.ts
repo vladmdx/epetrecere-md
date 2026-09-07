@@ -5,28 +5,19 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans } from "@/lib/db/schema";
 import { requestHasMomentsAccess } from "@/lib/moments/access";
 import { rateLimit } from "@/lib/rate-limit";
+import { deleteManagedPhoto } from "@/lib/moments/managed-photo";
 
 const deleteSchema = z.object({ deviceId: z.string().min(6).max(80) });
 const reportSchema = z.object({ reason: z.string().trim().min(2).max(240) });
 
 async function locate(slug: string, photoId: number) {
   const [row] = await db
-    .select({ id: eventPhotos.id, url: eventPhotos.url, deviceId: eventPhotos.deviceId })
+    .select({ id: eventPhotos.id, url: eventPhotos.url, deviceId: eventPhotos.deviceId, planId: eventPlans.id })
     .from(eventPhotos)
     .innerJoin(eventPlans, eq(eventPlans.id, eventPhotos.planId))
     .where(and(eq(eventPlans.momentsSlug, slug), eq(eventPlans.momentsEnabled, true), eq(eventPhotos.id, photoId)))
     .limit(1);
   return row ?? null;
-}
-
-async function deleteBlob(url: string) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN || !url.startsWith("https://")) return;
-  try {
-    const { del } = await import("@vercel/blob");
-    await del(url);
-  } catch (error) {
-    console.error("[moments] blob deletion failed", error);
-  }
 }
 
 export async function DELETE(
@@ -43,8 +34,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
   await db.delete(eventPhotos).where(eq(eventPhotos.id, photo.id));
-  await deleteBlob(photo.url);
-  return NextResponse.json({ deleted: true });
+  const storageDeleted = await deleteManagedPhoto(photo.url, { id: photo.planId, momentsSlug: slug });
+  return NextResponse.json({ deleted: true, storagePreserved: !storageDeleted });
 }
 
 export async function POST(

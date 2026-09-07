@@ -220,7 +220,11 @@ export function MomentsUploadClient({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deviceId }),
     });
-    if (res.ok) setState((s) => ({ ...s, photos: s.photos.filter((p) => p.id !== photoId), totalPhotos: Math.max(0, s.totalPhotos - 1) }));
+    if (res.ok) {
+      setState((s) => ({ ...s, photos: s.photos.filter((p) => p.id !== photoId), totalPhotos: Math.max(0, s.totalPhotos - 1) }));
+      const result = await res.json().catch(() => null);
+      if (result?.storagePreserved) setError(t("planner.photos.storagePreserved"));
+    }
   }
 
   async function reportPhoto(photoId: number) {
@@ -340,6 +344,13 @@ export function MomentsUploadClient({
       setError(t("moments.errAllShotsUsed", { count: shotLimit ?? 0 }));
       return;
     }
+    // Validate the whole selection before the first request, not midway
+    // through the batch after earlier photographs were already saved.
+    const maxPhotoBytes = 4 * 1024 * 1024;
+    if (files.some(file => file.size > maxPhotoBytes)) {
+      setError(t("moments.errTooLarge"));
+      return;
+    }
     // Cap the batch by remaining shots so the user doesn't waste a
     // long upload that the server will reject halfway through.
     const batch =
@@ -349,6 +360,7 @@ export function MomentsUploadClient({
     setUploading(true);
     const newPhotos: Photo[] = [];
     try {
+      const prepared: File[] = [];
       for (const original of batch) {
         // When the owner enabled vintage on the film, replace the raw
         // photo with a filtered version client-side. The server upload
@@ -357,6 +369,12 @@ export function MomentsUploadClient({
           vintage && original.type.startsWith("image/")
             ? await applyVintage(original).catch(() => original)
             : original;
+        // A vintage border/re-encoding can increase the file size. Finish
+        // preparing and checking every file before uploading any of them.
+        if (file.size > maxPhotoBytes) throw new Error(t("moments.errTooLarge"));
+        prepared.push(file);
+      }
+      for (const file of prepared) {
         const fd = new FormData();
         fd.append("file", file);
         fd.append("guestName", guestName.trim());
@@ -369,7 +387,9 @@ export function MomentsUploadClient({
         const saveRes = await fetch(`/api/moments/${slug}/upload`, { method: "POST", body: fd });
         if (!saveRes.ok) {
           const j = await saveRes.json().catch(() => ({}));
-          throw new Error(j.error || t("moments.errUploadFailed"));
+          throw new Error(saveRes.status === 413 || j.code === "PHOTO_TOO_LARGE"
+            ? t("moments.errTooLarge")
+            : j.error || t("moments.errUploadFailed"));
         }
         const { id, url } = await saveRes.json();
         newPhotos.push({

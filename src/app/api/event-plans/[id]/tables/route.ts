@@ -4,13 +4,15 @@ import { db } from "@/lib/db";
 import { seatingTables } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
+import { TABLE_SHAPES } from "@/lib/planner/table-shape";
 
 // M4 — POST /api/event-plans/[id]/tables
 // Create a new seating table.
 
 const createTableSchema = z.object({
   name: z.string().min(1).max(80),
-  seats: z.number().int().min(2).max(30).optional(),
+  seats: z.number().int().min(1).max(30).optional(),
+  shape: z.enum(TABLE_SHAPES).optional(),
   posX: z.number().int().optional(),
   posY: z.number().int().optional(),
 });
@@ -51,6 +53,7 @@ export async function POST(
       planId,
       name: parsed.data.name,
       seats: parsed.data.seats ?? defaultSeats,
+      shape: parsed.data.shape ?? null,
       posX: parsed.data.posX,
       posY: parsed.data.posY,
       sortOrder: (last?.sortOrder ?? 0) + 1,

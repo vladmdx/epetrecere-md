@@ -93,6 +93,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { venueRequestInterval } from "@/lib/planner/venue-request-interval";
 import { planTabFromQuery, planTabHref, type PlanTabKey } from "@/lib/planner/tab-navigation";
 import { guestHeadcount, assignedHeadcount } from "@/lib/planner/guest-headcount";
+import { checklistDisplayTitle } from "@/lib/planner/checklist-copy";
 
 interface Plan {
   id: number;
@@ -445,14 +446,15 @@ export default function PlanDetailPage({
         })}
       </nav>
 
-      {/* Mobile tab bar */}
+      {/* Keep every enabled tool reachable; the mobile bar scrolls horizontally. */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex overflow-x-auto border-t border-border/40 bg-background px-2 py-1.5 gap-1">
-        {visibleNavItems.slice(0, 6).map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           return (
             <button
               key={item.key}
               type="button"
+              aria-current={activeTab === item.key ? "page" : undefined}
               onClick={() => setActiveTab(item.key)}
               className={cn(
                 "flex flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-[10px] min-w-[56px] transition-colors",
@@ -752,7 +754,7 @@ function OverviewTab({
   onCheckItem: (id: number, done: boolean) => void;
   onSwitchTab: (tab: TabKey) => void;
 }) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   return (
     <div className="space-y-6">
       {/* Event Hero Card */}
@@ -880,7 +882,7 @@ function OverviewTab({
                         className="data-[state=checked]:bg-gold data-[state=checked]:border-gold"
                       />
                       <span className={cn("text-sm flex-1", item.done && "line-through")}>
-                        {item.title}
+                        {checklistDisplayTitle(item, plan.eventType, locale)}
                       </span>
                       {item.priority === "high" && !item.done && (
                         <span className="text-[10px] text-warning font-medium">{t("cabinet.plan.urgent")}</span>

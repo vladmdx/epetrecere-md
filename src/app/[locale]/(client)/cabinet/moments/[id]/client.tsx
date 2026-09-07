@@ -424,10 +424,13 @@ export function MomentsOwnerClient({ planId }: { planId: number }) {
     }
     setPhotos((prev) => prev.filter((p) => p.id !== photo.id));
     try {
-      await fetch(`/api/event-plans/${planId}/photos/${photo.id}`, {
+      const response = await fetch(`/api/event-plans/${planId}/photos/${photo.id}`, {
         method: "DELETE",
       });
-      toast.success(t("moments.owner.photoDeleted"));
+      if (!response.ok) throw new Error("photo_delete_failed");
+      const result = await response.json();
+      if (result.storagePreserved) toast.warning(t("planner.photos.storagePreserved"), { duration: 10_000 });
+      else toast.success(t("moments.owner.photoDeleted"));
     } catch {
       toast.error(t("moments.owner.deleteFailed"));
       void refreshPhotos();

@@ -1,7 +1,7 @@
 "use client";
 
 // M4 — Photos sub-view: users upload snapshots from their event.
-// Upload flow: file → /api/upload (Vercel Blob) → /api/event-plans/[id]/photos.
+// One owner-checked upload endpoint processes, stores and attaches the file.
 // Photos default to private + awaiting approval so admins can moderate
 // UGC before it's surfaced publicly on artist profiles.
 
@@ -67,31 +67,18 @@ export function PhotosView({ planId }: Props) {
       toast.error(t("planner.photos.onlyImages"));
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
+    if (file.size > 4 * 1024 * 1024) {
       toast.error(t("planner.photos.tooLarge"));
       return;
     }
     setUploading(true);
     try {
-      // 1. Upload to Vercel Blob via the shared /api/upload endpoint
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("folder", `event-plans/${planId}`);
-      const upRes = await fetch("/api/upload", { method: "POST", body: fd });
-      const upData = await upRes.json();
-      if (!upRes.ok || !upData.url) {
-        toast.error(upData.error || t("planner.photos.uploadFailed"));
-        return;
-      }
-
-      // 2. Attach URL to this plan
+      if (caption.trim()) fd.append("caption", caption.trim());
       const res = await fetch(`/api/event-plans/${planId}/photos`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url: upData.url,
-          caption: caption.trim() || undefined,
-        }),
+        body: fd,
       });
       if (!res.ok) {
         toast.error(t("planner.photos.saveError"));
@@ -102,6 +89,8 @@ export function PhotosView({ planId }: Props) {
       setCaption("");
       if (fileRef.current) fileRef.current.value = "";
       toast.success(t("planner.photos.added"));
+    } catch {
+      toast.error(t("planner.photos.uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -137,6 +126,9 @@ export function PhotosView({ planId }: Props) {
     if (!res.ok) {
       toast.error(t("planner.photos.deleteError"));
       setPhotos(prev);
+    } else {
+      const result = await res.json().catch(() => null);
+      if (result?.storagePreserved) toast.warning(t("planner.photos.storagePreserved"), { duration: 10_000 });
     }
   }
 

@@ -6,7 +6,7 @@
 // from library), camera (capture new photo).
 //
 // Photos POST to /api/v1/event-plans/[id]/photos using FormData. Expo
-// ImagePicker returns a local URI which we wrap in a Blob fetch. We
+// ImagePicker returns a local URI passed as a native multipart file. We
 // then refetch the photo list to show the new entry.
 
 import { useState, useCallback } from "react";
@@ -79,12 +79,11 @@ export default function MomentsScreen() {
 
   const uploadMutation = useMutation({
     mutationFn: async (asset: ImagePicker.ImagePickerAsset) => {
-      // Two-step upload:
-      //   1) POST the file as multipart to /api/v1/upload — server returns
-      //      the persisted URL (Vercel Blob or local fs depending on env).
-      //   2) POST the URL to /api/v1/event-plans/[id]/photos as JSON.
-      // This is cleaner than streaming through the photos endpoint
-      // because /upload already handles MIME validation + rate limit.
+      // The owner-scoped endpoint processes and attaches the file itself.
+      // Arbitrary URL attachment is intentionally no longer supported.
+      if (asset.fileSize && asset.fileSize > 4 * 1024 * 1024) {
+        throw new Error("Fotografia trebuie să aibă maximum 4 MB.");
+      }
       const token = await getToken();
       if (!token) throw new Error("not_authenticated");
 
@@ -94,27 +93,19 @@ export default function MomentsScreen() {
         name: asset.fileName ?? `photo-${Date.now()}.jpg`,
         type: asset.mimeType ?? "image/jpeg",
       } as unknown as Blob);
-      form.append("folder", "uploads");
-
+      const baseUrl = (process.env.EXPO_PUBLIC_API_URL ?? "https://epetrecere.md/api/v1").replace(/\/$/, "");
       const uploadRes = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL}/upload`,
+        `${baseUrl}${API_PATHS.eventPlanPhotos(planId)}`,
         {
           method: "POST",
           headers: { Authorization: `Bearer ${token}` },
           body: form,
         },
       );
-      if (!uploadRes.ok) throw new Error(`upload_failed_${uploadRes.status}`);
-      const { url } = (await uploadRes.json()) as { url: string };
-
-      // Now register the photo with the event plan
-      const registerRes = await api.post(API_PATHS.eventPlanPhotos(planId), {
-        url,
-        width: asset.width,
-        height: asset.height,
-      });
-      if (!registerRes.ok) throw new Error("register_failed");
-      return registerRes.data;
+      if (!uploadRes.ok) throw new Error(uploadRes.status === 413
+        ? "Fotografia trebuie să aibă maximum 4 MB."
+        : "Fotografia nu a putut fi încărcată. Încearcă din nou.");
+      return uploadRes.json();
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["plan", planId, "photos"] });
@@ -136,6 +127,8 @@ export default function MomentsScreen() {
       for (const asset of result.assets) {
         await uploadMutation.mutateAsync(asset);
       }
+    } catch {
+      // The mutation error remains visible below the toolbar.
     } finally {
       setUploading(false);
     }
@@ -154,6 +147,8 @@ export default function MomentsScreen() {
       if (result.canceled) return;
       const asset = result.assets[0];
       if (asset) await uploadMutation.mutateAsync(asset);
+    } catch {
+      // The mutation error remains visible below the toolbar.
     } finally {
       setUploading(false);
     }
@@ -208,6 +203,11 @@ export default function MomentsScreen() {
           <ActivityIndicator size="small" color={colors.gold} />
           <Text className="text-[12px] text-gold">Se încarcă pozele…</Text>
         </View>
+      )}
+      {uploadMutation.isError && (
+        <Text accessibilityRole="alert" className="px-4 py-2 text-red-400">
+          {uploadMutation.error.message}
+        </Text>
       )}
 
       <FlatList

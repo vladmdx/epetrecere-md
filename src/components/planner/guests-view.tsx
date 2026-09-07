@@ -32,6 +32,7 @@ import {
 import { useLocale } from "@/hooks/use-locale";
 import Link from "@/components/shared/locale-link";
 import { guestHeadcount } from "@/lib/planner/guest-headcount";
+import { GuestImportError, parseGuestImportRows, GUEST_IMPORT_WORKBOOK_OPTIONS } from "@/lib/planner/guest-import";
 
 export type GuestType = "single" | "couple" | "family";
 export type ContactChannel =
@@ -527,7 +528,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
     setImporting(true);
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data, { type: "array" });
+      const workbook = XLSX.read(data, GUEST_IMPORT_WORKBOOK_OPTIONS);
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
 
@@ -536,45 +537,29 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         return;
       }
 
-      // Normalise header keys — match Romanian or English names, case-insensitive
-      function col(row: Record<string, unknown>, ...keys: string[]): string {
-        for (const k of keys) {
-          for (const rk of Object.keys(row)) {
-            if (rk.toLowerCase().trim() === k.toLowerCase()) {
-              const v = row[rk];
-              return v == null ? "" : String(v).trim();
-            }
-          }
-        }
-        return "";
+      const parsedGuests = parseGuestImportRows(rows);
+      if (!parsedGuests.length) {
+        toast.error(t("cabinet.guests.emptyFile"));
+        return;
       }
-
       let imported = 0;
+      let failed = 0;
       const newGuests: Guest[] = [];
 
-      for (const row of rows) {
-        const fullName = col(row, "Nume", "Name", "FullName", "Full Name", "fullName");
-        if (!fullName) continue; // skip empty rows
-
-        const phone = col(row, "Telefon", "Phone", "Tel", "phone");
-        const email = col(row, "Email", "E-mail", "email");
-        const group = col(row, "Grup", "Group", "group");
-
-        const res = await fetch(`/api/event-plans/${planId}/guests`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            fullName,
-            phone: phone || undefined,
-            email: email || undefined,
-            group: group || undefined,
-          }),
-        });
-
-        if (res.ok) {
-          const d = await res.json();
-          newGuests.push(d.guest);
-          imported++;
+      for (const guest of parsedGuests) {
+        try {
+          const res = await fetch(`/api/event-plans/${planId}/guests`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(guest),
+          });
+          if (res.ok) {
+            const d = await res.json();
+            newGuests.push(d.guest);
+            imported++;
+          } else failed++;
+        } catch {
+          failed++;
         }
       }
 
@@ -582,10 +567,13 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
         onChange([...guests, ...newGuests]);
       }
 
-      toast.success(t("cabinet.guests.importedCount", { count: imported }));
+      if (failed) toast.error(t("cabinet.guests.importPartial", { count: imported, failed }));
+      else toast.success(t("cabinet.guests.importedCount", { count: imported }));
     } catch (err) {
-      console.error(err);
-      toast.error(t("cabinet.guests.importError"));
+      // Do not log plaintext guest data from spreadsheet/parser exceptions.
+      toast.error(err instanceof GuestImportError
+        ? t("cabinet.guests.importInvalidRow", { row: err.row })
+        : t("cabinet.guests.importError"));
     } finally {
       setImporting(false);
       // reset file input so the same file can be re-imported if needed
@@ -601,6 +589,7 @@ export function GuestsView({ planId, plan, guestCountTarget, guests, onChange }:
       [t("cabinet.guests.exportType")]: guest.guestType ?? "single",
       [t("cabinet.guests.exportAdults")]: guest.partySize ?? 1,
       [t("cabinet.guests.exportChildren")]: guest.kidsCount ?? 0,
+      [t("cabinet.guests.exportPlusOnes")]: guest.plusOnes ?? 0,
       [t("cabinet.guests.exportPhone")]: guest.phone ?? "",
       [t("cabinet.guests.exportEmail")]: guest.email ?? "",
       [t("cabinet.guests.exportGroup")]: guest.group ?? "",

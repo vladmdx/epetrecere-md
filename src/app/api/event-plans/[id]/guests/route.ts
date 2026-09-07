@@ -35,6 +35,7 @@ const createGuestSchema = z.object({
   /** Legacy: existing imports still send this. */
   plusOnes: z.number().int().min(0).max(20).optional(),
   rsvp: z.enum(["pending", "accepted", "declined", "maybe"]).optional(),
+  dietary: z.string().optional(),
   notes: z.string().optional(),
 });
 
@@ -129,6 +130,7 @@ export async function POST(
       contactValue: parsed.data.contactValue ?? null,
       plusOnes: parsed.data.plusOnes ?? 0,
       rsvp: parsed.data.rsvp ?? "pending",
+      dietary: parsed.data.dietary,
       notes: parsed.data.notes,
     }))
     .returning();

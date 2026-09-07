@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { eventPhotos } from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
+import { deleteManagedPhoto } from "@/lib/moments/managed-photo";
 
 // M4 — PATCH / DELETE /api/event-plans/[id]/photos/[photoId]
 
@@ -78,14 +79,6 @@ export async function DELETE(
     )
     .returning({ url: eventPhotos.url });
 
-  if (deleted?.url?.startsWith("https://") && process.env.BLOB_READ_WRITE_TOKEN) {
-    try {
-      const { del } = await import("@vercel/blob");
-      await del(deleted.url);
-    } catch (error) {
-      console.error("[moments-owner-delete] blob cleanup failed", error);
-    }
-  }
-
-  return NextResponse.json({ ok: true });
+  const storageDeleted = deleted ? await deleteManagedPhoto(deleted.url, owned.plan) : false;
+  return NextResponse.json({ ok: true, storagePreserved: Boolean(deleted && !storageDeleted) });
 }

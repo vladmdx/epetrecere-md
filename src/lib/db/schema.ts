@@ -15,8 +15,10 @@ import {
   index,
   uniqueIndex,
   primaryKey,
+  check,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
+import type { TableShape } from "@/lib/planner/table-shape";
 
 // ═══════════════════════════════════════════════════════
 // ENUMS
@@ -1502,11 +1504,15 @@ export const seatingTables = pgTable("seating_tables", {
     .notNull(),
   name: text("name").notNull(),          // "Masa 1", "Masa mirilor", etc.
   seats: integer("seats").default(10).notNull(),
+  // NULL preserves legacy layouts; new clients send an explicit shape.
+  shape: text("shape").$type<TableShape>(),
   /** Optional x/y canvas coords for drag-to-arrange layout. */
   posX: integer("pos_x"),
   posY: integer("pos_y"),
   sortOrder: integer("sort_order").default(0),
-});
+}, (table) => [
+  check("seating_tables_shape_check", sql`${table.shape} IS NULL OR ${table.shape} IN ('round', 'rectangular', 'long')`),
+]);
 
 export const seatAssignments = pgTable("seat_assignments", {
   id: serial("id").primaryKey(),

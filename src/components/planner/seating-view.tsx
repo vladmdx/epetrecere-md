@@ -3,7 +3,7 @@
 // Seating planner — drag & drop guests onto tables, quick-add shape buttons,
 // auto-assignment by group, color-coded table fill states.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 import { assignedHeadcount, fitsAtTable, guestHeadcount } from "@/lib/planner/guest-headcount";
 import { escapeHtml } from "@/lib/email/escape";
+import { resolveTableShape, type TableShape } from "@/lib/planner/table-shape";
 import {
   Dialog,
   DialogContent,
@@ -41,6 +42,7 @@ export interface SeatingTable {
   id: number;
   name: string;
   seats: number;
+  shape?: TableShape | null;
   posX: number | null;
   posY: number | null;
   sortOrder: number | null;
@@ -62,7 +64,13 @@ interface Props {
   onSeatsChange: (seats: SeatAssignment[]) => void;
 }
 
-type TableShape = "round" | "rectangular" | "long";
+type SeatingConfirmation = { kind: "auto" } | { kind: "delete"; table: SeatingTable };
+
+const TABLE_SHAPE_CLASSES: Record<TableShape, string> = {
+  round: "h-14 w-14 rounded-full",
+  rectangular: "h-14 w-20 rounded-lg",
+  long: "h-12 w-20 rounded-lg",
+};
 
 /** `nameBase` is deliberately NOT translated: it is written to the database as
  *  the table's name, so it has to stay stable whatever language the planner
@@ -130,6 +138,15 @@ export function SeatingView({
   const [customSeats, setCustomSeats] = useState("10");
   const [customShape, setCustomShape] = useState<TableShape>("round");
   const [addingCustom, setAddingCustom] = useState(false);
+  const [confirmation, setConfirmation] = useState<SeatingConfirmation | null>(null);
+  const [deletingTableId, setDeletingTableId] = useState<number | null>(null);
+  const [assigningGuest, setAssigningGuest] = useState<number | null>(null);
+  const [unassigningGuest, setUnassigningGuest] = useState<number | null>(null);
+  const [renamingTableId, setRenamingTableId] = useState<number | null>(null);
+  const mutationInFlight = useRef(false);
+  const seatingBusy = autoPlacing || adding !== null || addingCustom
+    || deletingTableId !== null || assigningGuest !== null
+    || unassigningGuest !== null || renamingTableId !== null;
 
   const guestById = useMemo(() => {
     const m = new Map<number, Guest>();
@@ -184,6 +201,8 @@ export function SeatingView({
   const placedPct = acceptedTotal > 0 ? Math.round((placedAccepted / acceptedTotal) * 100) : 0;
 
   async function addTable(shape: TableShape) {
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
     const config = SHAPE_CONFIG[shape];
     const tableNumber = tables.length + 1;
     const name =
@@ -193,7 +212,7 @@ export function SeatingView({
       const res = await fetch(`/api/event-plans/${planId}/tables`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, seats: config.seats }),
+        body: JSON.stringify({ name, seats: config.seats, shape }),
       });
       if (!res.ok) {
         toast.error(t("cabinet.seating.err.addTable"));
@@ -205,26 +224,29 @@ export function SeatingView({
     } catch {
       toast.error(t("cabinet.seating.err.addTable"));
     } finally {
+      mutationInFlight.current = false;
       setAdding(null);
     }
   }
 
   async function addCustomTable() {
+    if (mutationInFlight.current) return;
     const seatsNum = Number(customSeats);
     if (!customName.trim()) {
       toast.error(t("cabinet.seating.err.nameRequired"));
       return;
     }
-    if (!Number.isFinite(seatsNum) || seatsNum < 1 || seatsNum > 30) {
+    if (!Number.isInteger(seatsNum) || seatsNum < 1 || seatsNum > 30) {
       toast.error(t("cabinet.seating.err.seatsRange"));
       return;
     }
+    mutationInFlight.current = true;
     setAddingCustom(true);
     try {
       const res = await fetch(`/api/event-plans/${planId}/tables`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: customName.trim(), seats: seatsNum }),
+        body: JSON.stringify({ name: customName.trim(), seats: seatsNum, shape: customShape }),
       });
       if (!res.ok) {
         toast.error(t("cabinet.seating.err.addTable"));
@@ -240,42 +262,53 @@ export function SeatingView({
     } catch {
       toast.error(t("cabinet.seating.err.addTable"));
     } finally {
+      mutationInFlight.current = false;
       setAddingCustom(false);
     }
   }
 
   async function renameTable(table: SeatingTable) {
-    const newName = prompt(t("cabinet.seating.renamePrompt"), table.name);
-    if (!newName || newName.trim() === table.name) return;
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
     const prev = tables;
-    onTablesChange(tables.map((t) => (t.id === table.id ? { ...t, name: newName.trim() } : t)));
-    const res = await fetch(`/api/event-plans/${planId}/tables/${table.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName.trim() }),
-    });
-    if (!res.ok) {
+    try {
+      const newName = prompt(t("cabinet.seating.renamePrompt"), table.name);
+      if (!newName?.trim() || newName.trim() === table.name) return;
+      setRenamingTableId(table.id);
+      const res = await fetch(`/api/event-plans/${planId}/tables/${table.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (!res.ok) throw new Error("Could not rename table");
+      onTablesChange(prev.map((t) => (t.id === table.id ? { ...t, name: newName.trim() } : t)));
+    } catch {
       toast.error(t("cabinet.seating.err.rename"));
-      onTablesChange(prev);
+    } finally {
+      mutationInFlight.current = false;
+      setRenamingTableId(null);
     }
   }
 
   async function deleteTable(table: SeatingTable) {
-    if (!confirm(t("cabinet.seating.deleteConfirm", { name: table.name }))) return;
     const prev = { tables, seats };
-    onTablesChange(tables.filter((t) => t.id !== table.id));
-    onSeatsChange(seats.filter((s) => s.tableId !== table.id));
-    const res = await fetch(`/api/event-plans/${planId}/tables/${table.id}`, {
-      method: "DELETE",
-    });
-    if (!res.ok) {
+    setDeletingTableId(table.id);
+    try {
+      const res = await fetch(`/api/event-plans/${planId}/tables/${table.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Could not delete table");
+      onTablesChange(prev.tables.filter((t) => t.id !== table.id));
+      onSeatsChange(prev.seats.filter((s) => s.tableId !== table.id));
+    } catch {
       toast.error(t("cabinet.seating.err.delete"));
-      onTablesChange(prev.tables);
-      onSeatsChange(prev.seats);
+    } finally {
+      setDeletingTableId(null);
     }
   }
 
   async function assignGuest(guestId: number, tableId: number) {
+    if (mutationInFlight.current) return;
     const table = tables.find((t) => t.id === tableId);
     if (!table) return;
     const incoming = guestById.get(guestId);
@@ -286,33 +319,49 @@ export function SeatingView({
       toast.error(t("cabinet.seating.err.tableFull", { name: table.name }));
       return;
     }
-    const res = await fetch(`/api/event-plans/${planId}/seats`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ guestId, tableId }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      toast.error(err.code === "TABLE_FULL"
-        ? t("cabinet.seating.err.tableFull", { name: table.name })
-        : err.error || t("cabinet.seating.err.assign"));
-      return;
+    mutationInFlight.current = true;
+    setAssigningGuest(guestId);
+    try {
+      const res = await fetch(`/api/event-plans/${planId}/seats`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ guestId, tableId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast.error(err.code === "TABLE_FULL"
+          ? t("cabinet.seating.err.tableFull", { name: table.name })
+          : err.error || t("cabinet.seating.err.assign"));
+        return;
+      }
+      const data = await res.json();
+      const next = seats.filter((s) => s.guestId !== guestId).concat(data.assignment);
+      onSeatsChange(next);
+    } catch {
+      toast.error(t("cabinet.seating.err.assign"));
+    } finally {
+      mutationInFlight.current = false;
+      setAssigningGuest(null);
     }
-    const data = await res.json();
-    const next = seats.filter((s) => s.guestId !== guestId).concat(data.assignment);
-    onSeatsChange(next);
   }
 
   async function unassign(guestId: number) {
+    if (mutationInFlight.current) return;
+    mutationInFlight.current = true;
+    setUnassigningGuest(guestId);
     const prev = seats;
-    onSeatsChange(seats.filter((s) => s.guestId !== guestId));
-    const res = await fetch(
-      `/api/event-plans/${planId}/seats?guestId=${guestId}`,
-      { method: "DELETE" },
-    );
-    if (!res.ok) {
+    try {
+      const res = await fetch(
+        `/api/event-plans/${planId}/seats?guestId=${guestId}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error("Could not release seat");
+      onSeatsChange(prev.filter((s) => s.guestId !== guestId));
+    } catch {
       toast.error(t("cabinet.seating.err.release"));
-      onSeatsChange(prev);
+    } finally {
+      mutationInFlight.current = false;
+      setUnassigningGuest(null);
     }
   }
 
@@ -322,8 +371,8 @@ export function SeatingView({
       toast.error(t("cabinet.seating.err.noTables"));
       return;
     }
-    if (!confirm(t("cabinet.seating.autoConfirm"))) return;
     setAutoPlacing(true);
+    const nextSeats = [...seats];
     try {
       const groupedUnassigned = new Map<string, Guest[]>();
       for (const g of unassigned) {
@@ -339,7 +388,6 @@ export function SeatingView({
       }));
 
       let assigned = 0;
-      const nextSeats = [...seats];
       for (const [, guestList] of groupedUnassigned) {
         for (const guest of guestList) {
           const people = guestHeadcount(guest);
@@ -363,8 +411,24 @@ export function SeatingView({
       }
       onSeatsChange(nextSeats);
       toast.success(t("cabinet.seating.autoDone", { count: assigned }));
+    } catch {
+      // Keep any assignments already acknowledged by the server.
+      onSeatsChange(nextSeats);
+      toast.error(t("cabinet.seating.err.assign"));
     } finally {
       setAutoPlacing(false);
+    }
+  }
+
+  async function confirmSeatingAction() {
+    if (!confirmation || mutationInFlight.current) return;
+    mutationInFlight.current = true;
+    try {
+      if (confirmation.kind === "delete") await deleteTable(confirmation.table);
+      else await autoPlace();
+    } finally {
+      mutationInFlight.current = false;
+      setConfirmation(null);
     }
   }
 
@@ -423,8 +487,8 @@ export function SeatingView({
             <Button
               size="sm"
               variant="outline"
-              onClick={autoPlace}
-              disabled={autoPlacing || unassigned.length === 0 || tables.length === 0}
+              onClick={() => setConfirmation({ kind: "auto" })}
+              disabled={seatingBusy || unassigned.length === 0 || tables.length === 0}
               className="gap-1.5"
             >
               {autoPlacing ? (
@@ -503,7 +567,7 @@ export function SeatingView({
               <button
                 key={shape}
                 onClick={() => addTable(shape)}
-                disabled={adding !== null}
+                disabled={seatingBusy}
                 className="flex items-center gap-3 rounded-lg border border-border/40 bg-background/50 p-3 text-left transition-all hover:border-gold/40 hover:bg-gold/5 disabled:opacity-50"
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gold/10 text-gold">
@@ -524,7 +588,7 @@ export function SeatingView({
           {/* Custom table */}
           <button
             onClick={() => setCustomDialogOpen(true)}
-            disabled={adding !== null}
+            disabled={seatingBusy}
             className="flex items-center gap-3 rounded-lg border-2 border-dashed border-gold/40 bg-gold/5 p-3 text-left transition-all hover:border-gold/60 hover:bg-gold/10 disabled:opacity-50"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gold/20 text-gold">
@@ -611,7 +675,7 @@ export function SeatingView({
             </Button>
             <Button
               onClick={addCustomTable}
-              disabled={addingCustom || !customName.trim()}
+              disabled={seatingBusy || !customName.trim()}
               className="bg-gold text-[#0D0D0D] hover:bg-gold-dark"
             >
               {addingCustom ? (
@@ -620,6 +684,37 @@ export function SeatingView({
                 <Plus className="h-4 w-4" />
               )}
               {t("cabinet.seating.addTableSubmit")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmation !== null}
+        onOpenChange={(open) => { if (!open && !mutationInFlight.current) setConfirmation(null); }}
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>{t(confirmation?.kind === "delete"
+              ? "cabinet.seating.deleteTableAria" : "cabinet.seating.autoConfirmTitle")}</DialogTitle>
+            <DialogDescription>{confirmation?.kind === "delete"
+              ? t("cabinet.seating.deleteConfirm", { name: confirmation.table.name })
+              : t("cabinet.seating.autoConfirm")}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" autoFocus disabled={seatingBusy} onClick={() => setConfirmation(null)}>
+              {t("cabinet.seating.cancel")}
+            </Button>
+            <Button
+              disabled={seatingBusy}
+              onClick={confirmSeatingAction}
+              className={confirmation?.kind === "delete"
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-gold text-[#0D0D0D] hover:bg-gold-dark"}
+            >
+              {seatingBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t(confirmation?.kind === "delete"
+                ? "cabinet.seating.deleteTableAria" : "cabinet.seating.autoConfirmAction")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -656,11 +751,11 @@ export function SeatingView({
                 return (
                   <li
                     key={g.id}
-                    draggable
+                    draggable={!seatingBusy}
                     onDragStart={() => handleDragStart(g.id)}
                     onDragEnd={handleDragEnd}
                     className={cn(
-                      "flex cursor-grab items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-all active:cursor-grabbing active:scale-95",
+                      "flex min-w-0 cursor-grab flex-col gap-2 rounded-lg border px-2.5 py-2 text-sm transition-all active:cursor-grabbing",
                       groupColor,
                       dragGuest === g.id && "opacity-50",
                     )}
@@ -668,10 +763,34 @@ export function SeatingView({
                       group: g.group ? (GROUP_LABEL_KEYS[g.group] ? t(GROUP_LABEL_KEYS[g.group]) : g.group) : "—",
                     })}
                   >
-                    <span className="min-w-0 flex-1 truncate">
+                    <span className="min-w-0 truncate">
                       {g.fullName}
                       {guestHeadcount(g) > 1 && ` +${guestHeadcount(g) - 1}`}
                     </span>
+                    <label className="sr-only" htmlFor={`seat-guest-${g.id}`}>
+                      {t("cabinet.seating.assignToTableFor", { name: g.fullName })}
+                    </label>
+                    <select
+                      id={`seat-guest-${g.id}`}
+                      value=""
+                      disabled={seatingBusy || tables.length === 0}
+                      onChange={(event) => {
+                        if (event.target.value) void assignGuest(g.id, Number(event.target.value));
+                      }}
+                      onDragStart={(event) => event.stopPropagation()}
+                      className="min-h-11 w-full min-w-0 cursor-pointer rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold disabled:opacity-50"
+                    >
+                      <option value="">{t(assigningGuest === g.id
+                        ? "cabinet.seating.assigning" : "cabinet.seating.assignToTable")}</option>
+                      {tables.map((table) => {
+                        const free = Math.max(0, table.seats - assignedHeadcount(seatsByTable.get(table.id) ?? [], guests));
+                        return (
+                          <option key={table.id} value={table.id} disabled={free < guestHeadcount(g)}>
+                            {table.name} ({t("cabinet.seating.availableSeats", { count: free })})
+                          </option>
+                        );
+                      })}
+                    </select>
                   </li>
                 );
               })}
@@ -716,6 +835,7 @@ export function SeatingView({
                       <div className="min-w-0 flex-1">
                         <button
                           onClick={() => renameTable(table)}
+                          disabled={seatingBusy}
                           className="text-left font-heading text-base font-semibold hover:text-gold"
                         >
                           {table.name}
@@ -733,7 +853,8 @@ export function SeatingView({
                         </p>
                       </div>
                       <button
-                        onClick={() => deleteTable(table)}
+                        onClick={() => setConfirmation({ kind: "delete", table })}
+                        disabled={seatingBusy}
                         className="text-muted-foreground transition-colors hover:text-red-500"
                         aria-label={t("cabinet.seating.deleteTableAria")}
                       >
@@ -744,9 +865,10 @@ export function SeatingView({
                     {/* Visual table representation */}
                     <div className="relative mb-3 flex h-20 items-center justify-center rounded-lg bg-muted/30">
                       <div
+                        data-table-shape={resolveTableShape(table)}
                         className={cn(
-                          "rounded-full border-2 transition-all",
-                          table.seats > 12 ? "h-12 w-20 rounded-lg" : "h-14 w-14",
+                          "border-2 transition-all",
+                          TABLE_SHAPE_CLASSES[resolveTableShape(table)],
                           isFull
                             ? "border-emerald-500 bg-emerald-500/20"
                             : isPartial
@@ -787,6 +909,7 @@ export function SeatingView({
                               </span>
                               <button
                                 onClick={() => unassign(g.id)}
+                                disabled={seatingBusy}
                                 className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100 hover:text-red-500"
                                 aria-label={t("cabinet.seating.removeGuestAria")}
                               >
