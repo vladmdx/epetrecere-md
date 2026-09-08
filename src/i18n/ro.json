@@ -2386,7 +2386,19 @@
     "contractWithYourData": "Contractul de mai jos include datele tale, la final.",
     "mustReadContract": "Deschide și parcurge contractul înainte de a semna.",
     "contractRead": "Ai parcurs contractul",
-    "fillIdentityFirst": "Completează datele de mai sus ca să vezi contractul cu ele."
+    "fillIdentityFirst": "Completează datele de mai sus ca să vezi contractul cu ele.",
+    "legalNameIndividualError": "Introdu numele și prenumele complet, exact ca în actul de identitate.",
+    "legalNameEntityError": "Introdu denumirea oficială completă a entității.",
+    "idNumberIndividualError": "IDNP-ul trebuie să conțină exact 13 cifre, fără spații sau litere.",
+    "idNumberEntityError": "IDNO-ul trebuie să conțină exact 13 cifre, fără spații sau litere.",
+    "legalAddressIndividualError": "Introdu domiciliul complet, de exemplu localitatea, strada și numărul.",
+    "legalAddressEntityError": "Introdu sediul complet, de exemplu localitatea, strada și numărul.",
+    "representativeNameError": "Introdu numele și prenumele complet al administratorului sau reprezentantului.",
+    "documentsAcceptedError": "Bifează că ai citit și ești de acord cu documentele enumerate.",
+    "contractReadError": "Deschide contractul și parcurge-l până la final.",
+    "signatureNameError": "Introdu numele complet al semnatarului, identic cu persoana sau reprezentantul din contract.",
+    "signatureImageError": "Desenează o semnătură completă în chenar.",
+    "completeBeforeSubmit": "Mai trebuie să completezi următoarele înainte de trimitere:"
   },
   "pricing": {
     "metaTitle": "Tarife pentru furnizori",

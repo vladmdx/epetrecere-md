@@ -11,6 +11,7 @@ import { computeCommission, DEFAULT_RULES } from "../src/lib/commissions/rules";
 import { acceptanceSchema, missingCurrentDocuments } from "../src/lib/legal/acceptance";
 import { LEGAL_PACK_VERSION, PARTNER_REQUIRED_DOCS, VENUE_REQUIRED_DOCS, getLegalDocument } from "../src/lib/legal";
 import { validSignatureImage } from "../src/lib/legal/signature-image";
+import { onboardingSubmitDisabled } from "../src/lib/legal/onboarding-submit";
 import { privateLeadSummary } from "../src/lib/privacy/lead-summary";
 
 test("legacy lead summaries never expose identity or contact prose",()=>{
@@ -62,13 +63,46 @@ test("contract fee schedule has inclusive boundaries and exact cents",()=>{
   assert.equal(fee("birthday"),undefined); assert.equal(fee("birthday",0),undefined);
 });
 test("onboarding rejects missing, stale, mismatched and incomplete acceptance",()=>{
-  const valid={subjectType:"artist",accepted:true,packVersion:LEGAL_PACK_VERSION,signatureName:"QA Partner",signatureImage:"data:image/png;base64,QUJD",locale:"ro",documents:[...PARTNER_REQUIRED_DOCS],identity:{partnerType:"individual",legalName:"QA Partner",idNumber:"TEST1234",legalAddress:"Adresă exclusiv de test"}};
+  const valid={subjectType:"artist",accepted:true,packVersion:LEGAL_PACK_VERSION,signatureName:"QA Partner",signatureImage:"data:image/png;base64,QUJD",locale:"ro",documents:[...PARTNER_REQUIRED_DOCS],identity:{partnerType:"individual",legalName:"QA Partner",idNumber:"2000000000001",legalAddress:"Bălți, str. Test 10"}};
   assert.equal(acceptanceSchema.safeParse(valid).success,true);
   for(const changes of [{accepted:false},{packVersion:"0"},{documents:[]},{signatureImage:""},{signatureName:"Alt Nume"},{documents:[...VENUE_REQUIRED_DOCS]}]) assert.equal(acceptanceSchema.safeParse({...valid,...changes}).success,false);
   assert.equal(missingCurrentDocuments([],"venue").length,VENUE_REQUIRED_DOCS.length);
-  const evidence=PARTNER_REQUIRED_DOCS.map(documentSlug=>({documentSlug,documentVersion:getLegalDocument(documentSlug)!.version,packVersion:LEGAL_PACK_VERSION,signatureImage:"fixture",contentHash:"fixture",documentBlocks:[{text:"fixture"}],legalName:"QA Partner",idNumber:"TEST1234",legalAddress:"Test address"}));
+  const evidence=PARTNER_REQUIRED_DOCS.map(documentSlug=>({documentSlug,documentVersion:getLegalDocument(documentSlug)!.version,packVersion:LEGAL_PACK_VERSION,signatureImage:"fixture",contentHash:"fixture",documentBlocks:[{text:"fixture"}],legalName:"QA Partner",idNumber:"2000000000001",legalAddress:"Test address"}));
   assert.deepEqual(missingCurrentDocuments(evidence,"artist"),[]);
   assert.deepEqual(missingCurrentDocuments(evidence.map(x=>({...x,signatureImage:null})),"artist"),[...PARTNER_REQUIRED_DOCS]);
+});
+test("contract identity requires a full person name, 13-digit IDNP or IDNO, and a complete address",()=>{
+  const individual={subjectType:"artist",accepted:true,packVersion:LEGAL_PACK_VERSION,signatureName:"Ion Popescu",signatureImage:"data:image/png;base64,QUJD",locale:"ro",documents:[...PARTNER_REQUIRED_DOCS],identity:{partnerType:"individual",legalName:"Ion Popescu",idNumber:"2000000000001",legalAddress:"Chișinău, str. Test 10",representativeName:null}};
+  const issuePaths=(candidate:unknown)=>{
+    const parsed=acceptanceSchema.safeParse(candidate);
+    return parsed.success?[]:parsed.error.issues.map(issue=>issue.path.join("."));
+  };
+  assert.equal(acceptanceSchema.safeParse(individual).success,true);
+  for(const idNumber of ["134","123456789012","12345678901234","12345678901A3","123 456789012"]){
+    assert.ok(issuePaths({...individual,identity:{...individual.identity,idNumber}}).includes("identity.idNumber"),idNumber);
+  }
+  assert.ok(issuePaths({...individual,signatureName:"Vlas",identity:{...individual.identity,legalName:"Vlas"}}).includes("identity.legalName"));
+  for(const legalName of ["123Ion456 Popescu789","Ion 123 Popescu","!!Ion@@Popescu##"]){
+    assert.ok(issuePaths({...individual,signatureName:legalName,identity:{...individual.identity,legalName}}).includes("identity.legalName"),legalName);
+  }
+  assert.ok(issuePaths({...individual,identity:{...individual.identity,legalAddress:"Chi"}}).includes("identity.legalAddress"));
+  assert.ok(issuePaths({...individual,identity:{...individual.identity,legalAddress:"00000000"}}).includes("identity.legalAddress"));
+  for(const legalAddress of ["abcdef 1","test test"]){
+    assert.ok(issuePaths({...individual,identity:{...individual.identity,legalAddress}}).includes("identity.legalAddress"),legalAddress);
+  }
+  const company={...individual,documents:[...VENUE_REQUIRED_DOCS],subjectType:"venue",signatureName:"Ana Popescu",identity:{partnerType:"company",legalName:"Eventum SRL",idNumber:"1000000000001",legalAddress:"Bălți, str. Test 4",representativeName:"Ana Popescu"}};
+  assert.equal(acceptanceSchema.safeParse(company).success,true);
+  assert.ok(issuePaths({...company,identity:{...company.identity,idNumber:"1000"}}).includes("identity.idNumber"));
+  assert.ok(issuePaths({...company,signatureName:"Ana",identity:{...company.identity,representativeName:"Ana"}}).includes("identity.representativeName"));
+});
+test("incomplete legal details keep submit actionable while technical states disable it",()=>{
+  const disabled=(agreementStatus:"unsigned"|"resumable"|"blocked"|null,busy=false,agreementLoading=false)=>onboardingSubmitDisabled({busy,agreementLoading,agreementStatus});
+  assert.equal(disabled("unsigned"),false);
+  assert.equal(disabled("resumable"),false);
+  assert.equal(disabled(null),false,"an unavailable check stays actionable so the user can retry");
+  assert.equal(disabled("blocked"),true);
+  assert.equal(disabled("unsigned",true),true);
+  assert.equal(disabled("unsigned",false,true),true);
 });
 test("signature validation rejects blank and invalid images",async()=>{
   const png=async(color:string)=>"data:image/png;base64,"+(await sharp({create:{width:200,height:80,channels:3,background:color}}).png().toBuffer()).toString("base64");

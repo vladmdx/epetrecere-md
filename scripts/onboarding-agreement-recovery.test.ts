@@ -150,6 +150,18 @@ for (const subjectType of ["artist", "venue"] as const) {
     assertBlocked(rows, subjectType);
   });
 
+  test(`${subjectType} legacy placeholder identity cannot resume under current validation`, () => {
+    assertBlocked(signedRows(subjectType).map(row => ({ ...row, idNumber: "TEST1234" })), subjectType);
+    assertBlocked(signedRows(subjectType).map(row => ({ ...row, legalAddress: "test test" })), subjectType);
+    if (subjectType === "artist") {
+      assertBlocked(signedRows(subjectType).map(row => ({
+        ...row,
+        legalName: "123Ana456 Ștefan789",
+        signatureName: "123Ana456 Ștefan789",
+      })), subjectType);
+    }
+  });
+
   test(`${subjectType} partial sessions stay blocked even when their combined slugs cover the pack`, () => {
     const earlier = signedRows(subjectType);
     const later = signedRows(subjectType, { acceptedAt: "2026-09-06T09:30:00.000Z", firstId: 901 });

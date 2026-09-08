@@ -12,7 +12,7 @@
  * minimum amount of ink AND a minimum bounding box.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Eraser, PenLine } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 
@@ -31,11 +31,16 @@ export interface SignatureValue {
 export function SignaturePad({
   onChange,
   height = 180,
+  invalid = false,
+  describedBy,
 }: {
   onChange?: (v: SignatureValue) => void;
   height?: number;
+  invalid?: boolean;
+  describedBy?: string;
 }) {
   const { t } = useLocale();
+  const canvasId = useId();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const drawing = useRef(false);
   const points = useRef(0);
@@ -184,7 +189,7 @@ export function SignaturePad({
   return (
     <div>
       <div className="mb-1.5 flex items-center justify-between">
-        <label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+        <label htmlFor={canvasId} className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {t("legal.drawSignature")}
         </label>
         {hasInk && (
@@ -199,8 +204,9 @@ export function SignaturePad({
         )}
       </div>
 
-      <div className="relative overflow-hidden rounded-xl border border-border bg-white">
+      <div className={`relative overflow-hidden rounded-xl border bg-white ${invalid ? "border-destructive" : "border-border"}`}>
         <canvas
+          id={canvasId}
           ref={canvasRef}
           style={{ width: "100%", height, touchAction: "none", cursor: "crosshair" }}
           onPointerDown={start}
@@ -209,6 +215,8 @@ export function SignaturePad({
           onPointerLeave={end}
           onPointerCancel={end}
           aria-label={t("legal.drawSignature")}
+          aria-invalid={invalid}
+          aria-describedby={invalid ? describedBy : undefined}
         />
         {!hasInk && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 text-sm text-[#9A9A8C]">

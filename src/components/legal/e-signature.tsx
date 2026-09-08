@@ -14,7 +14,7 @@
 
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/shared/locale-link";
-import { Check, ChevronDown, FileText, ShieldCheck } from "lucide-react";
+import { AlertCircle, Check, ChevronDown, FileText, ShieldCheck } from "lucide-react";
 import { SignaturePad, type SignatureValue } from "./signature-pad";
 import { useLocale } from "@/hooks/use-locale";
 import {
@@ -25,7 +25,19 @@ import {
   type PartnerIdentity,
   type PartnerType,
 } from "@/lib/legal";
+import {
+  MOLDOVAN_ID_NUMBER_LENGTH,
+  signerMatchesIdentity,
+  validatePartnerIdentity,
+  type PartnerIdentityField,
+} from "@/lib/legal/identity-validation";
 import { ContractReader } from "./contract-reader";
+
+export type ESignatureIssue = PartnerIdentityField |
+  "documentsAccepted" |
+  "contractRead" |
+  "signatureName" |
+  "signatureImage";
 
 export interface ESignatureValue {
   signatureName: string;
@@ -37,22 +49,60 @@ export interface ESignatureValue {
    *  acceptance row, which is append-only, so the signed document stays
    *  reproducible exactly as it was shown. */
   identity: PartnerIdentity;
+  /** Exact unmet requirements, used by the final submit button to reveal a
+   * useful explanation instead of becoming inert. */
+  validationIssues: ESignatureIssue[];
+}
+
+function signatureIssues({
+  acceptedDocuments,
+  contractRead,
+  identity,
+  name,
+  signature,
+}: {
+  acceptedDocuments: boolean;
+  contractRead: boolean;
+  identity: PartnerIdentity;
+  name: string;
+  signature: SignatureValue;
+}): ESignatureIssue[] {
+  const identityFields = validatePartnerIdentity(identity).fields;
+  const issues: ESignatureIssue[] = [];
+  for (const field of [
+    "legalName",
+    "idNumber",
+    "legalAddress",
+    "representativeName",
+  ] as const) {
+    if (identityFields[field]) issues.push(field);
+  }
+  if (!acceptedDocuments) issues.push("documentsAccepted");
+  if (!contractRead) issues.push("contractRead");
+  if (!signerMatchesIdentity(name, identity)) issues.push("signatureName");
+  if (!signature.isValid) issues.push("signatureImage");
+  return issues;
 }
 
 export function ESignature({
   subjectType,
   onChange,
   defaultName = "",
+  showValidation = false,
 }: {
   subjectType: "artist" | "venue";
   onChange?: (v: ESignatureValue) => void;
   defaultName?: string;
+  showValidation?: boolean;
 }) {
   const { t, locale } = useLocale();
   const acceptanceId = useId();
+  const acceptanceErrorId = useId();
   const documentsId = useId();
   const contractId = useId();
   const signerId = useId();
+  const signerErrorId = useId();
+  const signatureErrorId = useId();
   const required = subjectType === "venue" ? VENUE_REQUIRED_DOCS : PARTNER_REQUIRED_DOCS;
 
   const docs = useMemo(
@@ -88,6 +138,15 @@ export function ESignature({
     accepted: false,
     documents: docs.map((doc) => doc.slug),
     identity: { partnerType: "individual", legalName: "", idNumber: null, legalAddress: null, representativeName: null },
+    validationIssues: [
+      "legalName",
+      "idNumber",
+      "legalAddress",
+      "documentsAccepted",
+      "contractRead",
+      "signatureName",
+      "signatureImage",
+    ],
   });
   useLayoutEffect(() => {
     initialChange.current?.(initialValue.current);
@@ -102,22 +161,25 @@ export function ESignature({
     representativeName: isEntity ? representativeName.trim() || null : null,
   };
   /** Required for signing, never a condition for opening the document. */
-  const identityOk =
-    legalName.trim().length >= 3 &&
-    idNumber.trim().length >= 4 &&
-    legalAddress.trim().length >= 5 &&
-    (!isEntity || representativeName.trim().length >= 3);
+  const identityValidation = validatePartnerIdentity(identity);
+  const identityOk = identityValidation.ok;
 
   /** The agreement itself — the one document that gets read in full. */
   const mainDoc = docs[0];
 
-  const matchesSigner = (n: string, party: PartnerIdentity) => n.trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase() === (party.partnerType === "individual" ? party.legalName : party.representativeName ?? "").trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase();
-  const nameOk = name.trim().length >= 3 && name.trim().includes(" ") && matchesSigner(name, identity);
+  const nameOk = signerMatchesIdentity(name, identity);
+  const validationIssues = signatureIssues({
+    acceptedDocuments,
+    contractRead,
+    identity,
+    name,
+    signature,
+  });
   // All three are required: the tick is what the Partner Agreement §4.2 asks
   // for, the typed name identifies the signer, and the drawing is the
   // handwritten signature itself.
   const valid =
-    acceptedDocuments && docs.length > 0 && nameOk && signature.isValid && identityOk && contractRead;
+    docs.length > 0 && validationIssues.length === 0;
 
   function emit(
     nextAccepted: boolean,
@@ -136,25 +198,48 @@ export function ESignature({
       nextAccepted = false;
       nextSig = { dataUrl: null, isValid: false };
     }
-    const entity = nextIdentity.partnerType !== "individual";
-    const idOk =
-      (nextIdentity.legalName ?? "").trim().length >= 3 &&
-      (nextIdentity.idNumber ?? "").trim().length >= 4 &&
-      (nextIdentity.legalAddress ?? "").trim().length >= 5 &&
-      (!entity || (nextIdentity.representativeName ?? "").trim().length >= 3);
+    const issues = signatureIssues({
+      acceptedDocuments: nextAccepted,
+      contractRead: nextRead,
+      identity: nextIdentity,
+      name: nextName,
+      signature: nextSig,
+    });
     onChange?.({
       signatureName: nextName.trim(),
       signatureImage: nextSig.dataUrl,
-      accepted:
-        nextAccepted && docs.length > 0 &&
-        nextName.trim().length >= 3 &&
-        nextName.trim().includes(" ") && matchesSigner(nextName, nextIdentity) &&
-        nextSig.isValid &&
-        idOk &&
-        nextRead,
+      accepted: docs.length > 0 && issues.length === 0,
       documents: docs.map((d) => d.slug),
       identity: nextIdentity,
+      validationIssues: issues,
     });
+  }
+
+  function issueMessage(issue: ESignatureIssue): string {
+    switch (issue) {
+      case "legalName":
+        return t(isEntity
+          ? "legal.legalNameEntityError"
+          : "legal.legalNameIndividualError");
+      case "idNumber":
+        return t(isEntity
+          ? "legal.idNumberEntityError"
+          : "legal.idNumberIndividualError");
+      case "legalAddress":
+        return t(isEntity
+          ? "legal.legalAddressEntityError"
+          : "legal.legalAddressIndividualError");
+      case "representativeName":
+        return t("legal.representativeNameError");
+      case "documentsAccepted":
+        return t("legal.documentsAcceptedError");
+      case "contractRead":
+        return t("legal.contractReadError");
+      case "signatureName":
+        return t("legal.signatureNameError");
+      case "signatureImage":
+        return t("legal.signatureImageError");
+    }
   }
 
   return (
@@ -218,6 +303,11 @@ export function ESignature({
               isEntity ? "legal.legalNameEntity" : "legal.legalNameIndividual",
             )}
             value={legalName}
+            maxLength={200}
+            error={identityValidation.fields.legalName
+              ? issueMessage("legalName")
+              : undefined}
+            showError={showValidation || legalName.trim().length > 0}
             onChange={(v) => {
               setLegalName(v);
               emit(acceptedDocuments, name, signature, contractRead, {
@@ -231,6 +321,13 @@ export function ESignature({
               isEntity ? "legal.idNumberEntity" : "legal.idNumberIndividual",
             )}
             value={idNumber}
+            error={identityValidation.fields.idNumber
+              ? issueMessage("idNumber")
+              : undefined}
+            showError={showValidation || idNumber.trim().length > 0}
+            inputMode="numeric"
+            pattern={`[0-9]{${MOLDOVAN_ID_NUMBER_LENGTH}}`}
+            maxLength={MOLDOVAN_ID_NUMBER_LENGTH}
             onChange={(v) => {
               setIdNumber(v);
               emit(acceptedDocuments, name, signature, contractRead, {
@@ -246,6 +343,11 @@ export function ESignature({
                 : "legal.legalAddressIndividual",
             )}
             value={legalAddress}
+            maxLength={300}
+            error={identityValidation.fields.legalAddress
+              ? issueMessage("legalAddress")
+              : undefined}
+            showError={showValidation || legalAddress.trim().length > 0}
             onChange={(v) => {
               setLegalAddress(v);
               emit(acceptedDocuments, name, signature, contractRead, {
@@ -259,6 +361,11 @@ export function ESignature({
             <IdField
               label={t("legal.representativeName")}
               value={representativeName}
+              maxLength={200}
+              error={identityValidation.fields.representativeName
+                ? issueMessage("representativeName")
+                : undefined}
+              showError={showValidation || representativeName.trim().length > 0}
               onChange={(v) => {
                 setRepresentativeName(v);
                 emit(acceptedDocuments, name, signature, contractRead, {
@@ -278,7 +385,8 @@ export function ESignature({
             id={acceptanceId}
             type="checkbox"
             checked={acceptedDocuments}
-            aria-describedby={documentsId}
+            aria-invalid={showValidation && !acceptedDocuments}
+            aria-describedby={`${documentsId}${showValidation && !acceptedDocuments ? ` ${acceptanceErrorId}` : ""}`}
             onChange={(event) => {
               const checked = event.target.checked;
               setAcceptedDocuments(checked);
@@ -306,6 +414,11 @@ export function ESignature({
             </li>
           ))}
         </ol>
+        {showValidation && !acceptedDocuments && (
+          <p id={acceptanceErrorId} className="mt-2 text-xs text-destructive">
+            {issueMessage("documentsAccepted")}
+          </p>
+        )}
       </div>
 
       {/* 2 — the agreement itself, with their details in it, before any
@@ -360,13 +473,13 @@ export function ESignature({
               <Check className="h-3.5 w-3.5" />
               {t("legal.contractRead")}
             </p>
-          ) : (
-            identityOk && (
-              <p className="mt-2 text-xs text-amber-500">
-                {t("legal.mustReadContract")}
-              </p>
-            )
-          )}
+          ) : (showValidation || identityOk) ? (
+            <p className="mt-2 text-xs text-amber-500">
+              {showValidation
+                ? issueMessage("contractRead")
+                : t("legal.mustReadContract")}
+            </p>
+          ) : null}
         </div>
       )}
 
@@ -378,27 +491,44 @@ export function ESignature({
         <input
           id={signerId}
           value={name}
+          required
+          aria-invalid={(showValidation || name.length > 0) && !nameOk}
+          aria-describedby={(showValidation || name.length > 0) && !nameOk
+            ? signerErrorId
+            : undefined}
           onChange={(e) => {
             setName(e.target.value);
             emit(acceptedDocuments, e.target.value);
           }}
           placeholder="Ion Popescu"
-          className="h-11 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-gold"
+          className={`h-11 w-full rounded-xl border bg-background px-3 text-sm outline-none focus:border-gold ${
+            (showValidation || name.length > 0) && !nameOk
+              ? "border-destructive"
+              : "border-border"
+          }`}
         />
-        {!nameOk && name.length > 0 && (
-          <p className="mt-1 text-xs text-amber-500">
-            {t("legal.nameHint")}
+        {!nameOk && (showValidation || name.length > 0) && (
+          <p id={signerErrorId} className="mt-1 text-xs text-destructive">
+            {issueMessage("signatureName")}
           </p>
         )}
       </div>
 
       <div className="mt-4">
-        <SignaturePad key={signatureKey}
+        <SignaturePad
+          key={signatureKey}
+          invalid={showValidation && !signature.isValid}
+          describedBy={signatureErrorId}
           onChange={(v) => {
             setSignature(v);
             emit(acceptedDocuments, name, v);
           }}
         />
+        {showValidation && !signature.isValid && (
+          <p id={signatureErrorId} className="mt-1 text-xs text-destructive">
+            {issueMessage("signatureImage")}
+          </p>
+        )}
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
@@ -411,6 +541,23 @@ export function ESignature({
           {t("legal.readyToSign")}
         </p>
       )}
+      {showValidation && validationIssues.length > 0 && (
+        <div
+          role="alert"
+          data-agreement-validation
+          className="mt-4 rounded-xl border border-destructive/40 bg-destructive/5 p-3 text-sm"
+        >
+          <p className="flex items-start gap-2 font-medium text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            {t("legal.completeBeforeSubmit")}
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-8 text-xs text-muted-foreground">
+            {validationIssues.map((issue) => (
+              <li key={issue}>{issueMessage(issue)}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
@@ -419,14 +566,26 @@ function IdField({
   label,
   value,
   onChange,
+  error,
+  showError = false,
+  inputMode,
+  pattern,
+  maxLength,
   className = "",
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  error?: string;
+  showError?: boolean;
+  inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
+  pattern?: string;
+  maxLength?: number;
   className?: string;
 }) {
   const inputId = useId();
+  const errorId = useId();
+  const invalid = Boolean(showError && error);
   return (
     <div className={className}>
       <label htmlFor={inputId} className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -434,10 +593,24 @@ function IdField({
       </label>
       <input
         id={inputId}
+        type="text"
         value={value}
+        required
+        inputMode={inputMode}
+        pattern={pattern}
+        maxLength={maxLength}
+        aria-invalid={invalid}
+        aria-describedby={invalid ? errorId : undefined}
         onChange={(e) => onChange(e.target.value)}
-        className="h-10 w-full rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-gold"
+        className={`h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none focus:border-gold ${
+          invalid ? "border-destructive" : "border-border"
+        }`}
       />
+      {invalid && (
+        <p id={errorId} className="mt-1 text-xs text-destructive">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

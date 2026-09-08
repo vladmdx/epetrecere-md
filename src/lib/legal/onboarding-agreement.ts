@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { LEGAL_PACK_VERSION, PARTNER_REQUIRED_DOCS, VENUE_REQUIRED_DOCS, getLegalDocument, type PartnerIdentity } from "@/lib/legal";
 import { missingCurrentDocuments, type SignedDocumentEvidence } from "./acceptance";
+import { signerMatchesIdentity, validatePartnerIdentity } from "./identity-validation";
 
 export interface SavedOnboardingAgreement {
   subjectType: "artist" | "venue";
@@ -26,7 +27,7 @@ interface EvidenceRow extends SignedDocumentEvidence {
   representativeRole: string | null;
   partnerType: string | null;
   representativeName: string | null;
-  documentTitle: string;
+  documentTitle: string | null;
 }
 
 /** Only a complete, coherent, current signing session can resume onboarding.
@@ -55,9 +56,18 @@ export function onboardingAgreementStatus(rows: EvidenceRow[], subjectType: "art
       !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(first.signatureImage)) continue;
     if (first.locale !== "ro" && first.locale !== "ru" && first.locale !== "en") continue;
     if (first.partnerType !== "individual" && first.partnerType !== "sole_trader" && first.partnerType !== "company") continue;
-    const normalized = (value: string) => value.trim().normalize("NFKC").replace(/\s+/g, " ").toLocaleLowerCase();
-    const signer = first.partnerType === "individual" ? first.legalName : first.representativeName;
-    if (!signer || normalized(signer) !== normalized(first.signatureName)) continue;
+    const identity: PartnerIdentity = {
+      partnerType: first.partnerType,
+      legalName: first.legalName ?? "",
+      idNumber: first.idNumber,
+      legalAddress: first.legalAddress,
+      representativeName: first.representativeName,
+    };
+    // Current validation also applies when resuming a historical signing
+    // attempt. The evidence remains immutable, but an old placeholder ID or
+    // incomplete party must never become a registration bypass.
+    if (!validatePartnerIdentity(identity).ok ||
+      !signerMatchesIdentity(first.signatureName, identity)) continue;
     if (!session.every(row => Array.isArray(row.documentBlocks) &&
       row.documentBlocks.every(block => block && typeof block.text === "string") &&
       createHash("sha256").update(row.documentBlocks.map(block => block.text).join("\n")).digest("hex") === row.contentHash)) continue;
@@ -66,11 +76,10 @@ export function onboardingAgreementStatus(rows: EvidenceRow[], subjectType: "art
       agreement: {
         subjectType, acceptedAt: new Date(first.acceptedAt).toISOString(), locale: first.locale,
         signatureName: first.signatureName, representativeRole: first.representativeRole,
-        identity: { partnerType: first.partnerType, legalName: first.legalName!, idNumber: first.idNumber,
-          legalAddress: first.legalAddress, representativeName: first.representativeName },
+        identity,
         documents: required.map(slug => {
           const row = session.find(item => item.documentSlug === slug)!;
-          return { id: row.id, title: row.documentTitle, copyUrl: `/api/legal/accept/${row.id}/copy` };
+          return { id: row.id, title: row.documentTitle ?? row.documentSlug, copyUrl: `/api/legal/accept/${row.id}/copy` };
         }),
       },
     };

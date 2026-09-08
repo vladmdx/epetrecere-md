@@ -7,10 +7,16 @@ import type { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
 import { ESignature, type ESignatureValue } from "./e-signature";
 import { onboardingAgreementText } from "./onboarding-agreement-text";
 
-export function OnboardingAgreement({ subjectType, agreement, onChange }: {
+export function OnboardingAgreement({
+  subjectType,
+  agreement,
+  onChange,
+  showValidation = false,
+}: {
   subjectType: "artist" | "venue";
   agreement: ReturnType<typeof useOnboardingAgreement>;
   onChange: (value: ESignatureValue) => void;
+  showValidation?: boolean;
 }) {
   const { locale } = useLocale();
   const text = onboardingAgreementText[locale];
@@ -22,7 +28,12 @@ export function OnboardingAgreement({ subjectType, agreement, onChange }: {
     <p>{text.blocked}</p><Link href="/contact" className="text-gold underline">{text.contact}</Link>
   </div>;
   const saved = agreement.value?.agreement;
-  if (!saved) return <ESignature key={`${subjectType}-${locale}`} subjectType={subjectType} onChange={onChange} />;
+  if (!saved) return <ESignature
+    key={`${subjectType}-${locale}`}
+    subjectType={subjectType}
+    onChange={onChange}
+    showValidation={showValidation}
+  />;
 
   const fields = [
     [text.kind, text[saved.identity.partnerType]],

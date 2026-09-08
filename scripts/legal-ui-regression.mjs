@@ -20,8 +20,10 @@ const result = await build({
       function Harness() {
         const [value, setValue] = useState(null);
         const [visible, setVisible] = useState(true);
+        const [showValidation, setShowValidation] = useState(false);
         return <><button id="toggle-form" onClick={() => setVisible(!visible)}>Toggle form</button>
-          {visible && <ESignature subjectType={new URLSearchParams(location.search).get('subject')} onChange={setValue}/>}
+          <button id="show-validation" onClick={() => setShowValidation(true)}>Validate</button>
+          {visible && <ESignature subjectType={new URLSearchParams(location.search).get('subject')} onChange={setValue} showValidation={showValidation}/>}
           <output id="result">{JSON.stringify(value)}</output></>;
       }
       createRoot(document.getElementById('root')).render(<StrictMode><Harness/></StrictMode>);`,
@@ -90,6 +92,19 @@ async function drawSignature(page) {
   await page.mouse.up();
 }
 
+async function assertFieldError(input, expected = true) {
+  assert.equal(await input.getAttribute("aria-invalid"), String(expected));
+  const describedBy = await input.getAttribute("aria-describedby");
+  if (!expected) {
+    assert.equal(describedBy, null);
+    return;
+  }
+  assert.ok(describedBy, "Invalid field points to its error message");
+  const message = input.page().locator(`[id="${describedBy}"]`);
+  await message.waitFor();
+  assert.ok((await message.textContent()).trim().length > 0, "Field error is visible and non-empty");
+}
+
 try {
   for (const locale of ["ro", "ru", "en"]) {
     for (const subject of ["artist", "venue"]) {
@@ -109,13 +124,34 @@ try {
       await checkbox.check();
       assert.equal((await signingValue(page)).accepted, false, "Reading and checking cannot bypass identity or signature");
 
-      await page.getByLabel(labels[locale].legalNameIndividual, { exact: true }).fill("Test Partner");
-      await page.getByLabel(labels[locale].idNumberIndividual, { exact: true }).fill("2000000000001");
-      await page.getByLabel(labels[locale].legalAddressIndividual, { exact: true }).fill("Balti, Test Street 10");
+      const legalName = page.getByLabel(labels[locale].legalNameIndividual, { exact: true });
+      const idNumber = page.getByLabel(labels[locale].idNumberIndividual, { exact: true });
+      const legalAddress = page.getByLabel(labels[locale].legalAddressIndividual, { exact: true });
+      await legalName.fill("Vlas");
+      await idNumber.fill("134");
+      await legalAddress.fill("Chi");
+      await page.locator("#show-validation").click();
+      await page.locator("[data-agreement-validation]").waitFor();
+      await assertFieldError(legalName);
+      await assertFieldError(idNumber);
+      await assertFieldError(legalAddress);
+      await assertFieldError(page.locator("canvas"));
+      assert.deepEqual(
+        (await signingValue(page)).validationIssues.slice(0, 3),
+        ["legalName", "idNumber", "legalAddress"],
+        "The photographed filler values identify all three exact fields",
+      );
+      await legalName.fill("Test Partner");
+      await idNumber.fill("2000000000001");
+      await legalAddress.fill("Bălți, str. Test 10");
+      await assertFieldError(legalName, false);
+      await assertFieldError(idNumber, false);
+      await assertFieldError(legalAddress, false);
       assert.equal(await checkbox.isChecked(), false, "Identity edits invalidate earlier consent");
       await page.getByRole("button", { name: words[locale].expand, exact: true }).click();
       await page.getByLabel(labels[locale].fullName, { exact: true }).fill("Wrong Signer");
       await drawSignature(page);
+      await assertFieldError(page.locator("canvas"), false);
       await checkbox.check();
       assert.equal((await signingValue(page)).accepted, false, "Another person's name cannot sign");
       await page.getByLabel(labels[locale].fullName, { exact: true }).fill("Test Partner");
@@ -137,7 +173,11 @@ try {
 
       await page.getByRole("button", { name: labels[locale].partnerTypeCompany, exact: true }).click();
       await page.getByLabel(labels[locale].legalNameEntity, { exact: true }).fill("Test Company SRL");
-      await page.getByLabel(labels[locale].representativeName, { exact: true }).fill("Test Manager");
+      const representative = page.getByLabel(labels[locale].representativeName, { exact: true });
+      await representative.fill("Test");
+      await assertFieldError(representative);
+      await representative.fill("Test Manager");
+      await assertFieldError(representative, false);
       await page.getByRole("button", { name: words[locale].expand, exact: true }).click();
       await drawSignature(page);
       await checkbox.check();

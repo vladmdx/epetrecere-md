@@ -84,7 +84,7 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
     assert.equal(response.status,409,await response.text()); ok(kind+": registration without contract blocked");
     const body={subjectType:kind,accepted:true,packVersion:legal.LEGAL_PACK_VERSION,signatureName:"QA "+kind,
       signatureImage,locale:"ro",documents:[...(kind==="artist"?legal.PARTNER_REQUIRED_DOCS:legal.VENUE_REQUIRED_DOCS)],
-      identity:{partnerType:"individual",legalName:"QA "+kind,idNumber:"ROLLBACK-TEST",legalAddress:"Adresă fictivă, test exclusiv tehnic"}};
+      identity:{partnerType:"individual",legalName:"QA "+kind,idNumber:"2000000000001",legalAddress:"Adresă fictivă, test exclusiv tehnic"}};
     response=await accept.POST(req("/api/legal/accept",body)); assert.equal(response.status,200,await response.text());
     const rows=await txDb.select().from(schema.legalAcceptances).where(eq(schema.legalAcceptances.userId,current.id));
     assert.equal(rows.length,body.documents.length);

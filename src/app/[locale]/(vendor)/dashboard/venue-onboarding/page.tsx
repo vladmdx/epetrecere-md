@@ -38,6 +38,7 @@ import { MapsAutofill } from "@/components/vendor/maps-autofill";
 import type { ESignatureValue } from "@/components/legal/e-signature";
 import { OnboardingAgreement } from "@/components/legal/onboarding-agreement";
 import { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
+import { onboardingSubmitDisabled } from "@/lib/legal/onboarding-submit";
 import { useLocale } from "@/hooks/use-locale";
 
 const STEP_LABEL_KEYS = [
@@ -55,6 +56,7 @@ export default function VenueOnboardingPage() {
   const [step, setStep] = useState(0);
   // Vendors must sign the Legal Pack before their profile is submitted.
   const [signature, setSignature] = useState<ESignatureValue | null>(null);
+  const [showAgreementValidation, setShowAgreementValidation] = useState(false);
   const agreement = useOnboardingAgreement("venue", user?.id, locale);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -245,6 +247,11 @@ export default function VenueOnboardingPage() {
 
   async function handleSubmit() {
     if (submitting || uploading) return;
+    setShowAgreementValidation(true);
+    if (agreement.value?.status === "unsigned" && !signature?.accepted) {
+      toast.error(t("legal.completeBeforeSubmit"));
+      return;
+    }
     setSubmitting(true);
     try {
       await agreement.prepare(signature);
@@ -718,7 +725,12 @@ export default function VenueOnboardingPage() {
           Back and Submit. */}
       {step === STEP_LABEL_KEYS.length - 1 && (
         <div className="mt-8">
-          <OnboardingAgreement subjectType="venue" agreement={agreement} onChange={setSignature} />
+          <OnboardingAgreement
+            subjectType="venue"
+            agreement={agreement}
+            onChange={setSignature}
+            showValidation={showAgreementValidation}
+          />
         </div>
       )}
 
@@ -741,9 +753,13 @@ export default function VenueOnboardingPage() {
           </Button>
         ) : (
           <Button
+            type="button"
             onClick={handleSubmit}
-            disabled={submitting || agreement.loading || agreement.error ||
-              (agreement.value?.status !== "resumable" && !(agreement.value?.status === "unsigned" && signature?.accepted))}
+            disabled={onboardingSubmitDisabled({
+              busy: submitting || uploading,
+              agreementLoading: agreement.loading,
+              agreementStatus: agreement.value?.status,
+            })}
             className="h-auto min-h-10 min-w-0 whitespace-normal gap-2 bg-gold py-2 text-[#0D0D0D] hover:bg-gold-dark"
           >
             {submitting ? (
