@@ -119,10 +119,14 @@ try {
       assert.equal(await page.locator("ol a").count(), subject === "venue" ? 6 : 5);
       const preview = page.getByRole("button", { name: labels[locale].readContract, exact: true });
       assert.equal(await preview.isEnabled(), true, "Contract can be opened before completing identity");
-      await preview.click();
-      await page.getByRole("button", { name: words[locale].expand, exact: true }).click();
+      assert.equal(await preview.getAttribute("aria-expanded"), "false", "Contract starts closed");
+      assert.deepEqual(
+        (await signingValue(page)).validationIssues,
+        ["legalName", "idNumber", "legalAddress", "documentsAccepted", "signatureName", "signatureImage"],
+        "Opening the contract is not an initial submission requirement",
+      );
       await checkbox.check();
-      assert.equal((await signingValue(page)).accepted, false, "Reading and checking cannot bypass identity or signature");
+      assert.equal((await signingValue(page)).accepted, false, "Consent alone cannot bypass identity or signature");
 
       const legalName = page.getByLabel(labels[locale].legalNameIndividual, { exact: true });
       const idNumber = page.getByLabel(labels[locale].idNumberIndividual, { exact: true });
@@ -148,26 +152,40 @@ try {
       await assertFieldError(idNumber, false);
       await assertFieldError(legalAddress, false);
       assert.equal(await checkbox.isChecked(), false, "Identity edits invalidate earlier consent");
-      await page.getByRole("button", { name: words[locale].expand, exact: true }).click();
-      await page.getByLabel(labels[locale].fullName, { exact: true }).fill("Wrong Signer");
+      const signer = page.getByLabel(labels[locale].fullName, { exact: true });
+      await signer.fill("Test Partner");
+      await checkbox.check();
+      assert.deepEqual((await signingValue(page)).validationIssues, ["signatureImage"], "A drawn signature remains mandatory");
+      await checkbox.uncheck();
+      assert.deepEqual(
+        (await signingValue(page)).validationIssues,
+        ["documentsAccepted", "signatureImage"],
+        "Explicit document consent remains mandatory",
+      );
+      await signer.fill("Wrong Signer");
       await drawSignature(page);
       await assertFieldError(page.locator("canvas"), false);
       await checkbox.check();
       assert.equal((await signingValue(page)).accepted, false, "Another person's name cannot sign");
-      await page.getByLabel(labels[locale].fullName, { exact: true }).fill("Test Partner");
-      assert.equal((await signingValue(page)).accepted, true, "Complete matching signature is accepted");
+      assert.deepEqual((await signingValue(page)).validationIssues, ["signatureName"], "The signer must still match the contracting party");
+      await signer.fill("Test Partner");
+      assert.equal((await signingValue(page)).accepted, true, "Complete matching signature is accepted without opening the contract");
+      assert.equal(await preview.getAttribute("aria-expanded"), "false", "Successful signing does not force the preview open");
+      assert.equal((await signingValue(page)).validationIssues.includes("contractRead"), false);
       assert.equal((await signingValue(page)).documents.length, subject === "venue" ? 6 : 5);
 
       await page.getByLabel(labels[locale].legalAddressIndividual, { exact: true }).fill("Balti, Updated Street 11");
       assert.equal((await signingValue(page)).accepted, false, "Editing signed identity invalidates acceptance");
       assert.equal((await signingValue(page)).signatureImage, null, "Editing signed identity clears old signature");
-      await page.getByRole("button", { name: words[locale].expand, exact: true }).click();
       await drawSignature(page);
       await checkbox.check();
-      assert.equal((await signingValue(page)).accepted, true, "Contract can be reviewed and signed after an identity edit");
+      assert.equal((await signingValue(page)).accepted, true, "A changed identity can be re-signed without opening every section");
+      assert.equal(await preview.getAttribute("aria-expanded"), "false");
+      await preview.click();
+      await page.getByRole("button", { name: words[locale].expand, exact: true }).click();
+      assert.equal((await signingValue(page)).accepted, true, "Optional contract review does not change a valid signature");
       await page.getByRole("button", { name: labels[locale].hideContract, exact: true }).click();
-      await page.getByRole("button", { name: labels[locale].readContract, exact: true }).click();
-      assert.equal((await signingValue(page)).accepted, true, "Collapsing the document preserves its review");
+      assert.equal((await signingValue(page)).accepted, true, "Collapsing the optional document preserves acceptance");
       await checkbox.uncheck();
       assert.equal((await signingValue(page)).accepted, false, "Revoking consent disables submission");
 
@@ -178,12 +196,11 @@ try {
       await assertFieldError(representative);
       await representative.fill("Test Manager");
       await assertFieldError(representative, false);
-      await page.getByRole("button", { name: words[locale].expand, exact: true }).click();
       await drawSignature(page);
       await checkbox.check();
       assert.equal((await signingValue(page)).accepted, false, "Company needs its representative's signature");
       await page.getByLabel(labels[locale].fullName, { exact: true }).fill("Test Manager");
-      assert.equal((await signingValue(page)).accepted, true, "Named representative can sign for company");
+      assert.equal((await signingValue(page)).accepted, true, "Named representative can sign for company without opening the contract");
       await page.locator("#toggle-form").click();
       assert.equal((await signingValue(page)).accepted, true, "Harness preserves parent state while form is away");
       await page.locator("#toggle-form").click();
@@ -191,7 +208,7 @@ try {
       assert.equal((await signingValue(page)).signatureImage, null, "Remount clears the previous drawn signature");
       assert.equal((await signingValue(page)).identity.legalName, "", "Remount does not reuse the previous contracting party");
       assert.equal(await page.getByRole("checkbox").isChecked(), false, "Remounted form starts unchecked");
-      console.log(`PASS ${locale}/${subject}: preview, one consent, signer validation, identity reset, re-sign, company representative, remount`);
+      console.log(`PASS ${locale}/${subject}: optional preview, required consent/signature, identity reset, re-sign, company representative, remount`);
       await page.close();
     }
   }

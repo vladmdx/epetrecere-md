@@ -8,8 +8,9 @@
  * On submit the server records the technical evidence of acceptance
  * (version, timestamp, IP, user-agent, content hash).
  *
- * Submission still requires complete identity details, the contract review,
- * an unchecked-by-default acceptance and a matching drawn signature.
+ * Submission still requires complete identity details, an unchecked-by-default
+ * acceptance and a matching drawn signature. The contract preview remains
+ * available, but opening every section is not a submission requirement.
  */
 
 import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -35,7 +36,6 @@ import { ContractReader } from "./contract-reader";
 
 export type ESignatureIssue = PartnerIdentityField |
   "documentsAccepted" |
-  "contractRead" |
   "signatureName" |
   "signatureImage";
 
@@ -56,13 +56,11 @@ export interface ESignatureValue {
 
 function signatureIssues({
   acceptedDocuments,
-  contractRead,
   identity,
   name,
   signature,
 }: {
   acceptedDocuments: boolean;
-  contractRead: boolean;
   identity: PartnerIdentity;
   name: string;
   signature: SignatureValue;
@@ -78,7 +76,6 @@ function signatureIssues({
     if (identityFields[field]) issues.push(field);
   }
   if (!acceptedDocuments) issues.push("documentsAccepted");
-  if (!contractRead) issues.push("contractRead");
   if (!signerMatchesIdentity(name, identity)) issues.push("signatureName");
   if (!signature.isValid) issues.push("signatureImage");
   return issues;
@@ -143,7 +140,6 @@ export function ESignature({
       "idNumber",
       "legalAddress",
       "documentsAccepted",
-      "contractRead",
       "signatureName",
       "signatureImage",
     ],
@@ -164,20 +160,18 @@ export function ESignature({
   const identityValidation = validatePartnerIdentity(identity);
   const identityOk = identityValidation.ok;
 
-  /** The agreement itself — the one document that gets read in full. */
+  /** The main agreement shown in the optional expandable preview. */
   const mainDoc = docs[0];
 
   const nameOk = signerMatchesIdentity(name, identity);
   const validationIssues = signatureIssues({
     acceptedDocuments,
-    contractRead,
     identity,
     name,
     signature,
   });
-  // All three are required: the tick is what the Partner Agreement §4.2 asks
-  // for, the typed name identifies the signer, and the drawing is the
-  // handwritten signature itself.
+  // These remain required: the tick is the signer's explicit acceptance, the
+  // typed name identifies them, and the drawing is the handwritten signature.
   const valid =
     docs.length > 0 && validationIssues.length === 0;
 
@@ -185,22 +179,20 @@ export function ESignature({
     nextAccepted: boolean,
     nextName: string,
     nextSig: SignatureValue = signature,
-    nextRead: boolean = contractRead,
     nextIdentity: PartnerIdentity = identity,
   ) {
     if (JSON.stringify(nextIdentity) !== JSON.stringify(identity)) {
-      // Changing the contracting party invalidates the earlier read/consent.
+      // Changing the contracting party invalidates the earlier consent and
+      // signature. Reset the optional preview progress as its Annex changes.
       setSignatureKey(k => k + 1);
       setContractRead(false);
       setSignature({ dataUrl: null, isValid: false });
       setAcceptedDocuments(false);
-      nextRead = false;
       nextAccepted = false;
       nextSig = { dataUrl: null, isValid: false };
     }
     const issues = signatureIssues({
       acceptedDocuments: nextAccepted,
-      contractRead: nextRead,
       identity: nextIdentity,
       name: nextName,
       signature: nextSig,
@@ -233,8 +225,6 @@ export function ESignature({
         return t("legal.representativeNameError");
       case "documentsAccepted":
         return t("legal.documentsAcceptedError");
-      case "contractRead":
-        return t("legal.contractReadError");
       case "signatureName":
         return t("legal.signatureNameError");
       case "signatureImage":
@@ -280,7 +270,7 @@ export function ESignature({
               type="button"
               onClick={() => {
                 setPartnerType(value);
-                emit(acceptedDocuments, name, signature, contractRead, {
+                emit(acceptedDocuments, name, signature, {
                   ...identity,
                   partnerType: value,
                   representativeName: value === "individual" ? null : representativeName.trim() || null,
@@ -310,7 +300,7 @@ export function ESignature({
             showError={showValidation || legalName.trim().length > 0}
             onChange={(v) => {
               setLegalName(v);
-              emit(acceptedDocuments, name, signature, contractRead, {
+              emit(acceptedDocuments, name, signature, {
                 ...identity,
                 legalName: v.trim(),
               });
@@ -330,7 +320,7 @@ export function ESignature({
             maxLength={MOLDOVAN_ID_NUMBER_LENGTH}
             onChange={(v) => {
               setIdNumber(v);
-              emit(acceptedDocuments, name, signature, contractRead, {
+              emit(acceptedDocuments, name, signature, {
                 ...identity,
                 idNumber: v.trim() || null,
               });
@@ -350,7 +340,7 @@ export function ESignature({
             showError={showValidation || legalAddress.trim().length > 0}
             onChange={(v) => {
               setLegalAddress(v);
-              emit(acceptedDocuments, name, signature, contractRead, {
+              emit(acceptedDocuments, name, signature, {
                 ...identity,
                 legalAddress: v.trim() || null,
               });
@@ -368,7 +358,7 @@ export function ESignature({
               showError={showValidation || representativeName.trim().length > 0}
               onChange={(v) => {
                 setRepresentativeName(v);
-                emit(acceptedDocuments, name, signature, contractRead, {
+                emit(acceptedDocuments, name, signature, {
                   ...identity,
                   representativeName: v.trim() || null,
                 });
@@ -456,7 +446,6 @@ export function ESignature({
               showVersion={false}
               onReachedEnd={() => {
                 setContractRead(true);
-                emit(acceptedDocuments, name, signature, true);
               }}
               // Shown at the foot of the document as it is given, so the
               // page reads as a signed contract rather than a form sitting
@@ -468,18 +457,12 @@ export function ESignature({
               }
             />
           </div>
-          {contractRead ? (
+          {contractRead && (
             <p className="mt-2 flex items-center gap-1.5 text-xs text-green-500">
               <Check className="h-3.5 w-3.5" />
               {t("legal.contractRead")}
             </p>
-          ) : (showValidation || identityOk) ? (
-            <p className="mt-2 text-xs text-amber-500">
-              {showValidation
-                ? issueMessage("contractRead")
-                : t("legal.mustReadContract")}
-            </p>
-          ) : null}
+          )}
         </div>
       )}
 

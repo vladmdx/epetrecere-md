@@ -9,12 +9,10 @@
  * not tell what they were signing.
  *
  * Rendering the whole text inline fixed that and created a second problem —
- * twenty-odd articles in one scroll box is a wall, and the "read" gate was a
- * single drag of the scrollbar to the bottom, which proves a scroll position
- * and nothing else. So the document is split at its headings and opened one
- * section at a time. Each section has to be opened before the signature is
- * enabled, which is a weaker claim than "you read it" but a much stronger one
- * than "you dragged a scrollbar".
+ * twenty-odd articles in one scroll box is a wall. So the document is split at
+ * its headings and opened one section at a time. Progress is informational:
+ * vendors may inspect any section without being forced through every section
+ * before the explicit acceptance checkbox and signature can be submitted.
  *
  * The signature is shown where it belongs: at the end of the document, under
  * the last article, with the date it was given — so what is on screen reads
@@ -71,7 +69,7 @@ export function ContractReader({
   doc: LegalDocument;
   locale: string;
   partner?: PartnerIdentity | null;
-  /** Fires once every section has been opened. */
+  /** Fires once every section has been opened; informational only. */
   onReachedEnd?: () => void;
   /** When present, rendered at the foot of the document. */
   signature?: ContractSignature | null;

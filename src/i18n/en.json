@@ -2384,8 +2384,7 @@
     "readContract": "Read the contract",
     "hideContract": "Hide the contract",
     "contractWithYourData": "The contract below includes your details, at the end.",
-    "mustReadContract": "Open and read through the contract before signing.",
-    "contractRead": "You have read through the contract",
+    "contractRead": "You opened all contract sections",
     "fillIdentityFirst": "Fill in the details above to see the contract with them.",
     "legalNameIndividualError": "Enter your full first and last name exactly as shown on your identity document.",
     "legalNameEntityError": "Enter the entity's complete official name.",
@@ -2395,7 +2394,6 @@
     "legalAddressEntityError": "Enter the complete registered office, for example the locality, street and number.",
     "representativeNameError": "Enter the administrator or representative's full first and last name.",
     "documentsAcceptedError": "Confirm that you have read and agree to the listed documents.",
-    "contractReadError": "Open the contract and read through it to the end.",
     "signatureNameError": "Enter the signer's full name exactly as the person or representative named in the contract.",
     "signatureImageError": "Draw a complete signature in the box.",
     "completeBeforeSubmit": "Complete the following before submitting:"
