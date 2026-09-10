@@ -15,9 +15,10 @@ import {
 } from "@/lib/db/schema";
 import { and, eq, ilike, or, sql, inArray } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { ALL_EVENT_TYPES, type EventTypeKey } from "@/lib/events/normalize";
 
 const quizSchema = z.object({
-  eventType: z.string().min(1),
+  eventType: z.enum(ALL_EVENT_TYPES as [EventTypeKey, ...EventTypeKey[]]),
   guestCount: z.number().positive(),
   budget: z.number().positive(),
   city: z.string().min(1),
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
 
   // 2. Query candidates
   const conditions = [eq(artists.isActive, true)];
+  conditions.push(sql`${quiz.eventType} = ANY(${artists.eventTypes})`);
   if (quiz.city) {
     conditions.push(ilike(artists.location, `%${quiz.city}%`));
   }

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
+import { normalizeEventType } from "@/lib/events/normalize";
 
 async function isAdmin(clerkId: string | null): Promise<boolean> {
   if (!clerkId) return false;
@@ -44,8 +45,15 @@ export async function GET(req: NextRequest) {
   const featured =
     featuredParam === "true" || featuredParam === "1" ? true : undefined;
 
+  const eventTypeParam = params.get("event_type");
+  const eventType = normalizeEventType(eventTypeParam);
+  if (eventTypeParam && !eventType) {
+    return NextResponse.json({ error: "Invalid event type" }, { status: 400 });
+  }
+
   const filters = {
     categoryId,
+    eventType: eventType ?? undefined,
     search: params.get("q") || undefined,
     // City filter — passed by the planifica wizard so artists are scoped to
     // (a) their base_city OR (b) "all Moldova" travel preference. Empty

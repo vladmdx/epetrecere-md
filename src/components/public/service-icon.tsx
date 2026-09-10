@@ -30,6 +30,7 @@ const ICONS: Record<string, string> = {
   "interesant-la-sarbatoare": "sparkles",
   "show-circus": "circus",
   "foto-video": "clapperboard",
+  "coordonatori-evenimente": "sparkles",
   "foto-zona-selfie": "selfie",
 };
 

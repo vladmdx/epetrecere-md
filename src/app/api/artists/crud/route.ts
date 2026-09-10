@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { slugify } from "@/lib/utils/slugify";
 import { artistLocationUpdate, artistTravelShape } from "@/lib/validation/vendor-profile";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
+import { ALL_EVENT_TYPES, type EventTypeKey } from "@/lib/events/normalize";
 
 // F-A4 auth lockdown — until this fix the endpoint accepted anonymous
 // POST/PUT/DELETE against any artist row. Ownership model is:
@@ -22,6 +23,12 @@ import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 // POST here is admin-only.
 
 type AuthedUser = { id: string; role: string };
+
+const eventTypesSchema = z
+  .array(z.enum(ALL_EVENT_TYPES as [EventTypeKey, ...EventTypeKey[]]))
+  .min(1)
+  .max(ALL_EVENT_TYPES.length)
+  .transform((values) => [...new Set(values)]);
 
 async function requireAuthedUser(): Promise<
   | { ok: true; user: AuthedUser }
@@ -53,6 +60,7 @@ const artistSchema = z.object({
   descriptionRu: z.string().optional(),
   descriptionEn: z.string().optional(),
   categoryIds: z.array(z.number()).optional(),
+  eventTypes: eventTypesSchema.optional(),
   priceFrom: z.number().optional(),
   priceCurrency: z.string().default("EUR"),
   location: z.string().optional(),
@@ -193,6 +201,19 @@ export async function PUT(req: Request) {
     data = filtered;
   }
 
+  // PUT accepts partial settings updates, so validate this new field on its
+  // own before the generic update object reaches Drizzle/Postgres.
+  if ("eventTypes" in data) {
+    const parsedEventTypes = eventTypesSchema.safeParse(data.eventTypes);
+    if (!parsedEventTypes.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsedEventTypes.error.issues },
+        { status: 400 },
+      );
+    }
+    data = { ...data, eventTypes: parsedEventTypes.data };
+  }
+
   // AD-29: detect slug change and record redirect
   const oldSlug = existing.slug;
   const newSlug = typeof data.slug === "string" ? data.slug : oldSlug;
@@ -257,7 +278,7 @@ export async function PUT(req: Request) {
       // the artist remains published; an active-flag change alters totals too.
       services:
         existing.isActive !== updated?.isActive ||
-        (Boolean(updated?.isActive) && "categoryIds" in data),
+        (Boolean(updated?.isActive) && ("categoryIds" in data || "eventTypes" in data)),
     });
   }
   return NextResponse.json(updated);

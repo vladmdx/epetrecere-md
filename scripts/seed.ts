@@ -22,10 +22,12 @@ async function seed() {
     { nameRo: "Formații / Grupuri", nameRu: "Группы", nameEn: "Bands", slug: "formatii", type: "artist" as const, icon: "guitar", priceFrom: 500, sortOrder: 4 },
     { nameRo: "Fotografi", nameRu: "Фотографы", nameEn: "Photographers", slug: "fotografi", type: "service" as const, icon: "camera", priceFrom: 200, sortOrder: 5 },
     { nameRo: "Videografi", nameRu: "Видеографы", nameEn: "Videographers", slug: "videografi", type: "service" as const, icon: "video", priceFrom: 250, sortOrder: 6 },
-    { nameRo: "Decor & Floristică", nameRu: "Декор и Флористика", nameEn: "Decor & Floristry", slug: "decor", type: "service" as const, icon: "palette", priceFrom: 100, sortOrder: 7 },
-    { nameRo: "Animatori", nameRu: "Аниматоры", nameEn: "Animators", slug: "animatori", type: "artist" as const, icon: "party-popper", priceFrom: 100, sortOrder: 8 },
-    { nameRo: "Echipament Tehnic", nameRu: "Техническое оборудование", nameEn: "Technical Equipment", slug: "echipament", type: "service" as const, icon: "speaker", priceFrom: 100, sortOrder: 9 },
-    { nameRo: "Show Program", nameRu: "Шоу Программа", nameEn: "Show Program", slug: "show-program", type: "artist" as const, icon: "star", priceFrom: 200, sortOrder: 10 },
+    { nameRo: "Foto & Video", nameRu: "Фото и видео", nameEn: "Photo & Video", slug: "foto-video", type: "service" as const, icon: "clapperboard", priceFrom: 250, sortOrder: 7 },
+    { nameRo: "Coordonatori de evenimente", nameRu: "Координаторы мероприятий", nameEn: "Event Coordinators", slug: "coordonatori-evenimente", type: "service" as const, icon: "clipboard-check", priceFrom: null, sortOrder: 8 },
+    { nameRo: "Decor & Floristică", nameRu: "Декор и Флористика", nameEn: "Decor & Floristry", slug: "decor", type: "service" as const, icon: "palette", priceFrom: 100, sortOrder: 9 },
+    { nameRo: "Animatori", nameRu: "Аниматоры", nameEn: "Animators", slug: "animatori", type: "artist" as const, icon: "party-popper", priceFrom: 100, sortOrder: 10 },
+    { nameRo: "Echipament Tehnic", nameRu: "Техническое оборудование", nameEn: "Technical Equipment", slug: "echipament", type: "service" as const, icon: "speaker", priceFrom: 100, sortOrder: 11 },
+    { nameRo: "Show Program", nameRu: "Шоу Программа", nameEn: "Show Program", slug: "show-program", type: "artist" as const, icon: "star", priceFrom: 200, sortOrder: 12 },
   ];
 
   for (const cat of categoryData) {
@@ -33,7 +35,7 @@ async function seed() {
       ...cat,
       isActive: true,
       seoTitleRo: `${cat.nameRo} pentru Evenimente | ePetrecere.md`,
-      seoDescRo: `Găsește cei mai buni ${cat.nameRo.toLowerCase()} pentru evenimentul tău în Republica Moldova. Prețuri de la ${cat.priceFrom}€.`,
+      seoDescRo: `Găsește cei mai buni ${cat.nameRo.toLowerCase()} pentru evenimentul tău în Republica Moldova.${cat.priceFrom == null ? "" : ` Prețuri de la ${cat.priceFrom}€.`}`,
     });
   }
   console.log(`✅ ${categoryData.length} categorii create`);

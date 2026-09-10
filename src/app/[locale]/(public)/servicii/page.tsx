@@ -30,6 +30,8 @@ const serviceGroups = [
   { slug: "formatii", nameKey: "services.groups.formatii.name", descKey: "services.groups.formatii.desc", image: "/images/categories/formatii.jpg" },
   { slug: "fotografi", nameKey: "services.groups.fotografi.name", descKey: "services.groups.fotografi.desc", image: "/images/categories/fotografi.jpg" },
   { slug: "videografi", nameKey: "services.groups.videografi.name", descKey: "services.groups.videografi.desc", image: "/images/categories/videografi.jpg" },
+  { slug: "foto-video", nameKey: "services.groups.fotoVideo.name", descKey: "services.groups.fotoVideo.desc", image: "/images/categories/foto-video.jpg" },
+  { slug: "coordonatori-evenimente", nameKey: "services.groups.eventCoordinators.name", descKey: "services.groups.eventCoordinators.desc", image: "/images/redesign/home/home-feature-planner.webp" },
   { slug: "decor", nameKey: "home.categories.decor", descKey: "services.groups.decor.desc", image: "/images/categories/decor.jpg" },
   { slug: "animatori", nameKey: "services.groups.animatori.name", descKey: "services.groups.animatori.desc", image: "/images/categories/animatori.jpg" },
   { slug: "sali", nameKey: "nav.venues", descKey: "services.groups.sali.desc", image: "/images/categories/sali.jpg", href: "/sali" },

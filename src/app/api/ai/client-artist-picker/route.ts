@@ -23,6 +23,7 @@ import {
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 import { getAiClient } from "@/lib/ai/provider";
+import { normalizeEventType } from "@/lib/events/normalize";
 
 function getClient() {
   return getAiClient();
@@ -298,6 +299,10 @@ Reguli:
 
         // Fetch artists — use the SAME availability filter as /api/artists
         const where = [eq(artists.isActive, true)];
+        const planEventType = normalizeEventType(plan.eventType);
+        if (planEventType) {
+          where.push(sql`${planEventType} = ANY(${artists.eventTypes})`);
+        }
         if (typeof input.minRating === "number") {
           where.push(gte(artists.ratingAvg, input.minRating));
         }

@@ -1146,7 +1146,11 @@
       "pricingByDuration": "Pe durată",
       "pricingByEvent": "Pe eveniment",
       "eventTypeLabel": "Tip eveniment",
-      "eventTypeAny": "Orice eveniment"
+      "eventTypeAny": "Orice eveniment",
+      "eventTypesTitle": "La ce tipuri de evenimente participi? *",
+      "eventTypesHint": "Bifează toate tipurile de evenimente pentru care poți fi rezervat.",
+      "eventTypesRequired": "Selectează cel puțin un tip de eveniment.",
+      "eventTypesSummary": "Tipuri de evenimente"
     },
     "aiAssistantPage": {
       "subtitle": "Asistentul tău personal pentru gestionarea profilului"
@@ -1628,7 +1632,11 @@
       "travelFee": "Plată suplimentară pentru deplasare",
       "travelFeeHint": "Activează dacă percepi o sumă fixă pentru evenimente în afara orașului de bază.",
       "travelHint": "Stabilește orașul de bază și distanța maximă la care te deplasezi. Clienții care planifică evenimente în afara razei tale nu te vor vedea în rezultate.",
-      "travelTitle": "Locație și deplasare"
+      "travelTitle": "Locație și deplasare",
+      "eventTypesTitle": "Tipuri de evenimente",
+      "eventTypesQuestion": "La ce tipuri de evenimente participi?",
+      "eventTypesHint": "Bifează toate tipurile pentru care vrei să apari în rezultatele clienților.",
+      "eventTypesRequired": "Selectează cel puțin un tip de eveniment."
     },
     "slots": {
       "addSlot": "Adaugă slot",
@@ -2921,6 +2929,14 @@
       "videografi": {
         "name": "Videografi",
         "desc": "Filmări profesionale pentru amintiri veșnice."
+      },
+      "fotoVideo": {
+        "name": "Foto & Video",
+        "desc": "Echipe complete pentru fotografiere și filmare la același eveniment."
+      },
+      "eventCoordinators": {
+        "name": "Coordonatori de evenimente",
+        "desc": "Planificare și coordonare atentă pentru ca evenimentul să decurgă fără griji."
       },
       "decor": {
         "desc": "Transformăm spațiul în vis."

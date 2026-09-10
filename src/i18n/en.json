@@ -1146,7 +1146,11 @@
       "pricingByDuration": "By duration",
       "pricingByEvent": "Per event",
       "eventTypeLabel": "Event type",
-      "eventTypeAny": "Any event"
+      "eventTypeAny": "Any event",
+      "eventTypesTitle": "Which event types do you work at? *",
+      "eventTypesHint": "Select every event type for which clients can book you.",
+      "eventTypesRequired": "Select at least one event type.",
+      "eventTypesSummary": "Event types"
     },
     "aiAssistantPage": {
       "subtitle": "Your personal assistant for profile management"
@@ -1628,7 +1632,11 @@
       "travelFee": "Additional travel fee",
       "travelFeeHint": "Enable if you charge a fixed fee for events outside the base city.",
       "travelHint": "Set your base city and maximum travel distance. Clients planning events outside your radius will not see you in results.",
-      "travelTitle": "Location and travel"
+      "travelTitle": "Location and travel",
+      "eventTypesTitle": "Event types",
+      "eventTypesQuestion": "Which event types do you work at?",
+      "eventTypesHint": "Select every type for which you want to appear in client results.",
+      "eventTypesRequired": "Select at least one event type."
     },
     "slots": {
       "addSlot": "Add slot",
@@ -2921,6 +2929,14 @@
       "videografi": {
         "name": "Videographers",
         "desc": "Professional filming for everlasting memories."
+      },
+      "fotoVideo": {
+        "name": "Photo & Video",
+        "desc": "Complete teams for photography and filming at the same event."
+      },
+      "eventCoordinators": {
+        "name": "Event Coordinators",
+        "desc": "Careful planning and coordination so your event runs smoothly."
       },
       "decor": {
         "desc": "We transform space into a dream."

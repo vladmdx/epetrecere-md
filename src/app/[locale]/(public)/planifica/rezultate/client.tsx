@@ -108,7 +108,7 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
         `/sign-in?redirect_url=${encodeURIComponent(lp("/planifica/rezultate"))}`,
       );
     }
-  }, [isLoaded, isSignedIn, router, adminMode]);
+  }, [isLoaded, isSignedIn, router, adminMode, lp]);
 
   // Create event plan and redirect authenticated non-admin users to their
   // plan's "Rezervări Artiști" tab so they see the discovery grid in
@@ -194,6 +194,7 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
           qs.set("limit", "12");
           qs.set("date", wizard!.eventDate);
           if (categoryId !== undefined) qs.set("category", String(categoryId));
+          if (wizard!.eventType) qs.set("event_type", wizard!.eventType);
           if (wizard!.budget > 0) qs.set("price_max", String(wizard!.budget));
           // Filter by event city — only artists whose base_city matches OR
           // whose travel_distance_km covers it should appear. The API

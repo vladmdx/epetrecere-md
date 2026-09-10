@@ -14,9 +14,11 @@ import { resolveArtistCoverImage } from "@/lib/artists/demo-images";
 import { cityTravelDistances } from "@/lib/geo/city-proximity";
 import { moldovaCitySpellings } from "@/lib/moldova-cities";
 import { photoContentUrl } from "@/lib/moments/photo-url";
+import type { EventTypeKey } from "@/lib/events/normalize";
 
 export interface ArtistFilters {
   categoryId?: number;
+  eventType?: EventTypeKey;
   search?: string;
   priceMin?: number;
   priceMax?: number;
@@ -76,6 +78,9 @@ export async function getArtists(filters: ArtistFilters = {}) {
 
   if (filters.categoryId) {
     conditions.push(arrayContains(artists.categoryIds, [filters.categoryId]));
+  }
+  if (filters.eventType) {
+    conditions.push(arrayContains(artists.eventTypes, [filters.eventType]));
   }
   if (filters.search) {
     conditions.push(

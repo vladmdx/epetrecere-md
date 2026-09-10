@@ -81,6 +81,12 @@ const registerSchema = z.object({
   // onboarding form may send an empty string. We fall back to users.phone.
   phone: z.string().optional().default(""),
   categoryId: z.number().int().positive(),
+  eventTypes: z
+    .array(z.enum(EVENT_TYPE_KEYS))
+    .min(1)
+    .max(EVENT_TYPE_KEYS.length)
+    .transform((values) => [...new Set(values)])
+    .optional(),
   description: z
     .string()
     .refine((v) => checkDescription(v).ok, {
@@ -291,6 +297,9 @@ export async function POST(req: Request) {
         priceHidden: data.priceHidden ?? false,
         priceFrom: resolvedPriceFrom,
         categoryIds: [data.categoryId],
+        // Older mobile builds do not send this field yet. They retain the
+        // all-events behaviour while the current onboarding requires a choice.
+        eventTypes: data.eventTypes ?? [...EVENT_TYPE_KEYS],
         isActive: false,
         isVerified: false,
         isFeatured: false,

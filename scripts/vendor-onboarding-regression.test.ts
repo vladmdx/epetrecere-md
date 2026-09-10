@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { z } from "zod/v4";
 import { artistLocationUpdate, artistTravelShape, registrationDecisionSchema, venueOwnerFields } from "../src/lib/validation/vendor-profile";
+import { ALL_EVENT_TYPES } from "../src/lib/events/normalize";
+import { normalizeArtistEventTypes } from "../src/lib/events/artist-event-types";
 
 test("onboarding retains a non-Chisinau base, travel allowance, surcharge and hidden pricing", () => {
   const submitted = { baseCity: "Bălți", travelDistanceKm: 90, travelSurchargeEnabled: true, travelSurchargeAmount: 75, priceHidden: true };
@@ -31,4 +33,13 @@ test("unknown admin action cannot fall through into destructive rejection", () =
   for (const invalid of [{ action: "approved" }, { action: "" }, { type: "anything" }, { id: -1 }, { id: 1.5 }]) {
     assert.equal(registrationDecisionSchema.safeParse({ id: 12, type: "artist", action: "approve", ...invalid }).success, false);
   }
+});
+
+test("partner event types are canonical, ordered and backward compatible", () => {
+  assert.deepEqual(normalizeArtistEventTypes(null), ALL_EVENT_TYPES);
+  assert.deepEqual(
+    normalizeArtistEventTypes(["concert", "wedding", "concert", "invalid"]),
+    ["wedding", "concert"],
+  );
+  assert.deepEqual(normalizeArtistEventTypes([], false), []);
 });

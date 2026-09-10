@@ -114,6 +114,7 @@ export const CATEGORY_META: Record<string, CategoryMeta> = {
   fotografi: { emoji: "📸", allowedEventTypes: [...ALL_EVENT_TYPES] },
   videografi: { emoji: "🎥", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "foto-video": { emoji: "🎬", allowedEventTypes: [...ALL_EVENT_TYPES] },
+  "coordonatori-evenimente": { emoji: "📋", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "foto-zona-selfie": { emoji: "🤳", allowedEventTypes: [...VENUE_NEUTRAL, ...KIDS] },
   decor: { emoji: "🌸", allowedEventTypes: [...ALL_EVENT_TYPES] },
   "echipament-tehnic": { emoji: "🔊", allowedEventTypes: [...ALL_EVENT_TYPES] },

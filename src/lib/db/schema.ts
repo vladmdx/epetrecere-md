@@ -272,6 +272,12 @@ export const artists = pgTable("artists", {
   descriptionRu: text("description_ru"),
   descriptionEn: text("description_en"),
   categoryIds: integer("category_ids").array(),
+  /** Event types this partner accepts. Existing partners default to every
+   *  canonical type; onboarding and /dashboard/setari let them narrow it. */
+  eventTypes: text("event_types")
+    .array()
+    .default(sql`ARRAY['wedding','proposal','cununie','baptism','cumatrie','birthday','kids_birthday','corporate','concert','other']::text[]`)
+    .notNull(),
   priceFrom: integer("price_from"),
   priceCurrency: varchar("price_currency", { length: 3 }).default("EUR"),
   location: text("location"),

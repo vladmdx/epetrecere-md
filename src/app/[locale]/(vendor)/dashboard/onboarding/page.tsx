@@ -53,6 +53,7 @@ import type { ESignatureValue } from "@/components/legal/e-signature";
 import { OnboardingAgreement } from "@/components/legal/onboarding-agreement";
 import { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
 import { onboardingSubmitDisabled } from "@/lib/legal/onboarding-submit";
+import { EventTypeSelector } from "@/components/vendor/event-type-selector";
 
 interface Category {
   id: number;
@@ -101,6 +102,7 @@ export default function OnboardingPage() {
   const [data, setData] = useState({
     name: "",
     categoryId: 0,
+    eventTypes: [] as EventTypeKey[],
     imageUrl: "",
     description: "",
     baseCity: DEFAULT_CITY,
@@ -277,7 +279,7 @@ export default function OnboardingPage() {
   async function handleSubmit() {
     if (submitting || uploadingPhoto || generatingAi) return;
     if (!checkName(data.name).ok || !data.imageUrl || !checkDescription(data.description).ok ||
-        !data.categoryId || !data.baseCity || !validTravelAmount || !validPackages) {
+        !data.categoryId || data.eventTypes.length === 0 || !data.baseCity || !validTravelAmount || !validPackages) {
       toast.error(t("vendor.onboarding.errSubmit"));
       return;
     }
@@ -313,6 +315,7 @@ export default function OnboardingPage() {
           name: data.name,
           phone: "",
           categoryId: data.categoryId,
+          eventTypes: data.eventTypes,
           location: data.baseCity,
           baseCity: data.baseCity,
           travelDistanceKm: data.travelDistanceKm,
@@ -343,7 +346,7 @@ export default function OnboardingPage() {
   function canContinue(): boolean {
     switch (step) {
       case 0:
-        return !!data.categoryId;
+        return !!data.categoryId && data.eventTypes.length > 0;
       case 1:
         // Presence was the only rule, so "kk" walked straight through.
         return checkName(data.name).ok && Boolean(data.imageUrl) && !uploadingPhoto;
@@ -417,6 +420,20 @@ export default function OnboardingPage() {
                 {getLocalized(cat, "name", locale)}
               </button>
             ))}
+          </div>
+          <div className="border-t border-border/40 pt-4">
+            <EventTypeSelector
+              value={data.eventTypes}
+              onChange={(eventTypes) => update({ eventTypes })}
+              locale={locale}
+              title={t("vendor.onboarding.eventTypesTitle")}
+              hint={t("vendor.onboarding.eventTypesHint")}
+              error={
+                data.categoryId > 0 && data.eventTypes.length === 0
+                  ? t("vendor.onboarding.eventTypesRequired")
+                  : undefined
+              }
+            />
           </div>
         </div>
       )}
@@ -920,6 +937,12 @@ export default function OnboardingPage() {
             <SummaryRow
               label={t("vendor.onboarding.sumName")}
               value={data.name}
+            />
+            <SummaryRow
+              label={t("vendor.onboarding.eventTypesSummary")}
+              value={data.eventTypes
+                .map((eventType) => eventTypeLabel(eventType, locale))
+                .join(", ")}
             />
             <SummaryRow
               label={t("vendor.settings.baseCity")}

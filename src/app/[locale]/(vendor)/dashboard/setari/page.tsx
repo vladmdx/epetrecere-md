@@ -45,6 +45,9 @@ import { SignedDocumentsCard } from "@/components/vendor/signed-documents-card";
 import { NotificationSoundToggle } from "@/components/shared/notification-sound-toggle";
 import { TimezoneSelector } from "@/components/shared/timezone-selector";
 import { useLocale } from "@/hooks/use-locale";
+import { EventTypeSelector } from "@/components/vendor/event-type-selector";
+import { normalizeArtistEventTypes } from "@/lib/events/artist-event-types";
+import type { EventTypeKey } from "@/lib/events/normalize";
 
 type ArtistSettings = {
   kind: "artist";
@@ -56,6 +59,7 @@ type ArtistSettings = {
   travelDistanceKm: number;
   travelSurchargeEnabled: boolean;
   travelSurchargeAmount: number | null;
+  eventTypes: EventTypeKey[];
   priceHidden: boolean;
   autoReplyEnabled: boolean;
   autoReplyMessage: string;
@@ -101,6 +105,7 @@ export default function VendorSettingsPage() {
               travelDistanceKm: Number(a.travelDistanceKm ?? 30),
               travelSurchargeEnabled: Boolean(a.travelSurchargeEnabled),
               travelSurchargeAmount: a.travelSurchargeAmount == null ? null : Number(a.travelSurchargeAmount),
+              eventTypes: normalizeArtistEventTypes(a.eventTypes),
               priceHidden: Boolean(a.priceHidden),
               autoReplyEnabled: Boolean(a.autoReplyEnabled),
               autoReplyMessage:
@@ -139,11 +144,15 @@ export default function VendorSettingsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   async function handleSave() {
     if (state.kind === "none") {
       toast.error(t("vendor.settings.errNoProfile"));
+      return;
+    }
+    if (state.kind === "artist" && state.eventTypes.length === 0) {
+      toast.error(t("vendor.settings.eventTypesRequired"));
       return;
     }
     if (state.kind === "artist" && state.travelSurchargeEnabled && (
@@ -172,6 +181,7 @@ export default function VendorSettingsPage() {
             travelDistanceKm: state.travelDistanceKm,
             travelSurchargeEnabled: state.travelSurchargeEnabled,
             travelSurchargeAmount: state.travelSurchargeEnabled ? state.travelSurchargeAmount : null,
+            eventTypes: state.eventTypes,
             priceHidden: state.priceHidden,
             autoReplyEnabled: state.autoReplyEnabled,
             autoReplyMessage: state.autoReplyMessage,
@@ -325,6 +335,32 @@ export default function VendorSettingsPage() {
       {/* Travel settings — artist only. Determines which events the artist
           appears in (city + max distance) and whether they charge a travel
           surcharge for events outside their base city. */}
+      {state.kind === "artist" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("vendor.settings.eventTypesTitle")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EventTypeSelector
+              value={state.eventTypes}
+              onChange={(eventTypes) =>
+                setState((prev) =>
+                  prev.kind === "artist" ? { ...prev, eventTypes } : prev,
+                )
+              }
+              locale={locale}
+              title={t("vendor.settings.eventTypesQuestion")}
+              hint={t("vendor.settings.eventTypesHint")}
+              error={
+                state.eventTypes.length === 0
+                  ? t("vendor.settings.eventTypesRequired")
+                  : undefined
+              }
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {state.kind === "artist" && (
         <Card>
           <CardHeader>

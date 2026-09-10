@@ -1623,7 +1623,7 @@ function BookingsTab({
         //     memory without refetching.
         if (categories.length === 0) {
           const res = await fetch(
-            `/api/artists?date=${plan.eventDate}&sort=newest&limit=200`,
+            `/api/artists?date=${plan.eventDate}&sort=newest&limit=200${plan.eventType ? `&event_type=${encodeURIComponent(plan.eventType)}` : ""}`,
             { cache: "no-store" },
           ).then((r) => (r.ok ? r.json() : { items: [] }));
           setByCategory([
@@ -1639,7 +1639,7 @@ function BookingsTab({
         const sections = await Promise.all(
           categories.map(async (catId) => {
             const res = await fetch(
-              `/api/artists?date=${plan.eventDate}&category=${catId}&sort=newest&limit=200`,
+              `/api/artists?date=${plan.eventDate}&category=${catId}&sort=newest&limit=200${plan.eventType ? `&event_type=${encodeURIComponent(plan.eventType)}` : ""}`,
               { cache: "no-store" },
             ).then((r) => (r.ok ? r.json() : { items: [] }));
             return {
@@ -1658,7 +1658,7 @@ function BookingsTab({
         setDiscoveryLoading(false);
       }
     })();
-  }, [plan.eventDate, plan.selectedCategories, t]);
+  }, [plan.eventDate, plan.eventType, plan.selectedCategories, t]);
 
   // Active bookings indexed by artistId. Rejected / cancelled / expired
   // entries don't count — those slots free up so the client can shop
