@@ -8,8 +8,10 @@ import { getLocalized, t } from "@/i18n";
 import { CategoryPageClient } from "./client";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 
-// M11 Intern #2 — ISR: category landings refresh every hour.
-export const revalidate = 3600;
+// Filters and price visibility depend on request data. Explicitly keep this
+// route out of the shared Full Route Cache so one user's priced HTML can never
+// be reused for another visitor.
+export const dynamic = "force-dynamic";
 
 interface Props {
   params: Promise<{ locale: string; slug: string }>;

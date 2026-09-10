@@ -25,8 +25,12 @@ const db = {
     const rows = () => {
       const name = getTableName(table);
       if (name === "users") return state.userExists ? [{ id: "qa-private-id", clerkId: "qa-private-clerk", role: state.role, email: "qa@example.invalid" }] : [];
-      if (name === "artists") return state.ownedKinds.includes("artist") ? [{ id: 101, photoUrl: null }] : [];
-      if (name === "venues") return state.venueExists && (state.ownedKinds.includes("venue") || !state.accountDelete) ? [{ id: 202, menuPdfUrl: null, ogImageUrl: null }] : [];
+      if (name === "artists") return state.ownedKinds.includes("artist")
+        ? [{ id: 101, slug: "qa-artist", isActive: true, photoUrl: null }]
+        : [];
+      if (name === "venues") return state.venueExists && (state.ownedKinds.includes("venue") || !state.accountDelete)
+        ? [{ id: 202, slug: "qa-venue", isActive: true, isFeatured: true, menuPdfUrl: null, ogImageUrl: null }]
+        : [];
       return [];
     };
     const builder = { from(value) { table = value; return builder; }, where() { return builder; }, limit() { return Promise.resolve(rows()); },
@@ -46,7 +50,9 @@ const db = {
       if (state.accountDelete) assert.equal(state.inTx, true);
       if (!executed) state.trace.push(`delete:${name}`);
       executed = true;
-      return name === "artists" && state.artistExists ? [{ id: 101 }] : [];
+      return name === "artists" && state.artistExists
+        ? [{ id: 101, slug: "qa-artist", isActive: true }]
+        : [];
     };
     const builder = { where() { return builder; }, returning: execute, then(resolve, reject) { return execute().then(resolve, reject); } };
     return builder;
@@ -73,7 +79,8 @@ Module._load = function(request, parent, isMain) {
     clerkClient: async () => ({ users: { deleteUser: async id => { assert.equal(id, "qa-private-clerk"); state.trace.push("delete:clerk"); } } }),
   };
   if (request === "next/cache") return { revalidatePath: (route, type) => {
-    assert.equal(type, "page"); assert.equal(state.inTx, false, "cache invalidation waits for commit"); state.trace.push(`cache:${route}`);
+    assert.equal(type, undefined, "concrete paths omit Next's dynamic-route type");
+    assert.equal(state.inTx, false, "cache invalidation waits for commit"); state.trace.push(`cache:${route}`);
   } };
   let resolved; try { resolved = Module._resolveFilename(request, parent); } catch {}
   if (request === "@/lib/db" || resolved === path.join(root, "src/lib/db/index.ts")) return { db };
@@ -95,9 +102,21 @@ Module._load = function(request, parent, isMain) {
       const deleted = state.trace.indexOf(`delete:${kind === "artist" ? "artists" : "venues"}`);
       const cached = state.trace.findIndex(entry => entry.startsWith("cache:"));
       assert.ok(deleted >= 0 && cached > deleted, "cache expires only after deletion succeeds");
-      assert.equal(state.trace.filter(entry => entry.startsWith("cache:")).length, 5);
-      assert.ok(state.trace.includes(`cache:/[locale]/(public)/${kind === "artist" ? "artisti" : "sali"}/[slug]`));
-      passed(`${kind}: successful delete expires the matching catalog, profile, categories and homepage`);
+      const directory = kind === "artist" ? "artisti" : "sali";
+      const slug = kind === "artist" ? "qa-artist" : "qa-venue";
+      const cache = state.trace.filter(entry => entry.startsWith("cache:"));
+      assert.equal(cache.length, 16);
+      for (const route of [
+        `cache:/${directory}/${slug}`,
+        `cache:/ro/${directory}/${slug}`,
+        `cache:/ru/${directory}/${slug}`,
+        `cache:/en/${directory}/${slug}`,
+        `cache:/${directory}`,
+        `cache:/servicii`,
+        `cache:/`,
+      ]) assert.ok(cache.includes(route), `missing precise cache target ${route}`);
+      assert.ok(cache.every(entry => !entry.includes("[") && !entry.includes("(public)")));
+      passed(`${kind}: successful delete expires exact profile, directory, homepage and supply paths`);
 
       for (const gate of [{ signedIn: false }, { role: "user" }]) {
         reset(gate); assert.equal((await invoke(kind)).status, gate.role ? 403 : 401); assert.deepEqual(state.trace, []);
@@ -120,14 +139,15 @@ Module._load = function(request, parent, isMain) {
       reset({ ownedKinds, accountDelete: true });
       assert.equal((await account.DELETE()).status, 200);
       const cache = state.trace.filter(entry => entry.startsWith("cache:"));
-      assert.equal(cache.length, ownedKinds.length * 5);
+      assert.equal(cache.length, ownedKinds.length * 16);
       for (const kind of ownedKinds) {
-        const route = `cache:/[locale]/(public)/${kind === "artist" ? "artisti" : "sali"}/[slug]`;
+        const route = `cache:/${kind === "artist" ? "artisti/qa-artist" : "sali/qa-venue"}`;
         assert.ok(state.trace.indexOf(route) > state.trace.indexOf(`update:${kind === "artist" ? "artists" : "venues"}`));
         assert.ok(state.trace.indexOf(route) > state.trace.indexOf("delete:users"), "catalog refresh follows atomic local account erasure");
         assert.ok(state.trace.indexOf(route) > state.trace.indexOf("tx:commit"), "rolled-back minimization must never invalidate catalog pages");
         assert.ok(state.trace.indexOf(route) < state.trace.indexOf("delete:clerk"), "local catalog erasure is visible before external identity cleanup");
       }
+      assert.ok(cache.every(entry => !entry.includes("[") && !entry.includes("(public)")));
       assert.ok(!state.trace.some(entry => entry.includes("legal_acceptances")), "signed evidence is never altered");
       assert.ok(state.trace.includes("delete:clerk"));
       passed(`account: ${ownedKinds.join("+") || "client-only"} invalidates only owned catalogs and preserves signed evidence`);

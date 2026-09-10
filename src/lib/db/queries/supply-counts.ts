@@ -8,7 +8,7 @@
  * numbers are true whatever its size and rise on their own as it fills up.
  */
 
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { artists, venues, categories, bookingRequests, users } from "@/lib/db/schema";
 
@@ -46,67 +46,84 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
   };
 
   try {
-    // Bounded. Every caller already renders without these numbers, so a slow
-    // or contended database should cost a counter, never a page — and never a
-    // deploy. Waiting is the failure mode that actually happens here: the
-    // driver queues rather than erroring once the pooler is full.
-    const [[artistRow], [venueRow], [catRow], [reqRow]] = await Promise.all([
-      db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(artists)
-        .where(eq(artists.isActive, true)),
-      db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(venues)
-        .where(eq(venues.isActive, true)),
-      db.select({ n: sql<number>`count(*)::int` }).from(categories),
-      // Exclude bookings made by QA/E2E accounts — they are real rows, but
-      // counting them would overstate the marketplace's activity on a public
-      // trust badge. The data stays; only the public tally ignores it.
-      db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(bookingRequests)
-        .leftJoin(users, eq(users.id, bookingRequests.clientUserId))
-        .where(
-          sql`${bookingRequests.status} in ('completed','confirmed_by_client')
-              and (${users.email} is null or ${users.email} !~* '(test|qa|demo|e2e)')`,
-        ),
-    ]);
-
-    // One grouped statement for every tile. This used to be a loop that
-    // awaited a separate count per tile — five more strictly serial
-    // round-trips to Frankfurt on every homepage render, which was the
-    // single longest stretch of the critical path.
-    const perCategory = await db
-      .select({
-        slug: categories.slug,
-        n: sql<number>`count(${artists.id})::int`,
-      })
-      .from(categories)
-      .leftJoin(
-        artists,
-        and(
-          eq(artists.isActive, true),
-          sql`${categories.id} = ANY(${artists.categoryIds})`,
-        ),
+    // This must remain ONE database statement. Runtime postgres.js uses a
+    // deliberately small pool; launching several queries with Promise.all
+    // only makes them queue for the same sockets and can strand an ISR render
+    // behind the pooler. Combining the counters also removes queue
+    // amplification and leaves one failure boundary for the zero-data
+    // fallback. Do not treat the postgres.js startup statement_timeout as a
+    // hard deadline here: Supavisor's transaction endpoint ignores that
+    // override.
+    //
+    // Exclude bookings made by QA/E2E accounts from the public trust badge.
+    // They remain in the database; only this aggregate ignores them.
+    type SupplyCountRow = {
+      activeArtists: number | string;
+      activeVenues: number | string;
+      serviceCategories: number | string;
+      completedRequests: number | string;
+      bySlug: Record<string, number | string> | null;
+    };
+    const response = await db.execute<SupplyCountRow>(sql`
+      WITH category_counts AS (
+        SELECT
+          ${categories.slug} AS slug,
+          count(${artists.id})::int AS n
+        FROM ${categories}
+        LEFT JOIN ${artists}
+          ON ${artists.isActive} = true
+         AND ${categories.id} = ANY(${artists.categoryIds})
+        GROUP BY ${categories.slug}
       )
-      .groupBy(categories.slug);
+      SELECT
+        (SELECT count(*)::int FROM ${artists}
+          WHERE ${artists.isActive} = true) AS "activeArtists",
+        (SELECT count(*)::int FROM ${venues}
+          WHERE ${venues.isActive} = true) AS "activeVenues",
+        (SELECT count(*)::int FROM ${categories}) AS "serviceCategories",
+        (SELECT count(*)::int
+          FROM ${bookingRequests}
+          LEFT JOIN ${users}
+            ON ${users.id} = ${bookingRequests.clientUserId}
+          WHERE ${bookingRequests.status} IN ('completed', 'confirmed_by_client')
+            AND (${users.email} IS NULL
+              OR ${users.email} !~* '(test|qa|demo|e2e)')) AS "completedRequests",
+        coalesce(
+          (SELECT jsonb_object_agg(slug, n) FROM category_counts),
+          '{}'::jsonb
+        ) AS "bySlug"
+    `);
+    // neon-http returns { rows }, while postgres.js returns its row array
+    // directly. The shared DB facade intentionally supports both drivers.
+    const rows: SupplyCountRow[] = Array.isArray(response)
+      ? response as unknown as SupplyCountRow[]
+      : response.rows;
+    const row = rows[0];
+    if (!row) throw new Error("Supply count query returned no row");
 
-    const countBySlug = new Map(perCategory.map((r) => [r.slug, r.n]));
+    const toCount = (value: number | string | null | undefined) => {
+      const parsed = Number(value ?? 0);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const countBySlug = new Map(
+      Object.entries(row.bySlug ?? {}).map(([slug, count]) => [slug, toCount(count)]),
+    );
     const result: Record<string, number> = {};
 
     for (const [tile, slug] of Object.entries(TILE_CATEGORY_SLUG)) {
       // A null slug means the tile counts venues, not artists.
-      result[tile] = slug === null ? (venueRow?.n ?? 0) : (countBySlug.get(slug) ?? 0);
+      result[tile] = slug === null
+        ? toCount(row.activeVenues)
+        : (countBySlug.get(slug) ?? 0);
     }
 
     return {
       categories: result,
       bySlug: Object.fromEntries(countBySlug),
-      activeArtists: artistRow?.n ?? 0,
-      activeVenues: venueRow?.n ?? 0,
-      serviceCategories: catRow?.n ?? 0,
-      completedRequests: reqRow?.n ?? 0,
+      activeArtists: toCount(row.activeArtists),
+      activeVenues: toCount(row.activeVenues),
+      serviceCategories: toCount(row.serviceCategories),
+      completedRequests: toCount(row.completedRequests),
     };
   } catch {
     // DB unreachable — render without counters rather than with invented ones.

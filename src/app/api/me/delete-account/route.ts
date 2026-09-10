@@ -75,8 +75,8 @@ export async function DELETE() {
   });
   if (!cleanup.complete) return NextResponse.json(photoErasureError(cleanup.reason!), { status: cleanup.reason === "unverified" ? 409 : 503 });
   const [ownedArtists, ownedVenues] = await Promise.all([
-    db.select({ id: artists.id, photoUrl: artists.photoUrl }).from(artists).where(eq(artists.userId, user.id)),
-    db.select({ id: venues.id, menuPdfUrl: venues.menuPdfUrl, ogImageUrl: venues.ogImageUrl }).from(venues).where(eq(venues.userId, user.id)),
+    db.select({ id: artists.id, slug: artists.slug, isActive: artists.isActive, photoUrl: artists.photoUrl }).from(artists).where(eq(artists.userId, user.id)),
+    db.select({ id: venues.id, slug: venues.slug, isActive: venues.isActive, menuPdfUrl: venues.menuPdfUrl, ogImageUrl: venues.ogImageUrl }).from(venues).where(eq(venues.userId, user.id)),
   ]);
   const artistIds = ownedArtists.map((profile) => profile.id);
   const venueIds = ownedVenues.map((profile) => profile.id);
@@ -193,8 +193,24 @@ export async function DELETE() {
   if (!deleted) return NextResponse.json(photoErasureError("remaining"), { status: 503 });
   // Invalidate only after the atomic local erasure committed. Signed legal
   // evidence is unrelated to the public catalog and remains untouched.
-  if (artistIds.length > 0) revalidateVendorCatalog("artist");
-  if (venueIds.length > 0) revalidateVendorCatalog("venue");
+  const publishedArtistSlugs = ownedArtists.filter(profile => profile.isActive).map(profile => profile.slug);
+  const publishedVenueSlugs = ownedVenues.filter(profile => profile.isActive).map(profile => profile.slug);
+  if (publishedArtistSlugs.length > 0) {
+    revalidateVendorCatalog("artist", {
+      profileSlugs: publishedArtistSlugs,
+      directory: true,
+      homepage: true,
+      services: true,
+    });
+  }
+  if (publishedVenueSlugs.length > 0) {
+    revalidateVendorCatalog("venue", {
+      profileSlugs: publishedVenueSlugs,
+      directory: true,
+      homepage: true,
+      services: true,
+    });
+  }
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const urls = [
       ...ownedArtistImages.map((image) => image.url),

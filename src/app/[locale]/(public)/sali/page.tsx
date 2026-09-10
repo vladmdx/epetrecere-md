@@ -6,6 +6,10 @@ import { VenuesListClient } from "./client";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { t } from "@/i18n";
 
+// Filters and authenticated price visibility make the response request-specific.
+// Never cache this HTML across users.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }) {
   const { locale: rawLocale } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;

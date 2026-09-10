@@ -3,15 +3,19 @@ import Link from "@/components/shared/locale-link";
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { getArtists } from "@/lib/db/queries/artists";
-import { getCategoryBySlug, getAllCategories } from "@/lib/db/queries/categories";
+import { getCategoryBySlug } from "@/lib/db/queries/categories";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
-import { getCityBySlug, getCityLocalizedName, CITIES } from "@/lib/seo/cities";
+import { getCityBySlug, getCityLocalizedName } from "@/lib/seo/cities";
 import { cityNameAfterIn } from "@/lib/seo/city-grammar";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { plural } from "@/lib/i18n/plural";
 import { getLocalized, t } from "@/i18n";
 import { ArtistCard } from "@/components/public/artist-card";
+
+// Search parameters and authenticated price visibility make the response
+// request-specific. Never put this HTML in the shared Full Route Cache.
+export const dynamic = "force-dynamic";
 
 // M2 — City × Category SEO landing page.
 // URL: /artisti/in/[city]/[category]
@@ -84,11 +88,10 @@ export async function generateStaticParams() {
   // deploy with it. The page that died moved every attempt, which is how the
   // contention gave itself away.
   //
-  // `dynamicParams` defaults to true, so every slug still resolves; the page
-  // is simply rendered on its first request and then cached under the
-  // `revalidate` below, which is where all but the first visitor was already
-  // being served from. What this costs is one slow request per page after a
-  // deploy. What it buys is a build that finishes.
+  // `dynamicParams` defaults to true, so every slug still resolves. The page
+  // is request-rendered because its filters and authenticated price visibility
+  // are request-specific; returning no params merely keeps that work out of the
+  // build.
   return [];
 }
 

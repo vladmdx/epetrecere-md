@@ -72,22 +72,29 @@ export default async function HomePage() {
   // would drop those sections on prod. Ordering is intentionally code-owned now.
   const visibleSections: string[] = defaultSectionOrder;
 
+  // Keep database work serial. The runtime client deliberately has a small
+  // connection pool, so starting all three fetchers together only creates a
+  // queue of further queries behind the same sockets during ISR. Each section
+  // has its own fallback so one failed optional query does not suppress later
+  // sections or prevent the homepage from rendering.
   try {
-    // Bounded on purpose. Next.js allows a statically generated page 60
-    // seconds; exceeding it fails the entire export, which is exactly how four
-    // production deploys were lost. Everything below renders without this
-    // data, so waiting indefinitely for it buys nothing and risks the build.
-    const [artists, venues, counts] = await Promise.all([
-      getFeaturedArtists(5),
-      getFeaturedVenues(3),
-      getSupplyCounts(),
-    ]);
+    const artists = await getFeaturedArtists(5);
     featuredArtists = publicCatalogData(artists);
-    featuredVenues = publicCatalogData(venues);
-    supply = counts;
   } catch {
-    // DB unreachable or too slow — sections still render, featured lists stay
-    // empty, and ISR fills them in on the first request after deploy.
+    // Optional public data — keep the featured-artists section empty.
+  }
+
+  try {
+    const venues = await getFeaturedVenues(3);
+    featuredVenues = publicCatalogData(venues);
+  } catch {
+    // Optional public data — keep the featured-venues section empty.
+  }
+
+  try {
+    supply = await getSupplyCounts();
+  } catch {
+    // Defensive in case the query helper changes: counters are optional too.
   }
 
   // Map section type to React element

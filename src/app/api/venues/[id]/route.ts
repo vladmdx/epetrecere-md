@@ -146,7 +146,15 @@ export async function PUT(
   }
 
   const [venue] = await db
-    .select({ id: venues.id, userId: venues.userId, capacityMin: venues.capacityMin, capacityMax: venues.capacityMax })
+    .select({
+      id: venues.id,
+      userId: venues.userId,
+      slug: venues.slug,
+      isActive: venues.isActive,
+      isFeatured: venues.isFeatured,
+      capacityMin: venues.capacityMin,
+      capacityMax: venues.capacityMax,
+    })
     .from(venues)
     .where(eq(venues.id, venueId))
     .limit(1);
@@ -240,7 +248,15 @@ export async function PUT(
     .from(venues)
     .where(eq(venues.id, venueId))
     .limit(1);
-  revalidateVendorCatalog("venue");
+  if (venue.isActive || updated?.isActive) {
+    const publicationChanged = venue.isActive !== updated?.isActive;
+    revalidateVendorCatalog("venue", {
+      profileSlugs: [venue.slug, updated?.slug],
+      directory: true,
+      homepage: publicationChanged || venue.isFeatured || Boolean(updated?.isFeatured),
+      services: publicationChanged,
+    });
+  }
   return NextResponse.json(updated);
 }
 
@@ -267,7 +283,7 @@ export async function DELETE(
   }
 
   const [venue] = await db
-    .select({ id: venues.id })
+    .select({ id: venues.id, slug: venues.slug, isActive: venues.isActive })
     .from(venues)
     .where(eq(venues.id, venueId))
     .limit(1);
@@ -276,6 +292,13 @@ export async function DELETE(
   }
 
   await db.delete(venues).where(eq(venues.id, venueId));
-  revalidateVendorCatalog("venue");
+  if (venue.isActive) {
+    revalidateVendorCatalog("venue", {
+      profileSlugs: [venue.slug],
+      directory: true,
+      homepage: true,
+      services: true,
+    });
+  }
   return NextResponse.json({ success: true });
 }

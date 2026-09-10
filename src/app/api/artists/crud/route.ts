@@ -141,6 +141,15 @@ export async function POST(req: Request) {
     })
     .returning();
 
+  if (artist.isActive) {
+    revalidateVendorCatalog("artist", {
+      profileSlugs: [artist.slug],
+      directory: true,
+      homepage: true,
+      services: true,
+    });
+  }
+
   return NextResponse.json(artist, { status: 201 });
 }
 
@@ -239,7 +248,18 @@ export async function PUT(req: Request) {
     .from(artists)
     .where(eq(artists.id, Number(id)))
     .limit(1);
-  revalidateVendorCatalog("artist");
+  if (existing.isActive || updated?.isActive) {
+    revalidateVendorCatalog("artist", {
+      profileSlugs: [oldSlug, updated?.slug],
+      directory: true,
+      homepage: true,
+      // Category membership changes the counts shown on /servicii even when
+      // the artist remains published; an active-flag change alters totals too.
+      services:
+        existing.isActive !== updated?.isActive ||
+        (Boolean(updated?.isActive) && "categoryIds" in data),
+    });
+  }
   return NextResponse.json(updated);
 }
 
@@ -263,8 +283,19 @@ export async function DELETE(req: NextRequest) {
   if (!Number.isSafeInteger(artistId) || artistId <= 0) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
-  const [deleted] = await db.delete(artists).where(eq(artists.id, artistId)).returning({ id: artists.id });
+  const [deleted] = await db.delete(artists).where(eq(artists.id, artistId)).returning({
+    id: artists.id,
+    slug: artists.slug,
+    isActive: artists.isActive,
+  });
   if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  revalidateVendorCatalog("artist");
+  if (deleted.isActive) {
+    revalidateVendorCatalog("artist", {
+      profileSlugs: [deleted.slug],
+      directory: true,
+      homepage: true,
+      services: true,
+    });
+  }
   return NextResponse.json({ success: true });
 }

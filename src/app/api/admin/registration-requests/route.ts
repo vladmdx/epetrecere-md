@@ -224,8 +224,10 @@ export async function POST(req: Request) {
         .select({
           id: artists.id,
           nameRo: artists.nameRo,
+          slug: artists.slug,
           email: artists.email,
           userId: artists.userId,
+          isActive: artists.isActive,
         })
         .from(artists)
         .where(eq(artists.id, id))
@@ -302,13 +304,26 @@ export async function POST(req: Request) {
 
         await db.delete(artists).where(eq(artists.id, id));
       }
+
+      // Approval publishes a new supplier; rejecting an unexpectedly active
+      // row withdraws one. Pending rejections never touched the public cache.
+      if (action === "approve" || artist.isActive) {
+        revalidateVendorCatalog("artist", {
+          profileSlugs: [artist.slug],
+          directory: true,
+          homepage: true,
+          services: true,
+        });
+      }
     } else if (type === "venue") {
       const [venue] = await db
         .select({
           id: venues.id,
           nameRo: venues.nameRo,
+          slug: venues.slug,
           email: venues.email,
           userId: venues.userId,
+          isActive: venues.isActive,
         })
         .from(venues)
         .where(eq(venues.id, id))
@@ -379,9 +394,17 @@ export async function POST(req: Request) {
 
         await db.delete(venues).where(eq(venues.id, id));
       }
+
+      if (action === "approve" || venue.isActive) {
+        revalidateVendorCatalog("venue", {
+          profileSlugs: [venue.slug],
+          directory: true,
+          homepage: true,
+          services: true,
+        });
+      }
     }
 
-    revalidateVendorCatalog(type);
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("[registration-requests] Error:", err);

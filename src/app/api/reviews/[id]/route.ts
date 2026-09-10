@@ -6,6 +6,32 @@ import { eq, and, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 
+type ReviewTarget = {
+  artistId: number | null;
+  venueId: number | null;
+  artistSlug: string | null;
+  venueSlug: string | null;
+  artistIsActive: boolean | null;
+  venueIsActive: boolean | null;
+};
+
+function revalidateReviewTarget(target: ReviewTarget, ratingChanged: boolean) {
+  if (target.artistId && target.artistIsActive) {
+    revalidateVendorCatalog("artist", {
+      profileSlugs: [target.artistSlug],
+      directory: ratingChanged,
+      homepage: ratingChanged,
+    });
+  }
+  if (target.venueId && target.venueIsActive) {
+    revalidateVendorCatalog("venue", {
+      profileSlugs: [target.venueSlug],
+      directory: ratingChanged,
+      homepage: ratingChanged,
+    });
+  }
+}
+
 /** Minimal, uncached owner read for reconciling a reply whose write response was lost. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { userId: clerkId } = await auth();
@@ -40,6 +66,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 async function refreshRatingAggregate(review: {
   artistId: number | null;
   venueId: number | null;
+  artistSlug: string | null;
+  venueSlug: string | null;
+  artistIsActive: boolean | null;
+  venueIsActive: boolean | null;
 }) {
   if (review.artistId) {
     await db.execute(sql`
@@ -55,7 +85,6 @@ async function refreshRatingAggregate(review: {
       ), 0)
       WHERE id = ${review.artistId}
     `);
-    revalidateVendorCatalog("artist");
   }
   if (review.venueId) {
     await db.execute(sql`
@@ -71,8 +100,8 @@ async function refreshRatingAggregate(review: {
       ), 0)
       WHERE id = ${review.venueId}
     `);
-    revalidateVendorCatalog("venue");
   }
+  revalidateReviewTarget(review, true);
 }
 
 // Approve / reject review — admin only; Reply — admin OR artist owner
@@ -99,8 +128,14 @@ export async function PUT(
       .select({
         artistId: reviews.artistId,
         venueId: reviews.venueId,
+        artistSlug: artists.slug,
+        venueSlug: venues.slug,
+        artistIsActive: artists.isActive,
+        venueIsActive: venues.isActive,
       })
       .from(reviews)
+      .leftJoin(artists, eq(artists.id, reviews.artistId))
+      .leftJoin(venues, eq(venues.id, reviews.venueId))
       .where(eq(reviews.id, Number(id)))
       .limit(1);
     if (!target) {
@@ -126,10 +161,28 @@ export async function PUT(
     // Check if admin
     const adminCheck = await requireAdmin();
     if (adminCheck.ok) {
-      const [updated] = await db.update(reviews).set({ reply: reply.trim(), replyAt: new Date() }).where(eq(reviews.id, Number(id)))
-        .returning({ artistId: reviews.artistId, venueId: reviews.venueId });
+      const [target] = await db
+        .select({
+          artistId: reviews.artistId,
+          venueId: reviews.venueId,
+          artistSlug: artists.slug,
+          venueSlug: venues.slug,
+          artistIsActive: artists.isActive,
+          venueIsActive: venues.isActive,
+        })
+        .from(reviews)
+        .leftJoin(artists, eq(artists.id, reviews.artistId))
+        .leftJoin(venues, eq(venues.id, reviews.venueId))
+        .where(eq(reviews.id, Number(id)))
+        .limit(1);
+      if (!target) return NextResponse.json({ error: "Review not found" }, { status: 404 });
+      const [updated] = await db
+        .update(reviews)
+        .set({ reply: reply.trim(), replyAt: new Date() })
+        .where(eq(reviews.id, Number(id)))
+        .returning({ id: reviews.id });
       if (!updated) return NextResponse.json({ error: "Review not found" }, { status: 404 });
-      revalidateVendorCatalog(updated.venueId ? "venue" : "artist");
+      revalidateReviewTarget(target, false);
       return NextResponse.json({ success: true });
     }
 
@@ -138,8 +191,17 @@ export async function PUT(
     if (!appUser) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const [review] = await db
-      .select({ artistId: reviews.artistId, venueId: reviews.venueId })
+      .select({
+        artistId: reviews.artistId,
+        venueId: reviews.venueId,
+        artistSlug: artists.slug,
+        venueSlug: venues.slug,
+        artistIsActive: artists.isActive,
+        venueIsActive: venues.isActive,
+      })
       .from(reviews)
+      .leftJoin(artists, eq(artists.id, reviews.artistId))
+      .leftJoin(venues, eq(venues.id, reviews.venueId))
       .where(eq(reviews.id, Number(id)))
       .limit(1);
     if (!review) return NextResponse.json({ error: "Review not found" }, { status: 404 });
@@ -168,7 +230,7 @@ export async function PUT(
       .update(reviews)
       .set({ reply: reply.trim(), replyAt: new Date() })
       .where(eq(reviews.id, Number(id)));
-    revalidateVendorCatalog(review.venueId ? "venue" : "artist");
+    revalidateReviewTarget(review, false);
     return NextResponse.json({ success: true });
   }
 
@@ -184,8 +246,17 @@ export async function DELETE(
 
   const { id } = await params;
   const [target] = await db
-    .select({ artistId: reviews.artistId, venueId: reviews.venueId })
+    .select({
+      artistId: reviews.artistId,
+      venueId: reviews.venueId,
+      artistSlug: artists.slug,
+      venueSlug: venues.slug,
+      artistIsActive: artists.isActive,
+      venueIsActive: venues.isActive,
+    })
     .from(reviews)
+    .leftJoin(artists, eq(artists.id, reviews.artistId))
+    .leftJoin(venues, eq(venues.id, reviews.venueId))
     .where(eq(reviews.id, Number(id)))
     .limit(1);
   if (!target) {

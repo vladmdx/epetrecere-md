@@ -7,6 +7,10 @@ import { ArtistsListClient } from "./client";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { t } from "@/i18n";
 
+// Filters and authenticated price visibility make the response request-specific.
+// Never cache this HTML across users.
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({
   params,
 }: {
@@ -51,10 +55,13 @@ export default async function ArtistsPage({ params, searchParams }: Props) {
     availableDate: (sp.date as string) || undefined,
   };
 
-  const [result, cats] = await Promise.all([
-    getArtists(filters),
-    getAllCategories(),
-  ]);
+  // getArtists already performs its list/count reads together. Starting the
+  // category query at the same time would put a third transaction onto the
+  // two-socket Supabase runtime pool and make postgres.js pipeline it. Keep
+  // this extra lookup serial because Supavisor transaction mode must not
+  // receive pipelined transactions.
+  const result = await getArtists(filters);
+  const cats = await getAllCategories();
 
   // M0a #8 — redact price for unauthenticated visitors at the server layer.
   const { userId } = await auth();

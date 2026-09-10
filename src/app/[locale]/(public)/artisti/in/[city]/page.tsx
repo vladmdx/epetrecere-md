@@ -12,6 +12,10 @@ import { t } from "@/i18n";
 import { NOUNS, plural } from "@/lib/i18n/plural";
 import { ArtistCard } from "@/components/public/artist-card";
 
+// Search parameters and authenticated price visibility make the response
+// request-specific. Never put this HTML in the shared Full Route Cache.
+export const dynamic = "force-dynamic";
+
 // M2 — SEO landing page for all artists in a given Moldovan city.
 // URL: /artisti/in/[city]   e.g. /artisti/in/chisinau
 
@@ -81,11 +85,10 @@ export async function generateStaticParams() {
   // deploy with it. The page that died moved every attempt, which is how the
   // contention gave itself away.
   //
-  // `dynamicParams` defaults to true, so every slug still resolves; the page
-  // is simply rendered on its first request and then cached under the
-  // `revalidate` below, which is where all but the first visitor was already
-  // being served from. What this costs is one slow request per page after a
-  // deploy. What it buys is a build that finishes.
+  // `dynamicParams` defaults to true, so every slug still resolves. The page
+  // is request-rendered because its filters and authenticated price visibility
+  // are request-specific; returning no params merely keeps that work out of the
+  // build.
   return [];
 }
 
