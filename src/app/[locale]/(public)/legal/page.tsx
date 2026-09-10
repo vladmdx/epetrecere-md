@@ -3,7 +3,11 @@ import Link from "@/components/shared/locale-link";
 import { FileText } from "lucide-react";
 import { generateMetaAsync } from "@/lib/seo/generate-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
-import { LEGAL_DOCUMENTS, LEGAL_PACK_VERSION } from "@/lib/legal";
+import {
+  LEGAL_DOCUMENTS,
+  LEGAL_PACK_VERSION,
+  getLegalDocument,
+} from "@/lib/legal";
 import { legalTitle } from "@/lib/legal";
 import { t } from "@/i18n";
 
@@ -48,6 +52,11 @@ export default async function LegalIndexPage({
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
   const canonicalPolicies = new Set(["termeni-generali", "politica-confidentialitate", "politica-cookie"]);
   const documents = LEGAL_DOCUMENTS.filter((doc) => !canonicalPolicies.has(doc.slug));
+  const canonical = [
+    { href: "/termeni", label: t("footer.terms", locale), slug: "termeni-generali" },
+    { href: "/confidentialitate", label: t("footer.privacy", locale), slug: "politica-confidentialitate" },
+    { href: "/cookies", label: t("footer.cookies", locale), slug: "politica-cookie" },
+  ];
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 lg:px-8">
       <nav className="mb-4 text-xs text-muted-foreground">
@@ -67,9 +76,18 @@ export default async function LegalIndexPage({
 
       <ul className="mt-8 space-y-2">
         <li className="grid gap-2 sm:grid-cols-3">
-          <Link href="/termeni" className="rounded-xl border border-gold/30 bg-gold/5 p-3 text-center text-sm text-gold hover:bg-gold/10">{t("footer.terms", locale)}</Link>
-          <Link href="/confidentialitate" className="rounded-xl border border-gold/30 bg-gold/5 p-3 text-center text-sm text-gold hover:bg-gold/10">{t("footer.privacy", locale)}</Link>
-          <Link href="/cookies" className="rounded-xl border border-gold/30 bg-gold/5 p-3 text-center text-sm text-gold hover:bg-gold/10">{t("footer.cookies", locale)}</Link>
+          {canonical.map((item) => (
+            <Link
+              key={item.slug}
+              href={item.href}
+              className="rounded-xl border border-gold/30 bg-gold/5 p-3 text-center text-sm text-gold hover:bg-gold/10"
+            >
+              {item.label}
+              <span className="ml-1 text-xs text-muted-foreground">
+                v{getLegalDocument(item.slug)?.version}
+              </span>
+            </Link>
+          ))}
         </li>
         {documents.map((doc) => (
           <li key={doc.slug}>

@@ -15,6 +15,7 @@ Principiu: se păstrează minimum necesar pentru scop, contract, obligații lega
 | Fișierele clientului | odată cu obiectul sau contul de care aparțin, dacă nu există obligație de păstrare | ștergere din DB și stocarea obiectelor |
 | Dovezi ale contractelor și evidențe financiar-contabile | perioada obligatorie prevăzută de lege și prescripția aplicabilă | arhivare cu acces restrâns, apoi distrugere controlată |
 | Loguri de securitate ale aplicației | IP și user-agent 90 zile, dacă nu documentează un incident | minimizare automată; acțiunea administrativă rămâne în jurnal, incidentul se separă în registrul de incidente |
+| Semnale antifraudă, scoruri de risc și loguri de moderare | 90 zile pentru semnale obișnuite; pe durata investigației/litigiului pentru cazul documentat | pseudonimizare; ștergere/anonimizare după închiderea cazului; decizia și contestația se păstrează proporțional |
 | Prompturi AI publice | aplicația nu le persistă pe server; în browser până la resetare | utilizatorul folosește Reset; furnizor API poate păstra loguri până la 30 zile |
 | Preferințe cookie | 12 luni | nouă alegere sau expirare |
 | Copii de siguranță | conform ciclului contractual al procesatorului, obiectiv maximum 35 zile | expirare automată; datele șterse nu se readuc în producție |

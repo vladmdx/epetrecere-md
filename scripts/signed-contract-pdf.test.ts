@@ -19,7 +19,7 @@ import {
   type SignedContractEvidence,
 } from "../src/lib/legal/signed-contract-pdf";
 
-const ACCEPTED_AT = "2026-09-10T07:10:53.000Z";
+const ACCEPTED_AT = "2026-09-11T07:10:53.000Z";
 
 async function fixtureRows(): Promise<SignedContractEvidence[]> {
   const signature = await sharp(Buffer.from(`

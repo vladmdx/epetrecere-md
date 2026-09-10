@@ -1,7 +1,7 @@
 [
   {
     "slug": "acord-parteneri",
-    "version": "2.1",
+    "version": "2.2",
     "order": 1,
     "title": {
       "ro": "Condițiile de colaborare pentru parteneri și locații",
@@ -16,7 +16,7 @@
         },
         {
           "type": "p",
-          "text": "Acord electronic. Versiunea 2.1. Data intrării în vigoare: 4 septembrie 2026. Limba care prevalează: româna."
+          "text": "Acord electronic. Versiunea 2.2. Data intrării în vigoare: 11 septembrie 2026. Limba care prevalează: româna."
         },
         {
           "type": "p",
@@ -60,7 +60,7 @@
         },
         {
           "type": "p",
-          "text": "Partener — prestator de servicii aprobat de Platformă: moderator, DJ, formație muzicală, artist, fotograf, videograf, decorator, colectiv de dans, sală, restaurant sau altă locație."
+          "text": "Partener — prestator de servicii aprobat de Platformă: moderator, coordonator de eveniment, DJ, formație muzicală, artist, fotograf, videograf, furnizor foto-video, decorator, colectiv de dans, sală, restaurant sau altă locație."
         },
         {
           "type": "p",
@@ -384,7 +384,7 @@
         },
         {
           "type": "p",
-          "text": "12.1. Până la confirmarea comenzii, Partenerul este obligat să comunice cu Clientul doar prin Platformă."
+          "text": "12.2. Până la confirmarea comenzii, Partenerul este obligat să comunice cu Clientul doar prin Platformă."
         },
         {
           "type": "p",
@@ -531,6 +531,14 @@
           "text": "19.4. Dacă Partenerul nu este de acord cu modificările, acesta trebuie să înceteze utilizarea Platformei și poate solicita ștergerea profilului."
         },
         {
+          "type": "p",
+          "text": "19.4. Simpla continuare a utilizării Platformei nu valorează acceptare pentru modificările comerciale, modificările răspunderii, documentele supuse semnării sau alte schimbări esențiale. Acestea intră în vigoare față de Partener numai după acceptarea electronică explicită a noii versiuni. Modificările strict tehnice ori favorabile, fără impact material asupra drepturilor și obligațiilor, pot fi comunicate fără resemnare dacă legea permite."
+        },
+        {
+          "type": "p",
+          "text": "19.4. Simpla continuare a utilizării Platformei nu valorează acceptare pentru modificările comerciale, modificările răspunderii, documentele supuse semnării sau alte schimbări esențiale. Acestea intră în vigoare față de Partener numai după acceptarea electronică explicită a noii versiuni. Modificările strict tehnice ori favorabile, fără impact material asupra drepturilor și obligațiilor, pot fi comunicate fără resemnare dacă legea permite."
+        },
+        {
           "type": "h2",
           "text": "20. Durata și încetarea colaborării"
         },
@@ -572,7 +580,7 @@
         },
         {
           "type": "p",
-          "text": "22.1. Prezentele Condiții sunt guvernate de legislația Republicii Moldova."
+          "text": "22.2. Prezentele Condiții sunt guvernate de legislația Republicii Moldova."
         },
         {
           "type": "p",
@@ -633,7 +641,7 @@
   },
   {
     "slug": "acord-locatii",
-    "version": "2.1",
+    "version": "2.2",
     "order": 2,
     "title": {
       "ro": "Acord cu Locațiile",
@@ -644,7 +652,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "Acord de colaborare cu locațiile înregistrate pe Platforma EPETRECERE. Versiunea 2.1, în vigoare din 4 septembrie 2026. Republica Moldova. Document din pachetul juridic EPETRECERE 2.1. În caz de divergențe între traduceri, prevalează textul român."
+          "text": "Acord de colaborare cu locațiile înregistrate pe Platforma EPETRECERE. Versiunea 2.2, în vigoare din 11 septembrie 2026. Republica Moldova. Document din pachetul juridic EPETRECERE 2.2. În caz de divergențe între traduceri, prevalează textul român."
         },
         {
           "type": "h2",
@@ -692,7 +700,7 @@
         },
         {
           "type": "p",
-          "text": "12.12. Modificarea, reprogramarea și anularea"
+          "text": "12.22. Modificarea, reprogramarea și anularea"
         },
         {
           "type": "p",
@@ -808,7 +816,7 @@
         },
         {
           "type": "p",
-          "text": "2.1. „Client” - utilizatorul care transmite o solicitare pentru organizarea unui eveniment."
+          "text": "2.2. „Client” - utilizatorul care transmite o solicitare pentru organizarea unui eveniment."
         },
         {
           "type": "p",
@@ -1000,7 +1008,7 @@
         },
         {
           "type": "p",
-          "text": "12.1. Modificările esențiale și anulările se înregistrează prin Platformă cu indicarea inițiatorului și motivului."
+          "text": "12.2. Modificările esențiale și anulările se înregistrează prin Platformă cu indicarea inițiatorului și motivului."
         },
         {
           "type": "p",
@@ -1200,7 +1208,7 @@
         },
         {
           "type": "p",
-          "text": "22.1. Drepturile asupra Platformei, software-ului, designului, bazelor de date, algoritmilor și mărcii aparțin Operatorului sau licențiatorilor."
+          "text": "22.2. Drepturile asupra Platformei, software-ului, designului, bazelor de date, algoritmilor și mărcii aparțin Operatorului sau licențiatorilor."
         },
         {
           "type": "p",
@@ -1244,7 +1252,7 @@
         },
         {
           "type": "p",
-          "text": "25.1. Până la 23 august 2026, prelucrarea ține cont de Legea nr.133/2011, iar din 23 august 2026 - de Legea nr.195/2024 și actele aplicabile."
+          "text": "25.1. Până la 22 august 2026, prelucrarea ține cont de Legea nr.133/2011, iar din 23 august 2026 - de Legea nr.195/2024 și actele aplicabile."
         },
         {
           "type": "p",
@@ -1356,7 +1364,7 @@
         },
         {
           "type": "p",
-          "text": "32.1. Transferul contului fără acordul Operatorului este interzis."
+          "text": "32.2. Transferul contului fără acordul Operatorului este interzis."
         },
         {
           "type": "p",
@@ -1381,6 +1389,14 @@
         {
           "type": "p",
           "text": "33.3. Dacă legea cere acord separat, Platforma solicită o nouă acceptare."
+        },
+        {
+          "type": "p",
+          "text": "33.4. Simpla continuare a utilizării Platformei nu valorează acceptare pentru modificările comerciale, modificările răspunderii sau alte schimbări esențiale. Acestea se aplică Locației numai după acceptarea electronică explicită a noii versiuni."
+        },
+        {
+          "type": "p",
+          "text": "33.4. Simpla continuare a utilizării Platformei nu valorează acceptare pentru modificările comerciale, modificările răspunderii sau alte schimbări esențiale. Acestea se aplică Locației numai după acceptarea electronică explicită a noii versiuni."
         },
         {
           "type": "h2",
@@ -1423,6 +1439,14 @@
           "text": "35.5. Datele Operatorului: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.); IDNO: 1026023123354; adresă: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova; e-mail: legal@epetrecere.md; site: epetrecere.md."
         },
         {
+          "type": "p",
+          "text": "35.6. Pentru o Locație, prezentul Acord prevalează față de Condițiile de colaborare pentru parteneri și locații în orice chestiune specifică sălilor, restaurantelor, rezervării Locației sau taxei fixe. Condițiile generale și acordul comun se aplică numai în completare și numai dacă nu contrazic prezentul Acord."
+        },
+        {
+          "type": "p",
+          "text": "35.6. Pentru o Locație, prezentul Acord prevalează față de Condițiile de colaborare pentru parteneri și locații în orice chestiune specifică sălilor, restaurantelor, rezervării Locației sau taxei fixe. Condițiile generale și acordul comun se aplică numai în completare și numai dacă nu contrazic prezentul Acord."
+        },
+        {
           "type": "h2",
           "text": "Anexa 1. Condiții comerciale"
         },
@@ -1458,7 +1482,7 @@
       "ru": [
         {
           "type": "p",
-          "text": "Соглашение о сотрудничестве с заведениями Платформы EPETRECERE. Версия 2.1, действует с 4 сентября 2026 года. Республика Молдова. Документ юридического пакета EPETRECERE 2.1. При расхождениях между переводами преимущество имеет румынский текст."
+          "text": "Соглашение о сотрудничестве с заведениями Платформы EPETRECERE. Версия 2.2, действует с 11 сентября 2026 года. Республика Молдова. Документ юридического пакета EPETRECERE 2.2. При расхождениях между переводами преимущество имеет румынский текст."
         },
         {
           "type": "h2",
@@ -1506,7 +1530,7 @@
         },
         {
           "type": "p",
-          "text": "12.12. Изменение, перенос и отмена"
+          "text": "12.22. Изменение, перенос и отмена"
         },
         {
           "type": "p",
@@ -1622,7 +1646,7 @@
         },
         {
           "type": "p",
-          "text": "2.1. «Клиент» - пользователь, направляющий запрос на проведение мероприятия."
+          "text": "2.2. «Клиент» - пользователь, направляющий запрос на проведение мероприятия."
         },
         {
           "type": "p",
@@ -1814,7 +1838,7 @@
         },
         {
           "type": "p",
-          "text": "12.1. Все существенные изменения и отмены фиксируются через Платформу с указанием инициатора и причины."
+          "text": "12.2. Все существенные изменения и отмены фиксируются через Платформу с указанием инициатора и причины."
         },
         {
           "type": "p",
@@ -2014,7 +2038,7 @@
         },
         {
           "type": "p",
-          "text": "22.1. Права на Платформу, программное обеспечение, дизайн, базы данных, алгоритмы и бренд принадлежат Оператору или его лицензиарам."
+          "text": "22.2. Права на Платформу, программное обеспечение, дизайн, базы данных, алгоритмы и бренд принадлежат Оператору или его лицензиарам."
         },
         {
           "type": "p",
@@ -2058,7 +2082,7 @@
         },
         {
           "type": "p",
-          "text": "25.1. До 23 августа 2026 года обработка осуществляется с учетом Закона №133/2011, а с 23 августа 2026 года - Закона №195/2024 и иных применимых актов."
+          "text": "25.1. До 22 августа 2026 года обработка осуществляется с учетом Закона №133/2011, а с 23 августа 2026 года - Закона №195/2024 и иных применимых актов."
         },
         {
           "type": "p",
@@ -2170,7 +2194,7 @@
         },
         {
           "type": "p",
-          "text": "32.1. Передача аккаунта третьему лицу без согласия Оператора запрещена."
+          "text": "32.2. Передача аккаунта третьему лицу без согласия Оператора запрещена."
         },
         {
           "type": "p",
@@ -2195,6 +2219,14 @@
         {
           "type": "p",
           "text": "33.3. Для изменений, требующих отдельного согласия, Платформа запросит повторный акцепт."
+        },
+        {
+          "type": "p",
+          "text": "33.4. Простое продолжение использования Платформы не считается согласием с коммерческими изменениями, изменениями ответственности или иными существенными изменениями. Они применяются к Заведению только после явного электронного принятия новой версии."
+        },
+        {
+          "type": "p",
+          "text": "33.4. Простое продолжение использования Платформы не считается согласием с коммерческими изменениями, изменениями ответственности или иными существенными изменениями. Они применяются к Заведению только после явного электронного принятия новой версии."
         },
         {
           "type": "h2",
@@ -2235,6 +2267,14 @@
         {
           "type": "p",
           "text": "35.5. Реквизиты Оператора: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.); IDNO: 1026023123354; адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова; e-mail: legal@epetrecere.md; веб-сайт: epetrecere.md."
+        },
+        {
+          "type": "p",
+          "text": "35.6. Для Заведения настоящее Соглашение имеет преимущественную силу перед общими Условиями сотрудничества партнеров и заведений по всем вопросам, относящимся к залам, ресторанам, бронированию Заведения или фиксированной плате. Общие условия и общий договор применяются лишь дополнительно и при отсутствии противоречия."
+        },
+        {
+          "type": "p",
+          "text": "35.6. Для Заведения настоящее Соглашение имеет преимущественную силу перед общими Условиями сотрудничества партнеров и заведений по всем вопросам, относящимся к залам, ресторанам, бронированию Заведения или фиксированной плате. Общие условия и общий договор применяются лишь дополнительно и при отсутствии противоречия."
         },
         {
           "type": "h2",
@@ -2284,7 +2324,7 @@
       "en": [
         {
           "type": "p",
-          "text": "Cooperation Agreement with Venues registered on the EPETRECERE Platform. Version 2.1, effective 4 September 2026. Republic of Moldova. Part of EPETRECERE Legal Pack 2.1. The Romanian text prevails in the event of a discrepancy between translations."
+          "text": "Cooperation Agreement with Venues registered on the EPETRECERE Platform. Version 2.2, effective 11 September 2026. Republic of Moldova. Part of EPETRECERE Legal Pack 2.2. The Romanian text prevails in the event of a discrepancy between translations."
         },
         {
           "type": "h2",
@@ -2332,7 +2372,7 @@
         },
         {
           "type": "p",
-          "text": "12.12. Amendment, Rescheduling and Cancellation"
+          "text": "12.22. Amendment, Rescheduling and Cancellation"
         },
         {
           "type": "p",
@@ -2448,7 +2488,7 @@
         },
         {
           "type": "p",
-          "text": "2.1. “Client” - the user who submits a Request for the organisation of an event."
+          "text": "2.2. “Client” - the user who submits a Request for the organisation of an event."
         },
         {
           "type": "p",
@@ -2640,7 +2680,7 @@
         },
         {
           "type": "p",
-          "text": "12.1. Material changes and cancellations shall be recorded through the Platform, stating the initiating party and the reason."
+          "text": "12.2. Material changes and cancellations shall be recorded through the Platform, stating the initiating party and the reason."
         },
         {
           "type": "p",
@@ -2840,7 +2880,7 @@
         },
         {
           "type": "p",
-          "text": "22.1. The rights in the Platform, the software, the design, the databases, the algorithms and the trade mark belong to the Operator or to its licensors."
+          "text": "22.2. The rights in the Platform, the software, the design, the databases, the algorithms and the trade mark belong to the Operator or to its licensors."
         },
         {
           "type": "p",
@@ -2884,7 +2924,7 @@
         },
         {
           "type": "p",
-          "text": "25.1. Until 23 August 2026, processing shall have regard to Law No. 133/2011, and as from 23 August 2026 to Law No. 195/2024 and the applicable instruments."
+          "text": "25.1. Until 22 August 2026, processing shall have regard to Law No. 133/2011, and as from 23 August 2026 to Law No. 195/2024 and the applicable instruments."
         },
         {
           "type": "p",
@@ -2996,7 +3036,7 @@
         },
         {
           "type": "p",
-          "text": "32.1. Transfer of the Account without the Operator’s consent is prohibited."
+          "text": "32.2. Transfer of the Account without the Operator’s consent is prohibited."
         },
         {
           "type": "p",
@@ -3021,6 +3061,14 @@
         {
           "type": "p",
           "text": "33.3. Where the law requires separate consent, the Platform shall request a new acceptance."
+        },
+        {
+          "type": "p",
+          "text": "33.4. Continued use of the Platform alone does not constitute acceptance of commercial changes, changes to liability, or other material changes. Such changes apply to the Venue only after explicit electronic acceptance of the new version."
+        },
+        {
+          "type": "p",
+          "text": "33.4. Continued use of the Platform alone does not constitute acceptance of commercial changes, changes to liability, or other material changes. Such changes apply to the Venue only after explicit electronic acceptance of the new version."
         },
         {
           "type": "h2",
@@ -3063,6 +3111,14 @@
           "text": "35.5. The Operator's details: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.); IDNO: 1026023123354; address: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova; e-mail: legal@epetrecere.md; website: epetrecere.md."
         },
         {
+          "type": "p",
+          "text": "35.6. For a Venue, this Agreement prevails over the common Terms of Cooperation for partners and venues on every matter specific to halls, restaurants, Venue bookings, or the fixed fee. The General Terms and common agreement apply only as a supplement and only where they do not conflict with this Agreement."
+        },
+        {
+          "type": "p",
+          "text": "35.6. For a Venue, this Agreement prevails over the common Terms of Cooperation for partners and venues on every matter specific to halls, restaurants, Venue bookings, or the fixed fee. The General Terms and common agreement apply only as a supplement and only where they do not conflict with this Agreement."
+        },
+        {
           "type": "h2",
           "text": "Annex 1. Commercial Terms"
         },
@@ -3099,7 +3155,7 @@
   },
   {
     "slug": "termeni-generali",
-    "version": "1.0",
+    "version": "2.0",
     "order": 3,
     "title": {
       "ro": "Termeni Generali",
@@ -3110,7 +3166,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE TERMENI ȘI CONDIȚII GENERALE GENERAL TERMS AND CONDITIONS Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE TERMENI ȘI CONDIȚII GENERALE. Document v2.0 din pachetul juridic EPETRECERE v2.2. Republica Moldova. În vigoare din 11 septembrie 2026. Textul român este versiunea oficială și prevalează."
         },
         {
           "type": "h2",
@@ -3142,7 +3198,11 @@
         },
         {
           "type": "p",
-          "text": "Utilizatorul răspunde pentru păstrarea confidențialității datelor de acces și trebuie să raporteze imediat suspiciunile de acces neautorizat.  Transmiterea contului unei terțe persoane este interzisă fără un temei permis de Platformă.  Este interzisă eludarea mecanismelor de autentificare.  EPETRECERE poate limita temporar contul în cazul unui risc justificat de securitate."
+          "text": "Utilizatorul răspunde pentru păstrarea confidențialității datelor de acces și notifică imediat orice suspiciune de acces neautorizat. Contul nu poate fi transferat fără acordul Operatorului."
+        },
+        {
+          "type": "p",
+          "text": "Utilizatorul poate corecta datele, exporta datele proprii și solicita ștergerea contului din setările disponibile. Ștergerea nu elimină automat dovezile contractuale, evidențele financiar-contabile sau datele aflate sub o obligație legală de păstrare; acestea sunt arhivate cu acces restrâns."
         },
         {
           "type": "h2",
@@ -3158,7 +3218,15 @@
         },
         {
           "type": "p",
-          "text": "Solicitările sunt create prin Platformă. Primirea unei solicitări nu constituie în sine o rezervare. Comanda este confirmată numai după acțiunea prevăzută de Platformă și atribuirea statutului corespunzător. Condițiile serviciului principal sunt convenite între Client și Partener sau Locație."
+          "text": "Transmiterea unei solicitări, răspunsul unui furnizor sau simpla discuție în chat nu constituie rezervare. Pentru un Partener care nu este Locație, rezervarea se încheie când Clientul acceptă în Platformă oferta activă care indică serviciul, data, prețul și condițiile esențiale, iar sistemul atribuie statutul «Confirmată». Pentru o Locație, rezervarea se încheie numai după acceptarea ofertei de către Client, confirmarea ulterioară a Locației și atribuirea statutului «Rezervare confirmată»."
+        },
+        {
+          "type": "p",
+          "text": "Orice avans, arvună sau plată directă către furnizor este datorată numai dacă oferta acceptată precizează suma, scadența, metoda, condițiile de restituire și identitatea beneficiarului. EPETRECERE nu confirmă încasarea plăților efectuate în afara sistemelor sale și nu păstrează fondurile părților."
+        },
+        {
+          "type": "p",
+          "text": "Anularea sau reprogramarea se înregistrează în Platformă cu inițiatorul, motivul și data. Efectele asupra avansului, restituirii și serviciilor deja executate urmează oferta acceptată, acordul direct al părților și normele imperative. Furnizorul trebuie să prezinte o justificare și dovezi pentru sumele nerefundabile; rambursarea se face fără întârziere nejustificată în termenul convenit sau legal."
         },
         {
           "type": "h2",
@@ -3166,7 +3234,7 @@
         },
         {
           "type": "p",
-          "text": "Platforma poate oferi chat și notificări. Până la etapa stabilită de logica serviciului, EPETRECERE poate limita schimbul datelor directe de contact pentru solicitarea provenită prin Platformă. Istoricul mesajelor poate fi păstrat pentru executarea comenzii, securitate, reclamații, prevenirea fraudei și protejarea intereselor legitime în conformitate cu Privacy Policy."
+          "text": "Înainte de confirmare, contactele directe pot fi mascate pentru prevenirea eludării. După confirmare, contactele se dezvăluie părților numai pentru pregătirea și executarea rezervării, reclamații și obligații legale. Ele nu pot fi reutilizate pentru marketing, vândute sau păstrate după încetarea scopului fără un temei juridic separat."
         },
         {
           "type": "h2",
@@ -3174,7 +3242,7 @@
         },
         {
           "type": "p",
-          "text": "Condițiile comerciale sunt stabilite prin Tariffs și acordurile speciale. Utilizatorul trebuie informat despre condițiile esențiale înainte de nașterea obligației de plată. Tarifele noi nu se aplică retroactiv obligațiilor deja născute, dacă legea sau acordul expres nu permite altfel."
+          "text": "Tariful aplicabil este cel acceptat și în vigoare la momentul confirmării rezervării. Valoarea, baza de calcul, cursul valutar, scadența, anularea și recalcularea sunt prevăzute în documentul Tarife. O condiție comercială nouă se aplică numai pentru viitor și după acceptarea expresă atunci când modificarea este esențială."
         },
         {
           "type": "h2",
@@ -3182,7 +3250,7 @@
         },
         {
           "type": "p",
-          "text": "Utilizatorul răspunde pentru fotografii, video, texte, logouri și alte materiale și confirmă că are drepturile necesare. Utilizatorul acordă EPETRECERE un drept neexclusiv de utilizare în măsura necesară pentru funcționarea, afișarea și promovarea Platformei și profilului."
+          "text": "Utilizatorul răspunde pentru fotografii, video, texte, logouri, liste de invitați și alte materiale și confirmă că deține drepturile și informările necesare. Pentru fotografiile unui eveniment privat trebuie respectată opțiunea persoanelor fotografiate; pentru minori, încărcarea sau publicarea necesită confirmarea adultului care exercită autoritatea părintească ori un alt temei legal. Conținutul raportat poate fi ascuns imediat până la revizuirea umană."
         },
         {
           "type": "h2",
@@ -3198,7 +3266,7 @@
         },
         {
           "type": "p",
-          "text": "Prelucrarea se efectuează conform Privacy Policy și legislației aplicabile. Partenerii și Locațiile trebuie să utilizeze datele Clienților numai în baza unui temei legal și pentru scopuri permise."
+          "text": "Prelucrarea se efectuează potrivit Politicii de confidențialitate și legislației aplicabile. Organizatorul care introduce datele invitaților trebuie să îi informeze și să furnizeze numai datele necesare. Partenerii și Locațiile folosesc datele Clientului exclusiv pentru solicitarea și rezervarea relevantă, dacă nu au un alt temei juridic propriu pe care îl pot demonstra."
         },
         {
           "type": "h2",
@@ -3222,7 +3290,11 @@
         },
         {
           "type": "p",
-          "text": "În cazul încălcărilor grave sau repetate, EPETRECERE poate avertiza, elimina conținut, limita funcții, suspenda temporar sau închide contul, ținând cont de natura riscului și de cerințele imperative ale legii."
+          "text": "EPETRECERE poate avertiza, elimina conținut, limita funcții, suspenda ori închide contul pentru încălcări, fraudă, risc de securitate sau neplată, aplicând o măsură proporțională. Cu excepția urgențelor de securitate sau a obligațiilor legale, Utilizatorul primește motivul și posibilitatea de a remedia ori contesta la support@epetrecere.md."
+        },
+        {
+          "type": "p",
+          "text": "O restricție bazată pe un semnal automat care afectează semnificativ accesul sau activitatea comercială poate fi contestată. EPETRECERE asigură revizuire de către o persoană autorizată, posibilitatea prezentării observațiilor și comunicarea unei decizii motivate."
         },
         {
           "type": "h2",
@@ -3230,7 +3302,7 @@
         },
         {
           "type": "p",
-          "text": "Partenerii și Locațiile răspund independent pentru legalitatea, calitatea și executarea serviciilor. EPETRECERE nu garantează încheierea tranzacției și nu răspunde pentru neexecutarea contractului principal între Utilizatori, cu excepția răspunderii obligatorii prevăzute de lege. Platforma poate fi temporar indisponibilă din cauza mentenanței, actualizărilor, incidentelor de securitate sau circumstanțelor aflate în afara controlului rezonabil al Operatorului."
+          "text": "Furnizorul este singurul responsabil pentru legalitatea, prețul, calitatea, siguranța și executarea serviciului. Clientul este responsabil pentru informațiile și obligațiile pe care și le asumă direct. EPETRECERE furnizează infrastructura de căutare, comunicare și evidență și răspunde pentru propriile obligații tehnice, de protecție a datelor și alte obligații care nu pot fi excluse prin lege; nu garantează executarea contractului principal dintre Client și furnizor."
         },
         {
           "type": "h2",
@@ -3238,7 +3310,7 @@
         },
         {
           "type": "p",
-          "text": "Nicio prevedere din Legal Pack nu limitează drepturile imperative ale consumatorilor prevăzute de legislația Republicii Moldova."
+          "text": "Nicio prevedere nu limitează drepturile imperative ale consumatorului. Înainte de confirmare, Clientul trebuie să poată identifica furnizorul, serviciul, prețul total sau metoda de calcul, condițiile avansului, anulării și reprogramării și modalitatea de reclamație. Dacă o normă imperativă acordă un drept de retragere, remediere sau rambursare, oferta ori regula contrară nu îl poate elimina."
         },
         {
           "type": "h2",
@@ -3254,7 +3326,7 @@
         },
         {
           "type": "p",
-          "text": "EPETRECERE poate actualiza Condițiile în legătură cu modificarea legii, funcțiilor, proceselor comerciale sau cerințelor de securitate. Modificările esențiale sunt comunicate conform dreptului aplicabil."
+          "text": "Modificările strict tehnice, editoriale ori favorabile pot fi comunicate prin Platformă și se aplică de la data indicată dacă nu reduc drepturi și nu măresc obligații. Modificările comerciale, cele privind răspunderea, datele personale sau alte condiții esențiale se publică într-o versiune nouă și necesită acceptare electronică explicită înainte de aplicare. Simpla continuare a utilizării nu valorează acceptare pentru aceste modificări."
         },
         {
           "type": "h2",
@@ -3262,7 +3334,11 @@
         },
         {
           "type": "p",
-          "text": "Se aplică legislația Republicii Moldova. Părțile urmăresc soluționarea amiabilă, iar litigiul nesoluționat este examinat de instanța competentă. Drepturile consumatorilor de a sesiza autoritățile competente se păstrează."
+          "text": "Se aplică legislația Republicii Moldova. Reclamația se transmite la support@epetrecere.md ori legal@epetrecere.md și trebuie să descrie rezervarea, problema și remediul solicitat. EPETRECERE confirmă primirea, solicită numai dovezile necesare și comunică o soluție motivată fără întârziere nejustificată, de regulă în 15 zile lucrătoare; termenele și drepturile imperative rămân neafectate."
+        },
+        {
+          "type": "p",
+          "text": "Părțile încearcă soluționarea amiabilă, iar litigiul nesoluționat este examinat de instanța competentă potrivit legii. Dreptul consumatorului de a sesiza autoritatea competentă pentru protecția consumatorilor sau instanța rămâne neafectat."
         },
         {
           "type": "h2",
@@ -3270,7 +3346,7 @@
         },
         {
           "type": "p",
-          "text": "Se aplică suplimentar Acordul cu Partenerii, Acordul cu Locațiile, Marketplace Rules, Tariffs, Privacy Policy, Cookie Policy, Review Policy, Anti-Fraud Policy și Quality Standards. Documentul special prevalează pentru chestiunea reglementată special."
+          "text": "Normele imperative prevalează. Pentru Locații, Acordul cu Locațiile prevalează asupra acordului comun pentru parteneri și locații în chestiunile specifice sălilor, restaurantelor, confirmării rezervării și taxei fixe. Pentru ceilalți Parteneri prevalează Condițiile de colaborare. Tarifele prevalează pentru calcul, monedă, scadență și recalculare, iar politicile speciale pentru obiectul lor; Termenii Generali completează documentele speciale."
         },
         {
           "type": "h2",
@@ -3278,13 +3354,13 @@
         },
         {
           "type": "p",
-          "text": "Documentul este publicat în română, rusă și engleză. Textul român este versiunea oficială; în caz de divergență între traduceri prevalează textul român. Numărul versiunii, data ultimei actualizări și data intrării în vigoare sunt afișate în document. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.0, în vigoare din 20 iulie 2026."
+          "text": "Documentul este publicat în română, rusă și engleză. Textul român este versiunea oficială și prevalează în caz de divergență. Operator: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova; legal@epetrecere.md. Versiunea 2.0, în vigoare din 11 septembrie 2026."
         }
       ],
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ОБЩИЕ УСЛОВИЯ ИСПОЛЬЗОВАНИЯ GENERAL TERMS AND CONDITIONS Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE ОБЩИЕ УСЛОВИЯ. Документ v2.0 из юридического пакета EPETRECERE v2.2. Республика Молдова. Действует с 11 сентября 2026 года. Румынский текст является официальным и имеет преимущественную силу."
         },
         {
           "type": "h2",
@@ -3316,7 +3392,11 @@
         },
         {
           "type": "p",
-          "text": "Пользователь отвечает за сохранность средств доступа и обязан незамедлительно сообщить о подозрении на несанкционированный доступ.  Запрещается передавать аккаунт третьим лицам без предусмотренного Платформой основания.  Запрещается обходить средства аутентификации или ограничения доступа.  EPETRECERE вправе временно ограничить аккаунт при обоснованном риске безопасности."
+          "text": "Пользователь отвечает за конфиденциальность данных доступа и немедленно сообщает о подозрении на несанкционированный доступ. Передача учетной записи без согласия Оператора запрещена."
+        },
+        {
+          "type": "p",
+          "text": "Пользователь может исправлять данные, экспортировать свои данные и запросить удаление учетной записи. Удаление не уничтожает договорные доказательства, финансово-бухгалтерские записи или данные, которые необходимо хранить по закону; они архивируются с ограниченным доступом."
         },
         {
           "type": "h2",
@@ -3332,7 +3412,15 @@
         },
         {
           "type": "p",
-          "text": "Заявки создаются через функционал Платформы. Получение заявки само по себе не означает бронирование. Заказ считается подтвержденным только после выполнения предусмотренного Платформой действия и присвоения соответствующего статуса. Условия исполнения основной услуги согласуются Клиентом с соответствующим Партнером или Заведением."
+          "text": "Отправка заявки, ответ поставщика или переписка в чате сами по себе не создают бронирование. Для Партнера, не являющегося Заведением, бронирование заключается, когда Клиент принимает в Платформе действующее предложение с услугой, датой, ценой и существенными условиями, а система присваивает статус «Подтверждено». Для Заведения бронирование заключается только после принятия предложения Клиентом, последующего подтверждения Заведением и присвоения статуса «Бронирование подтверждено»."
+        },
+        {
+          "type": "p",
+          "text": "Аванс, задаток или прямая выплата поставщику причитаются только если принятое предложение указывает сумму, срок, способ оплаты, условия возврата и получателя. EPETRECERE не подтверждает платежи вне своих систем и не хранит средства сторон."
+        },
+        {
+          "type": "p",
+          "text": "Отмена или перенос регистрируются в Платформе с указанием инициатора, причины и даты. Последствия для аванса, возврата и уже выполненных услуг определяются принятым предложением, прямым соглашением сторон и императивными нормами. Невозвратимые суммы должны быть обоснованы и подтверждены; возврат осуществляется без неоправданной задержки в согласованный или установленный законом срок."
         },
         {
           "type": "h2",
@@ -3340,7 +3428,7 @@
         },
         {
           "type": "p",
-          "text": "Платформа может предоставлять встроенный чат и систему уведомлений. До предусмотренного бизнес-логикой этапа EPETRECERE вправе ограничивать обмен прямыми контактными данными по заявке, возникшей через Платформу. История сообщений может храниться для исполнения заказа, безопасности, рассмотрения жалоб, предотвращения мошенничества и защиты законных интересов в соответствии с Privacy Policy."
+          "text": "До подтверждения прямые контакты могут скрываться. После подтверждения они раскрываются только для подготовки и исполнения бронирования, претензий и юридических обязанностей. Их нельзя использовать для маркетинга, продавать или хранить после прекращения цели без отдельного правового основания."
         },
         {
           "type": "h2",
@@ -3348,7 +3436,7 @@
         },
         {
           "type": "p",
-          "text": "Коммерческие условия EPETRECERE определяются документом Tariffs и специальными соглашениями. Пользователь должен быть проинформирован о существенных условиях платежа до возникновения соответствующего обязательства. Новые тарифы не применяются ретроактивно к уже возникшим обязательствам, если иное не допускается законом или прямо не согласовано сторонами."
+          "text": "Применяется тариф, принятый и действующий на момент подтверждения бронирования. Размер, база расчета, валютный курс, срок, отмена и перерасчет определяются документом «Тарифы». Новое существенное коммерческое условие применяется только на будущее и после явного принятия."
         },
         {
           "type": "h2",
@@ -3356,7 +3444,7 @@
         },
         {
           "type": "p",
-          "text": "Пользователь отвечает за загружаемые фотографии, видео, тексты, логотипы и иные материалы и подтверждает наличие необходимых прав. Пользователь предоставляет EPETRECERE неисключительное право использовать такой контент в объеме, необходимом для работы, отображения и продвижения Платформы и профиля Пользователя."
+          "text": "Пользователь отвечает за фотографии, видео, тексты, логотипы, списки гостей и другие материалы и подтверждает наличие необходимых прав и уведомлений. Для фотографий частного мероприятия учитывается выбор изображенных лиц; для несовершеннолетних загрузка или публикация требует подтверждения родителя/опекуна либо иного законного основания. Материал по жалобе может быть немедленно скрыт до рассмотрения человеком."
         },
         {
           "type": "h2",
@@ -3372,7 +3460,7 @@
         },
         {
           "type": "p",
-          "text": "Обработка персональных данных осуществляется согласно Privacy Policy и применимому законодательству Республики Молдова. Партнеры и Заведения обязаны использовать полученные данные Клиентов только на законных основаниях и для допустимых целей."
+          "text": "Обработка ведется согласно Политике конфиденциальности. Организатор, вносящий данные гостей, обязан их информировать и предоставлять только необходимые данные. Партнеры и Заведения используют данные Клиента только для соответствующей заявки и бронирования, если не могут доказать иное собственное правовое основание."
         },
         {
           "type": "h2",
@@ -3396,7 +3484,11 @@
         },
         {
           "type": "p",
-          "text": "При существенном или повторном нарушении EPETRECERE вправе предупредить Пользователя, удалить нарушающий контент, ограничить функции, временно приостановить либо прекратить аккаунт с учетом характера риска и обязательных требований закона."
+          "text": "EPETRECERE может предупредить, удалить контент, ограничить функции, приостановить или закрыть учетную запись за нарушение, мошенничество, риск безопасности или неоплату, применяя соразмерную меру. Кроме срочных мер безопасности и требований закона, Пользователь получает причину и возможность устранить нарушение либо подать возражение на support@epetrecere.md."
+        },
+        {
+          "type": "p",
+          "text": "Существенное ограничение на основе автоматического сигнала можно оспорить. EPETRECERE обеспечивает рассмотрение уполномоченным лицом, возможность представить объяснения и мотивированное решение."
         },
         {
           "type": "h2",
@@ -3404,7 +3496,7 @@
         },
         {
           "type": "p",
-          "text": "Партнеры и Заведения самостоятельно отвечают за законность, качество, безопасность и исполнение своих услуг. EPETRECERE не гарантирует заключение сделки и не несет ответственность за неисполнение основной сделки одним Пользователем перед другим, кроме случаев обязательной ответственности по закону. Платформа может быть временно недоступна из-за обслуживания, обновлений, инцидентов безопасности или обстоятельств вне разумного контроля Оператора."
+          "text": "Поставщик единолично отвечает за законность, цену, качество, безопасность и исполнение услуги. Клиент отвечает за сведения и обязательства, принятые напрямую. EPETRECERE предоставляет инфраструктуру поиска, общения и учета и отвечает за собственные технические обязанности, защиту данных и иные обязанности, которые нельзя исключить по закону; Платформа не гарантирует исполнение основного договора между Клиентом и поставщиком."
         },
         {
           "type": "h2",
@@ -3412,7 +3504,7 @@
         },
         {
           "type": "p",
-          "text": "Ничто в Legal Pack не ограничивает императивные права потребителя, установленные законодательством Республики Молдова. Если Пользователь является потребителем, обязательные нормы имеют преимущество над противоречащими договорными условиями."
+          "text": "Ни одно положение не ограничивает императивные права потребителя. До подтверждения Клиент должен иметь возможность установить личность поставщика, услугу, полную цену или способ расчета, условия аванса, отмены и переноса и порядок претензии. Императивное право на отказ, средство защиты или возврат не может быть исключено предложением или правилом."
         },
         {
           "type": "h2",
@@ -3428,7 +3520,7 @@
         },
         {
           "type": "p",
-          "text": "EPETRECERE вправе обновлять Общие условия в связи с изменением законодательства, функций, бизнес-процессов или требований безопасности. Существенные изменения доводятся до сведения Пользователей в порядке, соответствующем применимому праву."
+          "text": "Технические, редакционные или благоприятные изменения могут быть сообщены через Платформу и применяться с указанной даты, если они не уменьшают права и не увеличивают обязанности. Коммерческие изменения, ответственность, персональные данные и иные существенные условия публикуются в новой версии и требуют явного электронного принятия. Простое продолжение использования не считается принятием таких изменений."
         },
         {
           "type": "h2",
@@ -3436,7 +3528,11 @@
         },
         {
           "type": "p",
-          "text": "Применяется законодательство Республики Молдова. Стороны стремятся к внесудебному урегулированию, после чего спор рассматривается компетентным судом по правилам применимой подсудности. Права потребителей на обращение в компетентные органы сохраняются."
+          "text": "Применяется законодательство Республики Молдова. Претензия направляется на support@epetrecere.md или legal@epetrecere.md с указанием бронирования, проблемы и требуемого решения. EPETRECERE подтверждает получение, запрашивает только необходимые доказательства и обычно сообщает мотивированное решение в течение 15 рабочих дней; императивные сроки и права сохраняются."
+        },
+        {
+          "type": "p",
+          "text": "Стороны стремятся к мирному урегулированию, а нерешенный спор рассматривается компетентным судом. Права потребителя обратиться в орган защиты потребителей или суд сохраняются."
         },
         {
           "type": "h2",
@@ -3444,7 +3540,7 @@
         },
         {
           "type": "p",
-          "text": "К специальным отношениям дополнительно применяются Partner Agreement, Venue Agreement, Marketplace Rules, Tariffs, Privacy Policy, Cookie Policy, Review Policy, Anti-Fraud Policy и Quality Standards. Специальное соглашение имеет приоритет по специально урегулированному вопросу."
+          "text": "Императивные нормы имеют преимущественную силу. Для Заведений специальное Соглашение с Заведениями преобладает над общим договором по вопросам залов, ресторанов, подтверждения бронирования и фиксированной платы. Для остальных Партнеров преобладают Условия сотрудничества. Тарифы преобладают по расчету, валюте, сроку и перерасчету, специальные политики — по своему предмету; Общие условия дополняют специальные документы."
         },
         {
           "type": "h2",
@@ -3452,13 +3548,13 @@
         },
         {
           "type": "p",
-          "text": "Документ публикуется на румынском, русском и английском языках. Официальной версией является румынский текст; при расхождении переводов преобладает румынский текст. Версия, дата последнего обновления и дата вступления в силу указываются на документе. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.0, действует с 20 июля 2026 г."
+          "text": "Документ опубликован на румынском, русском и английском языках. Официальным и преобладающим является румынский текст. Оператор: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, г. Стрэшень, ул. Михай Эминеску, 64, оф. 6, Республика Молдова; legal@epetrecere.md. Версия 2.0, действует с 11 сентября 2026 года."
         }
       ],
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE GENERAL TERMS AND CONDITIONS Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of that pack within the limits of its subject matter."
+          "text": "EPETRECERE GENERAL TERMS AND CONDITIONS. Document v2.0 in EPETRECERE Legal Pack v2.2. Republic of Moldova. Effective 11 September 2026. Romanian is the official and prevailing text."
         },
         {
           "type": "h2",
@@ -3490,7 +3586,11 @@
         },
         {
           "type": "p",
-          "text": "The User is responsible for keeping the access credentials confidential and must report any suspicion of unauthorised access immediately.  Transferring the account to a third party is prohibited in the absence of a ground permitted by the Platform.  Circumventing the authentication mechanisms is prohibited.  EPETRECERE may temporarily restrict the account in the event of a justified security risk."
+          "text": "The User is responsible for keeping access credentials confidential and must immediately report suspected unauthorized access. An Account may not be transferred without the Operator's consent."
+        },
+        {
+          "type": "p",
+          "text": "The User may correct data, export their own data and request account deletion. Deletion does not automatically erase contractual evidence, financial records or data subject to a legal retention duty; those records are archived with restricted access."
         },
         {
           "type": "h2",
@@ -3506,7 +3606,15 @@
         },
         {
           "type": "p",
-          "text": "Requests are created through the Platform. The receipt of a request does not in itself constitute a Booking. The Booking is confirmed only after the action provided for by the Platform has been taken and the corresponding status has been assigned. The terms of the principal service are agreed between the Client and the Partner or the Venue."
+          "text": "Sending a Request, receiving a supplier response or discussing details in chat does not itself create a Booking. For a Partner other than a Venue, the Booking is concluded when the Client accepts in the Platform the active offer identifying the service, date, price and essential terms and the system assigns Confirmed status. For a Venue, the Booking is concluded only after Client acceptance, subsequent Venue confirmation and assignment of Confirmed Booking status."
+        },
+        {
+          "type": "p",
+          "text": "A deposit, earnest payment or direct payment to a supplier is due only where the accepted offer states the amount, due date, method, refund conditions and recipient. EPETRECERE does not verify payments outside its systems and does not hold the parties' funds."
+        },
+        {
+          "type": "p",
+          "text": "Cancellation or rescheduling is recorded in the Platform with the initiator, reason and date. The consequences for deposits, refunds and work already performed follow the accepted offer, the parties' direct agreement and mandatory law. A supplier must justify and evidence any non-refundable amount; any refund is made without undue delay within the agreed or statutory period."
         },
         {
           "type": "h2",
@@ -3514,7 +3622,7 @@
         },
         {
           "type": "p",
-          "text": "The Platform may provide chat and notifications. Until the stage established by the logic of the service, EPETRECERE may restrict the exchange of direct contact details in respect of a request originating through the Platform. Message history may be retained for the performance of the Booking, for security, for complaints, for fraud prevention and for the protection of legitimate interests, in accordance with the Privacy Policy."
+          "text": "Before confirmation, direct contact details may be masked. After confirmation, they are disclosed only to prepare and perform the Booking, handle complaints and meet legal duties. They may not be reused for marketing, sold or retained after the purpose ends without a separate legal basis."
         },
         {
           "type": "h2",
@@ -3522,7 +3630,7 @@
         },
         {
           "type": "p",
-          "text": "The commercial terms are established by the Tariffs and by the special agreements. The User must be informed of the essential terms before the payment obligation arises. New tariffs do not apply retroactively to obligations that have already arisen, unless the law or an express agreement permits otherwise."
+          "text": "The applicable tariff is the one accepted and in force when the Booking is confirmed. Amount, calculation basis, exchange rate, due date, cancellation and recalculation are governed by the Fees document. A new material commercial condition applies prospectively and only after explicit acceptance."
         },
         {
           "type": "h2",
@@ -3530,7 +3638,7 @@
         },
         {
           "type": "p",
-          "text": "The User is responsible for photographs, videos, texts, logos and other materials and confirms that it holds the necessary rights. The User grants EPETRECERE a non-exclusive right of use to the extent necessary for the operation, display and promotion of the Platform and of the profile."
+          "text": "The User is responsible for photographs, videos, text, logos, guest lists and other materials and confirms the necessary rights and notices. For private-event photographs, the wishes of depicted people must be respected; uploading or publishing a minor's image requires confirmation by a parent or guardian or another lawful basis. Reported content may be hidden immediately pending human review."
         },
         {
           "type": "h2",
@@ -3546,7 +3654,7 @@
         },
         {
           "type": "p",
-          "text": "Processing is carried out in accordance with the Privacy Policy and the applicable legislation. Partners and Venues must use Clients' data only on a legal basis and for permitted purposes."
+          "text": "Processing is governed by the Privacy Policy and applicable law. An organizer entering guest data must inform those guests and provide only necessary data. Partners and Venues use Client data solely for the relevant Request and Booking unless they can demonstrate a separate legal basis of their own."
         },
         {
           "type": "h2",
@@ -3570,7 +3678,11 @@
         },
         {
           "type": "p",
-          "text": "In the event of serious or repeated breaches, EPETRECERE may issue a warning, remove content, restrict functions, temporarily suspend or close the account, having regard to the nature of the risk and to the mandatory requirements of the law."
+          "text": "EPETRECERE may warn, remove content, restrict features, suspend or close an Account for breach, fraud, security risk or non-payment, using a proportionate measure. Except for urgent security measures or legal duties, the User receives the reason and an opportunity to remedy or appeal to support@epetrecere.md."
+        },
+        {
+          "type": "p",
+          "text": "A material restriction based on an automated signal may be challenged. EPETRECERE provides review by an authorized person, an opportunity to submit comments and a reasoned decision."
         },
         {
           "type": "h2",
@@ -3578,7 +3690,7 @@
         },
         {
           "type": "p",
-          "text": "Partners and Venues are independently liable for the lawfulness, quality and performance of the Services. EPETRECERE does not guarantee that the transaction will be concluded and is not liable for non-performance of the principal contract between Users, save for the mandatory liability provided for by law. The Platform may be temporarily unavailable owing to maintenance, updates, security incidents or circumstances beyond the Operator's reasonable control."
+          "text": "The supplier alone is responsible for the legality, price, quality, safety and performance of the service. The Client is responsible for information and obligations undertaken directly. EPETRECERE provides search, communication and record-keeping infrastructure and remains responsible for its own technical, data-protection and other non-excludable duties; it does not guarantee performance of the principal contract between Client and supplier."
         },
         {
           "type": "h2",
@@ -3586,7 +3698,7 @@
         },
         {
           "type": "p",
-          "text": "No provision of the Legal Pack limits the mandatory consumer rights provided for by the legislation of the Republic of Moldova."
+          "text": "Nothing limits mandatory consumer rights. Before confirmation, the Client must be able to identify the supplier, service, total price or calculation method, deposit, cancellation and rescheduling terms and complaint route. A mandatory right of withdrawal, remedy or refund cannot be removed by an offer or rule."
         },
         {
           "type": "h2",
@@ -3602,7 +3714,7 @@
         },
         {
           "type": "p",
-          "text": "EPETRECERE may update the Terms in connection with changes to the law, to the functions, to the commercial processes or to the security requirements. Material changes are communicated in accordance with the applicable law."
+          "text": "Technical, editorial or beneficial changes may be notified through the Platform and take effect on the stated date if they do not reduce rights or increase obligations. Commercial changes, liability, personal data and other material terms are published as a new version and require explicit electronic acceptance. Continued use alone does not constitute acceptance of those changes."
         },
         {
           "type": "h2",
@@ -3610,7 +3722,11 @@
         },
         {
           "type": "p",
-          "text": "The legislation of the Republic of Moldova applies. The Parties shall seek an amicable settlement, and any dispute that is not settled shall be examined by the competent court. Consumers' rights to refer a matter to the competent authorities are preserved."
+          "text": "Moldovan law applies. A complaint may be sent to support@epetrecere.md or legal@epetrecere.md and should identify the Booking, problem and remedy requested. EPETRECERE acknowledges receipt, requests only necessary evidence and normally provides a reasoned outcome within 15 business days; mandatory rights and time limits remain unaffected."
+        },
+        {
+          "type": "p",
+          "text": "The parties seek an amicable solution and unresolved disputes are heard by the competent court. The consumer's right to contact a consumer-protection authority or court remains unaffected."
         },
         {
           "type": "h2",
@@ -3618,7 +3734,7 @@
         },
         {
           "type": "p",
-          "text": "The Partner Agreement, the Venue Agreement, the Marketplace Rules, the Tariffs, the Privacy Policy, the Cookie Policy, the Review Policy, the Anti-Fraud Policy and the Quality Standards apply in addition. The special document prevails in respect of the matter which it specifically regulates."
+          "text": "Mandatory law prevails. For Venues, the Venue Agreement prevails over the common agreement on matters specific to halls, restaurants, Venue confirmation and the fixed fee. For other Partners, the Terms of Cooperation prevail. The Fees document prevails for calculation, currency, due date and recalculation, and special policies for their subject matter; the General Terms supplement special documents."
         },
         {
           "type": "h2",
@@ -3626,14 +3742,14 @@
         },
         {
           "type": "p",
-          "text": "The document is published in Romanian, Russian and English. The Romanian text is the official version; in the event of a discrepancy between the translations, the Romanian text prevails. The version number, the date of the last update and the effective date are displayed in the document. Operator's Details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.0, in force as of 20 July 2026."
+          "text": "The document is published in Romanian, Russian and English. Romanian is the official and prevailing text. Operator: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, Strășeni, 64 Mihai Eminescu Street, office 6, Republic of Moldova; legal@epetrecere.md. Version 2.0, effective 11 September 2026."
         }
       ]
     }
   },
   {
     "slug": "politica-confidentialitate",
-    "version": "1.1",
+    "version": "1.2",
     "order": 4,
     "title": {
       "ro": "Politica de Confidențialitate",
@@ -3644,7 +3760,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE POLITICA DE CONFIDENȚIALITATE PRIVACY POLICY Versiunea 1.1 Republica Moldova Data actualizării: 5 septembrie 2026 Prezentul document face parte din EPETRECERE Legal Pack și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE POLITICA DE CONFIDENȚIALITATE PRIVACY POLICY Versiunea 1.2 Republica Moldova Data actualizării: 11 septembrie 2026 Prezentul document face parte din EPETRECERE Legal Pack și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
         },
         {
           "type": "h2",
@@ -3652,7 +3768,11 @@
         },
         {
           "type": "p",
-          "text": "Prezenta Politică descrie prelucrarea datelor cu caracter personal în cadrul EPETRECERE. Operatorul, în cazurile relevante, este EPETRECERE S.R.L. Politica se aplică Clienților, Partenerilor, reprezentanților Locațiilor, vizitatorilor site-ului, utilizatorilor aplicațiilor și persoanelor care contactează suportul."
+          "text": "Operatorul este Societatea cu Răspundere Limitată «EPETRECERE» (EPETRECERE S.R.L.), IDNO 1026023123354, MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova. Contact pentru date personale: privacy@epetrecere.md. Politica se aplică vizitatorilor, Clienților, Partenerilor, reprezentanților Locațiilor, invitaților și persoanelor fotografiate ori care contactează suportul."
+        },
+        {
+          "type": "p",
+          "text": "Până la 22 august 2026 prelucrarea este evaluată potrivit Legii nr. 133/2011; din 23 august 2026 se aplică Legea nr. 195/2024. Regulamentul (UE) 2016/679 se aplică direct în situațiile prevăzute de domeniul său teritorial."
         },
         {
           "type": "h2",
@@ -3668,7 +3788,7 @@
         },
         {
           "type": "p",
-          "text": " Date de identificare și înregistrare: nume, organizație, IDNO, reprezentant și verificare.  Date de contact: telefon, e-mail și alte date comunicate.  Date ale contului: identificator, statut, setări, autentificări și acțiuni.  Date ale evenimentului: tip, dată, localitate, Locație, invitați, servicii, buget și preferințe.  Date privind solicitările și rezervările: furnizori selectați, statuturi, confirmări, refuzuri, anulări și executare.  Mesaje prin chat și suport.  Date profesionale, portofoliu, fotografii, calendar, prețuri și documente ale Partenerilor și Locațiilor.  Recenzii și evaluări.  Date tehnice: IP, dispozitiv, sistem de operare, browser, identificatori, erori și evenimente de securitate.  Date privind semnarea electronică a documentelor: numele semnatarului, calitatea în care semnează, imaginea semnăturii olografe desenate, adresa IP, șirul user-agent al browserului sau al dispozitivului, data și ora, limba de afișare și amprenta SHA-256 a textului afișat în momentul semnării."
+          "text": "Prelucrăm, după funcția folosită: date de cont și contact; rol și preferințe; date de identificare/KYC ale Partenerilor și Locațiilor, inclusiv IDNO/IDNP, adresă, reprezentant și documente justificative; parametrii evenimentului, ofertă, preț, avans, rezervare, anulare și reclamație; mesaje și atașamente; liste de invitați, RSVP și alergii introduse voluntar; fotografii și metadate tehnice; recenzii; IP, user-agent, identificatori de sesiune, semnale antifraudă, scoruri de risc și jurnale de moderare; precum și numele, semnătura desenată, data, ora și hash-ul documentelor acceptate."
         },
         {
           "type": "h2",
@@ -3676,7 +3796,11 @@
         },
         {
           "type": "p",
-          "text": "Datele pot fi primite direct de la Utilizator, reprezentant, alt participant la comandă, sisteme tehnice, furnizori de infrastructură și surse publice accesibile legal pentru verificare."
+          "text": "Datele provin direct de la persoană, de la reprezentantul său, din utilizarea tehnică a serviciului și, numai când este necesar și permis, din registre publice pentru verificarea furnizorului. Datele invitaților, RSVP și unele fotografii pot fi primite de la organizator sau alți participanți, nu direct de la persoana vizată."
+        },
+        {
+          "type": "p",
+          "text": "Pentru datele primite indirect, informarea este pusă la dispoziție în invitația sau pagina RSVP și cel târziu la prima comunicare, iar în celelalte cazuri într-un termen rezonabil care nu depășește o lună, dacă nu se aplică o excepție legală. Informarea indică sursa, categoriile, scopurile, destinatarii și drepturile."
         },
         {
           "type": "h2",
@@ -3684,7 +3808,35 @@
         },
         {
           "type": "p",
-          "text": " Înregistrarea, autentificarea și administrarea contului.  Verificarea Partenerilor și Locațiilor.  Căutarea, solicitările și rezervările.  Comunicarea și suportul.  Evidența plăților și remunerației de serviciu.  Securitate, prevenirea fraudei și incidente.  Recenzii, ratinguri, reclamații și litigii.  Îndeplinirea obligațiilor legale și protejarea drepturilor.  Analiză și îmbunătățirea Platformei.  Marketing când există temei juridic.  Dovada acceptării documentelor legale: cine a semnat, ce versiune i-a fost afișată, când și de pe ce dispozitiv. Aceste date sunt păstrate exclusiv ca probă a acceptării și pentru apărarea unui drept în instanță."
+          "text": "Cont și autentificare — date de identitate, contact, rol, sesiune și securitate; temei: contract/demersuri precontractuale și interes legitim de securitate; destinatari: Clerk, Supabase și Vercel; retenție: durata contului, iar logurile tehnice conform perioadelor de mai jos."
+        },
+        {
+          "type": "p",
+          "text": "Onboarding și contractare — identitate/KYC, profil, reprezentare, semnătură și dovada acceptării; temei: contract, obligație legală și apărarea drepturilor; destinatari: Supabase, Vercel Blob, Resend și personal autorizat; retenție: termenul legal și de prescripție aplicabil."
+        },
+        {
+          "type": "p",
+          "text": "Planificare, solicitări, rezervări și chat — date despre eveniment, ofertă, preț, status, mesaje și atașamente; temei: contract/demersuri precontractuale și interes legitim pentru reclamații/fraudă; destinatari: părțile rezervării, Supabase, Vercel și Resend; retenție: maximum 36 luni după încheiere, dacă nu există litigiu."
+        },
+        {
+          "type": "p",
+          "text": "Invitați, RSVP și alergii — nume, contact, răspuns, masă, plus-one și alergii furnizate voluntar; temei: executarea funcției cerute de organizator și consimțământ explicit pentru alergii; destinatari: organizatorul, Supabase și Resend; retenție: 90 zile după eveniment."
+        },
+        {
+          "type": "p",
+          "text": "Event Moments — fotografie, legendă opțională, identificator tehnic și raportări; temei: confirmarea activă a drepturilor/consimțământului și contractul organizatorului; destinatari: organizatorul și persoanele cu acces la galeria privată, Vercel Blob și Supabase; retenție: 180 zile după eveniment sau încărcare."
+        },
+        {
+          "type": "p",
+          "text": "Antifraudă, securitate și moderare — IP pseudonimizat, user-agent, evenimente de cont, semnale de abuz, risc, reclamații și decizii; temei: interes legitim și obligații de securitate; destinatari: Supabase, Clerk, Vercel și personal autorizat; retenție: 90 zile pentru semnale obișnuite, separat pe durata incidentului/litigiului când este justificat."
+        },
+        {
+          "type": "p",
+          "text": "AI — promptul și contextul minim necesar; temei: solicitarea utilizatorului și interes legitim pentru funcția cerută; destinatari: OpenAI sau Anthropic; EPETRECERE nu persistă conversația publică pe server, iar furnizorul poate păstra loguri de siguranță până la 30 zile potrivit setărilor contractuale."
+        },
+        {
+          "type": "p",
+          "text": "Analytics și marketing — identificatori și interacțiuni numai după consimțământ pentru categoria opțională; destinatarii și retenția sunt cele afișate în Politica Cookie; retragerea este disponibilă oricând."
         },
         {
           "type": "h2",
@@ -3692,7 +3844,11 @@
         },
         {
           "type": "p",
-          "text": "În funcție de caz, prelucrarea se poate baza pe executarea unui contract sau demersuri precontractuale, obligație legală, interes legitim, consimțământ sau alt temei prevăzut de lege."
+          "text": "Temeiul este indicat pentru fiecare scop mai sus: contract sau demersuri precontractuale, obligație legală, interes legitim evaluat ori consimțământ. Interesul legitim pentru securitate, antifraudă, reclamații și apărarea drepturilor este supus unei evaluări de necesitate și echilibru; persoana poate formula opoziție."
+        },
+        {
+          "type": "p",
+          "text": "Date obligatorii: pentru cont sunt necesare numele, un contact verificabil și rolul; pentru furnizori, identitatea și informațiile/documentele cerute de verificare; pentru rezervare, data, serviciul și datele necesare ofertei. Refuzul poate împiedica crearea contului, aprobarea profilului, transmiterea ofertei sau confirmarea rezervării. Bugetul, alergiile, fotografiile, marketingul și câmpurile marcate opțional nu sunt obligatorii; refuzul limitează doar funcția aferentă."
         },
         {
           "type": "h2",
@@ -3708,7 +3864,11 @@
         },
         {
           "type": "p",
-          "text": "Datele pot fi comunicate furnizorilor de hosting, cloud, e-mail, SMS/OTP, push, plăți, analiză și servicii tehnice, consultanților, auditorilor și autorităților competente atunci când există temei juridic."
+          "text": "Procesatorii activi la data acestei versiuni sunt: Clerk pentru autentificare; Supabase pentru baza de date PostgreSQL; Vercel și Vercel Blob pentru găzduire și fișiere; Resend pentru e-mail; OpenAI și Anthropic pentru funcțiile AI; Google Maps pentru hărțile solicitate. Cloudflare poate procesa date tehnice de rețea și securitate când traficul trece prin serviciile sale. R2, Upstash, Sentry și WhatsApp nu sunt prezentate ca procesatori activi până la activarea lor efectivă și actualizarea prealabilă a Politicii."
+        },
+        {
+          "type": "p",
+          "text": "Furnizorii evenimentului primesc numai datele necesare solicitării sau rezervării; lista nominală completă a invitaților nu le este transmisă. Consultanții, auditorii ori autoritățile primesc date numai în baza unui temei juridic și cu acces limitat."
         },
         {
           "type": "h2",
@@ -3716,7 +3876,11 @@
         },
         {
           "type": "p",
-          "text": "Pentru transferurile în afara Republicii Moldova se aplică mecanismele și garanțiile cerute de lege. Furnizorii tehnici utilizați, în funcție de funcție, includ Clerk, Neon, Vercel și Vercel Blob, Cloudflare și R2, Upstash, Resend, Sentry, OpenAI, Anthropic, Google Maps și Meta. Datele sunt limitate la serviciul necesar, iar lista și garanțiile sunt revizuite la schimbarea infrastructurii."
+          "text": "Baza de date Supabase este configurată în regiunea eu-central-1 (Frankfurt, Germania), iar funcțiile Vercel sunt configurate în fra1 (Frankfurt). Clerk, Vercel Blob, Resend, OpenAI, Anthropic, Google și Cloudflare pot implica acces sau subprocessatori în Spațiul Economic European, Statele Unite și alte state indicate în documentația contractuală curentă a furnizorului."
+        },
+        {
+          "type": "p",
+          "text": "Orice transfer în afara Republicii Moldova are loc numai pe baza unei decizii de adecvare ori a garanțiilor permise de Legea nr. 195/2024, inclusiv clauze contractuale corespunzătoare, împreună cu măsuri tehnice și minimizare. Lista actuală a statelor, mecanismul aplicabil fiecărui furnizor și o copie ori descriere a garanțiilor pot fi solicitate la privacy@epetrecere.md."
         },
         {
           "type": "h2",
@@ -3724,7 +3888,11 @@
         },
         {
           "type": "p",
-          "text": "Datele nu sunt păstrate mai mult decât este necesar, ținând cont de durata relației, comenzi active, cerințe contabile și fiscale, prescripție, litigii și securitate. Ulterior datele sunt șterse, anonimizate sau scoase din prelucrarea activă dacă nu există alt temei."
+          "text": "Listele de invitați, RSVP și alergiile: 90 zile după eveniment. Event Moments: 180 zile după eveniment sau încărcare. Solicitări de contact fără contract: maximum 24 luni. Cereri, rezervări și chat: maximum 36 luni după încheiere, cu suspendare documentată la litigiu. Conversații AI autentificate: 30 zile; conversația publică rămâne local pe dispozitiv până la resetare. Notificări citite: 12 luni, maximum 24 luni. Semnale tehnice de securitate: 90 zile, dacă nu documentează un incident. Preferința cookie: maximum 12 luni."
+        },
+        {
+          "type": "p",
+          "text": "Datele de cont se păstrează până la ștergerea contului. Dovezile contractuale și evidențele financiar-contabile se păstrează pe termenul impus de lege și prescripție, apoi se distrug controlat. Datele eliminate din sistemele active pot rămâne în copii de siguranță pe ciclul contractual al furnizorului, cu obiectiv de maximum 35 zile, fără restabilire în utilizarea curentă."
         },
         {
           "type": "h2",
@@ -3748,7 +3916,11 @@
         },
         {
           "type": "p",
-          "text": " Informare și acces.  Rectificare.  Ștergere și restricționare în cazurile aplicabile.  Opoziție față de anumite prelucrări.  Portabilitate, dacă este aplicabilă.  Retragerea consimțământului fără afectarea prelucrării anterioare legale.  Plângere la autoritatea competentă."
+          "text": "În condițiile legii, persoana are dreptul la informare, acces, rectificare, ștergere, restricționare, opoziție, portabilitate, retragerea consimțământului și contestarea unei decizii exclusiv automatizate. Retragerea nu afectează prelucrarea anterioară legală."
+        },
+        {
+          "type": "p",
+          "text": "Persoana poate depune plângere la Centrul Național pentru Protecția Datelor cu Caracter Personal (CNPDCP), https://datepersonale.md, centru@datepersonale.md, (022) 820 801, MD-2004, mun. Chișinău, str. Serghei Lazo 48, fără a pierde dreptul la alte căi legale."
         },
         {
           "type": "h2",
@@ -3756,7 +3928,7 @@
         },
         {
           "type": "p",
-          "text": "Solicitarea se transmite la adresa publicată pentru protecția datelor. EPETRECERE poate verifica rezonabil identitatea și examinează cererea în termenul legal."
+          "text": "Solicitările se trimit la privacy@epetrecere.md sau prin funcțiile de export și ștergere din Cont. Verificăm identitatea proporțional, confirmăm operațional primirea și răspundem fără întârziere nejustificată, de regulă în cel mult o lună, cu prelungirea permisă și motivată de lege. Căutarea include sistemele active, fișierele, e-mailul și procesatorii relevanți."
         },
         {
           "type": "h2",
@@ -3764,7 +3936,7 @@
         },
         {
           "type": "p",
-          "text": "Sistemele automatizate pot fi utilizate pentru recomandări, sortare, antifraudă și securitate. Dacă va fi introdusă o decizie exclusiv automatizată cu efect juridic sau similar semnificativ, vor fi aplicate garanțiile suplimentare prevăzute de lege."
+          "text": "Folosim automatizări pentru recomandări, sortare, detectarea abuzului și securitate, dar AI nu stabilește prețul, acceptarea contractului sau accesul printr-o decizie exclusiv automată cu efect juridic. Dacă un semnal automat conduce la o restricție semnificativă, persoana poate cere la privacy@epetrecere.md intervenție umană, își poate exprima punctul de vedere și poate contesta rezultatul. Un angajat autorizat verifică dovezile și comunică decizia motivată."
         },
         {
           "type": "h2",
@@ -3788,7 +3960,7 @@
         },
         {
           "type": "p",
-          "text": "Platforma este destinată persoanelor care dispun de capacitatea juridică necesară. EPETRECERE nu urmărește prelucrarea conștientă a datelor copiilor fără temei legal."
+          "text": "Conturile comerciale și contractele sunt destinate persoanelor cu capacitatea juridică necesară. Datele copiilor pot apărea incidental în lista unui eveniment privat ori în fotografii. Organizatorul trebuie să informeze părintele/tutorele și să furnizeze numai datele necesare; alergiile se introduc prin consimțământ explicit. Încărcarea sau publicarea fotografiei unui minor necesită confirmarea adultului cu autoritate ori alt temei legal, iar raportarea ascunde fotografia până la revizuire. Nu folosim imaginile pentru recunoaștere facială, biometrie sau antrenarea modelelor."
         },
         {
           "type": "h2",
@@ -3812,13 +3984,13 @@
         },
         {
           "type": "p",
-          "text": "Utilizatorul poate sesiza autoritatea competentă din Republica Moldova. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.1, actualizată la 5 septembrie 2026. Textul român este versiunea oficială."
+          "text": "Operator: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova. Contact: privacy@epetrecere.md. Autoritate: CNPDCP, https://datepersonale.md, centru@datepersonale.md, (022) 820 801, MD-2004, mun. Chișinău, str. Serghei Lazo 48. Versiunea 1.2, actualizată la 11 septembrie 2026. Textul român prevalează."
         }
       ],
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ PRIVACY POLICY Версия 1.1 Республика Молдова Дата обновления: 5 сентября 2026 г. Настоящий документ является частью EPETRECERE Legal Pack и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE ПОЛИТИКА КОНФИДЕНЦИАЛЬНОСТИ PRIVACY POLICY Версия 1.2 Республика Молдова Дата обновления: 11 сентября 2026 г. Настоящий документ является частью EPETRECERE Legal Pack и применяется совместно с другими документами пакета в пределах своего предмета."
         },
         {
           "type": "h2",
@@ -3826,7 +3998,11 @@
         },
         {
           "type": "p",
-          "text": "Настоящая Политика описывает обработку персональных данных при использовании EPETRECERE. Оператором данных в соответствующих случаях является EPETRECERE S.R.L. Политика применяется к Клиентам, Партнерам, представителям Заведений, посетителям сайта, пользователям приложений и лицам, обращающимся в поддержку."
+          "text": "Оператор: Societatea cu Răspundere Limitată «EPETRECERE» (EPETRECERE S.R.L.), IDNO 1026023123354, MD-3701, г. Стрэшень, ул. Михай Эминеску, 64, оф. 6, Республика Молдова. Контакт по персональным данным: privacy@epetrecere.md. Политика применяется к посетителям, Клиентам, Партнерам, представителям Заведений, гостям и сфотографированным лицам."
+        },
+        {
+          "type": "p",
+          "text": "До 22 августа 2026 года обработка оценивается по Закону № 133/2011; с 23 августа 2026 года применяется Закон № 195/2024. Регламент (ЕС) 2016/679 применяется напрямую в случаях, предусмотренных его территориальной сферой."
         },
         {
           "type": "h2",
@@ -3842,7 +4018,7 @@
         },
         {
           "type": "p",
-          "text": " Регистрационные и идентификационные данные: имя, фамилия, организация, IDNO, сведения представителя и данные верификации.  Контактные данные: телефон, e-mail и иные предоставленные контакты.  Данные аккаунта: идентификатор, статус, настройки, история входов и действий.  Данные мероприятия: тип, дата, населенный пункт, выбранное Заведение, количество гостей, категории услуг, бюджет и пожелания.  Данные заявок и бронирований: выбранные поставщики, статусы, подтверждения, отказы, отмены и история исполнения.  Переписка через встроенный чат и поддержку.  Профессиональные данные Партнеров и Заведений, портфолио, фотографии, календарь, цены и документы проверки.  Отзывы, оценки и сведения, необходимые для проверки права на отзыв.  Технические данные: IP, устройство, ОС, браузер, идентификаторы, журналы ошибок и события безопасности.  Данные об электронном подписании документов: имя подписанта, качество, в котором он подписывает, изображение собственноручной подписи, IP-адрес, строка user-agent браузера или устройства, дата и время, язык отображения и отпечаток SHA-256 текста, показанного в момент подписания."
+          "text": "В зависимости от функции обрабатываются данные учетной записи и контакты; роль и настройки; KYC/идентификация Партнеров и Заведений, включая IDNO/IDNP, адрес, представителя и документы; параметры события, предложение, цена, аванс, бронирование, отмена и претензия; сообщения; списки гостей, RSVP и добровольно указанные аллергии; фотографии; отзывы; IP, user-agent, идентификаторы сессии, антифрод-сигналы, оценки риска и журналы модерации; имя, нарисованная подпись, дата, время и хэш принятых документов."
         },
         {
           "type": "h2",
@@ -3850,7 +4026,11 @@
         },
         {
           "type": "p",
-          "text": "Данные могут поступать непосредственно от Пользователя, его представителя, другого участника заказа, технических систем, поставщиков инфраструктуры и законно доступных публичных источников при верификации."
+          "text": "Данные поступают от самого лица, его представителя, из технического использования сервиса и, когда необходимо и законно, из публичных реестров для проверки поставщика. Данные гостей, RSVP и некоторые фотографии могут поступать от организатора или участников."
+        },
+        {
+          "type": "p",
+          "text": "При косвенном получении уведомление предоставляется в приглашении или RSVP не позднее первого сообщения, а в иных случаях — в разумный срок не более месяца, если не действует законное исключение. Указываются источник, категории, цели, получатели и права."
         },
         {
           "type": "h2",
@@ -3858,7 +4038,35 @@
         },
         {
           "type": "p",
-          "text": " Регистрация, аутентификация и обслуживание аккаунта.  Верификация Партнеров и Заведений.  Поиск, подбор, заявки и бронирования.  Коммуникация между Пользователями и служба поддержки.  Учет платежей и сервисного вознаграждения.  Безопасность, предотвращение мошенничества и расследование инцидентов.  Отзывы, рейтинги, жалобы и разрешение споров.  Исполнение юридических обязанностей и защита прав.  Аналитика и улучшение Платформы.  Маркетинговые коммуникации при наличии правового основания.  Доказательство принятия правовых документов: кто подписал, какая версия была ему показана, когда и с какого устройства. Эти данные хранятся исключительно как доказательство принятия и для защиты права в суде."
+          "text": "Учетная запись и вход — идентификация, контакты, роль, сессия и безопасность; основание: договор/преддоговорные меры и законный интерес безопасности; получатели: Clerk, Supabase, Vercel; срок: срок учетной записи и указанные ниже сроки журналов."
+        },
+        {
+          "type": "p",
+          "text": "Онбординг и договор — идентификация/KYC, профиль, полномочия, подпись и доказательство принятия; основание: договор, юридическая обязанность и защита прав; получатели: Supabase, Vercel Blob, Resend, уполномоченный персонал; срок: применимый срок закона и исковой давности."
+        },
+        {
+          "type": "p",
+          "text": "Планирование, заявки, бронирования и чат — событие, предложение, цена, статус, сообщения и файлы; основание: договор/преддоговорные меры и законный интерес для претензий и антифрода; получатели: стороны, Supabase, Vercel, Resend; срок: максимум 36 месяцев после завершения без спора."
+        },
+        {
+          "type": "p",
+          "text": "Гости, RSVP и аллергии — имя, контакт, ответ, стол, сопровождающий и добровольно сообщенные аллергии; основание: функция организатора и явное согласие для аллергий; получатели: организатор, Supabase, Resend; срок: 90 дней после события."
+        },
+        {
+          "type": "p",
+          "text": "Event Moments — фото, необязательная подпись, технический идентификатор и жалобы; основание: активное подтверждение прав/согласия и договор организатора; получатели: организатор и лица с доступом, Vercel Blob и Supabase; срок: 180 дней."
+        },
+        {
+          "type": "p",
+          "text": "Антифрод, безопасность и модерация — псевдонимизированный IP, user-agent, события учетной записи, сигналы злоупотреблений, риск, претензии и решения; основание: законный интерес и безопасность; получатели: Supabase, Clerk, Vercel и уполномоченный персонал; срок: 90 дней, отдельно на срок инцидента/спора при обосновании."
+        },
+        {
+          "type": "p",
+          "text": "AI — минимальный текст и контекст; основание: запрос пользователя и законный интерес к функции; получатели: OpenAI или Anthropic; публичный чат не сохраняется EPETRECERE на сервере, журналы поставщика — до 30 дней по договорным настройкам."
+        },
+        {
+          "type": "p",
+          "text": "Аналитика и маркетинг — только после согласия с необязательной категорией; получатели и срок указаны в Политике Cookie; согласие можно отозвать."
         },
         {
           "type": "h2",
@@ -3866,7 +4074,11 @@
         },
         {
           "type": "p",
-          "text": "В зависимости от ситуации обработка может основываться на исполнении договора или преддоговорных действиях, юридической обязанности, законном интересе, согласии или ином основании, установленном применимым законодательством."
+          "text": "Для каждой цели выше указано основание: договор/преддоговорные меры, юридическая обязанность, оцененный законный интерес или согласие. Законный интерес безопасности, антифрода, претензий и защиты прав проходит проверку необходимости и баланса; лицо может возражать."
+        },
+        {
+          "type": "p",
+          "text": "Обязательны: для учетной записи — имя, проверяемый контакт и роль; для поставщика — идентификация и документы проверки; для бронирования — дата, услуга и данные для предложения. Отказ может помешать созданию учетной записи, одобрению профиля, предложению или бронированию. Бюджет, аллергии, фото, маркетинг и поля с отметкой «необязательно» не обязательны."
         },
         {
           "type": "h2",
@@ -3882,7 +4094,11 @@
         },
         {
           "type": "p",
-          "text": "Данные могут предоставляться поставщикам хостинга, облачной инфраструктуры, e-mail, SMS/OTP, push-уведомлений, платежей, аналитики и технических сервисов, профессиональным консультантам, аудиторам и компетентным государственным органам при наличии правового основания."
+          "text": "Активные обработчики: Clerk — вход; Supabase — PostgreSQL; Vercel и Vercel Blob — хостинг и файлы; Resend — email; OpenAI и Anthropic — AI; Google Maps — запрошенные карты. Cloudflare может обрабатывать сетевые данные безопасности при прохождении трафика. R2, Upstash, Sentry и WhatsApp не считаются активными до фактического включения и предварительного обновления Политики."
+        },
+        {
+          "type": "p",
+          "text": "Поставщики события получают только необходимые данные заявки/бронирования и не получают полный именной список гостей. Консультанты, аудиторы и органы получают доступ только на законном основании."
         },
         {
           "type": "h2",
@@ -3890,7 +4106,11 @@
         },
         {
           "type": "p",
-          "text": "При передаче данных за пределы Республики Молдова EPETRECERE применяет предусмотренные законом механизмы и гарантии. В зависимости от функции используются Clerk, Neon, Vercel и Vercel Blob, Cloudflare и R2, Upstash, Resend, Sentry, OpenAI, Anthropic, Google Maps и Meta. Передаются только необходимые данные, а перечень и гарантии пересматриваются при изменении инфраструктуры."
+          "text": "Supabase настроен в eu-central-1 (Франкфурт, Германия), функции Vercel — в fra1 (Франкфурт). Clerk, Vercel Blob, Resend, OpenAI, Anthropic, Google и Cloudflare могут включать ЕЭЗ, США и иные страны из актуальной договорной документации и списка субпроцессоров."
+        },
+        {
+          "type": "p",
+          "text": "Передача за пределы Молдовы происходит только на основании решения об адекватности или гарантий Закона № 195/2024, включая договорные положения, технические меры и минимизацию. Актуальный список стран, механизм каждого поставщика и копию/описание гарантий можно запросить по privacy@epetrecere.md."
         },
         {
           "type": "h2",
@@ -3898,7 +4118,11 @@
         },
         {
           "type": "p",
-          "text": "Данные хранятся не дольше необходимого с учетом срока отношений, активных заказов, бухгалтерских и налоговых требований, исковой давности, споров и требований безопасности. После этого данные удаляются, обезличиваются либо выводятся из активной обработки при отсутствии другого основания."
+          "text": "Гости, RSVP и аллергии: 90 дней после события. Event Moments: 180 дней. Контакт без договора: до 24 месяцев. Заявки, бронирования и чат: до 36 месяцев после завершения без спора. Авторизованные AI-чаты: 30 дней; публичный чат локально до сброса. Прочитанные уведомления: 12, максимум 24 месяца. Обычные сигналы безопасности: 90 дней. Cookie-выбор: до 12 месяцев."
+        },
+        {
+          "type": "p",
+          "text": "Учетная запись хранится до удаления. Договорные и финансовые доказательства — установленный законом срок и срок давности, затем контролируемое уничтожение. Удаленные данные могут оставаться в резервных копиях по циклу поставщика с целью не более 35 дней и не возвращаются в обычное использование."
         },
         {
           "type": "h2",
@@ -3922,7 +4146,11 @@
         },
         {
           "type": "p",
-          "text": " Право на информацию и доступ.  Право на исправление неточных данных.  Право на удаление и ограничение в применимых случаях.  Право возражать против определенной обработки.  Право на переносимость, если оно применимо.  Право отозвать согласие без влияния на предыдущую законную обработку.  Право подать жалобу компетентному надзорному органу."
+          "text": "Предусмотрены права на информацию, доступ, исправление, удаление, ограничение, возражение, переносимость, отзыв согласия и оспаривание исключительно автоматического решения. Отзыв не затрагивает законную предыдущую обработку."
+        },
+        {
+          "type": "p",
+          "text": "Жалоба: Национальный центр защиты персональных данных (CNPDCP), https://datepersonale.md, centru@datepersonale.md, (022) 820 801, MD-2004, Кишинев, ул. Сергей Лазо 48."
         },
         {
           "type": "h2",
@@ -3930,7 +4158,7 @@
         },
         {
           "type": "p",
-          "text": "Запрос направляется по опубликованному e-mail по вопросам защиты данных. EPETRECERE вправе разумно удостовериться в личности заявителя и рассматривает запрос в сроки, установленные законом."
+          "text": "Запрос направляется на privacy@epetrecere.md или через экспорт/удаление в учетной записи. Личность проверяется соразмерно; ответ предоставляется без неоправданной задержки, как правило, не позднее одного месяца с разрешенным законом мотивированным продлением. Поиск охватывает активные системы, файлы, email и соответствующих обработчиков."
         },
         {
           "type": "h2",
@@ -3938,7 +4166,7 @@
         },
         {
           "type": "p",
-          "text": "Автоматизированные системы могут использоваться для рекомендаций, сортировки результатов, выявления мошенничества и безопасности. Если будет внедрено исключительно автоматизированное решение с юридическими или аналогично существенными последствиями, применяются дополнительные гарантии, предусмотренные законом."
+          "text": "Автоматизация используется для рекомендаций, сортировки, антифрода и безопасности, но AI не устанавливает цену, не принимает договор и не ограничивает доступ исключительно автоматическим юридически значимым решением. Существенное ограничение можно оспорить по privacy@epetrecere.md, потребовать вмешательства человека, представить мнение и получить мотивированное решение уполномоченного сотрудника."
         },
         {
           "type": "h2",
@@ -3962,7 +4190,7 @@
         },
         {
           "type": "p",
-          "text": "Платформа предназначена для лиц, обладающих необходимой правоспособностью. EPETRECERE не стремится сознательно обрабатывать данные детей без соответствующего правового основания."
+          "text": "Коммерческие учетные записи и договоры предназначены лицам с необходимой дееспособностью. Данные детей могут случайно появляться в частном списке или фотографиях. Организатор информирует родителя/опекуна и предоставляет минимум данных; аллергии требуют явного согласия. Фото несовершеннолетнего загружается/публикуется только с подтверждением уполномоченного взрослого или иным законным основанием; жалоба скрывает фото до проверки. Изображения не используются для распознавания лиц, биометрии или обучения моделей."
         },
         {
           "type": "h2",
@@ -3986,13 +4214,13 @@
         },
         {
           "type": "p",
-          "text": "Пользователь вправе обратиться в компетентный надзорный орган Республики Молдова. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.1, обновлена 5 сентября 2026 г. Официальной версией является румынский текст."
+          "text": "Оператор: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, г. Стрэшень, ул. Михай Эминеску, 64, оф. 6; privacy@epetrecere.md. CNPDCP: https://datepersonale.md, centru@datepersonale.md, (022) 820 801, MD-2004, Кишинев, ул. Сергей Лазо 48. Версия 1.2 от 11 сентября 2026 года. Румынский текст имеет преимущественную силу."
         }
       ],
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE PRIVACY POLICY Version 1.1 Republic of Moldova Updated: 5 September 2026 This document forms part of the EPETRECERE Legal Pack and applies together with the other documents of the pack within the limits of its subject matter."
+          "text": "EPETRECERE PRIVACY POLICY Version 1.2 Republic of Moldova Updated: 11 September 2026 This document forms part of the EPETRECERE Legal Pack and applies together with the other documents of the pack within the limits of its subject matter."
         },
         {
           "type": "h2",
@@ -4000,7 +4228,11 @@
         },
         {
           "type": "p",
-          "text": "This Policy describes the processing of personal data within EPETRECERE. The Operator, in the relevant cases, is EPETRECERE S.R.L. The Policy applies to Clients, Partners, representatives of Venues, visitors to the website, users of the applications and persons who contact support."
+          "text": "Controller: Societatea cu Răspundere Limitată “EPETRECERE” (EPETRECERE S.R.L.), IDNO 1026023123354, MD-3701, Strășeni, 64 Mihai Eminescu Street, office 6, Republic of Moldova. Privacy contact: privacy@epetrecere.md. This Policy applies to visitors, Clients, Partners, Venue representatives, guests and people appearing in photographs."
+        },
+        {
+          "type": "p",
+          "text": "Processing is assessed under Law No. 133/2011 until 22 August 2026 and under Law No. 195/2024 from 23 August 2026. Regulation (EU) 2016/679 applies directly where its territorial scope so provides."
         },
         {
           "type": "h2",
@@ -4016,7 +4248,7 @@
         },
         {
           "type": "p",
-          "text": " Identification and registration data: name, organisation, IDNO, representative and verification.  Contact data: telephone, e-mail and other data communicated.  Account data: identifier, status, settings, authentications and actions.  Event data: type, date, locality, Venue, guests, services, budget and preferences.  Data concerning requests and Bookings: selected providers, statuses, confirmations, refusals, cancellations and performance.  Messages through chat and support.  Professional data, portfolio, photographs, calendar, prices and documents of Partners and Venues.  Reviews and ratings.  Technical data: IP, device, operating system, browser, identifiers, errors and security events.  Data concerning the electronic signing of documents: the name of the signatory, the capacity in which they sign, the image of the handwritten signature, the IP address, the user-agent string of the browser or device, the date and time, the display language and the SHA-256 fingerprint of the text displayed at the moment of signing."
+          "text": "Depending on the feature, we process account and contact data; role and preferences; Partner/Venue identity and KYC data including IDNO/IDNP, address, representative and evidence; event, offer, price, deposit, Booking, cancellation and complaint data; messages; guest lists, RSVP and voluntarily provided allergy data; photographs; reviews; IP, user-agent, session identifiers, anti-fraud signals, risk scores and moderation logs; and the name, drawn signature, time and document hash for legal acceptance."
         },
         {
           "type": "h2",
@@ -4024,7 +4256,11 @@
         },
         {
           "type": "p",
-          "text": "Data may be received directly from the User, from a representative, from another participant in the order, from technical systems, from infrastructure providers and from public sources lawfully accessible for verification."
+          "text": "Data comes from the person, their representative, technical use of the service and, where necessary and lawful, public registers used to verify a supplier. Guest data, RSVP and some photographs may be received from the organizer or other participants rather than from the data subject."
+        },
+        {
+          "type": "p",
+          "text": "For indirectly obtained data, notice is provided in the invitation or RSVP no later than the first communication and otherwise within a reasonable period not exceeding one month unless a statutory exception applies. The notice identifies source, categories, purposes, recipients and rights."
         },
         {
           "type": "h2",
@@ -4032,7 +4268,35 @@
         },
         {
           "type": "p",
-          "text": " Registration, authentication and administration of the account.  Verification of Partners and Venues.  Search, requests and Bookings.  Communication and support.  Recording of payments and of the service remuneration.  Security, fraud prevention and incidents.  Reviews, ratings, complaints and disputes.  Compliance with legal obligations and protection of rights.  Analysis and improvement of the Platform.  Marketing where a legal basis exists.  Proof of acceptance of the legal documents: who signed, which version was displayed to them, when and from which device. This data is kept solely as evidence of the acceptance and for the defence of a legal claim."
+          "text": "Account and authentication — identity, contact, role, session and security data; basis: contract/pre-contract steps and legitimate security interest; recipients: Clerk, Supabase and Vercel; retention: account lifetime and the technical-log periods below."
+        },
+        {
+          "type": "p",
+          "text": "Onboarding and contracting — identity/KYC, profile, authority, signature and acceptance evidence; basis: contract, legal duty and defence of rights; recipients: Supabase, Vercel Blob, Resend and authorized staff; retention: applicable statutory and limitation period."
+        },
+        {
+          "type": "p",
+          "text": "Planning, Requests, Bookings and chat — event, offer, price, status, messages and attachments; basis: contract/pre-contract steps and legitimate interest for complaints/fraud; recipients: Booking parties, Supabase, Vercel and Resend; retention: up to 36 months after closure absent a dispute."
+        },
+        {
+          "type": "p",
+          "text": "Guests, RSVP and allergies — name, contact, response, table, plus-one and voluntarily submitted allergies; basis: organizer-requested function and explicit consent for allergies; recipients: organizer, Supabase and Resend; retention: 90 days after the event."
+        },
+        {
+          "type": "p",
+          "text": "Event Moments — photograph, optional caption, technical identifier and reports; basis: active confirmation of rights/consent and organizer contract; recipients: organizer and people with gallery access, Vercel Blob and Supabase; retention: 180 days."
+        },
+        {
+          "type": "p",
+          "text": "Anti-fraud, security and moderation — pseudonymized IP, user-agent, account events, abuse signals, risk, complaints and decisions; basis: legitimate interest and security duties; recipients: Supabase, Clerk, Vercel and authorized staff; retention: 90 days for ordinary signals, separately for a justified incident/dispute."
+        },
+        {
+          "type": "p",
+          "text": "AI — minimum prompt and context; basis: the user's request and legitimate interest in providing the feature; recipients: OpenAI or Anthropic; EPETRECERE does not persist public chat on its server and provider safety logs may be kept up to 30 days under contractual settings."
+        },
+        {
+          "type": "p",
+          "text": "Analytics and marketing — identifiers and interactions only after consent to an optional category; recipients and retention are stated in the Cookie Policy; consent can be withdrawn."
         },
         {
           "type": "h2",
@@ -4040,7 +4304,11 @@
         },
         {
           "type": "p",
-          "text": "Depending on the case, processing may be based on the performance of a contract or on pre-contractual steps, on a legal obligation, on legitimate interest, on consent or on another basis provided by law."
+          "text": "The basis for each purpose is identified above: contract/pre-contract steps, legal duty, assessed legitimate interest or consent. Legitimate interests in security, anti-fraud, complaints and defence of rights are subject to necessity and balancing assessments; the person may object."
+        },
+        {
+          "type": "p",
+          "text": "Required data: an account needs name, verifiable contact and role; a supplier needs identity and requested verification evidence; a Booking needs date, service and information necessary for the offer. Refusal may prevent account creation, profile approval, an offer or Booking. Budget, allergies, photographs, marketing and fields marked optional are not required; refusal limits only the related feature."
         },
         {
           "type": "h2",
@@ -4056,7 +4324,11 @@
         },
         {
           "type": "p",
-          "text": "Data may be disclosed to providers of hosting, cloud, e-mail, SMS/OTP, push, payment, analytics and technical services, to consultants, to auditors and to the competent authorities where a legal basis exists."
+          "text": "Active processors at this version are Clerk for authentication; Supabase for PostgreSQL; Vercel and Vercel Blob for hosting/files; Resend for email; OpenAI and Anthropic for AI; and Google Maps for requested maps. Cloudflare may process technical network-security data where traffic passes through its services. R2, Upstash, Sentry and WhatsApp are not described as active processors unless actually enabled and this Policy is first updated."
+        },
+        {
+          "type": "p",
+          "text": "Event suppliers receive only data needed for the relevant Request or Booking and never the complete named guest list. Consultants, auditors and authorities receive data only on a legal basis with limited access."
         },
         {
           "type": "h2",
@@ -4064,7 +4336,11 @@
         },
         {
           "type": "p",
-          "text": "Transfers outside the Republic of Moldova use the mechanisms and safeguards required by law. Depending on the feature, technical providers include Clerk, Neon, Vercel and Vercel Blob, Cloudflare and R2, Upstash, Resend, Sentry, OpenAI, Anthropic, Google Maps and Meta. Data is limited to what the service requires, and the list and safeguards are reviewed when infrastructure changes."
+          "text": "Supabase is configured in eu-central-1 (Frankfurt, Germany) and Vercel functions in fra1 (Frankfurt). Clerk, Vercel Blob, Resend, OpenAI, Anthropic, Google and Cloudflare may involve access or subprocessors in the EEA, United States and other countries listed in the provider's current contractual documentation."
+        },
+        {
+          "type": "p",
+          "text": "A transfer outside Moldova occurs only under an adequacy decision or safeguards permitted by Law No. 195/2024, including appropriate contractual clauses, technical measures and minimization. The current countries, mechanism for each provider and a copy or description of safeguards may be requested at privacy@epetrecere.md."
         },
         {
           "type": "h2",
@@ -4072,7 +4348,11 @@
         },
         {
           "type": "p",
-          "text": "Data is not kept for longer than necessary, taking into account the duration of the relationship, active orders, accounting and tax requirements, limitation periods, disputes and security. Thereafter the data is deleted, anonymised or withdrawn from active processing if no other basis exists."
+          "text": "Guest lists, RSVP and allergies: 90 days after the event. Event Moments: 180 days. Non-contract contact enquiries: up to 24 months. Requests, Bookings and chat: up to 36 months after closure absent a dispute. Authenticated AI conversations: 30 days; public chat remains locally until reset. Read notifications: 12 months, maximum 24 months. Ordinary security signals: 90 days. Cookie choice: up to 12 months."
+        },
+        {
+          "type": "p",
+          "text": "Account data is kept until deletion. Contract and financial evidence is kept for the statutory and limitation period, then securely destroyed. Deleted active data may remain in backups for the processor's contractual cycle, with a target maximum of 35 days, and is not restored to ordinary use."
         },
         {
           "type": "h2",
@@ -4096,7 +4376,11 @@
         },
         {
           "type": "p",
-          "text": " Information and access.  Rectification.  Erasure and restriction in the applicable cases.  Objection to certain processing operations.  Portability, where applicable.  Withdrawal of consent, without affecting the lawfulness of prior processing.  Complaint to the competent authority."
+          "text": "Subject to law, a person has rights to information, access, correction, deletion, restriction, objection, portability, withdrawal of consent and challenge of a solely automated decision. Withdrawal does not affect prior lawful processing."
+        },
+        {
+          "type": "p",
+          "text": "A complaint may be filed with the National Centre for Personal Data Protection (CNPDCP), https://datepersonale.md, centru@datepersonale.md, (022) 820 801, MD-2004, Chișinău, 48 Serghei Lazo Street."
         },
         {
           "type": "h2",
@@ -4104,7 +4388,7 @@
         },
         {
           "type": "p",
-          "text": "The request shall be sent to the address published for data protection. EPETRECERE may reasonably verify identity and shall examine the request within the period provided by law."
+          "text": "Requests may be sent to privacy@epetrecere.md or through account export/deletion tools. Identity is verified proportionately; we respond without undue delay, normally within one month, subject to a lawful explained extension. Searches cover active systems, files, email and relevant processors."
         },
         {
           "type": "h2",
@@ -4112,7 +4396,7 @@
         },
         {
           "type": "p",
-          "text": "Automated systems may be used for recommendations, sorting, anti-fraud and security. If a decision based solely on automated processing producing legal effects or similarly significant effects is introduced, the additional safeguards provided by law shall be applied."
+          "text": "Automation supports recommendations, ranking, anti-fraud and security, but AI does not determine price, contract acceptance or access through a solely automated decision with legal effect. A material restriction may be challenged at privacy@epetrecere.md; the person may request human intervention, state their position and receive a reasoned decision from authorized staff."
         },
         {
           "type": "h2",
@@ -4136,7 +4420,7 @@
         },
         {
           "type": "p",
-          "text": "The Platform is intended for persons who have the necessary legal capacity. EPETRECERE does not seek to knowingly process children's data without a legal basis."
+          "text": "Commercial Accounts and contracts require legal capacity. Children's data may incidentally appear in a private-event list or photographs. The organizer must inform the parent/guardian and provide only necessary data; allergies require explicit consent. Uploading or publishing a minor's image requires confirmation from an authorized adult or another lawful basis, and a report hides the photo pending review. Images are not used for facial recognition, biometrics or model training."
         },
         {
           "type": "h2",
@@ -4160,14 +4444,14 @@
         },
         {
           "type": "p",
-          "text": "The User may lodge a complaint with the competent authority of the Republic of Moldova. Operator's details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.1, updated 5 September 2026. The Romanian text is the official version."
+          "text": "Controller: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, Strășeni, 64 Mihai Eminescu Street, office 6; privacy@epetrecere.md. CNPDCP: https://datepersonale.md, centru@datepersonale.md, (022) 820 801, MD-2004, Chișinău, 48 Serghei Lazo Street. Version 1.2, updated 11 September 2026. Romanian prevails."
         }
       ]
     }
   },
   {
     "slug": "politica-cookie",
-    "version": "1.1",
+    "version": "1.2",
     "order": 5,
     "title": {
       "ro": "Politica Cookie",
@@ -4178,7 +4462,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE POLITICA PRIVIND COOKIE-URILE COOKIE POLICY Versiunea 1.1 Republica Moldova Data actualizării: 5 septembrie 2026 Prezentul document face parte din EPETRECERE Legal Pack și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE POLITICA PRIVIND COOKIE-URILE COOKIE POLICY Versiunea 1.2 Republica Moldova Data actualizării: 11 septembrie 2026 Prezentul document face parte din EPETRECERE Legal Pack și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
         },
         {
           "type": "h2",
@@ -4258,7 +4542,35 @@
         },
         {
           "type": "p",
-          "text": "Registrul tehnic actual este publicat la /cookies și include denumirea tehnologiei, furnizorul, categoria, scopul și durata. Registrul se actualizează înainte de activarea unei tehnologii noi."
+          "text": "__session și tokenurile Clerk — Clerk — autentificare și securitatea sesiunii — durata sesiunii — strict necesar."
+        },
+        {
+          "type": "p",
+          "text": "__cf_bm — Cloudflare pe domeniile furnizorilor — protecție împotriva traficului automat — aproximativ 30 minute — strict necesar."
+        },
+        {
+          "type": "p",
+          "text": "ep_consent — EPETRECERE — dovada alegerii din banner — maximum 12 luni — strict necesar."
+        },
+        {
+          "type": "p",
+          "text": "locale — EPETRECERE — limba interfeței — maximum 12 luni — preferință."
+        },
+        {
+          "type": "p",
+          "text": "epetrecere-public-ai-chat în localStorage — EPETRECERE — istoricul local al asistentului — până la resetarea chatului sau ștergerea din browser — necesar funcției solicitate."
+        },
+        {
+          "type": "p",
+          "text": "moments-device-* în localStorage — EPETRECERE — limitarea uploadurilor și ștergerea propriilor fotografii — până la ștergerea din browser; datele serverului maximum 180 zile — necesar funcției solicitate."
+        },
+        {
+          "type": "p",
+          "text": "compare/recent/preferences în localStorage — EPETRECERE — comparații, elemente recente și preferințe UI — până la ștergerea din browser — preferință."
+        },
+        {
+          "type": "p",
+          "text": "Tehnologiile analitice sau de marketing nu sunt activate înainte de consimțământ și se adaugă în acest registru înainte de utilizare."
         },
         {
           "type": "h2",
@@ -4266,13 +4578,17 @@
         },
         {
           "type": "p",
-          "text": "Politica se actualizează la schimbarea legislației, tehnologiilor sau furnizorilor. Data ultimei actualizări se publică în document. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.1, actualizată la 5 septembrie 2026. Textul român este versiunea oficială."
+          "text": "Politica și registrul se actualizează înainte de activarea unei tehnologii ori a unui furnizor nou. O schimbare care extinde categoriile opționale sau scopurile se comunică și solicită un consimțământ nou unde legea îl cere."
+        },
+        {
+          "type": "p",
+          "text": "Operator: EPETRECERE S.R.L., IDNO 1026023123354; privacy@epetrecere.md. Document v1.2 din pachetul juridic v2.2, actualizat la 11 septembrie 2026. Textul român prevalează."
         }
       ],
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ПОЛИТИКА ИСПОЛЬЗОВАНИЯ COOKIE COOKIE POLICY Версия 1.1 Республика Молдова Дата обновления: 5 сентября 2026 г. Настоящий документ является частью EPETRECERE Legal Pack и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE ПОЛИТИКА ИСПОЛЬЗОВАНИЯ COOKIE COOKIE POLICY Версия 1.2 Республика Молдова Дата обновления: 11 сентября 2026 г. Настоящий документ является частью EPETRECERE Legal Pack и применяется совместно с другими документами пакета в пределах своего предмета."
         },
         {
           "type": "h2",
@@ -4352,7 +4668,35 @@
         },
         {
           "type": "p",
-          "text": "Актуальный технический реестр опубликован в основной Политике cookies по адресу /cookies. Он включает название технологии, поставщика, категорию, цель и срок хранения и обновляется при изменении реализации."
+          "text": "__session и токены Clerk — Clerk — вход и безопасность сессии — срок сессии — строго необходимо."
+        },
+        {
+          "type": "p",
+          "text": "__cf_bm — Cloudflare на доменах поставщиков — защита от автоматического трафика — около 30 минут — строго необходимо."
+        },
+        {
+          "type": "p",
+          "text": "ep_consent — EPETRECERE — доказательство выбора в баннере — до 12 месяцев — строго необходимо."
+        },
+        {
+          "type": "p",
+          "text": "locale — EPETRECERE — язык интерфейса — до 12 месяцев — настройка."
+        },
+        {
+          "type": "p",
+          "text": "epetrecere-public-ai-chat в localStorage — EPETRECERE — локальная история помощника — до сброса или удаления в браузере — необходимо запрошенной функции."
+        },
+        {
+          "type": "p",
+          "text": "moments-device-* в localStorage — EPETRECERE — лимиты загрузки и удаление своих фото — до удаления в браузере; серверные данные до 180 дней — необходимо функции."
+        },
+        {
+          "type": "p",
+          "text": "compare/recent/preferences в localStorage — EPETRECERE — сравнения, недавние элементы и UI-настройки — до удаления в браузере — настройка."
+        },
+        {
+          "type": "p",
+          "text": "Аналитические или маркетинговые технологии не активируются до согласия и вносятся в реестр до использования."
         },
         {
           "type": "h2",
@@ -4360,13 +4704,17 @@
         },
         {
           "type": "p",
-          "text": "Политика обновляется при изменении законодательства, технологий или подключенных поставщиков. Дата последнего обновления публикуется в документе. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.1, обновлена 5 сентября 2026 г. Официальной версией является румынский текст."
+          "text": "Политика и реестр обновляются до включения новой технологии или поставщика. Расширение необязательных категорий или целей сообщается и требует нового согласия, когда это предусмотрено законом."
+        },
+        {
+          "type": "p",
+          "text": "Оператор: EPETRECERE S.R.L., IDNO 1026023123354; privacy@epetrecere.md. Документ v1.2 из юридического пакета v2.2, обновлен 11 сентября 2026 года. Румынский текст имеет преимущественную силу."
         }
       ],
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE COOKIE POLICY Version 1.1 Republic of Moldova Updated: 5 September 2026 This document forms part of the EPETRECERE Legal Pack and applies together with the other documents of the pack within the limits of its subject matter."
+          "text": "EPETRECERE COOKIE POLICY Version 1.2 Republic of Moldova Updated: 11 September 2026 This document forms part of the EPETRECERE Legal Pack and applies together with the other documents of the pack within the limits of its subject matter."
         },
         {
           "type": "h2",
@@ -4446,7 +4794,35 @@
         },
         {
           "type": "p",
-          "text": "The current technical register is published at /cookies and lists each technology, provider, category, purpose and duration. The register is updated before a new technology is enabled."
+          "text": "__session and Clerk tokens — Clerk — authentication and session security — session lifetime — strictly necessary."
+        },
+        {
+          "type": "p",
+          "text": "__cf_bm — Cloudflare on provider domains — automated-traffic protection — about 30 minutes — strictly necessary."
+        },
+        {
+          "type": "p",
+          "text": "ep_consent — EPETRECERE — evidence of banner choice — up to 12 months — strictly necessary."
+        },
+        {
+          "type": "p",
+          "text": "locale — EPETRECERE — interface language — up to 12 months — preference."
+        },
+        {
+          "type": "p",
+          "text": "epetrecere-public-ai-chat in localStorage — EPETRECERE — local assistant history — until chat reset or browser deletion — necessary for the requested feature."
+        },
+        {
+          "type": "p",
+          "text": "moments-device-* in localStorage — EPETRECERE — upload limits and deletion of the uploader's photographs — until browser deletion; server data up to 180 days — necessary for the feature."
+        },
+        {
+          "type": "p",
+          "text": "compare/recent/preferences in localStorage — EPETRECERE — comparisons, recent items and UI preferences — until browser deletion — preference."
+        },
+        {
+          "type": "p",
+          "text": "Analytics or marketing technologies are not enabled before consent and are added to this register before use."
         },
         {
           "type": "h2",
@@ -4454,7 +4830,11 @@
         },
         {
           "type": "p",
-          "text": "The Policy shall be updated upon any change of legislation, technologies or providers. The date of the last update shall be published in the document. Operator's Details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.1, updated 5 September 2026. The Romanian text is the official version."
+          "text": "The Policy and register are updated before a new technology or provider is enabled. An expansion of optional categories or purposes is notified and fresh consent is requested where legally required."
+        },
+        {
+          "type": "p",
+          "text": "Controller: EPETRECERE S.R.L., IDNO 1026023123354; privacy@epetrecere.md. Document v1.2 in Legal Pack v2.2, updated 11 September 2026. Romanian prevails."
         }
       ]
     }
@@ -4472,7 +4852,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE REGULILE MARKETPLACE MARKETPLACE RULES Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE REGULILE MARKETPLACE MARKETPLACE RULES Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v2.2 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
         },
         {
           "type": "h2",
@@ -4614,7 +4994,7 @@
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ПРАВИЛА MARKETPLACE MARKETPLACE RULES Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE ПРАВИЛА MARKETPLACE MARKETPLACE RULES Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v2.2 и применяется совместно с другими документами пакета в пределах своего предмета."
         },
         {
           "type": "h2",
@@ -4756,7 +5136,7 @@
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE MARKETPLACE RULES MARKETPLACE RULES Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of the pack, within the limits of its subject matter."
+          "text": "EPETRECERE MARKETPLACE RULES MARKETPLACE RULES Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v2.2 and applies together with the other documents of the pack, within the limits of its subject matter."
         },
         {
           "type": "h2",
@@ -4899,7 +5279,7 @@
   },
   {
     "slug": "tarife",
-    "version": "2.1",
+    "version": "2.2",
     "order": 7,
     "title": {
       "ro": "Tarife",
@@ -4910,7 +5290,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "Tarifele Platformei EPETRECERE. Versiunea 2.1, în vigoare din 4 septembrie 2026. Republica Moldova. Document din pachetul juridic EPETRECERE 2.1. În caz de divergențe între traduceri, prevalează textul român."
+          "text": "Tarifele Platformei EPETRECERE. Versiunea 2.2, în vigoare din 11 septembrie 2026. Republica Moldova. Document din pachetul juridic EPETRECERE 2.2. În caz de divergențe între traduceri, prevalează textul român."
         },
         {
           "type": "h2",
@@ -4977,6 +5357,10 @@
           "text": "Pot fi utilizate transfer bancar, card, furnizor de plăți și alte metode legale implementate efectiv."
         },
         {
+          "type": "p",
+          "text": "Tarifele exprimate în EUR se facturează și se achită în MDL la cursul oficial EUR/MDL publicat de Banca Națională a Moldovei pentru data emiterii facturii. Dacă BNM nu publică un curs pentru acea zi, se utilizează ultimul curs oficial publicat anterior. Factura indică suma în EUR, cursul, data cursului și suma rezultată în MDL."
+        },
+        {
           "type": "h2",
           "text": "9. Impozite"
         },
@@ -4990,7 +5374,31 @@
         },
         {
           "type": "p",
-          "text": "Anularea nu anulează automat remunerația. Recalcularea poate depinde de inițiator, motiv, etapa executării, avans și dovezi. EPETRECERE poate corecta suma dacă evenimentul nu a avut loc și menținerea remunerației ar fi nejustificată."
+          "text": "Recalcularea se face după următoarele scenarii previzibile și pe baza statuturilor și dovezilor din Platformă:"
+        },
+        {
+          "type": "p",
+          "text": "a) Furnizorul sau Locația anulează înaintea executării: remunerația Platformei este 0, iar sumele dintre Client și furnizor se restituie conform ofertei acceptate și legii."
+        },
+        {
+          "type": "p",
+          "text": "b) Clientul anulează înainte ca furnizorul să execute ori să suporte costuri nerecuperabile demonstrate: remunerația Platformei este 0."
+        },
+        {
+          "type": "p",
+          "text": "c) Clientul anulează după servicii pregătitoare executate sau costuri nerecuperabile documentate: remunerația se calculează numai asupra compensației pe care furnizorul are dreptul legal și contractual să o păstreze."
+        },
+        {
+          "type": "p",
+          "text": "d) Evenimentul a avut loc sau solicitarea obținută prin EPETRECERE a fost executată în afara Platformei: remunerația integrală rămâne datorată."
+        },
+        {
+          "type": "p",
+          "text": "e) Forță majoră ori reprogramare acceptată de ambele părți: obligația se transferă la noua dată și nu se dublează; dacă evenimentul este anulat definitiv, se aplică situația dovedită de la lit. a)-c)."
+        },
+        {
+          "type": "p",
+          "text": "f) Caz contestat: suma este marcată provizoriu drept contestată, fără sancțiuni asupra părții contestate până la revizuirea umană. Părțile pot transmite dovezi în 10 zile lucrătoare, iar EPETRECERE comunică o decizie motivată. Normele imperative și drepturile consumatorului prevalează."
         },
         {
           "type": "h2",
@@ -5022,13 +5430,17 @@
         },
         {
           "type": "p",
-          "text": "Tarifele pot fi modificate pentru viitor, cu notificare conform General Terms, fără aplicare retroactivă obligațiilor deja născute, dacă legea sau acordul expres nu permite altfel. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 2.1, în vigoare din 4 septembrie 2026. Textul român este versiunea oficială."
+          "text": "Tarifele se modifică numai pentru viitor și se publică într-o versiune nouă. Modificările comerciale esențiale necesită acceptarea electronică explicită a Partenerului sau Locației și nu afectează retroactiv rezervările deja confirmate. Simpla continuare a utilizării nu constituie acceptare."
+        },
+        {
+          "type": "p",
+          "text": "Operator: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova; legal@epetrecere.md. Versiunea 2.2, în vigoare din 11 septembrie 2026. Textul român prevalează."
         }
       ],
       "ru": [
         {
           "type": "p",
-          "text": "Тарифы Платформы EPETRECERE. Версия 2.1, действует с 4 сентября 2026 года. Республика Молдова. Документ юридического пакета EPETRECERE 2.1. При расхождениях между переводами преимущество имеет румынский текст."
+          "text": "Тарифы Платформы EPETRECERE. Версия 2.2, действует с 11 сентября 2026 года. Республика Молдова. Документ юридического пакета EPETRECERE 2.2. При расхождениях между переводами преимущество имеет румынский текст."
         },
         {
           "type": "h2",
@@ -5092,7 +5504,11 @@
         },
         {
           "type": "p",
-          "text": "Допускаются банковский перевод, карта, платежный провайдер и другие законные способы, фактически внедренные EPETRECERE."
+          "text": "Могут использоваться банковский перевод, карта, платежный провайдер и иные фактически внедренные законные способы."
+        },
+        {
+          "type": "p",
+          "text": "Тарифы в EUR выставляются и оплачиваются в MDL по официальному курсу EUR/MDL Национального банка Молдовы на дату выставления счета. Если в этот день НБМ не публикует курс, используется последний официальный курс, опубликованный ранее. В счете указываются сумма в EUR, курс, дата курса и итоговая сумма в MDL."
         },
         {
           "type": "h2",
@@ -5108,7 +5524,31 @@
         },
         {
           "type": "p",
-          "text": "Отмена Подтвержденного заказа не аннулирует начисление автоматически. Перерасчет может зависеть от инициатора, причины, стадии исполнения, предоплаты и доказательств. EPETRECERE может скорректировать начисление, если заказ объективно не состоялся и сохранение начисления необоснованно."
+          "text": "Перерасчет производится по следующим предсказуемым сценариям на основании статусов и доказательств в Платформе:"
+        },
+        {
+          "type": "p",
+          "text": "a) Поставщик или Заведение отменяет до исполнения: вознаграждение Платформы равно 0, а суммы между Клиентом и поставщиком возвращаются по принятому предложению и закону."
+        },
+        {
+          "type": "p",
+          "text": "b) Клиент отменяет до исполнения или возникновения доказанных невозвратимых расходов: вознаграждение Платформы равно 0."
+        },
+        {
+          "type": "p",
+          "text": "c) Клиент отменяет после выполненной подготовки или документированных невозвратимых расходов: вознаграждение рассчитывается только с компенсации, которую поставщик вправе сохранить по договору и закону."
+        },
+        {
+          "type": "p",
+          "text": "d) Мероприятие состоялось или заявка от EPETRECERE была исполнена вне Платформы: полное вознаграждение сохраняется."
+        },
+        {
+          "type": "p",
+          "text": "e) Форс-мажор или согласованный перенос: обязательство переносится на новую дату и не дублируется; при окончательной отмене применяется доказанный сценарий a)-c)."
+        },
+        {
+          "type": "p",
+          "text": "f) Спор: сумма временно отмечается как оспариваемая без санкций по оспариваемой части до рассмотрения человеком. Стороны могут представить доказательства в течение 10 рабочих дней, после чего EPETRECERE сообщает мотивированное решение. Императивные нормы и права потребителя имеют преимущественную силу."
         },
         {
           "type": "h2",
@@ -5140,13 +5580,17 @@
         },
         {
           "type": "p",
-          "text": "Тарифы могут изменяться на будущее с уведомлением в порядке General Terms и без ретроактивного изменения уже возникших обязательств, если иное не допускается законом или не согласовано сторонами. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 2.1, действует с 4 сентября 2026 года. Официальной версией является румынский текст."
+          "text": "Тарифы изменяются только на будущее и публикуются в новой версии. Существенные коммерческие изменения требуют явного электронного принятия Партнером или Заведением и не применяются к уже подтвержденным бронированиям. Простое продолжение использования не считается принятием."
+        },
+        {
+          "type": "p",
+          "text": "Оператор: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, г. Стрэшень, ул. Михай Эминеску, 64, оф. 6, Республика Молдова; legal@epetrecere.md. Версия 2.2, действует с 11 сентября 2026 года. Румынский текст имеет преимущественную силу."
         }
       ],
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE Platform Fees. Version 2.1, effective 4 September 2026. Republic of Moldova. Part of EPETRECERE Legal Pack 2.1. The Romanian text prevails in the event of a discrepancy between translations."
+          "text": "EPETRECERE Platform Fees. Version 2.2, effective 11 September 2026. Republic of Moldova. Part of EPETRECERE Legal Pack 2.2. The Romanian text prevails in the event of a discrepancy between translations."
         },
         {
           "type": "h2",
@@ -5210,7 +5654,11 @@
         },
         {
           "type": "p",
-          "text": "Bank transfer, card, a payment provider and other lawful methods actually implemented may be used."
+          "text": "Payment may be made by bank transfer, card, payment provider or another lawful method actually implemented."
+        },
+        {
+          "type": "p",
+          "text": "Fees expressed in EUR are invoiced and paid in MDL using the official EUR/MDL exchange rate published by the National Bank of Moldova for the invoice date. If the NBM does not publish a rate for that day, the most recent official rate published beforehand is used. The invoice states the EUR amount, exchange rate, rate date and resulting MDL amount."
         },
         {
           "type": "h2",
@@ -5226,7 +5674,31 @@
         },
         {
           "type": "p",
-          "text": "Cancellation does not automatically cancel the remuneration. Recalculation may depend on the initiating party, the reason, the stage of performance, the advance payment and the evidence. EPETRECERE may correct the amount if the event did not take place and maintaining the remuneration would be unjustified."
+          "text": "Recalculation follows these predictable scenarios based on Platform status records and evidence:"
+        },
+        {
+          "type": "p",
+          "text": "a) The supplier or Venue cancels before performance: the Platform fee is 0 and amounts between Client and supplier are refunded under the accepted offer and law."
+        },
+        {
+          "type": "p",
+          "text": "b) The Client cancels before performance or demonstrated non-recoverable cost: the Platform fee is 0."
+        },
+        {
+          "type": "p",
+          "text": "c) The Client cancels after preparatory work or documented non-recoverable cost: the fee is calculated only on compensation that the supplier is legally and contractually entitled to retain."
+        },
+        {
+          "type": "p",
+          "text": "d) The event took place or an EPETRECERE-sourced request was performed outside the Platform: the full fee remains due."
+        },
+        {
+          "type": "p",
+          "text": "e) Force majeure or an agreed rescheduling: the obligation moves to the new date and is not duplicated; if finally cancelled, the evidenced scenario in a)-c) applies."
+        },
+        {
+          "type": "p",
+          "text": "f) Dispute: the amount is provisionally marked disputed without penalties on the disputed portion pending human review. The parties may submit evidence within 10 business days and EPETRECERE provides a reasoned outcome. Mandatory law and consumer rights prevail."
         },
         {
           "type": "h2",
@@ -5258,7 +5730,11 @@
         },
         {
           "type": "p",
-          "text": "The Tariffs may be amended for the future, with notice in accordance with the General Terms, without retroactive application to obligations that have already arisen, unless the law or an express agreement permits otherwise. Operator's details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 2.1, in force as of 4 September 2026. The Romanian text is the official version."
+          "text": "Fees are changed prospectively only and published as a new version. Material commercial changes require explicit electronic acceptance by the Partner or Venue and do not retroactively affect already confirmed Bookings. Continued use alone does not constitute acceptance."
+        },
+        {
+          "type": "p",
+          "text": "Operator: EPETRECERE S.R.L., IDNO 1026023123354, MD-3701, Strășeni, 64 Mihai Eminescu Street, office 6, Republic of Moldova; legal@epetrecere.md. Version 2.2, effective 11 September 2026. Romanian prevails."
         }
       ]
     }
@@ -5276,7 +5752,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE POLITICA PRIVIND RECENZIILE REVIEW POLICY Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE POLITICA PRIVIND RECENZIILE REVIEW POLICY Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v2.2 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
         },
         {
           "type": "h2",
@@ -5378,7 +5854,7 @@
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ПОЛИТИКА ОТЗЫВОВ REVIEW POLICY Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE ПОЛИТИКА ОТЗЫВОВ REVIEW POLICY Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v2.2 и применяется совместно с другими документами пакета в пределах своего предмета."
         },
         {
           "type": "h2",
@@ -5480,7 +5956,7 @@
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE REVIEW POLICY Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of that pack within the limits of its subject matter."
+          "text": "EPETRECERE REVIEW POLICY Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v2.2 and applies together with the other documents of that pack within the limits of its subject matter."
         },
         {
           "type": "h2",
@@ -5594,7 +6070,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE POLITICA ANTIFRAUDĂ ANTI-FRAUD POLICY Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE POLITICA ANTIFRAUDĂ ANTI-FRAUD POLICY Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v2.2 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
         },
         {
           "type": "h2",
@@ -5720,7 +6196,7 @@
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE ПОЛИТИКА ПРОТИВОДЕЙСТВИЯ МОШЕННИЧЕСТВУ ANTI-FRAUD POLICY Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE ПОЛИТИКА ПРОТИВОДЕЙСТВИЯ МОШЕННИЧЕСТВУ ANTI-FRAUD POLICY Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v2.2 и применяется совместно с другими документами пакета в пределах своего предмета."
         },
         {
           "type": "h2",
@@ -5846,7 +6322,7 @@
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE ANTI-FRAUD POLICY Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of that pack within the limits of its subject matter."
+          "text": "EPETRECERE ANTI-FRAUD POLICY Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v2.2 and applies together with the other documents of that pack within the limits of its subject matter."
         },
         {
           "type": "h2",
@@ -5984,7 +6460,7 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE STANDARDE DE CALITATE QUALITY STANDARDS Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "EPETRECERE STANDARDE DE CALITATE QUALITY STANDARDS Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v2.2 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
         },
         {
           "type": "h2",
@@ -6134,7 +6610,7 @@
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE СТАНДАРТЫ КАЧЕСТВА QUALITY STANDARDS Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "EPETRECERE СТАНДАРТЫ КАЧЕСТВА QUALITY STANDARDS Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v2.2 и применяется совместно с другими документами пакета в пределах своего предмета."
         },
         {
           "type": "h2",
@@ -6284,7 +6760,7 @@
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE QUALITY STANDARDS Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of that pack within the limits of its subject matter."
+          "text": "EPETRECERE QUALITY STANDARDS Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v2.2 and applies together with the other documents of that pack within the limits of its subject matter."
         },
         {
           "type": "h2",
@@ -6435,7 +6911,7 @@
   },
   {
     "slug": "index-legal",
-    "version": "1.0",
+    "version": "2.2",
     "order": 11,
     "title": {
       "ro": "Index Legal",
@@ -6446,47 +6922,15 @@
       "ro": [
         {
           "type": "p",
-          "text": "EPETRECERE REGISTRUL DOCUMENTELOR JURIDICE LEGAL DOCUMENT INDEX Versiunea 1.0 Republica Moldova Data intrării în vigoare: 20 iulie 2026 Prezentul document face parte din EPETRECERE Legal Pack v1.0 și se aplică împreună cu celelalte documente ale pachetului în limitele obiectului său."
+          "text": "REGISTRUL DOCUMENTELOR JURIDICE EPETRECERE. Pachet juridic v2.2, în vigoare din 11 septembrie 2026. Fiecare document are propria versiune; versiunea documentului nu trebuie confundată cu versiunea pachetului."
         },
         {
           "type": "h2",
-          "text": "1. Componența Legal Pack"
+          "text": "1. Componența pachetului"
         },
         {
           "type": "p",
-          "text": "1. General Terms — condițiile generale de utilizare."
-        },
-        {
-          "type": "p",
-          "text": "2. Acordul cu Partenerii — acord separat cu prestatorii."
-        },
-        {
-          "type": "p",
-          "text": "3. Acordul cu Locațiile — acord separat cu restaurantele, sălile și alte spații."
-        },
-        {
-          "type": "p",
-          "text": "4. Privacy Policy — prelucrarea datelor cu caracter personal."
-        },
-        {
-          "type": "p",
-          "text": "5. Cookie Policy — cookies și tehnologii similare."
-        },
-        {
-          "type": "p",
-          "text": "6. Marketplace Rules — regulile marketplace."
-        },
-        {
-          "type": "p",
-          "text": "7. Tariffs — condițiile comerciale."
-        },
-        {
-          "type": "p",
-          "text": "8. Review Policy — recenzii și rating."
-        },
-        {
-          "type": "p",
-          "text": "9. Anti-Fraud Policy — prevenirea și verificarea abuzurilor. 10.Quality Standards — standardele de calitate. 11.Legal Index — prezentul registru."
+          "text": "Acordul comun pentru Parteneri și Locații v2.2; Acordul cu Locațiile v2.2; Termenii Generali v2.0; Politica de Confidențialitate v1.2; Politica Cookie v1.2; Regulile Marketplace v1.0; Tarifele v2.2; Politica de Recenzii v1.0; Politica Anti-Fraudă v1.0; Standardele de Calitate v1.0; prezentul Index v2.2."
         },
         {
           "type": "h2",
@@ -6494,97 +6938,37 @@
         },
         {
           "type": "p",
-          "text": "Normele imperative ale legislației Republicii Moldova prevalează. Pentru o chestiune specială, Acordul cu Partenerii sau Acordul cu Locațiile prevalează față de General Terms; politicile speciale se aplică obiectului lor. Tariffs stabilește condițiile comerciale fără a elimina drepturile imperative."
+          "text": "Normele imperative ale legii prevalează. Pentru Locații, Acordul cu Locațiile prevalează asupra acordului comun și a Termenilor Generali în chestiunile specifice sălilor, restaurantelor, confirmării rezervării și taxei fixe. Pentru ceilalți Parteneri prevalează acordul comun. Tarifele prevalează pentru calcul, monedă, scadență și recalculare; politicile speciale prevalează pentru obiectul lor. Termenii Generali completează documentele speciale."
         },
         {
           "type": "h2",
-          "text": "3. Versiuni"
+          "text": "3. Versiuni, publicare și acceptare"
         },
         {
           "type": "p",
-          "text": "Fiecare document trebuie să aibă număr de versiune, dată de intrare în vigoare și dată de actualizare și să fie arhivat astfel încât versiunea aplicabilă la o anumită dată să poată fi demonstrată."
+          "text": "Documentele aplicabile sunt disponibile înainte de acceptare. Sistemul păstrează versiunea pachetului, versiunea și copia exactă a fiecărui document, data, semnatarul și dovada tehnică. Modificările comerciale, răspunderea, datele personale și alte schimbări esențiale se publică într-o versiune nouă și necesită acceptare explicită; simpla continuare a utilizării nu constituie acceptare."
         },
         {
           "type": "h2",
-          "text": "4. Versiuni lingvistice"
+          "text": "4. Istoric și limbi"
         },
         {
           "type": "p",
-          "text": "Documentele principale sunt publicate în română, rusă și engleză. Textul român este versiunea oficială și prevalează în caz de diferențe între traduceri."
-        },
-        {
-          "type": "h2",
-          "text": "5. Publicare și acceptare"
-        },
-        {
-          "type": "p",
-          "text": "Linkurile către documentele aplicabile trebuie să fie disponibile înainte de acceptarea electronică. Sistemul trebuie să înregistreze versiunea documentului acceptat de Utilizator."
-        },
-        {
-          "type": "h2",
-          "text": "6. Revizuire"
-        },
-        {
-          "type": "p",
-          "text": "Legal Pack se revizuiește la schimbări semnificative ale legislației, modelului comercial, infrastructurii de plată, prelucrării datelor sau fluxurilor utilizatorilor. Datele Operatorului Denumire: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Sediul juridic: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republica Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Versiunea 1.0, în vigoare din 20 iulie 2026. Textul român este versiunea oficială."
+          "text": "Acceptările și copiile vechi rămân arhivate și nu sunt rescrise. Documentele sunt publicate în română, rusă și engleză; textul român este oficial și prevalează. Operator: EPETRECERE S.R.L., IDNO 1026023123354, legal@epetrecere.md."
         }
       ],
       "ru": [
         {
           "type": "p",
-          "text": "EPETRECERE РЕЕСТР ЮРИДИЧЕСКИХ ДОКУМЕНТОВ LEGAL DOCUMENT INDEX Версия 1.0 Республика Молдова Дата вступления в силу: 20 июля 2026 г. Настоящий документ является частью EPETRECERE Legal Pack v1.0 и применяется совместно с другими документами пакета в пределах своего предмета."
+          "text": "РЕЕСТР ЮРИДИЧЕСКИХ ДОКУМЕНТОВ EPETRECERE. Юридический пакет v2.2 действует с 11 сентября 2026 года. Каждый документ имеет собственную версию, которую нельзя смешивать с версией пакета."
         },
         {
           "type": "h2",
-          "text": "1. Состав Legal Pack"
+          "text": "1. Состав пакета"
         },
         {
           "type": "p",
-          "text": "1. General Terms — общие условия использования Платформы."
-        },
-        {
-          "type": "p",
-          "text": "2. Partner Agreement — отдельное соглашение с исполнителями услуг."
-        },
-        {
-          "type": "h2",
-          "text": "3. Venue Agreement — отдельное соглашение с ресторанами, банкетными залами и иными"
-        },
-        {
-          "type": "p",
-          "text": "площадками."
-        },
-        {
-          "type": "p",
-          "text": "4. Privacy Policy — обработка персональных данных."
-        },
-        {
-          "type": "p",
-          "text": "5. Cookie Policy — cookie и аналогичные технологии."
-        },
-        {
-          "type": "p",
-          "text": "6. Marketplace Rules — правила работы marketplace."
-        },
-        {
-          "type": "p",
-          "text": "7. Tariffs — коммерческие условия."
-        },
-        {
-          "type": "p",
-          "text": "8. Review Policy — отзывы и рейтинг."
-        },
-        {
-          "type": "p",
-          "text": "9. Anti-Fraud Policy — предупреждение и расследование злоупотреблений."
-        },
-        {
-          "type": "p",
-          "text": "10. Quality Standards — стандарты качества."
-        },
-        {
-          "type": "p",
-          "text": "11. Legal Index — настоящий реестр."
+          "text": "Общий договор Партнеров и Заведений v2.2; Соглашение с Заведениями v2.2; Общие условия v2.0; Политика конфиденциальности v1.2; Политика Cookie v1.2; Правила Marketplace v1.0; Тарифы v2.2; Политика отзывов v1.0; Антифрод-политика v1.0; Стандарты качества v1.0; настоящий Реестр v2.2."
         },
         {
           "type": "h2",
@@ -6592,125 +6976,61 @@
         },
         {
           "type": "p",
-          "text": "Обязательные нормы законодательства Республики Молдова имеют приоритет. По специально урегулированному вопросу соответствующий Partner Agreement или Venue Agreement имеет приоритет над General Terms; специальные политики применяются по своему предмету. Tariffs определяет коммерческие условия, но не отменяет обязательные права Пользователей."
+          "text": "Императивные нормы закона преобладают. Для Заведений специальное Соглашение с Заведениями преобладает над общим договором и Общими условиями по вопросам залов, ресторанов, подтверждения бронирования и фиксированной платы. Для остальных Партнеров преобладает общий договор. Тарифы преобладают по расчету, валюте, сроку и перерасчету; специальные политики — по своему предмету. Общие условия дополняют специальные документы."
         },
         {
           "type": "h2",
-          "text": "3. Версионность"
+          "text": "3. Версии, публикация и принятие"
         },
         {
           "type": "p",
-          "text": "Каждый документ должен иметь номер версии, дату вступления в силу, дату последнего обновления и храниться таким образом, чтобы можно было установить редакцию, действовавшую на конкретную дату."
+          "text": "Применимые документы доступны до принятия. Система хранит версию пакета, версию и точную копию каждого документа, дату, подписанта и техническое доказательство. Коммерческие изменения, ответственность, персональные данные и иные существенные изменения публикуются в новой версии и требуют явного принятия; простое продолжение использования не считается принятием."
         },
         {
           "type": "h2",
-          "text": "4. Языковые версии"
+          "text": "4. История и языки"
         },
         {
           "type": "p",
-          "text": "Все основные документы публикуются на румынском, русском и английском языках. При расхождениях преимущественную силу имеет румынская версия, если обязательное законодательство не требует иного."
-        },
-        {
-          "type": "h2",
-          "text": "5. Публикация и акцепт"
-        },
-        {
-          "type": "p",
-          "text": "Ссылки на применимые документы должны быть доступны Пользователю до электронного акцепта. Система должна фиксировать версию документа, принятую Пользователем."
-        },
-        {
-          "type": "h2",
-          "text": "6. Пересмотр"
-        },
-        {
-          "type": "p",
-          "text": "Legal Pack пересматривается при существенном изменении законодательства, бизнес- модели, платежной инфраструктуры, обработки данных или пользовательских сценариев. Реквизиты Оператора Наименование: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Юридический адрес: MD-3701, г. Стрэшень, ул. Михай Еминеску, 64, оф. 6, Республика Молдова E-mail: legal@epetrecere.md Веб-сайт: epetrecere.md Версия 1.0, действует с 20 июля 2026 г. Официальной версией является румынский текст."
+          "text": "Старые принятия и копии сохраняются и не переписываются. Документы публикуются на румынском, русском и английском; румынский текст официальный и преобладает. Оператор: EPETRECERE S.R.L., IDNO 1026023123354, legal@epetrecere.md."
         }
       ],
       "en": [
         {
           "type": "p",
-          "text": "EPETRECERE REGISTER OF LEGAL DOCUMENTS LEGAL DOCUMENT INDEX Version 1.0 Republic of Moldova Effective date: 20 July 2026 This document forms part of the EPETRECERE Legal Pack v1.0 and applies together with the other documents of the pack within the limits of its subject matter."
+          "text": "EPETRECERE LEGAL DOCUMENT REGISTER. Legal Pack v2.2, effective 11 September 2026. Each document has its own version, which must not be confused with the pack version."
         },
         {
           "type": "h2",
-          "text": "1. Composition of the Legal Pack"
+          "text": "1. Pack Contents"
         },
         {
           "type": "p",
-          "text": "1. General Terms — the general terms of use."
-        },
-        {
-          "type": "p",
-          "text": "2. Partner Agreement — a separate agreement with service providers."
-        },
-        {
-          "type": "p",
-          "text": "3. Venue Agreement — a separate agreement with restaurants, event halls and other spaces."
-        },
-        {
-          "type": "p",
-          "text": "4. Privacy Policy — the processing of personal data."
-        },
-        {
-          "type": "p",
-          "text": "5. Cookie Policy — cookies and similar technologies."
-        },
-        {
-          "type": "p",
-          "text": "6. Marketplace Rules — the marketplace rules."
-        },
-        {
-          "type": "p",
-          "text": "7. Tariffs — the commercial terms."
-        },
-        {
-          "type": "p",
-          "text": "8. Review Policy — reviews and ratings."
-        },
-        {
-          "type": "p",
-          "text": "9. Anti-Fraud Policy — the prevention and verification of abuse. 10.Quality Standards — the quality standards. 11.Legal Index — this register."
+          "text": "Common Partner and Venue Agreement v2.2; Venue Agreement v2.2; General Terms v2.0; Privacy Policy v1.2; Cookie Policy v1.2; Marketplace Rules v1.0; Fees v2.2; Review Policy v1.0; Anti-Fraud Policy v1.0; Quality Standards v1.0; this Register v2.2."
         },
         {
           "type": "h2",
-          "text": "2. Precedence of the Documents"
+          "text": "2. Precedence"
         },
         {
           "type": "p",
-          "text": "The mandatory provisions of the legislation of the Republic of Moldova shall prevail. For a particular matter, the Partner Agreement or the Venue Agreement shall prevail over the General Terms; the special policies apply to their own subject matter. The Tariffs establish the commercial terms without excluding mandatory rights."
+          "text": "Mandatory law prevails. For Venues, the Venue Agreement prevails over the common agreement and General Terms on matters specific to halls, restaurants, Venue confirmation and the fixed fee. For other Partners, the common agreement prevails. The Fees document prevails for calculation, currency, due date and recalculation; special policies prevail for their subject matter. The General Terms supplement special documents."
         },
         {
           "type": "h2",
-          "text": "3. Versions"
+          "text": "3. Versions, Publication and Acceptance"
         },
         {
           "type": "p",
-          "text": "Each document must bear a version number, an effective date and an update date, and must be archived in such a manner that the version applicable on a given date can be demonstrated."
+          "text": "Applicable documents are available before acceptance. The system stores the pack version, version and exact copy of each document, date, signatory and technical evidence. Commercial terms, liability, personal data and other material changes are published as a new version and require explicit acceptance; continued use alone is not acceptance."
         },
         {
           "type": "h2",
-          "text": "4. Language Versions"
+          "text": "4. History and Languages"
         },
         {
           "type": "p",
-          "text": "The principal documents are published in Romanian, Russian and English. The Romanian text is the official version and prevails if translations differ."
-        },
-        {
-          "type": "h2",
-          "text": "5. Publication and Acceptance"
-        },
-        {
-          "type": "p",
-          "text": "Links to the applicable documents must be available before electronic acceptance. The system must record the version of the document accepted by the User."
-        },
-        {
-          "type": "h2",
-          "text": "6. Review"
-        },
-        {
-          "type": "p",
-          "text": "The Legal Pack shall be reviewed upon significant changes to the legislation, the commercial model, the payment infrastructure, the processing of data or the user flows. Operator details Name: Societatea cu Răspundere Limitată „EPETRECERE” (EPETRECERE S.R.L.) IDNO: 1026023123354 Registered office: MD-3701, or. Strășeni, str. Mihai Eminescu 64, of. 6, Republic of Moldova E-mail: legal@epetrecere.md Website: epetrecere.md Version 1.0, in force from 20 July 2026. The Romanian text is the official version."
+          "text": "Earlier acceptances and copies remain archived and are not overwritten. Documents are published in Romanian, Russian and English; Romanian is official and prevails. Operator: EPETRECERE S.R.L., IDNO 1026023123354, legal@epetrecere.md."
         }
       ]
     }

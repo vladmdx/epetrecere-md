@@ -1,0 +1,93 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { test } from "node:test";
+import {
+  LEGAL_PACK_VERSION,
+  getLegalDocument,
+  legalBlocks,
+} from "../src/lib/legal";
+
+function text(slug: string, locale: "ro" | "ru" | "en" = "ro") {
+  const document = getLegalDocument(slug);
+  assert.ok(document, `missing ${slug}`);
+  return legalBlocks(document, locale).map((block) => block.text).join("\n");
+}
+
+test("legal pack 2.2 separates pack and document versions", () => {
+  assert.equal(LEGAL_PACK_VERSION, "2.2");
+  assert.equal(getLegalDocument("acord-parteneri")?.version, "2.2");
+  assert.equal(getLegalDocument("acord-locatii")?.version, "2.2");
+  assert.equal(getLegalDocument("termeni-generali")?.version, "2.0");
+  assert.equal(getLegalDocument("politica-confidentialitate")?.version, "1.2");
+  assert.equal(getLegalDocument("politica-cookie")?.version, "1.2");
+  assert.equal(getLegalDocument("tarife")?.version, "2.2");
+  assert.equal(getLegalDocument("index-legal")?.version, "2.2");
+
+  const source = readFileSync("src/content/legal/documents.json", "utf8");
+  assert.doesNotMatch(source, /Legal Pack v(?:1\.0|2\.0|2\.1)/);
+});
+
+test("general terms define booking, cancellation, complaints and explicit reacceptance", () => {
+  const terms = text("termeni-generali");
+  assert.match(terms, /statutul «Confirmată»/);
+  assert.match(terms, /avans, arvună/);
+  assert.match(terms, /support@epetrecere\.md/);
+  assert.match(terms, /Simpla continuare/);
+  assert.match(terms, /revizuire de către o persoană autorizată/);
+  assert.match(terms, /drepturile imperative ale consumatorului/i);
+});
+
+test("venue precedence, transition date and fee rules are deterministic", () => {
+  const venue = text("acord-locatii");
+  const fees = text("tarife");
+  assert.match(venue, /Până la 22 august 2026/);
+  assert.doesNotMatch(venue, /Până la 23 august 2026/);
+  assert.match(venue, /prevalează față de Condițiile de colaborare/);
+  assert.match(fees, /cursul oficial EUR\/MDL publicat de Banca Națională a Moldovei/);
+  assert.match(fees, /a\) Furnizorul sau Locația anulează/);
+  assert.match(fees, /f\) Caz contestat/);
+  assert.match(fees, /Simpla continuare a utilizării nu constituie acceptare/);
+});
+
+test("privacy notice reflects production and covers indirect data and human review", () => {
+  const privacy = text("politica-confidentialitate");
+  assert.match(privacy, /Supabase este configurată în regiunea eu-central-1/);
+  assert.match(privacy, /nu depășește o lună/);
+  assert.match(privacy, /Date obligatorii/);
+  assert.match(privacy, /scoruri de risc și jurnale de moderare/);
+  assert.match(privacy, /intervenție umană/);
+  assert.match(privacy, /centru@datepersonale\.md/);
+  assert.match(privacy, /fotografiei unui minor/);
+  assert.match(privacy, /R2, Upstash, Sentry și WhatsApp nu sunt prezentate ca procesatori activi/);
+});
+
+test("canonical policy pages render the same versioned source used for signatures", () => {
+  for (const path of [
+    "src/app/[locale]/(public)/termeni/page.tsx",
+    "src/app/[locale]/(public)/confidentialitate/page.tsx",
+    "src/app/[locale]/(public)/cookies/page.tsx",
+  ]) {
+    const source = readFileSync(path, "utf8");
+    assert.match(source, /getLegalDocument\(SLUG\)/);
+    assert.match(source, /LegalDocumentView/);
+    assert.doesNotMatch(source, /const copy\s*=/);
+  }
+});
+
+test("artist portfolio is not mislabeled as verified customer content", () => {
+  const source = readFileSync(
+    "src/app/[locale]/(public)/artisti/[slug]/client.tsx",
+    "utf8",
+  );
+  assert.match(source, /source: "portfolio" as const/);
+  assert.match(source, /source: "ugc" as const/);
+  assert.match(source, /moment\.source === "ugc"/);
+  assert.match(source, /pkg\.price !== 0/);
+  assert.match(source, /formatDuration\(pkg\.durationMinutes\)/);
+  assert.doesNotMatch(source, /\.\.\.\(profilePhotoUrl \? \[profilePhotoUrl\]/);
+
+  const ro = readFileSync("src/i18n/ro.json", "utf8");
+  assert.match(ro, /"portfolioBadge": "Portofoliu"/);
+  assert.match(ro, /"radius50Sub": "Zona extinsă"/);
+  assert.doesNotMatch(ro, /Județul extins/);
+});

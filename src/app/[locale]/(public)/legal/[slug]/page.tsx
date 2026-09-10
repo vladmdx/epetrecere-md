@@ -2,7 +2,12 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { generateMeta } from "@/lib/seo/generate-meta";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
-import { LEGAL_DOCUMENTS, getLegalDocument, legalTitle } from "@/lib/legal";
+import {
+  LEGAL_DOCUMENTS,
+  LEGAL_PACK_VERSION,
+  getLegalDocument,
+  legalTitle,
+} from "@/lib/legal";
 import { LegalDocumentView } from "./view";
 
 export function generateStaticParams() {
@@ -35,9 +40,9 @@ export async function generateMetadata({
   // legally prevails. Only the sentence around the title is written here.
   const title = legalTitle(doc, locale);
   const description = {
-    ro: `${title} — EPETRECERE Legal Pack v${doc.version}. Textul oficial al documentului.`,
-    ru: `${title} — EPETRECERE Legal Pack v${doc.version}. Официальный текст документа.`,
-    en: `${title} — EPETRECERE Legal Pack v${doc.version}. The official document text.`,
+    ro: `${title} — pachet juridic v${LEGAL_PACK_VERSION}, document v${doc.version}. Textul oficial al documentului.`,
+    ru: `${title} — юридический пакет v${LEGAL_PACK_VERSION}, документ v${doc.version}. Официальный текст документа.`,
+    en: `${title} — Legal Pack v${LEGAL_PACK_VERSION}, document v${doc.version}. The official document text.`,
   }[locale];
   return generateMeta({
     title,

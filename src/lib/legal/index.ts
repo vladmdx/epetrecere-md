@@ -26,12 +26,13 @@ export const LEGAL_DOCUMENTS = raw as unknown as LegalDocument[];
 /**
  * Current pack version, shown next to acceptance records.
  *
- * Version 2.1 records the owner's 2026-09-04 decision: 50 EUR for other
- * venue events at all guest counts, payment in 30 calendar days, no added
- * VAT because the operator is not registered as a VAT payer.
+ * Version 2.2, effective 2026-09-11, unifies the public and signed legal
+ * sources, adds explicit acceptance for material amendments, clarifies
+ * booking/cancellation rules, fixes venue-document precedence and the legal
+ * transition date, and records currency, privacy and human-review details.
  * Historical signatures retain their original version and exact snapshot.
  */
-export const LEGAL_PACK_VERSION = "2.1";
+export const LEGAL_PACK_VERSION = "2.2";
 
 export function getLegalDocument(slug: string): LegalDocument | null {
   return LEGAL_DOCUMENTS.find((d) => d.slug === slug) ?? null;

@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "@/components/shared/locale-link";
+import { CookieSettingsButton } from "@/components/shared/cookie-consent";
 import { useLocale } from "@/hooks/use-locale";
-import { legalBlocks, legalTitle, type LegalDocument } from "@/lib/legal";
+import {
+  LEGAL_PACK_VERSION,
+  legalBlocks,
+  legalTitle,
+  type LegalDocument,
+} from "@/lib/legal";
 
 /**
  * Renders the published language, or explicitly identifies the Romanian
@@ -36,7 +42,11 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
 
       <h1 className="font-heading text-3xl font-bold md:text-4xl">{title}</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        EPETRECERE Legal Pack v{doc.version}
+        {locale === "ru"
+          ? `Юридический пакет v${LEGAL_PACK_VERSION} · Документ v${doc.version}`
+          : locale === "en"
+            ? `Legal Pack v${LEGAL_PACK_VERSION} · Document v${doc.version}`
+            : `Pachet juridic v${LEGAL_PACK_VERSION} · Document v${doc.version}`}
         {isTranslation && prevailingNote}
       </p>
       {isRomanianFallback && <p className="mt-2 text-sm text-muted-foreground">
@@ -61,6 +71,12 @@ export function LegalDocumentView({ doc }: { doc: LegalDocument }) {
           ),
         )}
       </article>
+
+      {doc.slug === "politica-cookie" && (
+        <div className="mt-8">
+          <CookieSettingsButton />
+        </div>
+      )}
 
       <div className="mt-10 border-t border-border/60 pt-6 text-xs text-muted-foreground">
         <Link href="/legal" className="hover:text-gold">

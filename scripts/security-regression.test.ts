@@ -122,8 +122,10 @@ test("all event-picker images have different contents",()=>{
 
 test("published tariffs and pricing in all three languages match the approved terms",()=>{
   const docs=JSON.parse(readFileSync("src/content/legal/documents.json","utf8"));
-  assert.equal(LEGAL_PACK_VERSION,"2.1");
-  for(const slug of ["acord-parteneri","acord-locatii","tarife"]) assert.equal(getLegalDocument(slug)?.version,"2.1");
+  assert.equal(LEGAL_PACK_VERSION,"2.2");
+  for(const slug of ["acord-parteneri","acord-locatii","tarife"]) assert.equal(getLegalDocument(slug)?.version,"2.2");
+  assert.equal(getLegalDocument("termeni-generali")?.version,"2.0");
+  assert.equal(getLegalDocument("politica-confidentialitate")?.version,"1.2");
   for(const locale of ["ro","ru","en"]) {
     const tariffs=docs.find((d:{slug:string})=>d.slug==="tarife").blocks[locale].map((b:{text:string})=>b.text).join("\n");
     assert.ok(tariffs.includes("30"));

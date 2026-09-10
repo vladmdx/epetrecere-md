@@ -6,7 +6,7 @@ Canal: privacy@epetrecere.md. Termen operațional intern: confirmare în 3 zile 
 
 1. Înregistrează data, solicitantul, dreptul invocat și sistemele probabile.
 2. Verifică identitatea proporțional, fără a cere mai multe date decât sunt necesare.
-3. Caută în Clerk, Neon, Blob/R2, email, loguri și furnizorii relevanți din registru.
+3. Caută în Clerk, Supabase, Vercel Blob, email, loguri și furnizorii relevanți din registru.
 4. Separă datele altor persoane și obligațiile de păstrare.
 5. Execută accesul, rectificarea, ștergerea, restricția, opoziția sau exportul.
 6. Verifică rezultatul în sistemul activ și transmite instrucțiuni procesatorilor dacă este necesar.
@@ -26,6 +26,16 @@ Canal intern: administrator și privacy@epetrecere.md. Cronometrul începe la mo
 6. Înregistrează cauza, efectul, decizia, notificările, remedierea și lecțiile învățate inclusiv când nu s-a notificat.
 
 Registrul incidentelor minim: ID, detectare, constatare, sisteme, categorii, volum, risc, decizie, notificare autoritate/persoane, măsuri, închidere, proprietar.
+
+## Revizuirea umană a restricțiilor automate
+
+Canal: privacy@epetrecere.md sau support@epetrecere.md. O restricție de cont, ascundere de profil ori măsură comercială bazată pe un semnal automat se marchează în jurnal cu semnalul, regula, datele folosite și consecința.
+
+1. Persoana primește motivul într-un limbaj clar, cu excepția informațiilor a căror divulgare ar compromite securitatea sau o obligație legală.
+2. Persoana poate prezenta explicații și dovezi și poate cere intervenția unei persoane autorizate.
+3. Revizorul verifică independent datele, proporționalitatea și alternativele mai puțin restrictive; rezultatul automat nu este tratat drept dovadă definitivă.
+4. Decizia motivată, autorul, data și remediul se înregistrează. O eroare corectată actualizează profilul/contul și regula tehnică relevantă.
+5. Restricțiile urgente de securitate pot rămâne provizoriu active, dar intră în revizuire fără întârziere nejustificată.
 
 ## Evaluarea necesității unui DPO
 

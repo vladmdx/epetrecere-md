@@ -143,13 +143,13 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
   // what made "Galerie" count one photo short of what the page displays.
   const portfolio = artist.images;
   const profilePhotoUrl = artist.coverUrl;
-  const allMoments = Array.from(
-    new Set([
-      ...(profilePhotoUrl ? [profilePhotoUrl] : []),
-      ...portfolio.map((image) => image.url),
-      ...ugcPhotos.map((image) => image.url),
-    ]),
-  ).filter(Boolean);
+  const allMoments = [
+    ...portfolio.map((image) => ({ url: image.url, source: "portfolio" as const })),
+    ...ugcPhotos.map((image) => ({ url: image.url, source: "ugc" as const })),
+  ].filter(
+    (item, index, items) =>
+      Boolean(item.url) && items.findIndex((candidate) => candidate.url === item.url) === index,
+  );
   // Counted in full, shown truncated — the label used to print the length of
   // the already-sliced array, so 20 photos advertised as "6 fotografii".
   const momentImages = allMoments.slice(0, 6);
@@ -170,7 +170,7 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
     .sort((a, b) => (a.price ?? 0) - (b.price ?? 0));
 
   const hourlyPackages = artist.packages.filter(
-    (pkg) => pkg.pricingMode !== "per_event",
+    (pkg) => pkg.pricingMode !== "per_event" && pkg.price !== 0,
   );
 
   const profilePackages = hourlyPackages.length
@@ -179,7 +179,8 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
         name: getLocalized(pkg, "name", locale),
         description: getLocalized(pkg, "description", locale),
         price: pkg.price,
-        durationHours: pkg.durationHours,
+        durationMinutes:
+          (pkg.durationHours ?? 0) * 60 + (pkg.durationMinutes ?? 0),
         isReal: true,
       }))
     : [];
@@ -443,9 +444,11 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
                               {pkg.price}€
                             </span>
                           )}
-                          {pkg.durationHours && (
+                          {(pkg.durationHours || pkg.durationMinutes) && (
                             <span className="text-xs text-muted-foreground">
-                              {pkg.durationHours} {t("artist.duration_hours")}
+                              {formatDuration(
+                                (pkg.durationHours ?? 0) * 60 + (pkg.durationMinutes ?? 0),
+                              )}
                             </span>
                           )}
                         </div>
@@ -568,23 +571,26 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
               className="mt-5 grid auto-rows-[190px] gap-3 sm:grid-cols-2 lg:grid-cols-3"
               onClickCapture={() => trackClick("artist", artist.id, "gallery")}
             >
-              {momentImages.map((url, index) => (
+              {momentImages.map((moment, index) => (
                 <a
-                  key={url}
-                  href={url}
+                  key={moment.url}
+                  href={moment.url}
                   target="_blank"
                   rel="noreferrer"
                   className={`group relative overflow-hidden rounded-xl border border-white/10 ${index === 0 ? "sm:row-span-2" : ""}`}
                 >
                   <img
-                    src={url}
+                    src={moment.url}
                     alt={t("artist.profile.momentAlt", { name, index: index + 1 })}
                     loading="lazy"
                     className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent opacity-70" />
                   <span className="absolute bottom-3 left-3 inline-flex items-center gap-1.5 text-[10px] text-white/72">
-                    <Camera className="h-3 w-3 text-[#e6b84d]" /> {t("artist.profile.realMomentBadge")}
+                    <Camera className="h-3 w-3 text-[#e6b84d]" />
+                    {moment.source === "ugc"
+                      ? t("artist.profile.realMomentBadge")
+                      : t("artist.profile.portfolioBadge")}
                   </span>
                 </a>
               ))}
@@ -667,48 +673,55 @@ export function ArtistDetailClient({ artist: initialArtist, similar, ugcPhotos =
             </section>
           )}
 
-          <section id="pachete" className="mt-10 scroll-mt-24">
-            <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("artist.profile.packagesEyebrow")}</p>
-            <h2 className="mt-2 font-heading text-2xl font-semibold">{t("artist.profile.packagesTitle")}</h2>
-            <div className="mt-5 grid gap-3 md:grid-cols-3">
-              {profilePackages.map((pkg, index) => (
-                <article
-                  key={pkg.id}
-                  className={`relative flex flex-col rounded-xl border bg-[linear-gradient(180deg,#111722,#0b1018)] p-5 ${
-                    index === 1
-                      ? "border-[#e6b84d]/60 shadow-[0_14px_35px_rgba(230,184,77,.08)]"
-                      : "border-white/10"
-                  }`}
-                >
-                  {index === 1 && (
-                    <span className="absolute right-4 top-4 rounded-full bg-[#e6b84d] px-2.5 py-1 text-[9px] font-bold text-[#07101d]">
-                      {t("artist.profile.recommendedBadge")}
-                    </span>
-                  )}
-                  <Sparkles className="h-5 w-5 text-[#e6b84d]" />
-                  <h3 className="mt-4 font-heading text-lg font-semibold">{pkg.name}</h3>
-                  <p className="mt-2 min-h-14 text-xs leading-5 text-white/48">{pkg.description}</p>
-                  <div className="mt-4 space-y-2 text-[11px] text-white/58">
-                    <p className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#e6b84d]" /> {t("artist.profile.customRepertoire")}</p>
-                    <p className="flex items-center gap-2"><Clock3 className="h-3.5 w-3.5 text-[#e6b84d]" /> {pkg.durationHours || 2} {t("artist.profile.programHours")}</p>
-                  </div>
-                  <p className="mt-5 font-heading text-lg font-semibold text-[#e6b84d]">
-                    {pkg.price ? `${pkg.price}€` : t("artist.profile.priceOnRequest")}
-                  </p>
-                  <Link
-                    href={
-                      eventPlanId
-                        ? `/cabinet/planifica/${eventPlanId}?tab=bookings${pkg.isReal ? `&package=${pkg.id}` : ""}`
-                        : "/planifica"
-                    }
-                    className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e6b84d]/45 bg-[#e6b84d]/8 text-xs font-semibold text-[#e6b84d] hover:bg-[#e6b84d]/15"
+          {profilePackages.length > 0 && (
+            <section id="pachete" className="mt-10 scroll-mt-24">
+              <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("artist.profile.packagesEyebrow")}</p>
+              <h2 className="mt-2 font-heading text-2xl font-semibold">{t("artist.profile.packagesTitle")}</h2>
+              <div className="mt-5 grid gap-3 md:grid-cols-3">
+                {profilePackages.map((pkg, index) => (
+                  <article
+                    key={pkg.id}
+                    className={`relative flex flex-col rounded-xl border bg-[linear-gradient(180deg,#111722,#0b1018)] p-5 ${
+                      index === 1
+                        ? "border-[#e6b84d]/60 shadow-[0_14px_35px_rgba(230,184,77,.08)]"
+                        : "border-white/10"
+                    }`}
                   >
-                    {t("artist.profile.requestPackage")} <ArrowRight className="h-3.5 w-3.5" />
-                  </Link>
-                </article>
-              ))}
-            </div>
-          </section>
+                    {index === 1 && (
+                      <span className="absolute right-4 top-4 rounded-full bg-[#e6b84d] px-2.5 py-1 text-[9px] font-bold text-[#07101d]">
+                        {t("artist.profile.recommendedBadge")}
+                      </span>
+                    )}
+                    <Sparkles className="h-5 w-5 text-[#e6b84d]" />
+                    <h3 className="mt-4 font-heading text-lg font-semibold">{pkg.name}</h3>
+                    <p className="mt-2 min-h-14 text-xs leading-5 text-white/48">{pkg.description}</p>
+                    <div className="mt-4 space-y-2 text-[11px] text-white/58">
+                      <p className="flex items-center gap-2"><Check className="h-3.5 w-3.5 text-[#e6b84d]" /> {t("artist.profile.customRepertoire")}</p>
+                      {pkg.durationMinutes > 0 && (
+                        <p className="flex items-center gap-2">
+                          <Clock3 className="h-3.5 w-3.5 text-[#e6b84d]" />
+                          {formatDuration(pkg.durationMinutes)}
+                        </p>
+                      )}
+                    </div>
+                    <p className="mt-5 font-heading text-lg font-semibold text-[#e6b84d]">
+                      {pkg.price ? `${pkg.price}€` : t("artist.profile.priceOnRequest")}
+                    </p>
+                    <Link
+                      href={
+                        eventPlanId
+                          ? `/cabinet/planifica/${eventPlanId}?tab=bookings${pkg.isReal ? `&package=${pkg.id}` : ""}`
+                          : "/planifica"
+                      }
+                      className="mt-4 inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#e6b84d]/45 bg-[#e6b84d]/8 text-xs font-semibold text-[#e6b84d] hover:bg-[#e6b84d]/15"
+                    >
+                      {t("artist.profile.requestPackage")} <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section id="recenzii" className="mt-10 scroll-mt-24">
             <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-[#e6b84d]">{t("artist.profile.reviewsEyebrow")}</p>
