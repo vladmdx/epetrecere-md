@@ -23,6 +23,17 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  // The signed-contract renderer reads small Unicode font subsets at runtime.
+  // They are data files, not JS modules, so include them explicitly in both
+  // server routes that can generate a PDF (email attachment and download).
+  outputFileTracingIncludes: {
+    "/api/legal/accept": [
+      "./node_modules/@fontsource/noto-sans/files/noto-sans-{latin,latin-ext,cyrillic}-{400,700}-normal.woff",
+    ],
+    "/api/legal/accept/*": [
+      "./node_modules/@fontsource/noto-sans/files/noto-sans-{latin,latin-ext,cyrillic}-{400,700}-normal.woff",
+    ],
+  },
   images: {
     // M11 Intern #2 — perf audit. Prefer AVIF where supported, WebP as
     // fallback. Cache optimized images in Next's cache for 24h.

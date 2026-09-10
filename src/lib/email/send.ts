@@ -63,3 +63,16 @@ export function dataUrlToAttachment(
     contentType: "image/png",
   };
 }
+
+/** Turn generated binary content into the base64 payload Resend expects. */
+export function bytesToAttachment(
+  bytes: Uint8Array,
+  filename: string,
+  contentType: string,
+): EmailAttachment {
+  return {
+    filename,
+    content: Buffer.from(bytes).toString("base64"),
+    contentType,
+  };
+}

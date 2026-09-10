@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileSignature, Loader2 } from "lucide-react";
+import { Download, FileSignature, Loader2 } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
 
 interface Acceptance {
@@ -113,6 +113,15 @@ export function SignedDocumentsCard() {
                       {t("vendor.signedDocs.pack", { v: g.packVersion })} ·{" "}
                       {g.locale.toUpperCase()}
                     </p>
+                    {group.every((document) => document.documentBlocks?.length) ? (
+                      <a
+                        href={`/api/legal/accept/${g.id}/pdf`}
+                        className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-gold/90"
+                      >
+                        <Download className="h-3.5 w-3.5" />
+                        {t("vendor.signedDocs.downloadPdf")}
+                      </a>
+                    ) : null}
 
                     <ul className="mt-3 space-y-2">
                       {group.map((d) => (
@@ -149,7 +158,7 @@ export function SignedDocumentsCard() {
                             v{d.documentVersion}
                           </span>
                           {d.documentBlocks?.length ? <a href={`/api/legal/accept/${d.id}/copy`} className="ml-3 text-gold underline">
-                            {locale === "ru" ? "Скачать договор" : locale === "en" ? "Download contract" : "Descarcă contractul"}
+                            {t("vendor.signedDocs.downloadDocument")}
                           </a> : null}
                           <span className="block break-all font-mono text-[11px] text-muted-foreground/70">
                             {t("vendor.signedDocs.hash")}: {d.contentHash ?? "—"}
@@ -187,7 +196,6 @@ export function SignedDocumentsCard() {
                                   )}
                                 </p>
                                 {g.signatureImage && (
-                                  // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={g.signatureImage}
                                     alt={t("vendor.signedDocs.signature")}
@@ -207,7 +215,6 @@ export function SignedDocumentsCard() {
                       <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
                         {t("vendor.signedDocs.signature")}
                       </p>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={g.signatureImage}
                         alt={t("vendor.signedDocs.signature")}

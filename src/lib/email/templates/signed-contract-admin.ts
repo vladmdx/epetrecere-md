@@ -7,7 +7,8 @@
  * the database. Unlike the signer's copy, this one carries the whole
  * technical evidence of acceptance: IP,
  * user-agent, the SHA-256 of the exact text shown per document, versions and
- * timestamp. The drawn signature travels as an attachment.
+ * timestamp. The complete, multi-page signed contract travels as a PDF
+ * attachment; the drawn signature is embedded in that PDF.
  */
 
 import { escapeHtml } from "../escape";
@@ -27,6 +28,7 @@ export interface SignedContractAdminEmailData {
   ipAddress: string | null;
   userAgent: string | null;
   baseUrl: string;
+  hasContractPdf: boolean;
   hasSignatureImage: boolean;
 }
 
@@ -88,7 +90,8 @@ export function signedContractAdminEmail(d: SignedContractAdminEmailData): {
         ${row("User-agent", d.userAgent ?? "—", true)}
         ${row("Limba semnării", d.locale.toUpperCase())}
         ${row("Pachet legal", `v${d.packVersion}`)}
-        ${row("Semnătură olografă", d.hasSignatureImage ? "atașată acestui e-mail (PNG)" : "lipsește")}
+        ${row("Contract integral", d.hasContractPdf ? "atașat acestui e-mail (PDF)" : "generarea PDF nu a reușit")}
+        ${row("Semnătură olografă", d.hasSignatureImage ? (d.hasContractPdf ? "inclusă în PDF" : "atașată separat (PNG)") : "lipsește")}
       </table>
     </div>
 

@@ -16,7 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { getLegalDocument } from "@/lib/legal";
 import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
-import { ShieldCheck } from "lucide-react";
+import { Download, ShieldCheck } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -188,6 +188,15 @@ export default async function AdminContractsPage({
                         {t("adminUi.contracts.packVersion", locale, { v: g.packVersion })} ·{" "}
                         {t("adminUi.contracts.language", locale, { lang: g.locale.toUpperCase() })}
                       </p>
+                      {group.every((document) => document.documentBlocks?.length) ? (
+                        <a
+                          href={`/api/legal/accept/${g.id}/pdf`}
+                          className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-gold/90"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          {t("adminUi.contracts.downloadPdf", locale)}
+                        </a>
+                      ) : null}
 
                       <p className="mt-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         {t("adminUi.contracts.documents", locale)}
@@ -330,7 +339,6 @@ export default async function AdminContractsPage({
                         <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">
                           {t("adminUi.contracts.signature", locale)}
                         </p>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={g.signatureImage}
                           alt={t("adminUi.contracts.signatureAlt", locale, { name: g.signatureName })}

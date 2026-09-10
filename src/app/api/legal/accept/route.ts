@@ -215,9 +215,32 @@ export async function POST(req: NextRequest) {
       actionUrl: "/admin/contracte",
     }))).catch(err => console.error("[legal] in-app notification failed", err));
     after(async () => {
-      const { sendEmail, dataUrlToAttachment } = await import("@/lib/email/send");
+      const { sendEmail, bytesToAttachment, dataUrlToAttachment } = await import("@/lib/email/send");
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
-      const attachment = dataUrlToAttachment(signatureImage, "semnatura.png");
+      const signatureAttachment = dataUrlToAttachment(signatureImage, "semnatura.png");
+      let contractAttachment: import("@/lib/email/send").EmailAttachment | null = null;
+      try {
+        const {
+          generateSignedContractPdf,
+          signedContractPdfFilename,
+        } = await import("@/lib/legal/signed-contract-pdf");
+        const pdf = await generateSignedContractPdf(inserted);
+        contractAttachment = bytesToAttachment(
+          pdf,
+          signedContractPdfFilename(inserted[0]!),
+          "application/pdf",
+        );
+      } catch (err) {
+        // Never lose the existing signature evidence if PDF rendering has a
+        // transient problem. The dashboard can regenerate the same PDF from
+        // the immutable snapshots once the renderer is available again.
+        console.error("[legal] signed contract PDF attachment failed", err);
+      }
+      const attachments = contractAttachment
+        ? [contractAttachment]
+        : signatureAttachment
+          ? [signatureAttachment]
+          : undefined;
 
       // 1. The signer's own copy — Anexa 2 asks that the accepted version
       // stay available to them.
@@ -239,13 +262,14 @@ export async function POST(req: NextRequest) {
             ipAddress: ip,
             packVersion: LEGAL_PACK_VERSION,
             baseUrl,
+            hasContractPdf: Boolean(contractAttachment),
             hasSignatureImage: Boolean(signatureImage),
           });
           await sendEmail({
             to: u.email,
             subject,
             html,
-            attachments: attachment ? [attachment] : undefined,
+            attachments,
           });
         } catch (err) {
           console.error("[legal] signer contract email failed", err);
@@ -274,6 +298,7 @@ export async function POST(req: NextRequest) {
           ipAddress: ip,
           userAgent: ua,
           baseUrl,
+          hasContractPdf: Boolean(contractAttachment),
           hasSignatureImage: Boolean(signatureImage),
         });
 
@@ -283,7 +308,7 @@ export async function POST(req: NextRequest) {
               to: admin.email,
               subject,
               html,
-              attachments: attachment ? [attachment] : undefined,
+              attachments,
             }).catch((err) =>
               console.error("[legal] admin contract email failed", err),
             );

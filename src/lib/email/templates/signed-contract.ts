@@ -4,7 +4,9 @@
  * Doubles as their copy of the record: it lists exactly which documents and
  * versions were accepted, when, and the technical fixation the Venue
  * Agreement (Anexa 2) requires — so the signer holds the same evidence we do.
- * The drawn signature travels as an attachment.
+ * The complete multi-page contract travels as a PDF attachment and stays
+ * available in the signer's dashboard. The drawn signature is embedded in
+ * the PDF instead of being sent as a detached image.
  */
 
 import { escapeHtml } from "../escape";
@@ -17,6 +19,7 @@ export interface SignedContractEmailData {
   ipAddress?: string | null;
   packVersion: string;
   baseUrl: string;
+  hasContractPdf: boolean;
   hasSignatureImage: boolean;
 }
 
@@ -66,16 +69,20 @@ export function signedContractEmail(d: SignedContractEmailData): {
     </div>
 
     ${
-      d.hasSignatureImage
+      d.hasContractPdf
+        ? `<p style="margin:16px 0 0;font-size:13px;color:#D4D4E0;">
+             Contractul complet, pe mai multe pagini, cu data și semnătura ta, este atașat acestui email în format PDF.
+           </p>`
+        : d.hasSignatureImage
         ? `<p style="margin:16px 0 0;font-size:13px;color:#A0A0B0;">
-             Semnătura ta olografă este atașată acestui email.
+             PDF-ul nu a putut fi generat la trimitere; semnătura este atașată separat, iar contractul poate fi descărcat din dashboard.
            </p>`
         : ""
     }
 
     <p style="margin:20px 0 0;font-size:12px;color:#6B6B7B;">
-      Versiunile în vigoare ale documentelor sunt oricând disponibile la
-      <a href="${escapeHtml(d.baseUrl)}/legal" style="color:#C9A84C;">${escapeHtml(d.baseUrl)}/legal</a>.
+      Copia semnată este disponibilă permanent în
+      <a href="${escapeHtml(d.baseUrl)}${escapeHtml(d.documents[0]?.url ?? "/dashboard/setari")}" style="color:#C9A84C;">dashboardul tău ePetrecere.md</a>.
     </p>
   </div>`;
 
