@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { artistPackages, artists, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { syncArtistPriceFrom } from "@/lib/pricing/sync-price-from";
+import { normalizeArtistEventTypes } from "@/lib/events/artist-event-types";
 
 // M1 #2 — Update / delete a single artist package. Owner-only.
 
@@ -18,8 +19,8 @@ const scopeEnum = z.enum([
 ]);
 
 
-// Kept in step with lib/events/normalize.ts. A null event type means "any
-// event", which is what every row created before per-event pricing means.
+// Kept in step with lib/events/normalize.ts. Legacy rows may still have a null
+// event type, but new per-event prices must use one of the artist's selections.
 // Derived from the canonical list rather than retyped, because retyping is how
 // it drifted: the API accepted seven keys while the product had ten, so an
 // artist pricing a cununie, a cerere în căsătorie or a children's birthday —
@@ -60,7 +61,10 @@ async function loadOwnedPackage(id: number) {
     .select({
       pkgId: artistPackages.id,
       artistId: artistPackages.artistId,
+      pricingMode: artistPackages.pricingMode,
+      eventType: artistPackages.eventType,
       ownerId: artists.userId,
+      artistEventTypes: artists.eventTypes,
     })
     .from(artistPackages)
     .leftJoin(artists, eq(artists.id, artistPackages.artistId))
@@ -76,11 +80,22 @@ async function loadOwnedPackage(id: number) {
     .limit(1);
   if (!appUser) return { ok: false as const, status: 403, error: "Forbidden" };
 
-  if (appUser.role !== "admin" && row.ownerId !== appUser.id) {
+  if (
+    appUser.role !== "admin" &&
+    appUser.role !== "super_admin" &&
+    row.ownerId !== appUser.id
+  ) {
     return { ok: false as const, status: 403, error: "Forbidden" };
   }
 
-  return { ok: true as const, pkgId: row.pkgId, artistId: row.artistId };
+  return {
+    ok: true as const,
+    pkgId: row.pkgId,
+    artistId: row.artistId,
+    pricingMode: row.pricingMode,
+    eventType: row.eventType,
+    artistEventTypes: normalizeArtistEventTypes(row.artistEventTypes),
+  };
 }
 
 export async function PUT(
@@ -113,10 +128,26 @@ export async function PUT(
     return NextResponse.json({ error: owner.error }, { status: owner.status });
   }
 
+  const effectivePricingMode = parsed.data.pricingMode ?? owner.pricingMode ?? "per_hour";
+  const effectiveEventType = parsed.data.eventType === undefined
+    ? owner.eventType
+    : parsed.data.eventType;
+  if (
+    effectivePricingMode === "per_event" &&
+    (!effectiveEventType ||
+      !owner.artistEventTypes.some((eventType) => eventType === effectiveEventType))
+  ) {
+    return NextResponse.json(
+      { error: "event_type_not_selected" },
+      { status: 400 },
+    );
+  }
+
   // durationMinutes is NOT NULL on the column — coerce null → 0 so
   // drizzle's typed .set() accepts it.
   const updates: Record<string, unknown> = { ...parsed.data };
   if (updates.durationMinutes === null) updates.durationMinutes = 0;
+  if (effectivePricingMode !== "per_event") updates.eventType = null;
 
   // Every field is optional, so an empty body parses fine and would reach
   // drizzle's .set() with nothing to set — which throws, and the caller sees

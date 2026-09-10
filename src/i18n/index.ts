@@ -51,12 +51,22 @@ export function getLocalized<T extends object>(
 
   // Try camelCase first (nameRo), then snake_case (name_ro)
   const value = obj[`${field}${capLocale}`] ?? obj[`${field}_${locale}`];
-  if (typeof value === "string" && value) return value;
+  if (typeof value === "string" && value.trim()) return value;
 
-  // Fallback chain: ro → ru → en (both formats)
-  const fallback =
-    obj[`${field}Ro`] ?? obj[`${field}_ro`] ??
-    obj[`${field}Ru`] ?? obj[`${field}_ru`] ??
-    obj[`${field}En`] ?? obj[`${field}_en`];
+  // Fallback chain: ro → ru → en (both formats). Empty strings are missing
+  // content too: using `??` here stopped at "" and made the RU/EN public
+  // profile look blank even though a Romanian description existed.
+  const candidates = [
+    obj[`${field}Ro`],
+    obj[`${field}_ro`],
+    obj[`${field}Ru`],
+    obj[`${field}_ru`],
+    obj[`${field}En`],
+    obj[`${field}_en`],
+  ];
+  const fallback = candidates.find(
+    (candidate) =>
+      typeof candidate === "string" && candidate.trim().length > 0,
+  );
   return typeof fallback === "string" ? fallback : "";
 }

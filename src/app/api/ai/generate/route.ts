@@ -1,14 +1,24 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
-import { generateArtistDescription, generateArtistDescriptionFromScratch, generateSEOTexts } from "@/lib/ai";
+import {
+  generateArtistDescription,
+  generateArtistDescriptionFromScratch,
+  generateSEOTexts,
+  translateProfileDescription,
+} from "@/lib/ai";
 
 const generateSchema = z.object({
-  type: z.enum(["description", "generate-description", "seo"]),
-  name: z.string(),
+  type: z.enum([
+    "description",
+    "generate-description",
+    "translate-description",
+    "seo",
+  ]),
+  name: z.string().optional(),
   category: z.string().optional(),
   location: z.string().optional(),
-  description: z.string().optional(),
+  description: z.string().max(10_000).optional(),
   entityType: z.enum(["artist", "venue"]).optional(),
   language: z.enum(["ro", "ru", "en"]).default("ro"),
 });
@@ -28,9 +38,29 @@ export async function POST(req: Request) {
   }
 
   try {
+    if (parsed.data.type === "translate-description") {
+      const description = parsed.data.description?.trim() || "";
+      if (description.length < 10) {
+        return NextResponse.json(
+          { error: "Description is too short to translate" },
+          { status: 400 },
+        );
+      }
+      const result = await translateProfileDescription(
+        description,
+        parsed.data.language,
+      );
+      return NextResponse.json({ result });
+    }
+
+    const name = parsed.data.name?.trim();
+    if (!name) {
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
+    }
+
     if (parsed.data.type === "generate-description") {
       const result = await generateArtistDescriptionFromScratch(
-        parsed.data.name,
+        name,
         parsed.data.category || "artist",
         parsed.data.location || "",
         parsed.data.language,
@@ -40,7 +70,7 @@ export async function POST(req: Request) {
 
     if (parsed.data.type === "description") {
       const result = await generateArtistDescription(
-        parsed.data.name,
+        name,
         parsed.data.category || "artist",
         parsed.data.description || "",
         parsed.data.language,
@@ -50,7 +80,7 @@ export async function POST(req: Request) {
 
     if (parsed.data.type === "seo") {
       const result = await generateSEOTexts(
-        parsed.data.name,
+        name,
         parsed.data.entityType || "artist",
         parsed.data.description || "",
         parsed.data.language,

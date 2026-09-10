@@ -76,19 +76,6 @@ const STEP_KEYS = [
 
 const MIN_AI_INPUT = 40;
 
-const PRICING_EVENT_KEYS = [
-  "wedding",
-  "cununie",
-  "baptism",
-  "cumatrie",
-  "birthday",
-  "kids_birthday",
-  "corporate",
-  "concert",
-  "proposal",
-  "other",
-] as const;
-
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useUser();
@@ -107,6 +94,9 @@ export default function OnboardingPage() {
     eventTypes: [] as EventTypeKey[],
     imageUrl: "",
     description: "",
+    descriptionRo: "",
+    descriptionRu: "",
+    descriptionEn: "",
     baseCity: DEFAULT_CITY,
     travelDistanceKm: DEFAULT_TRAVEL_KM,
     travelSurchargeEnabled: false,
@@ -129,17 +119,19 @@ export default function OnboardingPage() {
        *  event, which is how photographers and videographers actually
        *  quote: one price for a wedding, another for a christening. */
       pricingMode: "per_hour" | "per_event";
-      /** Which event the per_event price covers; "" means any. */
+      /** Which selected event the per_event price covers. */
       eventType: string;
     }>,
   });
   const [submitting, setSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
+  const [translatingDescription, setTranslatingDescription] = useState(false);
   const [phoneConflict, setPhoneConflict] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const phoneInputRef = useRef<HTMLInputElement>(null);
   const seededUserId = useRef<string | null>(null);
+  const lastTranslatedDescription = useRef("");
   const travelOptions = getTravelDistanceOptions(data.baseCity, locale);
   const validTravelAmount = !data.travelSurchargeEnabled || (
     Number.isInteger(data.travelSurchargeAmount) &&
@@ -147,7 +139,8 @@ export default function OnboardingPage() {
   );
   const isValidPackage = (p: (typeof data.pricePackages)[number]) =>
     Number.isInteger(p.price) && p.price > 0 && p.price <= 100000 &&
-    (p.pricingMode === "per_event" || (
+    ((p.pricingMode === "per_event" &&
+      data.eventTypes.includes(p.eventType as EventTypeKey)) || (
       Number.isInteger(p.hours) && p.hours >= 0 && p.hours <= 24 &&
       Number.isInteger(p.minutes) && p.minutes >= 0 && p.minutes <= 59 &&
       (p.hours > 0 || p.minutes > 0)
@@ -213,6 +206,67 @@ export default function OnboardingPage() {
 
   function update(partial: Partial<typeof data>) {
     setData((prev) => ({ ...prev, ...partial }));
+  }
+
+  function updateSourceDescription(description: string) {
+    lastTranslatedDescription.current = "";
+    setData((prev) => ({
+      ...prev,
+      description,
+      descriptionRo: locale === "ro" ? description : "",
+      descriptionRu: locale === "ru" ? description : "",
+      descriptionEn: locale === "en" ? description : "",
+    }));
+  }
+
+  async function translateCurrentDescription(description = data.description) {
+    const source = description.trim();
+    if (source.length < 10) return false;
+    const translationKey = `${locale}:${source}`;
+    if (
+      lastTranslatedDescription.current === translationKey &&
+      data.descriptionRo.trim() &&
+      data.descriptionRu.trim() &&
+      data.descriptionEn.trim()
+    ) {
+      return true;
+    }
+
+    setTranslatingDescription(true);
+    try {
+      const response = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "translate-description",
+          description: source,
+          language: locale,
+        }),
+      });
+      if (!response.ok) throw new Error();
+      const payload = (await response.json()) as {
+        result?: { ro?: unknown; ru?: unknown; en?: unknown };
+      };
+      const ro = typeof payload.result?.ro === "string" ? payload.result.ro.trim() : "";
+      const ru = typeof payload.result?.ru === "string" ? payload.result.ru.trim() : "";
+      const en = typeof payload.result?.en === "string" ? payload.result.en.trim() : "";
+      if (!ro || !ru || !en) throw new Error();
+      setData((prev) => ({
+        ...prev,
+        description: source,
+        descriptionRo: ro,
+        descriptionRu: ru,
+        descriptionEn: en,
+      }));
+      lastTranslatedDescription.current = translationKey;
+      toast.success(t("vendor.onboarding.translationDone"));
+      return true;
+    } catch {
+      toast.error(t("vendor.onboarding.translationFailed"));
+      return false;
+    } finally {
+      setTranslatingDescription(false);
+    }
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -287,8 +341,9 @@ export default function OnboardingPage() {
       // The endpoint returns { result: "..." }, not { description: "..." }.
       const { result } = await res.json();
       if (typeof result === "string" && result.trim().length > 0) {
-        update({ description: result });
+        updateSourceDescription(result);
         toast.success(t("vendor.onboarding.aiDone"));
+        await translateCurrentDescription(result);
       } else {
         toast.error(t("vendor.onboarding.errAiInvalid"));
       }
@@ -302,7 +357,7 @@ export default function OnboardingPage() {
   }
 
   async function handleSubmit() {
-    if (submitting || uploadingPhoto || generatingAi) return;
+    if (submitting || uploadingPhoto || generatingAi || translatingDescription) return;
     if (!checkName(data.name).ok || !validatePhone(data.phone).ok || !data.imageUrl || !checkDescription(data.description).ok ||
         !data.categoryId || data.eventTypes.length === 0 || !data.baseCity || !validTravelAmount || !validPackages) {
       toast.error(t("vendor.onboarding.errSubmit"));
@@ -349,6 +404,10 @@ export default function OnboardingPage() {
           priceHidden: data.priceHidden,
           imageUrl: data.imageUrl,
           description: data.description || undefined,
+          descriptionLanguage: locale,
+          descriptionRo: data.descriptionRo || undefined,
+          descriptionRu: data.descriptionRu || undefined,
+          descriptionEn: data.descriptionEn || undefined,
           priceFrom: data.priceFrom > 0 ? data.priceFrom : undefined,
           packages: cleanPackages.length > 0 ? cleanPackages : undefined,
         }),
@@ -384,7 +443,7 @@ export default function OnboardingPage() {
       case 2:
         // Still optional — but if something was typed, it has to say
         // something. "000" used to reach an admin for approval.
-        return checkDescription(data.description).ok && !generatingAi;
+        return checkDescription(data.description).ok && !generatingAi && !translatingDescription;
       case 3:
         return !!data.baseCity && validTravelAmount;
       case 4:
@@ -392,6 +451,17 @@ export default function OnboardingPage() {
       default:
         return false;
     }
+  }
+
+  async function handleNext() {
+    if (!canContinue()) return;
+    if (step === 2 && data.description.trim()) {
+      // Translation improves the localized profile, but an AI outage must not
+      // trap a partner in onboarding. The public fallback still shows the
+      // source description until the profile-page button is used later.
+      await translateCurrentDescription();
+    }
+    setStep((current) => current + 1);
   }
 
   return (
@@ -455,7 +525,18 @@ export default function OnboardingPage() {
           <div className="border-t border-border/40 pt-4">
             <EventTypeSelector
               value={data.eventTypes}
-              onChange={(eventTypes) => update({ eventTypes })}
+              onChange={(eventTypes) =>
+                setData((prev) => ({
+                  ...prev,
+                  eventTypes,
+                  pricePackages: prev.pricePackages.map((tier) =>
+                    tier.pricingMode === "per_event" &&
+                    !eventTypes.includes(tier.eventType as EventTypeKey)
+                      ? { ...tier, eventType: eventTypes[0] ?? "" }
+                      : tier,
+                  ),
+                }))
+              }
               locale={locale}
               title={t("vendor.onboarding.eventTypesTitle")}
               hint={t("vendor.onboarding.eventTypesHint")}
@@ -598,11 +679,14 @@ export default function OnboardingPage() {
           </div>
           <textarea
             value={data.description}
-            onChange={(e) => update({ description: e.target.value })}
+            onChange={(e) => updateSourceDescription(e.target.value)}
             placeholder={t("vendor.onboarding.descPlaceholder")}
             rows={8}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
+          <p className="text-xs text-muted-foreground">
+            {t("vendor.onboarding.translationOnContinue")}
+          </p>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">
               {t("vendor.onboarding.charCount", {
@@ -767,7 +851,15 @@ export default function OnboardingPage() {
                         type="button"
                         onClick={() => {
                           const next = [...data.pricePackages];
-                          next[i] = { ...tier, pricingMode: mode };
+                          next[i] = {
+                            ...tier,
+                            pricingMode: mode,
+                            eventType:
+                              mode === "per_event" &&
+                              !data.eventTypes.includes(tier.eventType as EventTypeKey)
+                                ? data.eventTypes[0] ?? ""
+                                : tier.eventType,
+                          };
                           update({ pricePackages: next });
                         }}
                         className={`rounded-md px-2.5 py-1 text-[11px] transition-colors ${
@@ -798,12 +890,9 @@ export default function OnboardingPage() {
                           }}
                           className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
                         >
-                          <option value="">
-                            {t("vendor.onboarding.eventTypeAny")}
-                          </option>
-                          {PRICING_EVENT_KEYS.map((k) => (
+                          {data.eventTypes.map((k) => (
                             <option key={k} value={k}>
-                              {eventTypeLabel(k as EventTypeKey, locale)}
+                              {eventTypeLabel(k, locale)}
                             </option>
                           ))}
                         </select>
@@ -1096,18 +1185,27 @@ export default function OnboardingPage() {
         </Button>
         {step < STEP_LABELS.length - 1 ? (
           <Button
-            onClick={() => setStep(step + 1)}
+            onClick={() => void handleNext()}
             disabled={!canContinue()}
             className="h-auto min-h-10 whitespace-normal bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2"
           >
-            {t("common.next")} <ArrowRight className="h-4 w-4" />
+            {translatingDescription && step === 2 ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {t("vendor.onboarding.translating")}
+              </>
+            ) : (
+              <>
+                {t("common.next")} <ArrowRight className="h-4 w-4" />
+              </>
+            )}
           </Button>
         ) : (
           <Button
             type="button"
             onClick={handleSubmit}
             disabled={onboardingSubmitDisabled({
-              busy: submitting || uploadingPhoto || generatingAi,
+              busy: submitting || uploadingPhoto || generatingAi || translatingDescription,
               agreementLoading: agreement.loading,
               agreementStatus: agreement.value?.status,
             })}

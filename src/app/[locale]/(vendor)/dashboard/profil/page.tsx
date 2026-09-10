@@ -19,9 +19,10 @@ import { PackagesManager } from "@/components/vendor/packages-manager";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Save, Eye, Sparkles, Loader2, Search, Camera, Upload, ChevronDown, X } from "lucide-react";
+import { Save, Eye, Sparkles, Loader2, Search, Camera, Upload, ChevronDown, X, Languages } from "lucide-react";
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/use-locale";
+import { profileDescriptionSummary } from "@/lib/content/profile-description-summary";
 
 type ProfileData = {
   nameRo: string;
@@ -80,12 +81,13 @@ const EMPTY: ProfileData = {
 };
 
 export default function VendorProfilePage() {
-  const { t } = useLocale();
+  const { locale, t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [artistId, setArtistId] = useState<number | null>(null);
   const [data, setData] = useState<ProfileData>(EMPTY);
   const [generatingAI, setGeneratingAI] = useState(false);
+  const [translatingDescriptions, setTranslatingDescriptions] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [artistCategoryIds, setArtistCategoryIds] = useState<number[]>([]);
@@ -153,10 +155,105 @@ export default function VendorProfilePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [t]);
 
   function update(partial: Partial<ProfileData>) {
     setData((prev) => ({ ...prev, ...partial }));
+  }
+
+  type DescriptionLanguage = "ro" | "ru" | "en";
+  const descriptionField: Record<
+    DescriptionLanguage,
+    "descriptionRo" | "descriptionRu" | "descriptionEn"
+  > = {
+    ro: "descriptionRo",
+    ru: "descriptionRu",
+    en: "descriptionEn",
+  };
+
+  function hasDescription(value: string) {
+    return profileDescriptionSummary(value).length > 0;
+  }
+
+  async function translateMissingDescriptions(
+    preferredLanguage?: DescriptionLanguage,
+    preferredText?: string,
+  ) {
+    const snapshot = { ...data };
+    if (preferredLanguage && preferredText !== undefined) {
+      snapshot[descriptionField[preferredLanguage]] = preferredText;
+    }
+    const sourceLanguage = preferredLanguage && hasDescription(
+      snapshot[descriptionField[preferredLanguage]],
+    )
+      ? preferredLanguage
+      : ([locale, "ro", "ru", "en"] as DescriptionLanguage[]).find(
+          (language) => hasDescription(snapshot[descriptionField[language]]),
+        );
+    if (!sourceLanguage) {
+      toast.error(t("vendor.profilePage.toastNothingToTranslate"));
+      return false;
+    }
+
+    const missingLanguages = (["ro", "ru", "en"] as const).filter(
+      (language) => !hasDescription(snapshot[descriptionField[language]]),
+    );
+    if (missingLanguages.length === 0) {
+      toast.success(t("vendor.profilePage.toastTranslationsComplete"));
+      return true;
+    }
+
+    const source = snapshot[descriptionField[sourceLanguage]];
+    setTranslatingDescriptions(true);
+    try {
+      const response = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "translate-description",
+          description: source,
+          language: sourceLanguage,
+        }),
+      });
+      if (!response.ok) throw new Error();
+      const payload = (await response.json()) as {
+        result?: { ro?: unknown; ru?: unknown; en?: unknown };
+      };
+      if (
+        typeof payload.result?.ro !== "string" ||
+        typeof payload.result?.ru !== "string" ||
+        typeof payload.result?.en !== "string"
+      ) {
+        throw new Error();
+      }
+      const translated = payload.result as {
+        ro: string;
+        ru: string;
+        en: string;
+      };
+      setData((prev) => ({
+        ...prev,
+        descriptionRo: hasDescription(prev.descriptionRo)
+          ? prev.descriptionRo
+          : translated.ro,
+        descriptionRu: hasDescription(prev.descriptionRu)
+          ? prev.descriptionRu
+          : translated.ru,
+        descriptionEn: hasDescription(prev.descriptionEn)
+          ? prev.descriptionEn
+          : translated.en,
+        ...(preferredLanguage && preferredText !== undefined
+          ? { [descriptionField[preferredLanguage]]: preferredText }
+          : {}),
+      }));
+      toast.success(t("vendor.profilePage.toastTranslated"));
+      return true;
+    } catch {
+      toast.error(t("vendor.profilePage.toastTranslationFailed"));
+      return false;
+    } finally {
+      setTranslatingDescriptions(false);
+    }
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -261,6 +358,7 @@ export default function VendorProfilePage() {
   }
 
   async function handleAIImprove() {
+    setGeneratingAI(true);
     try {
       const res = await fetch("/api/ai/generate", {
         method: "POST",
@@ -276,8 +374,11 @@ export default function VendorProfilePage() {
       const result = await res.json();
       update({ descriptionRo: result.result });
       toast.success(t("vendor.profilePage.toastAiImproved"));
+      await translateMissingDescriptions("ro", result.result);
     } catch {
       toast.error(t("vendor.profilePage.toastAiUnavailable"));
+    } finally {
+      setGeneratingAI(false);
     }
   }
 
@@ -311,6 +412,7 @@ export default function VendorProfilePage() {
       const result = await res.json();
       update({ descriptionRo: result.result });
       toast.success(t("vendor.profilePage.toastAiGenerated"));
+      await translateMissingDescriptions("ro", result.result);
     } catch {
       toast.error(t("vendor.profilePage.toastAiRetry"));
     } finally {
@@ -359,7 +461,7 @@ export default function VendorProfilePage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="gap-2"><Eye className="h-4 w-4" /> {t("vendor.profilePage.preview")}</Button>
-          <Button onClick={handleSave} disabled={saving || !artistId} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
+          <Button onClick={handleSave} disabled={saving || translatingDescriptions || !artistId} className="bg-gold text-[#0D0D0D] hover:bg-gold-dark gap-2">
             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             {t("common.save")}
           </Button>
@@ -540,14 +642,14 @@ export default function VendorProfilePage() {
         <TabsContent value="description" className="mt-6">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <CardTitle>{t("artist.description")}</CardTitle>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     className="gap-1"
-                    disabled={generatingAI}
+                    disabled={generatingAI || translatingDescriptions}
                     onClick={handleAIGenerate}
                   >
                     {generatingAI ? (
@@ -557,13 +659,38 @@ export default function VendorProfilePage() {
                     )}
                     {t("vendor.profilePage.generateAi")}
                   </Button>
-                  <Button variant="outline" size="sm" className="gap-1" onClick={handleAIImprove}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1"
+                    disabled={generatingAI || translatingDescriptions || !hasDescription(data.descriptionRo)}
+                    onClick={handleAIImprove}
+                  >
                     <Sparkles className="h-3.5 w-3.5 text-gold" /> {t("vendor.profilePage.improveAi")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 border-gold/40 text-gold hover:bg-gold/10"
+                    disabled={generatingAI || translatingDescriptions}
+                    onClick={() => void translateMissingDescriptions()}
+                  >
+                    {translatingDescriptions ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Languages className="h-3.5 w-3.5" />
+                    )}
+                    {translatingDescriptions
+                      ? t("vendor.profilePage.translating")
+                      : t("vendor.profilePage.translateMissing")}
                   </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                {t("vendor.profilePage.translationHint")}
+              </p>
               <div><Label>{t("vendor.profilePage.descriptionRo")}</Label><RichEditor content={data.descriptionRo} onChange={(html) => update({ descriptionRo: html })} /></div>
               <div><Label>{t("vendor.profilePage.descriptionRu")}</Label><RichEditor content={data.descriptionRu} onChange={(html) => update({ descriptionRu: html })} /></div>
               <div><Label>{t("vendor.profilePage.descriptionEn")}</Label><RichEditor content={data.descriptionEn} onChange={(html) => update({ descriptionEn: html })} /></div>

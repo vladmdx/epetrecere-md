@@ -58,10 +58,23 @@ const packageTierSchema = z.object({
    *  per_event — one figure for a whole event, whatever it runs to. A
    *  photographer charges by the wedding, not by the hour. */
   pricingMode: z.enum(["per_hour", "per_event"]).default("per_hour"),
-  /** Which event this price is for; null means "any". Only meaningful
-   *  alongside per_event. */
+  /** Which selected event this price is for. Only meaningful alongside
+   *  per_event; current clients always send one explicit key. */
   eventType: z.enum(EVENT_TYPE_KEYS).nullish(),
 });
+
+const descriptionSchema = z
+  .string()
+  .max(2_000)
+  .refine((value) => checkDescription(value).ok, {
+    message: "description_not_substantive",
+  })
+  .optional();
+
+// AI translations can expand slightly compared with the source language.
+// Keep a generous storage bound without re-running the source-text quality
+// rule, whose 2,000-character ceiling would reject a valid longer translation.
+const translatedDescriptionSchema = z.string().max(5_000).optional();
 
 /** A duration tier needs a duration; an event tier needs only a price, since
  *  it deliberately has none. Requiring hours/minutes of both is what would
@@ -87,12 +100,11 @@ const registerSchema = z.object({
     .max(EVENT_TYPE_KEYS.length)
     .transform((values) => [...new Set(values)])
     .optional(),
-  description: z
-    .string()
-    .refine((v) => checkDescription(v).ok, {
-      message: "description_not_substantive",
-    })
-    .optional(),
+  description: descriptionSchema,
+  descriptionLanguage: z.enum(["ro", "ru", "en"]).default("ro"),
+  descriptionRo: translatedDescriptionSchema,
+  descriptionRu: translatedDescriptionSchema,
+  descriptionEn: translatedDescriptionSchema,
   location: z.string().optional(),
   ...artistTravelShape,
   imageUrl: z.string().url().max(2000),
@@ -271,12 +283,39 @@ export async function POST(req: Request) {
     // back to the legacy `priceFrom` field. Listing pages still sort
     // by this column, so we keep it accurate even with multiple tiers.
     const validTiers = (data.packages ?? []).filter(isUsableTier);
+    const selectedEventTypes = new Set(
+      data.eventTypes ?? [...EVENT_TYPE_KEYS],
+    );
+    const invalidEventTier = validTiers.some(
+      (tier) =>
+        tier.pricingMode === "per_event" &&
+        (!tier.eventType || !selectedEventTypes.has(tier.eventType)),
+    );
+    if (invalidEventTier) {
+      return NextResponse.json(
+        { error: "package_event_type_not_selected" },
+        { status: 400 },
+      );
+    }
     const minTierPrice = validTiers.length
       ? Math.min(...validTiers.map((p) => p.price))
       : null;
     const resolvedPriceFrom =
       minTierPrice ??
       (data.priceFrom && data.priceFrom > 0 ? data.priceFrom : null);
+
+    const sourceDescription = data.description?.trim() || null;
+    const descriptions = {
+      ro:
+        data.descriptionRo?.trim() ||
+        (data.descriptionLanguage === "ro" ? sourceDescription : null),
+      ru:
+        data.descriptionRu?.trim() ||
+        (data.descriptionLanguage === "ru" ? sourceDescription : null),
+      en:
+        data.descriptionEn?.trim() ||
+        (data.descriptionLanguage === "en" ? sourceDescription : null),
+    };
 
     // Create artist (inactive — needs admin approval)
     const [artist] = await db
@@ -290,7 +329,9 @@ export async function POST(req: Request) {
         phone: finalPhone,
         email: appUser.email,
         photoUrl: data.imageUrl || null,
-        descriptionRo: data.description || null,
+        descriptionRo: descriptions.ro,
+        descriptionRu: descriptions.ru,
+        descriptionEn: descriptions.en,
         ...artistLocationUpdate({ baseCity: data.baseCity, location: data.location || "Chișinău" }),
         travelDistanceKm: data.travelDistanceKm ?? 30,
         travelSurchargeEnabled: data.travelSurchargeEnabled ?? false,
@@ -310,34 +351,56 @@ export async function POST(req: Request) {
       })
       .returning();
 
-    // Auto-improve the description in the background. The partner wrote
-    // a seed in onboarding; we polish it with Claude so the public page
-    // launches with SEO-friendly copy instead of a one-paragraph blurb.
-    // Fire-and-forget: failures don't block submission, the partner can
-    // re-trigger from /dashboard/profil.
-    if (data.description && data.description.trim().length >= 40) {
-      const seed = data.description.trim();
+    // Legacy/mobile clients may still send one description only. Fill just
+    // the missing languages in the background; never rewrite the partner's
+    // source or overwrite a translation that already exists.
+    if (
+      sourceDescription &&
+      sourceDescription.length >= 10 &&
+      (!descriptions.ro || !descriptions.ru || !descriptions.en)
+    ) {
+      const sourceLanguage = data.descriptionLanguage;
       after(async () => {
         try {
-          const { generateArtistDescription } = await import("@/lib/ai");
-          const polished = await generateArtistDescription(
-            data.name,
-            // categoryIds resolved earlier as data.categoryId — we don't
-            // have the name handy here without another lookup, so we use
-            // a generic "artist" as the category. Good enough for the
-            // first pass; partner can re-generate from settings.
-            "artist",
-            seed,
-            "ro",
+          const { translateProfileDescription } = await import("@/lib/ai");
+          const translated = await translateProfileDescription(
+            sourceDescription,
+            sourceLanguage,
           );
-          if (polished && polished.trim().length > 0) {
-            await db
-              .update(artists)
-              .set({ descriptionRo: polished, updatedAt: new Date() })
-              .where(and(eq(artists.id, artist.id), eq(artists.descriptionRo, data.description!)));
-          }
+          const [current] = await db
+            .select({
+              descriptionRo: artists.descriptionRo,
+              descriptionRu: artists.descriptionRu,
+              descriptionEn: artists.descriptionEn,
+            })
+            .from(artists)
+            .where(eq(artists.id, artist.id))
+            .limit(1);
+          if (!current) return;
+          const currentSource = {
+            ro: current.descriptionRo,
+            ru: current.descriptionRu,
+            en: current.descriptionEn,
+          }[sourceLanguage];
+          if (currentSource?.trim() !== sourceDescription) return;
+
+          await db
+            .update(artists)
+            .set({
+              descriptionRo: current.descriptionRo?.trim()
+                ? current.descriptionRo
+                : translated.ro,
+              descriptionRu: current.descriptionRu?.trim()
+                ? current.descriptionRu
+                : translated.ru,
+              descriptionEn: current.descriptionEn?.trim()
+                ? current.descriptionEn
+                : translated.en,
+              updatedAt: new Date(),
+            })
+            .where(eq(artists.id, artist.id));
         } catch (err) {
-          console.error("[register-artist] auto AI rewrite failed:", err);
+          console.error("[register-artist] auto translation failed:", err);
         }
       });
     }

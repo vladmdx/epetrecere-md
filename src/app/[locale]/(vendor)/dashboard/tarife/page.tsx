@@ -9,10 +9,13 @@ import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { DurationPricingManager } from "@/components/vendor/duration-pricing-manager";
 import { useLocale } from "@/hooks/use-locale";
+import { normalizeArtistEventTypes } from "@/lib/events/artist-event-types";
+import type { EventTypeKey } from "@/lib/events/normalize";
 
 export default function TarifePage() {
   const { t } = useLocale();
   const [artistId, setArtistId] = useState<number | null>(null);
+  const [eventTypes, setEventTypes] = useState<EventTypeKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,6 +27,7 @@ export default function TarifePage() {
         if (cancelled) return;
         if (data?.artist?.id) {
           setArtistId(data.artist.id);
+          setEventTypes(normalizeArtistEventTypes(data.artist.eventTypes));
         } else {
           setError(t("vendor.ratesPage.noProfile"));
         }
@@ -57,7 +61,7 @@ export default function TarifePage() {
           <p className="text-sm text-muted-foreground">{error}</p>
         </div>
       ) : artistId != null ? (
-        <DurationPricingManager artistId={artistId} />
+        <DurationPricingManager artistId={artistId} eventTypes={eventTypes} />
       ) : null}
     </div>
   );

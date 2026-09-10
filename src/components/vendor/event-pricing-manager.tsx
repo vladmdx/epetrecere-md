@@ -46,33 +46,41 @@ interface Row {
 }
 
 interface Draft {
-  eventType: string; // "" = any event type
+  eventType: string; // Empty only when the artist has selected no event type.
   price: string;
   hours: string;
   minutes: string;
   nameRo: string;
 }
 
-const EMPTY: Draft = {
-  eventType: "wedding",
-  price: "",
-  hours: "",
-  minutes: "",
-  nameRo: "",
-};
+function emptyDraft(eventTypes: EventTypeKey[]): Draft {
+  return {
+    eventType: eventTypes[0] ?? "",
+    price: "",
+    hours: "",
+    minutes: "",
+    nameRo: "",
+  };
+}
 
 /** Sorted so the artist's list reads in the same order as the picker. */
 const ORDER = new Map<string, number>(ALL_EVENT_TYPES.map((k, i) => [k, i]));
 
-export function EventPricingManager({ artistId }: { artistId: number }) {
-  const { t } = useLocale();
+export function EventPricingManager({
+  artistId,
+  eventTypes,
+}: {
+  artistId: number;
+  eventTypes: EventTypeKey[];
+}) {
+  const { locale, t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [rows, setRows] = useState<Row[]>([]);
   const [adding, setAdding] = useState(false);
-  const [draft, setDraft] = useState<Draft>(EMPTY);
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(eventTypes));
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [editDraft, setEditDraft] = useState<Draft>(EMPTY);
+  const [editDraft, setEditDraft] = useState<Draft>(() => emptyDraft(eventTypes));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -95,13 +103,31 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
     } finally {
       setLoading(false);
     }
-  }, [artistId]);
+  }, [artistId, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    const firstSelected = eventTypes[0] ?? "";
+    setDraft((current) =>
+      eventTypes.includes(current.eventType as EventTypeKey)
+        ? current
+        : { ...current, eventType: firstSelected },
+    );
+    setEditDraft((current) =>
+      eventTypes.includes(current.eventType as EventTypeKey)
+        ? current
+        : { ...current, eventType: firstSelected },
+    );
+  }, [eventTypes]);
+
   function parse(d: Draft) {
+    if (!eventTypes.includes(d.eventType as EventTypeKey)) {
+      toast.error(t("vendor.eventPricing.toastEventNotSelected"));
+      return null;
+    }
     const price = Number(d.price);
     if (!Number.isFinite(price) || price <= 0) {
       toast.error(t("vendor.eventPricing.toastPricePositive"));
@@ -126,14 +152,12 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
       price: Math.round(price),
       durationHours: Math.floor(totalMinutes / 60),
       durationMinutes: totalMinutes % 60,
-      eventType: d.eventType === "" ? null : d.eventType,
+      eventType: d.eventType,
     };
   }
 
-  function defaultName(eventType: string | null): string {
-    return eventType
-      ? eventTypeLabel(eventType as EventTypeKey)
-      : t("artist.profile.anyEvent");
+  function defaultName(eventType: string): string {
+    return eventTypeLabel(eventType as EventTypeKey, locale);
   }
 
   async function create() {
@@ -158,7 +182,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
       });
       if (!res.ok) throw new Error();
       toast.success(t("vendor.eventPricing.toastAdded"));
-      setDraft(EMPTY);
+      setDraft(emptyDraft(eventTypes));
       setAdding(false);
       await load();
     } catch {
@@ -212,7 +236,9 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
     setAdding(false);
     setEditingId(row.id);
     setEditDraft({
-      eventType: row.eventType ?? "",
+      eventType: eventTypes.includes(row.eventType as EventTypeKey)
+        ? row.eventType!
+        : eventTypes[0] ?? "",
       price: String(row.price ?? ""),
       hours: String(row.durationHours ?? 0),
       minutes: String(row.durationMinutes ?? 0),
@@ -235,12 +261,11 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
             onChange={(e) => setD({ ...d, eventType: e.target.value })}
             className="mt-1 flex h-10 w-full rounded-md border border-border/50 bg-background px-3 text-sm"
           >
-            {ALL_EVENT_TYPES.map((k) => (
+            {eventTypes.map((k) => (
               <option key={k} value={k}>
-                {eventTypeLabel(k)}
+                {eventTypeLabel(k, locale)}
               </option>
             ))}
-            <option value="">{t("artist.profile.anyEvent")}</option>
           </select>
         </div>
         <div>
@@ -339,9 +364,10 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
             variant="outline"
             onClick={() => {
               setEditingId(null);
-              setDraft(EMPTY);
+              setDraft(emptyDraft(eventTypes));
               setAdding(true);
             }}
+            disabled={eventTypes.length === 0}
             className="gap-1.5"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -352,6 +378,11 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
 
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         {t("vendor.eventPricing.intro")}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {eventTypes.length > 0
+          ? t("vendor.eventPricing.selectedOnly")
+          : t("vendor.eventPricing.noSelected")}
       </p>
 
       {adding && <div className="mt-4">{form(draft, setDraft, create, () => setAdding(false))}</div>}
@@ -382,7 +413,7 @@ export function EventPricingManager({ artistId }: { artistId: number }) {
                   <div>
                     <p className="font-heading text-base font-bold">
                       {row.eventType
-                        ? eventTypeLabel(row.eventType as EventTypeKey)
+                        ? eventTypeLabel(row.eventType as EventTypeKey, locale)
                         : t("artist.profile.anyEvent")}
                       {row.price != null && (
                         <span className="ml-2 text-gold">

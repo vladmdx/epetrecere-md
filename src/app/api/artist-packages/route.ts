@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { artistPackages, artists, users } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { syncArtistPriceFrom } from "@/lib/pricing/sync-price-from";
+import { normalizeArtistEventTypes } from "@/lib/events/artist-event-types";
 
 // M1 #1 — Artist packages list + create.
 // Public GET (listing for a single artist) so the profile page stays fast.
@@ -20,8 +21,8 @@ const scopeEnum = z.enum([
 ]);
 
 
-// Kept in step with lib/events/normalize.ts. A null event type means "any
-// event", which is what every row created before per-event pricing means.
+// Kept in step with lib/events/normalize.ts. Legacy rows may still have a null
+// event type, but new per-event prices must use one of the artist's selections.
 // Derived from the canonical list rather than retyped, because retyping is how
 // it drifted: the API accepted seven keys while the product had ten, so an
 // artist pricing a cununie, a cerere în căsătorie or a children's birthday —
@@ -66,17 +67,25 @@ async function requireArtistOwner(artistId: number) {
     .limit(1);
   if (!appUser) return { ok: false as const, status: 403, error: "Forbidden" };
 
-  // Admins may edit any artist's packages.
-  if (appUser.role === "admin") return { ok: true as const, userId: appUser.id };
-
   const [artist] = await db
-    .select({ id: artists.id })
+    .select({ id: artists.id, userId: artists.userId, eventTypes: artists.eventTypes })
     .from(artists)
-    .where(and(eq(artists.id, artistId), eq(artists.userId, appUser.id)))
+    .where(eq(artists.id, artistId))
     .limit(1);
-  if (!artist) return { ok: false as const, status: 403, error: "Forbidden" };
+  if (!artist) return { ok: false as const, status: 404, error: "Not found" };
+  if (
+    appUser.role !== "admin" &&
+    appUser.role !== "super_admin" &&
+    artist.userId !== appUser.id
+  ) {
+    return { ok: false as const, status: 403, error: "Forbidden" };
+  }
 
-  return { ok: true as const, userId: appUser.id };
+  return {
+    ok: true as const,
+    userId: appUser.id,
+    eventTypes: normalizeArtistEventTypes(artist.eventTypes),
+  };
 }
 
 // GET /api/artist-packages?artist_id=N → public list of packages for an artist.
@@ -147,6 +156,16 @@ export async function POST(req: Request) {
   if (!owner.ok) {
     return NextResponse.json({ error: owner.error }, { status: owner.status });
   }
+  if (
+    parsed.data.pricingMode === "per_event" &&
+    (!parsed.data.eventType ||
+      !owner.eventTypes.some((eventType) => eventType === parsed.data.eventType))
+  ) {
+    return NextResponse.json(
+      { error: "event_type_not_selected" },
+      { status: 400 },
+    );
+  }
 
   const [created] = await db
     .insert(artistPackages)
@@ -162,7 +181,10 @@ export async function POST(req: Request) {
       durationHours: parsed.data.durationHours ?? null,
       durationMinutes: parsed.data.durationMinutes ?? 0,
       pricingMode: parsed.data.pricingMode ?? "per_hour",
-      eventType: parsed.data.eventType ?? null,
+      eventType:
+        parsed.data.pricingMode === "per_event"
+          ? parsed.data.eventType ?? null
+          : null,
       scope: parsed.data.scope ?? "base",
       scopeDayOfWeek: parsed.data.scopeDayOfWeek ?? null,
       scopeFromTime: parsed.data.scopeFromTime ?? null,

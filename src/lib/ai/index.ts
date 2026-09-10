@@ -66,6 +66,73 @@ Write ONLY the description text, no titles or headings.`,
   return block.type === "text" ? block.text : "";
 }
 
+export type ProfileDescriptionLanguage = "ro" | "ru" | "en";
+export type ProfileDescriptionTranslations = Record<
+  ProfileDescriptionLanguage,
+  string
+>;
+
+/**
+ * Parse the strict JSON requested from the translation model. Keeping this
+ * separate makes malformed/model-wrapped responses testable without an API
+ * call. The source text always wins for its own language: translation must
+ * never rewrite what the partner actually entered.
+ */
+export function parseProfileDescriptionTranslations(
+  raw: string,
+  sourceLanguage: ProfileDescriptionLanguage,
+  sourceText: string,
+): ProfileDescriptionTranslations {
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```\s*$/, "")
+    .trim();
+  const objectText = cleaned.match(/\{[\s\S]*\}/)?.[0];
+  if (!objectText) throw new Error("Invalid translation response");
+
+  const parsed = JSON.parse(objectText) as Partial<ProfileDescriptionTranslations>;
+  const result = {
+    ro: typeof parsed.ro === "string" ? parsed.ro.trim() : "",
+    ru: typeof parsed.ru === "string" ? parsed.ru.trim() : "",
+    en: typeof parsed.en === "string" ? parsed.en.trim() : "",
+  };
+  result[sourceLanguage] = sourceText.trim();
+
+  if (!result.ro || !result.ru || !result.en) {
+    throw new Error("Incomplete translation response");
+  }
+  return result;
+}
+
+/** Translate one partner description into all three public languages. */
+export async function translateProfileDescription(
+  sourceText: string,
+  sourceLanguage: ProfileDescriptionLanguage,
+): Promise<ProfileDescriptionTranslations> {
+  const languageNames: Record<ProfileDescriptionLanguage, string> = {
+    ro: "Romanian",
+    ru: "Russian",
+    en: "English",
+  };
+  const message = await getClient().messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1800,
+    system: `You translate profile descriptions for a Moldovan events marketplace. Return strict JSON with exactly these string keys: {"ro":"...","ru":"...","en":"..."}.
+- Translate faithfully without inventing services, experience, awards, prices or contact details.
+- Preserve the meaning, paragraph structure and any safe HTML tags already present.
+- Return only the JSON object, without markdown fences or commentary.`,
+    messages: [
+      {
+        role: "user",
+        content: `The source language is ${languageNames[sourceLanguage]}. Translate this profile description into Romanian, Russian and English:\n\n${sourceText}`,
+      },
+    ],
+  });
+  const block = message.content[0];
+  const raw = block?.type === "text" ? block.text : "";
+  return parseProfileDescriptionTranslations(raw, sourceLanguage, sourceText);
+}
+
 /**
  * Generate (or rewrite) a rich-text venue description. Returns HTML so it
  * plugs straight into the TipTap editor. `mode: "improve"` rewrites the

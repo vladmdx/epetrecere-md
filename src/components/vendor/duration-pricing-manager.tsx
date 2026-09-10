@@ -28,6 +28,7 @@ import { cn } from "@/lib/utils";
 import { formatDuration } from "@/lib/pricing/resolve";
 import { EventPricingManager } from "@/components/vendor/event-pricing-manager";
 import { useLocale } from "@/hooks/use-locale";
+import type { EventTypeKey } from "@/lib/events/normalize";
 
 type Scope = "base" | "weekend" | "weekday" | "evening" | "specific_day";
 
@@ -131,7 +132,13 @@ function scopeDescription(
   }
 }
 
-export function DurationPricingManager({ artistId }: { artistId: number }) {
+export function DurationPricingManager({
+  artistId,
+  eventTypes,
+}: {
+  artistId: number;
+  eventTypes: EventTypeKey[];
+}) {
   const { t } = useLocale();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -624,7 +631,7 @@ export function DurationPricingManager({ artistId }: { artistId: number }) {
         </p>
       </div>
 
-      <EventPricingManager artistId={artistId} />
+      <EventPricingManager artistId={artistId} eventTypes={eventTypes} />
 
       {renderGroup("base")}
       {renderGroup("weekend")}
