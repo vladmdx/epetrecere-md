@@ -185,7 +185,10 @@ export async function POST(req: Request) {
       .limit(1);
     if (phoneCollision) {
       return NextResponse.json(
-        { error: "Acest număr de telefon este deja folosit de un alt cont." },
+        {
+          code: "phone_in_use",
+          error: "Acest număr de telefon este deja folosit de un alt cont.",
+        },
         { status: 409 },
       );
     }

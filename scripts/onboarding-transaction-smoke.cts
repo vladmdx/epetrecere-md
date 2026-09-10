@@ -39,7 +39,12 @@ Module._load = function (request, parent, isMain) {
   if (request === "next/cache") return {revalidatePath:route=>revalidated.push(route)};
   let resolved; try { resolved = Module._resolveFilename(request,parent); } catch {}
   if (request === "@/lib/db" || resolved === path.join(root,"src/lib/db/index.ts")) return {db:txDb};
-  if (request === "@/lib/email/send" || resolved === path.join(root,"src/lib/email/send.ts")) return {sendEmail:async()=>({}),dataUrlToAttachment:()=>null};
+  if (request === "@/lib/email/send" || resolved === path.join(root,"src/lib/email/send.ts")) return {
+    sendEmail:async()=>({}), dataUrlToAttachment:()=>null, bytesToAttachment:()=>null,
+  };
+  if (request === "@/lib/vendors/revalidate" || resolved === path.join(root,"src/lib/vendors/revalidate.ts")) return {
+    revalidateVendorCatalog:kind=>revalidated.push(kind==="artist"?"/artisti/[slug]":"/sali/[slug]"),
+  };
   if (request === "@/lib/push/expo" || resolved === path.join(root,"src/lib/push/expo.ts")) return {sendPushToUser:async()=>({})};
   if (request === "@/lib/push/send" || resolved === path.join(root,"src/lib/push/send.ts")) return {sendPushToUser:async()=>({})};
   if (request === "@/lib/whatsapp/send" || resolved === path.join(root,"src/lib/whatsapp/send.ts")) return {sendWhatsAppToUser:async()=>({})};
@@ -58,6 +63,7 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
    const nativeAccept=require("../src/app/api/v1/legal/accept/route");
    const artistRoute=require("../src/app/api/auth/register-artist/route");
    const venueRoute=require("../src/app/api/auth/register-venue/route");
+   const phoneRoute=require("../src/app/api/me/phone/route");
    const artistEdit=require("../src/app/api/artists/crud/route");
    const venueEdit=require("../src/app/api/venues/[id]/route");
    const registrationAdmin=require("../src/app/api/admin/registration-requests/route");
@@ -106,10 +112,19 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
     assert.equal(response.status,legal.LEGAL_PACK_VERSION==="2.0"?200:409); ok(kind+": legacy native submission cannot silently accept changed terms");
     response=await nativeAccept.POST(req("/api/v1/legal/accept",body));
     assert.equal(response.status,200); ok(kind+": explicit current-version native acceptance succeeds");
-    response=await accept.POST(req("/api/legal/accept",{...body,identity:{...body.identity,legalAddress:"Changed party address"}}));
+    response=await accept.POST(req("/api/legal/accept",{...body,identity:{...body.identity,legalAddress:"Changed party address, 2"}}));
     assert.equal(response.status,409); ok(kind+": signed snapshot cannot be substituted on retry");
     response=await accept.POST(req("/api/legal/accept",body)); assert.equal(response.status,200);
     assert.equal((await txDb.select().from(schema.legalAcceptances).where(eq(schema.legalAcceptances.userId,current.id))).length,rows.length); ok(kind+": signing retry does not duplicate evidence");
+    const [phoneOwner]=await txDb.insert(schema.users).values({
+      clerkId:"qa_phone_owner_"+randomUUID(), email:randomUUID()+"@example.invalid",
+      name:"QA phone owner", phone:payloads[kind].phone, role:"user",
+    }).returning({id:schema.users.id});
+    response=await route.POST(req("/api/auth/register-"+kind,payloads[kind]));
+    assert.equal(response.status,409,await response.clone().text());
+    assert.equal((await response.json()).code,"phone_in_use");
+    await txDb.update(schema.users).set({phone:null}).where(eq(schema.users.id,phoneOwner.id));
+    ok(kind+": a phone owned by another account returns the actionable conflict code");
     response=await route.POST(req("/api/auth/register-"+kind,payloads[kind])); const result=await response.json();
     assert.equal(response.status,200,JSON.stringify(result));
     ids[kind]=result.artistId??result.venueId;
@@ -126,12 +141,18 @@ const ok=(label)=>{checks.push(label);console.log("PASS",label);};
     assert.equal(response.status,200); assert.equal(response.headers.get("Cache-Control"),"private, no-store");
     const html=await response.text(); assert.ok(html.includes(rows[0].contentHash)); ok(kind+": owner downloads exact signed copy");
    }
+   current=personas.artist;
+   let response=await phoneRoute.PUT(req("/api/me/phone",{phone:payloads.venue.phone}));
+   assert.equal(response.status,409,await response.clone().text());
+   assert.equal((await response.json()).code,"phone_in_use");
+   assert.equal((await txDb.select().from(schema.users).where(eq(schema.users.id,current.id)))[0].phone,payloads.artist.phone);
+   ok("phone settings preserve the current number when another account owns the replacement");
    await flushEffects();
    current=personas.client;
    let statusResponse=await accept.GET(); const clientLegal=await statusResponse.json();
    assert.equal(clientLegal.onboarding.artist.status,"unsigned"); assert.equal(clientLegal.onboarding.venue.status,"unsigned");
    assert.equal(clientLegal.items.length,0); ok("saved-agreement recovery never reads another account's legal identity");
-   let response=await copy.GET(req("/copy",{}),{params:Promise.resolve({id:String(acceptanceIds.artist)})});
+   response=await copy.GET(req("/copy",{}),{params:Promise.resolve({id:String(acceptanceIds.artist)})});
    assert.equal(response.status,404); ok("client cannot download another account's signed contract");
    current=personas.admin;
    response=await copy.GET(req("/copy",{}),{params:Promise.resolve({id:String(acceptanceIds.artist)})});

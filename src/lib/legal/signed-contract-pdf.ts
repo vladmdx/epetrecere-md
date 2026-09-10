@@ -1,7 +1,11 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import * as fontkit from "@pdf-lib/fontkit";
+// @pdf-lib/fontkit is a CommonJS package exposed to Next's server bundle as a
+// default export. A namespace import works in tsx/node, but becomes
+// `{ default: fontkit }` in the production chunk; pdf-lib then tries to call
+// `.create()` on that wrapper and PDF rendering fails only after deployment.
+import fontkit from "@pdf-lib/fontkit";
 import {
   PDFDocument,
   type PDFFont,

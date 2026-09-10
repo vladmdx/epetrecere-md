@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { z } from "zod/v4";
 import { artistLocationUpdate, artistTravelShape, registrationDecisionSchema, venueOwnerFields } from "../src/lib/validation/vendor-profile";
@@ -42,4 +43,19 @@ test("partner event types are canonical, ordered and backward compatible", () =>
     ["wedding", "concert"],
   );
   assert.deepEqual(normalizeArtistEventTypes([], false), []);
+});
+
+test("a duplicate onboarding phone returns to the editable field instead of trapping a signed request", () => {
+  const artist = readFileSync("src/app/[locale]/(vendor)/dashboard/onboarding/page.tsx", "utf8");
+  const venue = readFileSync("src/app/[locale]/(vendor)/dashboard/venue-onboarding/page.tsx", "utf8");
+  const artistRoute = readFileSync("src/app/api/auth/register-artist/route.ts", "utf8");
+  const venueRoute = readFileSync("src/app/api/auth/register-venue/route.ts", "utf8");
+
+  assert.match(artist, /phone: data\.phone/);
+  assert.match(artist, /err\.code === "phone_in_use"[\s\S]*setStep\(1\)/);
+  assert.match(artist, /ref=\{phoneInputRef\}/);
+  assert.match(venue, /err\.code === "phone_in_use"[\s\S]*setStep\(0\)/);
+  assert.match(venue, /ref=\{phoneInputRef\}/);
+  assert.match(artistRoute, /code: "phone_in_use"/);
+  assert.match(venueRoute, /code: "phone_in_use"/);
 });

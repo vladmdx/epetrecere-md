@@ -6,23 +6,14 @@
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { validatePhone } from "@/lib/phone/validate";
 
 const schema = z.object({
   phone: z.string().max(32).nullable(),
 });
-
-function normalize(raw: string | null): string | null {
-  if (!raw) return null;
-  const digits = raw.replace(/\D/g, "");
-  if (!digits) return null;
-  if (digits.startsWith("373")) return "+" + digits;
-  if (digits.startsWith("0")) return "+373" + digits.slice(1);
-  if (digits.length === 8) return "+373" + digits;
-  return "+" + digits;
-}
 
 export async function GET() {
   const { userId: clerkId } = await auth();
@@ -57,12 +48,43 @@ export async function PUT(req: Request) {
     );
   }
 
-  const normalized = normalize(parsed.data.phone);
+  const rawPhone = parsed.data.phone?.trim() || null;
+  const checked = rawPhone ? validatePhone(rawPhone) : null;
+  if (checked && !checked.ok) {
+    return NextResponse.json({ error: checked.error }, { status: 400 });
+  }
+  const normalized = checked?.ok ? checked.e164 : null;
+
+  const [appUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, clerkId))
+    .limit(1);
+  if (!appUser) {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+
+  if (normalized) {
+    const [collision] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, normalized), ne(users.id, appUser.id)))
+      .limit(1);
+    if (collision) {
+      return NextResponse.json(
+        {
+          code: "phone_in_use",
+          error: "Acest număr de telefon este deja folosit de un alt cont.",
+        },
+        { status: 409 },
+      );
+    }
+  }
 
   const result = await db
     .update(users)
     .set({ phone: normalized, updatedAt: new Date() })
-    .where(eq(users.clerkId, clerkId))
+    .where(eq(users.id, appUser.id))
     .returning({ id: users.id, phone: users.phone });
 
   if (result.length === 0) {

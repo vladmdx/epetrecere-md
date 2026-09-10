@@ -250,6 +250,7 @@ export async function POST(req: Request) {
       if (phoneCollision) {
         return NextResponse.json(
           {
+            code: "phone_in_use",
             error:
               "Acest număr de telefon este deja folosit de un alt cont.",
           },

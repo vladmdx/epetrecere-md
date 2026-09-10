@@ -62,8 +62,10 @@ export default function VenueOnboardingPage() {
   const [uploading, setUploading] = useState(false);
   const [loadingExisting, setLoadingExisting] = useState(true);
   const [resubmit, setResubmit] = useState(false);
+  const [phoneConflict, setPhoneConflict] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const menuInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState({
     name: "",
     phone: "",
@@ -152,6 +154,10 @@ export default function VenueOnboardingPage() {
       alive = false;
     };
   }, [router, locale]);
+
+  useEffect(() => {
+    if (phoneConflict && step === 0) phoneInputRef.current?.focus();
+  }, [phoneConflict, step]);
 
   function update(partial: Partial<typeof data>) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -283,6 +289,12 @@ export default function VenueOnboardingPage() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        if (err.code === "phone_in_use") {
+          setPhoneConflict(true);
+          setStep(0);
+          toast.error(t("vendor.venueOnboarding.phoneInUse"));
+          return;
+        }
         throw new Error(err.error || t("vendor.venueOnboarding.registerError"));
       }
       toast.success(t("vendor.venueOnboarding.submitted"));
@@ -379,21 +391,26 @@ export default function VenueOnboardingPage() {
           <div>
             <Label>{t("vendor.venueOnboarding.phone")}</Label>
             <Input
+              ref={phoneInputRef}
               type="tel"
               autoComplete="tel"
               value={data.phone}
-              onChange={(e) => update({ phone: e.target.value })}
+              aria-invalid={phoneConflict || (Boolean(data.phone.trim()) && !validatePhone(data.phone).ok)}
+              onChange={(e) => {
+                setPhoneConflict(false);
+                update({ phone: e.target.value });
+              }}
               placeholder="+373 69 ..."
             />
-            {data.phone.trim() && !validatePhone(data.phone).ok && (
-              <p className="mt-1 text-xs text-destructive">
-                {{
-                  ro: "Introdu numărul complet, de exemplu +373 69 123 456.",
-                  ru: "Введите полный номер, например +373 69 123 456.",
-                  en: "Enter the complete number, for example +373 69 123 456.",
-                }[locale]}
+            {phoneConflict ? (
+              <p className="mt-1 text-xs text-destructive" role="alert">
+                {t("vendor.venueOnboarding.phoneInUse")}
               </p>
-            )}
+            ) : data.phone.trim() && !validatePhone(data.phone).ok ? (
+              <p className="mt-1 text-xs text-destructive">
+                {t("vendor.venueOnboarding.phoneInvalid")}
+              </p>
+            ) : null}
           </div>
           {/* Google Maps autofill — paste the venue's Maps URL and we
               pre-fill name, address, city, phone, website and (when

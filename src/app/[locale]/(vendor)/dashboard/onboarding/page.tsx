@@ -54,6 +54,7 @@ import { OnboardingAgreement } from "@/components/legal/onboarding-agreement";
 import { useOnboardingAgreement } from "@/hooks/use-onboarding-agreement";
 import { onboardingSubmitDisabled } from "@/lib/legal/onboarding-submit";
 import { EventTypeSelector } from "@/components/vendor/event-type-selector";
+import { validatePhone } from "@/lib/phone/validate";
 
 interface Category {
   id: number;
@@ -101,6 +102,7 @@ export default function OnboardingPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [data, setData] = useState({
     name: "",
+    phone: "",
     categoryId: 0,
     eventTypes: [] as EventTypeKey[],
     imageUrl: "",
@@ -134,7 +136,9 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [generatingAi, setGeneratingAi] = useState(false);
+  const [phoneConflict, setPhoneConflict] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const phoneInputRef = useRef<HTMLInputElement>(null);
   const seededUserId = useRef<string | null>(null);
   const travelOptions = getTravelDistanceOptions(data.baseCity, locale);
   const validTravelAmount = !data.travelSurchargeEnabled || (
@@ -181,10 +185,31 @@ export default function OnboardingPage() {
       setData((d) => ({
         ...d,
         name: d.name || user.fullName || "",
+        phone: d.phone || user.phoneNumbers?.[0]?.phoneNumber || "",
         imageUrl: d.imageUrl || user.imageUrl || "",
       }));
     }
   }, [user]);
+
+  // Google sign-ins usually have no phone in Clerk; the number collected by
+  // our registration step lives in the app database instead. Show it here so
+  // a legacy duplicate can be corrected before another submit attempt.
+  useEffect(() => {
+    if (!user?.id) return;
+    let alive = true;
+    fetch("/api/me/phone", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((result: { phone?: string | null } | null) => {
+        if (!alive || !result?.phone) return;
+        setData((current) => current.phone ? current : { ...current, phone: result.phone! });
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (phoneConflict && step === 1) phoneInputRef.current?.focus();
+  }, [phoneConflict, step]);
 
   function update(partial: Partial<typeof data>) {
     setData((prev) => ({ ...prev, ...partial }));
@@ -278,7 +303,7 @@ export default function OnboardingPage() {
 
   async function handleSubmit() {
     if (submitting || uploadingPhoto || generatingAi) return;
-    if (!checkName(data.name).ok || !data.imageUrl || !checkDescription(data.description).ok ||
+    if (!checkName(data.name).ok || !validatePhone(data.phone).ok || !data.imageUrl || !checkDescription(data.description).ok ||
         !data.categoryId || data.eventTypes.length === 0 || !data.baseCity || !validTravelAmount || !validPackages) {
       toast.error(t("vendor.onboarding.errSubmit"));
       return;
@@ -313,7 +338,7 @@ export default function OnboardingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: data.name,
-          phone: "",
+          phone: data.phone,
           categoryId: data.categoryId,
           eventTypes: data.eventTypes,
           location: data.baseCity,
@@ -329,7 +354,13 @@ export default function OnboardingPage() {
         }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Unknown error" }));
+        const err = await res.json().catch(() => ({ error: "Unknown error", code: "" }));
+        if (err.code === "phone_in_use") {
+          setPhoneConflict(true);
+          setStep(1);
+          toast.error(t("vendor.onboarding.phoneInUse"));
+          return;
+        }
         throw new Error(err.error || `HTTP ${res.status}`);
       }
       toast.success(t("vendor.onboarding.submitted"));
@@ -349,7 +380,7 @@ export default function OnboardingPage() {
         return !!data.categoryId && data.eventTypes.length > 0;
       case 1:
         // Presence was the only rule, so "kk" walked straight through.
-        return checkName(data.name).ok && Boolean(data.imageUrl) && !uploadingPhoto;
+        return checkName(data.name).ok && validatePhone(data.phone).ok && Boolean(data.imageUrl) && !uploadingPhoto;
       case 2:
         // Still optional — but if something was typed, it has to say
         // something. "000" used to reach an admin for approval.
@@ -515,6 +546,37 @@ export default function OnboardingPage() {
             {data.name.trim().length > 0 && !checkName(data.name).ok && (
               <p className="mt-1.5 text-xs text-amber-500">
                 {t(textIssueKey("name", checkName(data.name).issue!))}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <Label className="mb-1.5 block">
+              {t("vendor.onboarding.phone")}
+            </Label>
+            <Input
+              ref={phoneInputRef}
+              type="tel"
+              autoComplete="tel"
+              value={data.phone}
+              aria-invalid={phoneConflict || (Boolean(data.phone.trim()) && !validatePhone(data.phone).ok)}
+              onChange={(event) => {
+                setPhoneConflict(false);
+                update({ phone: event.target.value });
+              }}
+              placeholder="+373 69 123 456"
+            />
+            {phoneConflict ? (
+              <p className="mt-1.5 text-xs text-destructive" role="alert">
+                {t("vendor.onboarding.phoneInUse")}
+              </p>
+            ) : data.phone.trim() && !validatePhone(data.phone).ok ? (
+              <p className="mt-1.5 text-xs text-destructive">
+                {t("vendor.onboarding.phoneInvalid")}
+              </p>
+            ) : (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {t("vendor.onboarding.phoneHint")}
               </p>
             )}
           </div>
@@ -937,6 +999,10 @@ export default function OnboardingPage() {
             <SummaryRow
               label={t("vendor.onboarding.sumName")}
               value={data.name}
+            />
+            <SummaryRow
+              label={t("vendor.onboarding.phoneSummary")}
+              value={data.phone}
             />
             <SummaryRow
               label={t("vendor.onboarding.eventTypesSummary")}
