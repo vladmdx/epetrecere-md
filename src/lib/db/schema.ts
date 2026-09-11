@@ -14,8 +14,10 @@ import {
   date,
   index,
   uniqueIndex,
+  unique,
   primaryKey,
   check,
+  foreignKey,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { TableShape } from "@/lib/planner/table-shape";
@@ -124,6 +126,276 @@ export const videoPlatformEnum = pgEnum("video_platform", [
 export const entityTypeEnum = pgEnum("entity_type", ["artist", "venue"]);
 
 export const redirectStatusEnum = pgEnum("redirect_status", ["301", "302"]);
+
+// ═══════════════════════════════════════════════════════
+// PARTNER ORGANIZATIONS → VENUES → HALLS (ADR 0028)
+// Expand-phase model. Behaviour gated by the MULTI_HALL feature flag.
+// ═══════════════════════════════════════════════════════
+
+export const partnerOrgTypeEnum = pgEnum("partner_org_type", [
+  "individual",
+  "sole_trader",
+  "company",
+]);
+
+/** Shared lifecycle status for organizations and halls. */
+export const partnerEntityStatusEnum = pgEnum("partner_entity_status", [
+  "draft",
+  "pending",
+  "active",
+  "rejected",
+  "suspended",
+  "archived",
+]);
+
+export const orgMemberRoleEnum = pgEnum("org_member_role", [
+  "owner",
+  "admin",
+  "manager",
+  "staff",
+]);
+
+export const hallPricingModelEnum = pgEnum("hall_pricing_model", [
+  "per_person",
+  "minimum_order",
+  "fixed",
+  "quote",
+]);
+
+export const hallDepositTypeEnum = pgEnum("hall_deposit_type", [
+  "none",
+  "percent",
+  "fixed",
+]);
+
+export const hallSeatingTypeEnum = pgEnum("hall_seating_type", [
+  "banquet",
+  "theatre",
+  "classroom",
+  "cocktail",
+  "u_shape",
+  "custom",
+]);
+
+export const reservationScopeEnum = pgEnum("reservation_scope", [
+  "hall",
+  "venue",
+]);
+
+export const scheduleBlockKindEnum = pgEnum("schedule_block_kind", [
+  "maintenance",
+  "sanitary_day",
+  "private_event",
+  "manual",
+  "external_calendar",
+]);
+
+// ── ADR 0028 tables ──────────────────────────────────────────────────────
+// Defined before `venues`/`venue_images`/`booking_requests` so their composite
+// foreign keys can reference venue_halls(id, venue_id) at module-eval time.
+
+export const partnerOrganizations = pgTable("partner_organizations", {
+  id: serial("id").primaryKey(),
+  type: partnerOrgTypeEnum("type").notNull().default("company"),
+  displayName: text("display_name").notNull(),
+  legalName: text("legal_name"),
+  idNumber: text("id_number"),
+  legalAddress: text("legal_address"),
+  billingEmail: text("billing_email"),
+  billingPhone: text("billing_phone"),
+  /** Server-side only. Never exposed in catalog, logs or public payloads. */
+  bankDetails: jsonb("bank_details").$type<Record<string, unknown>>(),
+  status: partnerEntityStatusEnum("status").notNull().default("active"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const partnerOrganizationMembers = pgTable(
+  "partner_organization_members",
+  {
+    id: serial("id").primaryKey(),
+    organizationId: integer("organization_id")
+      .references(() => partnerOrganizations.id, { onDelete: "cascade" })
+      .notNull(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    role: orgMemberRoleEnum("role").notNull().default("owner"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique("partner_org_members_org_user_unique").on(t.organizationId, t.userId),
+    index("partner_org_members_user_idx").on(t.userId),
+    index("partner_org_members_org_idx").on(t.organizationId),
+  ],
+);
+
+export const venueHalls = pgTable(
+  "venue_halls",
+  {
+    id: serial("id").primaryKey(),
+    venueId: integer("venue_id")
+      .references(() => venues.id, { onDelete: "cascade" })
+      .notNull(),
+    slug: text("slug").notNull(),
+    nameRo: text("name_ro").notNull(),
+    nameRu: text("name_ru"),
+    nameEn: text("name_en"),
+    descriptionRo: text("description_ro"),
+    descriptionRu: text("description_ru"),
+    descriptionEn: text("description_en"),
+    capacityMin: integer("capacity_min"),
+    capacityMax: integer("capacity_max"),
+    pricingModel: hallPricingModelEnum("pricing_model").notNull().default("per_person"),
+    basePrice: numeric("base_price", { precision: 12, scale: 2, mode: "number" }),
+    minimumOrder: numeric("minimum_order", { precision: 12, scale: 2, mode: "number" }),
+    currency: varchar("currency", { length: 3 }).notNull().default("EUR"),
+    depositType: hallDepositTypeEnum("deposit_type").notNull().default("none"),
+    depositValue: numeric("deposit_value", { precision: 12, scale: 2, mode: "number" }),
+    facilities: jsonb("facilities").$type<string[]>().default([]),
+    /** NULL = inherit the venue's working hours. */
+    workingHours: jsonb("working_hours").$type<Record<
+      string,
+      { open: string; close: string } | null
+    >>(),
+    /** NULL = inherit the venue's buffer. */
+    bufferMinutes: integer("buffer_minutes"),
+    bookingTermsRo: text("booking_terms_ro"),
+    bookingTermsRu: text("booking_terms_ru"),
+    bookingTermsEn: text("booking_terms_en"),
+    isLegacyDefault: boolean("is_legacy_default").notNull().default(false),
+    status: partnerEntityStatusEnum("status").notNull().default("draft"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("venue_halls_venue_slug_unique").on(t.venueId, t.slug),
+    // Enables composite FKs (hall_id, venue_id) on child tables.
+    unique("venue_halls_id_venue_unique").on(t.id, t.venueId),
+    uniqueIndex("venue_halls_one_legacy_default_per_venue")
+      .on(t.venueId)
+      .where(sql`${t.isLegacyDefault}`),
+    index("venue_halls_venue_status_sort_idx").on(t.venueId, t.status, t.sortOrder),
+    index("venue_halls_capacity_idx").on(t.venueId, t.capacityMin, t.capacityMax),
+    check(
+      "venue_halls_capacity_chk",
+      sql`${t.capacityMin} IS NULL OR ${t.capacityMax} IS NULL OR ${t.capacityMax} >= ${t.capacityMin}`,
+    ),
+  ],
+);
+
+export const venueHallSeatingOptions = pgTable(
+  "venue_hall_seating_options",
+  {
+    id: serial("id").primaryKey(),
+    hallId: integer("hall_id")
+      .references(() => venueHalls.id, { onDelete: "cascade" })
+      .notNull(),
+    type: hallSeatingTypeEnum("type").notNull(),
+    labelRo: text("label_ro"),
+    labelRu: text("label_ru"),
+    labelEn: text("label_en"),
+    capacityMin: integer("capacity_min"),
+    capacityMax: integer("capacity_max"),
+    notesRo: text("notes_ro"),
+    notesRu: text("notes_ru"),
+    notesEn: text("notes_en"),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("hall_seating_hall_idx").on(t.hallId, t.sortOrder)],
+);
+
+export const venueMenuSets = pgTable(
+  "venue_menu_sets",
+  {
+    id: serial("id").primaryKey(),
+    venueId: integer("venue_id")
+      .references(() => venues.id, { onDelete: "cascade" })
+      .notNull(),
+    nameRo: text("name_ro").notNull(),
+    nameRu: text("name_ru"),
+    nameEn: text("name_en"),
+    isDefault: boolean("is_default").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("venue_menu_sets_one_default_per_venue")
+      .on(t.venueId)
+      .where(sql`${t.isDefault}`),
+    index("venue_menu_sets_venue_idx").on(t.venueId),
+  ],
+);
+
+export const venueHallMenuSets = pgTable(
+  "venue_hall_menu_sets",
+  {
+    hallId: integer("hall_id")
+      .references(() => venueHalls.id, { onDelete: "cascade" })
+      .notNull(),
+    menuSetId: integer("menu_set_id")
+      .references(() => venueMenuSets.id, { onDelete: "cascade" })
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.hallId, t.menuSetId] })],
+);
+
+export const venueScheduleBlocks = pgTable(
+  "venue_schedule_blocks",
+  {
+    id: serial("id").primaryKey(),
+    venueId: integer("venue_id")
+      .references(() => venues.id, { onDelete: "cascade" })
+      .notNull(),
+    hallId: integer("hall_id"),
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    endsAt: timestamp("ends_at", { withTimezone: true }).notNull(),
+    kind: scheduleBlockKindEnum("kind").notNull().default("manual"),
+    reason: text("reason"),
+    source: text("source"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "venue_schedule_blocks_hall_venue_fk",
+      columns: [t.hallId, t.venueId],
+      foreignColumns: [venueHalls.id, venueHalls.venueId],
+    }).onDelete("set null"),
+    index("venue_schedule_blocks_venue_time_idx").on(t.venueId, t.startsAt, t.endsAt),
+    index("venue_schedule_blocks_hall_time_idx").on(t.hallId, t.startsAt, t.endsAt),
+    check("venue_schedule_blocks_interval_chk", sql`${t.endsAt} > ${t.startsAt}`),
+  ],
+);
+
+export const venueHallConflictGroups = pgTable(
+  "venue_hall_conflict_groups",
+  {
+    id: serial("id").primaryKey(),
+    venueId: integer("venue_id")
+      .references(() => venues.id, { onDelete: "cascade" })
+      .notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [index("venue_hall_conflict_groups_venue_idx").on(t.venueId)],
+);
+
+export const venueHallConflictGroupMembers = pgTable(
+  "venue_hall_conflict_group_members",
+  {
+    groupId: integer("group_id")
+      .references(() => venueHallConflictGroups.id, { onDelete: "cascade" })
+      .notNull(),
+    hallId: integer("hall_id")
+      .references(() => venueHalls.id, { onDelete: "cascade" })
+      .notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.groupId, t.hallId] })],
+);
 
 // ═══════════════════════════════════════════════════════
 // USERS
@@ -419,10 +691,17 @@ export const artistPackages = pgTable("artist_packages", {
 
 export const venues = pgTable("venues", {
   id: serial("id").primaryKey(),
-  // One user owns at most one venue. Enforced via UNIQUE constraint.
+  // Legacy ownership. Kept for compatibility during the expand phase; the
+  // canonical owner chain is user → membership → organization → venue.
+  // The UNIQUE constraint is only dropped in a later (contract) phase.
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "set null" })
     .unique(),
+  /** ADR 0028 — legal/billing holder this location belongs to. */
+  organizationId: integer("organization_id").references(
+    () => partnerOrganizations.id,
+    { onDelete: "set null" },
+  ),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),
@@ -493,18 +772,32 @@ export const venues = pgTable("venues", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-export const venueImages = pgTable("venue_images", {
-  id: serial("id").primaryKey(),
-  venueId: integer("venue_id")
-    .references(() => venues.id, { onDelete: "cascade" })
-    .notNull(),
-  url: text("url").notNull(),
-  altRo: text("alt_ro"),
-  altRu: text("alt_ru"),
-  altEn: text("alt_en"),
-  sortOrder: integer("sort_order").default(0),
-  isCover: boolean("is_cover").default(false).notNull(),
-});
+export const venueImages = pgTable(
+  "venue_images",
+  {
+    id: serial("id").primaryKey(),
+    venueId: integer("venue_id")
+      .references(() => venues.id, { onDelete: "cascade" })
+      .notNull(),
+    /** ADR 0028 — NULL = general/location image; non-null = hall image.
+     *  Composite FK below guarantees the hall belongs to this venue. */
+    hallId: integer("hall_id"),
+    url: text("url").notNull(),
+    altRo: text("alt_ro"),
+    altRu: text("alt_ru"),
+    altEn: text("alt_en"),
+    sortOrder: integer("sort_order").default(0),
+    isCover: boolean("is_cover").default(false).notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "venue_images_hall_venue_fk",
+      columns: [t.hallId, t.venueId],
+      foreignColumns: [venueHalls.id, venueHalls.venueId],
+    }).onDelete("set null"),
+    index("venue_images_hall_idx").on(t.hallId),
+  ],
+);
 
 // ═══════════════════════════════════════════════════════
 // VENUE DIGITAL MENU (Phase 3 — spec section 5)
@@ -515,6 +808,10 @@ export const venueMenuCategories = pgTable("venue_menu_categories", {
   venueId: integer("venue_id")
     .references(() => venues.id, { onDelete: "cascade" })
     .notNull(),
+  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour. */
+  menuSetId: integer("menu_set_id").references(() => venueMenuSets.id, {
+    onDelete: "set null",
+  }),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),
@@ -543,6 +840,10 @@ export const venueMenuPackages = pgTable("venue_menu_packages", {
   venueId: integer("venue_id")
     .references(() => venues.id, { onDelete: "cascade" })
     .notNull(),
+  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour. */
+  menuSetId: integer("menu_set_id").references(() => venueMenuSets.id, {
+    onDelete: "set null",
+  }),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),
@@ -569,6 +870,10 @@ export const menuScanCache = pgTable("menu_scan_cache", {
   venueId: integer("venue_id")
     .references(() => venues.id, { onDelete: "cascade" })
     .notNull(),
+  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour. */
+  menuSetId: integer("menu_set_id").references(() => venueMenuSets.id, {
+    onDelete: "set null",
+  }),
   /** SHA-256 of file bytes, hex. 64 chars. */
   fileHash: varchar("file_hash", { length: 64 }).notNull(),
   /** "image/jpeg" | "image/png" | "application/pdf" | "text/html" */
@@ -680,6 +985,11 @@ export const reviews = pgTable("reviews", {
   }),
   venueId: integer("venue_id").references(() => venues.id, {
     onDelete: "cascade",
+  }),
+  /** ADR 0028 — optional hall context for the reviewed booking. Review stays
+   *  at venue level; this only enriches per-hall aggregation. */
+  hallId: integer("hall_id").references(() => venueHalls.id, {
+    onDelete: "set null",
   }),
   /** M4 — FK to the booking the review is written for. Lets us enforce
    *  "one review per completed booking" and prove the author actually
@@ -1014,6 +1324,12 @@ export const legalAcceptances = pgTable(
     subjectType: text("subject_type").notNull(),
     artistId: integer("artist_id").references(() => artists.id, { onDelete: "set null" }),
     venueId: integer("venue_id").references(() => venues.id, { onDelete: "set null" }),
+    /** ADR 0028 — legal holder for organization-level acceptances. May be set
+     *  once (NULL → id); the append-only trigger forbids swapping/clearing. */
+    organizationId: integer("organization_id").references(
+      () => partnerOrganizations.id,
+      { onDelete: "set null" },
+    ),
 
     documentSlug: text("document_slug").notNull(),
     documentVersion: text("document_version").notNull(),
@@ -1066,6 +1382,11 @@ export const legalAcceptances = pgTable(
       t.documentVersion,
     ),
     index("legal_acceptances_user_idx").on(t.userId),
+    // ADR 0028 — one organization acceptance per (org, slug, version).
+    uniqueIndex("legal_acceptances_org_unique")
+      .on(t.organizationId, t.documentSlug, t.documentVersion)
+      .where(sql`${t.organizationId} IS NOT NULL`),
+    index("legal_acceptances_organization_idx").on(t.organizationId),
   ],
 );
 
@@ -1094,6 +1415,11 @@ export const commissions = pgTable(
     vendorType: text("vendor_type").notNull(), // "artist" | "venue"
     artistId: integer("artist_id").references(() => artists.id, { onDelete: "cascade" }),
     venueId: integer("venue_id").references(() => venues.id, { onDelete: "cascade" }),
+    /** ADR 0028 — hall context for per-hall reporting. SET NULL (not cascade)
+     *  so removing a hall never deletes financial evidence. */
+    hallId: integer("hall_id").references(() => venueHalls.id, { onDelete: "set null" }),
+    /** Snapshot of the hall name at commission time, for historical reports. */
+    hallNameSnapshot: text("hall_name_snapshot"),
 
     /** Order value the fee was computed from, in minor-unit-free integers. */
     baseAmount: integer("base_amount").notNull(),
@@ -1125,6 +1451,7 @@ export const commissions = pgTable(
     index("commissions_status_idx").on(t.status),
     index("commissions_artist_idx").on(t.artistId),
     index("commissions_venue_idx").on(t.venueId),
+    index("commissions_hall_idx").on(t.hallId),
   ],
 );
 
@@ -1152,6 +1479,22 @@ export const bookingRequests = pgTable("booking_requests", {
     .references(() => artists.id, { onDelete: "cascade" }),
   venueId: integer("venue_id")
     .references(() => venues.id, { onDelete: "set null" }),
+  /** ADR 0028 — concrete hall for venue bookings. Nullable in the expand
+   *  phase; required for new venue bookings once MULTI_HALL is enabled.
+   *  Composite FK below guarantees the hall belongs to `venueId`. */
+  hallId: integer("hall_id"),
+  /** `hall` = only this hall is occupied; `venue` = the whole location is
+   *  closed for the interval. */
+  reservationScope: reservationScopeEnum("reservation_scope"),
+  /** Canonical interval (tz-aware). Legacy event_date/start_time/end_time are
+   *  kept for compatibility during the transition. */
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  timezone: text("timezone"),
+  agreedCurrency: varchar("agreed_currency", { length: 3 }),
+  /** Immutable commercial snapshot frozen at confirmation (org/venue/hall,
+   *  pricing model, agreed price, deposit, package, terms). */
+  commercialSnapshot: jsonb("commercial_snapshot").$type<Record<string, unknown>>(),
   /** Optional link to the client's event plan so artist bookings show up in
    *  that plan's "Rezervări Artiști" tab and feed the budget. */
   eventPlanId: integer("event_plan_id")
@@ -1198,6 +1541,12 @@ export const bookingRequests = pgTable("booking_requests", {
   index("idx_booking_artist_status").on(t.artistId, t.status),
   index("idx_booking_client_user").on(t.clientUserId),
   index("idx_booking_event_plan").on(t.eventPlanId),
+  index("booking_requests_hall_idx").on(t.hallId),
+  foreignKey({
+    name: "booking_requests_hall_venue_fk",
+    columns: [t.hallId, t.venueId],
+    foreignColumns: [venueHalls.id, venueHalls.venueId],
+  }).onDelete("set null"),
 ]);
 
 /**
@@ -1786,6 +2135,7 @@ export const profileClicks = pgTable(
 export const usersRelations = relations(users, ({ many }) => ({
   artists: many(artists),
   venues: many(venues),
+  organizationMemberships: many(partnerOrganizationMembers),
   leads: many(leads, { relationName: "assignedLeads" }),
   blogPosts: many(blogPosts),
   aiConversations: many(aiConversations),
@@ -1824,6 +2174,12 @@ export const artistPackagesRelations = relations(artistPackages, ({ one }) => ({
 
 export const venuesRelations = relations(venues, ({ one, many }) => ({
   user: one(users, { fields: [venues.userId], references: [users.id] }),
+  organization: one(partnerOrganizations, {
+    fields: [venues.organizationId],
+    references: [partnerOrganizations.id],
+  }),
+  halls: many(venueHalls),
+  menuSets: many(venueMenuSets),
   images: many(venueImages),
   bookings: many(bookings),
   reviews: many(reviews),
@@ -1834,7 +2190,117 @@ export const venueImagesRelations = relations(venueImages, ({ one }) => ({
     fields: [venueImages.venueId],
     references: [venues.id],
   }),
+  hall: one(venueHalls, {
+    fields: [venueImages.hallId],
+    references: [venueHalls.id],
+  }),
 }));
+
+// ── ADR 0028 relations ───────────────────────────────────────────────────
+export const partnerOrganizationsRelations = relations(
+  partnerOrganizations,
+  ({ many }) => ({
+    members: many(partnerOrganizationMembers),
+    venues: many(venues),
+  }),
+);
+
+export const partnerOrganizationMembersRelations = relations(
+  partnerOrganizationMembers,
+  ({ one }) => ({
+    organization: one(partnerOrganizations, {
+      fields: [partnerOrganizationMembers.organizationId],
+      references: [partnerOrganizations.id],
+    }),
+    user: one(users, {
+      fields: [partnerOrganizationMembers.userId],
+      references: [users.id],
+    }),
+  }),
+);
+
+export const venueHallsRelations = relations(venueHalls, ({ one, many }) => ({
+  venue: one(venues, {
+    fields: [venueHalls.venueId],
+    references: [venues.id],
+  }),
+  seatingOptions: many(venueHallSeatingOptions),
+  menuSets: many(venueHallMenuSets),
+}));
+
+export const venueHallSeatingOptionsRelations = relations(
+  venueHallSeatingOptions,
+  ({ one }) => ({
+    hall: one(venueHalls, {
+      fields: [venueHallSeatingOptions.hallId],
+      references: [venueHalls.id],
+    }),
+  }),
+);
+
+export const venueMenuSetsRelations = relations(
+  venueMenuSets,
+  ({ one, many }) => ({
+    venue: one(venues, {
+      fields: [venueMenuSets.venueId],
+      references: [venues.id],
+    }),
+    halls: many(venueHallMenuSets),
+  }),
+);
+
+export const venueHallMenuSetsRelations = relations(
+  venueHallMenuSets,
+  ({ one }) => ({
+    hall: one(venueHalls, {
+      fields: [venueHallMenuSets.hallId],
+      references: [venueHalls.id],
+    }),
+    menuSet: one(venueMenuSets, {
+      fields: [venueHallMenuSets.menuSetId],
+      references: [venueMenuSets.id],
+    }),
+  }),
+);
+
+export const venueScheduleBlocksRelations = relations(
+  venueScheduleBlocks,
+  ({ one }) => ({
+    venue: one(venues, {
+      fields: [venueScheduleBlocks.venueId],
+      references: [venues.id],
+    }),
+    hall: one(venueHalls, {
+      fields: [venueScheduleBlocks.hallId],
+      references: [venueHalls.id],
+    }),
+  }),
+);
+
+export const venueHallConflictGroupsRelations = relations(
+  venueHallConflictGroups,
+  ({ one, many }) => ({
+    venue: one(venues, {
+      fields: [venueHallConflictGroups.venueId],
+      references: [venues.id],
+    }),
+    members: many(venueHallConflictGroupMembers),
+  }),
+);
+
+export const venueHallConflictGroupMembersRelations = relations(
+  venueHallConflictGroupMembers,
+  ({ one }) => ({
+    group: one(venueHallConflictGroups, {
+      fields: [venueHallConflictGroupMembers.groupId],
+      references: [venueHallConflictGroups.id],
+    }),
+    hall: one(venueHalls, {
+      fields: [venueHallConflictGroupMembers.hallId],
+      references: [venueHalls.id],
+    }),
+  }),
+);
 
 export const leadsRelations = relations(leads, ({ one, many }) => ({
   assignedUser: one(users, {
