@@ -327,20 +327,32 @@ export const venueMenuSets = pgTable(
       .on(t.venueId)
       .where(sql`${t.isDefault}`),
     index("venue_menu_sets_venue_idx").on(t.venueId),
+    // Enables same-venue composite FKs from menu rows and hall links.
+    unique("venue_menu_sets_id_venue_unique").on(t.id, t.venueId),
   ],
 );
 
 export const venueHallMenuSets = pgTable(
   "venue_hall_menu_sets",
   {
-    hallId: integer("hall_id")
-      .references(() => venueHalls.id, { onDelete: "cascade" })
-      .notNull(),
-    menuSetId: integer("menu_set_id")
-      .references(() => venueMenuSets.id, { onDelete: "cascade" })
-      .notNull(),
+    hallId: integer("hall_id").notNull(),
+    menuSetId: integer("menu_set_id").notNull(),
+    // Same-venue guard: both hall and set must belong to this venue.
+    venueId: integer("venue_id"),
   },
-  (t) => [primaryKey({ columns: [t.hallId, t.menuSetId] })],
+  (t) => [
+    primaryKey({ columns: [t.hallId, t.menuSetId] }),
+    foreignKey({
+      name: "venue_hall_menu_sets_hall_venue_fk",
+      columns: [t.hallId, t.venueId],
+      foreignColumns: [venueHalls.id, venueHalls.venueId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "venue_hall_menu_sets_set_venue_fk",
+      columns: [t.menuSetId, t.venueId],
+      foreignColumns: [venueMenuSets.id, venueMenuSets.venueId],
+    }).onDelete("cascade"),
+  ],
 );
 
 export const venueScheduleBlocks = pgTable(
@@ -381,20 +393,33 @@ export const venueHallConflictGroups = pgTable(
     name: text("name").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [index("venue_hall_conflict_groups_venue_idx").on(t.venueId)],
+  (t) => [
+    index("venue_hall_conflict_groups_venue_idx").on(t.venueId),
+    unique("venue_hall_conflict_groups_id_venue_unique").on(t.id, t.venueId),
+  ],
 );
 
 export const venueHallConflictGroupMembers = pgTable(
   "venue_hall_conflict_group_members",
   {
-    groupId: integer("group_id")
-      .references(() => venueHallConflictGroups.id, { onDelete: "cascade" })
-      .notNull(),
-    hallId: integer("hall_id")
-      .references(() => venueHalls.id, { onDelete: "cascade" })
-      .notNull(),
+    groupId: integer("group_id").notNull(),
+    hallId: integer("hall_id").notNull(),
+    // Same-venue guard: group and hall must belong to this venue.
+    venueId: integer("venue_id"),
   },
-  (t) => [primaryKey({ columns: [t.groupId, t.hallId] })],
+  (t) => [
+    primaryKey({ columns: [t.groupId, t.hallId] }),
+    foreignKey({
+      name: "conflict_members_group_venue_fk",
+      columns: [t.groupId, t.venueId],
+      foreignColumns: [venueHallConflictGroups.id, venueHallConflictGroups.venueId],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "conflict_members_hall_venue_fk",
+      columns: [t.hallId, t.venueId],
+      foreignColumns: [venueHalls.id, venueHalls.venueId],
+    }).onDelete("cascade"),
+  ],
 );
 
 // ═══════════════════════════════════════════════════════
@@ -808,10 +833,10 @@ export const venueMenuCategories = pgTable("venue_menu_categories", {
   venueId: integer("venue_id")
     .references(() => venues.id, { onDelete: "cascade" })
     .notNull(),
-  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour. */
-  menuSetId: integer("menu_set_id").references(() => venueMenuSets.id, {
-    onDelete: "set null",
-  }),
+  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour.
+   *  Same-venue integrity is enforced by a composite FK (menu_set_id, venue_id)
+   *  → venue_menu_sets(id, venue_id) in migration 0028 (authoritative). */
+  menuSetId: integer("menu_set_id"),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),
@@ -840,10 +865,9 @@ export const venueMenuPackages = pgTable("venue_menu_packages", {
   venueId: integer("venue_id")
     .references(() => venues.id, { onDelete: "cascade" })
     .notNull(),
-  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour. */
-  menuSetId: integer("menu_set_id").references(() => venueMenuSets.id, {
-    onDelete: "set null",
-  }),
+  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour.
+   *  Same-venue integrity enforced by composite FK in migration 0028. */
+  menuSetId: integer("menu_set_id"),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),
@@ -870,10 +894,9 @@ export const menuScanCache = pgTable("menu_scan_cache", {
   venueId: integer("venue_id")
     .references(() => venues.id, { onDelete: "cascade" })
     .notNull(),
-  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour. */
-  menuSetId: integer("menu_set_id").references(() => venueMenuSets.id, {
-    onDelete: "set null",
-  }),
+  /** ADR 0028 — optional menu-set scope; NULL keeps location-wide behaviour.
+   *  Same-venue integrity enforced by composite FK in migration 0028. */
+  menuSetId: integer("menu_set_id"),
   /** SHA-256 of file bytes, hex. 64 chars. */
   fileHash: varchar("file_hash", { length: 64 }).notNull(),
   /** "image/jpeg" | "image/png" | "application/pdf" | "text/html" */
@@ -987,10 +1010,9 @@ export const reviews = pgTable("reviews", {
     onDelete: "cascade",
   }),
   /** ADR 0028 — optional hall context for the reviewed booking. Review stays
-   *  at venue level; this only enriches per-hall aggregation. */
-  hallId: integer("hall_id").references(() => venueHalls.id, {
-    onDelete: "set null",
-  }),
+   *  at venue level; this only enriches per-hall aggregation. Same-venue
+   *  composite FK is defined in migration 0028 (authoritative). */
+  hallId: integer("hall_id"),
   /** M4 — FK to the booking the review is written for. Lets us enforce
    *  "one review per completed booking" and prove the author actually
    *  transacted with this vendor (Trustpilot-style verification). */
@@ -1012,7 +1034,13 @@ export const reviews = pgTable("reviews", {
    *  separate table. Empty array = text-only review. */
   photos: jsonb("photos").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  foreignKey({
+    name: "reviews_hall_venue_fk",
+    columns: [t.hallId, t.venueId],
+    foreignColumns: [venueHalls.id, venueHalls.venueId],
+  }).onDelete("set null"),
+]);
 
 // ═══════════════════════════════════════════════════════
 // BLOG
@@ -1375,14 +1403,14 @@ export const legalAcceptances = pgTable(
     contentHash: text("content_hash"),
   },
   (t) => [
-    uniqueIndex("legal_acceptances_unique").on(
-      t.userId,
-      t.subjectType,
-      t.documentSlug,
-      t.documentVersion,
-    ),
+    // ADR 0028 #5 — legacy/artist/venue uniqueness only. Scoped to
+    // organization_id IS NULL so the same representative can sign the same
+    // version for two DISTINCT organizations (org rows use the index below).
+    uniqueIndex("legal_acceptances_unique")
+      .on(t.userId, t.subjectType, t.documentSlug, t.documentVersion)
+      .where(sql`${t.organizationId} IS NULL`),
     index("legal_acceptances_user_idx").on(t.userId),
-    // ADR 0028 — one organization acceptance per (org, slug, version).
+    // One organization acceptance per (org, slug, version).
     uniqueIndex("legal_acceptances_org_unique")
       .on(t.organizationId, t.documentSlug, t.documentVersion)
       .where(sql`${t.organizationId} IS NOT NULL`),
@@ -1407,19 +1435,25 @@ export const commissions = pgTable(
   "commissions",
   {
     id: serial("id").primaryKey(),
-    /** One commission per booking. */
+    /** One commission per booking. ADR 0028 #6 — RESTRICT (not cascade): a
+     *  booking with a commission cannot be deleted, so financial evidence is
+     *  never destroyed. Archive the booking instead. */
     bookingRequestId: integer("booking_request_id")
       .notNull()
-      .references(() => bookingRequests.id, { onDelete: "cascade" }),
+      .references(() => bookingRequests.id, { onDelete: "restrict" }),
     /** Which side of the marketplace owes it. */
     vendorType: text("vendor_type").notNull(), // "artist" | "venue"
-    artistId: integer("artist_id").references(() => artists.id, { onDelete: "cascade" }),
-    venueId: integer("venue_id").references(() => venues.id, { onDelete: "cascade" }),
-    /** ADR 0028 — hall context for per-hall reporting. SET NULL (not cascade)
-     *  so removing a hall never deletes financial evidence. */
-    hallId: integer("hall_id").references(() => venueHalls.id, { onDelete: "set null" }),
-    /** Snapshot of the hall name at commission time, for historical reports. */
+    // ADR 0028 #6 — SET NULL (not cascade): keep the commission if the
+    // artist/venue row is removed; names are snapshotted below.
+    artistId: integer("artist_id").references(() => artists.id, { onDelete: "set null" }),
+    venueId: integer("venue_id").references(() => venues.id, { onDelete: "set null" }),
+    /** ADR 0028 — hall context for per-hall reporting. Same-venue composite FK
+     *  (hall_id, venue_id) with ON DELETE SET NULL (hall_id) is defined in
+     *  migration 0028 (authoritative); never deletes financial evidence. */
+    hallId: integer("hall_id"),
+    /** Snapshots so reports survive hall/venue deletion. */
     hallNameSnapshot: text("hall_name_snapshot"),
+    venueNameSnapshot: text("venue_name_snapshot"),
 
     /** Order value the fee was computed from, in minor-unit-free integers. */
     baseAmount: integer("base_amount").notNull(),
@@ -1452,6 +1486,11 @@ export const commissions = pgTable(
     index("commissions_artist_idx").on(t.artistId),
     index("commissions_venue_idx").on(t.venueId),
     index("commissions_hall_idx").on(t.hallId),
+    foreignKey({
+      name: "commissions_hall_venue_fk",
+      columns: [t.hallId, t.venueId],
+      foreignColumns: [venueHalls.id, venueHalls.venueId],
+    }).onDelete("set null"),
   ],
 );
 

@@ -1,30 +1,46 @@
-// M12 — Returns the venue owned by the currently signed-in user, or null.
-// Powers the venue owner dashboard detection and profile editor load.
+// M12 / ADR 0028 — Returns the venue the signed-in user administers.
+// Powers venue owner dashboard detection and the profile editor load.
 
 import { NextResponse } from "next/server";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venues, venueImages } from "@/lib/db/schema";
-import { getCurrentAppUser, listAccessibleVenueIds } from "@/lib/venue-access";
+import { getCurrentAppUser, resolveSelectedVenue } from "@/lib/venue-access";
 
-export async function GET() {
+export async function GET(req: Request) {
   const appUser = await getCurrentAppUser();
   if (!appUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // ADR 0028 — venues reachable via org membership (legacy owner chain
-  // included). Single-venue accounts keep returning their one venue.
-  const venueIds = await listAccessibleVenueIds(appUser.id);
-  if (venueIds.length === 0) {
-    return NextResponse.json({ venue: null });
+  // Explicit selection — never orderBy + limit(1) "first venue". An optional
+  // ?venueId= lets a multi-venue account address a specific location; when
+  // several are accessible and none is requested we return a typed
+  // VENUE_REQUIRED result instead of silently guessing.
+  const url = new URL(req.url);
+  const requested = url.searchParams.get("venueId");
+  const requestedId = requested != null ? Number(requested) : undefined;
+
+  const selection = await resolveSelectedVenue(appUser.id, requestedId);
+  if (!selection.ok) {
+    if (selection.reason === "ambiguous") {
+      return NextResponse.json({
+        venue: null,
+        code: "VENUE_REQUIRED",
+        reason: "AMBIGUOUS",
+        venueIds: selection.venueIds,
+      });
+    }
+    if (selection.reason === "forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.json({ venue: null }); // reason: "none"
   }
 
   const [venue] = await db
     .select()
     .from(venues)
-    .where(inArray(venues.id, venueIds))
-    .orderBy(venues.id)
+    .where(eq(venues.id, selection.venueId))
     .limit(1);
 
   if (!venue) {
