@@ -3,10 +3,10 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { venueImages, venues, users } from "@/lib/db/schema";
+import { venueImages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { requireVenueAccess } from "@/lib/venue-access";
 
 const updateSchema = z.object({
   altRo: z.string().max(500).nullable().optional(),
@@ -16,20 +16,16 @@ const updateSchema = z.object({
   isCover: z.boolean().optional(),
 });
 
+// ADR 0028 — resolve the image, then authorize via its venue's membership
+// chain (legacy venues.user_id fallback + global-admin bypass inside
+// requireVenueAccess). A forged image id from another org is rejected.
 async function loadOwnedImage(imageId: number) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
-  }
-
   const [row] = await db
     .select({
       imageId: venueImages.id,
       venueId: venueImages.venueId,
-      ownerId: venues.userId,
     })
     .from(venueImages)
-    .leftJoin(venues, eq(venues.id, venueImages.venueId))
     .where(eq(venueImages.id, imageId))
     .limit(1);
 
@@ -37,18 +33,9 @@ async function loadOwnedImage(imageId: number) {
     return { ok: false as const, status: 404, error: "Not found" };
   }
 
-  const [appUser] = await db
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!appUser) {
-    return { ok: false as const, status: 403, error: "Forbidden" };
-  }
-
-  const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
-  if (!isAdmin && row.ownerId !== appUser.id) {
-    return { ok: false as const, status: 403, error: "Forbidden" };
+  const access = await requireVenueAccess(row.venueId, "manager");
+  if (!access.ok) {
+    return { ok: false as const, status: access.status, error: access.error };
   }
 
   return {

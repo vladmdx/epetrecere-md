@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { venues, venueImages, reviews, users, redirects } from "@/lib/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
+import { requireVenueAccess } from "@/lib/venue-access";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
 import { venueOwnerFields } from "@/lib/validation/vendor-profile";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
@@ -130,20 +131,14 @@ export async function PUT(
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // ADR 0028 — ownership resolved through the membership chain (with a legacy
+  // venues.user_id fallback and global-admin bypass). A forged venue id that
+  // belongs to another organization is rejected with 403/404 here.
+  const access = await requireVenueAccess(venueId, "manager");
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
-
-  const [appUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-
-  if (!appUser) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
+  const isAdmin = access.viaAdmin;
 
   const [venue] = await db
     .select({
@@ -161,14 +156,6 @@ export async function PUT(
 
   if (!venue) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // Allow admin OR venue owner
-  const admin = await requireAdmin();
-  const isAdmin = admin.ok;
-
-  if (!isAdmin && venue.userId !== appUser.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await req.json();
