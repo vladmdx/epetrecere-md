@@ -16,8 +16,6 @@ import { e2eDatabaseConfig, verifyE2EDatabase } from "../e2e/helpers/safety";
 const config = e2eDatabaseConfig();
 process.env.DATABASE_URL = config.url;
 process.env.E2E_RUNTIME = "1";
-await verifyE2EDatabase(config);
-
 const client = postgres(config.url, { max: 1, prepare: false, ssl: false });
 const migration = "src/lib/db/migrations/manual/0029_calendar_hall_booking.sql";
 const log = (message: string) => console.log(message);
@@ -240,11 +238,16 @@ async function main() {
   }
 }
 
-main()
-  .catch((error) => {
-    console.error(error);
-    process.exitCode = 1;
-  })
-  .finally(async () => {
+async function run() {
+  await verifyE2EDatabase(config);
+  try {
+    await main();
+  } finally {
     await client.end({ timeout: 1 });
-  });
+  }
+}
+
+void run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
