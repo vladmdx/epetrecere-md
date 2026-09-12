@@ -1,7 +1,8 @@
 // M5 — In-app notification dispatcher + email.
 //
-// Enqueues an in-app notification row and optionally sends an email.
-// Swallows errors so notification failures never break the triggering action.
+// Enqueues an in-app notification row and optionally sends external channels.
+// Normal calls stay best-effort. Durable outbox calls surface provider errors
+// so the worker can record a failed attempt and retry later.
 //
 // Digest frequency: user-level setting in `users.notificationDigestFrequency`
 // controls email cadence:
@@ -60,6 +61,34 @@ export interface DispatchInput {
   emailHtml?: string;
   /** Durable idempotency key (unique per user). */
   dedupeKey?: string;
+}
+
+type PushResult = { sent: number; pruned: number; failed?: number };
+type WhatsAppResult = { sent: boolean; reason?: string };
+
+export interface DispatchOptions {
+  /**
+   * Durable callers retry external channels from an outbox. In this mode a
+   * duplicate in-app row does not suppress email/push and provider failures
+   * are returned to the worker instead of being swallowed.
+   */
+  delivery?: "best-effort" | "durable";
+  /** Test seam; production callers use the lazily imported channel drivers. */
+  drivers?: {
+    sendPushToUser?: (
+      userId: string,
+      payload: { title: string; body?: string; actionUrl?: string; tag?: string },
+    ) => Promise<PushResult>;
+    sendWhatsAppToUser?: (
+      userId: string,
+      payload: { title: string; body: string; actionUrl?: string },
+    ) => Promise<WhatsAppResult>;
+    sendEmail?: (input: {
+      to: string;
+      subject: string;
+      html: string;
+    }) => Promise<unknown>;
+  };
 }
 
 /**
@@ -124,90 +153,125 @@ async function resolvePrefs(
   };
 }
 
-export async function dispatchNotification(input: DispatchInput): Promise<void> {
-  try {
-    // In-app notification — always inserted regardless of channel prefs.
-    // Users can still see them in the bell dropdown even if they muted
-    // email + push for that category.
-    const inserted = await db.insert(notifications).values({
-      userId: input.userId,
-      type: input.type,
+function providerError(result: unknown): unknown {
+  if (!result || typeof result !== "object" || !("error" in result)) return null;
+  return (result as { error?: unknown }).error ?? null;
+}
+
+async function performDispatch(
+  input: DispatchInput,
+  options: DispatchOptions,
+): Promise<void> {
+  const durable = options.delivery === "durable";
+  if (durable && !input.dedupeKey) {
+    throw new Error("durable_notification_requires_dedupe_key");
+  }
+
+  // In-app notification — exactly once when a durable dedupe key is present.
+  const inserted = await db.insert(notifications).values({
+    userId: input.userId,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    actionUrl: input.actionUrl,
+    dedupeKey: input.dedupeKey ?? null,
+  }).onConflictDoNothing().returning({ id: notifications.id });
+  // Legacy/best-effort calls preserve the old behavior. Durable retries must
+  // continue to the external channels even though their DB row already exists.
+  if (!durable && input.dedupeKey && inserted.length === 0) return;
+
+  const prefs = await resolvePrefs(input.userId, String(input.type));
+  const durableDeliveries: Array<() => Promise<void>> = [];
+  const push = async () => {
+    const sender = options.drivers?.sendPushToUser
+      ?? (await import("@/lib/push/send")).sendPushToUser;
+    const result = await sender(input.userId, {
       title: input.title,
-      message: input.message,
+      body: input.message ?? "",
+      actionUrl: input.actionUrl ?? "/",
+      tag: String(input.type),
+    });
+    if ((result.failed ?? 0) > 0) {
+      throw new Error(`push_delivery_failed:${result.failed}`);
+    }
+  };
+  if (prefs.push) {
+    if (durable) durableDeliveries.push(push);
+    else void push().catch((error) => console.error("[notifications] push failed:", error));
+  }
+
+  const whatsapp = async () => {
+    const sender = options.drivers?.sendWhatsAppToUser
+      ?? (await import("@/lib/whatsapp/send")).sendWhatsAppToUser;
+    const result = await sender(input.userId, {
+      title: input.title,
+      body: input.message ?? "",
       actionUrl: input.actionUrl,
-      dedupeKey: input.dedupeKey ?? null,
-    }).onConflictDoNothing().returning({ id: notifications.id });
-    if (input.dedupeKey && inserted.length === 0) return;
+    });
+    if (result.reason === "api-error") throw new Error("whatsapp_delivery_failed");
+  };
+  if (CRITICAL_TYPES.has(String(input.type))) {
+    if (durable) durableDeliveries.push(whatsapp);
+    else void whatsapp().catch((error) => console.error("[notifications] whatsapp failed:", error));
+  }
 
-    const prefs = await resolvePrefs(input.userId, String(input.type));
-
-    // Web Push — gated by the recipient's push preference for this type's
-    // category. Still fire-and-forget so a slow push API doesn't stall.
-    if (prefs.push) {
-      void (async () => {
-        try {
-          const { sendPushToUser } = await import("@/lib/push/send");
-          await sendPushToUser(input.userId, {
-            title: input.title,
-            body: input.message ?? "",
-            actionUrl: input.actionUrl ?? "/",
-            tag: String(input.type),
-          });
-        } catch (err) {
-          console.error("[notifications] push failed:", err);
-        }
-      })();
+  // Email — gated by preferences and digest cadence. Critical confirmation
+  // messages bypass the digest as before.
+  if (input.email && input.emailHtml && prefs.email) {
+    const isCritical = CRITICAL_TYPES.has(String(input.type));
+    let shouldEmailNow = true;
+    if (!isCritical) {
+      const [userRow] = await db
+        .select({ freq: users.notificationDigestFrequency })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      const freq = (userRow?.freq ?? "instant").toLowerCase();
+      if (freq === "daily" || freq === "weekly") shouldEmailNow = false;
     }
-
-    // WhatsApp — only for critical time-sensitive events. Fire-and-forget.
-    // Safe no-op when WhatsApp env vars or user.phone are missing.
-    if (CRITICAL_TYPES.has(String(input.type))) {
-      void (async () => {
-        try {
-          const { sendWhatsAppToUser } = await import("@/lib/whatsapp/send");
-          await sendWhatsAppToUser(input.userId, {
-            title: input.title,
-            body: input.message ?? "",
-            actionUrl: input.actionUrl,
-          });
-        } catch (err) {
-          console.error("[notifications] whatsapp failed:", err);
-        }
-      })();
-    }
-
-    // Email — gated by (a) per-type preference and (b) the digest
-    // frequency, unless the event is critical (time-sensitive updates
-    // that always ship instantly).
-    if (input.email && input.emailHtml && prefs.email) {
-      const isCritical = CRITICAL_TYPES.has(String(input.type));
-      let shouldEmailNow = true;
-      if (!isCritical) {
-        const [userRow] = await db
-          .select({ freq: users.notificationDigestFrequency })
-          .from(users)
-          .where(eq(users.id, input.userId))
-          .limit(1);
-        const freq = (userRow?.freq ?? "instant").toLowerCase();
-        if (freq === "daily" || freq === "weekly") {
-          // Queued for digest cron — skip immediate send. The notification row
-          // above is the source of truth the cron reads from.
-          shouldEmailNow = false;
-        }
-      }
-      if (shouldEmailNow) {
-        const { sendEmail } = await import("@/lib/email/send");
-        await sendEmail({
-          to: input.email,
+    if (shouldEmailNow) {
+      const email = async () => {
+        const sender = options.drivers?.sendEmail
+          ?? (await import("@/lib/email/send")).sendEmail;
+        const result = await sender({
+          to: input.email!,
           subject: input.emailSubject || input.title,
-          html: input.emailHtml,
-        }).catch((err) =>
-          console.error("[notifications] email failed:", err),
-        );
-      }
+          html: input.emailHtml!,
+        });
+        const error = providerError(result);
+        if (error) throw new Error("email_delivery_failed", { cause: error });
+      };
+      if (durable) durableDeliveries.push(email);
+      else await email();
     }
-  } catch (err) {
-    console.error("[notifications] dispatch failed", err);
+  }
+
+  if (durable) {
+    // Try every enabled channel even when one provider is down. The outbox
+    // remains failed if any channel failed and retries the whole set, which is
+    // deliberately at-least-once for external systems.
+    const results = await Promise.allSettled(durableDeliveries.map((deliver) => deliver()));
+    const failures = results
+      .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+      .map((result) => result.reason);
+    if (failures.length > 0) {
+      throw new AggregateError(failures, "notification_channel_delivery_failed");
+    }
+  }
+}
+
+export async function dispatchNotification(
+  input: DispatchInput,
+  options: DispatchOptions = {},
+): Promise<void> {
+  if (options.delivery === "durable") {
+    await performDispatch(input, options);
+    return;
+  }
+  try {
+    await performDispatch(input, options);
+  } catch (error) {
+    console.error("[notifications] dispatch failed", error);
   }
 }
 

@@ -280,6 +280,7 @@ export async function PUT(
     if (booking.status === "confirmed_by_client") {
       try {
         const row = await replayConfirmationEffects(booking);
+        scheduleConfirmationNotifications(row);
         return NextResponse.json({ success: true, status: row.status });
       } catch (error) {
         if (error instanceof BookingChangedError) {
@@ -346,6 +347,7 @@ export async function PUT(
     if (booking.venueId && booking.status === "confirmed_by_client") {
       try {
         const row = await replayConfirmationEffects(booking);
+        scheduleConfirmationNotifications(row);
         return NextResponse.json({ success: true, status: row.status });
       } catch (error) {
         if (error instanceof BookingChangedError) {

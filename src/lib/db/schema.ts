@@ -1678,10 +1678,14 @@ export const bookingRequests = pgTable("booking_requests", {
   check("booking_requests_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
 ]);
 
+export type BookingEffectStatus = "pending" | "processing" | "failed" | "delivered";
+
 /**
- * One-shot external effects for a booking (emails / in-app notify).
- * Insert in the same transaction as the status change; skip if the key exists.
- * Authoritative SQL: 0030.
+ * Durable external effects for a booking (emails / push / in-app notify).
+ *
+ * The row is inserted in the same transaction as the confirmation. Workers
+ * claim it with a renewable lease and only mark it delivered after every
+ * channel has returned successfully. Authoritative SQL: 0030 + 0031.
  */
 export const bookingEffectOutbox = pgTable(
   "booking_effect_outbox",
@@ -1691,9 +1695,42 @@ export const bookingEffectOutbox = pgTable(
       .notNull()
       .references(() => bookingRequests.id, { onDelete: "cascade" }),
     effectKey: text("effect_key").notNull(),
+    status: text("status")
+      .$type<BookingEffectStatus>()
+      .default("pending")
+      .notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
-  (t) => [unique("booking_effect_outbox_booking_key_unique").on(t.bookingId, t.effectKey)],
+  (t) => [
+    unique("booking_effect_outbox_booking_key_unique").on(t.bookingId, t.effectKey),
+    index("booking_effect_outbox_due_idx").on(
+      t.effectKey,
+      t.status,
+      t.nextAttemptAt,
+    ),
+    check(
+      "booking_effect_outbox_status_chk",
+      sql`${t.status} IN ('pending', 'processing', 'failed', 'delivered')`,
+    ),
+    check("booking_effect_outbox_attempts_chk", sql`${t.attempts} >= 0`),
+    check(
+      "booking_effect_outbox_state_chk",
+      sql`(
+        (${t.status} = 'processing' AND ${t.leaseToken} IS NOT NULL AND ${t.leaseUntil} IS NOT NULL AND ${t.deliveredAt} IS NULL)
+        OR (${t.status} = 'delivered' AND ${t.deliveredAt} IS NOT NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
+        OR (${t.status} IN ('pending', 'failed') AND ${t.deliveredAt} IS NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
+      )`,
+    ),
+  ],
 );
 
 /**

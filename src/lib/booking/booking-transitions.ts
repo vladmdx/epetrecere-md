@@ -7,7 +7,6 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { bookingRequests, calendarEvents } from "@/lib/db/schema";
 import { persistConfirmationEffects } from "./confirmation-persist";
-import { claimBookingEffect } from "./effect-outbox";
 import { withVenueAvailabilityWrite } from "./venue-booking-write";
 import { cancelCommissionForBooking } from "@/lib/commissions/service";
 
@@ -233,8 +232,4 @@ export async function replayConfirmationEffects(booking: BookingRow): Promise<Bo
     }
     return persistConfirmationEffects(executor, locked);
   });
-}
-
-export async function claimConfirmationNotify(bookingId: number, executor: Executor = db): Promise<boolean> {
-  return claimBookingEffect(executor, bookingId, "confirm_notify");
 }

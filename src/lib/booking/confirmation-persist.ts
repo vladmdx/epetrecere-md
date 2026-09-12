@@ -2,6 +2,10 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { bookingRequests, calendarEvents } from "@/lib/db/schema";
 import { ensureCommissionForBooking } from "@/lib/commissions/service";
+import {
+  CONFIRMATION_NOTIFICATION_EFFECT,
+  enqueueBookingEffect,
+} from "./effect-outbox";
 
 type Booking = typeof bookingRequests.$inferSelect;
 type Executor = typeof db;
@@ -54,5 +58,9 @@ export async function persistConfirmationEffects(executor: Executor, b: Booking)
     if (updated) row = updated;
   }
   await projectBookingOntoCalendar(executor, row);
+  // This insert commits atomically with confirmation, the commission and the
+  // calendar projection. `after()` is only an immediate delivery accelerator;
+  // cron workers can always recover this durable row after a process crash.
+  await enqueueBookingEffect(executor, row.id, CONFIRMATION_NOTIFICATION_EFFECT);
   return row;
 }

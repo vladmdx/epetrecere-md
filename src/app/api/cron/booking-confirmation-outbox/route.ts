@@ -1,0 +1,21 @@
+import { NextRequest, NextResponse } from "next/server";
+import { drainConfirmationNotificationOutbox } from "@/lib/booking/confirmation-effects";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+/** Redundant durable-outbox runner. Vercel supplies CRON_SECRET as Bearer. */
+export async function GET(req: NextRequest) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    console.error("[cron/booking-outbox] CRON_SECRET not configured");
+    return NextResponse.json({ error: "Cron not configured" }, { status: 503 });
+  }
+  if (req.headers.get("authorization") !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const result = await drainConfirmationNotificationOutbox({ limit: 50 });
+  return NextResponse.json(result);
+}

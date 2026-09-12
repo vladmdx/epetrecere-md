@@ -49,15 +49,15 @@ export interface PushPayload {
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
-): Promise<{ sent: number; pruned: number }> {
-  if (!ensureConfigured()) return { sent: 0, pruned: 0 };
+): Promise<{ sent: number; pruned: number; failed: number }> {
+  if (!ensureConfigured()) return { sent: 0, pruned: 0, failed: 0 };
 
   const subs = await db
     .select()
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.userId, userId));
 
-  if (subs.length === 0) return { sent: 0, pruned: 0 };
+  if (subs.length === 0) return { sent: 0, pruned: 0, failed: 0 };
 
   const body = JSON.stringify({
     title: payload.title,
@@ -68,6 +68,7 @@ export async function sendPushToUser(
 
   let sent = 0;
   let pruned = 0;
+  let failed = 0;
   const deadEndpoints: string[] = [];
 
   await Promise.all(
@@ -88,6 +89,7 @@ export async function sendPushToUser(
           deadEndpoints.push(s.endpoint);
           pruned += 1;
         } else {
+          failed += 1;
           console.error("[push] send failed", statusCode, err);
         }
       }
@@ -104,7 +106,7 @@ export async function sendPushToUser(
     }
   }
 
-  return { sent, pruned };
+  return { sent, pruned, failed };
 }
 
 export function isPushConfigured(): boolean {

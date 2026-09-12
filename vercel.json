@@ -10,6 +10,10 @@
     {
       "path": "/api/cron/expire-bookings",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/booking-confirmation-outbox",
+      "schedule": "10 4 * * *"
     }
   ],
   "installCommand": "npm install --workspaces=false --legacy-peer-deps",

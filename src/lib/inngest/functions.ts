@@ -21,6 +21,7 @@ import {
 } from "@/lib/google/calendar";
 import { revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 import { isGuestTokenActive } from "@/lib/invitations/access";
+import { drainConfirmationNotificationOutbox } from "@/lib/booking/confirmation-effects";
 
 // Trigger 1: New lead → emails
 export const onLeadCreated = inngest.createFunction(
@@ -343,6 +344,22 @@ export const expirePendingBookings = inngest.createFunction(
   },
 );
 
+// Durable confirmation effects. `after()` gives the fast path; this poller
+// recovers a process crash before/after that callback. A second Vercel cron
+// provides the same recovery path when either scheduler is temporarily down.
+export const bookingConfirmationOutbox = inngest.createFunction(
+  {
+    id: "booking-confirmation-outbox",
+    triggers: [{ cron: "*/5 * * * *" }],
+    concurrency: { limit: 1 },
+  },
+  async ({ step }) => {
+    return step.run("deliver-booking-confirmations", async () =>
+      drainConfirmationNotificationOutbox({ limit: 50 }),
+    );
+  },
+);
+
 /**
  * Google Calendar pull sync — spec section 2.6.
  *
@@ -506,5 +523,6 @@ export const functions = [
   eventReminder,
   invitationRsvpReminders,
   expirePendingBookings,
+  bookingConfirmationOutbox,
   googleCalendarSync,
 ];
