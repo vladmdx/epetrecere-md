@@ -205,19 +205,14 @@ for IDOR-sensitive id-from-client gates; `listAccessibleVenueIds` /
   now): `auth/register-venue`, `auth/register-artist`, `auth/select-role`, and
   `api/legal/accept` (still links acceptances via the legacy owner; wiring them
   to write `organization_id` is phase 3 onboarding).
-- Notification-recipient *email* resolution that still reads the legacy owner
-  (not an authorization gate; single-owner-safe today): the vendor-email lookups
-  in `booking-requests/[id]`, `chat`, `conversations/[id]/messages`,
-  `reviews/from-booking`, `reviews/request`, and `booking-requests/route`
-  recipient/creation paths.
 - Admin views (phase 6): `admin/contracte`, `admin/registration-requests`
   (still map contracts by legacy owner; org-grouping is phase 6).
 - Inngest Google-Calendar sync (`inngest/functions`): kept on the per-user
   legacy owner chain deliberately, so a co-managed org venue is not double-synced
   from multiple members' tokens (phase 6).
-- GDPR `me/data-export` and `me/delete-account`: intentionally scoped to venues
-  the user *personally* owns (`venues.user_id`), not org venues co-managed with
-  others; org-wide export/last-owner-transfer is phase 6.
+- Organization-wide GDPR export is phase 6. Personal export/deletion now avoids
+  organization-owned customer data, exports membership metadata, and blocks a
+  last owner until ownership is transferred.
 
 An IDOR regression (`scripts/venue-multihall-access-regression.test.ts`) proves
 organization A cannot reach organization B's venue/hall, that disabled/removed/
@@ -248,10 +243,11 @@ demoted members lose access, and that the flag switches the behaviour off.
   projections (`booking_id IS NULL`).
 - **Owner-less venues** create a persistent row in `partner_admin_review_cases`
   (not a `RAISE NOTICE`).
-- **E2E test safety (P0):** the suite loads only `.env.test.local`, requires a
-  dedicated `E2E_DATABASE_URL` + `E2E_DB_IS_TEST=1`, refuses anything that looks
-  like production centrally at import time (no `ALLOW_PROD` escape), and has no
-  `epetrecere.md` fallback. `test:e2e:prod` was removed.
+- **E2E test safety (P0):** the suite loads only `.env.test.local`, accepts only
+  a loopback app server and loopback PostgreSQL, verifies a database-resident
+  marker against `E2E_DB_MARKER`, starts its own Next server with
+  `DATABASE_URL=E2E_DATABASE_URL`, and refuses to reuse an existing server.
+  There is no production/staging escape hatch.
 
 ### Legacy `bookings` table strategy (CP3 #4)
 
@@ -263,6 +259,29 @@ forward). Migrating or dual-reading the legacy `bookings` rows for hall-aware
 analytics is deferred to phase 6 (the analytics/reporting consumer phase); until
 then analytics that read `bookings` remain venue-level, which matches their
 current behaviour and does not regress.
+
+## 6c. Correction Pass 4 (final phases 0–2 hardening)
+
+- Access now requires both an active membership and an active organization.
+  A central capability matrix defines profile/AI/financial/review actions as
+  owner/admin, calendar/menu/booking actions as manager+, and private reads as
+  staff+.
+- All venue notifications resolve active owner/admin members. The transitional
+  `venues.user_id` is ignored once a venue belongs to an organization.
+- Personal DSR export and account erasure touch only organization-less legacy
+  venues. A last organization owner receives
+  `LAST_ORG_OWNER_TRANSFER_REQUIRED` before any storage/database mutation.
+- Venue iCal URLs are membership-scoped and stop validating when membership is
+  removed/deactivated or the organization is suspended. Calendar feeds no
+  longer expose phone numbers, request messages, or private blackout notes.
+- Destructive E2E is loopback-only, database-marker verified, Clerk-test-key
+  verified, and starts its own Next server against the same database.
+- Migration 0028 handles ambiguous legacy legal acceptances without deleting
+  evidence, uses venue timezones, excludes booking-derived calendar projections
+  by source, enables RLS on every new public-schema server table, and includes
+  lock/statement timeouts.
+- `drizzle-kit push/generate` package scripts were removed. Until migration
+  history is consolidated, reviewed manual SQL is the sole DDL authority.
 
 ## 7. Known availability defects to fix in phase 4 (recorded, not fixed here)
 

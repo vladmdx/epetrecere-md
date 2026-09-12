@@ -10,20 +10,13 @@
  *     preserved) but is RESTRICTed when the hall still has schedule blocks
  *     (hall blocks are never silently turned into whole-venue blocks).
  *
- * Safety: refuses any non-local database unless ALLOW_NONLOCAL_TEST_DB=1.
- * Run: DATABASE_URL=postgres://…localhost… npx tsx --test scripts/venue-multihall-schema-regression.test.ts
+ * Safety: requires the marker-verified disposable local E2E database.
+ * Run: npm run test:multihall:schema
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 
-const DB_URL = process.env.DATABASE_URL ?? "";
-const isLocal = /@(localhost|127\.0\.0\.1|::1)[:/]/.test(DB_URL) || /host=(localhost|127\.0\.0\.1)/.test(DB_URL);
-if (!isLocal && process.env.ALLOW_NONLOCAL_TEST_DB !== "1") {
-  throw new Error("Refusing to run destructive tests against a non-local database.");
-}
-if (/epetrecere\.md|prod/i.test(DB_URL)) throw new Error("Refusing: looks like production.");
-
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "../src/lib/db";
 import {
   users, venues, venueHalls, bookingRequests, commissions,
@@ -126,4 +119,29 @@ test("[#3] deleting a hall that still has a schedule block is RESTRICTed (archiv
   // cleanup this sub-fixture
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.hallId, h3.id));
   await db.delete(venueHalls).where(eq(venueHalls.id, h3.id));
+});
+
+test("new server-only tables have RLS and no anon/authenticated grants", async () => {
+  const result = await db.execute(sql`
+    SELECT c.relname,
+      c.relrowsecurity,
+      count(p.grantee) FILTER (WHERE p.privilege_type IS NOT NULL)::int AS client_grants
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN information_schema.role_table_grants p
+      ON p.table_schema = n.nspname AND p.table_name = c.relname
+      AND p.grantee IN ('anon', 'authenticated')
+    WHERE n.nspname = 'public' AND c.relname IN (
+      'partner_organizations', 'partner_organization_members', 'venue_halls',
+      'venue_hall_seating_options', 'venue_menu_sets', 'venue_hall_menu_sets',
+      'venue_schedule_blocks', 'venue_hall_conflict_groups',
+      'venue_hall_conflict_group_members', 'partner_admin_review_cases'
+    )
+    GROUP BY c.relname, c.relrowsecurity
+  `) as unknown as Array<{ relname: string; relrowsecurity: boolean; client_grants: number }>;
+  assert.equal(result.length, 10);
+  for (const row of result) {
+    assert.equal(row.relrowsecurity, true, `${row.relname} must have RLS enabled`);
+    assert.equal(row.client_grants, 0, `${row.relname} must not grant anon/authenticated`);
+  }
 });

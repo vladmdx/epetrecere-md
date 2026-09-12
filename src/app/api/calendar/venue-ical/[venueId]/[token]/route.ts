@@ -44,7 +44,7 @@ export async function GET(
   const venueId = Number(venueIdStr);
   const token = rawToken.replace(/\.ics$/i, "");
 
-  if (!Number.isFinite(venueId) || !verifyVenueIcalToken(venueId, token)) {
+  if (!Number.isFinite(venueId) || !(await verifyVenueIcalToken(venueId, token))) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
@@ -105,10 +105,8 @@ export async function GET(
         : `🟡 ${eventType} — ${clientName}`;
     const descParts = [
       `Client: ${clientName}`,
-      b.status === "confirmed_by_client" && b.clientPhone ? `Telefon: ${b.clientPhone}` : "",
       b.guestCount ? `Invitați: ${b.guestCount}` : "",
       b.startTime && b.endTime ? `Ora: ${b.startTime}–${b.endTime}` : "",
-      b.message ? `Mesaj: ${bookingTextForViewer(b.message, shared)}` : "",
     ].filter(Boolean);
 
     lines.push(
@@ -136,7 +134,7 @@ export async function GET(
       `DTSTAMP:${formatDateTime(c.createdAt ?? now)}`,
       `DTSTART;VALUE=DATE:${start}`,
       `DTEND;VALUE=DATE:${end}`,
-      `SUMMARY:${escapeIcs(`⛔ Indisponibil${c.note ? ` — ${c.note}` : ""}`)}`,
+      `SUMMARY:${escapeIcs("⛔ Indisponibil")}`,
       "TRANSP:OPAQUE",
       "END:VEVENT",
     );

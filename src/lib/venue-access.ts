@@ -23,6 +23,7 @@ import { auth } from "@clerk/nextjs/server";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  partnerOrganizations,
   partnerOrganizationMembers,
   users,
   venueHalls,
@@ -31,6 +32,33 @@ import {
 import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 export type OrgRole = "owner" | "admin" | "manager" | "staff";
+
+/**
+ * Central capability matrix for venue work. Route handlers should ask for a
+ * capability instead of inventing their own role threshold.
+ */
+export type VenueCapability =
+  | "view_private"
+  | "manage_bookings"
+  | "manage_calendar"
+  | "manage_menu"
+  | "manage_profile"
+  | "manage_ai"
+  | "manage_financials"
+  | "request_reviews"
+  | "manage_members";
+
+export const VENUE_CAPABILITY_MIN_ROLE: Record<VenueCapability, OrgRole> = {
+  view_private: "staff",
+  manage_bookings: "manager",
+  manage_calendar: "manager",
+  manage_menu: "manager",
+  manage_profile: "admin",
+  manage_ai: "admin",
+  manage_financials: "admin",
+  request_reviews: "admin",
+  manage_members: "owner",
+};
 
 const ROLE_RANK: Record<OrgRole, number> = {
   staff: 1,
@@ -99,11 +127,16 @@ async function membershipRole(
   const rows = await db
     .select({ role: partnerOrganizationMembers.role })
     .from(partnerOrganizationMembers)
+    .innerJoin(
+      partnerOrganizations,
+      eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+    )
     .where(
       and(
         eq(partnerOrganizationMembers.userId, userId),
         eq(partnerOrganizationMembers.organizationId, organizationId),
         eq(partnerOrganizationMembers.isActive, true),
+        eq(partnerOrganizations.status, "active"),
       ),
     );
   if (rows.length === 0) return null;
@@ -199,6 +232,14 @@ export async function authorizeVenueAccess(
   return { ok: false, status: 403, error: "Forbidden" };
 }
 
+export async function authorizeVenueCapability(
+  user: AppUser,
+  venueId: number,
+  capability: VenueCapability,
+): Promise<VenueAccess | AccessError> {
+  return authorizeVenueAccess(user, venueId, VENUE_CAPABILITY_MIN_ROLE[capability]);
+}
+
 /** Pure hall authorization: resolves the hall's venue, then authorizes it. */
 export async function authorizeHallAccess(
   user: AppUser,
@@ -249,6 +290,15 @@ export async function requireVenueAccess(
   return authorizeVenueAccess(user, venueId, minimumRole);
 }
 
+export async function requireVenueCapability(
+  venueId: number,
+  capability: VenueCapability,
+): Promise<VenueAccess | AccessError> {
+  const user = await getCurrentAppUser();
+  if (!user) return { ok: false, status: 401, error: "Unauthorized" };
+  return authorizeVenueCapability(user, venueId, capability);
+}
+
 /**
  * Require access to the venue that owns `hallId`. Guarantees the hall exists
  * and resolves ownership through its venue, so a forged hall id belonging to
@@ -295,10 +345,15 @@ export async function listAccessibleVenueIds(userId: string): Promise<number[]> 
   const memberships = await db
     .select({ organizationId: partnerOrganizationMembers.organizationId })
     .from(partnerOrganizationMembers)
+    .innerJoin(
+      partnerOrganizations,
+      eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+    )
     .where(
       and(
         eq(partnerOrganizationMembers.userId, userId),
         eq(partnerOrganizationMembers.isActive, true),
+        eq(partnerOrganizations.status, "active"),
       ),
     );
   const orgIds = memberships.map((m) => m.organizationId);
@@ -334,10 +389,14 @@ export async function isVenuePartner(userId: string): Promise<boolean> {
  * Resolves the real recipients rather than "the first venue's user":
  *   - MULTI_HALL on + organization set → active owner/admin members;
  *   - otherwise → the legacy venues.user_id (when present).
- * Always includes the legacy owner as a safety net so no notification is lost
- * during the transition.
+ * Once a venue belongs to an organization, the legacy owner is deliberately
+ * excluded so a removed or demoted account receives no private notices.
  */
-export async function getVenueOwnerUserIds(venueId: number): Promise<string[]> {
+export type VenueNotificationRecipient = { userId: string; email: string | null };
+
+export async function getVenueOwnerRecipients(
+  venueId: number,
+): Promise<VenueNotificationRecipient[]> {
   const [venue] = await db
     .select({ organizationId: venues.organizationId, userId: venues.userId })
     .from(venues)
@@ -345,26 +404,43 @@ export async function getVenueOwnerUserIds(venueId: number): Promise<string[]> {
     .limit(1);
   if (!venue) return [];
 
-  const recipients = new Set<string>();
+  const recipients = new Map<string, string | null>();
   if (isMultiHallEnabled() && venue.organizationId != null) {
     // Membership-only: the legacy owner must NOT be re-added here (CP3 #2),
     // otherwise a removed/demoted ex-owner would keep receiving owner notices.
     const members = await db
-      .select({ userId: partnerOrganizationMembers.userId })
+      .select({ userId: partnerOrganizationMembers.userId, email: users.email })
       .from(partnerOrganizationMembers)
+      .innerJoin(users, eq(users.id, partnerOrganizationMembers.userId))
+      .innerJoin(
+        partnerOrganizations,
+        eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+      )
       .where(
         and(
           eq(partnerOrganizationMembers.organizationId, venue.organizationId),
           eq(partnerOrganizationMembers.isActive, true),
           inArray(partnerOrganizationMembers.role, ["owner", "admin"]),
+          eq(partnerOrganizations.status, "active"),
         ),
       );
-    for (const m of members) recipients.add(m.userId);
-    return [...recipients];
+    for (const m of members) recipients.set(m.userId, m.email);
+    return [...recipients].map(([userId, email]) => ({ userId, email }));
   }
   // Flag off, or venue has no organization yet → legacy owner.
-  if (venue.userId) recipients.add(venue.userId);
-  return [...recipients];
+  if (venue.userId) {
+    const [legacyOwner] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.id, venue.userId))
+      .limit(1);
+    if (legacyOwner) recipients.set(legacyOwner.id, legacyOwner.email);
+  }
+  return [...recipients].map(([userId, email]) => ({ userId, email }));
+}
+
+export async function getVenueOwnerUserIds(venueId: number): Promise<string[]> {
+  return (await getVenueOwnerRecipients(venueId)).map((recipient) => recipient.userId);
 }
 
 export type ResolvedSelection =

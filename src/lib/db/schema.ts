@@ -425,17 +425,26 @@ export const venueHallConflictGroupMembers = pgTable(
 
 /** CP3 #4 — persistent queue for venues/orgs that need manual admin review
  *  (e.g. imported venues with no owner). Not a log line. */
-export const partnerAdminReviewCases = pgTable("partner_admin_review_cases", {
-  id: serial("id").primaryKey(),
-  venueId: integer("venue_id").references(() => venues.id, { onDelete: "cascade" }),
-  organizationId: integer("organization_id").references(
-    () => partnerOrganizations.id,
-    { onDelete: "cascade" },
-  ),
-  reason: text("reason").notNull(),
-  status: partnerEntityStatusEnum("status").notNull().default("pending"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const partnerAdminReviewCases = pgTable(
+  "partner_admin_review_cases",
+  {
+    id: serial("id").primaryKey(),
+    venueId: integer("venue_id").references(() => venues.id, { onDelete: "cascade" }),
+    organizationId: integer("organization_id").references(
+      () => partnerOrganizations.id,
+      { onDelete: "cascade" },
+    ),
+    reason: text("reason").notNull(),
+    status: partnerEntityStatusEnum("status").notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("partner_admin_review_open_venue_ux")
+      .on(t.venueId, t.reason)
+      .where(sql`${t.status} = 'pending'`),
+    index("partner_admin_review_status_idx").on(t.status),
+  ],
+);
 
 // ═══════════════════════════════════════════════════════
 // USERS
@@ -745,9 +754,7 @@ export const venues = pgTable("venues", {
     { onDelete: "restrict" },
   ),
   /** IANA timezone for this location; drives canonical booking intervals. */
-  timezone: varchar("timezone", { length: 64 })
-    .default("Europe/Chisinau")
-    .notNull(),
+  timezone: text("timezone").default("Europe/Chisinau").notNull(),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),

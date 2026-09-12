@@ -16,7 +16,7 @@ import {
   venueMenuItems,
   venueMenuPackages,
 } from "@/lib/db/schema";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 const itemSchema = z.object({
   nameRo: z.string().min(1).max(200),
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ADR 0028 — ownership via the membership chain (legacy fallback + admin).
-  const access = await requireVenueAccess(parsed.data.venueId, "manager");
+  const access = await requireVenueCapability(parsed.data.venueId, "manage_menu");
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

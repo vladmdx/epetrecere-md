@@ -2,7 +2,7 @@
  * ADR 0028 / Phase 2 — authorization regression for the org → venue → hall
  * membership resolver (src/lib/venue-access.ts).
  *
- * Runs against a real database (uses DATABASE_URL). Covers:
+ * Runs against a marker-verified disposable local E2E database. Covers:
  *   - member of org A acts on A; denied on B and on a forged hall id from B;
  *   - #1 a DISABLED, DELETED or DEMOTED membership does NOT recover owner access
  *     through the legacy venues.user_id column when the venue has an org;
@@ -10,28 +10,14 @@
  *     legacy owner chain only (current production behaviour);
  *   - legacy (org-less) venues, global-admin bypass, role thresholds, 404s.
  *
- * #10 test safety: refuses to run against a non-local database unless
- * ALLOW_NONLOCAL_TEST_DB=1 is set, and never touches real catalog rows — it
- * creates and deletes its own isolated fixtures.
+ * #10 test safety: refuses every non-loopback or unmarked database and never
+ * touches real catalog rows — it creates and deletes isolated fixtures.
  *
- * Run: DATABASE_URL=postgres://…localhost… npx tsx --test scripts/venue-multihall-access-regression.test.ts
+ * Run: npm run test:multihall:access
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { inArray } from "drizzle-orm";
-
-// ── #10 safety guard: never run against production/non-local DBs ──
-const DB_URL = process.env.DATABASE_URL ?? "";
-const isLocal = /@(localhost|127\.0\.0\.1|::1)[:/]/.test(DB_URL) || /host=(localhost|127\.0\.0\.1)/.test(DB_URL);
-if (!isLocal && process.env.ALLOW_NONLOCAL_TEST_DB !== "1") {
-  throw new Error(
-    `Refusing to run destructive tests against a non-local database.\n` +
-      `DATABASE_URL must point at localhost/127.0.0.1, or set ALLOW_NONLOCAL_TEST_DB=1 for a staging DB.`,
-  );
-}
-if (/epetrecere\.md|prod/i.test(DB_URL)) {
-  throw new Error("Refusing to run against what looks like a production database.");
-}
 
 import { db } from "../src/lib/db";
 import {
@@ -43,14 +29,20 @@ import {
 } from "../src/lib/db/schema";
 import {
   authorizeVenueAccess,
+  authorizeVenueCapability,
   authorizeHallAccess,
+  getVenueOwnerRecipients,
   type AppUser,
 } from "../src/lib/venue-access";
 import { eq, and } from "drizzle-orm";
+import {
+  getVenueIcalTokenForUser,
+  verifyVenueIcalToken,
+} from "../src/lib/calendar/ical-token";
 
 const MARK = "mh_test_";
 const ids = {
-  userA: "", userB: "", userL: "", staffA: "", admin: "",
+  userA: "", userB: "", userL: "", staffA: "", orgAdminA: "", admin: "",
   orgA: 0, orgB: 0,
   venueA: 0, venueB: 0, venueL: 0,
   hallA: 0, hallB: 0,
@@ -69,7 +61,7 @@ async function mkUser(clerk: string, role: "user" | "admin" = "user") {
     .returning({ id: users.id });
   return u.id;
 }
-async function setMembership(userId: string, orgId: number, role: "owner" | "staff", active: boolean) {
+async function setMembership(userId: string, orgId: number, role: "owner" | "admin" | "manager" | "staff", active: boolean) {
   await db.update(partnerOrganizationMembers)
     .set({ role, isActive: active })
     .where(and(eq(partnerOrganizationMembers.userId, userId), eq(partnerOrganizationMembers.organizationId, orgId)));
@@ -81,6 +73,7 @@ before(async () => {
   ids.userB = await mkUser("ownerB");
   ids.userL = await mkUser("ownerL");
   ids.staffA = await mkUser("staffA");
+  ids.orgAdminA = await mkUser("orgAdminA");
   ids.admin = await mkUser("admin", "admin");
 
   const [oa] = await db.insert(partnerOrganizations).values({ displayName: MARK + "A" }).returning({ id: partnerOrganizations.id });
@@ -90,6 +83,7 @@ before(async () => {
   await db.insert(partnerOrganizationMembers).values([
     { organizationId: ids.orgA, userId: ids.userA, role: "owner" },
     { organizationId: ids.orgA, userId: ids.staffA, role: "staff" },
+    { organizationId: ids.orgA, userId: ids.orgAdminA, role: "admin" },
     { organizationId: ids.orgB, userId: ids.userB, role: "owner" },
   ]);
 
@@ -111,7 +105,7 @@ after(async () => {
   await db.delete(partnerOrganizationMembers).where(inArray(partnerOrganizationMembers.organizationId, [ids.orgA, ids.orgB].filter(Boolean)));
   await db.delete(venues).where(inArray(venues.id, [ids.venueA, ids.venueB, ids.venueL].filter(Boolean)));
   await db.delete(partnerOrganizations).where(inArray(partnerOrganizations.id, [ids.orgA, ids.orgB].filter(Boolean)));
-  await db.delete(users).where(inArray(users.id, [ids.userA, ids.userB, ids.userL, ids.staffA, ids.admin].filter(Boolean)));
+  await db.delete(users).where(inArray(users.id, [ids.userA, ids.userB, ids.userL, ids.staffA, ids.orgAdminA, ids.admin].filter(Boolean)));
 });
 
 test("[flag on] owner member can act on own venue", async () => {
@@ -182,6 +176,42 @@ test("[flag on] role threshold: staff passes 'staff', fails 'manager'", async ()
   assert.equal(okStaff.ok, true);
   const denied = await authorizeVenueAccess(appUser(ids.staffA), ids.venueA, "manager");
   assert.equal(denied.ok, false);
+});
+
+test("capability matrix keeps profile/financial actions owner-admin only", async () => {
+  flag(true);
+  assert.equal((await authorizeVenueCapability(appUser(ids.orgAdminA), ids.venueA, "manage_profile")).ok, true);
+  assert.equal((await authorizeVenueCapability(appUser(ids.staffA), ids.venueA, "manage_profile")).ok, false);
+  assert.equal((await authorizeVenueCapability(appUser(ids.staffA), ids.venueA, "manage_financials")).ok, false);
+  assert.equal((await authorizeVenueCapability(appUser(ids.staffA), ids.venueA, "view_private")).ok, true);
+});
+
+test("suspended organization denies members and owner notifications", async () => {
+  flag(true);
+  await db.update(partnerOrganizations).set({ status: "suspended" }).where(eq(partnerOrganizations.id, ids.orgA));
+  assert.equal((await authorizeVenueAccess(appUser(ids.userA), ids.venueA, "staff")).ok, false);
+  assert.deepEqual(await getVenueOwnerRecipients(ids.venueA), []);
+  await db.update(partnerOrganizations).set({ status: "active" }).where(eq(partnerOrganizations.id, ids.orgA));
+});
+
+test("owner notifications include active owner/admin, never staff", async () => {
+  flag(true);
+  const recipients = await getVenueOwnerRecipients(ids.venueA);
+  assert.deepEqual(
+    new Set(recipients.map((recipient) => recipient.userId)),
+    new Set([ids.userA, ids.orgAdminA]),
+  );
+});
+
+test("venue iCal token is revoked with membership access", async () => {
+  flag(true);
+  process.env.ICAL_SECRET = "cp4-local-test-secret-at-least-32-bytes";
+  const token = await getVenueIcalTokenForUser(ids.venueA, ids.userA);
+  assert.ok(token);
+  assert.equal(await verifyVenueIcalToken(ids.venueA, token), true);
+  await setMembership(ids.userA, ids.orgA, "owner", false);
+  assert.equal(await verifyVenueIcalToken(ids.venueA, token), false);
+  await setMembership(ids.userA, ids.orgA, "owner", true);
 });
 
 test("[flag on] legacy org-less venue works via user_id fallback", async () => {

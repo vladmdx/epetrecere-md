@@ -5,7 +5,7 @@ import { db } from "@/lib/db";
 import { venues, venueImages, reviews, redirects } from "@/lib/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
-import { requireVenueAccess, getCurrentAppUser, authorizeVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability, getCurrentAppUser, authorizeVenueAccess } from "@/lib/venue-access";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
 import { venueOwnerFields } from "@/lib/validation/vendor-profile";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
@@ -51,8 +51,8 @@ export async function GET(
   });
 }
 
-// M12 — Owner-gated venue profile update. The signed-in user must own the
-// venue row (venues.userId === users.id for the current Clerk session).
+// M12 / ADR 0028 — profile updates require the centralized manage_profile
+// capability (organization owner/admin, legacy owner, or global admin).
 const updateSchema = z.object({
   nameRo: z.string().min(2).optional(),
   nameRu: z.string().optional(),
@@ -133,10 +133,8 @@ export async function PUT(
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
-  // ADR 0028 — ownership resolved through the membership chain (with a legacy
-  // venues.user_id fallback and global-admin bypass). A forged venue id that
-  // belongs to another organization is rejected with 403/404 here.
-  const access = await requireVenueAccess(venueId, "manager");
+  // A forged venue id from another organization is rejected here.
+  const access = await requireVenueCapability(venueId, "manage_profile");
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

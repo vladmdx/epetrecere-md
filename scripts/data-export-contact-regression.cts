@@ -1,4 +1,5 @@
 /** Real export handler with owner-scoped in-memory records. No DB or HTTP writes. */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const assert = require("node:assert/strict");
 const Module = require("node:module");
 const path = require("node:path");
@@ -90,7 +91,7 @@ const db = {
       // The non-chat personal records are out of this regression's scope.
       return [];
     };
-    const query = { from(value) { table = value; return query; }, leftJoin() { joined = true; return query; }, where(value) { condition = value; return query; }, orderBy() { return query; }, limit() { return Promise.resolve(rows()); }, then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
+    const query = { from(value) { table = value; return query; }, leftJoin() { joined = true; return query; }, innerJoin() { joined = true; return query; }, where(value) { condition = value; return query; }, orderBy() { return query; }, limit() { return Promise.resolve(rows()); }, then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
     return query;
   },
   // Intentionally no insert/update/delete: any mutation fails immediately.

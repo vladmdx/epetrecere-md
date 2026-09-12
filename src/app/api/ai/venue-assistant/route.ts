@@ -35,7 +35,7 @@ import {
   lte,
   sql,
 } from "drizzle-orm";
-import { resolveSelectedVenue, requireVenueAccess } from "@/lib/venue-access";
+import { resolveSelectedVenue, requireVenueCapability } from "@/lib/venue-access";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   generateVenueDescription,
@@ -251,7 +251,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ error: "No venue found" }, { status: 403 });
   }
-  const venueAccess = await requireVenueAccess(selection.venueId, "owner");
+  const venueAccess = await requireVenueCapability(selection.venueId, "manage_ai");
   if (!venueAccess.ok) {
     return NextResponse.json({ error: venueAccess.error }, { status: venueAccess.status });
   }

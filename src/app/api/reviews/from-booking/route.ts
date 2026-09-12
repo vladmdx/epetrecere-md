@@ -2,10 +2,11 @@ import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { reviews, bookingRequests, users, artists, venues } from "@/lib/db/schema";
+import { reviews, bookingRequests, users, artists } from "@/lib/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
 import { isUniqueViolation } from "@/lib/reviews/duplicate-error";
+import { getVenueOwnerRecipients } from "@/lib/venue-access";
 
 // M4 — POST /api/reviews/from-booking
 //
@@ -146,15 +147,14 @@ export async function POST(req: NextRequest) {
             });
           }
         } else if (booking.venueId) {
-          const [venue] = await db.select({ userId: venues.userId }).from(venues)
-            .where(eq(venues.id, booking.venueId)).limit(1);
-          if (venue?.userId) await dispatchNotification({
-            userId: venue.userId,
+          const recipients = await getVenueOwnerRecipients(booking.venueId);
+          await Promise.all(recipients.map((recipient) => dispatchNotification({
+            userId: recipient.userId,
             type: "review_new",
             title: "Ai o recenzie verificată nouă",
             message: `${parsed.data.rating}★ de la un client real`,
             actionUrl: "/dashboard/sala/recenzii",
-          });
+          })));
         }
       } catch (err) {
         console.error("[notifications] verified review", err);

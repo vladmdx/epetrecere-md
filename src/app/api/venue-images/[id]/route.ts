@@ -6,7 +6,7 @@ import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { venueImages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 const updateSchema = z.object({
   altRo: z.string().max(500).nullable().optional(),
@@ -33,7 +33,7 @@ async function loadOwnedImage(imageId: number) {
     return { ok: false as const, status: 404, error: "Not found" };
   }
 
-  const access = await requireVenueAccess(row.venueId, "manager");
+  const access = await requireVenueCapability(row.venueId, "manage_profile");
   if (!access.ok) {
     return { ok: false as const, status: access.status, error: access.error };
   }

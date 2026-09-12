@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { eq, or } from "drizzle-orm";
+import { and, eq, isNull, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   users,
@@ -30,6 +30,8 @@ import {
   legalAcceptances,
   pushSubscriptions,
   pushTokens,
+  partnerOrganizationMembers,
+  partnerOrganizations,
 } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
 import {
@@ -73,6 +75,7 @@ export async function GET() {
     userLegalAcceptances,
     userPushSubscriptions,
     userPushTokens,
+    organizationMemberships,
   ] = await Promise.all([
     user.email
       ? db.select().from(leads).where(eq(leads.email, user.email))
@@ -86,9 +89,10 @@ export async function GET() {
     db.select().from(invitations).where(eq(invitations.userId, user.id)),
     db.select().from(eventPhotos).where(eq(eventPhotos.userId, user.id)),
     db.select().from(artists).where(eq(artists.userId, user.id)),
-    // ADR 0028 — GDPR export is scoped to venues the user personally owns
-    // (legacy user_id). Org-wide export/transfer semantics are Phase 6.
-    db.select().from(venues).where(eq(venues.userId, user.id)),
+    // A personal DSR must not export an organization's customer data merely
+    // because this user remains in the transitional venues.user_id column.
+    // Only pre-organization legacy venues are personal-profile data.
+    db.select().from(venues).where(and(eq(venues.userId, user.id), isNull(venues.organizationId))),
     db.select().from(bookingRequests).where(eq(bookingRequests.clientUserId, user.id)),
     db.select().from(aiConversations).where(eq(aiConversations.userId, user.id)),
     db.select().from(notifications).where(eq(notifications.userId, user.id)),
@@ -96,6 +100,21 @@ export async function GET() {
     db.select().from(legalAcceptances).where(eq(legalAcceptances.userId, user.id)),
     db.select().from(pushSubscriptions).where(eq(pushSubscriptions.userId, user.id)),
     db.select().from(pushTokens).where(eq(pushTokens.userId, user.id)),
+    db
+      .select({
+        organizationId: partnerOrganizationMembers.organizationId,
+        organizationName: partnerOrganizations.displayName,
+        organizationStatus: partnerOrganizations.status,
+        role: partnerOrganizationMembers.role,
+        isActive: partnerOrganizationMembers.isActive,
+        joinedAt: partnerOrganizationMembers.createdAt,
+      })
+      .from(partnerOrganizationMembers)
+      .innerJoin(
+        partnerOrganizations,
+        eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+      )
+      .where(eq(partnerOrganizationMembers.userId, user.id)),
   ]);
 
   const artistIds = artistProfiles.map((profile) => profile.id);
@@ -214,6 +233,7 @@ export async function GET() {
         images: ownedVenueImages.filter((image) => image.venueId === profile.id),
       })),
     },
+    organizationMemberships,
     bookingRequests: allBookings.map(booking => bookingForDataExport(booking, exportOwner)),
     legalAcceptances: userLegalAcceptances,
     notifications: await notificationsForUser(userNotifications, user.id),

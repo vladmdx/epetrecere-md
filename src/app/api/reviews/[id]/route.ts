@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability } from "@/lib/venue-access";
 import { reviews, artists, venues, users } from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
@@ -51,7 +51,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     owns = !!artist;
   }
   if (!owns && review.venueId) {
-    const access = await requireVenueAccess(review.venueId, "manager");
+    const access = await requireVenueCapability(review.venueId, "request_reviews");
     owns = access.ok;
   }
   if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -217,7 +217,7 @@ export async function PUT(
       if (artist) owns = true;
     }
     if (!owns && review.venueId) {
-      const access = await requireVenueAccess(review.venueId, "manager");
+      const access = await requireVenueCapability(review.venueId, "request_reviews");
       if (access.ok) owns = true;
     }
     if (!owns) return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -19,6 +19,12 @@ import { sendEmail } from "@/lib/email/send";
 import { bookingRequestNewEmail } from "@/lib/email/templates/booking-request-new";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { bookingTextForViewer } from "@/lib/privacy/booking-text";
+import {
+  authorizeVenueAccess,
+  getVenueOwnerRecipients,
+  isVenuePartner,
+  type VenueNotificationRecipient,
+} from "@/lib/venue-access";
 
 const bookingSchema = z.object({
   /** Either artistId or venueId must be set. */
@@ -180,13 +186,13 @@ export async function GET(req: NextRequest) {
         if (owns) vendorViewer = true;
       }
       if (!owns && b.venueId) {
-        const [v] = await db
-          .select({ userId: venues.userId })
-          .from(venues)
-          .where(eq(venues.id, b.venueId))
-          .limit(1);
-        owns = v?.userId === appUser.id;
-        if (owns) vendorViewer = true;
+        const venueAccess = await authorizeVenueAccess(
+          { id: appUser.id, role: "user", isGlobalAdmin: false },
+          b.venueId,
+          "staff",
+        );
+        owns = venueAccess.ok;
+        if (venueAccess.ok) vendorViewer = true;
       }
       if (!owns) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -382,14 +388,8 @@ export async function POST(req: NextRequest) {
           .from(artists)
           .where(eq(artists.userId, appUser.id))
           .limit(1);
-        const [venueOwn] = artistOwn
-          ? [null]
-          : await db
-              .select({ id: venues.id })
-              .from(venues)
-              .where(eq(venues.userId, appUser.id))
-              .limit(1);
-        if (artistOwn || venueOwn || appUser.role === "artist") {
+        const venuePartner = artistOwn ? false : await isVenuePartner(appUser.id);
+        if (artistOwn || venuePartner || appUser.role === "artist") {
           return NextResponse.json(
             {
               error:
@@ -671,6 +671,7 @@ export async function POST(req: NextRequest) {
         autoReplyEnabled: boolean;
         autoReplyMessage: string | null;
       } | null = null;
+      let venueRecipients: VenueNotificationRecipient[] = [];
       let dashboardUrl = "/dashboard/rezervari";
 
       if (parsed.data.artistId) {
@@ -710,30 +711,39 @@ export async function POST(req: NextRequest) {
             autoReplyEnabled: v.autoReplyEnabled,
             autoReplyMessage: v.autoReplyMessage,
           };
+          venueRecipients = await getVenueOwnerRecipients(parsed.data.venueId);
           dashboardUrl = "/dashboard/sala/rezervari";
         }
       }
 
-      if (artist?.userId) {
+      const vendorRecipients = parsed.data.venueId
+        ? venueRecipients
+        : artist?.userId
+          ? [{ userId: artist.userId, email: artist.email }]
+          : [];
+
+      if (artist && vendorRecipients.length > 0) {
         const timePart = parsed.data.startTime
           ? ` · ${parsed.data.startTime}${parsed.data.endTime ? `–${parsed.data.endTime}` : ""}`
           : "";
-        await dispatchNotification({
-          userId: artist.userId,
+        await Promise.all(vendorRecipients.map((recipient) => dispatchNotification({
+          userId: recipient.userId,
           type: "booking_request_new",
           title: "Cerere nouă de rezervare",
           message: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} · ${parsed.data.eventDate}${timePart}`,
           actionUrl: dashboardUrl,
-        });
+        })));
         // Mobile push (fire-and-forget). The mobile app's push tap
         // handler reads `data.kind` and routes to the inbox with the
         // booking expanded.
-        void sendPushToUser({
-          userId: artist.userId,
-          title: "Cerere nouă de rezervare",
-          body: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} pe ${parsed.data.eventDate}`,
-          data: { kind: "booking_new", id: booking.id },
-        });
+        for (const recipient of vendorRecipients) {
+          void sendPushToUser({
+            userId: recipient.userId,
+            title: "Cerere nouă de rezervare",
+            body: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} pe ${parsed.data.eventDate}`,
+            data: { kind: "booking_new", id: booking.id },
+          });
+        }
 
         // Spec 2.8 — pending-conflict alert: if 2+ pending requests now
         // exist on the same (venue/artist, date), flag it so the vendor
@@ -785,8 +795,8 @@ export async function POST(req: NextRequest) {
               .where(and(...confirmedCond));
 
             const totalCompeting = others.length + confirmed.length;
-            await dispatchNotification({
-              userId: artist.userId,
+            await Promise.all(vendorRecipients.map((recipient) => dispatchNotification({
+              userId: recipient.userId,
               type: "booking_conflict",
               title: `⚠️ Conflict potențial pe ${parsed.data.eventDate}`,
               message:
@@ -794,7 +804,7 @@ export async function POST(req: NextRequest) {
                   ? `Ai deja o rezervare confirmată pe această dată + ${others.length + 1} cereri tentative.`
                   : `${totalCompeting + 1} cereri tentative pe aceeași dată. Acceptă pe cea mai potrivită.`,
               actionUrl: `${dashboardUrl}?date=${parsed.data.eventDate}`,
-            });
+            })));
 
             // Loop in admins too — they mediate conflicts between vendor and clients.
             void dispatchToAdmins({
@@ -827,13 +837,18 @@ export async function POST(req: NextRequest) {
       });
 
       // Email the artist about the new booking request
-      if (artist?.email) {
+      const vendorEmails = parsed.data.venueId
+        ? [...new Set(venueRecipients.map((recipient) => recipient.email).filter(Boolean))]
+        : artist?.email
+          ? [artist.email]
+          : [];
+      for (const vendorEmail of vendorEmails) {
         try {
           await sendEmail({
-            to: artist.email,
+            to: vendorEmail!,
             subject: `Cerere nouă de rezervare de la ${parsed.data.clientName}`,
             html: bookingRequestNewEmail({
-              vendorName: artist.nameRo ?? "Artist",
+              vendorName: artist?.nameRo ?? "Partener",
               clientName: parsed.data.clientName,
               eventType: parsed.data.eventType ?? null,
               eventDate: parsed.data.eventDate ?? null,

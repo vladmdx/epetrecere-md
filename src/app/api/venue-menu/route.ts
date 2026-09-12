@@ -12,12 +12,12 @@ import {
   venueMenuItems,
   venueMenuPackages,
 } from "@/lib/db/schema";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 // ADR 0028 — ownership resolved through the membership chain (legacy fallback +
 // admin bypass inside requireVenueAccess). Return shape kept for the handlers.
 async function requireVenueOwner(venueId: number) {
-  const access = await requireVenueAccess(venueId, "manager");
+  const access = await requireVenueCapability(venueId, "manage_menu");
   if (!access.ok) return { ok: false as const, status: access.status };
   return { ok: true as const };
 }

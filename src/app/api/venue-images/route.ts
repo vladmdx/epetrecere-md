@@ -3,7 +3,7 @@ import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { venueImages } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 // Venue gallery images CRUD — mirrors /api/artist-images.
 //
@@ -23,7 +23,7 @@ const createSchema = z.object({
 // (with legacy venues.user_id fallback + global-admin bypass). Return shape is
 // kept so the handlers below are unchanged.
 async function requireVenueOwner(venueId: number) {
-  const access = await requireVenueAccess(venueId, "manager");
+  const access = await requireVenueCapability(venueId, "manage_profile");
   if (!access.ok) {
     return { ok: false as const, status: access.status, error: access.error };
   }

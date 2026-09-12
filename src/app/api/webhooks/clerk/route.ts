@@ -2,8 +2,9 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { bookingRequests, users } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
+import { BOOKING_CLIENT_ERASURE } from "@/lib/privacy/account-erasure";
 
 interface ClerkWebhookEvent {
   type: string;
@@ -86,7 +87,56 @@ export async function POST(req: Request) {
   }
 
   if (type === "user.deleted") {
-    await db.delete(users).where(eq(users.clerkId, data.id));
+    const [user] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.clerkId, data.id))
+      .limit(1);
+    if (user) {
+      await db.transaction(async (tx) => {
+        // An out-of-band deletion (Clerk dashboard/API) cannot ask the owner
+        // to transfer first. Suspend any organization that would become
+        // ownerless and create a durable admin-review case before the
+        // membership cascade removes the user.
+        await tx.execute(sql`
+          INSERT INTO partner_admin_review_cases
+            (venue_id, organization_id, reason, status)
+          SELECT v.id, v.organization_id, 'clerk_deleted_last_owner', 'pending'
+          FROM venues v
+          WHERE v.organization_id IN (
+            SELECT m.organization_id
+            FROM partner_organization_members m
+            WHERE m.user_id = ${user.id} AND m.role = 'owner' AND m.is_active
+              AND NOT EXISTS (
+                SELECT 1 FROM partner_organization_members other
+                WHERE other.organization_id = m.organization_id
+                  AND other.user_id <> m.user_id
+                  AND other.role = 'owner' AND other.is_active
+              )
+          )
+          ON CONFLICT (venue_id, reason) WHERE status = 'pending' DO NOTHING
+        `);
+        await tx.execute(sql`
+          UPDATE partner_organizations o SET status = 'suspended', updated_at = now()
+          WHERE o.id IN (
+            SELECT m.organization_id
+            FROM partner_organization_members m
+            WHERE m.user_id = ${user.id} AND m.role = 'owner' AND m.is_active
+              AND NOT EXISTS (
+                SELECT 1 FROM partner_organization_members other
+                WHERE other.organization_id = m.organization_id
+                  AND other.user_id <> m.user_id
+                  AND other.role = 'owner' AND other.is_active
+              )
+          )
+        `);
+        await tx
+          .update(bookingRequests)
+          .set(BOOKING_CLIENT_ERASURE)
+          .where(eq(bookingRequests.clientUserId, user.id));
+        await tx.delete(users).where(eq(users.id, user.id));
+      });
+    }
   }
 
   return NextResponse.json({ success: true });

@@ -12,7 +12,7 @@ import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability } from "@/lib/venue-access";
 import {
   users,
   venues,
@@ -72,7 +72,7 @@ async function checkViewAccess(
     if (a?.userId === u.id) return { ok: true as const, user: u };
   }
   if (b.venueId) {
-    const access = await requireVenueAccess(b.venueId, "staff");
+    const access = await requireVenueCapability(b.venueId, "manage_financials");
     if (access.ok) return { ok: true as const, user: u };
   }
   return { ok: false as const };

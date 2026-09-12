@@ -13,7 +13,7 @@ import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability } from "@/lib/venue-access";
 import {
   users,
   venues,
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
   // venue side resolved through the membership chain.
   let kind: "sala" | "artist" | null = null;
   if (booking.venueId) {
-    const access = await requireVenueAccess(booking.venueId, "staff");
+    const access = await requireVenueCapability(booking.venueId, "request_reviews");
     if (access.ok) kind = "sala";
   }
   if (!kind && booking.artistId && booking.artistOwner === appUser.id) {

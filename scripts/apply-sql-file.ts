@@ -46,7 +46,14 @@ const sql = readFileSync(path, "utf8");
   // multi-statement query, so a migration may carry its own BEGIN/COMMIT
   // and dollar-quoted DO blocks.
   if (!url!.includes("neon.tech")) {
-    const client = postgres(url!, { ssl: "require", max: 1, onnotice: () => {} });
+    const host = new URL(url!).hostname;
+    const loopback = ["localhost", "127.0.0.1", "::1"].includes(host);
+    const client = postgres(url!, {
+      ssl: loopback ? false : "require",
+      prepare: false,
+      max: 1,
+      onnotice: () => {},
+    });
     try {
       await client.unsafe(sql);
       console.log("Done.");

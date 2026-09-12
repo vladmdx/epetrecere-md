@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { getVenueOwnerRecipients, requireVenueAccess } from "@/lib/venue-access";
 import {
   chatMessages,
   conversations,
@@ -256,6 +256,7 @@ export async function POST(
       let vendorName = "Vendor";
       let vendorUserId: string | null = null;
       let vendorEmail: string | null = null;
+      let venueRecipients: Awaited<ReturnType<typeof getVenueOwnerRecipients>> = [];
       let vendorDashboardUrl = "/dashboard/mesaje";
 
       if (ctx.conv.artistId) {
@@ -287,6 +288,7 @@ export async function POST(
           vendorName = venue.nameRo;
           vendorUserId = venue.userId;
           vendorEmail = venue.email;
+          venueRecipients = await getVenueOwnerRecipients(ctx.conv.venueId);
           vendorDashboardUrl = "/dashboard/sala/mesaje";
         }
       }
@@ -327,14 +329,18 @@ export async function POST(
         }
       } else {
         // Client sent a message → notify the vendor
-        if (vendorUserId) {
-          await dispatchNotification({
-            userId: vendorUserId,
+        const recipients = ctx.conv.venueId
+          ? venueRecipients
+          : vendorUserId
+            ? [{ userId: vendorUserId, email: vendorEmail }]
+            : [];
+        await Promise.all(recipients.map((recipient) => dispatchNotification({
+            userId: recipient.userId,
             type: "booking_request_new",
             title: `Mesaj nou de la ${senderName}`,
             message: preview,
             actionUrl: `${vendorDashboardUrl}?conversation=${conversationId}`,
-            email: vendorEmail ?? undefined,
+            email: recipient.email ?? undefined,
             emailSubject: `💬 Mesaj nou de la ${senderName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
@@ -343,15 +349,16 @@ export async function POST(
               ctaText: "Răspunde →",
               emoji: "💬",
             }),
-          });
+          })));
           // Mobile push to vendor — same deep-link contract.
-          void sendPushToUser({
-            userId: vendorUserId,
-            title: senderName,
-            body: preview,
-            data: { kind: "message_new", id: conversationId },
-          });
-        }
+          for (const recipient of recipients) {
+            void sendPushToUser({
+              userId: recipient.userId,
+              title: senderName,
+              body: preview,
+              data: { kind: "message_new", id: conversationId },
+            });
+          }
       }
     } catch (err) {
       console.error("[chat] message notification failed:", err);

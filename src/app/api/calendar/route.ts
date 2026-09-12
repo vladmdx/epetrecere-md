@@ -3,7 +3,7 @@ import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { requireVenueAccess, authorizeVenueAccess } from "@/lib/venue-access";
+import { requireVenueCapability, authorizeVenueAccess } from "@/lib/venue-access";
 import { users, artists } from "@/lib/db/schema";
 import { calendarEventForViewer } from "@/lib/privacy/booking-text";
 import {
@@ -128,7 +128,7 @@ export async function POST(req: Request) {
     }
   } else {
     // ADR 0028 — venue ownership via the membership chain (IDOR-safe).
-    const access = await requireVenueAccess(parsed.data.entity_id, "manager");
+    const access = await requireVenueCapability(parsed.data.entity_id, "manage_calendar");
     if (!access.ok) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }

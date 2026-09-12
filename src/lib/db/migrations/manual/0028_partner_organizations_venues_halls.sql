@@ -28,6 +28,8 @@
 --   #9 REVOKE anon/authenticated on the new server-only tables and sequences.
 
 BEGIN;
+SET LOCAL lock_timeout = '5s';
+SET LOCAL statement_timeout = '15min';
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- 1. ENUMS
@@ -420,18 +422,6 @@ BEGIN
   END IF;
 END $$;
 
--- CP3 #3 — a hall reference is only meaningful with a venue. Guarantee it can
--- never be set without one (closes the hall_id-without-venue_id bypass).
-DO $$
-DECLARE t text;
-BEGIN
-  FOREACH t IN ARRAY ARRAY['booking_requests','venue_images','venue_schedule_blocks','commissions','reviews'] LOOP
-    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = t||'_hall_requires_venue_chk') THEN
-      EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I CHECK (hall_id IS NULL OR venue_id IS NOT NULL)', t, t||'_hall_requires_venue_chk');
-    END IF;
-  END LOOP;
-END $$;
-
 -- ─────────────────────────────────────────────────────────────────────────
 -- 10. LEGAL ACCEPTANCES — organization link + unique-index scoping + trigger
 -- ─────────────────────────────────────────────────────────────────────────
@@ -448,9 +438,11 @@ DROP INDEX IF EXISTS legal_acceptances_unique;
 CREATE UNIQUE INDEX IF NOT EXISTS legal_acceptances_unique
   ON legal_acceptances (user_id, subject_type, document_slug, document_version)
   WHERE organization_id IS NULL;
-CREATE UNIQUE INDEX IF NOT EXISTS legal_acceptances_org_unique
-  ON legal_acceptances (organization_id, document_slug, document_version)
-  WHERE organization_id IS NOT NULL;
+-- Recreated only after the canonical evidence backfill in section 12. Older
+-- data can contain acceptances by several representatives for the same org;
+-- all rows remain immutable evidence, while exactly one is linked as the
+-- organization-level acceptance.
+DROP INDEX IF EXISTS legal_acceptances_org_unique;
 
 -- Extend the append-only guard from 0017 so organization_id may be set exactly
 -- once (NULL → id) or cleared by ON DELETE SET NULL, never swapped.
@@ -558,6 +550,19 @@ BEGIN
   END IF;
 END $$;
 
+-- CP3 #3 — a hall reference is only meaningful with a venue. Run this only
+-- after section 11 has created hall_id on commissions and reviews; otherwise a
+-- genuine pre-0028 baseline would fail before reaching their ALTER TABLEs.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['booking_requests','venue_images','venue_schedule_blocks','commissions','reviews'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = t||'_hall_requires_venue_chk') THEN
+      EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I CHECK (hall_id IS NULL OR venue_id IS NOT NULL)', t, t||'_hall_requires_venue_chk');
+    END IF;
+  END LOOP;
+END $$;
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- 12. BACKFILL (idempotent) — #8
 -- ─────────────────────────────────────────────────────────────────────────
@@ -565,35 +570,50 @@ DO $$
 DECLARE
   v RECORD;
   new_org_id integer;
+  owner_org_count integer;
   default_hall_id integer;
   default_set_id integer;
 BEGIN
-  -- 12a. One organization + owner membership per existing venue owner.
+  -- 12a. Attach each legacy owner's unassigned venues to their single active
+  -- owner organization, or create a new organization when there is no
+  -- unambiguous owner organization. A staff membership in an unrelated org
+  -- must never make this backfill skip the user's venues.
   FOR v IN
     SELECT DISTINCT vn.user_id FROM venues vn
-    WHERE vn.user_id IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM partner_organization_members m WHERE m.user_id = vn.user_id)
+    WHERE vn.user_id IS NOT NULL AND vn.organization_id IS NULL
   LOOP
-    INSERT INTO partner_organizations (type, display_name, legal_name, id_number, legal_address, billing_email, status)
-    SELECT COALESCE(NULLIF(la.partner_type,'')::partner_org_type,'company'),
-           COALESCE(NULLIF(la.legal_name,''), vn.name_ro, 'Organizație'),
-           NULLIF(la.legal_name,''), NULLIF(la.id_number,''), NULLIF(la.legal_address,''),
-           vn.email, 'active'
-    FROM venues vn
-    LEFT JOIN LATERAL (
-      SELECT partner_type, legal_name, id_number, legal_address FROM legal_acceptances la2
-      WHERE la2.user_id = v.user_id AND la2.subject_type = 'venue'
-      ORDER BY la2.accepted_at DESC LIMIT 1
-    ) la ON true
-    WHERE vn.user_id = v.user_id ORDER BY vn.id LIMIT 1
-    RETURNING id INTO new_org_id;
+    SELECT count(DISTINCT m.organization_id), min(m.organization_id)
+      INTO owner_org_count, new_org_id
+    FROM partner_organization_members m
+    JOIN partner_organizations o ON o.id = m.organization_id
+    WHERE m.user_id = v.user_id AND m.role = 'owner' AND m.is_active
+      AND o.status = 'active';
 
-    INSERT INTO partner_organization_members (organization_id, user_id, role, is_active)
-    VALUES (new_org_id, v.user_id, 'owner', true)
-    ON CONFLICT (organization_id, user_id) DO NOTHING;
+    IF owner_org_count <> 1 THEN
+      INSERT INTO partner_organizations (type, display_name, legal_name, id_number, legal_address, billing_email, status)
+      SELECT COALESCE(NULLIF(la.partner_type,'')::partner_org_type,'company'),
+             COALESCE(NULLIF(la.legal_name,''), vn.name_ro, 'Organizație'),
+             NULLIF(la.legal_name,''), NULLIF(la.id_number,''), NULLIF(la.legal_address,''),
+             vn.email, 'active'
+      FROM venues vn
+      LEFT JOIN LATERAL (
+        SELECT partner_type, legal_name, id_number, legal_address FROM legal_acceptances la2
+        WHERE la2.user_id = v.user_id AND la2.subject_type = 'venue'
+        ORDER BY la2.accepted_at DESC LIMIT 1
+      ) la ON true
+      WHERE vn.user_id = v.user_id AND vn.organization_id IS NULL
+      ORDER BY vn.id LIMIT 1
+      RETURNING id INTO new_org_id;
+
+      INSERT INTO partner_organization_members (organization_id, user_id, role, is_active)
+      VALUES (new_org_id, v.user_id, 'owner', true)
+      ON CONFLICT (organization_id, user_id) DO NOTHING;
+    END IF;
 
     UPDATE venues SET organization_id = new_org_id, updated_at = now()
     WHERE user_id = v.user_id AND organization_id IS NULL;
+    new_org_id := NULL;
+    owner_org_count := 0;
   END LOOP;
 
   -- 12b. Exactly one legacy-default hall per venue + default menu set, and
@@ -612,7 +632,16 @@ BEGIN
       ON CONFLICT (venue_id, slug) DO NOTHING
       RETURNING id INTO default_hall_id;
       IF default_hall_id IS NULL THEN
-        SELECT id INTO default_hall_id FROM venue_halls WHERE venue_id = v.id AND is_legacy_default LIMIT 1;
+        -- A partially-applied/hand-created database may already contain the
+        -- `principal` slug without the legacy marker. Adopt one deterministic
+        -- existing hall instead of carrying NULL into the backfill.
+        SELECT id INTO default_hall_id
+        FROM venue_halls
+        WHERE venue_id = v.id
+        ORDER BY (slug = 'principal') DESC, id
+        LIMIT 1;
+        UPDATE venue_halls SET is_legacy_default = true
+        WHERE id = default_hall_id;
       END IF;
     END IF;
 
@@ -656,48 +685,88 @@ BEGIN
           'venueId', v.id, 'hallId', default_hall_id, 'hallName', COALESCE(v.name_ro,'Sala principală'),
           'agreedPrice', b.agreed_price, 'currency', COALESCE(b.agreed_currency,'EUR'),
           'source', 'backfill_0028') ELSE NULL END)
-    WHERE b.venue_id = v.id;
+    WHERE b.venue_id = v.id
+      AND (b.hall_id IS NULL OR b.reservation_scope IS NULL OR b.timezone IS NULL
+        OR b.starts_at IS NULL OR b.ends_at IS NULL
+        OR (b.agreed_price IS NOT NULL AND b.agreed_currency IS NULL)
+        OR (b.confirmed_at IS NOT NULL AND b.commercial_snapshot IS NULL));
 
     -- 12e. commission hall + name snapshots for this venue
     UPDATE commissions c SET
       hall_id = COALESCE(c.hall_id, default_hall_id),
       hall_name_snapshot = COALESCE(c.hall_name_snapshot, COALESCE(v.name_ro,'Sala principală')),
       venue_name_snapshot = COALESCE(c.venue_name_snapshot, v.name_ro)
-    WHERE c.venue_id = v.id;
+    WHERE c.venue_id = v.id
+      AND (c.hall_id IS NULL OR c.hall_name_snapshot IS NULL OR c.venue_name_snapshot IS NULL);
 
     default_hall_id := NULL; default_set_id := NULL;
   END LOOP;
 
-  -- 12f. Link existing venue legal acceptances to the venue's organization.
-  UPDATE legal_acceptances la SET organization_id = vn.organization_id
-  FROM venues vn
-  WHERE la.subject_type = 'venue' AND la.venue_id = vn.id
-    AND la.organization_id IS NULL AND vn.organization_id IS NOT NULL;
+  -- 12f. Link one canonical acceptance per organization/document/version.
+  -- Other immutable signatures remain as legacy evidence with organization_id
+  -- NULL instead of being deleted, modified or causing a uniqueness failure.
+  WITH single_owner_orgs AS (
+    SELECT m.user_id, min(m.organization_id) AS organization_id
+    FROM partner_organization_members m
+    JOIN partner_organizations o ON o.id = m.organization_id
+    WHERE m.role = 'owner' AND m.is_active AND o.status = 'active'
+    GROUP BY m.user_id
+    HAVING count(DISTINCT m.organization_id) = 1
+  ), mapped AS (
+    SELECT la.id, vn.organization_id, la.document_slug, la.document_version, la.accepted_at
+    FROM legal_acceptances la
+    JOIN venues vn ON vn.id = la.venue_id
+    WHERE la.subject_type = 'venue' AND la.organization_id IS NULL
+      AND vn.organization_id IS NOT NULL
+    UNION
+    SELECT la.id, so.organization_id, la.document_slug, la.document_version, la.accepted_at
+    FROM legal_acceptances la
+    JOIN single_owner_orgs so ON so.user_id = la.user_id
+    WHERE la.subject_type = 'venue' AND la.organization_id IS NULL
+      AND la.venue_id IS NULL
+  ), ranked AS (
+    SELECT mapped.*,
+      row_number() OVER (
+        PARTITION BY organization_id, document_slug, document_version
+        ORDER BY accepted_at DESC, id DESC
+      ) AS rn
+    FROM mapped
+    WHERE NOT EXISTS (
+      SELECT 1 FROM legal_acceptances existing
+      WHERE existing.organization_id = mapped.organization_id
+        AND existing.document_slug = mapped.document_slug
+        AND existing.document_version = mapped.document_version
+    )
+  )
+  UPDATE legal_acceptances la SET organization_id = ranked.organization_id
+  FROM ranked WHERE ranked.id = la.id AND ranked.rn = 1;
 
   -- 12g. Legacy non-booking calendar blocks → whole-venue schedule blocks.
-  --      Includes BOTH 'blocked' and manual 'booked' rows, but ONLY those not
-  --      tied to a booking (booking_id IS NULL) so booking-derived projections
-  --      are never duplicated. Intervals are half-open: full-day → next day
+  --      Includes BOTH 'blocked' and manual 'booked' rows, but ONLY explicit
+  --      manual/Google sources. Booking projections can temporarily have a
+  --      NULL booking_id, so source—not booking_id—is the safety boundary.
+  --      Intervals are half-open: full-day → next day
   --      00:00; overnight (end <= start) → next day. (CP3 #4)
   INSERT INTO venue_schedule_blocks (venue_id, hall_id, starts_at, ends_at, kind, reason, source)
   SELECT ce.entity_id, NULL,
-         (ce.date::text || ' ' || COALESCE(NULLIF(ce.start_time,''),'00:00'))::timestamp AT TIME ZONE 'Europe/Chisinau',
+         (ce.date::text || ' ' || COALESCE(NULLIF(ce.start_time,''),'00:00'))::timestamp AT TIME ZONE vv.timezone,
          CASE
            WHEN NULLIF(ce.end_time,'') IS NULL
-             THEN (((ce.date + 1)::text || ' 00:00')::timestamp AT TIME ZONE 'Europe/Chisinau')
+             THEN (((ce.date + 1)::text || ' 00:00')::timestamp AT TIME ZONE vv.timezone)
            WHEN ce.end_time <= COALESCE(NULLIF(ce.start_time,''),'00:00')
-             THEN (((ce.date + 1)::text || ' ' || ce.end_time)::timestamp AT TIME ZONE 'Europe/Chisinau')
-           ELSE ((ce.date::text || ' ' || ce.end_time)::timestamp AT TIME ZONE 'Europe/Chisinau')
+             THEN (((ce.date + 1)::text || ' ' || ce.end_time)::timestamp AT TIME ZONE vv.timezone)
+           ELSE ((ce.date::text || ' ' || ce.end_time)::timestamp AT TIME ZONE vv.timezone)
          END,
          CASE WHEN ce.source = 'google_sync' THEN 'external_calendar'::schedule_block_kind ELSE 'manual'::schedule_block_kind END,
          ce.note, 'backfill_0028:calendar_events'
   FROM calendar_events ce
-  WHERE ce.entity_type = 'venue' AND ce.status IN ('blocked','booked') AND ce.booking_id IS NULL
-    AND EXISTS (SELECT 1 FROM venues vv WHERE vv.id = ce.entity_id)
+  JOIN venues vv ON vv.id = ce.entity_id
+  WHERE ce.entity_type = 'venue' AND ce.status IN ('blocked','booked')
+    AND COALESCE(ce.source, 'manual') IN ('manual','google_sync')
     AND NOT EXISTS (
       SELECT 1 FROM venue_schedule_blocks b
       WHERE b.venue_id = ce.entity_id AND b.source = 'backfill_0028:calendar_events'
-        AND b.starts_at = (ce.date::text || ' ' || COALESCE(NULLIF(ce.start_time,''),'00:00'))::timestamp AT TIME ZONE 'Europe/Chisinau'
+        AND b.starts_at = (ce.date::text || ' ' || COALESCE(NULLIF(ce.start_time,''),'00:00'))::timestamp AT TIME ZONE vv.timezone
     );
 
   -- 12h. Owner-less venues → a persistent admin-review case (no invented
@@ -711,6 +780,10 @@ BEGIN
       WHERE c.venue_id = vn.id AND c.reason = 'no_owner_no_org' AND c.status = 'pending'
     );
 END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS legal_acceptances_org_unique
+  ON legal_acceptances (organization_id, document_slug, document_version)
+  WHERE organization_id IS NOT NULL;
 
 -- CP3 #3 — now that the backfill has populated venue_id on the association
 -- tables, enforce NOT NULL (only if there are no stragglers).
@@ -734,7 +807,8 @@ BEGIN
       FOREACH t IN ARRAY ARRAY[
         'partner_organizations','partner_organization_members','venue_halls',
         'venue_hall_seating_options','venue_menu_sets','venue_hall_menu_sets',
-        'venue_schedule_blocks','venue_hall_conflict_groups','venue_hall_conflict_group_members'
+        'venue_schedule_blocks','venue_hall_conflict_groups','venue_hall_conflict_group_members',
+        'partner_admin_review_cases'
       ] LOOP
         EXECUTE format('REVOKE ALL ON TABLE public.%I FROM %I', t, r);
       END LOOP;
@@ -744,13 +818,28 @@ BEGIN
         WHERE sequence_schema='public' AND sequence_name = ANY (ARRAY[
           'partner_organizations_id_seq','partner_organization_members_id_seq',
           'venue_halls_id_seq','venue_hall_seating_options_id_seq','venue_menu_sets_id_seq',
-          'venue_schedule_blocks_id_seq','venue_hall_conflict_groups_id_seq'])
+          'venue_schedule_blocks_id_seq','venue_hall_conflict_groups_id_seq',
+          'partner_admin_review_cases_id_seq'])
       LOOP
         EXECUTE format('REVOKE ALL ON SEQUENCE public.%I FROM %I', s, r);
       END LOOP;
     END IF;
   END LOOP;
 END $$;
+
+-- Public-schema tables are server-managed. RLS is enabled with no client
+-- policies, while the server's database owner/service connection retains its
+-- normal owner bypass. REVOKE above provides the first line of defence.
+ALTER TABLE partner_organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE partner_organization_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE venue_halls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE venue_hall_seating_options ENABLE ROW LEVEL SECURITY;
+ALTER TABLE venue_menu_sets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE venue_hall_menu_sets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE venue_schedule_blocks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE venue_hall_conflict_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE venue_hall_conflict_group_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE partner_admin_review_cases ENABLE ROW LEVEL SECURITY;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- 14. POST-MIGRATION INVARIANTS
