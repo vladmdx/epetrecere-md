@@ -587,7 +587,7 @@ function intervalOn(date: string, start = "18:00", end = "23:00") {
   });
 }
 
-async function insertPending(hallId: number, date: string, name: string) {
+async function insertPending(hallId: number, date: string, name: string, guestCount = 40) {
   const interval = intervalOn(date);
   const [row] = await db
     .insert(bookingRequests)
@@ -604,7 +604,7 @@ async function insertPending(hallId: number, date: string, name: string) {
       timezone: "Europe/Chisinau",
       startsAt: interval.startsAt,
       endsAt: interval.endsAt,
-      guestCount: 40,
+      guestCount,
     })
     .returning();
   return row;
@@ -640,7 +640,7 @@ test("concurrent accept: exactly one pending→accepted CAS wins", async () => {
 });
 
 test("concurrent confirm and retry keep a single calendar projection", async () => {
-  const booking = await insertPending(ids.garden, "2027-12-03", "RaceConfirm");
+  const booking = await insertPending(ids.garden, "2027-12-03", "RaceConfirm", 80);
   const accepted = await acceptVenueBooking(booking, {});
   await db.update(bookingRequests).set({ clientConfirmedAt: new Date() }).where(eq(bookingRequests.id, accepted.id));
   const confirm = () =>

@@ -475,14 +475,14 @@ test("contract validity rejects a mismatched legal identity", async () => {
   assert.equal(matched.ok, true);
 
   await db
-    .update(legalAcceptances)
-    .set({ legalName: "Other Company SRL" })
-    .where(eq(legalAcceptances.organizationId, ids.org));
+    .update(partnerOrganizations)
+    .set({ legalName: "Other Company SRL", updatedAt: new Date() })
+    .where(eq(partnerOrganizations.id, ids.org));
   assert.equal(await organizationHasValidContract(ids.org), false);
   await db
-    .update(legalAcceptances)
-    .set({ legalName: IDENTITY.legalName })
-    .where(eq(legalAcceptances.organizationId, ids.org));
+    .update(partnerOrganizations)
+    .set({ legalName: IDENTITY.legalName, updatedAt: new Date() })
+    .where(eq(partnerOrganizations.id, ids.org));
   assert.equal(await organizationHasValidContract(ids.org), true);
 });
 

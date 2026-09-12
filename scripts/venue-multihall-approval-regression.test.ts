@@ -162,7 +162,6 @@ after(async () => {
     await db.delete(venues).where(inArray(venues.id, venueIds));
   }
   if (ids.org) {
-    await db.delete(legalAcceptances).where(eq(legalAcceptances.organizationId, ids.org));
     await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, ids.org));
     await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, ids.org));
   }
