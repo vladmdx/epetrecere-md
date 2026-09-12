@@ -5,7 +5,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { legalAcceptances } from "@/lib/db/schema";
+import { legalAcceptances, legalContractDeliveryOutbox } from "@/lib/db/schema";
 import {
   LEGAL_PACK_VERSION,
   PARTNER_REQUIRED_DOCS,
@@ -170,9 +170,29 @@ function immutableConflict(
         row.documentSlug === value.documentSlug &&
         row.documentVersion === value.documentVersion &&
         row.packVersion === value.packVersion &&
-        (row.contentHash !== value.contentHash || row.signatureName !== value.signatureName),
+        (row.contentHash !== value.contentHash ||
+          row.signatureName !== value.signatureName ||
+          row.signatureImage !== value.signatureImage ||
+          row.representativeRole !== value.representativeRole ||
+          row.locale !== value.locale ||
+          row.partnerType !== value.partnerType ||
+          row.legalName !== value.legalName ||
+          row.idNumber !== value.idNumber ||
+          row.legalAddress !== value.legalAddress ||
+          row.representativeName !== value.representativeName),
     ),
   );
+}
+
+async function ensureDeliveryJob(
+  executor: Executor,
+  sessionId: string,
+  anchorAcceptanceId: number,
+): Promise<void> {
+  await executor
+    .insert(legalContractDeliveryOutbox)
+    .values({ acceptanceSessionId: sessionId, anchorAcceptanceId })
+    .onConflictDoNothing();
 }
 
 export async function recordLegalAcceptancePack(input: {
@@ -257,17 +277,12 @@ export async function recordLegalAcceptancePack(input: {
       const existing = await loadScopeRows(executor, input);
       const current = rowsForCurrentPack(existing);
       const sessions = groupBySession(current);
-      const complete = sessions.find((session) => sessionIsComplete(session, input.subjectType));
+      const complete = sessions.find(
+        (session) =>
+          sessionIsComplete(session, input.subjectType) &&
+          onboardingAgreementStatus(session, input.subjectType).status === "resumable",
+      );
       if (complete) {
-        const status = onboardingAgreementStatus(complete, input.subjectType);
-        if (status.status !== "resumable") {
-          return {
-            ok: false as const,
-            status: 409,
-            error: "PACK_SESSION_INCOMPLETE",
-            code: "PACK_SESSION_INCOMPLETE",
-          };
-        }
         if (immutableConflict(complete, buildAcceptanceValues({
           ...input,
           identity,
@@ -282,6 +297,11 @@ export async function recordLegalAcceptancePack(input: {
             code: "signed_document_is_immutable",
           };
         }
+        await ensureDeliveryJob(
+          executor,
+          complete[0]!.acceptanceSessionId,
+          complete[0]!.id,
+        );
         const recorded = required.map((slug) => {
           const row = complete.find((item) => item.documentSlug === slug)!;
           return {
@@ -301,15 +321,9 @@ export async function recordLegalAcceptancePack(input: {
         };
       }
 
-      if (current.length > 0) {
-        return {
-          ok: false as const,
-          status: 409,
-          error: "PACK_SESSION_INCOMPLETE",
-          code: "PACK_SESSION_INCOMPLETE",
-        };
-      }
-
+      // Partial sessions remain immutable evidence. Because uniqueness is
+      // session-scoped, append a fresh, complete canonical session instead of
+      // trying to mutate/delete the failed attempt.
       const sessionId = randomUUID();
       const acceptedAt = new Date();
       const values = buildAcceptanceValues({
@@ -323,6 +337,13 @@ export async function recordLegalAcceptancePack(input: {
       if (inserted.length !== values.length) {
         throw new Error("legal_session_insert_incomplete");
       }
+      if (
+        !sessionIsComplete(inserted, input.subjectType) ||
+        onboardingAgreementStatus(inserted, input.subjectType).status !== "resumable"
+      ) {
+        throw new Error("legal_session_insert_incomplete");
+      }
+      await ensureDeliveryJob(executor, sessionId, inserted[0]!.id);
       const recorded = inserted.map((row) => ({
         slug: row.documentSlug,
         title: row.documentTitle ?? row.documentSlug,

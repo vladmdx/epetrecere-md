@@ -21,6 +21,7 @@ interface Acceptance {
   documentBlocks?: { type: string; text: string }[] | null;
   documentTitleStored?: string | null;
   id: number;
+  acceptanceSessionId: string;
   subjectType: string;
   documentSlug: string;
   documentTitle: string;
@@ -62,11 +63,11 @@ export function SignedDocumentsCard() {
     };
   }, []);
 
-  // A pack is accepted in one action, so group by the minute it was signed —
-  // the same grouping the admin panel uses.
+  // The durable session id is the contract boundary. Never merge two signing
+  // attempts merely because their timestamps or signer names happen to match.
   const groups = new Map<string, Acceptance[]>();
   for (const it of items ?? []) {
-    const key = `${it.subjectType}|${it.packVersion}|${it.signatureName}|${it.acceptedAt}`;
+    const key = it.acceptanceSessionId;
     const arr = groups.get(key);
     if (arr) arr.push(it);
     else groups.set(key, [it]);
@@ -96,9 +97,14 @@ export function SignedDocumentsCard() {
         ) : (
           [...groups.values()].map((group) => {
             const g = group[0]!;
+            const expectedDocuments = g.subjectType === "venue" && g.packVersion !== "1.0" ? 6 : 5;
+            const completeSession =
+              group.length === expectedDocuments &&
+              new Set(group.map((document) => document.documentSlug)).size === expectedDocuments &&
+              group.every((document) => document.documentBlocks?.length);
             return (
               <div
-                key={g.id}
+                key={g.acceptanceSessionId}
                 className="rounded-lg border border-border/50 p-4"
               >
                 <div className="flex flex-wrap items-start justify-between gap-4">
@@ -113,7 +119,7 @@ export function SignedDocumentsCard() {
                       {t("vendor.signedDocs.pack", { v: g.packVersion })} ·{" "}
                       {g.locale.toUpperCase()}
                     </p>
-                    {group.every((document) => document.documentBlocks?.length) ? (
+                    {completeSession ? (
                       <a
                         href={`/api/legal/accept/${g.id}/pdf`}
                         className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-gold/90"
@@ -157,7 +163,7 @@ export function SignedDocumentsCard() {
                           <span className="text-muted-foreground">
                             v{d.documentVersion}
                           </span>
-                          {d.documentBlocks?.length ? <a href={`/api/legal/accept/${d.id}/copy`} className="ml-3 text-gold underline">
+                          {completeSession && d.documentBlocks?.length ? <a href={`/api/legal/accept/${d.id}/copy`} className="ml-3 text-gold underline">
                             {t("vendor.signedDocs.downloadDocument")}
                           </a> : null}
                           <span className="block break-all font-mono text-[11px] text-muted-foreground/70">

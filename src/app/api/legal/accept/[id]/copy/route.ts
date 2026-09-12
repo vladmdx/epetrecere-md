@@ -3,6 +3,11 @@ import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { legalAcceptances, users } from "@/lib/db/schema";
+import { canViewLegalAcceptance } from "@/lib/legal/acceptance-access";
+import {
+  SignedContractPdfError,
+  validateSignedContractSession,
+} from "@/lib/legal/signed-contract-pdf";
 
 const escape = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
 
@@ -13,8 +18,29 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!Number.isSafeInteger(id) || id < 1) return NextResponse.json({ error: "invalid_id" }, { status: 400 });
   const [user] = await db.select().from(users).where(eq(users.clerkId, userId)).limit(1);
   const [doc] = await db.select().from(legalAcceptances).where(eq(legalAcceptances.id, id)).limit(1);
-  if (!doc || !user || (doc.userId !== user.id && user.role !== "admin" && user.role !== "super_admin")) {
+  if (!doc || !user) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  const allowed = await canViewLegalAcceptance(
+    {
+      id: user.id,
+      role: user.role,
+      isGlobalAdmin: user.role === "admin" || user.role === "super_admin",
+    },
+    doc,
+  );
+  if (!allowed) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  const session = await db
+    .select()
+    .from(legalAcceptances)
+    .where(eq(legalAcceptances.acceptanceSessionId, doc.acceptanceSessionId));
+  try {
+    validateSignedContractSession(session);
+  } catch (error) {
+    if (error instanceof SignedContractPdfError) {
+      return NextResponse.json({ error: error.code }, { status: 410 });
+    }
+    throw error;
   }
   if (!doc.documentBlocks?.length) return NextResponse.json({ error: "historical_snapshot_unavailable" }, { status: 410 });
   const labels = doc.locale === "ru" ? ["Подписант", "Дата (UTC)", "IP-адрес", "Устройство", "Электронная подпись на экране, не квалифицированная", "Сохранённая копия подписанного документа"] : doc.locale === "en" ? ["Signed by", "Date (UTC)", "IP address", "Device", "On-screen electronic signature, not qualified", "Stored copy of the signed document"] : ["Semnat de", "Data (UTC)", "Adresă IP", "Dispozitiv", "Semnătură electronică desenată pe ecran, necalificată", "Copia păstrată a documentului semnat"];

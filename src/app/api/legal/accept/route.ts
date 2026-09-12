@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "verified_email_required" }, { status: 403 });
   }
   let [u] = await db
-    .select({ id: users.id, email: users.email, phone: users.phone })
+    .select({ id: users.id, phone: users.phone })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
       name: [cu.firstName, cu.lastName].filter(Boolean).join(" ") || null,
       phone: cu.phoneNumbers[0]?.phoneNumber ?? null, role: "user",
     }).onConflictDoNothing();
-    [u] = await db.select({ id: users.id, email: users.email, phone: users.phone })
+    [u] = await db.select({ id: users.id, phone: users.phone })
       .from(users).where(eq(users.clerkId, clerkId)).limit(1);
   }
   if (!u) return NextResponse.json({ error: "account_sync_required" }, { status: 409 });
@@ -167,14 +167,14 @@ export async function POST(req: NextRequest) {
   // ids are backfilled by register-artist / register-venue right afterwards.
   const [a] = subjectType === "artist"
     ? await db
-        .select({ id: artists.id, name: artists.nameRo })
+        .select({ id: artists.id })
         .from(artists)
         .where(eq(artists.userId, u.id))
         .limit(1)
     : [];
   const [v] = subjectType === "venue"
     ? await db
-        .select({ id: venues.id, name: venues.nameRo })
+        .select({ id: venues.id })
         .from(venues)
         .where(eq(venues.userId, u.id))
         .limit(1)
@@ -200,7 +200,9 @@ export async function POST(req: NextRequest) {
     ipAddress: ip,
     userAgent: ua,
     deviceSummary: device,
-    email: u.email,
+    // Bind delivery/evidence to the verified identity used for this request,
+    // even if an older local users.email mirror is empty or stale.
+    email: cu.primaryEmailAddress.emailAddress,
     phone,
     slugs,
   });
@@ -210,134 +212,41 @@ export async function POST(req: NextRequest) {
       { status: recordedPack.status },
     );
   }
-  const inserted = recordedPack.rows;
   const recordedDocs = recordedPack.recorded.map((r) => ({
     slug: r.slug, title: r.title, version: r.version, contentHash: r.contentHash, acceptedAt: r.acceptedAt,
   }));
   const recorded = recordedDocs.map((d) => d.slug);
 
-  // The dashboard reads the durable acceptance itself. Emails run with Next
-  // after(), which keeps serverless work alive after the HTTP response.
+  // In-app admin notification is a separate, deduplicated effect. Contract
+  // PDF/email delivery is driven by the durable per-session outbox below.
   if (recordedDocs.length > 0 && !recordedPack.reused) {
-    // The stored timestamp, not a fresh one: this value is printed in the
-    // signer's copy and the admin mail as the moment of acceptance, and it
-    // has to be the moment the row actually records.
-    const acceptedAt = recordedDocs[0].acceptedAt;
-    const subjectName = (subjectType === "venue" ? v?.name : a?.name) ?? null;
-
-    const { getAdminRecipients } = await import("@/lib/email/recipients");
-    const recipients = await getAdminRecipients();
-    if (recipients.length) await db.insert(notifications).values(recipients.map(admin => ({
-      userId: admin.id, type: "legal_signed",
-      title: subjectType === "venue" ? "Contract semnat - sală" : "Contract semnat - partener",
-      message: signatureName + " a acceptat pachetul legal v" + LEGAL_PACK_VERSION + ".",
-      actionUrl: "/admin/contracte",
-    }))).catch(err => console.error("[legal] in-app notification failed", err));
-    after(async () => {
-      const { sendEmail, bytesToAttachment, dataUrlToAttachment } = await import("@/lib/email/send");
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
-      const signatureAttachment = dataUrlToAttachment(signatureImage, "semnatura.png");
-      let contractAttachment: import("@/lib/email/send").EmailAttachment | null = null;
-      try {
-        const {
-          generateSignedContractPdf,
-          signedContractPdfFilename,
-        } = await import("@/lib/legal/signed-contract-pdf");
-        const pdf = await generateSignedContractPdf(inserted);
-        contractAttachment = bytesToAttachment(
-          pdf,
-          signedContractPdfFilename(inserted[0]!),
-          "application/pdf",
-        );
-      } catch (err) {
-        // Never lose the existing signature evidence if PDF rendering has a
-        // transient problem. The dashboard can regenerate the same PDF from
-        // the immutable snapshots once the renderer is available again.
-        console.error("[legal] signed contract PDF attachment failed", err);
-      }
-      const attachments = contractAttachment
-        ? [contractAttachment]
-        : signatureAttachment
-          ? [signatureAttachment]
-          : undefined;
-
-      // 1. The signer's own copy — Anexa 2 asks that the accepted version
-      // stay available to them.
-      if (u.email) {
-        try {
-          const { signedContractEmail } = await import(
-            "@/lib/email/templates/signed-contract"
-          );
-          const { subject, html } = signedContractEmail({
-            signerName: signatureName,
-            subjectLabel:
-              subjectType === "venue" ? "locația ta" : "profilul tău de artist",
-            documents: recordedDocs.map((d) => ({
-              title: d.title,
-              version: d.version,
-              url: subjectType === "venue" ? "/dashboard/sala/setari" : "/dashboard/setari",
-            })),
-            acceptedAt,
-            ipAddress: ip,
-            packVersion: LEGAL_PACK_VERSION,
-            baseUrl,
-            hasContractPdf: Boolean(contractAttachment),
-            hasSignatureImage: Boolean(signatureImage),
-          });
-          await sendEmail({
-            to: u.email,
-            subject,
-            html,
-            attachments,
-          });
-        } catch (err) {
-          console.error("[legal] signer contract email failed", err);
-        }
-      }
-
-      // 2. The administrators — every one of them, with the whole forensic
-      // record, at signature time rather than at registration time.
-      try {
-        const { getAdminRecipients } = await import("@/lib/email/recipients");
-        const { signedContractAdminEmail } = await import(
-          "@/lib/email/templates/signed-contract-admin"
-        );
-        const admins = await getAdminRecipients();
-        const { subject, html } = signedContractAdminEmail({
-          signerName: signatureName,
-          representativeRole: body.representativeRole ?? null,
-          subjectType,
-          subjectName,
-          email: u.email,
-          phone,
-          documents: recordedDocs,
-          packVersion: LEGAL_PACK_VERSION,
-          locale,
-          acceptedAt,
-          ipAddress: ip,
-          userAgent: ua,
-          baseUrl,
-          hasContractPdf: Boolean(contractAttachment),
-          hasSignatureImage: Boolean(signatureImage),
-        });
-
-        for (const admin of admins) {
-          if (admin.email) {
-            await sendEmail({
-              to: admin.email,
-              subject,
-              html,
-              attachments,
-            }).catch((err) =>
-              console.error("[legal] admin contract email failed", err),
-            );
-          }
-        }
-      } catch (err) {
-        console.error("[legal] admin notification failed", err);
-      }
-    });
+    try {
+      const { getAdminRecipients } = await import("@/lib/email/recipients");
+      const recipients = await getAdminRecipients();
+      if (recipients.length) await db.insert(notifications).values(recipients.map(admin => ({
+        userId: admin.id, type: "legal_signed",
+        title: subjectType === "venue" ? "Contract semnat - sală" : "Contract semnat - partener",
+        message: signatureName + " a acceptat pachetul legal v" + LEGAL_PACK_VERSION + ".",
+        actionUrl: "/admin/contracte",
+        dedupeKey: `legal_signed:${recordedPack.sessionId}:${admin.id}`,
+      }))).onConflictDoNothing();
+    } catch (error) {
+      console.error("[legal] in-app notification failed", error);
+    }
   }
+
+  // Run for both a fresh acceptance and an idempotent retry. The outbox claim
+  // makes concurrent calls harmless, and a failed attempt remains retryable.
+  after(async () => {
+    try {
+      const { processLegalContractDelivery } = await import(
+        "@/lib/legal/contract-delivery"
+      );
+      await processLegalContractDelivery(recordedPack.sessionId);
+    } catch (error) {
+      console.error("[legal] contract delivery failed; retry remains pending", error);
+    }
+  });
 
   return NextResponse.json({ success: true, recorded, packVersion: LEGAL_PACK_VERSION });
 }

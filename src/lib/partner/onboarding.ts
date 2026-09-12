@@ -81,6 +81,16 @@ export type OrganizationDraftInput = {
   billingPhone?: string | null;
 };
 
+export class OrganizationDraftUpdateError extends Error {
+  constructor(
+    public readonly code: string,
+    public readonly status: number,
+  ) {
+    super(code);
+    this.name = "OrganizationDraftUpdateError";
+  }
+}
+
 export async function ensureDraftOrganization(
   user: AppUser,
   input?: OrganizationDraftInput,
@@ -98,27 +108,6 @@ export async function ensureDraftOrganization(
     return row ?? null;
   };
 
-  const has = (key: keyof OrganizationDraftInput) =>
-    input != null && Object.prototype.hasOwnProperty.call(input, key) && input[key] != null;
-
-  const profilePatch = () => {
-    const patch: Record<string, unknown> = { updatedAt: new Date() };
-    if (has("displayName")) patch.displayName = input!.displayName!.trim() || "Organizație nouă";
-    if (has("type")) patch.type = input!.type;
-    if (Object.prototype.hasOwnProperty.call(input ?? {}, "legalName")) patch.legalName = emptyToNull(input?.legalName);
-    if (Object.prototype.hasOwnProperty.call(input ?? {}, "idNumber")) patch.idNumber = emptyToNull(input?.idNumber);
-    if (Object.prototype.hasOwnProperty.call(input ?? {}, "legalAddress")) {
-      patch.legalAddress = emptyToNull(input?.legalAddress);
-    }
-    if (Object.prototype.hasOwnProperty.call(input ?? {}, "billingEmail")) {
-      patch.billingEmail = emptyToNull(input?.billingEmail);
-    }
-    if (Object.prototype.hasOwnProperty.call(input ?? {}, "billingPhone")) {
-      patch.billingPhone = emptyToNull(input?.billingPhone);
-    }
-    return patch;
-  };
-
   if (reusable && !input) {
     const row = await loadReusable();
     if (row) return row;
@@ -134,17 +123,16 @@ export async function ensureDraftOrganization(
       const row = await loadReusable();
       if (row) return row;
     } else {
-      const [updated] = await db
-        .update(partnerOrganizations)
-        .set(profilePatch())
-        .where(
-          and(
-            eq(partnerOrganizations.id, reusable.id),
-            inArray(partnerOrganizations.status, ["draft", "rejected"]),
-          ),
-        )
-        .returning();
-      if (updated) return updated;
+      const saved = await saveOrganizationProfile(reusable.id, input, {
+        allowedStatuses: ["draft", "rejected"],
+      });
+      if (saved.ok && saved.organization) return saved.organization;
+      if (!saved.ok && saved.error === "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION") {
+        throw new OrganizationDraftUpdateError(saved.error, saved.status ?? 409);
+      }
+      if (!saved.ok && saved.error !== "ORGANIZATION_NOT_EDITABLE") {
+        throw new OrganizationDraftUpdateError(saved.error, saved.status ?? 400);
+      }
       const row = await loadReusable();
       if (row) return row;
     }
@@ -179,6 +167,7 @@ export async function ensureDraftOrganization(
 export async function saveOrganizationProfile(
   organizationId: number,
   raw: unknown,
+  options: { allowedStatuses?: readonly string[] } = {},
 ) {
   const record = raw && typeof raw === "object" && !Array.isArray(raw)
     ? (raw as Record<string, unknown>)
@@ -200,6 +189,9 @@ export async function saveOrganizationProfile(
         .for("update")
         .limit(1);
       if (!current) return { missing: true as const };
+      if (options.allowedStatuses && !options.allowedStatuses.includes(current.status)) {
+        return { notEditable: true as const };
+      }
 
       const signed = await organizationHasAnyAcceptance(organizationId, tx as unknown as typeof db);
       const nextType = present("type") ? data.type ?? current.type : current.type;
@@ -244,6 +236,9 @@ export async function saveOrganizationProfile(
 
     if ("missing" in updated && updated.missing) {
       return { ok: false as const, error: "Not found", status: 404 as const };
+    }
+    if ("notEditable" in updated && updated.notEditable) {
+      return { ok: false as const, error: "ORGANIZATION_NOT_EDITABLE", status: 409 as const };
     }
     if ("frozen" in updated && updated.frozen) {
       return {

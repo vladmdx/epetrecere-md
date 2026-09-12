@@ -4,7 +4,10 @@ import {
   listAccessibleOrganizations,
 } from "@/lib/venue-access";
 import { jsonError } from "@/lib/http/json";
-import { ensureDraftOrganization } from "@/lib/partner/onboarding";
+import {
+  ensureDraftOrganization,
+  OrganizationDraftUpdateError,
+} from "@/lib/partner/onboarding";
 import { organizationCreateSchema, validatePhoneOrError } from "@/lib/partner/validation";
 import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 import { redactOrganizationForRole } from "@/lib/partner/organization-dto";
@@ -42,6 +45,13 @@ export async function POST(req: Request) {
     if (!phone.ok) return jsonError(phone.message, 400, { field: "billingPhone" });
     parsed.data.billingPhone = phone.e164;
   }
-  const organization = await ensureDraftOrganization(user, parsed.data);
-  return NextResponse.json({ organization: redactOrganizationForRole(organization, "owner") });
+  try {
+    const organization = await ensureDraftOrganization(user, parsed.data);
+    return NextResponse.json({ organization: redactOrganizationForRole(organization, "owner") });
+  } catch (error) {
+    if (error instanceof OrganizationDraftUpdateError) {
+      return jsonError(error.code, error.status, { code: error.code });
+    }
+    throw error;
+  }
 }

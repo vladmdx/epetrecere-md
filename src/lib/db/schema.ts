@@ -1480,19 +1480,64 @@ export const legalAcceptances = pgTable(
     contentHash: text("content_hash"),
   },
   (t) => [
-    // Pack-scoped uniqueness (0030). Same slug+document_version may exist
-    // across packs (reguli-marketplace stayed 1.0 from 2.1 → 2.2).
+    // Session-scoped uniqueness (0030). An incomplete session remains
+    // append-only; recovery writes a separate complete signing session.
     uniqueIndex("legal_acceptances_unique")
-      .on(t.userId, t.subjectType, t.documentSlug, t.documentVersion, t.packVersion)
+      .on(t.userId, t.subjectType, t.packVersion, t.acceptanceSessionId, t.documentSlug)
       .where(sql`${t.organizationId} IS NULL`),
     index("legal_acceptances_user_idx").on(t.userId),
     uniqueIndex("legal_acceptances_org_unique")
-      .on(t.organizationId, t.documentSlug, t.documentVersion, t.packVersion)
+      .on(t.organizationId, t.subjectType, t.packVersion, t.acceptanceSessionId, t.documentSlug)
       .where(sql`${t.organizationId} IS NOT NULL`),
     uniqueIndex("legal_acceptances_session_document_unique")
       .on(t.acceptanceSessionId, t.documentSlug),
+    uniqueIndex("legal_acceptances_id_session_unique")
+      .on(t.id, t.acceptanceSessionId),
     index("legal_acceptances_organization_idx").on(t.organizationId),
     index("legal_acceptances_session_idx").on(t.acceptanceSessionId),
+    check(
+      "legal_acceptances_org_subject_chk",
+      sql`${t.organizationId} IS NULL OR ${t.subjectType} = 'venue'`,
+    ),
+  ],
+);
+
+/**
+ * Durable retry state for the complete PDF + email delivery of one signing
+ * session. The signed evidence and this job are created in the same database
+ * transaction. Resend receives stable idempotency keys per recipient.
+ * Authoritative SQL: 0030.
+ */
+export const legalContractDeliveryOutbox = pgTable(
+  "legal_contract_delivery_outbox",
+  {
+    acceptanceSessionId: uuid("acceptance_session_id").primaryKey(),
+    anchorAcceptanceId: integer("anchor_acceptance_id")
+      .notNull(),
+    status: text("status").default("pending").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    lockedAt: timestamp("locked_at", { withTimezone: true }),
+    /** Random ownership token; a stale worker cannot clear a newer lease. */
+    leaseToken: uuid("lease_token"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique("legal_contract_delivery_anchor_unique").on(t.anchorAcceptanceId),
+    index("legal_contract_delivery_pending_idx")
+      .on(t.status, t.lockedAt)
+      .where(sql`${t.deliveredAt} IS NULL`),
+    check(
+      "legal_contract_delivery_status_chk",
+      sql`${t.status} IN ('pending', 'processing', 'delivered', 'failed')`,
+    ),
+    foreignKey({
+      name: "legal_contract_delivery_anchor_session_fk",
+      columns: [t.anchorAcceptanceId, t.acceptanceSessionId],
+      foreignColumns: [legalAcceptances.id, legalAcceptances.acceptanceSessionId],
+    }).onDelete("restrict"),
   ],
 );
 

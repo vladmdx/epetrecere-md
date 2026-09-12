@@ -13,11 +13,19 @@ import {
   type RGB,
   rgb,
 } from "pdf-lib";
-import { getLegalDocument } from "@/lib/legal";
+import {
+  PARTNER_REQUIRED_DOCS,
+  VENUE_REQUIRED_DOCS,
+  getLegalDocument,
+} from "@/lib/legal";
 
 export interface SignedContractEvidence {
   id: number;
   userId?: string | null;
+  artistId?: number | null;
+  venueId?: number | null;
+  organizationId?: number | null;
+  acceptanceSessionId?: string | null;
   subjectType: string;
   documentSlug: string;
   documentVersion: string;
@@ -207,10 +215,13 @@ function acceptedIso(row: SignedContractEvidence): string {
   return date.toISOString();
 }
 
-export function signedContractSessionKey(row: SignedContractEvidence): string {
+function signedContractEvidenceKey(row: SignedContractEvidence): string {
   const signatureHash = createHash("sha256").update(row.signatureImage ?? "").digest("hex");
   return JSON.stringify([
     row.userId ?? null,
+    row.artistId ?? null,
+    row.venueId ?? null,
+    row.organizationId ?? null,
     row.subjectType,
     row.packVersion,
     row.locale,
@@ -223,7 +234,18 @@ export function signedContractSessionKey(row: SignedContractEvidence): string {
     row.legalAddress,
     row.representativeName,
     row.representativeRole,
+    row.email,
+    row.phone,
+    row.ipAddress,
+    row.userAgent,
+    row.deviceSummary,
   ]);
+}
+
+export function signedContractSessionKey(row: SignedContractEvidence): string {
+  return row.acceptanceSessionId
+    ? `session:${row.acceptanceSessionId}`
+    : `legacy:${signedContractEvidenceKey(row)}`;
 }
 
 export function signedContractPdfFilename(row: Pick<SignedContractEvidence, "id" | "subjectType">): string {
@@ -231,10 +253,34 @@ export function signedContractPdfFilename(row: Pick<SignedContractEvidence, "id"
   return `epetrecere-contract-${subject}-${row.id}.pdf`;
 }
 
-function normalizeAndValidate(rows: SignedContractEvidence[]): SignedContractEvidence[] {
+function expectedDocumentSlugs(row: SignedContractEvidence): readonly string[] {
+  if (row.subjectType === "artist") return PARTNER_REQUIRED_DOCS;
+  if (row.subjectType !== "venue") throw new SignedContractPdfError("incomplete_session");
+  // Legal Pack 1.0 predated the shared partner agreement for venues.
+  return row.packVersion === "1.0"
+    ? VENUE_REQUIRED_DOCS.filter((slug) => slug !== "acord-parteneri")
+    : VENUE_REQUIRED_DOCS;
+}
+
+export function validateSignedContractSession(
+  rows: SignedContractEvidence[],
+): SignedContractEvidence[] {
   if (!rows.length) throw new SignedContractPdfError("incomplete_session");
   const key = signedContractSessionKey(rows[0]);
   if (!rows.every((row) => signedContractSessionKey(row) === key)) {
+    throw new SignedContractPdfError("incomplete_session");
+  }
+  const evidenceKey = signedContractEvidenceKey(rows[0]);
+  if (!rows.every((row) => signedContractEvidenceKey(row) === evidenceKey)) {
+    throw new SignedContractPdfError("incomplete_session");
+  }
+  const expected = expectedDocumentSlugs(rows[0]);
+  const slugs = rows.map((row) => row.documentSlug);
+  if (
+    slugs.length !== expected.length ||
+    new Set(slugs).size !== slugs.length ||
+    expected.some((slug) => !slugs.includes(slug))
+  ) {
     throw new SignedContractPdfError("incomplete_session");
   }
   if (!rows[0].signatureImage?.startsWith("data:image/png;base64,")) {
@@ -631,7 +677,7 @@ function drawFooters(document: PDFDocument, fonts: Fonts, reference: string, loc
  * current published legal templates are never substituted for signed text.
  */
 export async function generateSignedContractPdf(input: SignedContractEvidence[]): Promise<Uint8Array> {
-  const rows = normalizeAndValidate(input);
+  const rows = validateSignedContractSession(input);
   const first = rows[0];
   const locale = localeOf(first.locale);
   const acceptedAt = new Date(first.acceptedAt);

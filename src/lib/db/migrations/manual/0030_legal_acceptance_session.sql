@@ -1,4 +1,4 @@
--- 0030 — Legal acceptance sessions, pack-scoped uniqueness, notification
+-- 0030 — Legal acceptance sessions, retryable contract delivery, notification
 -- dedupe, booking effect outbox, venue-only conversations.
 --
 -- Idempotent. drizzle-kit generate/push is forbidden. SQL is authoritative.
@@ -10,11 +10,9 @@
 -- partial 2.2 session that onboardingAgreementStatus treats as blocked.
 --
 -- Recovery for any already-partial 2.2 rows: keep them as append-only
--- evidence. Do not UPDATE/DELETE signatures. After this schema lands, a
--- complete new pack session can insert because uniqueness includes
--- pack_version + acceptance_session_id. If a target already has a partial
--- current-pack session, the app refuses further writes of that pack
--- (PACK_SESSION_INCOMPLETE) until a new pack is published.
+-- evidence. Do not UPDATE/DELETE signatures. Scope uniqueness includes the
+-- durable acceptance_session_id, so the application can append one complete
+-- canonical session under the same scope advisory lock.
 
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -86,12 +84,14 @@ ALTER TABLE legal_acceptances
 
 DROP INDEX IF EXISTS legal_acceptances_unique;
 CREATE UNIQUE INDEX IF NOT EXISTS legal_acceptances_unique
-  ON legal_acceptances (user_id, subject_type, document_slug, document_version, pack_version)
+  ON legal_acceptances
+    (user_id, subject_type, pack_version, acceptance_session_id, document_slug)
   WHERE organization_id IS NULL;
 
 DROP INDEX IF EXISTS legal_acceptances_org_unique;
 CREATE UNIQUE INDEX IF NOT EXISTS legal_acceptances_org_unique
-  ON legal_acceptances (organization_id, document_slug, document_version, pack_version)
+  ON legal_acceptances
+    (organization_id, subject_type, pack_version, acceptance_session_id, document_slug)
   WHERE organization_id IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS legal_acceptances_session_document_unique
@@ -99,6 +99,90 @@ CREATE UNIQUE INDEX IF NOT EXISTS legal_acceptances_session_document_unique
 
 CREATE INDEX IF NOT EXISTS legal_acceptances_session_idx
   ON legal_acceptances (acceptance_session_id);
+
+-- Supports a composite FK from the delivery outbox, proving in the database
+-- that its anchor belongs to the exact session being delivered.
+CREATE UNIQUE INDEX IF NOT EXISTS legal_acceptances_id_session_unique
+  ON legal_acceptances (id, acceptance_session_id);
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM legal_acceptances
+    WHERE organization_id IS NOT NULL AND subject_type <> 'venue'
+  ) THEN
+    RAISE EXCEPTION 'organization legal acceptances must have subject_type=venue'
+      USING ERRCODE = '23514';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'legal_acceptances_org_subject_chk'
+      AND conrelid = 'public.legal_acceptances'::regclass
+  ) THEN
+    ALTER TABLE legal_acceptances
+      ADD CONSTRAINT legal_acceptances_org_subject_chk
+      CHECK (organization_id IS NULL OR subject_type = 'venue');
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS legal_contract_delivery_outbox (
+  acceptance_session_id uuid PRIMARY KEY,
+  anchor_acceptance_id integer NOT NULL,
+  status text NOT NULL DEFAULT 'pending',
+  attempts integer NOT NULL DEFAULT 0,
+  locked_at timestamptz,
+  lease_token uuid,
+  delivered_at timestamptz,
+  last_error text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT legal_contract_delivery_status_chk
+    CHECK (status IN ('pending', 'processing', 'delivered', 'failed')),
+  CONSTRAINT legal_contract_delivery_anchor_unique UNIQUE (anchor_acceptance_id),
+  CONSTRAINT legal_contract_delivery_anchor_session_fk
+    FOREIGN KEY (anchor_acceptance_id, acceptance_session_id)
+    REFERENCES legal_acceptances(id, acceptance_session_id) ON DELETE RESTRICT
+);
+
+-- Idempotent upgrade path if an earlier correction-pass draft created the
+-- outbox before lease ownership and the composite anchor invariant existed.
+ALTER TABLE legal_contract_delivery_outbox
+  ADD COLUMN IF NOT EXISTS lease_token uuid;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'legal_contract_delivery_anchor_session_fk'
+      AND conrelid = 'public.legal_contract_delivery_outbox'::regclass
+  ) THEN
+    ALTER TABLE legal_contract_delivery_outbox
+      ADD CONSTRAINT legal_contract_delivery_anchor_session_fk
+      FOREIGN KEY (anchor_acceptance_id, acceptance_session_id)
+      REFERENCES legal_acceptances(id, acceptance_session_id) ON DELETE RESTRICT;
+  END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS legal_contract_delivery_pending_idx
+  ON legal_contract_delivery_outbox (status, locked_at)
+  WHERE delivered_at IS NULL;
+
+ALTER TABLE legal_contract_delivery_outbox ENABLE ROW LEVEL SECURITY;
+
+DO $$
+DECLARE r text;
+BEGIN
+  FOREACH r IN ARRAY ARRAY['anon','authenticated'] LOOP
+    IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
+      EXECUTE format(
+        'REVOKE ALL ON TABLE public.legal_contract_delivery_outbox FROM %I',
+        r
+      );
+    END IF;
+  END LOOP;
+END $$;
 
 ALTER TABLE notifications
   ADD COLUMN IF NOT EXISTS dedupe_key text;

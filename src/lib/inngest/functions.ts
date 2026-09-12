@@ -22,6 +22,7 @@ import {
 import { revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 import { isGuestTokenActive } from "@/lib/invitations/access";
 import { drainConfirmationNotificationOutbox } from "@/lib/booking/confirmation-effects";
+import { retryPendingLegalContractDeliveries } from "@/lib/legal/contract-delivery";
 
 // Trigger 1: New lead → emails
 export const onLeadCreated = inngest.createFunction(
@@ -370,6 +371,21 @@ export const bookingConfirmationOutbox = inngest.createFunction(
   },
 );
 
+// Durable legal-delivery recovery. The request path tries immediately via
+// after(), while this worker guarantees that a transient PDF/email failure is
+// not left permanently pending when the signer never submits again.
+export const retryLegalContractDeliveries = inngest.createFunction(
+  {
+    id: "retry-legal-contract-deliveries",
+    triggers: [{ cron: "*/10 * * * *" }],
+    concurrency: { limit: 1 },
+  },
+  async ({ step }) =>
+    step.run("deliver-pending-legal-contracts", () =>
+      retryPendingLegalContractDeliveries(20),
+    ),
+);
+
 /**
  * Google Calendar pull sync — spec section 2.6.
  *
@@ -534,5 +550,6 @@ export const functions = [
   invitationRsvpReminders,
   expirePendingBookings,
   bookingConfirmationOutbox,
+  retryLegalContractDeliveries,
   googleCalendarSync,
 ];

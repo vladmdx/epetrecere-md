@@ -36,9 +36,11 @@ export async function GET(_req: Request, ctx: Ctx) {
     venues: orgVenues,
     contracts: contracts.map((row) => ({
       id: row.id,
+      subjectType: row.subjectType,
       documentSlug: row.documentSlug,
       documentVersion: row.documentVersion,
       packVersion: row.packVersion,
+      acceptanceSessionId: row.acceptanceSessionId,
       acceptedAt: row.acceptedAt,
       copyUrl: `/api/legal/accept/${row.id}/copy`,
       pdfUrl: `/api/legal/accept/${row.id}/pdf`,

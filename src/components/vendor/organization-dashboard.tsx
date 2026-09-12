@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "@/components/shared/locale-link";
 import { toast } from "sonner";
 import { Loader2, Plus } from "lucide-react";
@@ -19,7 +19,16 @@ type Org = {
 };
 
 type Member = { id: number; userId: string; role: string; isActive: boolean; email: string | null; name: string | null };
-type Contract = { id: number; documentSlug: string; acceptedAt: string; pdfUrl: string; copyUrl: string };
+type Contract = {
+  id: number;
+  acceptanceSessionId: string;
+  subjectType: string;
+  documentSlug: string;
+  packVersion: string;
+  acceptedAt: string;
+  pdfUrl: string;
+  copyUrl: string;
+};
 type VenueRow = { id: number; nameRo: string; isActive: boolean; slug: string };
 
 export function OrganizationDashboard({ organizationId }: { organizationId?: number }) {
@@ -32,14 +41,23 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
   const [inviteUserId, setInviteUserId] = useState("");
   const [transferTo, setTransferTo] = useState("");
 
-  async function loadList() {
+  const contractSessions = new Map<string, Contract[]>();
+  for (const contract of detail?.contracts ?? []) {
+    const existing = contractSessions.get(contract.acceptanceSessionId);
+    if (existing) existing.push(contract);
+    else contractSessions.set(contract.acceptanceSessionId, [contract]);
+  }
+
+  const loadList = useCallback(async () => {
     const res = await fetch("/api/organizations");
     const data = await res.json();
     setOrgs(data.organizations ?? []);
-    if (!selected && data.organizations?.[0]) setSelected(data.organizations[0].id);
-  }
+    if (data.organizations?.[0]) {
+      setSelected((current) => current ?? data.organizations[0].id);
+    }
+  }, []);
 
-  async function loadDetail(id: number) {
+  const loadDetail = useCallback(async (id: number) => {
     const [orgRes, memRes] = await Promise.all([
       fetch(`/api/organizations/${id}`),
       fetch(`/api/organizations/${id}/members`),
@@ -48,15 +66,15 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
     const memData = await memRes.json();
     if (orgRes.ok) setDetail(orgData);
     setMembers(memData.members ?? []);
-  }
-
-  useEffect(() => {
-    void loadList().finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
+    void loadList().finally(() => setLoading(false));
+  }, [loadList]);
+
+  useEffect(() => {
     if (selected) void loadDetail(selected);
-  }, [selected]);
+  }, [selected, loadDetail]);
 
   async function createOrg() {
     const res = await fetch("/api/organizations", {
@@ -165,17 +183,33 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
           <Card>
             <CardContent className="space-y-3 p-4">
               <h2 className="font-heading text-lg font-semibold">Contract PDF</h2>
-              {detail.contracts.length === 0 ? (
+              {contractSessions.size === 0 ? (
                 <p className="text-sm text-muted-foreground">Niciun contract atașat organizației.</p>
               ) : (
-                detail.contracts.map((row) => (
-                  <p key={row.id} className="text-sm">
-                    {row.documentSlug} · {new Date(row.acceptedAt).toLocaleString("ro-RO")}{" "}
-                    <a className="text-gold" href={row.pdfUrl} target="_blank" rel="noreferrer">PDF</a>
-                    {" · "}
-                    <a className="text-gold" href={row.copyUrl} target="_blank" rel="noreferrer">copie</a>
-                  </p>
-                ))
+                [...contractSessions.values()].map((session) => {
+                  const anchor = session[0]!;
+                  const expected = anchor.subjectType === "venue" && anchor.packVersion !== "1.0" ? 6 : 5;
+                  const complete = session.length === expected &&
+                    new Set(session.map((row) => row.documentSlug)).size === expected;
+                  return (
+                    <div key={anchor.acceptanceSessionId} className="space-y-2 rounded-lg border p-3 text-sm">
+                      <p>v{anchor.packVersion} · {new Date(anchor.acceptedAt).toLocaleString("ro-RO")}</p>
+                      {complete ? (
+                        <>
+                          <a className="font-medium text-gold" href={anchor.pdfUrl} target="_blank" rel="noreferrer">Descarcă PDF complet</a>
+                          <ul className="space-y-1">
+                            {session.map((row) => <li key={row.id}>
+                              {row.documentSlug}{" · "}
+                              <a className="text-gold" href={row.copyUrl} target="_blank" rel="noreferrer">copie</a>
+                            </li>)}
+                          </ul>
+                        </>
+                      ) : (
+                        <p className="text-muted-foreground">Încercare incompletă păstrată ca dovadă tehnică; PDF-ul contractual nu este disponibil.</p>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </CardContent>
           </Card>

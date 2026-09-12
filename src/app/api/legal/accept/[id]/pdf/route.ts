@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { legalAcceptances, users } from "@/lib/db/schema";
 import {
   generateSignedContractPdf,
   SignedContractPdfError,
   signedContractPdfFilename,
-  signedContractSessionKey,
 } from "@/lib/legal/signed-contract-pdf";
+import { canViewLegalAcceptance } from "@/lib/legal/acceptance-access";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,31 +33,24 @@ export async function GET(
       .limit(1),
     db.select().from(legalAcceptances).where(eq(legalAcceptances.id, id)).limit(1),
   ]);
-  const isAdmin = viewer?.role === "admin" || viewer?.role === "super_admin";
-  if (!viewer || !anchor || (anchor.userId !== viewer.id && !isAdmin)) {
+  if (!viewer || !anchor) {
     // Deliberately hide whether another account's signed contract exists.
     return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
+  const allowed = await canViewLegalAcceptance(
+    {
+      id: viewer.id,
+      role: viewer.role,
+      isGlobalAdmin: viewer.role === "admin" || viewer.role === "super_admin",
+    },
+    anchor,
+  );
+  if (!allowed) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  const candidates = await db
+  const session = await db
     .select()
     .from(legalAcceptances)
-    .where(
-      anchor.userId
-        ? and(
-            eq(legalAcceptances.userId, anchor.userId),
-            eq(legalAcceptances.subjectType, anchor.subjectType),
-            eq(legalAcceptances.acceptedAt, anchor.acceptedAt),
-          )
-        : and(
-            isNull(legalAcceptances.userId),
-            eq(legalAcceptances.subjectType, anchor.subjectType),
-            eq(legalAcceptances.signatureName, anchor.signatureName),
-            eq(legalAcceptances.acceptedAt, anchor.acceptedAt),
-          ),
-    );
-  const sessionKey = signedContractSessionKey(anchor);
-  const session = candidates.filter((row) => signedContractSessionKey(row) === sessionKey);
+    .where(eq(legalAcceptances.acceptanceSessionId, anchor.acceptanceSessionId));
 
   try {
     const pdf = await generateSignedContractPdf(session);
