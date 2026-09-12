@@ -20,6 +20,7 @@ import {
 } from "../src/lib/legal/signed-contract-pdf";
 
 const ACCEPTED_AT = "2026-09-11T07:10:53.000Z";
+const SESSION_ID = "00000000-0000-4000-8000-000000000099";
 
 async function fixtureRows(): Promise<SignedContractEvidence[]> {
   const signature = await sharp(Buffer.from(`
@@ -46,6 +47,8 @@ async function fixtureRows(): Promise<SignedContractEvidence[]> {
     return {
       id: 9001 + index,
       userId: "00000000-0000-4000-8000-000000000001",
+      organizationId: 99,
+      acceptanceSessionId: SESSION_ID,
       subjectType: "venue",
       documentSlug: slug,
       documentVersion: document.version,
@@ -92,14 +95,49 @@ test("a PDF never mixes signing sessions or renders a modified frozen snapshot",
   const rows = await fixtureRows();
   assert.notEqual(
     signedContractSessionKey(rows[0]),
-    signedContractSessionKey({ ...rows[0], acceptedAt: "2026-09-10T07:10:54.000Z" }),
+    signedContractSessionKey({
+      ...rows[0],
+      acceptanceSessionId: "00000000-0000-4000-8000-000000000100",
+    }),
   );
   await assert.rejects(
-    () => generateSignedContractPdf([rows[0], { ...rows[1], acceptedAt: "2026-09-10T07:10:54.000Z" }]),
+    () => generateSignedContractPdf([
+      rows[0],
+      {
+        ...rows[1],
+        acceptanceSessionId: "00000000-0000-4000-8000-000000000100",
+      },
+    ]),
     (error: unknown) => error instanceof SignedContractPdfError && error.code === "incomplete_session",
   );
   await assert.rejects(
-    () => generateSignedContractPdf([{ ...rows[0], documentBlocks: [{ type: "p", text: "modified" }] }]),
+    () => generateSignedContractPdf([
+      rows[0],
+      { ...rows[1], organizationId: 100 },
+      ...rows.slice(2),
+    ]),
+    (error: unknown) =>
+      error instanceof SignedContractPdfError && error.code === "incomplete_session",
+  );
+  await assert.rejects(
+    () => generateSignedContractPdf([
+      rows[0],
+      { ...rows[1], acceptedAt: "2026-09-10T07:10:54.000Z" },
+      ...rows.slice(2),
+    ]),
+    (error: unknown) =>
+      error instanceof SignedContractPdfError && error.code === "incomplete_session",
+  );
+  await assert.rejects(
+    () => generateSignedContractPdf(rows.slice(0, -1)),
+    (error: unknown) =>
+      error instanceof SignedContractPdfError && error.code === "incomplete_session",
+  );
+  await assert.rejects(
+    () => generateSignedContractPdf([
+      { ...rows[0], documentBlocks: [{ type: "p", text: "modified" }] },
+      ...rows.slice(1),
+    ]),
     (error: unknown) => error instanceof SignedContractPdfError && error.code === "invalid_snapshot",
   );
 });

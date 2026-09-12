@@ -44,6 +44,7 @@ async function indexShape() {
         'legal_acceptances_unique',
         'legal_acceptances_org_unique',
         'legal_acceptances_session_document_unique',
+        'legal_acceptances_id_session_unique',
         'notifications_user_dedupe_unique'
       )
     ORDER BY indexname
@@ -63,10 +64,51 @@ async function sessionColumn() {
 }
 
 async function outboxExists() {
-  const [row] = await client<{ exists: boolean }[]>`
-    SELECT to_regclass('public.booking_effect_outbox') IS NOT NULL AS exists
+  const [row] = await client<{ booking: boolean; legal: boolean }[]>`
+    SELECT
+      to_regclass('public.booking_effect_outbox') IS NOT NULL AS booking,
+      to_regclass('public.legal_contract_delivery_outbox') IS NOT NULL AS legal
   `;
-  return Boolean(row?.exists);
+  return row;
+}
+
+async function legalConstraintShape() {
+  const rows = await client<{ conname: string; definition: string }[]>`
+    SELECT conname, pg_get_constraintdef(oid) AS definition
+    FROM pg_constraint
+    WHERE conrelid IN (
+      'public.legal_acceptances'::regclass,
+      'public.legal_contract_delivery_outbox'::regclass
+    )
+      AND conname IN (
+        'legal_acceptances_org_subject_chk',
+        'legal_contract_delivery_status_chk',
+        'legal_contract_delivery_outbox_pkey',
+        'legal_contract_delivery_anchor_session_fk'
+      )
+    ORDER BY conname
+  `;
+  return Object.fromEntries(rows.map((row) => [row.conname, row.definition]));
+}
+
+async function legalOutboxRls() {
+  const [row] = await client<{ enabled: boolean }[]>`
+    SELECT relrowsecurity AS enabled
+    FROM pg_class
+    WHERE oid = 'public.legal_contract_delivery_outbox'::regclass
+  `;
+  return Boolean(row?.enabled);
+}
+
+async function legalOutboxLeaseColumn() {
+  const [row] = await client<{ data_type: string; is_nullable: string }[]>`
+    SELECT data_type, is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'legal_contract_delivery_outbox'
+      AND column_name = 'lease_token'
+  `;
+  return row;
 }
 
 async function conversationsArtistNullable() {
@@ -113,14 +155,46 @@ async function main() {
   if (!first.legal_acceptances_org_unique?.includes("pack_version")) {
     throw new Error(`org unique must include pack_version: ${first.legal_acceptances_org_unique}`);
   }
+  if (!first.legal_acceptances_unique?.includes("acceptance_session_id")) {
+    throw new Error(`legacy unique must include session id: ${first.legal_acceptances_unique}`);
+  }
+  if (!first.legal_acceptances_org_unique?.includes("acceptance_session_id")) {
+    throw new Error(`org unique must include session id: ${first.legal_acceptances_org_unique}`);
+  }
   if (!first.legal_acceptances_session_document_unique) {
     throw new Error("legal_acceptances_session_document_unique missing");
+  }
+  if (!first.legal_acceptances_id_session_unique) {
+    throw new Error("legal_acceptances_id_session_unique missing");
   }
   if (!first.notifications_user_dedupe_unique) {
     throw new Error("notifications_user_dedupe_unique missing");
   }
-  if (!(await outboxExists())) {
-    throw new Error("booking_effect_outbox missing");
+  const outboxes = await outboxExists();
+  if (!outboxes?.booking || !outboxes.legal) {
+    throw new Error(`required outbox missing: ${JSON.stringify(outboxes)}`);
+  }
+  const legalConstraintsFirst = await legalConstraintShape();
+  if (!legalConstraintsFirst.legal_acceptances_org_subject_chk) {
+    throw new Error("legal_acceptances_org_subject_chk missing");
+  }
+  if (!legalConstraintsFirst.legal_contract_delivery_status_chk) {
+    throw new Error("legal_contract_delivery_status_chk missing");
+  }
+  if (!legalConstraintsFirst.legal_contract_delivery_outbox_pkey?.includes("acceptance_session_id")) {
+    throw new Error("legal delivery outbox must be keyed by acceptance_session_id");
+  }
+  if (!/FOREIGN KEY \(anchor_acceptance_id, acceptance_session_id\)/i.test(
+    legalConstraintsFirst.legal_contract_delivery_anchor_session_fk ?? "",
+  )) {
+    throw new Error("legal delivery anchor must belong to its exact acceptance session");
+  }
+  const leaseFirst = await legalOutboxLeaseColumn();
+  if (!leaseFirst || leaseFirst.data_type !== "uuid" || leaseFirst.is_nullable !== "YES") {
+    throw new Error(`legal delivery lease_token must be nullable uuid: ${JSON.stringify(leaseFirst)}`);
+  }
+  if (!(await legalOutboxRls())) {
+    throw new Error("legal_contract_delivery_outbox RLS must be enabled");
   }
   const convFirst = await conversationsArtistNullable();
   if (!convFirst || convFirst.is_nullable !== "YES") {
@@ -133,12 +207,20 @@ async function main() {
   apply("0030 second apply (idempotent)");
   const second = await indexShape();
   const colSecond = await sessionColumn();
+  const legalConstraintsSecond = await legalConstraintShape();
+  const leaseSecond = await legalOutboxLeaseColumn();
   const convSecond = await conversationsArtistNullable();
   if (JSON.stringify(first) !== JSON.stringify(second)) {
     throw new Error(`0030 indexes drifted:\n${JSON.stringify(first)}\n${JSON.stringify(second)}`);
   }
   if (JSON.stringify(colFirst) !== JSON.stringify(colSecond)) {
     throw new Error("acceptance_session_id drifted on second apply");
+  }
+  if (JSON.stringify(legalConstraintsFirst) !== JSON.stringify(legalConstraintsSecond)) {
+    throw new Error("legal delivery constraints drifted on second apply");
+  }
+  if (JSON.stringify(leaseFirst) !== JSON.stringify(leaseSecond)) {
+    throw new Error("legal delivery lease_token drifted on second apply");
   }
   if (JSON.stringify(convFirst) !== JSON.stringify(convSecond)) {
     throw new Error("conversations.artist_id drifted on second apply");

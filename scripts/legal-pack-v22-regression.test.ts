@@ -3,10 +3,12 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   LEGAL_PACK_VERSION,
+  PARTNER_REQUIRED_DOCS,
   REQUIRED_DOCUMENT_VERSIONS_THIS_PACK,
   getLegalDocument,
   legalBlocks,
 } from "../src/lib/legal";
+import { acceptanceSchema } from "../src/lib/legal/acceptance";
 
 function text(slug: string, locale: "ro" | "ru" | "en" = "ro") {
   const document = getLegalDocument(slug);
@@ -30,6 +32,33 @@ test("legal pack 2.2 separates pack and document versions", () => {
 
   const source = readFileSync("src/content/legal/documents.json", "utf8");
   assert.doesNotMatch(source, /Legal Pack v(?:1\.0|2\.0|2\.1)/);
+});
+
+test("artist acceptance rejects an organization scope before route authorization", () => {
+  const parsed = acceptanceSchema.safeParse({
+    subjectType: "artist",
+    organizationId: 1,
+    accepted: true,
+    packVersion: LEGAL_PACK_VERSION,
+    signatureName: "Ana Popescu",
+    signatureImage:
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    locale: "ro",
+    documents: PARTNER_REQUIRED_DOCS,
+    identity: {
+      partnerType: "individual",
+      legalName: "Ana Popescu",
+      idNumber: "2000000000001",
+      legalAddress: "Chișinău, str. Test 1",
+      representativeName: null,
+    },
+  });
+  assert.equal(parsed.success, false);
+  if (!parsed.success) {
+    assert.ok(parsed.error.issues.some((issue) =>
+      issue.path.join(".") === "organizationId" &&
+      issue.message === "organization_id_is_venue_only"));
+  }
 });
 
 test("general terms define booking, cancellation, complaints and explicit reacceptance", () => {
