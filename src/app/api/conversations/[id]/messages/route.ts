@@ -21,6 +21,7 @@ import { contactsAreShared } from "@/lib/privacy/booking-contact";
 import { chatMessageForViewer } from "@/lib/privacy/chat-message";
 import { plainText } from "@/lib/content/plain-text";
 import { conversationMatchesVenueScope } from "@/lib/conversations/scope";
+import { escapeHtml } from "@/lib/email/escape";
 
 // M0b #10 — Messages for a persistent client↔artist conversation.
 // GET  lists messages (oldest → newest, capped at 200) and resets the caller's

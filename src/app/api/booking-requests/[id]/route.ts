@@ -6,7 +6,7 @@ import { notifyConfirmationStep, scheduleConfirmationNotifications } from "@/lib
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, artists, users } from "@/lib/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   getVenueOwnerRecipients,
   requireVenueCapability,

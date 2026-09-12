@@ -12,6 +12,7 @@ import { artists, venues, users, notifications } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { validatePhone } from "@/lib/phone/validate";
 import { jsonIfMultiHallEnabled } from "@/lib/partner/multi-hall-gate";
+import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 
 // Each day is `{ open: HH:mm, close: HH:mm }` or null (closed). Mirrors
 // venues.workingHours so we can pass it straight through.
