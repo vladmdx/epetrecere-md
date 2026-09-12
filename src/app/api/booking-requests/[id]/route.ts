@@ -508,13 +508,9 @@ export async function PUT(
       isVendorOwner = artist?.userId === appUser.id;
     }
     if (!isClient && !isVendorOwner && booking.venueId) {
-      const { venues } = await import("@/lib/db/schema");
-      const [venue] = await db
-        .select({ userId: venues.userId })
-        .from(venues)
-        .where(eq(venues.id, booking.venueId))
-        .limit(1);
-      isVendorOwner = venue?.userId === appUser.id;
+      // ADR 0028 / CP3 #2 — venue ownership via the membership chain.
+      const access = await requireVenueAccess(booking.venueId, "staff");
+      isVendorOwner = access.ok;
     }
     if (!isClient && !isVendorOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -565,13 +561,9 @@ export async function PUT(
       isArtistOwner = artist?.userId === appUser.id;
     }
     if (!isClient && !isArtistOwner && booking.venueId) {
-      const { venues } = await import("@/lib/db/schema");
-      const [venue] = await db
-        .select({ userId: venues.userId })
-        .from(venues)
-        .where(eq(venues.id, booking.venueId))
-        .limit(1);
-      isArtistOwner = venue?.userId === appUser.id;
+      // ADR 0028 / CP3 #2 — venue ownership via the membership chain.
+      const access = await requireVenueAccess(booking.venueId, "staff");
+      isArtistOwner = access.ok;
     }
     if (!isClient && !isArtistOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

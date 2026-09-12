@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { venues, venueImages, reviews, users, redirects } from "@/lib/db/schema";
+import { venues, venueImages, reviews, redirects } from "@/lib/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
-import { requireVenueAccess } from "@/lib/venue-access";
+import { requireVenueAccess, getCurrentAppUser, authorizeVenueAccess } from "@/lib/venue-access";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
 import { venueOwnerFields } from "@/lib/validation/vendor-profile";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
@@ -30,9 +30,11 @@ export async function GET(
   }
   const venueId = venue.id;
   const { userId } = await auth();
-  const [viewer] = userId ? await db.select({ id: users.id, role: users.role })
-    .from(users).where(eq(users.clerkId, userId)).limit(1) : [];
-  const privileged = viewer && (viewer.id === venue.userId || viewer.role === "admin" || viewer.role === "super_admin");
+  // ADR 0028 / CP3 #2 — privileged view resolved through the membership chain,
+  // not venues.user_id.
+  const appUser = await getCurrentAppUser();
+  const access = appUser ? await authorizeVenueAccess(appUser, venue.id) : null;
+  const privileged = Boolean(access?.ok);
   if (!venue.isActive && !privileged) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

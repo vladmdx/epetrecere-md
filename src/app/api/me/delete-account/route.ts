@@ -38,6 +38,7 @@ import {
   eventPlans,
   eventPhotos,
   reviews,
+  bookingRequests,
 } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
@@ -185,8 +186,23 @@ export async function DELETE() {
       await tx.delete(venueImages).where(inArray(venueImages.venueId, venueIds));
     }
 
+    // CP3 #3 — anonymize the client's bookings BEFORE deleting the user, then
+    // let the SET NULL FK detach them. The booking (and its commission) is kept
+    // as financial evidence with no personal data, so deletion never hits the
+    // commission RESTRICT and never 503s on that path.
+    await tx
+      .update(bookingRequests)
+      .set({
+        clientName: "(cont șters)",
+        clientPhone: "",
+        clientEmail: null,
+        clientSignature: null,
+      })
+      .where(eq(bookingRequests.clientUserId, user.id));
+
     // 4. Delete the user row — cascades to event plans, messages,
-    //    conversations, invitations and photos.
+    //    conversations, invitations and photos; booking_requests.client_user_id
+    //    is SET NULL (evidence retained).
     await tx.delete(users).where(eq(users.id, user.id));
     return true;
   }).catch(() => false);

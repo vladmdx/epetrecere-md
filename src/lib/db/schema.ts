@@ -338,7 +338,7 @@ export const venueHallMenuSets = pgTable(
     hallId: integer("hall_id").notNull(),
     menuSetId: integer("menu_set_id").notNull(),
     // Same-venue guard: both hall and set must belong to this venue.
-    venueId: integer("venue_id"),
+    venueId: integer("venue_id").notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.hallId, t.menuSetId] }),
@@ -376,10 +376,11 @@ export const venueScheduleBlocks = pgTable(
       name: "venue_schedule_blocks_hall_venue_fk",
       columns: [t.hallId, t.venueId],
       foreignColumns: [venueHalls.id, venueHalls.venueId],
-    }).onDelete("set null"),
+    }).onDelete("restrict"),
     index("venue_schedule_blocks_venue_time_idx").on(t.venueId, t.startsAt, t.endsAt),
     index("venue_schedule_blocks_hall_time_idx").on(t.hallId, t.startsAt, t.endsAt),
     check("venue_schedule_blocks_interval_chk", sql`${t.endsAt} > ${t.startsAt}`),
+    check("venue_schedule_blocks_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
   ],
 );
 
@@ -405,7 +406,7 @@ export const venueHallConflictGroupMembers = pgTable(
     groupId: integer("group_id").notNull(),
     hallId: integer("hall_id").notNull(),
     // Same-venue guard: group and hall must belong to this venue.
-    venueId: integer("venue_id"),
+    venueId: integer("venue_id").notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.groupId, t.hallId] }),
@@ -421,6 +422,20 @@ export const venueHallConflictGroupMembers = pgTable(
     }).onDelete("cascade"),
   ],
 );
+
+/** CP3 #4 — persistent queue for venues/orgs that need manual admin review
+ *  (e.g. imported venues with no owner). Not a log line. */
+export const partnerAdminReviewCases = pgTable("partner_admin_review_cases", {
+  id: serial("id").primaryKey(),
+  venueId: integer("venue_id").references(() => venues.id, { onDelete: "cascade" }),
+  organizationId: integer("organization_id").references(
+    () => partnerOrganizations.id,
+    { onDelete: "cascade" },
+  ),
+  reason: text("reason").notNull(),
+  status: partnerEntityStatusEnum("status").notNull().default("pending"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 // ═══════════════════════════════════════════════════════
 // USERS
@@ -722,11 +737,17 @@ export const venues = pgTable("venues", {
   userId: uuid("user_id")
     .references(() => users.id, { onDelete: "set null" })
     .unique(),
-  /** ADR 0028 — legal/billing holder this location belongs to. */
+  /** ADR 0028 — legal/billing holder this location belongs to. RESTRICT on
+   *  delete (CP3 #3): an organization cannot be deleted while it owns venues,
+   *  so this never becomes NULL and reactivates the legacy access path. */
   organizationId: integer("organization_id").references(
     () => partnerOrganizations.id,
-    { onDelete: "set null" },
+    { onDelete: "restrict" },
   ),
+  /** IANA timezone for this location; drives canonical booking intervals. */
+  timezone: varchar("timezone", { length: 64 })
+    .default("Europe/Chisinau")
+    .notNull(),
   nameRo: text("name_ro").notNull(),
   nameRu: text("name_ru"),
   nameEn: text("name_en"),
@@ -821,6 +842,7 @@ export const venueImages = pgTable(
       foreignColumns: [venueHalls.id, venueHalls.venueId],
     }).onDelete("set null"),
     index("venue_images_hall_idx").on(t.hallId),
+    check("venue_images_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
   ],
 );
 
@@ -1040,6 +1062,7 @@ export const reviews = pgTable("reviews", {
     columns: [t.hallId, t.venueId],
     foreignColumns: [venueHalls.id, venueHalls.venueId],
   }).onDelete("set null"),
+  check("reviews_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
 ]);
 
 // ═══════════════════════════════════════════════════════
@@ -1491,6 +1514,7 @@ export const commissions = pgTable(
       columns: [t.hallId, t.venueId],
       foreignColumns: [venueHalls.id, venueHalls.venueId],
     }).onDelete("set null"),
+    check("commissions_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
   ],
 );
 
@@ -1538,8 +1562,10 @@ export const bookingRequests = pgTable("booking_requests", {
    *  that plan's "Rezervări Artiști" tab and feed the budget. */
   eventPlanId: integer("event_plan_id")
     .references(() => eventPlans.id, { onDelete: "set null" }),
+  // CP3 #3 — SET NULL (not cascade): deleting a client anonymizes the booking
+  // and keeps it (and its commission) as financial evidence.
   clientUserId: uuid("client_user_id")
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => users.id, { onDelete: "set null" }),
   clientName: text("client_name").notNull(),
   clientPhone: text("client_phone").notNull(),
   clientEmail: text("client_email"),
@@ -1586,6 +1612,7 @@ export const bookingRequests = pgTable("booking_requests", {
     columns: [t.hallId, t.venueId],
     foreignColumns: [venueHalls.id, venueHalls.venueId],
   }).onDelete("set null"),
+  check("booking_requests_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
 ]);
 
 /**

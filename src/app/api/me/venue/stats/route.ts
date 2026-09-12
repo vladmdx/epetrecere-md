@@ -4,19 +4,30 @@
 
 import { NextResponse } from "next/server";
 import { getVenueStats } from "@/lib/db/queries/venue-stats";
-import { getCurrentAppUser, getPrimaryAccessibleVenueId } from "@/lib/venue-access";
+import { getCurrentAppUser, resolveSelectedVenue } from "@/lib/venue-access";
 
-export async function GET() {
+export async function GET(req: Request) {
   const appUser = await getCurrentAppUser();
   if (!appUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const venueId = await getPrimaryAccessibleVenueId(appUser.id);
-  if (!venueId) {
+  // CP3 #2 — explicit selection, no implicit "first venue".
+  const requested = new URL(req.url).searchParams.get("venueId");
+  const selection = await resolveSelectedVenue(
+    appUser.id,
+    requested != null ? Number(requested) : undefined,
+  );
+  if (!selection.ok) {
+    if (selection.reason === "ambiguous") {
+      return NextResponse.json({ stats: null, code: "VENUE_REQUIRED", venueIds: selection.venueIds });
+    }
+    if (selection.reason === "forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json({ stats: null });
   }
 
-  const stats = await getVenueStats(venueId);
+  const stats = await getVenueStats(selection.venueId);
   return NextResponse.json({ stats });
 }

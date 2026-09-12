@@ -11,7 +11,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues } from "@/lib/db/schema";
-import { getPrimaryAccessibleVenueId } from "@/lib/venue-access";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 
 export default async function VenueDashboardLayout({
@@ -38,8 +38,16 @@ export default async function VenueDashboardLayout({
     redirect(localizePath("/", locale));
   }
 
-  // ADR 0028 — resolve the venue through the membership chain, not user_id.
-  const primaryVenueId = await getPrimaryAccessibleVenueId(appUser.id);
+  // ADR 0028 / CP3 #2 — resolve via the membership chain, never an implicit
+  // "first venue". With several accessible venues and no selection, send the
+  // user to pick one instead of guessing. This layout wraps every /sala/* page,
+  // so sub-pages then operate on a single, unambiguous venue.
+  const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
+  const venueIds = await listAccessibleVenueIds(appUser.id);
+  if (venueIds.length > 1 && !isAdmin) {
+    redirect(localizePath("/dashboard/locatii", locale));
+  }
+  const primaryVenueId = venueIds[0] ?? null;
   const [venueRecord] = primaryVenueId
     ? await db
         .select({ id: venues.id, nameRo: venues.nameRo, slug: venues.slug, isActive: venues.isActive })
@@ -47,8 +55,6 @@ export default async function VenueDashboardLayout({
         .where(eq(venues.id, primaryVenueId))
         .limit(1)
     : [];
-
-  const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
 
   if (!venueRecord && !isAdmin) {
     // No venue — send them back to the main dashboard (which will resolve

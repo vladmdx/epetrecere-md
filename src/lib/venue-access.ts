@@ -328,20 +328,6 @@ export async function isVenuePartner(userId: string): Promise<boolean> {
   return ids.length > 0;
 }
 
-/**
- * Deterministic primary venue id for dashboard server pages that today assume a
- * single venue. Returns the lowest accessible venue id, or null. Routes through
- * the membership resolver (flag-gated) instead of `venues.user_id`. Multi-venue
- * selection UI arrives in a later phase; until then this is stable, not "first
- * row arbitrary".
- */
-export async function getPrimaryAccessibleVenueId(
-  userId: string,
-): Promise<number | null> {
-  const ids = await listAccessibleVenueIds(userId);
-  if (ids.length === 0) return null;
-  return ids.slice().sort((a, b) => a - b)[0];
-}
 
 /**
  * The user ids that should receive owner-facing notifications for a venue.
@@ -361,6 +347,8 @@ export async function getVenueOwnerUserIds(venueId: number): Promise<string[]> {
 
   const recipients = new Set<string>();
   if (isMultiHallEnabled() && venue.organizationId != null) {
+    // Membership-only: the legacy owner must NOT be re-added here (CP3 #2),
+    // otherwise a removed/demoted ex-owner would keep receiving owner notices.
     const members = await db
       .select({ userId: partnerOrganizationMembers.userId })
       .from(partnerOrganizationMembers)
@@ -372,7 +360,9 @@ export async function getVenueOwnerUserIds(venueId: number): Promise<string[]> {
         ),
       );
     for (const m of members) recipients.add(m.userId);
+    return [...recipients];
   }
+  // Flag off, or venue has no organization yet → legacy owner.
   if (venue.userId) recipients.add(venue.userId);
   return [...recipients];
 }

@@ -223,6 +223,47 @@ An IDOR regression (`scripts/venue-multihall-access-regression.test.ts`) proves
 organization A cannot reach organization B's venue/hall, that disabled/removed/
 demoted members lose access, and that the flag switches the behaviour off.
 
+## 6b. Correction Pass 3 (hardening) — status
+
+- **Migration mechanism is singular and canonical:** one idempotent, self-healing
+  file `src/lib/db/migrations/manual/0028_*.sql`, applied via
+  `scripts/apply-sql-file.ts`; `schema.ts` is kept byte-aligned with it. It is
+  **not** duplicated into `supabase/migrations`. `drizzle-kit generate` is not used.
+- **Deletes are safe:** `venues.organization_id` is `ON DELETE RESTRICT` (an org
+  cannot be deleted while it owns venues → archive instead; the link never nulls
+  and never reactivates legacy access). `booking_requests.client_user_id` is
+  `ON DELETE SET NULL` so deleting a client anonymizes and retains the booking
+  and its commission (commissions never cascade; `booking_request_id` is
+  RESTRICT). Hall schedule blocks use `ON DELETE RESTRICT` so a hall with blocks
+  must be archived, never silently converted to a whole-venue block; historical
+  bookings/commissions/reviews keep `SET NULL (hall_id)` + snapshots.
+- **NULL-FK bypass closed:** `CHECK (hall_id IS NULL OR venue_id IS NOT NULL)` on
+  booking_requests / venue_images / venue_schedule_blocks / commissions / reviews;
+  association tables carry a `NOT NULL venue_id` after backfill.
+- **`venues.timezone`** added (default `Europe/Chisinau`) and used to compute
+  canonical booking intervals.
+- **Intervals are half-open `[starts_at, ends_at)`**: full-day → next day 00:00;
+  overnight (`end <= start`) → next day. Legacy calendar backfill covers both
+  `blocked` and manual `booked` rows and never duplicates booking-derived
+  projections (`booking_id IS NULL`).
+- **Owner-less venues** create a persistent row in `partner_admin_review_cases`
+  (not a `RAISE NOTICE`).
+- **E2E test safety (P0):** the suite loads only `.env.test.local`, requires a
+  dedicated `E2E_DATABASE_URL` + `E2E_DB_IS_TEST=1`, refuses anything that looks
+  like production centrally at import time (no `ALLOW_PROD` escape), and has no
+  `epetrecere.md` fallback. `test:e2e:prod` was removed.
+
+### Legacy `bookings` table strategy (CP3 #4)
+
+The old `bookings` table (distinct from `booking_requests`) is still read by some
+analytics queries. Strategy for phases 0–2: it is treated as **historical,
+read-only** — no new writes, not extended with `hall_id`. All hall-level
+reporting derives from `booking_requests.hall_id` (the canonical source going
+forward). Migrating or dual-reading the legacy `bookings` rows for hall-aware
+analytics is deferred to phase 6 (the analytics/reporting consumer phase); until
+then analytics that read `bookings` remain venue-level, which matches their
+current behaviour and does not regress.
+
 ## 7. Known availability defects to fix in phase 4 (recorded, not fixed here)
 
 Documented so phase 4 addresses them: `checkVenueAvailability()` ignores manual/

@@ -100,8 +100,24 @@ CREATE INDEX IF NOT EXISTS partner_org_members_org_idx
 -- 3. VENUES BECOME LOCATIONS — add organization_id (keep user_id for now)
 -- ─────────────────────────────────────────────────────────────────────────
 ALTER TABLE venues
-  ADD COLUMN IF NOT EXISTS organization_id integer REFERENCES partner_organizations(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS organization_id integer,
+  ADD COLUMN IF NOT EXISTS timezone text NOT NULL DEFAULT 'Europe/Chisinau';
 CREATE INDEX IF NOT EXISTS venues_organization_idx ON venues (organization_id);
+-- CP3 #3 — organization delete must NOT null venues.organization_id (that would
+-- silently reactivate the legacy user_id access path). RESTRICT forces archiving
+-- the organization instead of deleting it while it still owns venues.
+DO $$
+DECLARE fk text;
+BEGIN
+  SELECT con.conname INTO fk FROM pg_constraint con JOIN pg_class rel ON rel.oid=con.conrelid
+    JOIN pg_attribute att ON att.attrelid=rel.oid AND att.attnum=con.conkey[1]
+    WHERE rel.relname='venues' AND con.contype='f' AND array_length(con.conkey,1)=1 AND att.attname='organization_id';
+  IF fk IS NOT NULL THEN EXECUTE format('ALTER TABLE venues DROP CONSTRAINT %I', fk); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='venues_organization_fk') THEN
+    ALTER TABLE venues ADD CONSTRAINT venues_organization_fk
+      FOREIGN KEY (organization_id) REFERENCES partner_organizations(id) ON DELETE RESTRICT;
+  END IF;
+END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- 4. VENUE HALLS
@@ -288,19 +304,15 @@ CREATE TABLE IF NOT EXISTS venue_schedule_blocks (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT venue_schedule_blocks_interval_chk CHECK (ends_at > starts_at)
 );
-DO $$
-DECLARE v int := current_setting('server_version_num')::int;
-BEGIN
+-- CP3 #3 — a hall block must NOT silently become a whole-venue block when the
+-- hall is removed. RESTRICT forces archiving the hall (and clearing its blocks)
+-- instead of converting them.
+DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'venue_schedule_blocks_hall_venue_fk') THEN
     ALTER TABLE venue_schedule_blocks DROP CONSTRAINT venue_schedule_blocks_hall_venue_fk;
   END IF;
-  IF v >= 150000 THEN
-    ALTER TABLE venue_schedule_blocks ADD CONSTRAINT venue_schedule_blocks_hall_venue_fk
-      FOREIGN KEY (hall_id, venue_id) REFERENCES venue_halls(id, venue_id) ON DELETE SET NULL (hall_id);
-  ELSE
-    ALTER TABLE venue_schedule_blocks ADD CONSTRAINT venue_schedule_blocks_hall_venue_fk
-      FOREIGN KEY (hall_id, venue_id) REFERENCES venue_halls(id, venue_id) ON DELETE RESTRICT;
-  END IF;
+  ALTER TABLE venue_schedule_blocks ADD CONSTRAINT venue_schedule_blocks_hall_venue_fk
+    FOREIGN KEY (hall_id, venue_id) REFERENCES venue_halls(id, venue_id) ON DELETE RESTRICT;
 END $$;
 CREATE INDEX IF NOT EXISTS venue_schedule_blocks_venue_time_idx
   ON venue_schedule_blocks (venue_id, starts_at, ends_at);
@@ -348,6 +360,23 @@ DO $$ BEGIN
 END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- 8b. ADMIN REVIEW CASES (CP3 #4) — persistent queue, not a RAISE NOTICE.
+-- ─────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS partner_admin_review_cases (
+  id              serial PRIMARY KEY,
+  venue_id        integer REFERENCES venues(id) ON DELETE CASCADE,
+  organization_id integer REFERENCES partner_organizations(id) ON DELETE CASCADE,
+  reason          text NOT NULL,
+  status          partner_entity_status NOT NULL DEFAULT 'pending',
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+-- One open case per (venue, reason) keeps the backfill idempotent.
+CREATE UNIQUE INDEX IF NOT EXISTS partner_admin_review_open_venue_ux
+  ON partner_admin_review_cases (venue_id, reason) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS partner_admin_review_status_idx
+  ON partner_admin_review_cases (status);
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- 9. BOOKING REQUESTS — hall + canonical interval + commercial snapshot
 -- ─────────────────────────────────────────────────────────────────────────
 ALTER TABLE booking_requests
@@ -373,6 +402,35 @@ BEGIN
   END IF;
 END $$;
 CREATE INDEX IF NOT EXISTS booking_requests_hall_idx ON booking_requests (hall_id);
+
+-- CP3 #3 — client account deletion must retain the booking (and its commission)
+-- as anonymized financial evidence. Switch client_user_id CASCADE → SET NULL so
+-- deleting a client nulls the link instead of deleting the booking (which
+-- commissions_booking_request_fk RESTRICT would otherwise block → 503).
+DO $$
+DECLARE fk text;
+BEGIN
+  SELECT con.conname INTO fk FROM pg_constraint con JOIN pg_class rel ON rel.oid=con.conrelid
+    JOIN pg_attribute att ON att.attrelid=rel.oid AND att.attnum=con.conkey[1]
+    WHERE rel.relname='booking_requests' AND con.contype='f' AND array_length(con.conkey,1)=1 AND att.attname='client_user_id';
+  IF fk IS NOT NULL THEN EXECUTE format('ALTER TABLE booking_requests DROP CONSTRAINT %I', fk); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='booking_requests_client_user_fk') THEN
+    ALTER TABLE booking_requests ADD CONSTRAINT booking_requests_client_user_fk
+      FOREIGN KEY (client_user_id) REFERENCES users(id) ON DELETE SET NULL;
+  END IF;
+END $$;
+
+-- CP3 #3 — a hall reference is only meaningful with a venue. Guarantee it can
+-- never be set without one (closes the hall_id-without-venue_id bypass).
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY['booking_requests','venue_images','venue_schedule_blocks','commissions','reviews'] LOOP
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = t||'_hall_requires_venue_chk') THEN
+      EXECUTE format('ALTER TABLE %I ADD CONSTRAINT %I CHECK (hall_id IS NULL OR venue_id IS NOT NULL)', t, t||'_hall_requires_venue_chk');
+    END IF;
+  END LOOP;
+END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- 10. LEGAL ACCEPTANCES — organization link + unique-index scoping + trigger
@@ -573,18 +631,25 @@ BEGIN
     UPDATE menu_scan_cache       SET menu_set_id = default_set_id WHERE venue_id = v.id AND menu_set_id IS NULL;
 
     -- 12d. existing venue bookings → default hall + canonical interval + tz + currency + snapshot
+    -- Canonical interval as half-open [starts_at, ends_at). Full-day bookings
+    -- (no end_time) end at 00:00 the NEXT day; overnight bookings (end_time
+    -- <= start_time) also roll into the next day. (CP3 #4)
     UPDATE booking_requests b SET
       hall_id = COALESCE(b.hall_id, default_hall_id),
       reservation_scope = COALESCE(b.reservation_scope, 'hall'),
-      timezone = COALESCE(b.timezone, 'Europe/Chisinau'),
+      timezone = COALESCE(b.timezone, COALESCE(v.timezone, 'Europe/Chisinau')),
       starts_at = COALESCE(b.starts_at,
         CASE WHEN b.event_date IS NOT NULL
-             THEN ((b.event_date::text || ' ' || COALESCE(NULLIF(b.start_time,''),'00:00'))::timestamp AT TIME ZONE 'Europe/Chisinau')
+             THEN ((b.event_date::text || ' ' || COALESCE(NULLIF(b.start_time,''),'00:00'))::timestamp AT TIME ZONE COALESCE(v.timezone,'Europe/Chisinau'))
              ELSE NULL END),
-      ends_at = COALESCE(b.ends_at,
-        CASE WHEN b.event_date IS NOT NULL AND NULLIF(b.end_time,'') IS NOT NULL
-             THEN ((b.event_date::text || ' ' || b.end_time)::timestamp AT TIME ZONE 'Europe/Chisinau')
-             ELSE NULL END),
+      ends_at = COALESCE(b.ends_at, CASE
+        WHEN b.event_date IS NULL THEN NULL
+        WHEN NULLIF(b.end_time,'') IS NULL
+          THEN (((b.event_date + 1)::text || ' 00:00')::timestamp AT TIME ZONE COALESCE(v.timezone,'Europe/Chisinau'))
+        WHEN b.end_time <= COALESCE(NULLIF(b.start_time,''),'00:00')
+          THEN (((b.event_date + 1)::text || ' ' || b.end_time)::timestamp AT TIME ZONE COALESCE(v.timezone,'Europe/Chisinau'))
+        ELSE ((b.event_date::text || ' ' || b.end_time)::timestamp AT TIME ZONE COALESCE(v.timezone,'Europe/Chisinau'))
+      END),
       agreed_currency = COALESCE(b.agreed_currency, CASE WHEN b.agreed_price IS NOT NULL THEN 'EUR' ELSE b.agreed_currency END),
       commercial_snapshot = COALESCE(b.commercial_snapshot,
         CASE WHEN b.confirmed_at IS NOT NULL THEN jsonb_build_object(
@@ -610,22 +675,52 @@ BEGIN
     AND la.organization_id IS NULL AND vn.organization_id IS NOT NULL;
 
   -- 12g. Legacy non-booking calendar blocks → whole-venue schedule blocks.
-  --      Conservative: only manual/google 'blocked' rows that are NOT tied to a
-  --      booking (booking_id IS NULL) become whole-venue blocks (hall_id NULL).
+  --      Includes BOTH 'blocked' and manual 'booked' rows, but ONLY those not
+  --      tied to a booking (booking_id IS NULL) so booking-derived projections
+  --      are never duplicated. Intervals are half-open: full-day → next day
+  --      00:00; overnight (end <= start) → next day. (CP3 #4)
   INSERT INTO venue_schedule_blocks (venue_id, hall_id, starts_at, ends_at, kind, reason, source)
   SELECT ce.entity_id, NULL,
          (ce.date::text || ' ' || COALESCE(NULLIF(ce.start_time,''),'00:00'))::timestamp AT TIME ZONE 'Europe/Chisinau',
-         (ce.date::text || ' ' || COALESCE(NULLIF(ce.end_time,''),'23:59'))::timestamp AT TIME ZONE 'Europe/Chisinau',
+         CASE
+           WHEN NULLIF(ce.end_time,'') IS NULL
+             THEN (((ce.date + 1)::text || ' 00:00')::timestamp AT TIME ZONE 'Europe/Chisinau')
+           WHEN ce.end_time <= COALESCE(NULLIF(ce.start_time,''),'00:00')
+             THEN (((ce.date + 1)::text || ' ' || ce.end_time)::timestamp AT TIME ZONE 'Europe/Chisinau')
+           ELSE ((ce.date::text || ' ' || ce.end_time)::timestamp AT TIME ZONE 'Europe/Chisinau')
+         END,
          CASE WHEN ce.source = 'google_sync' THEN 'external_calendar'::schedule_block_kind ELSE 'manual'::schedule_block_kind END,
          ce.note, 'backfill_0028:calendar_events'
   FROM calendar_events ce
-  WHERE ce.entity_type = 'venue' AND ce.status = 'blocked' AND ce.booking_id IS NULL
+  WHERE ce.entity_type = 'venue' AND ce.status IN ('blocked','booked') AND ce.booking_id IS NULL
     AND EXISTS (SELECT 1 FROM venues vv WHERE vv.id = ce.entity_id)
     AND NOT EXISTS (
       SELECT 1 FROM venue_schedule_blocks b
       WHERE b.venue_id = ce.entity_id AND b.source = 'backfill_0028:calendar_events'
         AND b.starts_at = (ce.date::text || ' ' || COALESCE(NULLIF(ce.start_time,''),'00:00'))::timestamp AT TIME ZONE 'Europe/Chisinau'
     );
+
+  -- 12h. Owner-less venues → a persistent admin-review case (no invented
+  --      identity). Idempotent via the partial unique index. (CP3 #4)
+  INSERT INTO partner_admin_review_cases (venue_id, reason, status)
+  SELECT vn.id, 'no_owner_no_org', 'pending'
+  FROM venues vn
+  WHERE vn.user_id IS NULL AND vn.organization_id IS NULL
+    AND NOT EXISTS (
+      SELECT 1 FROM partner_admin_review_cases c
+      WHERE c.venue_id = vn.id AND c.reason = 'no_owner_no_org' AND c.status = 'pending'
+    );
+END $$;
+
+-- CP3 #3 — now that the backfill has populated venue_id on the association
+-- tables, enforce NOT NULL (only if there are no stragglers).
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM venue_hall_menu_sets WHERE venue_id IS NULL) THEN
+    ALTER TABLE venue_hall_menu_sets ALTER COLUMN venue_id SET NOT NULL;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM venue_hall_conflict_group_members WHERE venue_id IS NULL) THEN
+    ALTER TABLE venue_hall_conflict_group_members ALTER COLUMN venue_id SET NOT NULL;
+  END IF;
 END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────

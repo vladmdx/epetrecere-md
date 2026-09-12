@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, artists } from "@/lib/db/schema";
 import { VendorLayoutChrome } from "@/components/vendor/vendor-layout-chrome";
-import { getPrimaryAccessibleVenueId } from "@/lib/venue-access";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { signInPath } from "@/lib/i18n/server-redirect";
 
 export default async function VendorLayout({
@@ -33,11 +33,17 @@ export default async function VendorLayout({
     .where(eq(artists.userId, appUser.id))
     .limit(1);
 
-  // ADR 0028 — venue partner detection via the membership resolver.
-  const primaryVenueId = await getPrimaryAccessibleVenueId(appUser.id);
-  const venueRecord = primaryVenueId ? { id: primaryVenueId } : undefined;
-
   const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
+
+  // ADR 0028 / CP3 #2 — venue partner detection via the membership resolver.
+  // No implicit "first venue": a multi-venue owner with no selection is sent to
+  // pick one. (Cannot happen while UNIQUE(venues.user_id) still holds, but the
+  // guard is in place for when it is lifted.)
+  const venueIds = await listAccessibleVenueIds(appUser.id);
+  if (venueIds.length > 1 && !isAdmin) {
+    redirect("/dashboard/locatii");
+  }
+  const venueRecord = venueIds.length === 1 ? { id: venueIds[0] } : undefined;
   // Artists who picked the role on the picker but haven't completed
   // onboarding yet have role="artist" without an artist record. Let
   // them through so the dashboard can prompt them to finish setup.

@@ -35,7 +35,7 @@ import {
   lte,
   sql,
 } from "drizzle-orm";
-import { listAccessibleVenueIds } from "@/lib/venue-access";
+import { resolveSelectedVenue, requireVenueAccess } from "@/lib/venue-access";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   generateVenueDescription,
@@ -234,6 +234,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // CP3 #2 — the assistant performs mutations (descriptions, SEO, review
+  // replies, calendar). Require an explicit, single venue AND an owner/admin
+  // capability before doing anything (no implicit "first venue", no staff
+  // mutations until the capability matrix exists).
+  const body = await req.json().catch(() => null);
+  const requestedVenueId =
+    typeof body?.venueId === "number" ? body.venueId : undefined;
+  const selection = await resolveSelectedVenue(appUser.id, requestedVenueId);
+  if (!selection.ok) {
+    if (selection.reason === "ambiguous") {
+      return NextResponse.json(
+        { error: "VENUE_REQUIRED", venueIds: selection.venueIds },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: "No venue found" }, { status: 403 });
+  }
+  const venueAccess = await requireVenueAccess(selection.venueId, "owner");
+  if (!venueAccess.ok) {
+    return NextResponse.json({ error: venueAccess.error }, { status: venueAccess.status });
+  }
   const [venue] = await db
     .select({
       id: venues.id,
@@ -246,13 +267,11 @@ export async function POST(req: NextRequest) {
       facilities: venues.facilities,
     })
     .from(venues)
-    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
+    .where(eq(venues.id, selection.venueId))
     .limit(1);
   if (!venue) {
     return NextResponse.json({ error: "No venue found" }, { status: 403 });
   }
-
-  const body = await req.json().catch(() => null);
   const incoming = body?.messages as ClientMessage[] | undefined;
   if (!Array.isArray(incoming) || incoming.length === 0) {
     return NextResponse.json(

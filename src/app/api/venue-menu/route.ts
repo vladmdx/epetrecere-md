@@ -213,7 +213,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ item: row });
     }
     case "update_item": {
-      const { id, venueId: _v, action: _a, ...updates } = data;
+      const { id, venueId, action: _a, ...updates } = data;
+      // CP3 #2 — item → category → venue ownership (close IDOR by item id).
+      const [owned] = await db
+        .select({ id: venueMenuItems.id })
+        .from(venueMenuItems)
+        .innerJoin(venueMenuCategories, eq(venueMenuCategories.id, venueMenuItems.categoryId))
+        .where(and(eq(venueMenuItems.id, id), eq(venueMenuCategories.venueId, venueId)))
+        .limit(1);
+      if (!owned) return NextResponse.json({ error: "Invalid item" }, { status: 404 });
       const [row] = await db
         .update(venueMenuItems)
         .set(updates)
@@ -222,6 +230,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ item: row });
     }
     case "delete_item": {
+      // CP3 #2 — item → category → venue ownership (close IDOR by item id).
+      const [owned] = await db
+        .select({ id: venueMenuItems.id })
+        .from(venueMenuItems)
+        .innerJoin(venueMenuCategories, eq(venueMenuCategories.id, venueMenuItems.categoryId))
+        .where(and(eq(venueMenuItems.id, data.id), eq(venueMenuCategories.venueId, data.venueId)))
+        .limit(1);
+      if (!owned) return NextResponse.json({ error: "Invalid item" }, { status: 404 });
       await db.delete(venueMenuItems).where(eq(venueMenuItems.id, data.id));
       return NextResponse.json({ ok: true });
     }
