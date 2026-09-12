@@ -1,5 +1,5 @@
 -- 0030 — Legal acceptance sessions, pack-scoped uniqueness, notification
--- dedupe, booking effect outbox.
+-- dedupe, booking effect outbox, venue-only conversations.
 --
 -- Idempotent. drizzle-kit generate/push is forbidden. SQL is authoritative.
 -- Do NOT apply this file to Preview or Production from this correction pass.
@@ -125,6 +125,29 @@ BEGIN
       EXECUTE format('REVOKE ALL ON TABLE public.booking_effect_outbox FROM %I', r);
     END IF;
   END LOOP;
+END $$;
+
+-- Venue Mesaje threads store venue_id and leave artist_id NULL. 0002 created
+-- artist_id NOT NULL; schema.ts already models it as nullable.
+ALTER TABLE conversations
+  ALTER COLUMN artist_id DROP NOT NULL;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM conversations
+    WHERE artist_id IS NULL AND venue_id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'conversations rows must reference an artist or a venue'
+      USING ERRCODE = '23514';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'conversations_vendor_required_chk'
+  ) THEN
+    ALTER TABLE conversations
+      ADD CONSTRAINT conversations_vendor_required_chk
+      CHECK (artist_id IS NOT NULL OR venue_id IS NOT NULL);
+  END IF;
 END $$;
 
 COMMIT;

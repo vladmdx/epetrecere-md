@@ -1,6 +1,6 @@
 /**
  * Verifies migration 0030 (legal session uniqueness, notification dedupe,
- * booking effect outbox) on the disposable local E2E database.
+ * booking effect outbox, venue-only conversations) on the disposable local E2E database.
  * Applies 0030 twice, asserts unique-index shape and session column.
  *
  * Do NOT apply this file to Preview or Production.
@@ -69,6 +69,26 @@ async function outboxExists() {
   return Boolean(row?.exists);
 }
 
+async function conversationsArtistNullable() {
+  const [row] = await client<{ is_nullable: string }[]>`
+    SELECT is_nullable
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'conversations'
+      AND column_name = 'artist_id'
+  `;
+  return row;
+}
+
+async function conversationsVendorCheck() {
+  const [row] = await client<{ conname: string }[]>`
+    SELECT conname
+    FROM pg_constraint
+    WHERE conname = 'conversations_vendor_required_chk'
+  `;
+  return row;
+}
+
 async function main() {
   await verifyE2EDatabase(config);
   const [state] = await client<{ has_legal: boolean }[]>`
@@ -102,17 +122,28 @@ async function main() {
   if (!(await outboxExists())) {
     throw new Error("booking_effect_outbox missing");
   }
+  const convFirst = await conversationsArtistNullable();
+  if (!convFirst || convFirst.is_nullable !== "YES") {
+    throw new Error(`conversations.artist_id must be nullable: ${JSON.stringify(convFirst)}`);
+  }
+  if (!(await conversationsVendorCheck())) {
+    throw new Error("conversations_vendor_required_chk missing");
+  }
 
   apply("0030 second apply (idempotent)");
   const second = await indexShape();
   const colSecond = await sessionColumn();
+  const convSecond = await conversationsArtistNullable();
   if (JSON.stringify(first) !== JSON.stringify(second)) {
     throw new Error(`0030 indexes drifted:\n${JSON.stringify(first)}\n${JSON.stringify(second)}`);
   }
   if (JSON.stringify(colFirst) !== JSON.stringify(colSecond)) {
     throw new Error("acceptance_session_id drifted on second apply");
   }
-  log("idempotent: unique indexes and session column unchanged");
+  if (JSON.stringify(convFirst) !== JSON.stringify(convSecond)) {
+    throw new Error("conversations.artist_id drifted on second apply");
+  }
+  log("idempotent: unique indexes, session column, and conversations.artist_id unchanged");
   log("0030 verify PASS");
 }
 

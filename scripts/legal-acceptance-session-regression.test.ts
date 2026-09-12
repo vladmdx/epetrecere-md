@@ -100,12 +100,12 @@ before(async () => {
 });
 
 after(async () => {
+  // Signatures are append-only and keep organization_id. Do not delete orgs
+  // or users that still appear on evidence rows.
   const orgIds = [ids.org, ids.partialOrg].filter(Boolean);
   if (orgIds.length) {
     await db.delete(partnerOrganizationMembers).where(inArray(partnerOrganizationMembers.organizationId, orgIds));
-    await db.delete(partnerOrganizations).where(inArray(partnerOrganizations.id, orgIds));
   }
-  await db.delete(users).where(inArray(users.id, [ids.owner, ids.owner2].filter(Boolean)));
 });
 
 test("2.1 pack with reguli-marketplace 1.0 can still sign a complete 2.2 session", async () => {

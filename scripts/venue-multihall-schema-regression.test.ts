@@ -251,3 +251,13 @@ test("composite hall FKs in schema.ts do not declare onDelete set null", () => {
     assert.doesNotMatch(slice, /onDelete/, name);
   }
 });
+
+test("conversations.artist_id is nullable with a vendor-required check", () => {
+  const source = readFileSync("src/lib/db/schema.ts", "utf8");
+  const start = source.indexOf("export const conversations");
+  assert.ok(start > 0);
+  const slice = source.slice(start, start + 1200);
+  assert.match(slice, /artistId: integer\("artist_id"\)/);
+  assert.doesNotMatch(slice, /artistId: integer\("artist_id"\)[\s\S]{0,80}\.notNull\(\)/);
+  assert.match(slice, /conversations_vendor_required_chk/);
+});

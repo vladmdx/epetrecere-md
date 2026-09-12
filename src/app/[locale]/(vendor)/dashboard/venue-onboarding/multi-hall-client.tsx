@@ -29,7 +29,7 @@ export default function MultiHallVenueOnboarding() {
   const { user } = useUser();
   const presetOrg = Number(search.get("organizationId") || "") || null;
   const presetVenue = Number(search.get("venueId") || "") || null;
-  const createIntent = !presetVenue;
+  const createIntent = search.get("intent") === "create" || !presetVenue;
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [organizationId, setOrganizationId] = useState<number | null>(presetOrg);

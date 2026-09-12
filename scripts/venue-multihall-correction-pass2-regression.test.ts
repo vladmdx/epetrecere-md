@@ -245,11 +245,7 @@ after(async () => {
   const orgIds = [ids.org, ids.orgB].filter(Boolean);
   if (orgIds.length) {
     await db.delete(partnerOrganizationMembers).where(inArray(partnerOrganizationMembers.organizationId, orgIds));
-    await db.delete(partnerOrganizations).where(inArray(partnerOrganizations.id, orgIds));
   }
-  await db.delete(users).where(inArray(users.id, [
-    ids.owner, ids.owner2, ids.staff, ids.outsider, ids.client, ids.artistUser,
-  ].filter(Boolean)));
 });
 
 test("fresh POST legal fields persist; add venue does not mutate the first local", async () => {
@@ -580,7 +576,11 @@ test("artist overlapping accepts: only one wins; set_paid CAS refuses cancelled"
     acceptArtistBooking(b, { agreedPrice: 100 }),
   ]);
   const ok = race.filter((item) => item.status === "fulfilled");
-  assert.equal(ok.length, 1, JSON.stringify(race.map((item) => item.status)));
+  assert.equal(ok.length, 1, JSON.stringify(race.map((item) =>
+    item.status === "rejected" ? String(item.reason) : item.status)));
+  const accepted = await db.select({ id: bookingRequests.id, status: bookingRequests.status })
+    .from(bookingRequests).where(inArray(bookingRequests.id, [a.id, b.id]));
+  assert.equal(accepted.filter((row) => row.status === "accepted").length, 1);
 
   const [paidBooking] = await db.insert(bookingRequests).values({
     venueId: ids.venue,

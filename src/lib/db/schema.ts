@@ -1761,6 +1761,8 @@ export const conversations = pgTable("conversations", {
   index("idx_conv_client_artist").on(t.clientUserId, t.artistId),
   index("idx_conv_artist").on(t.artistId),
   index("idx_conv_client_venue").on(t.clientUserId, t.venueId),
+  // Authoritative SQL: 0030 (DROP NOT NULL on artist_id + this CHECK).
+  check("conversations_vendor_required_chk", sql`${t.artistId} IS NOT NULL OR ${t.venueId} IS NOT NULL`),
 ]);
 
 // ═══════════════════════════════════════════════════════

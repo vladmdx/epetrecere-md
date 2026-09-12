@@ -107,9 +107,18 @@ export async function checkArtistAvailability(opts: {
   startTime?: string | null;
   endTime?: string | null;
   excludeBookingId?: number;
+  /**
+   * Accept/confirm already hold a pending/accepted row. Other pending
+   * requests must not deadlock the artist out of choosing one overlapping
+   * offer; accepted/confirmed rows still block.
+   */
+  ignorePendingBookings?: boolean;
   executor?: typeof db;
 }): Promise<AvailabilityResult> {
   const { artistId, eventDate, excludeBookingId } = opts;
+  const blockingStatuses = opts.ignorePendingBookings
+    ? (["accepted", "confirmed_by_client"] as const)
+    : BLOCKING_STATUSES;
   const q = opts.executor ?? db;
   const targetStart = toMinutes(opts.startTime);
   const targetEnd = toEndMinutes(opts.endTime, targetStart);
@@ -217,7 +226,7 @@ export async function checkArtistAvailability(opts: {
       and(
         eq(bookingRequests.artistId, artistId),
         eq(bookingRequests.eventDate, eventDate),
-        inArray(bookingRequests.status, [...BLOCKING_STATUSES]),
+        inArray(bookingRequests.status, [...blockingStatuses]),
         excludeBookingId !== undefined
           ? ne(bookingRequests.id, excludeBookingId)
           : undefined,

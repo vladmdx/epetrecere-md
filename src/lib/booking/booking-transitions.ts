@@ -112,6 +112,7 @@ export async function acceptArtistBooking(
       startTime: booking.startTime,
       endTime: booking.endTime,
       excludeBookingId: booking.id,
+      ignorePendingBookings: true,
       executor,
     });
     if (!result.available) {
@@ -176,6 +177,7 @@ export async function confirmBookingWithEffects(
           startTime: booking.startTime,
           endTime: booking.endTime,
           excludeBookingId: booking.id,
+          ignorePendingBookings: true,
           executor,
         });
         if (!available.available) {

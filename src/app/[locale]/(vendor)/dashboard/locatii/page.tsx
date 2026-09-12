@@ -62,7 +62,14 @@ export default async function LocatiiPickerPage({
             Alege un local. Autorizarea se face la fiecare cerere; această listă nu este un token.
           </p>
         </div>
-        <Link href="/dashboard/venue-onboarding?intent=create" className="inline-flex h-8 items-center rounded-lg bg-gold px-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark">
+        <Link
+          href={
+            organizations.length === 1
+              ? `/dashboard/venue-onboarding?intent=create&organizationId=${organizations[0].id}`
+              : "/dashboard/venue-onboarding?intent=create"
+          }
+          className="inline-flex h-8 items-center rounded-lg bg-gold px-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark"
+        >
           <Plus className="mr-1.5 h-4 w-4" />
           Adaugă local
         </Link>
