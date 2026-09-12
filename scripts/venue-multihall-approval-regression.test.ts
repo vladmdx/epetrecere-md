@@ -40,6 +40,7 @@ import {
 import type { AppUser } from "../src/lib/venue-access";
 
 const MARK = `appr_${Date.now()}_`;
+const PHONE = `+37369${String(Date.now()).slice(-6)}`;
 const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 const IDENTITY = {
@@ -101,7 +102,7 @@ before(async () => {
   flagOn();
   const [owner] = await db
     .insert(users)
-    .values({ clerkId: MARK + "owner", email: `${MARK}owner@example.com`, name: "Owner", phone: "+37369110001" })
+    .values({ clerkId: MARK + "owner", email: `${MARK}owner@example.com`, name: "Owner", phone: PHONE })
     .returning({ id: users.id });
   ids.owner = owner.id;
   const [admin] = await db
@@ -134,12 +135,12 @@ before(async () => {
   const venue = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
     name: MARK + "Local 1",
-    phone: "+37369110001",
+    phone: PHONE,
     city: "Chișinău",
     address: "str. București 10",
     imageUrls: ["https://example.com/cover.jpg"],
   });
-  assert.equal(venue.ok, true);
+  assert.equal(venue.ok, true, JSON.stringify(venue));
   if (!venue.ok) throw new Error("venue 1");
   ids.venue = venue.venue.id;
   await saveHallDraft({
@@ -192,7 +193,7 @@ test("second venue with user_id NULL appears in the queue and approve does not d
   const venue2 = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
     name: MARK + "Local 2",
-    phone: "+37369110001",
+    phone: PHONE,
     city: "Chișinău",
     address: "str. Armenească 5",
     imageUrls: ["https://example.com/cover2.jpg"],
