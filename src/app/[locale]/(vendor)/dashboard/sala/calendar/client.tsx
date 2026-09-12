@@ -74,6 +74,7 @@ interface Props {
   basePath?: string;
   halls?: Array<{ id: number; nameRo: string; status: string }>;
   selectedHallId?: number | null;
+  writeTarget?: "calendar_events" | "schedule-blocks";
 }
 
 /** Spec 2.8: calendar window capped at 18 months ahead of today. */
@@ -145,6 +146,7 @@ export function VenueCalendarClient({
   basePath = "/dashboard/sala/calendar",
   halls = [],
   selectedHallId = null,
+  writeTarget = "calendar_events",
 }: Props) {
   const { t, locale } = useLocale();
   const router = useLocalizedRouter();
@@ -305,10 +307,60 @@ export function VenueCalendarClient({
     window.location.href = `/api/auth/google/callback?return=${encodeURIComponent(returnPath)}`;
   }
 
+  async function saveScheduleBlocks(dates: string[], status: string, noteText: string) {
+    const wholeVenue = selectedHallId == null;
+    if (status === "available") {
+      for (const date of dates) {
+        const qs = new URLSearchParams({ eventDate: date });
+        if (wholeVenue) qs.set("wholeVenue", "1");
+        else qs.set("hallId", String(selectedHallId));
+        const res = await fetch(`/api/venues/${venueId}/schedule-blocks?${qs.toString()}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          return err;
+        }
+      }
+      return null;
+    }
+    for (const date of dates) {
+      const res = await fetch(`/api/venues/${venueId}/schedule-blocks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventDate: date,
+          timezone: "Europe/Chisinau",
+          kind: "manual",
+          reason: noteText || null,
+          ...(wholeVenue ? { wholeVenue: true } : { hallId: selectedHallId, wholeVenue: false }),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        return err;
+      }
+    }
+    return null;
+  }
+
   async function saveDayStatus() {
     if (!dayDialog) return;
     setSaving(true);
     try {
+      if (writeTarget === "schedule-blocks") {
+        const err = await saveScheduleBlocks([dayDialog], newStatus, note.trim());
+        if (err) {
+          toast.error(err.message || err.error || t("vendorSalaCalendar.saveFailed"));
+          return;
+        }
+        toast.success(t("vendorSalaCalendar.calendarUpdated"));
+        setDayDialog(null);
+        setNote("");
+        setNewStatus("available");
+        router.refresh();
+        return;
+      }
       const res = await fetch("/api/calendar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -350,6 +402,23 @@ export function VenueCalendarClient({
       });
       if (dates.length === 0) {
         toast.error(t("vendorSalaCalendar.rangeAllBooked"));
+        return;
+      }
+      if (writeTarget === "schedule-blocks") {
+        const err = await saveScheduleBlocks(dates, rangeStatus, rangeNote.trim());
+        if (err) {
+          toast.error(err.message || err.error || t("vendorSalaCalendar.saveFailed"));
+          return;
+        }
+        const skipped = all.length - dates.length;
+        toast.success(
+          skipped > 0
+            ? t("vendorSalaCalendar.daysUpdatedSkipped", { count: dates.length, skipped })
+            : t("vendorSalaCalendar.daysUpdated", { count: dates.length }),
+        );
+        setRangeDialog(null);
+        setRangeNote("");
+        router.refresh();
         return;
       }
       const res = await fetch("/api/calendar", {

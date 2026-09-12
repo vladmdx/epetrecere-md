@@ -114,6 +114,7 @@ export default async function LocatieCalendarPage({
       initialDate={sp.date || null}
       icalUrl={icalUrl}
       googleConnected={!!appUser.googleRefreshToken}
+      writeTarget="schedule-blocks"
     />
   );
 }

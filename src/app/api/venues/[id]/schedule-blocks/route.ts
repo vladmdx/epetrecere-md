@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
-import { and, eq } from "drizzle-orm";
-import { z } from "zod/v4";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venueScheduleBlocks } from "@/lib/db/schema";
 import { requireVenueCapability } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
-import { canonicalVenueInterval } from "@/lib/booking/zoned-interval";
-import { evaluateVenueAvailability } from "@/lib/booking/venue-availability";
-import { acquireAvailabilityLocks } from "@/lib/booking/advisory-locks";
-import { VenueAvailabilityError } from "@/lib/booking/venue-booking-write";
+import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
+import { createVenueScheduleBlock, deleteVenueScheduleBlocks } from "@/lib/booking/venue-schedule-write";
+import { z } from "zod/v4";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -40,96 +38,54 @@ export async function POST(req: Request, ctx: Ctx) {
   const venueId = Number((await ctx.params).id);
   const access = await requireVenueCapability(venueId, "manage_calendar");
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError("Validation failed", 400, { details: parsed.error.issues });
-  const wholeVenue = parsed.data.wholeVenue || parsed.data.hallId == null;
-  const interval = canonicalVenueInterval({
-    eventDate: parsed.data.eventDate ?? (parsed.data.startsAt ? parsed.data.startsAt.slice(0, 10) : ""),
+  const created = await createVenueScheduleBlock({
+    venueId,
+    hallId: parsed.data.hallId,
+    wholeVenue: parsed.data.wholeVenue,
+    eventDate: parsed.data.eventDate,
     startTime: parsed.data.startTime,
     endTime: parsed.data.endTime,
-    timezone: parsed.data.timezone,
     startsAt: parsed.data.startsAt,
     endsAt: parsed.data.endsAt,
+    timezone: parsed.data.timezone,
+    kind: parsed.data.kind,
+    reason: parsed.data.reason,
+    createdBy: access.user.id,
   });
-  if (wholeVenue) {
-    const check = await evaluateVenueAvailability({
-      venueId,
-      eventDate: interval.eventDate,
-      startTime: parsed.data.startTime,
-      endTime: parsed.data.endTime,
-      startsAt: interval.startsAt,
-      endsAt: interval.endsAt,
-      reservationScope: "venue",
-      mode: "owner",
+  if (!created.ok) {
+    return jsonError(created.error, created.status, {
+      code: created.code,
+      message:
+        created.code === "AFFECTED_BOOKINGS"
+          ? "Blocarea se suprapune cu rezervări existente. Confirmă explicit acțiunea după ce le anulezi sau le muți."
+          : created.error,
     });
-    if (!check.available && check.code === "BOOKING_CONFLICT") {
-      return jsonError("AFFECTED_BOOKINGS", 409, {
-        code: "AFFECTED_BOOKINGS",
-        message: "Închiderea întregului local se suprapune cu rezervări existente. Confirmă explicit acțiunea după ce le anulezi sau le muți.",
-      });
-    }
   }
-  try {
-    const created = await db.transaction(async (tx) => {
-      const executor = tx as unknown as typeof db;
-      const locked = await evaluateVenueAvailability({
-        venueId,
-        hallId: wholeVenue ? undefined : parsed.data.hallId ?? undefined,
-        eventDate: interval.eventDate,
-        startTime: parsed.data.startTime,
-        endTime: parsed.data.endTime,
-        startsAt: interval.startsAt,
-        endsAt: interval.endsAt,
-        reservationScope: wholeVenue ? "venue" : "hall",
-        mode: "owner",
-        executor,
-      });
-      if (locked.lockKeys) await acquireAvailabilityLocks(tx, locked.lockKeys);
-      const recheck = await evaluateVenueAvailability({
-        venueId,
-        hallId: wholeVenue ? undefined : parsed.data.hallId ?? undefined,
-        eventDate: interval.eventDate,
-        startTime: parsed.data.startTime,
-        endTime: parsed.data.endTime,
-        startsAt: interval.startsAt,
-        endsAt: interval.endsAt,
-        reservationScope: wholeVenue ? "venue" : "hall",
-        mode: "owner",
-        executor,
-      });
-      if (wholeVenue && !recheck.available && recheck.code === "BOOKING_CONFLICT") {
-        throw new VenueAvailabilityError(recheck);
-      }
-      const [row] = await tx.insert(venueScheduleBlocks).values({
-        venueId,
-        hallId: wholeVenue ? null : parsed.data.hallId ?? null,
-        startsAt: interval.startsAt,
-        endsAt: interval.endsAt,
-        kind: parsed.data.kind,
-        reason: parsed.data.reason ?? null,
-        source: "manual",
-        createdBy: access.user.id,
-      }).returning();
-      return row;
-    });
-    return NextResponse.json({ block: created });
-  } catch (error) {
-    if (error instanceof VenueAvailabilityError && error.result.code === "BOOKING_CONFLICT") {
-      return jsonError("AFFECTED_BOOKINGS", 409, {
-        code: "AFFECTED_BOOKINGS",
-        message: "Închiderea întregului local se suprapune cu rezervări existente. Confirmă explicit acțiunea după ce le anulezi sau le muți.",
-      });
-    }
-    throw error;
-  }
+  return NextResponse.json({ block: created.block });
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {
   const venueId = Number((await ctx.params).id);
   const access = await requireVenueCapability(venueId, "manage_calendar");
   if (!access.ok) return jsonAccess(access);
-  const id = Number(new URL(req.url).searchParams.get("id"));
-  if (!id) return jsonError("id required", 400);
-  await db.delete(venueScheduleBlocks).where(and(eq(venueScheduleBlocks.id, id), eq(venueScheduleBlocks.venueId, venueId)));
-  return NextResponse.json({ ok: true });
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
+  const url = new URL(req.url);
+  const id = Number(url.searchParams.get("id") ?? "") || undefined;
+  const hallIdRaw = url.searchParams.get("hallId");
+  const hallId = hallIdRaw ? Number(hallIdRaw) : undefined;
+  const result = await deleteVenueScheduleBlocks({
+    venueId,
+    id,
+    eventDate: url.searchParams.get("eventDate") ?? undefined,
+    hallId: Number.isFinite(hallId) ? hallId : undefined,
+    wholeVenue: url.searchParams.get("wholeVenue") === "1" || url.searchParams.get("wholeVenue") === "true",
+    timezone: url.searchParams.get("timezone") ?? undefined,
+  });
+  if (!result.ok) return jsonError(result.error, result.status, { code: result.code });
+  return NextResponse.json({ ok: true, deleted: result.deleted });
 }

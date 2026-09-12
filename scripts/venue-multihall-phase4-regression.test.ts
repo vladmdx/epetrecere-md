@@ -5,12 +5,13 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
 import {
   bookingRequests,
   calendarEvents,
+  commissions,
   partnerOrganizationMembers,
   partnerOrganizations,
   users,
@@ -25,9 +26,20 @@ import {
 } from "../src/lib/booking/venue-availability";
 import {
   commercialSnapshotFor,
+  publicVenueReservationScope,
   VenueAvailabilityError,
   withVenueAvailabilityWrite,
 } from "../src/lib/booking/venue-booking-write";
+import {
+  acceptVenueBooking,
+  BookingChangedError,
+  clientCancelBooking,
+  confirmBookingWithEffects,
+  vendorCancelBooking,
+} from "../src/lib/booking/booking-transitions";
+import { persistConfirmationEffects } from "../src/lib/booking/confirmation-persist";
+import { createVenueScheduleBlock, deleteVenueScheduleBlocks } from "../src/lib/booking/venue-schedule-write";
+import { getMergedVenueCalendar } from "../src/lib/booking/merged-calendar";
 import {
   canonicalVenueInterval,
   intervalsOverlapHalfOpen,
@@ -175,6 +187,7 @@ before(async () => {
 });
 
 after(async () => {
+  await db.delete(commissions).where(eq(commissions.venueId, ids.venue));
   await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.venue));
   await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.extraVenue));
   await db.delete(bookingRequests).where(eq(bookingRequests.venueId, ids.venue));
@@ -563,4 +576,238 @@ test("commercial snapshot includes venue + hall names", async () => {
   assert.equal(snapshot.hallName, "Grand");
   assert.ok(String(snapshot.venueName).includes("Complex"));
   assert.equal(snapshot.hallId, ids.grand);
+});
+
+function intervalOn(date: string, start = "18:00", end = "23:00") {
+  return canonicalVenueInterval({
+    eventDate: date,
+    startTime: start,
+    endTime: end,
+    timezone: "Europe/Chisinau",
+  });
+}
+
+async function insertPending(hallId: number, date: string, name: string) {
+  const interval = intervalOn(date);
+  const [row] = await db
+    .insert(bookingRequests)
+    .values({
+      venueId: ids.venue,
+      hallId,
+      clientName: name,
+      clientPhone: "+37360000111",
+      eventDate: date,
+      startTime: "18:00",
+      endTime: "23:00",
+      status: "pending",
+      reservationScope: "hall",
+      timezone: "Europe/Chisinau",
+      startsAt: interval.startsAt,
+      endsAt: interval.endsAt,
+      guestCount: 40,
+    })
+    .returning();
+  return row;
+}
+
+test("public payload cannot block every hall", async () => {
+  const forbidden = publicVenueReservationScope({ hallId: ids.grand, reservationScope: "venue" });
+  assert.equal(forbidden.ok, false);
+  if (!forbidden.ok) assert.equal(forbidden.code, "PUBLIC_VENUE_SCOPE_FORBIDDEN");
+  const booking = await insertPending(ids.grand, "2027-12-01", "PublicHall");
+  const garden = await availability({ hallId: ids.garden, eventDate: "2027-12-01" });
+  assert.equal(garden.available, true);
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, booking.id));
+});
+
+test("concurrent accept: exactly one pending→accepted CAS wins", async () => {
+  const booking = await insertPending(ids.grand, "2027-12-02", "RaceAccept");
+  const results = await Promise.allSettled([
+    acceptVenueBooking(booking, { reply: "a" }),
+    acceptVenueBooking(booking, { reply: "b" }),
+  ]);
+  const ok = results.filter((result) => result.status === "fulfilled");
+  const failed = results.filter((result) => result.status === "rejected");
+  assert.equal(ok.length, 1, JSON.stringify(results, null, 2));
+  assert.equal(failed.length, 1);
+  assert.ok(
+    failed[0].status === "rejected" &&
+      (failed[0].reason instanceof BookingChangedError || failed[0].reason instanceof VenueAvailabilityError),
+  );
+  const [row] = await db.select({ status: bookingRequests.status }).from(bookingRequests).where(eq(bookingRequests.id, booking.id));
+  assert.equal(row.status, "accepted");
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, booking.id));
+});
+
+test("concurrent confirm and retry keep a single calendar projection", async () => {
+  const booking = await insertPending(ids.garden, "2027-12-03", "RaceConfirm");
+  const accepted = await acceptVenueBooking(booking, {});
+  await db.update(bookingRequests).set({ clientConfirmedAt: new Date() }).where(eq(bookingRequests.id, accepted.id));
+  const confirm = () =>
+    confirmBookingWithEffects(accepted, async (tx) => {
+      const now = new Date();
+      const [row] = await tx
+        .update(bookingRequests)
+        .set({ status: "confirmed_by_client", confirmedAt: now, updatedAt: now })
+        .where(and(eq(bookingRequests.id, accepted.id), eq(bookingRequests.status, "accepted")))
+        .returning();
+      return row;
+    });
+  const results = await Promise.allSettled([confirm(), confirm()]);
+  const ok = results.filter((result) => result.status === "fulfilled");
+  assert.equal(ok.length, 1, JSON.stringify(results, null, 2));
+  const [confirmed] = await db.select().from(bookingRequests).where(eq(bookingRequests.id, accepted.id));
+  assert.equal(confirmed.status, "confirmed_by_client");
+  await persistConfirmationEffects(db, confirmed);
+  await persistConfirmationEffects(db, confirmed);
+  const projections = await db
+    .select({ id: calendarEvents.id })
+    .from(calendarEvents)
+    .where(eq(calendarEvents.bookingId, confirmed.id));
+  assert.equal(projections.length, 1);
+  await db.delete(commissions).where(eq(commissions.bookingRequestId, confirmed.id));
+  await db.delete(calendarEvents).where(eq(calendarEvents.bookingId, confirmed.id));
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, confirmed.id));
+});
+
+test("concurrent client cancel uses CAS", async () => {
+  const booking = await insertPending(ids.vip, "2027-12-04", "RaceCancel");
+  const results = await Promise.allSettled([
+    clientCancelBooking(booking.id),
+    clientCancelBooking(booking.id),
+  ]);
+  const ok = results.filter((result) => result.status === "fulfilled");
+  assert.equal(ok.length, 1, JSON.stringify(results, null, 2));
+  const [row] = await db.select({ status: bookingRequests.status }).from(bookingRequests).where(eq(bookingRequests.id, booking.id));
+  assert.equal(row.status, "cancelled");
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, booking.id));
+});
+
+test("vendor cancel CAS and booking vs whole-venue block concurrency", async () => {
+  const booking = await insertPending(ids.grand, "2027-12-05", "VsBlock");
+  const accepted = await acceptVenueBooking(booking, {});
+  const cancelled = await vendorCancelBooking(accepted.id);
+  assert.equal(cancelled.status, "cancelled");
+  const again = await vendorCancelBooking(accepted.id).catch((error) => error);
+  assert.ok(again instanceof BookingChangedError);
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, accepted.id));
+
+  const live = await insertPending(ids.grand, "2027-12-06", "LiveBlock");
+  const race = await Promise.allSettled([
+    acceptVenueBooking(live, {}),
+    createVenueScheduleBlock({
+      venueId: ids.venue,
+      wholeVenue: true,
+      eventDate: "2027-12-06",
+      startTime: "18:00",
+      endTime: "23:00",
+      timezone: "Europe/Chisinau",
+      createdBy: ids.owner,
+    }),
+  ]);
+  const bookingWon = race[0].status === "fulfilled";
+  const blockWon = race[1].status === "fulfilled" && race[1].value.ok;
+  assert.equal(bookingWon !== blockWon, true, JSON.stringify(race, null, 2));
+  await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, live.id));
+});
+
+test("whole-venue and hall-specific blocks lock and refuse booking overlap", async () => {
+  const occupied = await insertPending(ids.grand, "2027-12-07", "Occupied");
+  const blocked = await createVenueScheduleBlock({
+    venueId: ids.venue,
+    hallId: ids.grand,
+    wholeVenue: false,
+    eventDate: "2027-12-07",
+    startTime: "18:00",
+    endTime: "23:00",
+    timezone: "Europe/Chisinau",
+    createdBy: ids.owner,
+  });
+  assert.equal(blocked.ok, false);
+  if (!blocked.ok) assert.equal(blocked.code, "AFFECTED_BOOKINGS");
+  const missing = await createVenueScheduleBlock({
+    venueId: ids.venue,
+    eventDate: "2027-12-08",
+    createdBy: ids.owner,
+  });
+  assert.equal(missing.ok, false);
+  if (!missing.ok) assert.equal(missing.code, "HALL_OR_WHOLE_VENUE_REQUIRED");
+  const whole = await createVenueScheduleBlock({
+    venueId: ids.venue,
+    wholeVenue: true,
+    eventDate: "2027-12-08",
+    timezone: "Europe/Chisinau",
+    createdBy: ids.owner,
+  });
+  assert.equal(whole.ok, true, JSON.stringify(whole));
+  const perHall = await createVenueScheduleBlock({
+    venueId: ids.venue,
+    hallId: ids.vip,
+    wholeVenue: false,
+    eventDate: "2027-12-09",
+    timezone: "Europe/Chisinau",
+    createdBy: ids.owner,
+  });
+  assert.equal(perHall.ok, true);
+  const merged = await getMergedVenueCalendar({
+    venueId: ids.venue,
+    monthStartIso: "2027-12-01",
+    monthEndIso: "2027-12-31",
+  });
+  assert.ok(merged.some((row) => row.date === "2027-12-08" && row.status === "blocked" && row.source === "block"));
+  assert.ok(merged.some((row) => row.date === "2027-12-09" && row.hallId === ids.vip));
+  const gardenFree = await availability({ hallId: ids.garden, eventDate: "2027-12-09" });
+  assert.equal(gardenFree.available, true);
+  const vipBlocked = await availability({ hallId: ids.vip, eventDate: "2027-12-09" });
+  assert.equal(vipBlocked.available, false);
+  await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, occupied.id));
+});
+
+test("editing one hall must not delete a sister hall block", async () => {
+  const grand = await createVenueScheduleBlock({
+    venueId: ids.venue,
+    hallId: ids.grand,
+    wholeVenue: false,
+    eventDate: "2027-12-12",
+    timezone: "Europe/Chisinau",
+    createdBy: ids.owner,
+  });
+  const garden = await createVenueScheduleBlock({
+    venueId: ids.venue,
+    hallId: ids.garden,
+    wholeVenue: false,
+    eventDate: "2027-12-12",
+    timezone: "Europe/Chisinau",
+    createdBy: ids.owner,
+  });
+  assert.equal(grand.ok, true);
+  assert.equal(garden.ok, true);
+  const removed = await deleteVenueScheduleBlocks({
+    venueId: ids.venue,
+    eventDate: "2027-12-12",
+    hallId: ids.grand,
+    wholeVenue: false,
+    timezone: "Europe/Chisinau",
+  });
+  assert.equal(removed.ok, true);
+  const leftover = await db.select().from(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
+  assert.equal(leftover.filter((row) => row.hallId === ids.grand).length, 0);
+  assert.equal(leftover.filter((row) => row.hallId === ids.garden).length, 1);
+  await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
+});
+
+test("legacy calendar_events blocked day is not bookable", async () => {
+  await db.insert(calendarEvents).values({
+    entityType: "venue",
+    entityId: ids.venue,
+    date: "2027-12-11",
+    status: "blocked",
+    source: "manual",
+  });
+  const result = await availability({ hallId: ids.grand, eventDate: "2027-12-11" });
+  assert.equal(result.available, false);
+  assert.equal(result.code, "VENUE_BLOCK");
+  await db.delete(calendarEvents).where(and(eq(calendarEvents.entityId, ids.venue), eq(calendarEvents.date, "2027-12-11")));
 });
