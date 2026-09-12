@@ -1,8 +1,10 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { legalAcceptances, partnerOrganizations } from "@/lib/db/schema";
 import { onboardingAgreementStatus } from "@/lib/legal/onboarding-agreement";
 import { VENUE_REQUIRED_DOCS, type PartnerIdentity, type PartnerType } from "@/lib/legal";
+
+type Executor = typeof db;
 
 export function organizationContractIdentityEquals(
   org: {
@@ -26,14 +28,27 @@ export function organizationContractIdentityEquals(
   );
 }
 
+export async function organizationHasAnyAcceptance(
+  organizationId: number,
+  executor: Executor = db,
+): Promise<boolean> {
+  const [row] = await executor
+    .select({ id: legalAcceptances.id })
+    .from(legalAcceptances)
+    .where(eq(legalAcceptances.organizationId, organizationId))
+    .limit(1);
+  return Boolean(row);
+}
+
 export async function resolveOrganizationSigningIdentity(
   organizationId: number,
   clientIdentity: PartnerIdentity,
+  executor: Executor = db,
 ): Promise<
   | { ok: true; identity: PartnerIdentity }
   | { ok: false; code: "IDENTITY_MISMATCH" | "LEGAL_IDENTITY_INCOMPLETE"; status: 409 }
 > {
-  const snapshot = await loadOrganizationLegalSnapshot(organizationId);
+  const snapshot = await loadOrganizationLegalSnapshot(organizationId, executor);
   if (!snapshot?.legalName || !snapshot.idNumber || !snapshot.legalAddress) {
     return { ok: false, code: "LEGAL_IDENTITY_INCOMPLETE", status: 409 };
   }
@@ -52,10 +67,13 @@ export async function resolveOrganizationSigningIdentity(
   };
 }
 
-export async function organizationHasValidContract(organizationId: number): Promise<boolean> {
-  const snapshot = await loadOrganizationLegalSnapshot(organizationId);
+export async function organizationHasValidContract(
+  organizationId: number,
+  executor: Executor = db,
+): Promise<boolean> {
+  const snapshot = await loadOrganizationLegalSnapshot(organizationId, executor);
   if (!snapshot) return false;
-  const rows = await db
+  const rows = await executor
     .select()
     .from(legalAcceptances)
     .where(
@@ -92,8 +110,11 @@ export async function organizationContractRows(organizationId: number) {
     );
 }
 
-export async function loadOrganizationLegalSnapshot(organizationId: number) {
-  const [org] = await db
+export async function loadOrganizationLegalSnapshot(
+  organizationId: number,
+  executor: Executor = db,
+) {
+  const [org] = await executor
     .select({
       id: partnerOrganizations.id,
       type: partnerOrganizations.type,
@@ -107,4 +128,28 @@ export async function loadOrganizationLegalSnapshot(organizationId: number) {
     .where(eq(partnerOrganizations.id, organizationId))
     .limit(1);
   return org ?? null;
+}
+
+export async function countOrganizationAcceptances(organizationId: number): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(legalAcceptances)
+    .where(eq(legalAcceptances.organizationId, organizationId));
+  return Number(row?.n ?? 0);
+}
+
+/** Org venues look up contracts only by organizationId; legacy only when org is null. */
+export function adminContractsForVenue<
+  T extends { organizationId?: number | null; userId?: string | null; subjectType: string },
+>(
+  venue: { organizationId: number | null; userId: string | null },
+  orgRows: T[],
+  userRows: T[],
+): T[] {
+  if (venue.organizationId != null) {
+    return orgRows.filter(
+      (row) => row.organizationId === venue.organizationId && row.subjectType === "venue",
+    );
+  }
+  return userRows.filter((row) => row.userId === venue.userId && row.subjectType === "venue");
 }

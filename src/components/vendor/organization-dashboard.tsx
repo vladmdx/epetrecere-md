@@ -156,7 +156,7 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
               <p><strong>{detail.organization.displayName}</strong> · {detail.organization.type} · {detail.organization.status}</p>
               <p>Contract valabil: {detail.organization.hasValidContract ? "da" : "nu"}</p>
               <p>Un local nou pe o organizație cu contract nu cere re-semnare.</p>
-              <Link href={`/dashboard/venue-onboarding?organizationId=${detail.organization.id}`} className="inline-flex h-7 items-center rounded-lg bg-gold px-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark">
+              <Link href={`/dashboard/venue-onboarding?organizationId=${detail.organization.id}&intent=create`} className="inline-flex h-7 items-center rounded-lg bg-gold px-2.5 text-sm font-medium text-[#0D0D0D] hover:bg-gold-dark">
                 Adaugă local
               </Link>
             </CardContent>

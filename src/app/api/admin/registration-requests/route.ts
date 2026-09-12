@@ -9,6 +9,7 @@ import { registrationDecisionSchema } from "@/lib/validation/vendor-profile";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 import { approvePartnerVenue, listPendingPartnerVenues, rejectPartnerVenue } from "@/lib/partner/registration-decision";
+import { adminContractsForVenue } from "@/lib/partner/legal";
 
 async function requireAdmin() {
   const { userId: clerkId } = await auth();
@@ -105,9 +106,28 @@ export async function GET() {
     acceptedAt: legalAcceptances.acceptedAt,
   }).from(legalAcceptances).where(inArray(legalAcceptances.userId, userIds))
     .orderBy(desc(legalAcceptances.acceptedAt)) : [];
+  const orgIds = pendingVenues.map((v) => v.organizationId).filter((id): id is number => id != null);
+  const orgSignedRows = orgIds.length
+    ? await db.select({
+        id: legalAcceptances.id,
+        userId: legalAcceptances.userId,
+        organizationId: legalAcceptances.organizationId,
+        subjectType: legalAcceptances.subjectType,
+        documentSlug: legalAcceptances.documentSlug,
+        documentTitle: legalAcceptances.documentTitle,
+        signatureName: legalAcceptances.signatureName,
+        acceptedAt: legalAcceptances.acceptedAt,
+      }).from(legalAcceptances).where(inArray(legalAcceptances.organizationId, orgIds))
+        .orderBy(desc(legalAcceptances.acceptedAt))
+    : [];
   const contractsFor = (userId: string | null, subjectType: "artist" | "venue") => signedRows
     .filter(row => row.userId === userId && row.subjectType === subjectType)
     .map(row => ({ ...row, copyUrl: `/api/legal/accept/${row.id}/copy` }));
+  const contractsForVenue = (venue: { userId: string | null; organizationId: number | null }) =>
+    adminContractsForVenue(venue, orgSignedRows, signedRows).map((row) => ({
+      ...row,
+      copyUrl: `/api/legal/accept/${row.id}/copy`,
+    }));
   const artistIds = pendingArtists.map(a => a.id);
   const packageRows = artistIds.length ? await db.select().from(artistPackages)
     .where(inArray(artistPackages.artistId, artistIds)) : [];
@@ -173,7 +193,7 @@ export async function GET() {
         lat: v.lat,
         lng: v.lng,
         images: venueImageRows.filter(image => image.venueId === v.id),
-        contracts: contractsFor(v.userId, "venue"),
+        contracts: contractsForVenue(v),
         createdAt: v.createdAt?.toISOString() ?? new Date().toISOString(),
         userId: v.userId,
         userName: u?.name ?? null,

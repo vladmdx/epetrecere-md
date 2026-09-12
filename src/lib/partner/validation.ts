@@ -28,6 +28,30 @@ export const organizationProfileSchema = z.object({
   bankDetails: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 
+/** POST create — type is required, no implicit company default. */
+export const organizationCreateSchema = z.object({
+  type: z.enum(["individual", "sole_trader", "company"]),
+  displayName: z.string().trim().min(2).max(200),
+  legalName: z.string().trim().max(200).optional().nullable(),
+  idNumber: z.string().trim().max(40).optional().nullable(),
+  legalAddress: z.string().trim().max(300).optional().nullable(),
+  billingEmail: z.string().trim().email().max(200).optional().nullable(),
+  billingPhone: z.string().trim().max(40).optional().nullable(),
+  bankDetails: z.record(z.string(), z.unknown()).optional().nullable(),
+});
+
+/** PATCH — all optional, no defaults. Capability uses raw field presence. */
+export const organizationPatchSchema = z.object({
+  type: z.enum(["individual", "sole_trader", "company"]).optional(),
+  displayName: z.string().trim().min(2).max(200).optional(),
+  legalName: z.string().trim().max(200).optional().nullable(),
+  idNumber: z.string().trim().max(40).optional().nullable(),
+  legalAddress: z.string().trim().max(300).optional().nullable(),
+  billingEmail: z.string().trim().email().max(200).optional().nullable(),
+  billingPhone: z.string().trim().max(40).optional().nullable(),
+  bankDetails: z.record(z.string(), z.unknown()).optional().nullable(),
+});
+
 export const venueDraftSchema = z.object({
   organizationId: z.number().int().positive(),
   venueId: z.number().int().positive().optional(),

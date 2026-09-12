@@ -6,6 +6,7 @@ import { getCurrentAppUser, listAccessibleOrganizations, listAccessibleVenues } 
 import { jsonError } from "@/lib/http/json";
 import { collectSubmitMissing } from "@/lib/partner/onboarding";
 import { organizationHasValidContract } from "@/lib/partner/legal";
+import { redactOrganizationForRole } from "@/lib/partner/organization-dto";
 
 export async function GET() {
   const user = await getCurrentAppUser();
@@ -20,7 +21,9 @@ export async function GET() {
     const [full] = await db.select().from(partnerOrganizations).where(eq(partnerOrganizations.id, org.id)).limit(1);
     const orgVenues = venueRows.filter((venue) => venue.organizationId === org.id);
     payload.push({
-      organization: { ...full, bankDetails: undefined, role: org.role },
+      organization: full
+        ? redactOrganizationForRole(full, org.role)
+        : { id: org.id, role: org.role },
       hasValidContract: await organizationHasValidContract(org.id),
       venues: await Promise.all(orgVenues.map(async (venue) => {
         const images = await db.select().from(venueImages).where(eq(venueImages.venueId, venue.id));

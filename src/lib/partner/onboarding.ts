@@ -22,17 +22,18 @@ import {
   listAccessibleOrganizations,
   type AppUser,
 } from "@/lib/venue-access";
-import { organizationHasValidContract } from "./legal";
+import { organizationHasAnyAcceptance, organizationHasValidContract } from "./legal";
 import { organizationWriteCapability } from "./organization-write";
 import {
   emptyToNull,
   hallDraftSchema,
   organizationLegalIssues,
-  organizationProfileSchema,
+  organizationPatchSchema,
   validatePhoneOrError,
   venueDraftSchema,
   type MissingField,
 } from "./validation";
+import { acquireAvailabilityLocks, acquireLegalScopeLock } from "@/lib/booking/advisory-locks";
 
 export type OnboardingStep =
   | "organization"
@@ -70,9 +71,19 @@ async function uniqueHallSlug(venueId: number, name: string, excludeId?: number)
 
 const ELIGIBLE_DRAFT_STATUSES = new Set(["draft", "rejected"]);
 
+export type OrganizationDraftInput = {
+  displayName?: string;
+  type?: "individual" | "sole_trader" | "company";
+  legalName?: string | null;
+  idNumber?: string | null;
+  legalAddress?: string | null;
+  billingEmail?: string | null;
+  billingPhone?: string | null;
+};
+
 export async function ensureDraftOrganization(
   user: AppUser,
-  input?: { displayName?: string; type?: "individual" | "sole_trader" | "company" },
+  input?: OrganizationDraftInput,
 ) {
   const existing = await listAccessibleOrganizations(user.id);
   const reusable = existing.find((org) => ELIGIBLE_DRAFT_STATUSES.has(org.status));
@@ -87,15 +98,33 @@ export async function ensureDraftOrganization(
     return row ?? null;
   };
 
-  const hasName = input != null && Object.prototype.hasOwnProperty.call(input, "displayName") && input.displayName != null;
-  const hasType = input != null && Object.prototype.hasOwnProperty.call(input, "type") && input.type != null;
+  const has = (key: keyof OrganizationDraftInput) =>
+    input != null && Object.prototype.hasOwnProperty.call(input, key) && input[key] != null;
 
-  if (reusable && !hasName && !hasType) {
+  const profilePatch = () => {
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (has("displayName")) patch.displayName = input!.displayName!.trim() || "Organizație nouă";
+    if (has("type")) patch.type = input!.type;
+    if (Object.prototype.hasOwnProperty.call(input ?? {}, "legalName")) patch.legalName = emptyToNull(input?.legalName);
+    if (Object.prototype.hasOwnProperty.call(input ?? {}, "idNumber")) patch.idNumber = emptyToNull(input?.idNumber);
+    if (Object.prototype.hasOwnProperty.call(input ?? {}, "legalAddress")) {
+      patch.legalAddress = emptyToNull(input?.legalAddress);
+    }
+    if (Object.prototype.hasOwnProperty.call(input ?? {}, "billingEmail")) {
+      patch.billingEmail = emptyToNull(input?.billingEmail);
+    }
+    if (Object.prototype.hasOwnProperty.call(input ?? {}, "billingPhone")) {
+      patch.billingPhone = emptyToNull(input?.billingPhone);
+    }
+    return patch;
+  };
+
+  if (reusable && !input) {
     const row = await loadReusable();
     if (row) return row;
   }
 
-  if (reusable && (hasName || hasType)) {
+  if (reusable && input) {
     const access = await authorizeOrganizationCapability(
       user,
       reusable.id,
@@ -105,14 +134,9 @@ export async function ensureDraftOrganization(
       const row = await loadReusable();
       if (row) return row;
     } else {
-      const displayName = input?.displayName?.trim() || "Organizație nouă";
       const [updated] = await db
         .update(partnerOrganizations)
-        .set({
-          ...(hasName ? { displayName } : {}),
-          ...(hasType ? { type: input!.type } : {}),
-          updatedAt: new Date(),
-        })
+        .set(profilePatch())
         .where(
           and(
             eq(partnerOrganizations.id, reusable.id),
@@ -133,6 +157,11 @@ export async function ensureDraftOrganization(
       type: input?.type ?? "company",
       displayName,
       status: "draft",
+      legalName: emptyToNull(input?.legalName),
+      idNumber: emptyToNull(input?.idNumber),
+      legalAddress: emptyToNull(input?.legalAddress),
+      billingEmail: emptyToNull(input?.billingEmail),
+      billingPhone: emptyToNull(input?.billingPhone),
     })
     .returning();
   await db
@@ -151,56 +180,85 @@ export async function saveOrganizationProfile(
   organizationId: number,
   raw: unknown,
 ) {
-  const parsed = organizationProfileSchema.safeParse(raw);
+  const record = raw && typeof raw === "object" && !Array.isArray(raw)
+    ? (raw as Record<string, unknown>)
+    : {};
+  const parsed = organizationPatchSchema.safeParse(raw);
   if (!parsed.success) {
     return { ok: false as const, error: "Validation failed", details: parsed.error.issues };
   }
   const data = parsed.data;
-  const [current] = await db
-    .select()
-    .from(partnerOrganizations)
-    .where(eq(partnerOrganizations.id, organizationId))
-    .limit(1);
-  if (!current) return { ok: false as const, error: "Not found", status: 404 as const };
+  const present = (key: string) => Object.prototype.hasOwnProperty.call(record, key);
 
-  const signed = await organizationHasValidContract(organizationId);
-  const identityChanged =
-    signed &&
-    ((data.legalName ?? null) !== (current.legalName ?? null) ||
-      (data.idNumber ?? null) !== (current.idNumber ?? null) ||
-      (data.type ?? current.type) !== current.type);
-  if (identityChanged) {
-    return {
-      ok: false as const,
-      error: "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION",
-      status: 409 as const,
-    };
-  }
+  try {
+    const updated = await db.transaction(async (tx) => {
+      await acquireLegalScopeLock(tx, { organizationId });
+      const [current] = await tx
+        .select()
+        .from(partnerOrganizations)
+        .where(eq(partnerOrganizations.id, organizationId))
+        .for("update")
+        .limit(1);
+      if (!current) return { missing: true as const };
 
-  if (data.billingPhone) {
-    const phone = validatePhoneOrError(data.billingPhone);
-    if (!phone.ok) {
-      return { ok: false as const, error: phone.message, field: "billingPhone", status: 400 as const };
+      const signed = await organizationHasAnyAcceptance(organizationId, tx as unknown as typeof db);
+      const nextType = present("type") ? data.type ?? current.type : current.type;
+      const nextLegalName = present("legalName") ? emptyToNull(data.legalName) : current.legalName;
+      const nextIdNumber = present("idNumber") ? emptyToNull(data.idNumber) : current.idNumber;
+      const nextLegalAddress = present("legalAddress") ? emptyToNull(data.legalAddress) : current.legalAddress;
+      if (
+        signed &&
+        (nextType !== current.type ||
+          (nextLegalName ?? null) !== (current.legalName ?? null) ||
+          (nextIdNumber ?? null) !== (current.idNumber ?? null) ||
+          (nextLegalAddress ?? null) !== (current.legalAddress ?? null))
+      ) {
+        return { frozen: true as const };
+      }
+
+      if (present("billingPhone") && data.billingPhone) {
+        const phone = validatePhoneOrError(data.billingPhone);
+        if (!phone.ok) {
+          return { phoneError: phone.message as string };
+        }
+        data.billingPhone = phone.e164;
+      }
+
+      const set: Record<string, unknown> = { updatedAt: new Date() };
+      if (present("type") && data.type) set.type = data.type;
+      if (present("displayName") && data.displayName) set.displayName = data.displayName;
+      if (present("legalName")) set.legalName = emptyToNull(data.legalName);
+      if (present("idNumber")) set.idNumber = emptyToNull(data.idNumber);
+      if (present("legalAddress")) set.legalAddress = emptyToNull(data.legalAddress);
+      if (present("billingEmail")) set.billingEmail = emptyToNull(data.billingEmail);
+      if (present("billingPhone")) set.billingPhone = emptyToNull(data.billingPhone);
+      if (present("bankDetails")) set.bankDetails = data.bankDetails ?? current.bankDetails;
+
+      const [row] = await tx
+        .update(partnerOrganizations)
+        .set(set)
+        .where(eq(partnerOrganizations.id, organizationId))
+        .returning();
+      return { row };
+    });
+
+    if ("missing" in updated && updated.missing) {
+      return { ok: false as const, error: "Not found", status: 404 as const };
     }
-    data.billingPhone = phone.e164;
+    if ("frozen" in updated && updated.frozen) {
+      return {
+        ok: false as const,
+        error: "LEGAL_HOLDER_CHANGE_REQUIRES_NEW_ORGANIZATION",
+        status: 409 as const,
+      };
+    }
+    if ("phoneError" in updated && updated.phoneError) {
+      return { ok: false as const, error: updated.phoneError, field: "billingPhone", status: 400 as const };
+    }
+    return { ok: true as const, organization: updated.row };
+  } catch (error) {
+    throw error;
   }
-
-  const [updated] = await db
-    .update(partnerOrganizations)
-    .set({
-      type: data.type,
-      displayName: data.displayName,
-      legalName: emptyToNull(data.legalName),
-      idNumber: emptyToNull(data.idNumber),
-      legalAddress: emptyToNull(data.legalAddress),
-      billingEmail: emptyToNull(data.billingEmail),
-      billingPhone: emptyToNull(data.billingPhone),
-      bankDetails: data.bankDetails ?? current.bankDetails,
-      updatedAt: new Date(),
-    })
-    .where(eq(partnerOrganizations.id, organizationId))
-    .returning();
-  return { ok: true as const, organization: updated };
 }
 
 export async function saveVenueDraft(user: AppUser, raw: unknown) {
@@ -214,24 +272,31 @@ export async function saveVenueDraft(user: AppUser, raw: unknown) {
     return { ok: false as const, error: phone.message, field: "phone", status: 400 as const };
   }
 
-  const [otherPhone] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(and(eq(users.phone, phone.e164)))
-    .limit(1);
-  if (otherPhone && otherPhone.id !== user.id) {
-    return {
-      ok: false as const,
-      code: "phone_in_use" as const,
-      error: "Acest număr de telefon este deja folosit de un alt cont.",
-      field: "phone",
-      status: 409 as const,
-    };
+  if (!isMultiHallEnabled()) {
+    const [otherPhone] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.phone, phone.e164)))
+      .limit(1);
+    if (otherPhone && otherPhone.id !== user.id) {
+      return {
+        ok: false as const,
+        code: "phone_in_use" as const,
+        error: "Acest număr de telefon este deja folosit de un alt cont.",
+        field: "phone",
+        status: 409 as const,
+      };
+    }
   }
 
   const optionalUrl = (value?: string | null) => {
     const trimmed = value?.trim();
     return trimmed ? trimmed : null;
+  };
+
+  const syncLegacyUserPhone = async () => {
+    if (isMultiHallEnabled()) return;
+    await db.update(users).set({ phone: phone.e164, updatedAt: new Date() }).where(eq(users.id, user.id));
   };
 
   if (data.venueId) {
@@ -268,17 +333,8 @@ export async function saveVenueDraft(user: AppUser, raw: unknown) {
       .where(eq(venues.id, existing.id))
       .returning();
     await replaceVenueImages(existing.id, null, data.imageUrls);
-    await db.update(users).set({ phone: phone.e164, updatedAt: new Date() }).where(eq(users.id, user.id));
+    await syncLegacyUserPhone();
     return { ok: true as const, venue: updated };
-  }
-
-  const existingForOrg = await db
-    .select()
-    .from(venues)
-    .where(and(eq(venues.organizationId, data.organizationId), eq(venues.nameRo, data.name)))
-    .limit(1);
-  if (existingForOrg[0] && !existingForOrg[0].isActive) {
-    return saveVenueDraft(user, { ...data, venueId: existingForOrg[0].id });
   }
 
   const slug = await uniqueVenueSlug(data.name);
@@ -313,7 +369,7 @@ export async function saveVenueDraft(user: AppUser, raw: unknown) {
     })
     .returning();
   await replaceVenueImages(created.id, null, data.imageUrls);
-  await db.update(users).set({ phone: phone.e164, updatedAt: new Date() }).where(eq(users.id, user.id));
+  await syncLegacyUserPhone();
   return { ok: true as const, venue: created };
 }
 
@@ -556,8 +612,9 @@ export async function submitVenueForApproval(venueId: number) {
       await db.update(venueHalls).set({ status: "pending", updatedAt: new Date() }).where(eq(venueHalls.id, hall.id));
     }
   }
-  // Venue stays inactive until admin approval; pending is expressed by halls/org.
-  await db.update(venues).set({ isActive: false, updatedAt: new Date() }).where(eq(venues.id, venueId));
+  if (!venue.isActive) {
+    await db.update(venues).set({ isActive: false, updatedAt: new Date() }).where(eq(venues.id, venueId));
+  }
   return { ok: true as const, venueId, organizationId: venue.organizationId };
 }
 
@@ -568,46 +625,66 @@ export async function archiveHall(hallId: number) {
   }
   if (hall.status === "archived") return { ok: true as const, hallId };
 
-  const siblings = await db
-    .select({ id: venueHalls.id, status: venueHalls.status })
-    .from(venueHalls)
-    .where(eq(venueHalls.venueId, hall.venueId));
-  const usable = siblings.filter((row) => row.status !== "archived");
-  if (usable.length <= 1) {
-    return {
-      ok: false as const,
-      status: 409 as const,
-      error: "LAST_USABLE_HALL",
-      code: "LAST_USABLE_HALL" as const,
-    };
+  try {
+    await db.transaction(async (tx) => {
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Chisinau" });
+      await acquireAvailabilityLocks(tx, {
+        venueId: hall.venueId,
+        hallIds: [hallId],
+        localDates: [today],
+        conflictGroupIds: [],
+      });
+      const [locked] = await tx
+        .select()
+        .from(venueHalls)
+        .where(eq(venueHalls.id, hallId))
+        .for("update")
+        .limit(1);
+      if (!locked || locked.status === "archived") return;
+      const siblings = await tx
+        .select({ id: venueHalls.id, status: venueHalls.status })
+        .from(venueHalls)
+        .where(eq(venueHalls.venueId, locked.venueId));
+      const usable = siblings.filter((row) => row.status !== "archived");
+      if (usable.length <= 1) {
+        throw Object.assign(new Error("LAST_USABLE_HALL"), { code: "LAST_USABLE_HALL" });
+      }
+      const [future] = await tx
+        .select({ id: bookingRequests.id })
+        .from(bookingRequests)
+        .where(
+          and(
+            eq(bookingRequests.venueId, locked.venueId),
+            inArray(bookingRequests.status, ["pending", "accepted", "confirmed_by_client"]),
+            gte(bookingRequests.eventDate, today),
+            or(eq(bookingRequests.hallId, hallId), eq(bookingRequests.reservationScope, "venue")),
+          ),
+        )
+        .limit(1);
+      if (future) {
+        throw Object.assign(new Error("HALL_HAS_FUTURE_BOOKINGS"), { code: "HALL_HAS_FUTURE_BOOKINGS" });
+      }
+      const [updated] = await tx
+        .update(venueHalls)
+        .set({ status: "archived", updatedAt: new Date() })
+        .where(and(eq(venueHalls.id, hallId), eq(venueHalls.status, locked.status)))
+        .returning({ id: venueHalls.id });
+      if (!updated) {
+        throw Object.assign(new Error("HALL_CHANGED"), { code: "HALL_CHANGED" });
+      }
+    });
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "LAST_USABLE_HALL" || code === "HALL_HAS_FUTURE_BOOKINGS" || code === "HALL_CHANGED") {
+      return {
+        ok: false as const,
+        status: 409 as const,
+        error: code,
+        code: code as "LAST_USABLE_HALL" | "HALL_HAS_FUTURE_BOOKINGS" | "HALL_CHANGED",
+      };
+    }
+    throw error;
   }
-
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Chisinau" });
-  const [future] = await db
-    .select({ id: bookingRequests.id })
-    .from(bookingRequests)
-    .where(
-      and(
-        eq(bookingRequests.venueId, hall.venueId),
-        inArray(bookingRequests.status, ["pending", "accepted", "confirmed_by_client"]),
-        gte(bookingRequests.eventDate, today),
-        or(eq(bookingRequests.hallId, hallId), eq(bookingRequests.reservationScope, "venue")),
-      ),
-    )
-    .limit(1);
-  if (future) {
-    return {
-      ok: false as const,
-      status: 409 as const,
-      error: "HALL_HAS_FUTURE_BOOKINGS",
-      code: "HALL_HAS_FUTURE_BOOKINGS" as const,
-    };
-  }
-
-  await db
-    .update(venueHalls)
-    .set({ status: "archived", updatedAt: new Date() })
-    .where(eq(venueHalls.id, hallId));
   return { ok: true as const, hallId };
 }
 

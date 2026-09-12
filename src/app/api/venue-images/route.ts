@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { venueImages, venueHalls } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { requireVenueCapability } from "@/lib/venue-access";
+import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 
 // Venue gallery images CRUD — mirrors /api/artist-images.
 //
@@ -68,6 +69,8 @@ export async function POST(req: Request) {
   }
 
   if (parsed.data.hallId) {
+    const blocked = jsonIfMultiHallDisabled();
+    if (blocked) return blocked;
     const [hall] = await db
       .select({ id: venueHalls.id, venueId: venueHalls.venueId })
       .from(venueHalls)

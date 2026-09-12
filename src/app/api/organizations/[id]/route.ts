@@ -8,6 +8,7 @@ import { saveOrganizationProfile } from "@/lib/partner/onboarding";
 import { organizationHasValidContract, organizationContractRows } from "@/lib/partner/legal";
 import { organizationWriteCapability } from "@/lib/partner/organization-write";
 import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
+import { redactOrganizationForRole } from "@/lib/partner/organization-dto";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -24,9 +25,10 @@ export async function GET(_req: Request, ctx: Ctx) {
   const billing = access.role === "owner" || access.role === "admin"
     ? { billingEmail: org.billingEmail, billingPhone: org.billingPhone, bankDetails: org.bankDetails }
     : { billingEmail: null, billingPhone: null, bankDetails: null };
+  const dto = redactOrganizationForRole(org, access.role);
   return NextResponse.json({
     organization: {
-      ...org,
+      ...dto,
       ...billing,
       bankDetails: billing.bankDetails,
       hasValidContract: await organizationHasValidContract(organizationId),
@@ -54,5 +56,9 @@ export async function PATCH(req: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const saved = await saveOrganizationProfile(organizationId, body);
   if (!saved.ok) return jsonError(saved.error, saved.status ?? 400, saved);
-  return NextResponse.json({ organization: { ...saved.organization, bankDetails: access.role === "owner" || access.role === "admin" ? saved.organization?.bankDetails : undefined } });
+  return NextResponse.json({
+    organization: saved.organization
+      ? redactOrganizationForRole(saved.organization, access.role)
+      : saved.organization,
+  });
 }

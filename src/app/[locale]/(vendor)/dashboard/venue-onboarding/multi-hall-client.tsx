@@ -28,6 +28,8 @@ export default function MultiHallVenueOnboarding() {
   const search = useSearchParams();
   const { user } = useUser();
   const presetOrg = Number(search.get("organizationId") || "") || null;
+  const presetVenue = Number(search.get("venueId") || "") || null;
+  const createIntent = !presetVenue;
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [organizationId, setOrganizationId] = useState<number | null>(presetOrg);
@@ -46,12 +48,15 @@ export default function MultiHallVenueOnboarding() {
     void fetch("/api/partner/onboarding")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        const first = data?.drafts?.[0];
-        if (!first) return;
-        const organization = first.organization;
+        const drafts = Array.isArray(data?.drafts) ? data.drafts : [];
+        const orgDraft = presetOrg
+          ? drafts.find((d: { organization?: { id: number } }) => d.organization?.id === presetOrg)
+          : drafts[0];
+        if (!orgDraft) return;
+        const organization = orgDraft.organization;
         if (organization && (presetOrg == null || organization.id === presetOrg)) {
           setOrganizationId(organization.id);
-          setHasContract(Boolean(first.hasValidContract));
+          setHasContract(Boolean(orgDraft.hasValidContract));
           setOrg((prev) => ({
             ...prev,
             displayName: organization.displayName ?? "",
@@ -63,7 +68,9 @@ export default function MultiHallVenueOnboarding() {
             billingPhone: organization.billingPhone ?? "",
           }));
         }
-        const v = first.venues?.[0];
+        if (createIntent) return;
+        const venues = drafts.flatMap((d: { venues?: Array<{ id: number; halls?: unknown[] }> }) => d.venues ?? []);
+        const v = venues.find((item: { id: number }) => item.id === presetVenue) ?? null;
         if (v) {
           setVenueId(v.id);
           setVenue({
@@ -92,7 +99,7 @@ export default function MultiHallVenueOnboarding() {
           if (v.missing) setMissing(v.missing);
         }
       });
-  }, [presetOrg]);
+  }, [presetOrg, presetVenue, createIntent]);
 
   function jumpToMissing(list: Missing[]) {
     setMissing(list);
@@ -128,7 +135,7 @@ export default function MultiHallVenueOnboarding() {
       const res = await fetch(`/api/organizations/${organizationId}/venues`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...venue, organizationId, venueId }),
+        body: JSON.stringify({ ...venue, organizationId, ...(createIntent ? {} : { venueId }) }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

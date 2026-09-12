@@ -22,3 +22,9 @@ export function jsonIfMultiHallDisabled() {
   if (multiHallMutationsAllowed()) return null;
   return jsonError("FEATURE_DISABLED", 404, { code: MULTI_HALL_DISABLED_CODE });
 }
+
+/** Inverse gate: legacy routes that must not run while multi-hall is ON. */
+export function jsonIfMultiHallEnabled() {
+  if (!multiHallMutationsAllowed()) return null;
+  return jsonError("FEATURE_DISABLED", 404, { code: MULTI_HALL_DISABLED_CODE });
+}
