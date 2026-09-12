@@ -8,6 +8,7 @@ import { registrationStatusEmail } from "@/lib/email/templates/registration-stat
 import { registrationDecisionSchema } from "@/lib/validation/vendor-profile";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
+import { approvePartnerVenue, listPendingPartnerVenues, rejectPartnerVenue } from "@/lib/partner/registration-decision";
 
 async function requireAdmin() {
   const { userId: clerkId } = await auth();
@@ -52,31 +53,8 @@ export async function GET() {
     .where(and(eq(artists.isActive, false), sql`${artists.userId} IS NOT NULL`))
     .orderBy(artists.createdAt);
 
-  // Get pending venues — pull a cover image so admins can see what they're approving.
-  const pendingVenues = await db
-    .select({
-      id: venues.id,
-      name: venues.nameRo,
-      email: venues.email,
-      phone: venues.phone,
-      city: venues.city,
-      address: venues.address,
-      description: venues.descriptionRo,
-      capacityMin: venues.capacityMin,
-      capacityMax: venues.capacityMax,
-      website: venues.website,
-      menuUrl: venues.menuUrl,
-      menuPdfUrl: venues.menuPdfUrl,
-      virtualTourUrl: venues.virtualTourUrl,
-      workingHours: venues.workingHours,
-      lat: venues.lat,
-      lng: venues.lng,
-      createdAt: venues.createdAt,
-      userId: venues.userId,
-    })
-    .from(venues)
-    .where(and(eq(venues.isActive, false), sql`${venues.userId} IS NOT NULL`))
-    .orderBy(venues.createdAt);
+  // Get pending venues — includes extra org venues even when user_id is NULL.
+  const pendingVenues = await listPendingPartnerVenues();
 
   // Cover images for the pending venues — venues' first uploaded photo.
   const venueIds = pendingVenues.map((v) => v.id);
@@ -334,28 +312,20 @@ export async function POST(req: Request) {
       }
 
       if (action === "approve") {
-        if (venue.userId) {
-          const missing = await missingRegistrationDocuments(venue.userId, "venue");
-          if (missing.length) return NextResponse.json({ error: "current_signed_contract_required", missing }, { status: 409 });
+        const decided = await approvePartnerVenue(id);
+        if (!decided.ok) {
+          return NextResponse.json(
+            { error: decided.error, missing: decided.missing },
+            { status: decided.status },
+          );
         }
-        await db
-          .update(venues)
-          .set({ isActive: true, updatedAt: new Date() })
-          .where(eq(venues.id, id));
-
-        if (venue.userId) {
-          await db.insert(notifications).values({
-            userId: venue.userId,
-            type: "registration_approved",
-            title: "Sala ta a fost aprobată! 🎉",
-            message:
-              "Sala ta este acum vizibilă pe ePetrecere.md. Bine ai venit!",
-            actionUrl: "/dashboard/sala",
-          });
-        }
-
-        const email = venue.email;
-        if (email) {
+        const emailTargets = [
+          ...new Set([
+            ...(venue.email ? [venue.email] : []),
+            ...decided.emails.map((row) => row.email).filter((value): value is string => Boolean(value)),
+          ]),
+        ];
+        for (const email of emailTargets) {
           await sendEmail({
             to: email,
             subject: "Sala ta pe ePetrecere.md a fost aprobată! 🎉",
@@ -367,20 +337,17 @@ export async function POST(req: Request) {
           }).catch((err) => console.error("[email] Failed to send approval email:", err));
         }
       } else {
-        if (venue.userId) {
-          await db.update(users).set({ onboardingComplete: false, updatedAt: new Date() }).where(eq(users.id, venue.userId));
-          await db.insert(notifications).values({
-            userId: venue.userId,
-            type: "registration_rejected",
-            title: "Cererea ta a fost refuzată",
-            message:
-              "Sala ta nu a fost aprobată. Contactează-ne dacă ai întrebări.",
-            actionUrl: "/contact",
-          });
+        const decided = await rejectPartnerVenue(id);
+        if (!decided.ok) {
+          return NextResponse.json({ error: decided.error }, { status: decided.status });
         }
-
-        const email = venue.email;
-        if (email) {
+        const emailTargets = [
+          ...new Set([
+            ...(venue.email ? [venue.email] : []),
+            ...decided.emails.map((row) => row.email).filter((value): value is string => Boolean(value)),
+          ]),
+        ];
+        for (const email of emailTargets) {
           await sendEmail({
             to: email,
             subject: "Actualizare privind înregistrarea pe ePetrecere.md",
@@ -391,8 +358,6 @@ export async function POST(req: Request) {
             }),
           }).catch((err) => console.error("[email] Failed to send rejection email:", err));
         }
-
-        await db.delete(venues).where(eq(venues.id, id));
       }
 
       if (action === "approve" || venue.isActive) {
