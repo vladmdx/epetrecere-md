@@ -9,7 +9,7 @@ import {
   bookingRequests,
 } from "@/lib/db/schema";
 import { and, eq, desc, isNull, inArray } from "drizzle-orm";
-import { listAccessibleVenueIds } from "@/lib/venue-access";
+import { listAccessibleVenueIds, requireVenueCapability } from "@/lib/venue-access";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { plainText } from "@/lib/content/plain-text";
 import { contactsAreShared } from "@/lib/privacy/booking-contact";
@@ -179,6 +179,16 @@ export async function GET(req: NextRequest) {
   }
 
   const role = req.nextUrl.searchParams.get("role") || "client";
+  const requestedVenueId = Number(req.nextUrl.searchParams.get("venueId") ?? "");
+  async function scopedVenueIds(): Promise<number[] | NextResponse> {
+    const accessible = await listAccessibleVenueIds(appUser.id);
+    if (Number.isFinite(requestedVenueId) && requestedVenueId > 0) {
+      const access = await requireVenueCapability(requestedVenueId, "view_private");
+      if (!access.ok) return NextResponse.json({ error: access.error, code: "FORBIDDEN" }, { status: access.status });
+      return [requestedVenueId];
+    }
+    return accessible;
+  }
 
   if (role === "artist") {
     const [artist] = await db
@@ -210,12 +220,9 @@ export async function GET(req: NextRequest) {
   }
 
   if (role === "venue") {
-    const [venue] = await db
-      .select({ id: venues.id })
-      .from(venues)
-      .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
-      .limit(1);
-    if (!venue) return NextResponse.json([]);
+    const scope = await scopedVenueIds();
+    if (scope instanceof NextResponse) return scope;
+    if (!scope.length) return NextResponse.json([]);
 
     const rows = await db
       .select({
@@ -232,7 +239,7 @@ export async function GET(req: NextRequest) {
       })
       .from(conversations)
       .leftJoin(users, eq(users.id, conversations.clientUserId))
-      .where(eq(conversations.venueId, venue.id))
+      .where(inArray(conversations.venueId, scope))
       .orderBy(desc(conversations.lastMessageAt));
 
     return NextResponse.json(await attachLinkedBookings(rows));
@@ -242,16 +249,15 @@ export async function GET(req: NextRequest) {
   // profile (if any) and their venue (if any). Used by the shared
   // /dashboard/mesaje page where the same user might own both entities.
   if (role === "vendor") {
-    const [artist] = await db
-      .select({ id: artists.id })
-      .from(artists)
-      .where(eq(artists.userId, appUser.id))
-      .limit(1);
-    const [venue] = await db
-      .select({ id: venues.id })
-      .from(venues)
-      .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
-      .limit(1);
+    const scope = await scopedVenueIds();
+    if (scope instanceof NextResponse) return scope;
+    const [artist] = requestedVenueId
+      ? [null]
+      : await db
+          .select({ id: artists.id })
+          .from(artists)
+          .where(eq(artists.userId, appUser.id))
+          .limit(1);
 
     const artistRows = artist
       ? await db
@@ -272,7 +278,7 @@ export async function GET(req: NextRequest) {
           .where(eq(conversations.artistId, artist.id))
       : [];
 
-    const venueRows = venue
+    const venueRows = scope.length
       ? await db
           .select({
             id: conversations.id,
@@ -288,7 +294,7 @@ export async function GET(req: NextRequest) {
           })
           .from(conversations)
           .leftJoin(users, eq(users.id, conversations.clientUserId))
-          .where(eq(conversations.venueId, venue.id))
+          .where(inArray(conversations.venueId, scope))
       : [];
 
     const merged = [...artistRows, ...venueRows].sort(

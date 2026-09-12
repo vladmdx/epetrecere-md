@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import { useParams } from "next/navigation";
 
 type Message = {
   role: "user" | "assistant";
@@ -27,6 +28,8 @@ const SUGGESTION_KEYS = [
 
 export default function VenueAIAssistantPage() {
   const { t } = useLocale();
+  const params = useParams<{ venueId?: string }>();
+  const scopedVenueId = Number(params.venueId) || undefined;
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -55,7 +58,7 @@ export default function VenueAIAssistantPage() {
       const res = await fetch("/api/ai/venue-assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMsgs }),
+        body: JSON.stringify({ messages: newMsgs, venueId: scopedVenueId }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
