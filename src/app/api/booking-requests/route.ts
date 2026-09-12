@@ -57,8 +57,9 @@ const bookingSchema = z.object({
   agreedPrice: z.number().int().min(0).optional(),
   /** Optional — artist package id selected by the client. */
   packageId: z.number().int().positive().optional(),
-  /** Optional — duration in hours (from the selected package). */
-  durationHours: z.number().positive().optional(),
+  /** Optional — concrete hall after MULTI_HALL is on. */
+  hallId: z.number().int().positive().optional(),
+  reservationScope: z.enum(["hall", "venue"]).optional(),
 }).refine(data => Boolean(data.artistId) !== Boolean(data.venueId), { message: "Exactly one artist or venue is required" });
 
 // GET booking requests — requires auth; scoped to caller's own data.
@@ -452,7 +453,8 @@ export async function POST(req: NextRequest) {
     eventPlanId,
     agreedPrice,
     packageId: _packageId,
-    durationHours: _durationHours,
+    hallId,
+    reservationScope,
     ...bookingBase
   } = parsed.data;
 
@@ -616,36 +618,66 @@ export async function POST(req: NextRequest) {
   }
 
   // Venue availability check — working hours + conflicts.
-  if (parsed.data.venueId) {
-    const { checkVenueAvailability, formatConflictMessage } = await import(
-      "@/lib/booking/availability"
-    );
-    const result = await checkVenueAvailability({
-      venueId: parsed.data.venueId,
-      eventDate: parsed.data.eventDate,
-      startTime: parsed.data.startTime,
-      endTime: parsed.data.endTime,
-    });
-    if (!result.available) {
-      return NextResponse.json(
-        {
-          error: formatConflictMessage(result),
-          conflict: result.conflict,
-          outsideWorkingHours: result.outsideWorkingHours,
-          workingHours: result.workingHours,
-        },
-        { status: 409 },
-      );
-    }
-  }
+  let booking;
 
-  const [booking] = await db.insert(bookingRequests).values({
-    ...bookingBase,
-    eventPlanId: eventPlanId ?? null,
-    clientUserId: clientUserId ?? null,
-    agreedPrice: agreedPrice ?? null,
-    status: "pending",
-  }).returning();
+  if (parsed.data.venueId) {
+    const { withVenueAvailabilityWrite, VenueAvailabilityError } = await import(
+      "@/lib/booking/venue-booking-write"
+    );
+    try {
+      booking = await withVenueAvailabilityWrite(
+        {
+          venueId: parsed.data.venueId,
+          hallId: hallId ?? undefined,
+          guestCount: parsed.data.guestCount,
+          eventDate: parsed.data.eventDate,
+          startTime: parsed.data.startTime,
+          endTime: parsed.data.endTime,
+          reservationScope: parsed.data.reservationScope ?? "hall",
+          mode: "public",
+        },
+        async (tx, available) => {
+          const [row] = await tx.insert(bookingRequests).values({
+            ...bookingBase,
+            eventPlanId: eventPlanId ?? null,
+            clientUserId: clientUserId ?? null,
+            agreedPrice: agreedPrice ?? null,
+            hallId: available.hallId,
+            reservationScope: parsed.data.venueId ? (reservationScope ?? "hall") : null,
+            startsAt: available.interval?.startsAt ?? null,
+            endsAt: available.interval?.endsAt ?? null,
+            timezone: available.interval?.timezone ?? null,
+            status: "pending",
+          }).returning();
+          return row;
+        },
+      );
+    } catch (error) {
+      if (error instanceof VenueAvailabilityError) {
+        const payload: Record<string, unknown> = {
+          error: error.result.message || error.result.code,
+          code: error.result.code,
+        };
+        if (error.result.code === "HALL_REQUIRED") payload.code = "HALL_REQUIRED";
+        return NextResponse.json(payload, { status: error.status });
+      }
+      throw error;
+    }
+  } else {
+    const [row] = await db.insert(bookingRequests).values({
+      ...bookingBase,
+      eventPlanId: eventPlanId ?? null,
+      clientUserId: clientUserId ?? null,
+      agreedPrice: agreedPrice ?? null,
+      hallId: parsed.data.hallId ?? hallId ?? null,
+      reservationScope: parsed.data.venueId ? (reservationScope ?? "hall") : null,
+      startsAt: null,
+      endsAt: null,
+      timezone: null,
+      status: "pending",
+    }).returning();
+    booking = row;
+  }
 
   // Also create offer request for admin
   await db.insert(offerRequests).values({

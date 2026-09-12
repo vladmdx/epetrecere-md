@@ -2106,7 +2106,18 @@
       "analytics": "Аналитика",
       "digitalMenu": "Цифровое меню",
       "profileGallery": "Профиль и галерея",
-      "yourVenue": "Ваш зал"
+      "yourVenue": "Ваш зал",
+      "switchVenue": "Сменить локацию"
+    },
+    "multiHall": {
+      "halls": "Залы",
+      "locations": "Локации",
+      "organization": "Организация",
+      "addVenue": "Добавить локацию",
+      "addHall": "Добавить зал",
+      "translateMissing": "Перевести пустые поля на RU и EN",
+      "submitApproval": "Отправить на утверждение",
+      "allHalls": "Все залы"
     },
     "videoManager": {
       "addVideoLabel": "Добавить видео (YouTube или Vimeo)",

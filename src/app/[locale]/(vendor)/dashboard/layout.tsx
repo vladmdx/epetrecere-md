@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, artists } from "@/lib/db/schema";
 import { VendorLayoutChrome } from "@/components/vendor/vendor-layout-chrome";
-import { listAccessibleVenueIds } from "@/lib/venue-access";
+import { listAccessibleOrganizations, listAccessibleVenueIds } from "@/lib/venue-access";
 import { signInPath } from "@/lib/i18n/server-redirect";
 
 export default async function VendorLayout({
@@ -40,16 +40,11 @@ export default async function VendorLayout({
   // pick one. (Cannot happen while UNIQUE(venues.user_id) still holds, but the
   // guard is in place for when it is lifted.)
   const venueIds = await listAccessibleVenueIds(appUser.id);
-  if (venueIds.length > 1 && !isAdmin) {
-    redirect("/dashboard/locatii");
-  }
-  const venueRecord = venueIds.length === 1 ? { id: venueIds[0] } : undefined;
-  // Artists who picked the role on the picker but haven't completed
-  // onboarding yet have role="artist" without an artist record. Let
-  // them through so the dashboard can prompt them to finish setup.
+  const venueRecord = venueIds.length > 0 ? { id: venueIds[0] } : undefined;
+  const organizations = await listAccessibleOrganizations(appUser.id);
   const isArtistRole = appUser.role === "artist";
 
-  if (!artistRecord && !venueRecord && !isAdmin && !isArtistRole) {
+  if (!artistRecord && !venueRecord && organizations.length === 0 && !isAdmin && !isArtistRole) {
     redirect("/");
   }
 

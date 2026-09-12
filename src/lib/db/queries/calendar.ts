@@ -49,6 +49,7 @@ export async function setCalendarEvent(
         eq(calendarEvents.entityType, entityType),
         eq(calendarEvents.entityId, entityId),
         eq(calendarEvents.date, date),
+        eq(calendarEvents.source, "manual"),
       ),
     );
 
@@ -79,7 +80,8 @@ export async function bulkSetCalendarEvents(
 ) {
   if (!dates.length) return;
 
-  // Delete existing entries for these dates
+  // Delete only this source's manual/owner rows. Never touch booking
+  // projections or another hall's events.
   await db
     .delete(calendarEvents)
     .where(
@@ -87,10 +89,12 @@ export async function bulkSetCalendarEvents(
         eq(calendarEvents.entityType, entityType),
         eq(calendarEvents.entityId, entityId),
         inArray(calendarEvents.date, dates),
+        eq(calendarEvents.source, source),
       ),
     );
 
-  // Insert new entries
+  if (status === "available") return;
+
   await db.insert(calendarEvents).values(
     dates.map((date) => ({
       entityType,

@@ -57,6 +57,9 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
+  const hallIdRaw = _req.nextUrl.searchParams.get("hallId");
+  const hallId = hallIdRaw ? Number(hallIdRaw) : null;
+
   const [bookings, blackouts] = await Promise.all([
     db
       .select()
@@ -79,6 +82,13 @@ export async function GET(
       ),
   ]);
 
+  const filteredBookings = hallId && Number.isFinite(hallId)
+    ? bookings.filter((b) => b.hallId === hallId)
+    : bookings;
+  const filteredBlackouts = hallId && Number.isFinite(hallId)
+    ? blackouts.filter((c) => c.hallId == null || c.hallId === hallId)
+    : blackouts;
+
   const now = new Date();
   const lines: string[] = [
     "BEGIN:VCALENDAR",
@@ -90,7 +100,7 @@ export async function GET(
     "X-WR-TIMEZONE:Europe/Chisinau",
   ];
 
-  for (const b of bookings) {
+  for (const b of filteredBookings) {
     const shared = b.status === "confirmed_by_client";
     const clientName = bookingTextForViewer(b.clientName, shared);
     const eventType = bookingTextForViewer(b.eventType, shared) ?? "Eveniment";
@@ -122,7 +132,7 @@ export async function GET(
     );
   }
 
-  for (const c of blackouts) {
+  for (const c of filteredBlackouts) {
     const uid = `venue-blackout-${c.id}@epetrecere.md`;
     const start = formatDate(c.date);
     const endDate = new Date(c.date);

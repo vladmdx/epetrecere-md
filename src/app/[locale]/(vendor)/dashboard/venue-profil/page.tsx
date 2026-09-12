@@ -8,6 +8,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import {
   Building2,
@@ -34,6 +35,7 @@ const RichEditor = dynamic(
 import { MapPicker } from "@/components/shared/map-picker";
 import { MapsAutofill } from "@/components/vendor/maps-autofill";
 import { VenueGalleryManager } from "@/components/vendor/venue-gallery-manager";
+import { TranslateMissingFields } from "@/components/vendor/translate-missing-fields";
 import {
   WorkingHoursEditor,
   type WorkingHours,
@@ -97,18 +99,21 @@ interface Venue {
 
 export default function VenueProfilePage() {
   const { t } = useLocale();
+  const pathname = usePathname();
   const [venue, setVenue] = useState<Venue | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [customFacility, setCustomFacility] = useState("");
 
   useEffect(() => {
-    fetch("/api/me/venue")
+    const match = pathname.match(/\/dashboard\/locatii\/(\d+)/);
+    const qs = match ? `?venueId=${match[1]}` : "";
+    fetch(`/api/me/venue${qs}`)
       .then((r) => (r.ok ? r.json() : { venue: null }))
       .then((data) => setVenue(data.venue))
       .catch(() => setVenue(null))
       .finally(() => setLoading(false));
-  }, []);
+  }, [pathname]);
 
   function update(partial: Partial<Venue>) {
     setVenue((prev) => (prev ? { ...prev, ...partial } : prev));
@@ -324,6 +329,25 @@ export default function VenueProfilePage() {
               <CardTitle>{t("vendor.venueOnboarding.stepBasics")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              <TranslateMissingFields
+                venueId={venue.id}
+                fields={{
+                  name: { ro: venue.nameRo, ru: venue.nameRu, en: venue.nameEn },
+                  description: {
+                    ro: venue.descriptionRo,
+                    ru: venue.descriptionRu,
+                    en: venue.descriptionEn,
+                  },
+                }}
+                onTranslated={(next) => {
+                  update({
+                    nameRu: next.name?.ru ?? venue.nameRu,
+                    nameEn: next.name?.en ?? venue.nameEn,
+                    descriptionRu: next.description?.ru ?? venue.descriptionRu,
+                    descriptionEn: next.description?.en ?? venue.descriptionEn,
+                  });
+                }}
+              />
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <Label>{t("vendor.packagesPage.nameRoLabel")}</Label>

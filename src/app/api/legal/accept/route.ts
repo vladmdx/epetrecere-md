@@ -28,6 +28,9 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { legalAcceptances, notifications, users, artists, venues } from "@/lib/db/schema";
 import {
+  requireOrganizationCapability,
+} from "@/lib/venue-access";
+import {
   LEGAL_PACK_VERSION,
   getLegalDocument,
   legalBlocksFor,
@@ -46,9 +49,17 @@ function clientIp(req: NextRequest): string | null {
   return value && isIP(value) ? value : null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const organizationIdRaw = Number(req.nextUrl.searchParams.get("organizationId") ?? "");
+  const organizationId = Number.isFinite(organizationIdRaw) && organizationIdRaw > 0 ? organizationIdRaw : null;
+  if (organizationId) {
+    const orgAccess = await requireOrganizationCapability(organizationId, "view_organization");
+    if (!orgAccess.ok) {
+      return NextResponse.json({ error: orgAccess.error, code: "FORBIDDEN" }, { status: orgAccess.status });
+    }
+  }
   const [u] = await db
     .select({ id: users.id })
     .from(users)
@@ -85,9 +96,14 @@ export async function GET() {
       email: legalAcceptances.email,
       phone: legalAcceptances.phone,
       contentHash: legalAcceptances.contentHash,
+      organizationId: legalAcceptances.organizationId,
     })
     .from(legalAcceptances)
-    .where(eq(legalAcceptances.userId, u.id))
+    .where(
+      organizationId
+        ? eq(legalAcceptances.organizationId, organizationId)
+        : eq(legalAcceptances.userId, u.id),
+    )
     .orderBy(desc(legalAcceptances.acceptedAt));
 
   // Name each document server-side: the settings page must not pull the whole
@@ -115,9 +131,15 @@ export async function POST(req: NextRequest) {
     details: parsed.error.issues.map(i => ({ field: i.path.join("."), message: i.message })),
   }, { status: 400 });
   const body = parsed.data;
-  const { subjectType, signatureName, signatureImage, identity } = body;
+  const { subjectType, signatureName, signatureImage, identity, organizationId } = body;
   if (!await validSignatureImage(signatureImage)) {
     return NextResponse.json({ error: "valid_handwritten_signature_required" }, { status: 400 });
+  }
+  if (organizationId) {
+    const orgAccess = await requireOrganizationCapability(organizationId, "manage_legal");
+    if (!orgAccess.ok) {
+      return NextResponse.json({ error: orgAccess.error, code: "FORBIDDEN" }, { status: orgAccess.status });
+    }
   }
 
   const cu = await currentUser();
@@ -170,6 +192,7 @@ export async function POST(req: NextRequest) {
     const shown = legalBlocksFor(doc, locale, identity);
     return {
       userId: u.id, subjectType, artistId: a?.id ?? null, venueId: v?.id ?? null,
+      organizationId: organizationId ?? null,
       documentSlug: slug, documentVersion: doc.version, packVersion: LEGAL_PACK_VERSION,
       locale, signatureName, signatureImage, representativeRole: body.representativeRole ?? null,
       documentTitle: legalTitle(doc, locale), documentBlocks: shown, deviceSummary: device,
@@ -179,6 +202,9 @@ export async function POST(req: NextRequest) {
   });
   const previous = await db.select().from(legalAcceptances).where(and(
     eq(legalAcceptances.userId, u.id), eq(legalAcceptances.subjectType, subjectType),
+    organizationId
+      ? eq(legalAcceptances.organizationId, organizationId)
+      : undefined,
   ));
   // A retry may reuse the same immutable acceptance, never silently substitute
   // a different party, language or document underneath an existing signature.

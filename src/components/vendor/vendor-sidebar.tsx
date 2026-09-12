@@ -46,6 +46,8 @@ const artistNav = [
 // Reuses the same calendar / rezervari / mesaje / recenzii routes (they're
 // entity-agnostic on the backend).
 const venueNav = [
+  { href: "/dashboard/locatii", icon: Building2, labelKey: "vendor.multiHall.locations" },
+  { href: "/dashboard/organizatie", icon: Globe, labelKey: "vendor.multiHall.organization" },
   { href: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
   { href: "/dashboard/calendar", icon: CalendarDays, labelKey: "dashboard.calendar" },
   { href: "/dashboard/rezervari", icon: BookOpen, labelKey: "dashboard.bookings" },
@@ -117,7 +119,8 @@ export function VendorSidebar() {
           .then((r) => (r.ok ? r.json() : { venue: null }))
           .then((venueData) => {
             if (cancelled) return;
-            setIsVenue(!!venueData.venue);
+            const partner = Boolean(venueData.venue) || venueData.code === "VENUE_REQUIRED" || (venueData.venueIds?.length ?? 0) > 0;
+            setIsVenue(partner);
             setProfileHref(publishedVendorProfileHref(venueData.venue, "venue"));
           });
       })

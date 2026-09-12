@@ -2106,7 +2106,18 @@
       "analytics": "Analytics",
       "digitalMenu": "Digital Menu",
       "profileGallery": "Profile & Gallery",
-      "yourVenue": "Your hall"
+      "yourVenue": "Your hall",
+      "switchVenue": "Switch location"
+    },
+    "multiHall": {
+      "halls": "Halls",
+      "locations": "Locations",
+      "organization": "Organization",
+      "addVenue": "Add location",
+      "addHall": "Add hall",
+      "translateMissing": "Translate empty RU and EN fields",
+      "submitApproval": "Submit for approval",
+      "allHalls": "All halls"
     },
     "videoManager": {
       "addVideoLabel": "Add video (YouTube or Vimeo)",

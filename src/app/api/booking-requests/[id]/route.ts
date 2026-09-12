@@ -15,6 +15,7 @@ import {
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
 import { vendorBookingNotificationPath } from "@/lib/notifications/venue-routing";
+import type { VenueWriteTx } from "@/lib/booking/venue-booking-write";
 
 /**
  * Raise the platform fee for a booking that has just reached a fee-bearing
@@ -301,11 +302,46 @@ export async function PUT(
     const next = confirmationTransition({ status: booking.status, venue: Boolean(booking.venueId), clientConfirmed: Boolean(booking.clientConfirmedAt), action });
     if (!next) return NextResponse.json({ error: "invalid_confirmation_step" }, { status: 409 });
     const now = new Date();
-    const [updated] = await db.update(bookingRequests).set({
-      status: next === "awaiting_venue" ? "accepted" : "confirmed_by_client",
-      clientConfirmedAt: booking.clientConfirmedAt ?? now,
-      confirmedAt: next === "awaiting_venue" ? null : now, updatedAt: now,
-    }).where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "accepted"))).returning();
+    const applyClientConfirm = async (tx: VenueWriteTx | typeof db) => {
+      const [row] = await tx.update(bookingRequests).set({
+        status: next === "awaiting_venue" ? "accepted" : "confirmed_by_client",
+        clientConfirmedAt: booking.clientConfirmedAt ?? now,
+        confirmedAt: next === "awaiting_venue" ? null : now, updatedAt: now,
+      }).where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "accepted"))).returning();
+      return row;
+    };
+    let updated;
+    if (booking.venueId && next !== "awaiting_venue") {
+      const { withVenueAvailabilityWrite, VenueAvailabilityError } = await import("@/lib/booking/venue-booking-write");
+      try {
+        updated = await withVenueAvailabilityWrite({
+          venueId: booking.venueId,
+          hallId: booking.hallId,
+          guestCount: booking.guestCount,
+          eventDate: booking.eventDate,
+          startTime: booking.startTime,
+          endTime: booking.endTime,
+          timezone: booking.timezone,
+          reservationScope: booking.reservationScope ?? "hall",
+          excludeBookingId: booking.id,
+          mode: "owner",
+        }, async (tx) => {
+          const row = await applyClientConfirm(tx);
+          if (!row) throw new Error("booking_changed");
+          return row;
+        });
+      } catch (error) {
+        if (error instanceof VenueAvailabilityError) {
+          return NextResponse.json({ error: "venue_unavailable", code: error.result.code }, { status: error.status });
+        }
+        if (error instanceof Error && error.message === "booking_changed") {
+          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+        }
+        throw error;
+      }
+    } else {
+      updated = await applyClientConfirm(db);
+    }
     if (!updated) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
     if (next === "awaiting_venue") after(() => notifyConfirmationStep(updated, "Clientul a acceptat oferta. Sala trebuie să confirme rezervarea"));
     else await finalConfirmationEffects(updated);
@@ -324,13 +360,36 @@ export async function PUT(
     if (!computeCommission({ vendorType: "venue", baseAmount: booking.agreedPrice ?? 0, guestCount: booking.guestCount, eventType: booking.eventType }, await getCommissionRules())) {
       return NextResponse.json({ error: "Tariful acestui eveniment necesită clarificare cu administrația înainte de confirmare." }, { status: 409 });
     }
-    const { checkVenueAvailability } = await import("@/lib/booking/availability");
-    const available = await checkVenueAvailability({ venueId: booking.venueId!, eventDate: booking.eventDate, startTime: booking.startTime, endTime: booking.endTime, excludeBookingId: booking.id });
-    if (!available.available) return NextResponse.json({ error: "venue_unavailable" }, { status: 409 });
-    const now = new Date();
-    const [updated] = await db.update(bookingRequests).set({ status: "confirmed_by_client", confirmedAt: now, updatedAt: now })
-      .where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "accepted"))).returning();
-    if (!updated) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+    const { withVenueAvailabilityWrite, VenueAvailabilityError } = await import("@/lib/booking/venue-booking-write");
+    let updated;
+    try {
+      updated = await withVenueAvailabilityWrite({
+        venueId: booking.venueId!,
+        hallId: booking.hallId,
+        guestCount: booking.guestCount,
+        eventDate: booking.eventDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        timezone: booking.timezone,
+        reservationScope: booking.reservationScope ?? "hall",
+        excludeBookingId: booking.id,
+        mode: "owner",
+      }, async (tx) => {
+        const now = new Date();
+        const [row] = await tx.update(bookingRequests).set({ status: "confirmed_by_client", confirmedAt: now, updatedAt: now })
+          .where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "accepted"))).returning();
+        if (!row) throw new Error("booking_changed");
+        return row;
+      });
+    } catch (error) {
+      if (error instanceof VenueAvailabilityError) {
+        return NextResponse.json({ error: "venue_unavailable", code: error.result.code }, { status: error.status });
+      }
+      if (error instanceof Error && error.message === "booking_changed") {
+        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+      }
+      throw error;
+    }
     await finalConfirmationEffects(updated);
     return NextResponse.json({ success: true, status: updated.status });
   } else if (action === "cancel") {
@@ -401,22 +460,9 @@ export async function PUT(
     dropCommission(Number(id), "Anulată de furnizor");
 
     // Release the auto-blocked calendar slot.
-    if (booking.eventDate) {
-      const entityType = booking.venueId ? "venue" : "artist";
-      const entityId = booking.venueId ?? booking.artistId;
-      if (entityId) {
-        await db
-          .delete(calendarEvents)
-          .where(
-            and(
-              eq(calendarEvents.entityType, entityType),
-              eq(calendarEvents.entityId, entityId),
-              eq(calendarEvents.date, booking.eventDate),
-              eq(calendarEvents.source, "booking"),
-            ),
-          );
-      }
-    }
+    await db
+      .delete(calendarEvents)
+      .where(eq(calendarEvents.bookingId, booking.id));
 
     // Notify the client (in-app + email) — outside the main request flow so
     // a transient email failure doesn't break the status transition.
@@ -430,7 +476,10 @@ export async function PUT(
             .from(venues)
             .where(eq(venues.id, booking.venueId))
             .limit(1);
-          if (v) vendorName = `Sala ${v.nameRo}`;
+          if (v) {
+            const { venueHallDisplayName } = await import("@/lib/booking/venue-booking-write");
+            vendorName = await venueHallDisplayName(booking.venueId, booking.hallId ?? null);
+          }
         } else if (booking.artistId) {
           const [a] = await db
             .select({ nameRo: artists.nameRo })

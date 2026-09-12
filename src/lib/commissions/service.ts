@@ -72,13 +72,11 @@ export async function ensureCommissionForBooking(
       id: bookingRequests.id,
       artistId: bookingRequests.artistId,
       venueId: bookingRequests.venueId,
+      hallId: bookingRequests.hallId,
       status: bookingRequests.status,
       confirmedAt: bookingRequests.confirmedAt,
       agreedPrice: bookingRequests.agreedPrice,
       guestCount: bookingRequests.guestCount,
-      // The agreement prices a venue by event type as well as by size, so the
-      // fee cannot be worked out without it. It was not selected before,
-      // because until now the venue tiers were a single global threshold.
       eventType: bookingRequests.eventType,
       source: bookingRequests.source,
     })
@@ -135,6 +133,31 @@ export async function ensureCommissionForBooking(
   );
   if (!result) return null;
 
+  const snapshot = b.venueId
+    ? await (async () => {
+        const { venueHallDisplayName } = await import("@/lib/booking/venue-booking-write");
+        const { venues, venueHalls } = await import("@/lib/db/schema");
+        const [venue] = await db
+          .select({ nameRo: venues.nameRo })
+          .from(venues)
+          .where(eq(venues.id, b.venueId!))
+          .limit(1);
+        const [hall] = b.hallId
+          ? await db
+              .select({ nameRo: venueHalls.nameRo })
+              .from(venueHalls)
+              .where(eq(venueHalls.id, b.hallId))
+              .limit(1)
+          : [];
+        void venueHallDisplayName;
+        return {
+          hallId: b.hallId ?? null,
+          hallNameSnapshot: hall?.nameRo ?? null,
+          venueNameSnapshot: venue?.nameRo ?? null,
+        };
+      })()
+    : { hallId: null, hallNameSnapshot: null, venueNameSnapshot: null };
+
   const [created] = await db
     .insert(commissions)
     .values({
@@ -142,6 +165,9 @@ export async function ensureCommissionForBooking(
       vendorType,
       artistId: b.artistId ?? null,
       venueId: b.venueId ?? null,
+      hallId: snapshot.hallId,
+      hallNameSnapshot: snapshot.hallNameSnapshot,
+      venueNameSnapshot: snapshot.venueNameSnapshot,
       baseAmount,
       currency: result.currency,
       rateBps: result.rateBps,

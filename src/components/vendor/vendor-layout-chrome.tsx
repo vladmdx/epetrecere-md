@@ -14,7 +14,9 @@ export function VendorLayoutChrome({
   children: React.ReactNode;
 }) {
   const pathname = usePathname()?.replace(/^\/(ro|ru|en)(?=\/|$)/, "");
-  const isSalaRoute = pathname?.startsWith("/dashboard/sala") ?? false;
+  const isSalaRoute =
+    (pathname?.startsWith("/dashboard/sala") ?? false) ||
+    Boolean(pathname?.match(/^\/dashboard\/locatii\/\d+/));
 
   if (isSalaRoute) {
     // Pass-through — venue layout owns the chrome.

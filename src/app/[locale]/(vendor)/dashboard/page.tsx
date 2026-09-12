@@ -14,12 +14,12 @@
 import Link from "@/components/shared/locale-link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
 import { db } from "@/lib/db";
-import { listAccessibleVenueIds } from "@/lib/venue-access";
-import { artists, users, venues } from "@/lib/db/schema";
+import { listAccessibleOrganizations, listAccessibleVenueIds } from "@/lib/venue-access";
+import { artists, users } from "@/lib/db/schema";
 import { getArtistStats } from "@/lib/db/queries/artist-stats";
 import {
   getArtistNextEvent,
@@ -62,13 +62,13 @@ export default async function VendorDashboard({
     .limit(1);
 
   if (!artist) {
-    const [venue] = await db
-      .select({ id: venues.id })
-      .from(venues)
-      .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
-      .limit(1);
-    if (venue) {
+    const venueIds = await listAccessibleVenueIds(appUser.id);
+    if (venueIds.length) {
       redirect(localizePath("/dashboard/sala", locale));
+    }
+    const orgs = await listAccessibleOrganizations(appUser.id);
+    if (orgs.length) {
+      redirect(localizePath("/dashboard/organizatie", locale));
     }
     // No vendor record at all — artists mid-onboarding stay; everyone
     // else goes back to the client cabinet.

@@ -950,6 +950,7 @@ export const calendarEvents = pgTable("calendar_events", {
   date: date("date").notNull(),
   status: calendarStatusEnum("status").default("available").notNull(),
   bookingId: integer("booking_id"),
+  hallId: integer("hall_id"),
   note: text("note"),
   /** F-S6 — Event type for color coding on the owner dashboard calendar.
    *  Free-form string (e.g. "nunta", "cumetrie", "corporate") so new types
@@ -962,6 +963,8 @@ export const calendarEvents = pgTable("calendar_events", {
 }, (t) => [
   index("idx_cal_entity_date").on(t.entityType, t.entityId, t.date),
   index("idx_cal_entity_type_date_status").on(t.entityType, t.date, t.status),
+  index("idx_cal_booking").on(t.bookingId),
+  index("idx_cal_hall").on(t.hallId),
 ]);
 
 // ═══════════════════════════════════════════════════════

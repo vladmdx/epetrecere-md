@@ -81,6 +81,7 @@ interface Props {
   monthCalendar: CalendarDay[];
   monthYear: number;
   monthIndex: number;
+  basePath?: string;
 }
 
 const EVENT_TYPE_COLORS: Record<string, string> = {
@@ -143,6 +144,7 @@ export function VenueHomeDashboard({
   monthCalendar,
   monthYear,
   monthIndex,
+  basePath = "/dashboard/sala",
 }: Props) {
   const router = useRouter();
   const { t, locale } = useLocale();
@@ -262,7 +264,7 @@ export function VenueHomeDashboard({
           value={stats.pendingBookings}
           icon={Bell}
           accentColor="text-gold"
-          href="/dashboard/sala/rezervari?tab=noi"
+          href={`${basePath}/rezervari?tab=noi`}
         />
 
         <KpiCard
@@ -271,7 +273,7 @@ export function VenueHomeDashboard({
           subLabel={t("vendor.venueHome.occupancyDays", { busy: stats.occupancyBusyDays, total: stats.occupancyTotalDays })}
           icon={CalendarIcon}
           accentColor="text-blue-400"
-          href="/dashboard/sala/calendar"
+          href={`${basePath}/calendar`}
           progressPct={stats.occupancyRate}
         />
 
@@ -287,7 +289,7 @@ export function VenueHomeDashboard({
           trendDown={revenueDiffPct < 0}
           icon={Wallet}
           accentColor="text-emerald-400"
-          href="/dashboard/sala/financiar"
+          href={`${basePath}/financiar`}
         />
 
         <KpiCard
@@ -304,7 +306,7 @@ export function VenueHomeDashboard({
           }
           icon={Star}
           accentColor="text-amber-400"
-          href="/dashboard/sala/recenzii"
+          href={`${basePath}/recenzii`}
           showStars={stats.ratingAvg ?? undefined}
         />
       </div>
@@ -319,7 +321,7 @@ export function VenueHomeDashboard({
                 {t(`vendor.venueHome.month${monthIndex + 1}`)} {monthYear}
               </h2>
               <Link
-                href="/dashboard/sala/calendar"
+                href={`${basePath}/calendar`}
                 className="text-xs text-gold hover:underline"
               >
                 {t("vendor.venueHome.fullCalendar")}
@@ -340,7 +342,7 @@ export function VenueHomeDashboard({
                 return (
                   <Link
                     key={i}
-                    href={`/dashboard/sala/calendar?date=${dateStr}`}
+                    href={`${basePath}/calendar?date=${dateStr}`}
                     className={cn(
                       "relative flex aspect-square items-center justify-center rounded-md border border-transparent text-xs transition-all hover:border-gold/40 hover:bg-gold/5",
                       statusColor,
@@ -462,7 +464,7 @@ export function VenueHomeDashboard({
               {t("vendor.venueHome.latestRequests")}
             </h2>
             <Link
-              href="/dashboard/sala/rezervari"
+              href={`${basePath}/rezervari`}
               className="inline-flex items-center gap-1 text-xs text-gold hover:underline"
             >
               {t("common.viewAll")} <ArrowRight className="h-3 w-3" />
@@ -559,7 +561,7 @@ export function VenueHomeDashboard({
                             </div>
                           ) : (
                             <Link
-                              href="/dashboard/sala/rezervari"
+                              href={`${basePath}/rezervari`}
                               className="text-xs text-muted-foreground hover:text-gold"
                             >
                               {t("vendor.venueHome.viewArrow")}

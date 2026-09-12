@@ -8,6 +8,7 @@ import {
 
 export const acceptanceSchema = z.object({
   subjectType: z.enum(["artist", "venue"]),
+  organizationId: z.number().int().positive().optional(),
   accepted: z.literal(true),
   packVersion: z.literal(LEGAL_PACK_VERSION),
   signatureName: z.string().trim().max(200).refine(isFullPersonName, {

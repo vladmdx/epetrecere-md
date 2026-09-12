@@ -2106,7 +2106,18 @@
       "analytics": "Analytics",
       "digitalMenu": "Meniu Digital",
       "profileGallery": "Profil & Galerie",
-      "yourVenue": "Sala ta"
+      "yourVenue": "Sala ta",
+      "switchVenue": "Schimbă localul"
+    },
+    "multiHall": {
+      "halls": "Săli",
+      "locations": "Localuri",
+      "organization": "Organizație",
+      "addVenue": "Adaugă local",
+      "addHall": "Adaugă sală",
+      "translateMissing": "Tradu câmpurile lipsă în RU și EN",
+      "submitApproval": "Trimite la aprobare",
+      "allHalls": "Toate sălile"
     },
     "videoManager": {
       "addVideoLabel": "Adaugă video (YouTube sau Vimeo)",

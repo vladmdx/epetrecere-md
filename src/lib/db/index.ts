@@ -81,10 +81,14 @@ function createDb(): Db {
       ? url.replace(".pooler.supabase.com:6543", ".pooler.supabase.com:5432")
       : url;
 
+  const host = new URL(connectionUrl).hostname;
+  const loopback = ["localhost", "127.0.0.1", "::1"].includes(host);
   const client = postgres(connectionUrl, {
-    ssl: "require",
+    // Loopback disposable databases used by multi-hall tests have no TLS.
+    // Hosted Postgres (Supabase/Neon session) still requires it.
+    ssl: loopback ? false : "require",
     prepare: false,
-    max: isBuild ? 4 : 2,
+    max: isBuild ? 4 : process.env.E2E_RUNTIME === "1" ? 8 : 2,
     // Do not lower the driver's global pipeline limit: in postgres.js 3.4.9
     // that same boundary controls the BEGIN reservation hook, so low values
     // can make transactions unsafe or leave a queued BEGIN stalled. Critical
