@@ -965,12 +965,26 @@ export const calendarEvents = pgTable("calendar_events", {
   index("idx_cal_entity_type_date_status").on(t.entityType, t.date, t.status),
   index("idx_cal_booking").on(t.bookingId),
   index("idx_cal_hall").on(t.hallId),
-  // Authoritative delete action is SET NULL (hall_id) in 0029 (PG15+).
+  /**
+   * One calendar projection per booking. NULL booking_id (manual/legacy rows)
+   * remains allowed — PostgreSQL unique indexes treat NULL as distinct.
+   * Authoritative SQL: 0029 `calendar_events_booking_id_unique`.
+   */
+  uniqueIndex("calendar_events_booking_id_unique").on(t.bookingId),
+  /**
+   * Composite FK (hall_id, entity_id) → venue_halls(id, venue_id).
+   * Do NOT set onDelete() here: Drizzle would apply SET NULL to BOTH columns
+   * and wipe entity_id. Authoritative SQL is 0029:
+   *   PG15+  ON DELETE SET NULL (hall_id)
+   *   PG<15  ON DELETE RESTRICT (archive the hall instead).
+   * booking_id FK is calendar_events_booking_fk in 0029 (ON DELETE SET NULL).
+   * It is not declared here because `bookingRequests` is defined below.
+   */
   foreignKey({
     name: "calendar_events_hall_venue_fk",
     columns: [t.hallId, t.entityId],
     foreignColumns: [venueHalls.id, venueHalls.venueId],
-  }).onDelete("set null"),
+  }),
   check(
     "calendar_events_hall_requires_venue_entity_chk",
     sql`${t.hallId} IS NULL OR ${t.entityType} = 'venue'`,

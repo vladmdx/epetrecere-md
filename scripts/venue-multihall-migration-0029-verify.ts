@@ -61,6 +61,17 @@ async function constraintShape() {
   return Object.fromEntries(rows.map((row) => [row.conname, row.def]));
 }
 
+async function indexShape() {
+  const rows = await client<{ indexname: string; indexdef: string }[]>`
+    SELECT indexname, indexdef
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND tablename = 'calendar_events'
+      AND indexname = 'calendar_events_booking_id_unique'
+  `;
+  return Object.fromEntries(rows.map((row) => [row.indexname, row.indexdef]));
+}
+
 async function main() {
   const [state] = await client<{ has_orgs: boolean; has_halls: boolean }[]>`
     SELECT
@@ -82,11 +93,21 @@ async function main() {
 
   apply("0029 first apply");
   const afterFirst = await constraintShape();
+  const indexesFirst = await indexShape();
   if (!afterFirst.calendar_events_hall_venue_fk) {
     throw new Error("calendar_events_hall_venue_fk missing after first apply");
   }
   if (!afterFirst.calendar_events_hall_requires_venue_entity_chk) {
     throw new Error("calendar_events_hall_requires_venue_entity_chk missing after first apply");
+  }
+  if (!afterFirst.calendar_events_booking_fk) {
+    throw new Error("calendar_events_booking_fk missing after first apply");
+  }
+  if (!/REFERENCES booking_requests/i.test(afterFirst.calendar_events_booking_fk)) {
+    throw new Error(`booking FK must reference booking_requests: ${afterFirst.calendar_events_booking_fk}`);
+  }
+  if (!/SET NULL/i.test(afterFirst.calendar_events_booking_fk)) {
+    throw new Error(`booking FK must ON DELETE SET NULL: ${afterFirst.calendar_events_booking_fk}`);
   }
   if (!/SET NULL \(hall_id\)|ON DELETE RESTRICT/i.test(afterFirst.calendar_events_hall_venue_fk)) {
     throw new Error(`unexpected hall FK: ${afterFirst.calendar_events_hall_venue_fk}`);
@@ -94,15 +115,30 @@ async function main() {
   if (!/REFERENCES venue_halls/i.test(afterFirst.calendar_events_hall_venue_fk)) {
     throw new Error(`hall FK must reference venue_halls: ${afterFirst.calendar_events_hall_venue_fk}`);
   }
+  if (!indexesFirst.calendar_events_booking_id_unique) {
+    throw new Error("calendar_events_booking_id_unique missing after first apply");
+  }
+  if (!/UNIQUE/i.test(indexesFirst.calendar_events_booking_id_unique)) {
+    throw new Error(`booking projection index must be UNIQUE: ${indexesFirst.calendar_events_booking_id_unique}`);
+  }
+  if (!/\(.*booking_id.*\)/i.test(indexesFirst.calendar_events_booking_id_unique)) {
+    throw new Error(`unique index must be on booking_id: ${indexesFirst.calendar_events_booking_id_unique}`);
+  }
 
   apply("0029 second apply (idempotent)");
   const afterSecond = await constraintShape();
+  const indexesSecond = await indexShape();
   if (JSON.stringify(afterFirst) !== JSON.stringify(afterSecond)) {
     throw new Error(
       `0029 drifted on second apply:\n${JSON.stringify(afterFirst)}\n${JSON.stringify(afterSecond)}`,
     );
   }
-  log("idempotent: constraint shape unchanged");
+  if (JSON.stringify(indexesFirst) !== JSON.stringify(indexesSecond)) {
+    throw new Error(
+      `0029 unique index drifted on second apply:\n${JSON.stringify(indexesFirst)}\n${JSON.stringify(indexesSecond)}`,
+    );
+  }
+  log("idempotent: constraint and unique-index shape unchanged");
 
   const mark = `m29_${Date.now()}_`;
   const [owner] = await client<{ id: string }[]>`
@@ -194,6 +230,29 @@ async function main() {
     `;
     log("ok: same-venue hall_id accepted");
 
+    const [booking] = await client<{ id: number }[]>`
+      INSERT INTO booking_requests (venue_id, hall_id, client_name, client_phone, event_date, status)
+      VALUES (${venueA.id}, ${hallA.id}, 'M29', '+37360000000', '2027-11-20', 'pending')
+      RETURNING id
+    `;
+    await client`
+      INSERT INTO calendar_events (entity_type, entity_id, date, status, source, booking_id, hall_id)
+      VALUES ('venue', ${venueA.id}, '2027-11-20', 'booked', 'booking', ${booking.id}, ${hallA.id})
+    `;
+    try {
+      await client`
+        INSERT INTO calendar_events (entity_type, entity_id, date, status, source, booking_id, hall_id)
+        VALUES ('venue', ${venueA.id}, '2027-11-20', 'booked', 'booking', ${booking.id}, ${hallA.id})
+      `;
+      throw new Error("expected duplicate booking_id projection to be rejected");
+    } catch (error) {
+      if ((error as Error).message.includes("expected duplicate")) throw error;
+      if (pgCode(error) !== "23505") {
+        throw new Error(`expected unique 23505 for booking projection, got ${pgCode(error)}: ${error}`);
+      }
+      log("ok: unique booking_id projection rejects duplicates");
+    }
+
     const [kept] = await client<{ id: number }[]>`
       INSERT INTO calendar_events (entity_type, entity_id, date, status, source, hall_id, note)
       VALUES ('venue', ${venueA.id}, '2027-11-04', 'blocked', 'manual', ${deletable.id}, ${mark + "keep"})
@@ -230,6 +289,7 @@ async function main() {
     log("0029 verification PASS");
   } finally {
     await client`DELETE FROM calendar_events WHERE entity_id IN (${venueA.id}, ${venueB.id})`;
+    await client`DELETE FROM booking_requests WHERE venue_id IN (${venueA.id}, ${venueB.id})`;
     await client`DELETE FROM venue_halls WHERE venue_id IN (${venueA.id}, ${venueB.id})`;
     await client`DELETE FROM venues WHERE id IN (${venueA.id}, ${venueB.id})`;
     await client`DELETE FROM partner_organization_members WHERE organization_id = ${org.id}`;

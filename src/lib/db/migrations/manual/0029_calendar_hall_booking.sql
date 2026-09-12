@@ -8,6 +8,11 @@
 --     share the integer entity_id namespace and must not ride the composite FK);
 --   * ON DELETE SET NULL (hall_id) on PG15+ so deleting a hall keeps the event
 --     and the venue entity_id; PG < 15 falls back to RESTRICT (archive instead).
+-- booking projection:
+--   * calendar_events_booking_fk (booking_id → booking_requests.id ON DELETE SET NULL);
+--   * UNIQUE INDEX calendar_events_booking_id_unique on booking_id (NULLs allowed).
+-- schema.ts must not declare onDelete on the composite hall FK: Drizzle would
+-- SET NULL both hall_id and entity_id. SQL in this file is authoritative.
 
 BEGIN;
 SET LOCAL lock_timeout = '5s';
@@ -53,5 +58,11 @@ BEGIN
       ON DELETE RESTRICT;
   END IF;
 END $$;
+
+-- Idempotent unique projection: one calendar_events row per booking_id.
+-- Multiple NULL booking_id values remain valid. Duplicate non-null booking_id
+-- rows cause this statement to fail loudly; do not rewrite history to force it.
+CREATE UNIQUE INDEX IF NOT EXISTS calendar_events_booking_id_unique
+  ON calendar_events (booking_id);
 
 COMMIT;
