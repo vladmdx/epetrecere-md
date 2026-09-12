@@ -16,6 +16,7 @@ import {
   venueHalls,
   venueImages,
   venues,
+  bookingRequests,
 } from "../src/lib/db/schema";
 import {
   authorizeHallAccess,
@@ -27,12 +28,14 @@ import {
 import {
   collectSubmitMissing,
   ensureDraftOrganization,
+  archiveHall,
   saveHallDraft,
   saveOrganizationProfile,
   saveVenueDraft,
   submitVenueForApproval,
 } from "../src/lib/partner/onboarding";
-import { organizationContractRows, organizationHasValidContract } from "../src/lib/partner/legal";
+import { organizationHasValidContract, organizationContractRows, resolveOrganizationSigningIdentity } from "../src/lib/partner/legal";
+import { organizationWriteCapability } from "../src/lib/partner/organization-write";
 import {
   LEGAL_PACK_VERSION,
   VENUE_REQUIRED_DOCS,
@@ -396,3 +399,131 @@ test("duplicate phone on another account stays editable (409 field)", async () =
     assert.equal(result.field, "phone");
   }
 });
+
+test("POST resume does not mutate a pending or already active organization", async () => {
+  const [before] = await db
+    .select({ displayName: partnerOrganizations.displayName, status: partnerOrganizations.status })
+    .from(partnerOrganizations)
+    .where(eq(partnerOrganizations.id, ids.org));
+  assert.equal(before.status, "pending");
+  const createdFromPending = await ensureDraftOrganization(appUser(ids.owner), {
+    displayName: MARK + "Hijack Pending",
+    type: "company",
+  });
+  assert.notEqual(createdFromPending.id, ids.org);
+  await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, createdFromPending.id));
+  await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, createdFromPending.id));
+
+  await db.update(partnerOrganizations).set({ status: "active", updatedAt: new Date() }).where(eq(partnerOrganizations.id, ids.org));
+  const createdFromActive = await ensureDraftOrganization(appUser(ids.owner), {
+    displayName: MARK + "Hijack Active",
+    type: "company",
+  });
+  assert.notEqual(createdFromActive.id, ids.org);
+  const [untouched] = await db
+    .select({ displayName: partnerOrganizations.displayName, status: partnerOrganizations.status })
+    .from(partnerOrganizations)
+    .where(eq(partnerOrganizations.id, ids.org));
+  assert.equal(untouched.displayName, before.displayName);
+  assert.equal(untouched.status, "active");
+  await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, createdFromActive.id));
+  await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, createdFromActive.id));
+  await db.update(partnerOrganizations).set({ status: "pending", updatedAt: new Date() }).where(eq(partnerOrganizations.id, ids.org));
+});
+
+test("staff cannot change displayName on an eligible draft they do not own", async () => {
+  const draft = await ensureDraftOrganization(appUser(ids.owner), {
+    displayName: MARK + "Draft Extra",
+    type: "company",
+  });
+  await db.insert(partnerOrganizationMembers).values({
+    organizationId: draft.id,
+    userId: ids.staff,
+    role: "staff",
+    isActive: true,
+  });
+  const again = await ensureDraftOrganization(appUser(ids.staff), {
+    displayName: MARK + "Staff Hijack",
+    type: "company",
+  });
+  assert.equal(again.id, draft.id);
+  const [row] = await db
+    .select({ displayName: partnerOrganizations.displayName })
+    .from(partnerOrganizations)
+    .where(eq(partnerOrganizations.id, draft.id));
+  assert.equal(row.displayName, MARK + "Draft Extra");
+  await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, draft.id));
+  await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, draft.id));
+});
+
+test("staff of org A cannot manage_legal; empty legalName still requires manage_legal", async () => {
+  const staff = appUser(ids.staff);
+  assert.equal((await authorizeOrganizationCapability(staff, ids.org, "manage_legal")).ok, false);
+  assert.equal((await authorizeOrganizationCapability(appUser(ids.admin), ids.org, "manage_legal")).ok, false);
+  assert.equal((await authorizeOrganizationCapability(appUser(ids.owner), ids.org, "manage_legal")).ok, true);
+  assert.equal(organizationWriteCapability({ legalName: "" }), "manage_legal");
+});
+
+test("contract validity rejects a mismatched legal identity", async () => {
+  const mismatch = await resolveOrganizationSigningIdentity(ids.org, {
+    ...IDENTITY,
+    legalName: "Other Company SRL",
+  });
+  assert.equal(mismatch.ok, false);
+  if (!mismatch.ok) assert.equal(mismatch.code, "IDENTITY_MISMATCH");
+  const matched = await resolveOrganizationSigningIdentity(ids.org, IDENTITY);
+  assert.equal(matched.ok, true);
+
+  await db
+    .update(legalAcceptances)
+    .set({ legalName: "Other Company SRL" })
+    .where(eq(legalAcceptances.organizationId, ids.org));
+  assert.equal(await organizationHasValidContract(ids.org), false);
+  await db
+    .update(legalAcceptances)
+    .set({ legalName: IDENTITY.legalName })
+    .where(eq(legalAcceptances.organizationId, ids.org));
+  assert.equal(await organizationHasValidContract(ids.org), true);
+});
+
+test("archiveHall refuses the last usable hall and future blocking bookings", async () => {
+  const last = await archiveHall(ids.hallA);
+  const lastB = await archiveHall(ids.hallB);
+  assert.equal(last.ok || lastB.ok, true);
+  const leftover = last.ok ? ids.hallB : ids.hallA;
+  const refused = await archiveHall(leftover);
+  assert.equal(refused.ok, false);
+  if (!refused.ok) assert.equal(refused.code, "LAST_USABLE_HALL");
+
+  const [extra] = await db
+    .insert(venueHalls)
+    .values({
+      venueId: ids.venue,
+      slug: MARK + "extra-hall",
+      nameRo: "Extra",
+      status: "active",
+      capacityMin: 10,
+      capacityMax: 20,
+    })
+    .returning({ id: venueHalls.id });
+  const future = "2099-05-01";
+  const [booking] = await db
+    .insert(bookingRequests)
+    .values({
+      venueId: ids.venue,
+      hallId: extra.id,
+      clientName: "Future",
+      clientPhone: "+37360000010",
+      eventDate: future,
+      status: "pending",
+      reservationScope: "hall",
+    })
+    .returning({ id: bookingRequests.id });
+  const blocked = await archiveHall(extra.id);
+  assert.equal(blocked.ok, false);
+  if (!blocked.ok) assert.equal(blocked.code, "HALL_HAS_FUTURE_BOOKINGS");
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, booking.id));
+  const archived = await archiveHall(extra.id);
+  assert.equal(archived.ok, true);
+});
+

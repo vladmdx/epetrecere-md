@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
   const organizationIdRaw = Number(req.nextUrl.searchParams.get("organizationId") ?? "");
   const organizationId = Number.isFinite(organizationIdRaw) && organizationIdRaw > 0 ? organizationIdRaw : null;
   if (organizationId) {
-    const orgAccess = await requireOrganizationCapability(organizationId, "view_organization");
+    const orgAccess = await requireOrganizationCapability(organizationId, "manage_legal");
     if (!orgAccess.ok) {
       return NextResponse.json({ error: orgAccess.error, code: "FORBIDDEN" }, { status: orgAccess.status });
     }
@@ -131,7 +131,8 @@ export async function POST(req: NextRequest) {
     details: parsed.error.issues.map(i => ({ field: i.path.join("."), message: i.message })),
   }, { status: 400 });
   const body = parsed.data;
-  const { subjectType, signatureName, signatureImage, identity, organizationId } = body;
+  const { subjectType, signatureName, signatureImage, organizationId } = body;
+  let { identity } = body;
   if (!await validSignatureImage(signatureImage)) {
     return NextResponse.json({ error: "valid_handwritten_signature_required" }, { status: 400 });
   }
@@ -140,6 +141,12 @@ export async function POST(req: NextRequest) {
     if (!orgAccess.ok) {
       return NextResponse.json({ error: orgAccess.error, code: "FORBIDDEN" }, { status: orgAccess.status });
     }
+    const { resolveOrganizationSigningIdentity } = await import("@/lib/partner/legal");
+    const resolved = await resolveOrganizationSigningIdentity(organizationId, identity);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.code, code: resolved.code }, { status: resolved.status });
+    }
+    identity = resolved.identity;
   }
 
   const cu = await currentUser();

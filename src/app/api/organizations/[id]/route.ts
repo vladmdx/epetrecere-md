@@ -6,6 +6,8 @@ import { requireOrganizationCapability } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
 import { saveOrganizationProfile } from "@/lib/partner/onboarding";
 import { organizationHasValidContract, organizationContractRows } from "@/lib/partner/legal";
+import { organizationWriteCapability } from "@/lib/partner/organization-write";
+import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -45,11 +47,11 @@ export async function GET(_req: Request, ctx: Ctx) {
 export async function PATCH(req: Request, ctx: Ctx) {
   const organizationId = Number((await ctx.params).id);
   const body = await req.json().catch(() => null);
-  const wantsBilling = Boolean(body && (body.billingEmail || body.billingPhone || body.bankDetails));
-  const wantsLegal = Boolean(body && (body.legalName || body.idNumber || body.legalAddress || body.type));
-  const capability = wantsLegal ? "manage_legal" : wantsBilling ? "manage_billing" : "manage_venues";
+  const capability = organizationWriteCapability(body);
   const access = await requireOrganizationCapability(organizationId, capability);
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   const saved = await saveOrganizationProfile(organizationId, body);
   if (!saved.ok) return jsonError(saved.error, saved.status ?? 400, saved);
   return NextResponse.json({ organization: { ...saved.organization, bankDetails: access.role === "owner" || access.role === "admin" ? saved.organization?.bankDetails : undefined } });

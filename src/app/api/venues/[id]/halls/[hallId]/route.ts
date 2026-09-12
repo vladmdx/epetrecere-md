@@ -5,6 +5,7 @@ import { venueHalls, venueHallSeatingOptions, venueImages } from "@/lib/db/schem
 import { requireHallAccess } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
 import { archiveHall, saveHallDraft } from "@/lib/partner/onboarding";
+import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 
 type Ctx = { params: Promise<{ id: string; hallId: string }> };
 
@@ -26,6 +27,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const hallId = Number(hallIdRaw);
   const access = await requireHallAccess(hallId, "admin");
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   if (access.venueId !== Number(id)) return jsonError("Forbidden", 403);
   const body = await req.json().catch(() => null);
   const saved = await saveHallDraft({ ...body, venueId: access.venueId, hallId });
@@ -38,8 +41,10 @@ export async function DELETE(_req: Request, ctx: Ctx) {
   const hallId = Number(hallIdRaw);
   const access = await requireHallAccess(hallId, "admin");
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   if (access.venueId !== Number(id)) return jsonError("Forbidden", 403);
   const result = await archiveHall(hallId);
-  if (!result.ok) return jsonError(result.error ?? "Not found", result.status ?? 404);
+  if (!result.ok) return jsonError(result.error ?? "Not found", result.status ?? 404, { code: result.code });
   return NextResponse.json({ ok: true, archived: true });
 }

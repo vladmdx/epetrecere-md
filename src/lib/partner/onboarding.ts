@@ -3,9 +3,10 @@
  * Draft rows are the durable state; refresh/back/retry reuse them.
  * server-only.
  */
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, or } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
+  bookingRequests,
   partnerOrganizationMembers,
   partnerOrganizations,
   users,
@@ -16,11 +17,13 @@ import {
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
 import {
+  authorizeOrganizationCapability,
   countActiveOwners,
   listAccessibleOrganizations,
   type AppUser,
 } from "@/lib/venue-access";
 import { organizationHasValidContract } from "./legal";
+import { organizationWriteCapability } from "./organization-write";
 import {
   emptyToNull,
   hallDraftSchema,
@@ -65,36 +68,65 @@ async function uniqueHallSlug(venueId: number, name: string, excludeId?: number)
   });
 }
 
+const ELIGIBLE_DRAFT_STATUSES = new Set(["draft", "rejected"]);
+
 export async function ensureDraftOrganization(
   user: AppUser,
   input?: { displayName?: string; type?: "individual" | "sole_trader" | "company" },
 ) {
   const existing = await listAccessibleOrganizations(user.id);
-  const reusable = existing.find((org) => org.status === "draft" || org.status === "pending" || org.status === "rejected")
-    ?? existing[0];
-  if (reusable && !input?.displayName) {
+  const reusable = existing.find((org) => ELIGIBLE_DRAFT_STATUSES.has(org.status));
+
+  const loadReusable = async () => {
+    if (!reusable) return null;
     const [row] = await db
       .select()
       .from(partnerOrganizations)
       .where(eq(partnerOrganizations.id, reusable.id))
       .limit(1);
+    return row ?? null;
+  };
+
+  const hasName = input != null && Object.prototype.hasOwnProperty.call(input, "displayName") && input.displayName != null;
+  const hasType = input != null && Object.prototype.hasOwnProperty.call(input, "type") && input.type != null;
+
+  if (reusable && !hasName && !hasType) {
+    const row = await loadReusable();
     if (row) return row;
   }
 
-  const displayName = input?.displayName?.trim() || "Organizație nouă";
-  if (reusable && input?.displayName) {
-    const [updated] = await db
-      .update(partnerOrganizations)
-      .set({
-        displayName,
-        type: input.type ?? "company",
-        updatedAt: new Date(),
-      })
-      .where(eq(partnerOrganizations.id, reusable.id))
-      .returning();
-    if (updated) return updated;
+  if (reusable && (hasName || hasType)) {
+    const access = await authorizeOrganizationCapability(
+      user,
+      reusable.id,
+      organizationWriteCapability(input),
+    );
+    if (!access.ok) {
+      const row = await loadReusable();
+      if (row) return row;
+    } else {
+      const displayName = input?.displayName?.trim() || "Organizație nouă";
+      const [updated] = await db
+        .update(partnerOrganizations)
+        .set({
+          ...(hasName ? { displayName } : {}),
+          ...(hasType ? { type: input!.type } : {}),
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(partnerOrganizations.id, reusable.id),
+            inArray(partnerOrganizations.status, ["draft", "rejected"]),
+          ),
+        )
+        .returning();
+      if (updated) return updated;
+      const row = await loadReusable();
+      if (row) return row;
+    }
   }
 
+  const displayName = input?.displayName?.trim() || "Organizație nouă";
   const [created] = await db
     .insert(partnerOrganizations)
     .values({
@@ -531,7 +563,47 @@ export async function submitVenueForApproval(venueId: number) {
 
 export async function archiveHall(hallId: number) {
   const [hall] = await db.select().from(venueHalls).where(eq(venueHalls.id, hallId)).limit(1);
-  if (!hall) return { ok: false as const, status: 404 as const, error: "Not found" };
+  if (!hall) {
+    return { ok: false as const, status: 404 as const, error: "Not found", code: "NOT_FOUND" as const };
+  }
+  if (hall.status === "archived") return { ok: true as const, hallId };
+
+  const siblings = await db
+    .select({ id: venueHalls.id, status: venueHalls.status })
+    .from(venueHalls)
+    .where(eq(venueHalls.venueId, hall.venueId));
+  const usable = siblings.filter((row) => row.status !== "archived");
+  if (usable.length <= 1) {
+    return {
+      ok: false as const,
+      status: 409 as const,
+      error: "LAST_USABLE_HALL",
+      code: "LAST_USABLE_HALL" as const,
+    };
+  }
+
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Chisinau" });
+  const [future] = await db
+    .select({ id: bookingRequests.id })
+    .from(bookingRequests)
+    .where(
+      and(
+        eq(bookingRequests.venueId, hall.venueId),
+        inArray(bookingRequests.status, ["pending", "accepted", "confirmed_by_client"]),
+        gte(bookingRequests.eventDate, today),
+        or(eq(bookingRequests.hallId, hallId), eq(bookingRequests.reservationScope, "venue")),
+      ),
+    )
+    .limit(1);
+  if (future) {
+    return {
+      ok: false as const,
+      status: 409 as const,
+      error: "HALL_HAS_FUTURE_BOOKINGS",
+      code: "HALL_HAS_FUTURE_BOOKINGS" as const,
+    };
+  }
+
   await db
     .update(venueHalls)
     .set({ status: "archived", updatedAt: new Date() })
