@@ -130,8 +130,7 @@ export async function POST(req: NextRequest) {
     details: parsed.error.issues.map(i => ({ field: i.path.join("."), message: i.message })),
   }, { status: 400 });
   const body = parsed.data;
-  const { subjectType, signatureName, signatureImage, organizationId } = body;
-  let { identity } = body;
+  const { subjectType, signatureName, signatureImage, organizationId, identity } = body;
   if (!await validSignatureImage(signatureImage)) {
     return NextResponse.json({ error: "valid_handwritten_signature_required" }, { status: 400 });
   }

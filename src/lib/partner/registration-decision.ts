@@ -3,7 +3,7 @@
  * Extra venues keep venues.user_id NULL; the queue and notifications
  * must follow the organization, not the legacy owner column.
  */
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   notifications,

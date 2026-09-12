@@ -528,4 +528,3 @@ test("archiveHall refuses the last usable hall and future blocking bookings", as
   const archived = await archiveHall(extra.id);
   assert.equal(archived.ok, true);
 });
-
