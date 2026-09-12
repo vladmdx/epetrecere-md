@@ -271,14 +271,13 @@ after(async () => {
   }
   await db.delete(venueHalls).where(eq(venueHalls.id, ids.hallForeign));
   await db.delete(venues).where(eq(venues.slug, MARK + "foreign"));
-  await db.delete(partnerOrganizationMembers).where(
-    inArray(partnerOrganizationMembers.organizationId, [ids.org, ids.orgB].filter(Boolean)),
-  );
-  if (ids.org) await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, ids.org));
-  if (ids.orgB) await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, ids.orgB));
-  await db.delete(users).where(
-    inArray(users.id, [ids.owner, ids.admin, ids.manager, ids.staff, ids.outsider].filter(Boolean)),
-  );
+  const orgIds = [ids.org, ids.orgB].filter(Boolean);
+  if (orgIds.length) {
+    await db.delete(partnerOrganizationMembers).where(
+      inArray(partnerOrganizationMembers.organizationId, orgIds),
+    );
+  }
+  // Signatures are append-only and keep organization_id / user_id.
 });
 
 test("new company → venue → two halls → submit pending", async () => {
