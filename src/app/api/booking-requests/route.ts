@@ -25,6 +25,7 @@ import {
   isVenuePartner,
   type VenueNotificationRecipient,
 } from "@/lib/venue-access";
+import { publicVenueReservationScope } from "@/lib/booking/venue-booking-write";
 
 const bookingSchema = z.object({
   /** Either artistId or venueId must be set. */
@@ -621,6 +622,16 @@ export async function POST(req: NextRequest) {
   let booking;
 
   if (parsed.data.venueId) {
+    const publicScope = publicVenueReservationScope({
+      hallId,
+      reservationScope: parsed.data.reservationScope,
+    });
+    if (!publicScope.ok) {
+      return NextResponse.json(
+        { error: publicScope.error, code: publicScope.code },
+        { status: publicScope.status },
+      );
+    }
     const { withVenueAvailabilityWrite, VenueAvailabilityError } = await import(
       "@/lib/booking/venue-booking-write"
     );
@@ -628,12 +639,12 @@ export async function POST(req: NextRequest) {
       booking = await withVenueAvailabilityWrite(
         {
           venueId: parsed.data.venueId,
-          hallId: hallId ?? undefined,
+          hallId: publicScope.hallId,
           guestCount: parsed.data.guestCount,
           eventDate: parsed.data.eventDate,
           startTime: parsed.data.startTime,
           endTime: parsed.data.endTime,
-          reservationScope: parsed.data.reservationScope ?? "hall",
+          reservationScope: publicScope.reservationScope,
           mode: "public",
         },
         async (tx, available) => {
@@ -643,7 +654,7 @@ export async function POST(req: NextRequest) {
             clientUserId: clientUserId ?? null,
             agreedPrice: agreedPrice ?? null,
             hallId: available.hallId,
-            reservationScope: parsed.data.venueId ? (reservationScope ?? "hall") : null,
+            reservationScope: publicScope.reservationScope,
             startsAt: available.interval?.startsAt ?? null,
             endsAt: available.interval?.endsAt ?? null,
             timezone: available.interval?.timezone ?? null,
@@ -670,7 +681,7 @@ export async function POST(req: NextRequest) {
       clientUserId: clientUserId ?? null,
       agreedPrice: agreedPrice ?? null,
       hallId: parsed.data.hallId ?? hallId ?? null,
-      reservationScope: parsed.data.venueId ? (reservationScope ?? "hall") : null,
+      reservationScope: parsed.data.venueId ? "hall" : null,
       startsAt: null,
       endsAt: null,
       timezone: null,

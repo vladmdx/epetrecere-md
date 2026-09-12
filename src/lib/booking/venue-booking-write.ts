@@ -61,6 +61,26 @@ export async function assertVenueAvailableForWrite(
   return withVenueAvailabilityWrite(input, async (_tx, result) => result);
 }
 
+export function publicVenueReservationScope(input: {
+  hallId?: number | null;
+  reservationScope?: "hall" | "venue" | null;
+}):
+  | { ok: true; hallId: number | null; reservationScope: "hall" }
+  | { ok: false; code: "PUBLIC_VENUE_SCOPE_FORBIDDEN" | "HALL_REQUIRED"; status: number; error: string } {
+  if (input.reservationScope === "venue") {
+    return {
+      ok: false,
+      code: "PUBLIC_VENUE_SCOPE_FORBIDDEN",
+      status: 400,
+      error: "Public bookings cannot reserve the whole venue.",
+    };
+  }
+  if (isMultiHallEnabled() && input.hallId == null) {
+    return { ok: false, code: "HALL_REQUIRED", status: 409, error: "HALL_REQUIRED" };
+  }
+  return { ok: true, hallId: input.hallId ?? null, reservationScope: "hall" };
+}
+
 export async function commercialSnapshotFor(opts: {
   venueId: number;
   hallId: number | null;
@@ -69,8 +89,10 @@ export async function commercialSnapshotFor(opts: {
   currency?: string | null;
   guestCount?: number | null;
   eventType?: string | null;
+  executor?: typeof db;
 }) {
-  const [venue] = await db
+  const q = opts.executor ?? db;
+  const [venue] = await q
     .select({
       id: venues.id,
       nameRo: venues.nameRo,
@@ -80,7 +102,7 @@ export async function commercialSnapshotFor(opts: {
     .where(eq(venues.id, opts.venueId))
     .limit(1);
   const [hall] = opts.hallId
-    ? await db.select().from(venueHalls).where(eq(venueHalls.id, opts.hallId)).limit(1)
+    ? await q.select().from(venueHalls).where(eq(venueHalls.id, opts.hallId)).limit(1)
     : [];
   return {
     organizationId: venue?.organizationId ?? null,

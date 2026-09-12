@@ -66,8 +66,9 @@ export function commissionDueDate(confirmedAt: Date): string {
  */
 export async function ensureCommissionForBooking(
   bookingRequestId: number,
+  executor: typeof db = db,
 ): Promise<number | null> {
-  const [b] = await db
+  const [b] = await executor
     .select({
       id: bookingRequests.id,
       artistId: bookingRequests.artistId,
@@ -93,7 +94,7 @@ export async function ensureCommissionForBooking(
   // a fee on one would bill an artist for their own bookkeeping.
   if (b.source === "manual") return null;
 
-  const [existing] = await db
+  const [existing] = await executor
     .select({ id: commissions.id })
     .from(commissions)
     .where(eq(commissions.bookingRequestId, bookingRequestId))
@@ -137,13 +138,13 @@ export async function ensureCommissionForBooking(
     ? await (async () => {
         const { venueHallDisplayName } = await import("@/lib/booking/venue-booking-write");
         const { venues, venueHalls } = await import("@/lib/db/schema");
-        const [venue] = await db
+        const [venue] = await executor
           .select({ nameRo: venues.nameRo })
           .from(venues)
           .where(eq(venues.id, b.venueId!))
           .limit(1);
         const [hall] = b.hallId
-          ? await db
+          ? await executor
               .select({ nameRo: venueHalls.nameRo })
               .from(venueHalls)
               .where(eq(venueHalls.id, b.hallId))
@@ -158,7 +159,7 @@ export async function ensureCommissionForBooking(
       })()
     : { hallId: null, hallNameSnapshot: null, venueNameSnapshot: null };
 
-  const [created] = await db
+  const [created] = await executor
     .insert(commissions)
     .values({
       bookingRequestId,

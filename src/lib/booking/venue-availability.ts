@@ -6,6 +6,7 @@ import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   bookingRequests,
+  calendarEvents,
   partnerOrganizations,
   venueHallConflictGroupMembers,
   venueHallConflictGroups,
@@ -61,9 +62,13 @@ const PUBLIC_UNAVAILABLE = "Intervalul nu este disponibil.";
 export async function resolveHallForVenueBooking(opts: {
   venueId: number;
   hallId?: number | null;
+  reservationScope?: "hall" | "venue";
   executor?: AvailabilityExecutor;
 }): Promise<{ ok: true; hallId: number | null; code?: undefined } | { ok: false; code: AvailabilityCode; message: string }> {
   const executor = opts.executor ?? db;
+  if (opts.reservationScope === "venue") {
+    return { ok: true, hallId: null };
+  }
   if (!isMultiHallEnabled()) {
     return { ok: true, hallId: opts.hallId ?? null };
   }
@@ -120,6 +125,8 @@ export async function evaluateVenueAvailability(opts: {
   excludeBookingId?: number;
   reservationScope?: "hall" | "venue";
   mode?: AvailabilityMode;
+  /** Owner blocks may land on closed days; still lock + recheck bookings. */
+  ignoreWorkingHours?: boolean;
   executor?: AvailabilityExecutor;
 }): Promise<VenueAvailabilityResult> {
   const q = opts.executor ?? db;
@@ -149,6 +156,7 @@ export async function evaluateVenueAvailability(opts: {
   const resolved = await resolveHallForVenueBooking({
     venueId: opts.venueId,
     hallId: opts.hallId,
+    reservationScope: opts.reservationScope,
     executor: q,
   });
   if (!resolved.ok) {
@@ -221,7 +229,7 @@ export async function evaluateVenueAvailability(opts: {
   }
 
   const hours = (hall?.workingHours as typeof venue.workingHours | null) ?? venue.workingHours;
-  if (opts.startTime && opts.endTime && hours) {
+  if (!opts.ignoreWorkingHours && opts.startTime && opts.endTime && hours) {
     const window = hoursWindow(hours, interval.eventDate, timezone);
     if (window === null) {
       return {
@@ -277,9 +285,16 @@ export async function evaluateVenueAvailability(opts: {
     conflictMembers.filter((row) => groupIds.includes(row.groupId) && row.hallId !== resolved.hallId).map((row) => row.hallId),
   )];
 
+  const allHalls = await q
+    .select({ id: venueHalls.id })
+    .from(venueHalls)
+    .where(eq(venueHalls.venueId, venue.id));
   const lockKeys: AvailabilityLockKeys = {
     venueId: venue.id,
-    hallIds: [resolved.hallId ?? 0, ...incompatibleHallIds].filter((id) => id > 0),
+    hallIds:
+      opts.reservationScope === "venue"
+        ? allHalls.map((row) => row.id)
+        : [resolved.hallId ?? 0, ...incompatibleHallIds].filter((id) => id > 0),
     localDates,
     conflictGroupIds: groupIds,
   };
@@ -310,7 +325,77 @@ export async function evaluateVenueAvailability(opts: {
         lockKeys,
       };
     }
+    if (opts.reservationScope === "venue") {
+      return {
+        available: false,
+        code: "HALL_BLOCK",
+        message: PUBLIC_UNAVAILABLE,
+        hallId: resolved.hallId,
+        interval,
+        lockKeys,
+      };
+    }
     if (incompatibleHallIds.includes(block.hallId)) {
+      return {
+        available: false,
+        code: "CONFLICT_GROUP",
+        message: PUBLIC_UNAVAILABLE,
+        hallId: resolved.hallId,
+        interval,
+        lockKeys,
+      };
+    }
+  }
+
+  const legacyEvents = await q
+    .select({
+      date: calendarEvents.date,
+      status: calendarEvents.status,
+      source: calendarEvents.source,
+      hallId: calendarEvents.hallId,
+      bookingId: calendarEvents.bookingId,
+      startTime: calendarEvents.startTime,
+      endTime: calendarEvents.endTime,
+    })
+    .from(calendarEvents)
+    .where(
+      and(
+        eq(calendarEvents.entityType, "venue"),
+        eq(calendarEvents.entityId, venue.id),
+        inArray(calendarEvents.status, ["blocked", "booked"]),
+        inArray(calendarEvents.date, localDates),
+        ne(calendarEvents.source, "booking"),
+      ),
+    );
+  for (const event of legacyEvents) {
+    const other = canonicalVenueInterval({
+      eventDate: event.date,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      timezone,
+    });
+    if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, other.startsAt, other.endsAt)) continue;
+    if (event.hallId == null || opts.reservationScope === "venue") {
+      return {
+        available: false,
+        code: "VENUE_BLOCK",
+        message: PUBLIC_UNAVAILABLE,
+        hallId: resolved.hallId,
+        interval,
+        lockKeys,
+      };
+    }
+    if (resolved.hallId != null && event.hallId === resolved.hallId) {
+      return {
+        available: false,
+        code: "HALL_BLOCK",
+        message: PUBLIC_UNAVAILABLE,
+        hallId: resolved.hallId,
+        interval,
+        lockKeys,
+      };
+    }
+    if (incompatibleHallIds.includes(event.hallId)) {
       return {
         available: false,
         code: "CONFLICT_GROUP",

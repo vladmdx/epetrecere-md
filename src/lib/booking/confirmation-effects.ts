@@ -1,12 +1,14 @@
 import { after } from "next/server";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { artists, users, bookingRequests, calendarEvents } from "@/lib/db/schema";
+import { artists, users, bookingRequests } from "@/lib/db/schema";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
-import { ensureCommissionForBooking } from "@/lib/commissions/service";
 import { getVenueOwnerUserIds } from "@/lib/venue-access";
+import { persistConfirmationEffects } from "./confirmation-persist";
 
 type Booking = typeof bookingRequests.$inferSelect;
+
+export { persistConfirmationEffects, projectBookingOntoCalendar } from "./confirmation-persist";
 
 export async function notifyConfirmationStep(b: Booking, title: string) {
   // ADR 0028 — notify the venue's real owners (org members), not "the first
@@ -21,10 +23,13 @@ export async function notifyConfirmationStep(b: Booking, title: string) {
   for (const userId of [b.clientUserId, ...vendorUserIds]) {
     if (!userId) continue;
     const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+    const { isMultiHallEnabled } = await import("@/lib/feature-flags");
     const actionUrl = userId === b.clientUserId
       ? "/cabinet/rezervari"
       : b.venueId
-        ? `/dashboard/locatii/${b.venueId}/rezervari?tab=acceptate`
+        ? isMultiHallEnabled()
+          ? `/dashboard/locatii/${b.venueId}/rezervari?tab=acceptate`
+          : "/dashboard/sala/rezervari?tab=acceptate"
         : "/dashboard/rezervari";
     const { venueHallDisplayName } = await import("@/lib/booking/venue-booking-write");
     const place = b.venueId ? await venueHallDisplayName(b.venueId, b.hallId ?? null) : "";
@@ -36,48 +41,19 @@ export async function notifyConfirmationStep(b: Booking, title: string) {
   }
 }
 
-export async function finalConfirmationEffects(b: Booking) {
-  // Await the financial write. Never rely on an unawaited serverless promise.
-  await ensureCommissionForBooking(b.id);
-  if (b.venueId && !b.commercialSnapshot) {
-    const { commercialSnapshotFor } = await import("@/lib/booking/venue-booking-write");
-    const snapshot = await commercialSnapshotFor({
-      venueId: b.venueId,
-      hallId: b.hallId ?? null,
-      reservationScope: b.reservationScope ?? "hall",
-      agreedPrice: b.agreedPrice,
-      currency: b.agreedCurrency,
-      guestCount: b.guestCount,
-      eventType: b.eventType,
-    });
-    await db.update(bookingRequests).set({ commercialSnapshot: snapshot, updatedAt: new Date() }).where(eq(bookingRequests.id, b.id));
-  }
-  const entityId = b.venueId ?? b.artistId;
-  if (entityId) {
-    const entityType = b.venueId ? "venue" : "artist";
-    const note = `Rezervare #${b.id}`;
-    const [existing] = await db.select({ id: calendarEvents.id }).from(calendarEvents).where(and(
-      eq(calendarEvents.bookingId, b.id),
-    )).limit(1);
-    if (!existing) await db.insert(calendarEvents).values({
-      entityType,
-      entityId,
-      date: b.eventDate,
-      status: "booked",
-      source: "booking",
-      bookingId: b.id,
-      hallId: b.hallId,
-      eventType: b.eventType,
-      startTime: b.startTime,
-      endTime: b.endTime,
-      note,
-    });
-  }
+export function scheduleConfirmationNotifications(b: Booking) {
   after(async () => {
     await notifyConfirmationStep(b, "Rezervare confirmată de ambele părți");
     if (b.clientUserId) {
       const { triggerReferral, isFirstBookingForUser } = await import("@/lib/referrals/trigger");
-      if (await isFirstBookingForUser(b.clientUserId)) await triggerReferral(b.clientUserId, "first_booking", { bookingId: b.id, eventDate: b.eventDate });
+      if (await isFirstBookingForUser(b.clientUserId)) {
+        await triggerReferral(b.clientUserId, "first_booking", { bookingId: b.id, eventDate: b.eventDate });
+      }
     }
   });
+}
+
+export async function finalConfirmationEffects(b: Booking) {
+  const row = await persistConfirmationEffects(db, b);
+  scheduleConfirmationNotifications(row);
 }
