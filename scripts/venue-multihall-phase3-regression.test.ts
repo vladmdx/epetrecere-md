@@ -4,7 +4,7 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
@@ -90,6 +90,7 @@ async function mkUser(suffix: string, phone?: string) {
 
 async function signOrgContract(userId: string, organizationId: number) {
   const acceptedAt = new Date();
+  const acceptanceSessionId = randomUUID();
   for (const slug of VENUE_REQUIRED_DOCS) {
     const doc = getLegalDocument(slug);
     assert.ok(doc, `missing legal document ${slug}`);
@@ -116,6 +117,7 @@ async function signOrgContract(userId: string, organizationId: number) {
       documentBlocks: blocks,
       contentHash,
       acceptedAt,
+      acceptanceSessionId,
     });
   }
 }
@@ -384,7 +386,7 @@ test("translation merge fills only empty RU/EN values", () => {
   assert.equal(merged.en, "Grand Hall");
 });
 
-test("duplicate phone on another account stays editable (409 field)", async () => {
+test("duplicate phone on another account is allowed when multi-hall is on", async () => {
   const result = await saveVenueDraft(appUser(ids.outsider), {
     organizationId: ids.orgB,
     name: MARK + "Phone clash",
@@ -393,10 +395,10 @@ test("duplicate phone on another account stays editable (409 field)", async () =
     address: "str. Test 12",
     imageUrls: [],
   });
-  assert.equal(result.ok, false);
-  if (!result.ok && "code" in result) {
-    assert.equal(result.code, "phone_in_use");
-    assert.equal(result.field, "phone");
+  assert.equal(result.ok, true);
+  if (result.ok) {
+    const [owner] = await db.select({ phone: users.phone }).from(users).where(eq(users.id, ids.owner));
+    assert.equal(owner.phone, "+37369111111");
   }
 });
 

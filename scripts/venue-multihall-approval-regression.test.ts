@@ -4,7 +4,7 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { eq, inArray } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
@@ -68,6 +68,7 @@ function appUser(id: string): AppUser {
 
 async function signOrgContract(userId: string, organizationId: number) {
   const acceptedAt = new Date();
+  const acceptanceSessionId = randomUUID();
   for (const slug of VENUE_REQUIRED_DOCS) {
     const doc = getLegalDocument(slug);
     assert.ok(doc);
@@ -94,6 +95,7 @@ async function signOrgContract(userId: string, organizationId: number) {
       documentBlocks: blocks,
       contentHash,
       acceptedAt,
+      acceptanceSessionId,
     });
   }
 }

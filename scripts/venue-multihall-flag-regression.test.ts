@@ -4,9 +4,11 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { isMultiHallEnabled } from "../src/lib/feature-flags";
 import {
   jsonIfMultiHallDisabled,
+  jsonIfMultiHallEnabled,
   MULTI_HALL_DISABLED_CODE,
   multiHallMutationsAllowed,
   salaUsesLegacyLayout,
@@ -75,4 +77,43 @@ test("organization patch capability uses field presence, not truthiness", () => 
   assert.equal(organizationWriteCapability({ type: "company" }), "manage_legal");
   assert.equal(organizationWriteCapability({ billingEmail: "" }), "manage_billing");
   assert.equal(organizationWriteCapability({ displayName: "Org" }), "manage_venues");
+});
+
+test("flag ON: inverse gate blocks the legacy register-venue route", async () => {
+  await withFlag(true, async () => {
+    const response = jsonIfMultiHallEnabled();
+    assert.ok(response);
+    assert.equal(response.status, 404);
+    const body = await response.json();
+    assert.equal(body.code, MULTI_HALL_DISABLED_CODE);
+  });
+  await withFlag(false, () => {
+    assert.equal(jsonIfMultiHallEnabled(), null);
+  });
+});
+
+test("flag OFF: public booking does not persist hallId", async () => {
+  await withFlag(false, () => {
+    const forced = publicVenueReservationScope({ hallId: 99, reservationScope: "hall" });
+    assert.equal(forced.ok, true);
+    if (forced.ok) assert.equal(forced.hallId, null);
+  });
+});
+
+test("kill-switch is wired at route level for org/hall mutations", () => {
+  const registerVenue = readFileSync("src/app/api/auth/register-venue/route.ts", "utf8");
+  assert.match(registerVenue, /jsonIfMultiHallEnabled\(\)/);
+  assert.doesNotMatch(registerVenue, /jsonIfMultiHallDisabled\(\)/);
+
+  const images = readFileSync("src/app/api/venue-images/route.ts", "utf8");
+  assert.match(images, /if \(parsed\.data\.hallId\)/);
+  assert.match(images, /jsonIfMultiHallDisabled\(\)/);
+
+  const legal = readFileSync("src/lib/legal/record-acceptance.ts", "utf8");
+  assert.match(legal, /FEATURE_DISABLED/);
+  assert.match(legal, /isMultiHallEnabled\(\)/);
+
+  const publicScope = readFileSync("src/lib/booking/venue-booking-write.ts", "utf8");
+  assert.match(publicScope, /if \(!isMultiHallEnabled\(\)\)/);
+  assert.match(publicScope, /hallId: null/);
 });

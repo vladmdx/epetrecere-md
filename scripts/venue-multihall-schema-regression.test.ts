@@ -15,6 +15,7 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "../src/lib/db";
@@ -232,5 +233,21 @@ test("new server-only tables have RLS and no anon/authenticated grants", async (
   for (const row of result) {
     assert.equal(row.relrowsecurity, true, `${row.relname} must have RLS enabled`);
     assert.equal(row.client_grants, 0, `${row.relname} must not grant anon/authenticated`);
+  }
+});
+
+test("composite hall FKs in schema.ts do not declare onDelete set null", () => {
+  const source = readFileSync("src/lib/db/schema.ts", "utf8");
+  for (const name of [
+    "venue_images_hall_venue_fk",
+    "reviews_hall_venue_fk",
+    "commissions_hall_venue_fk",
+    "booking_requests_hall_venue_fk",
+    "calendar_events_hall_venue_fk",
+  ]) {
+    const idx = source.indexOf(`name: "${name}"`);
+    assert.ok(idx > 0, name);
+    const slice = source.slice(idx, idx + 280);
+    assert.doesNotMatch(slice, /onDelete/, name);
   }
 });

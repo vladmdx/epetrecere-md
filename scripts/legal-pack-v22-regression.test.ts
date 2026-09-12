@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
   LEGAL_PACK_VERSION,
+  REQUIRED_DOCUMENT_VERSIONS_THIS_PACK,
   getLegalDocument,
   legalBlocks,
 } from "../src/lib/legal";
@@ -17,11 +18,15 @@ test("legal pack 2.2 separates pack and document versions", () => {
   assert.equal(LEGAL_PACK_VERSION, "2.2");
   assert.equal(getLegalDocument("acord-parteneri")?.version, "2.2");
   assert.equal(getLegalDocument("acord-locatii")?.version, "2.2");
-  assert.equal(getLegalDocument("termeni-generali")?.version, "2.0");
-  assert.equal(getLegalDocument("politica-confidentialitate")?.version, "1.2");
+  assert.equal(getLegalDocument("termeni-generali")?.version, "2.2");
+  assert.equal(getLegalDocument("politica-confidentialitate")?.version, "1.3");
   assert.equal(getLegalDocument("politica-cookie")?.version, "1.2");
   assert.equal(getLegalDocument("tarife")?.version, "2.2");
   assert.equal(getLegalDocument("index-legal")?.version, "2.2");
+  assert.equal(getLegalDocument("reguli-marketplace")?.version, "1.1");
+  for (const [slug, version] of Object.entries(REQUIRED_DOCUMENT_VERSIONS_THIS_PACK)) {
+    assert.equal(getLegalDocument(slug)?.version, version, slug);
+  }
 
   const source = readFileSync("src/content/legal/documents.json", "utf8");
   assert.doesNotMatch(source, /Legal Pack v(?:1\.0|2\.0|2\.1)/);
