@@ -85,7 +85,7 @@ export async function GET(
   ]);
 
   const filteredBookings = hallId && Number.isFinite(hallId)
-    ? bookings.filter((b) => b.hallId === hallId)
+    ? bookings.filter((b) => b.hallId === hallId || b.reservationScope === "venue" || b.hallId == null)
     : bookings;
   const filteredBlackouts = hallId && Number.isFinite(hallId)
     ? blackouts.filter((c) => c.hallId == null || c.hallId === hallId)
@@ -156,26 +156,50 @@ export async function GET(
   }
 
   for (const block of filteredBlocks) {
-    const dates = localDatesIntersecting({
-      startsAt: block.startsAt,
-      endsAt: block.endsAt,
-      timezone: "Europe/Chisinau",
-      eventDate: block.startsAt.toISOString().slice(0, 10),
-      startTime: null,
-      endTime: null,
-    });
-    for (const date of dates) {
-      const uid = `venue-block-${block.id}-${date}@epetrecere.md`;
-      const start = formatDate(date);
-      const endDate = new Date(date);
-      endDate.setUTCDate(endDate.getUTCDate() + 1);
-      const end = formatDate(endDate);
+    const uid = `venue-block-${block.id}@epetrecere.md`;
+    const fullDay = !block.startsAt || !block.endsAt
+      ? true
+      : localDatesIntersecting({
+          startsAt: block.startsAt,
+          endsAt: block.endsAt,
+          timezone: "Europe/Chisinau",
+          eventDate: block.startsAt.toISOString().slice(0, 10),
+          startTime: null,
+          endTime: null,
+        }).length > 0 &&
+        (block.endsAt.getTime() - block.startsAt.getTime()) >= 20 * 60 * 60 * 1000;
+    if (fullDay) {
+      const dates = localDatesIntersecting({
+        startsAt: block.startsAt,
+        endsAt: block.endsAt,
+        timezone: "Europe/Chisinau",
+        eventDate: block.startsAt.toISOString().slice(0, 10),
+        startTime: null,
+        endTime: null,
+      });
+      for (const date of dates) {
+        const start = formatDate(date);
+        const endDate = new Date(date);
+        endDate.setUTCDate(endDate.getUTCDate() + 1);
+        const end = formatDate(endDate);
+        lines.push(
+          "BEGIN:VEVENT",
+          `UID:${uid}-${date}`,
+          `DTSTAMP:${formatDateTime(block.createdAt ?? now)}`,
+          `DTSTART;VALUE=DATE:${start}`,
+          `DTEND;VALUE=DATE:${end}`,
+          `SUMMARY:${escapeIcs("⛔ Indisponibil")}`,
+          "TRANSP:OPAQUE",
+          "END:VEVENT",
+        );
+      }
+    } else {
       lines.push(
         "BEGIN:VEVENT",
         `UID:${uid}`,
         `DTSTAMP:${formatDateTime(block.createdAt ?? now)}`,
-        `DTSTART;VALUE=DATE:${start}`,
-        `DTEND;VALUE=DATE:${end}`,
+        `DTSTART:${formatDateTime(block.startsAt)}`,
+        `DTEND:${formatDateTime(block.endsAt)}`,
         `SUMMARY:${escapeIcs("⛔ Indisponibil")}`,
         "TRANSP:OPAQUE",
         "END:VEVENT",

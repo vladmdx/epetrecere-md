@@ -233,8 +233,9 @@ export async function setCommissionStatus(
 export async function cancelCommissionForBooking(
   bookingRequestId: number,
   note: string,
+  executor: typeof db = db,
 ): Promise<void> {
-  await db
+  await executor
     .update(commissions)
     .set({
       status: "cancelled",

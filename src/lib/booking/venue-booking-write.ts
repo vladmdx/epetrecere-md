@@ -75,10 +75,13 @@ export function publicVenueReservationScope(input: {
       error: "Public bookings cannot reserve the whole venue.",
     };
   }
-  if (isMultiHallEnabled() && input.hallId == null) {
+  if (!isMultiHallEnabled()) {
+    return { ok: true, hallId: null, reservationScope: "hall" };
+  }
+  if (input.hallId == null) {
     return { ok: false, code: "HALL_REQUIRED", status: 409, error: "HALL_REQUIRED" };
   }
-  return { ok: true, hallId: input.hallId ?? null, reservationScope: "hall" };
+  return { ok: true, hallId: input.hallId, reservationScope: "hall" };
 }
 
 export async function commercialSnapshotFor(opts: {

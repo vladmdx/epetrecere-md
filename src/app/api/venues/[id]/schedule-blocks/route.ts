@@ -24,6 +24,8 @@ export async function GET(req: Request, ctx: Ctx) {
 const createSchema = z.object({
   hallId: z.number().int().positive().nullable().optional(),
   eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  dates: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).max(62).optional(),
+  status: z.enum(["available", "blocked", "tentative"]).optional(),
   startTime: z.string().optional().nullable(),
   endTime: z.string().optional().nullable(),
   startsAt: z.string().datetime().optional(),
@@ -42,6 +44,32 @@ export async function POST(req: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError("Validation failed", 400, { details: parsed.error.issues });
+  if (parsed.data.status === "tentative") {
+    return jsonError("TENTATIVE_NOT_SUPPORTED", 400, { code: "TENTATIVE_NOT_SUPPORTED" });
+  }
+  const dates = parsed.data.dates?.length
+    ? parsed.data.dates
+    : parsed.data.eventDate
+      ? [parsed.data.eventDate]
+      : [];
+  if (dates.length > 1 || parsed.data.status) {
+    const { applyVenueScheduleBlocksBulk } = await import("@/lib/booking/venue-schedule-write");
+    const result = await applyVenueScheduleBlocksBulk({
+      venueId,
+      hallId: parsed.data.hallId,
+      wholeVenue: parsed.data.wholeVenue,
+      dates,
+      action: parsed.data.status === "available" ? "clear" : "block",
+      timezone: parsed.data.timezone,
+      kind: parsed.data.kind,
+      reason: parsed.data.reason,
+      createdBy: access.user.id,
+    });
+    if (!result.ok) {
+      return jsonError(result.error, result.status, { code: result.code });
+    }
+    return NextResponse.json({ ok: true, written: result.written });
+  }
   const created = await createVenueScheduleBlock({
     venueId,
     hallId: parsed.data.hallId,

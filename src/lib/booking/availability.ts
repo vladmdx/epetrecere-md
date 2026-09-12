@@ -107,8 +107,10 @@ export async function checkArtistAvailability(opts: {
   startTime?: string | null;
   endTime?: string | null;
   excludeBookingId?: number;
+  executor?: typeof db;
 }): Promise<AvailabilityResult> {
   const { artistId, eventDate, excludeBookingId } = opts;
+  const q = opts.executor ?? db;
   const targetStart = toMinutes(opts.startTime);
   const targetEnd = toEndMinutes(opts.endTime, targetStart);
 
@@ -116,7 +118,7 @@ export async function checkArtistAvailability(opts: {
   // ADDED to the END of every existing booking when checking for conflicts,
   // so a booking ending at 16:00 with a 15-min buffer is treated as taking
   // the slot until 16:15 from the next-client's perspective.
-  const [artistRow] = await db
+  const [artistRow] = await q
     .select({ bufferMinutes: artists.bufferMinutes })
     .from(artists)
     .where(eq(artists.id, artistId))
@@ -129,7 +131,7 @@ export async function checkArtistAvailability(opts: {
   // "no working-hour restriction" (existing artists keep working).
   if (targetStart !== null && targetEnd !== null) {
     const dow = dayOfWeekMonStart(eventDate);
-    const [scheduleRow] = await db
+    const [scheduleRow] = await q
       .select({
         startTime: workSchedule.startTime,
         endTime: workSchedule.endTime,
@@ -174,7 +176,7 @@ export async function checkArtistAvailability(opts: {
   }
 
   // 1. Check if the day is blocked on the calendar (vacation etc.)
-  const [blockedEntry] = await db
+  const [blockedEntry] = await q
     .select({
       status: calendarEvents.status,
       startTime: calendarEvents.startTime,
@@ -201,7 +203,7 @@ export async function checkArtistAvailability(opts: {
   }
 
   // 2. Find all active bookings for this artist on this date
-  const bookings = await db
+  const bookings = await q
     .select({
       id: bookingRequests.id,
       eventDate: bookingRequests.eventDate,

@@ -308,38 +308,25 @@ export function VenueCalendarClient({
   }
 
   async function saveScheduleBlocks(dates: string[], status: string, noteText: string) {
-    const wholeVenue = selectedHallId == null;
-    if (status === "available") {
-      for (const date of dates) {
-        const qs = new URLSearchParams({ eventDate: date });
-        if (wholeVenue) qs.set("wholeVenue", "1");
-        else qs.set("hallId", String(selectedHallId));
-        const res = await fetch(`/api/venues/${venueId}/schedule-blocks?${qs.toString()}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          return err;
-        }
-      }
-      return null;
+    if (status === "tentative") {
+      return { error: "TENTATIVE_NOT_SUPPORTED", message: "Schedule blocks cannot be tentative." };
     }
-    for (const date of dates) {
-      const res = await fetch(`/api/venues/${venueId}/schedule-blocks`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventDate: date,
-          timezone: "Europe/Chisinau",
-          kind: "manual",
-          reason: noteText || null,
-          ...(wholeVenue ? { wholeVenue: true } : { hallId: selectedHallId, wholeVenue: false }),
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        return err;
-      }
+    const wholeVenue = selectedHallId == null;
+    const res = await fetch(`/api/venues/${venueId}/schedule-blocks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dates,
+        status: status === "available" ? "available" : "blocked",
+        timezone: "Europe/Chisinau",
+        kind: "manual",
+        reason: noteText || null,
+        ...(wholeVenue ? { wholeVenue: true } : { hallId: selectedHallId, wholeVenue: false }),
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return err;
     }
     return null;
   }
@@ -392,6 +379,18 @@ export function VenueCalendarClient({
     setSaving(true);
     try {
       const all = enumerateRange(rangeDialog.start, rangeDialog.end);
+      if (writeTarget === "schedule-blocks") {
+        const err = await saveScheduleBlocks(all, rangeStatus, rangeNote.trim());
+        if (err) {
+          toast.error(err.message || err.error || t("vendorSalaCalendar.saveFailed"));
+          return;
+        }
+        toast.success(t("vendorSalaCalendar.daysUpdated", { count: all.length }));
+        setRangeDialog(null);
+        setRangeNote("");
+        router.refresh();
+        return;
+      }
       // Filter out dates that already have accepted/confirmed bookings (never overwrite real bookings)
       const dates = all.filter((d) => {
         const books = bookingsByDate.get(d);
@@ -402,23 +401,6 @@ export function VenueCalendarClient({
       });
       if (dates.length === 0) {
         toast.error(t("vendorSalaCalendar.rangeAllBooked"));
-        return;
-      }
-      if (writeTarget === "schedule-blocks") {
-        const err = await saveScheduleBlocks(dates, rangeStatus, rangeNote.trim());
-        if (err) {
-          toast.error(err.message || err.error || t("vendorSalaCalendar.saveFailed"));
-          return;
-        }
-        const skipped = all.length - dates.length;
-        toast.success(
-          skipped > 0
-            ? t("vendorSalaCalendar.daysUpdatedSkipped", { count: dates.length, skipped })
-            : t("vendorSalaCalendar.daysUpdated", { count: dates.length }),
-        );
-        setRangeDialog(null);
-        setRangeNote("");
-        router.refresh();
         return;
       }
       const res = await fetch("/api/calendar", {
@@ -893,7 +875,10 @@ export function VenueCalendarClient({
               <div>
                 <Label className="text-xs">{t("vendorSalaCalendar.statusLabel")}</Label>
                 <div className="mt-1 grid grid-cols-3 gap-2">
-                  {(["available", "tentative", "blocked"] as const).map((s) => {
+                  {(writeTarget === "schedule-blocks"
+                    ? (["available", "blocked"] as const)
+                    : (["available", "tentative", "blocked"] as const)
+                  ).map((s) => {
                     const cfg = {
                       available: {
                         labelKey: "common.available",
@@ -1003,7 +988,10 @@ export function VenueCalendarClient({
             <div>
               <Label className="text-xs">{t("vendorSalaCalendar.rangeStatusLabel")}</Label>
               <div className="mt-1 grid grid-cols-3 gap-2">
-                {(["available", "tentative", "blocked"] as const).map((s) => {
+                {(writeTarget === "schedule-blocks"
+                  ? (["available", "blocked"] as const)
+                  : (["available", "tentative", "blocked"] as const)
+                ).map((s) => {
                   const cfg = {
                     available: {
                       labelKey: "common.available",

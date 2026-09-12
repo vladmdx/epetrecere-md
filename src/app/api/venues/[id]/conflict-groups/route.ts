@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { venueHallConflictGroupMembers, venueHallConflictGroups, venueHalls } from "@/lib/db/schema";
+import { venueHallConflictGroupMembers, venueHallConflictGroups } from "@/lib/db/schema";
 import { requireVenueCapability } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
 import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
@@ -41,25 +41,15 @@ export async function POST(req: Request, ctx: Ctx) {
   if (blocked) return blocked;
   const parsed = saveSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError("Validation failed", 400, { details: parsed.error.issues });
-  const halls = await db.select({ id: venueHalls.id, venueId: venueHalls.venueId }).from(venueHalls);
-  for (const hallId of parsed.data.hallIds) {
-    const hall = halls.find((row) => row.id === hallId);
-    if (!hall || hall.venueId !== venueId) return jsonError("Halls must belong to this venue", 400, { code: "SAME_VENUE_REQUIRED" });
-  }
-  let groupId = parsed.data.id;
-  if (groupId) {
-    const [existing] = await db.select().from(venueHallConflictGroups).where(eq(venueHallConflictGroups.id, groupId)).limit(1);
-    if (!existing || existing.venueId !== venueId) return jsonError("Not found", 404);
-    await db.update(venueHallConflictGroups).set({ name: parsed.data.name }).where(eq(venueHallConflictGroups.id, groupId));
-    await db.delete(venueHallConflictGroupMembers).where(eq(venueHallConflictGroupMembers.groupId, groupId));
-  } else {
-    const [created] = await db.insert(venueHallConflictGroups).values({ venueId, name: parsed.data.name }).returning();
-    groupId = created.id;
-  }
-  await db.insert(venueHallConflictGroupMembers).values(
-    parsed.data.hallIds.map((hallId) => ({ groupId: groupId!, hallId, venueId })),
-  );
-  return NextResponse.json({ ok: true, id: groupId });
+  const { saveVenueConflictGroup } = await import("@/lib/booking/conflict-groups");
+  const saved = await saveVenueConflictGroup({
+    venueId,
+    id: parsed.data.id,
+    name: parsed.data.name,
+    hallIds: parsed.data.hallIds,
+  });
+  if (!saved.ok) return jsonError(saved.error, saved.status, { code: saved.code });
+  return NextResponse.json({ ok: true, id: saved.id });
 }
 
 export async function DELETE(req: Request, ctx: Ctx) {

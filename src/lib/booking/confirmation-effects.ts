@@ -37,12 +37,15 @@ export async function notifyConfirmationStep(b: Booking, title: string) {
       message: `${place ? `${place} · ` : ""}Rezervarea #${b.id} · ${b.eventDate}. Verifică detaliile în cont.`,
       actionUrl, email: u?.email, emailSubject: title,
       emailHtml: `<p>${title}</p><p>${place ? `${place} · ` : ""}Rezervarea #${b.id} · ${b.eventDate}</p><p><a href="https://epetrecere.md${actionUrl}">Vezi rezervarea în cont</a></p>`,
+      dedupeKey: `booking:${b.id}:${userId}:${title}`,
     });
   }
 }
 
 export function scheduleConfirmationNotifications(b: Booking) {
   after(async () => {
+    const { claimConfirmationNotify } = await import("./booking-transitions");
+    if (!(await claimConfirmationNotify(b.id))) return;
     await notifyConfirmationStep(b, "Rezervare confirmată de ambele părți");
     if (b.clientUserId) {
       const { triggerReferral, isFirstBookingForUser } = await import("@/lib/referrals/trigger");

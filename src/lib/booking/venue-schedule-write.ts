@@ -110,6 +110,106 @@ export async function createVenueScheduleBlock(input: {
   }
 }
 
+export async function applyVenueScheduleBlocksBulk(input: {
+  venueId: number;
+  hallId?: number | null;
+  wholeVenue?: boolean;
+  dates: string[];
+  action: "block" | "clear";
+  timezone?: string;
+  kind?: BlockKind;
+  reason?: string | null;
+  createdBy: string;
+}): Promise<
+  | { ok: true; written: number }
+  | { ok: false; status: number; error: string; code: string }
+> {
+  const dates = [...new Set(input.dates)].sort();
+  if (!dates.length) return { ok: false, status: 400, error: "dates required", code: "VALIDATION" };
+  if (input.action !== "block" && input.action !== "clear") {
+    return { ok: false, status: 400, error: "invalid_action", code: "TENTATIVE_NOT_SUPPORTED" };
+  }
+  if (input.wholeVenue !== true && input.hallId == null) {
+    return {
+      ok: false,
+      status: 400,
+      error: "HALL_OR_WHOLE_VENUE_REQUIRED",
+      code: "HALL_OR_WHOLE_VENUE_REQUIRED",
+    };
+  }
+  try {
+    const written = await db.transaction(async (tx) => {
+      const executor = tx as unknown as typeof db;
+      const wholeVenue = input.wholeVenue === true;
+      const hallId = wholeVenue ? null : input.hallId ?? null;
+      const firstDate = dates[0]!;
+      const firstInterval = canonicalVenueInterval({ eventDate: firstDate, timezone: input.timezone });
+      const availabilityInput = {
+        venueId: input.venueId,
+        hallId: wholeVenue ? undefined : hallId ?? undefined,
+        eventDate: firstInterval.eventDate,
+        timezone: input.timezone,
+        reservationScope: wholeVenue ? ("venue" as const) : ("hall" as const),
+        mode: "owner" as const,
+        ignoreWorkingHours: true,
+        executor,
+      };
+      const lockProbe = await evaluateVenueAvailability({ ...availabilityInput, eventDate: dates[0]! });
+      await acquireAvailabilityLocks(tx, {
+        venueId: input.venueId,
+        hallIds: wholeVenue ? [] : hallId ? [hallId] : [],
+        localDates: dates,
+        conflictGroupIds: lockProbe.lockKeys?.conflictGroupIds ?? [],
+      });
+      if (input.action === "block") {
+        for (const date of dates) {
+          const recheck = await evaluateVenueAvailability({ ...availabilityInput, eventDate: date });
+          if (!recheck.available) throw new VenueAvailabilityError(recheck);
+        }
+        let count = 0;
+        for (const date of dates) {
+          const interval = canonicalVenueInterval({ eventDate: date, timezone: input.timezone });
+          await tx.insert(venueScheduleBlocks).values({
+            venueId: input.venueId,
+            hallId,
+            startsAt: interval.startsAt,
+            endsAt: interval.endsAt,
+            kind: input.kind ?? "manual",
+            reason: input.reason ?? null,
+            source: "manual",
+            createdBy: input.createdBy,
+          });
+          count += 1;
+        }
+        return count;
+      }
+      let deleted = 0;
+      const rows = await tx.select().from(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, input.venueId));
+      const ids = rows
+        .filter((block) => {
+          const matchHall = wholeVenue ? block.hallId == null : block.hallId === hallId;
+          if (!matchHall) return false;
+          return dates.some((date) => {
+            const interval = canonicalVenueInterval({ eventDate: date, timezone: input.timezone });
+            return intervalsOverlapHalfOpen(interval.startsAt, interval.endsAt, block.startsAt, block.endsAt);
+          });
+        })
+        .map((block) => block.id);
+      if (ids.length) {
+        await tx.delete(venueScheduleBlocks).where(inArray(venueScheduleBlocks.id, ids));
+        deleted = ids.length;
+      }
+      return deleted;
+    });
+    return { ok: true, written };
+  } catch (error) {
+    if (error instanceof VenueAvailabilityError) {
+      return { ok: false, status: 409, error: "AFFECTED_BOOKINGS", code: "AFFECTED_BOOKINGS" };
+    }
+    throw error;
+  }
+}
+
 export async function deleteVenueScheduleBlocks(input: {
   venueId: number;
   id?: number;

@@ -29,6 +29,9 @@ export async function projectBookingOntoCalendar(executor: Executor, b: Booking)
 
 /** Financial + calendar effects that must commit with confirmation. */
 export async function persistConfirmationEffects(executor: Executor, b: Booking): Promise<Booking> {
+  if (b.status !== "confirmed_by_client" && b.status !== "completed") {
+    return b;
+  }
   await ensureCommissionForBooking(b.id, executor);
   let row = b;
   if (b.venueId && !b.commercialSnapshot) {
