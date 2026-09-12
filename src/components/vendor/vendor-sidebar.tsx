@@ -58,6 +58,18 @@ const venueNav = [
   { href: "/dashboard/setari", icon: Settings, labelKey: "dashboard.settings" },
 ];
 
+const venueNavLegacy = [
+  { href: "/dashboard/sala", icon: Building2, labelKey: "dashboard.venueProfile" },
+  { href: "/dashboard", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
+  { href: "/dashboard/calendar", icon: CalendarDays, labelKey: "dashboard.calendar" },
+  { href: "/dashboard/rezervari", icon: BookOpen, labelKey: "dashboard.bookings" },
+  { href: "/dashboard/venue-profil", icon: Building2, labelKey: "dashboard.venueProfile" },
+  { href: "/dashboard/mesaje", icon: MessageSquare, labelKey: "dashboard.messages" },
+  { href: "/dashboard/analytics", icon: BarChart3, labelKey: "dashboard.analytics" },
+  { href: "/dashboard/recenzii", icon: Star, labelKey: "dashboard.reviews" },
+  { href: "/dashboard/setari", icon: Settings, labelKey: "dashboard.settings" },
+];
+
 function NavList({
   items,
   pathname,
@@ -101,6 +113,7 @@ export function VendorSidebar() {
   const { locale, t } = useLocale();
   const pathname = usePathname().replace(/^\/(ro|ru|en)(?=\/|$)/, "") || "/";
   const [isVenue, setIsVenue] = useState(false);
+  const [multiHall, setMultiHall] = useState(false);
   const [profileHref, setProfileHref] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -121,6 +134,7 @@ export function VendorSidebar() {
             if (cancelled) return;
             const partner = Boolean(venueData.venue) || venueData.code === "VENUE_REQUIRED" || (venueData.venueIds?.length ?? 0) > 0;
             setIsVenue(partner);
+            setMultiHall(Boolean(venueData.multiHall));
             setProfileHref(publishedVendorProfileHref(venueData.venue, "venue"));
           });
       })
@@ -130,7 +144,7 @@ export function VendorSidebar() {
     };
   }, [pathname]);
 
-  const navItems = isVenue ? venueNav : artistNav;
+  const navItems = isVenue ? (multiHall ? venueNav : venueNavLegacy) : artistNav;
   const roleLabel = isVenue
     ? locale === "ru" ? "Зал" : locale === "en" ? "Venue" : "Sală"
     : locale === "ru" ? "Партнёр" : locale === "en" ? "Partner" : "Partener";

@@ -6,12 +6,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venues, venueImages } from "@/lib/db/schema";
 import { getCurrentAppUser, resolveSelectedVenue } from "@/lib/venue-access";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 export async function GET(req: Request) {
   const appUser = await getCurrentAppUser();
   if (!appUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const multiHall = isMultiHallEnabled();
 
   // Explicit selection — never orderBy + limit(1) "first venue". An optional
   // ?venueId= lets a multi-venue account address a specific location; when
@@ -29,12 +31,13 @@ export async function GET(req: Request) {
         code: "VENUE_REQUIRED",
         reason: "AMBIGUOUS",
         venueIds: selection.venueIds,
+        multiHall,
       });
     }
     if (selection.reason === "forbidden") {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: "Forbidden", multiHall }, { status: 403 });
     }
-    return NextResponse.json({ venue: null }); // reason: "none"
+    return NextResponse.json({ venue: null, multiHall }); // reason: "none"
   }
 
   const [venue] = await db
@@ -44,7 +47,7 @@ export async function GET(req: Request) {
     .limit(1);
 
   if (!venue) {
-    return NextResponse.json({ venue: null });
+    return NextResponse.json({ venue: null, multiHall });
   }
 
   const images = await db
@@ -52,5 +55,5 @@ export async function GET(req: Request) {
     .from(venueImages)
     .where(eq(venueImages.venueId, venue.id));
 
-  return NextResponse.json({ venue: { ...venue, images } });
+  return NextResponse.json({ venue: { ...venue, images }, multiHall });
 }

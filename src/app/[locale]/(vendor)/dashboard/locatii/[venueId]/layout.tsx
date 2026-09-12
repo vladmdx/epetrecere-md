@@ -1,7 +1,9 @@
 import { VenueSidebar } from "@/components/vendor/venue-sidebar";
 import { AdminTopbar } from "@/components/admin/admin-topbar";
-import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { redirect } from "next/navigation";
+import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 import { requireLocatieVenue, venueDashboardBase } from "@/lib/venues/dashboard-scope";
+import { salaUsesLegacyLayout } from "@/lib/partner/multi-hall-gate";
 
 export default async function LocatieDashboardLayout({
   children,
@@ -12,6 +14,9 @@ export default async function LocatieDashboardLayout({
 }) {
   const { locale: rawLocale, venueId } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
+  if (salaUsesLegacyLayout()) {
+    redirect(localizePath("/dashboard/sala", locale));
+  }
   const venue = await requireLocatieVenue(venueId, locale);
 
   return (

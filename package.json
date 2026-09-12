@@ -33,6 +33,8 @@
     "test:multihall:migration0029": "npx tsx scripts/venue-multihall-migration-0029-verify.ts",
     "test:multihall:phase3": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-phase3-regression.test.ts",
     "test:multihall:phase4": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-phase4-regression.test.ts",
+    "test:multihall:flag": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-flag-regression.test.ts",
+    "test:multihall:approval": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-approval-regression.test.ts",
     "mobile": "npm --prefix packages/mobile run start",
     "mobile:ios": "npm --prefix packages/mobile run ios",
     "mobile:android": "npm --prefix packages/mobile run android",

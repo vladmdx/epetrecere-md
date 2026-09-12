@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues } from "@/lib/db/schema";
 import { getCurrentAppUser, listAccessibleVenueIds, resolveSelectedVenue } from "@/lib/venue-access";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 import { DEFAULT_LOCALE, localizePath, type AppLocale } from "@/lib/i18n/routing";
 import { readLastVenueCookie, writeLastVenueCookie } from "./last-selected";
 
@@ -57,6 +58,9 @@ export async function redirectLegacySalaPath(opts: {
   restPath: string;
   requestedVenueId?: number | null;
 }): Promise<never> {
+  if (!isMultiHallEnabled()) {
+    throw new Error("redirectLegacySalaPath is a MULTI_HALL-only compatibility path");
+  }
   const locale = opts.locale || DEFAULT_LOCALE;
   const user = await getCurrentAppUser();
   if (!user) {

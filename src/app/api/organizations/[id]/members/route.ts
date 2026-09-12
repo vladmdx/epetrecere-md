@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { partnerOrganizationMembers, users } from "@/lib/db/schema";
 import { isLastActiveOwner, requireOrganizationCapability } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
+import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -36,6 +37,8 @@ export async function POST(req: Request, ctx: Ctx) {
   const organizationId = Number((await ctx.params).id);
   const access = await requireOrganizationCapability(organizationId, "manage_members");
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError("Validation failed", 400, { details: parsed.error.issues });
   const [existing] = await db
@@ -73,6 +76,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
   const organizationId = Number((await ctx.params).id);
   const access = await requireOrganizationCapability(organizationId, "manage_members");
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   const parsed = patchSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError("Validation failed", 400);
   const [member] = await db
@@ -97,6 +102,8 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const organizationId = Number((await ctx.params).id);
   const access = await requireOrganizationCapability(organizationId, "manage_members");
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   const { memberId } = z.object({ memberId: z.number().int().positive() }).parse(await req.json().catch(() => ({})));
   const [member] = await db.select().from(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.id, memberId)).limit(1);
   if (!member || member.organizationId !== organizationId) return jsonError("Not found", 404);

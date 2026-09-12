@@ -12,6 +12,7 @@ import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 import Link from "@/components/shared/locale-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { writeLastVenueCookie } from "@/lib/venues/last-selected";
+import { salaUsesLegacyLayout } from "@/lib/partner/multi-hall-gate";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,9 @@ export default async function LocatiiPickerPage({
 }) {
   const { locale: raw } = await params;
   const locale = isLocale(raw) ? raw : DEFAULT_LOCALE;
+  if (salaUsesLegacyLayout()) {
+    redirect(localizePath("/dashboard/sala", locale));
+  }
   const { userId: clerkId } = await auth();
   if (!clerkId) {
     redirect(

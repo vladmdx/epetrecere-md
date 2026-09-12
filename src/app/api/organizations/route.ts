@@ -6,6 +6,7 @@ import {
 import { jsonError } from "@/lib/http/json";
 import { ensureDraftOrganization } from "@/lib/partner/onboarding";
 import { organizationProfileSchema } from "@/lib/partner/validation";
+import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 import { db } from "@/lib/db";
 import { partnerOrganizations } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
@@ -35,6 +36,8 @@ const createSchema = organizationProfileSchema.pick({
 export async function POST(req: Request) {
   const user = await getCurrentAppUser();
   if (!user) return jsonError("Unauthorized", 401);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   const parsed = createSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError("Validation failed", 400, { details: parsed.error.issues });
   const organization = await ensureDraftOrganization(user, parsed.data);

@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { venueHallConflictGroupMembers, venueHallConflictGroups, venueHalls } from "@/lib/db/schema";
 import { requireVenueCapability } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
+import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -36,6 +37,8 @@ export async function POST(req: Request, ctx: Ctx) {
   const venueId = Number((await ctx.params).id);
   const access = await requireVenueCapability(venueId, "manage_calendar");
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   const parsed = saveSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return jsonError("Validation failed", 400, { details: parsed.error.issues });
   const halls = await db.select({ id: venueHalls.id, venueId: venueHalls.venueId }).from(venueHalls);
@@ -63,6 +66,8 @@ export async function DELETE(req: Request, ctx: Ctx) {
   const venueId = Number((await ctx.params).id);
   const access = await requireVenueCapability(venueId, "manage_calendar");
   if (!access.ok) return jsonAccess(access);
+  const blocked = jsonIfMultiHallDisabled();
+  if (blocked) return blocked;
   const id = Number(new URL(req.url).searchParams.get("id"));
   if (!id) return jsonError("id required", 400);
   const [existing] = await db.select().from(venueHallConflictGroups).where(eq(venueHallConflictGroups.id, id)).limit(1);
