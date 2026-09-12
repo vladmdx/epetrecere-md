@@ -21,6 +21,7 @@ import { db } from "../src/lib/db";
 import {
   users, venues, venueHalls, bookingRequests, commissions,
   venueScheduleBlocks, partnerOrganizations, partnerOrganizationMembers,
+  calendarEvents,
 } from "../src/lib/db/schema";
 
 // drizzle wraps the driver error as "Failed query: …"; the real Postgres
@@ -49,6 +50,7 @@ before(async () => {
 });
 
 after(async () => {
+  await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.venue));
   await db.delete(commissions).where(eq(commissions.venueId, ids.venue));
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
   await db.delete(bookingRequests).where(eq(bookingRequests.venueId, ids.venue));
@@ -119,6 +121,93 @@ test("[#3] deleting a hall that still has a schedule block is RESTRICTed (archiv
   // cleanup this sub-fixture
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.hallId, h3.id));
   await db.delete(venueHalls).where(eq(venueHalls.id, h3.id));
+});
+
+test("calendar_events rejects a hall that does not exist", async () => {
+  await assert.rejects(
+    db.insert(calendarEvents).values({
+      entityType: "venue",
+      entityId: ids.venue,
+      date: "2027-11-01",
+      status: "blocked",
+      source: "manual",
+      hallId: 2147483646,
+    }),
+    rejectsWith(/calendar_events_hall_venue_fk|foreign key/i),
+  );
+});
+
+test("calendar_events rejects a hall from another venue", async () => {
+  const [other] = await db.insert(venues).values({
+    nameRo: MARK + "other",
+    slug: MARK + "other-" + Date.now(),
+    organizationId: ids.org,
+    userId: null,
+  }).returning({ id: venues.id });
+  const [otherHall] = await db.insert(venueHalls).values({
+    venueId: other.id,
+    slug: "x",
+    nameRo: "X",
+  }).returning({ id: venueHalls.id });
+  try {
+    await assert.rejects(
+      db.insert(calendarEvents).values({
+        entityType: "venue",
+        entityId: ids.venue,
+        date: "2027-11-02",
+        status: "blocked",
+        source: "manual",
+        hallId: otherHall.id,
+      }),
+      rejectsWith(/calendar_events_hall_venue_fk|foreign key/i),
+    );
+  } finally {
+    await db.delete(venueHalls).where(eq(venueHalls.id, otherHall.id));
+    await db.delete(venues).where(eq(venues.id, other.id));
+  }
+});
+
+test("calendar_events hall_id requires entity_type=venue", async () => {
+  await assert.rejects(
+    db.insert(calendarEvents).values({
+      entityType: "artist",
+      entityId: ids.venue,
+      date: "2027-11-03",
+      status: "blocked",
+      source: "manual",
+      hallId: ids.hall,
+    }),
+    rejectsWith(/hall_requires_venue_entity|violates check/i),
+  );
+});
+
+test("deleting a hall SET NULLs calendar_events.hall_id and keeps the row", async () => {
+  const [temp] = await db.insert(venueHalls).values({
+    venueId: ids.venue,
+    slug: "cal-del",
+    nameRo: "CalDel",
+  }).returning({ id: venueHalls.id });
+  const [event] = await db.insert(calendarEvents).values({
+    entityType: "venue",
+    entityId: ids.venue,
+    date: "2027-11-04",
+    status: "blocked",
+    source: "manual",
+    hallId: temp.id,
+    note: MARK + "keep",
+  }).returning({ id: calendarEvents.id });
+  await db.delete(venueHalls).where(eq(venueHalls.id, temp.id));
+  const [kept] = await db
+    .select({
+      hallId: calendarEvents.hallId,
+      entityId: calendarEvents.entityId,
+      note: calendarEvents.note,
+    })
+    .from(calendarEvents)
+    .where(eq(calendarEvents.id, event.id));
+  assert.equal(kept.hallId, null, "hall_id set null");
+  assert.equal(kept.entityId, ids.venue, "entity_id preserved");
+  assert.equal(kept.note, MARK + "keep", "calendar row kept");
 });
 
 test("new server-only tables have RLS and no anon/authenticated grants", async () => {

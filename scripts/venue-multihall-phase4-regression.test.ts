@@ -41,9 +41,11 @@ const ids = {
   owner: "",
   org: 0,
   venue: 0,
+  extraVenue: 0,
   grand: 0,
   garden: 0,
   vip: 0,
+  extraHall: 0,
 };
 
 function flagOn() {
@@ -144,16 +146,45 @@ before(async () => {
   ids.grand = grand.id;
   ids.garden = garden.id;
   ids.vip = vip.id;
+  const [extraVenue] = await db
+    .insert(venues)
+    .values({
+      nameRo: "Extra " + MARK,
+      slug: MARK + "extra",
+      organizationId: ids.org,
+      userId: null,
+      isActive: true,
+      timezone: "Europe/Chisinau",
+      bufferMinutes: 0,
+    })
+    .returning({ id: venues.id });
+  ids.extraVenue = extraVenue.id;
+  const [extraHall] = await db
+    .insert(venueHalls)
+    .values({
+      venueId: ids.extraVenue,
+      slug: "other",
+      nameRo: "Other",
+      capacityMin: 10,
+      capacityMax: 40,
+      status: "active",
+      bufferMinutes: 0,
+    })
+    .returning({ id: venueHalls.id });
+  ids.extraHall = extraHall.id;
 });
 
 after(async () => {
   await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.venue));
+  await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.extraVenue));
   await db.delete(bookingRequests).where(eq(bookingRequests.venueId, ids.venue));
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
   await db.delete(venueHallConflictGroupMembers).where(eq(venueHallConflictGroupMembers.venueId, ids.venue));
   await db.delete(venueHallConflictGroups).where(eq(venueHallConflictGroups.venueId, ids.venue));
   await db.delete(venueHalls).where(eq(venueHalls.venueId, ids.venue));
+  await db.delete(venueHalls).where(eq(venueHalls.venueId, ids.extraVenue));
   await db.delete(venues).where(eq(venues.id, ids.venue));
+  await db.delete(venues).where(eq(venues.id, ids.extraVenue));
   await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, ids.org));
   await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, ids.org));
   await db.delete(users).where(eq(users.id, ids.owner));
@@ -470,6 +501,54 @@ test("v1 without hallId: one hall maps, two+ return HALL_REQUIRED", async () => 
   assert.equal(one.available, true);
   assert.equal(one.hallId, ids.grand);
   await db.update(venueHalls).set({ status: "active" }).where(inArray(venueHalls.id, [ids.garden, ids.vip]));
+});
+
+test("nonexistent hall is HALL_NOT_IN_VENUE", async () => {
+  const result = await availability({ hallId: 2_147_483_646 });
+  assert.equal(result.available, false);
+  assert.equal(result.code, "HALL_NOT_IN_VENUE");
+});
+
+test("hall from another venue is HALL_NOT_IN_VENUE", async () => {
+  const result = await availability({ hallId: ids.extraHall });
+  assert.equal(result.available, false);
+  assert.equal(result.code, "HALL_NOT_IN_VENUE");
+});
+
+test("deleting a hall SET NULLs calendar_events.hall_id and keeps the event", async () => {
+  const [temp] = await db
+    .insert(venueHalls)
+    .values({
+      venueId: ids.venue,
+      slug: "temp-del",
+      nameRo: "Temp",
+      status: "active",
+    })
+    .returning({ id: venueHalls.id });
+  const [event] = await db
+    .insert(calendarEvents)
+    .values({
+      entityType: "venue",
+      entityId: ids.venue,
+      date: DATE,
+      status: "blocked",
+      source: "manual",
+      hallId: temp.id,
+      note: MARK + "keep",
+    })
+    .returning({ id: calendarEvents.id });
+  await db.delete(venueHalls).where(eq(venueHalls.id, temp.id));
+  const [kept] = await db
+    .select({
+      hallId: calendarEvents.hallId,
+      entityId: calendarEvents.entityId,
+      note: calendarEvents.note,
+    })
+    .from(calendarEvents)
+    .where(eq(calendarEvents.id, event.id));
+  assert.equal(kept.hallId, null);
+  assert.equal(kept.entityId, ids.venue);
+  assert.equal(kept.note, MARK + "keep");
 });
 
 test("commercial snapshot includes venue + hall names", async () => {
