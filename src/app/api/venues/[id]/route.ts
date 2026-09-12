@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { venues, venueImages, reviews, users, redirects } from "@/lib/db/schema";
+import { venues, venueImages, reviews, redirects } from "@/lib/db/schema";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
+import { requireVenueCapability, getCurrentAppUser, authorizeVenueAccess } from "@/lib/venue-access";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
 import { venueOwnerFields } from "@/lib/validation/vendor-profile";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
@@ -29,9 +30,11 @@ export async function GET(
   }
   const venueId = venue.id;
   const { userId } = await auth();
-  const [viewer] = userId ? await db.select({ id: users.id, role: users.role })
-    .from(users).where(eq(users.clerkId, userId)).limit(1) : [];
-  const privileged = viewer && (viewer.id === venue.userId || viewer.role === "admin" || viewer.role === "super_admin");
+  // ADR 0028 / CP3 #2 — privileged view resolved through the membership chain,
+  // not venues.user_id.
+  const appUser = await getCurrentAppUser();
+  const access = appUser ? await authorizeVenueAccess(appUser, venue.id) : null;
+  const privileged = Boolean(access?.ok);
   if (!venue.isActive && !privileged) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -48,8 +51,8 @@ export async function GET(
   });
 }
 
-// M12 — Owner-gated venue profile update. The signed-in user must own the
-// venue row (venues.userId === users.id for the current Clerk session).
+// M12 / ADR 0028 — profile updates require the centralized manage_profile
+// capability (organization owner/admin, legacy owner, or global admin).
 const updateSchema = z.object({
   nameRo: z.string().min(2).optional(),
   nameRu: z.string().optional(),
@@ -130,20 +133,12 @@ export async function PUT(
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // A forged venue id from another organization is rejected here.
+  const access = await requireVenueCapability(venueId, "manage_profile");
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
-
-  const [appUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-
-  if (!appUser) {
-    return NextResponse.json({ error: "User not found" }, { status: 404 });
-  }
+  const isAdmin = access.viaAdmin;
 
   const [venue] = await db
     .select({
@@ -161,14 +156,6 @@ export async function PUT(
 
   if (!venue) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
-  // Allow admin OR venue owner
-  const admin = await requireAdmin();
-  const isAdmin = admin.ok;
-
-  if (!isAdmin && venue.userId !== appUser.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const body = await req.json();

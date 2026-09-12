@@ -10,12 +10,14 @@
 |---|---|---|
 | `0000_*.sql` … `0005_*.sql` | ✅ yes (`meta/_journal.json`) | `drizzle-kit migrate` / historical |
 | `0006_add_booking_completed_status.sql` | ❌ no (orphan in root) | applied manually |
-| `manual/0007_*.sql` … `manual/0015_*.sql` | ❌ no | hand-written, applied manually |
+| `manual/0007_*.sql` … current | ❌ no | hand-written, applied manually |
 
 `meta/_journal.json` stops at **0005**. Everything after it (the root `0006`
 and the whole `manual/` set) was written and applied by hand, outside
-Drizzle's tracking. In practice the schema is kept in sync with prod via
-`drizzle-kit push`, and `src/lib/db/schema.ts` is the source of truth.
+Drizzle's tracking. Until the history is consolidated, the ordered, reviewed
+`manual/*.sql` files are the DDL source of truth. `src/lib/db/schema.ts` is the
+runtime/type mirror, but cannot represent every PostgreSQL detail (including
+column-specific composite-FK delete actions).
 
 ## ⚠️ Do NOT run `drizzle-kit generate` blindly
 
@@ -27,23 +29,20 @@ baseline (see "Future consolidation").
 
 ## Applying schema changes
 
-### Preferred for day-to-day: `drizzle-kit push`
-```bash
-npx drizzle-kit push   # (npm run db:push)
-```
-Syncs `schema.ts` straight to the DB. **Caveat:** it prompts interactively
-about the `users.referral_code` unique constraint, so it can't run
-non-interactively / in CI.
+Do **not** run `drizzle-kit push` or `drizzle-kit generate` against any shared
+database. Both package scripts were removed because the incomplete journal can
+silently generate or apply destructive drift.
 
-### Non-interactive (CI, prod, or when push stalls): apply a `manual/*.sql`
+Apply a reviewed `manual/*.sql` file explicitly:
 ```bash
 DATABASE_URL=… npx tsx scripts/apply-sql-file.ts \
   src/lib/db/migrations/manual/<file>.sql
 # or, if you have psql:
 psql "$DATABASE_URL" -f src/lib/db/migrations/manual/<file>.sql
 ```
-All `manual/*.sql` files are written idempotently (`IF NOT EXISTS` / guarded
-`DO` blocks), so re-running them is a no-op.
+New manual migrations must be transactional, idempotent and verified on a
+disposable baseline database before staging. A re-run must converge without
+changing historical evidence or financial totals.
 
 ## 🔴 Pending on prod: `push_tokens`
 
@@ -69,4 +68,4 @@ To get back to a clean, Drizzle-tracked history:
 4. Delete `scripts/apply-migration.ts` (superseded; also references a table
    that no longer exists) and keep `scripts/apply-sql-file.ts` for one-offs.
 
-Until then, treat `push` + `manual/*.sql` as the real workflow.
+Until then, only reviewed `manual/*.sql` migrations are the real workflow.

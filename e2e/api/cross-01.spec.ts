@@ -19,7 +19,7 @@ import { sql, getIgorArtist, getTestUsers } from "../helpers/db";
 // Drag-drop seating, PDF export, SMS sends, Inngest-triggered emails, and
 // admin reassignment are out-of-band and tested separately.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 function futureDate(offsetDays: number) {
   const d = new Date();

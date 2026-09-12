@@ -1,32 +1,46 @@
-// M12 — Returns the venue owned by the currently signed-in user, or null.
-// Powers the venue owner dashboard detection and profile editor load.
+// M12 / ADR 0028 — Returns the venue the signed-in user administers.
+// Powers venue owner dashboard detection and the profile editor load.
 
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { venues, users, venueImages } from "@/lib/db/schema";
+import { venues, venueImages } from "@/lib/db/schema";
+import { getCurrentAppUser, resolveSelectedVenue } from "@/lib/venue-access";
 
-export async function GET() {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
+export async function GET(req: Request) {
+  const appUser = await getCurrentAppUser();
+  if (!appUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [appUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
+  // Explicit selection — never orderBy + limit(1) "first venue". An optional
+  // ?venueId= lets a multi-venue account address a specific location; when
+  // several are accessible and none is requested we return a typed
+  // VENUE_REQUIRED result instead of silently guessing.
+  const url = new URL(req.url);
+  const requested = url.searchParams.get("venueId");
+  const requestedId = requested != null ? Number(requested) : undefined;
 
-  if (!appUser) {
-    return NextResponse.json({ venue: null });
+  const selection = await resolveSelectedVenue(appUser.id, requestedId);
+  if (!selection.ok) {
+    if (selection.reason === "ambiguous") {
+      return NextResponse.json({
+        venue: null,
+        code: "VENUE_REQUIRED",
+        reason: "AMBIGUOUS",
+        venueIds: selection.venueIds,
+      });
+    }
+    if (selection.reason === "forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return NextResponse.json({ venue: null }); // reason: "none"
   }
 
   const [venue] = await db
     .select()
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(eq(venues.id, selection.venueId))
     .limit(1);
 
   if (!venue) {

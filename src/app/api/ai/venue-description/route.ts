@@ -3,12 +3,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users, venues } from "@/lib/db/schema";
+import { venues } from "@/lib/db/schema";
 import { generateVenueDescription } from "@/lib/ai";
 import { rateLimit } from "@/lib/rate-limit";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 const schema = z.object({
   venueId: z.number().int().positive(),
@@ -18,11 +18,6 @@ const schema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   // AI calls are expensive — cap per-IP at 10/min to prevent runaway usage.
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
   const { success } = await rateLimit(`ai-venue-desc:${ip}`, 10, 60_000);
@@ -39,13 +34,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const [appUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!appUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const access = await requireVenueCapability(parsed.data.venueId, "manage_ai");
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   const [venue] = await db
@@ -56,10 +47,6 @@ export async function POST(req: NextRequest) {
   if (!venue) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  if (venue.userId !== appUser.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   const name =
     parsed.data.lang === "ru"
       ? venue.nameRu || venue.nameRo

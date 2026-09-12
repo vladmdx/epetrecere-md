@@ -6,6 +6,7 @@ import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues, artists, bookingRequests } from "@/lib/db/schema";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 export async function GET(
   _req: NextRequest,
@@ -60,12 +61,8 @@ export async function GET(
       .limit(1);
     if (a?.userId === u.id) hasAccess = true;
   } else if (b.venueId) {
-    const [v] = await db
-      .select({ userId: venues.userId })
-      .from(venues)
-      .where(eq(venues.id, b.venueId))
-      .limit(1);
-    if (v?.userId === u.id) hasAccess = true;
+    const access = await requireVenueCapability(b.venueId, "manage_financials");
+    if (access.ok) hasAccess = true;
   }
 
   if (!hasAccess) {

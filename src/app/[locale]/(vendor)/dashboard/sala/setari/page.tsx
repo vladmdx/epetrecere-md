@@ -4,10 +4,11 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { users, venues } from "@/lib/db/schema";
-import { getVenueIcalToken } from "@/lib/calendar/ical-token";
+import { getVenueIcalTokenForUser } from "@/lib/calendar/ical-token";
 import { VenueSettingsClient } from "./client";
 
 export const dynamic = "force-dynamic";
@@ -40,11 +41,12 @@ export default async function VenueSettingsPage() {
       bufferHours: venues.bufferHours,
     })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (!venue) redirect("/dashboard");
 
-  const icalToken = getVenueIcalToken(venue.id);
+  const icalToken = await getVenueIcalTokenForUser(venue.id, appUser.id);
+  if (!icalToken) redirect("/dashboard");
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://epetrecere.md";
   const icalUrl = `${baseUrl}/api/calendar/venue-ical/${venue.id}/${icalToken}.ics`;
 

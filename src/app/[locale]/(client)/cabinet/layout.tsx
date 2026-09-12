@@ -4,7 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { signInPath } from "@/lib/i18n/server-redirect";
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 
@@ -45,7 +46,7 @@ export default async function ClientLayout({
         : await db
             .select({ id: venues.id })
             .from(venues)
-            .where(eq(venues.userId, appUser.id))
+            .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
             .limit(1);
       if (artistOwn || venueOwn || appUser.role === "artist") {
         redirect(localizePath("/dashboard", locale));

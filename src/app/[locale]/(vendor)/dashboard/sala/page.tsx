@@ -6,8 +6,9 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { and, eq, gte, lt } from "drizzle-orm";
+import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { users, venues, calendarEvents } from "@/lib/db/schema";
 import {
   getVenueStats,
@@ -37,7 +38,7 @@ export default async function VenueHomePage({ params }: { params: Promise<{ loca
   const [venue] = await db
     .select({ id: venues.id, nameRo: venues.nameRo, slug: venues.slug, isActive: venues.isActive })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (!venue) redirect(localizePath("/dashboard", locale));
 

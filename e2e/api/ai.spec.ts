@@ -8,7 +8,7 @@ import { test, expect, request as pwRequest } from "@playwright/test";
 // the key they return 503 "not configured". The spec adapts to whichever
 // environment we're hitting so it always provides a signal.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe("AI assistant reachability (AI-01 / AI-02)", () => {
   test("AI-02: POST /api/ai/generate responds with 200, 400, or 503", async () => {

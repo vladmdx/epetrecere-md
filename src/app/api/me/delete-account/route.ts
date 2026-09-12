@@ -25,7 +25,7 @@
 
 import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   users,
@@ -38,10 +38,14 @@ import {
   eventPlans,
   eventPhotos,
   reviews,
+  bookingRequests,
+  partnerOrganizations,
+  partnerOrganizationMembers,
 } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 import { erasePhotoBatch, photoErasureError, PHOTO_ERASURE_BATCH_SIZE } from "@/lib/moments/erase-photo";
+import { BOOKING_CLIENT_ERASURE } from "@/lib/privacy/account-erasure";
 
 export async function DELETE() {
   const { userId: clerkId } = await auth();
@@ -57,6 +61,51 @@ export async function DELETE() {
 
   if (!user) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  // An organization must never be left without an owner. This preflight runs
+  // before Blob deletion or any database mutation, so a blocked request is
+  // completely side-effect free. The owner can transfer ownership and retry.
+  const ownerMemberships = await db
+    .select({ organizationId: partnerOrganizationMembers.organizationId })
+    .from(partnerOrganizationMembers)
+    .innerJoin(
+      partnerOrganizations,
+      eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+    )
+    .where(
+      and(
+        eq(partnerOrganizationMembers.userId, user.id),
+        eq(partnerOrganizationMembers.role, "owner"),
+        eq(partnerOrganizationMembers.isActive, true),
+        ne(partnerOrganizations.status, "archived"),
+      ),
+    );
+  const lastOwnerOrganizationIds: number[] = [];
+  for (const membership of ownerMemberships) {
+    const [otherOwner] = await db
+      .select({ id: partnerOrganizationMembers.id })
+      .from(partnerOrganizationMembers)
+      .where(
+        and(
+          eq(partnerOrganizationMembers.organizationId, membership.organizationId),
+          eq(partnerOrganizationMembers.role, "owner"),
+          eq(partnerOrganizationMembers.isActive, true),
+          ne(partnerOrganizationMembers.userId, user.id),
+        ),
+      )
+      .limit(1);
+    if (!otherOwner) lastOwnerOrganizationIds.push(membership.organizationId);
+  }
+  if (lastOwnerOrganizationIds.length > 0) {
+    return NextResponse.json(
+      {
+        error: "Transferă proprietatea organizației înainte de ștergerea contului.",
+        code: "LAST_ORG_OWNER_TRANSFER_REQUIRED",
+        organizationIds: lastOwnerOrganizationIds,
+      },
+      { status: 409 },
+    );
   }
 
   const ownedPlans = await db
@@ -76,7 +125,7 @@ export async function DELETE() {
   if (!cleanup.complete) return NextResponse.json(photoErasureError(cleanup.reason!), { status: cleanup.reason === "unverified" ? 409 : 503 });
   const [ownedArtists, ownedVenues] = await Promise.all([
     db.select({ id: artists.id, slug: artists.slug, isActive: artists.isActive, photoUrl: artists.photoUrl }).from(artists).where(eq(artists.userId, user.id)),
-    db.select({ id: venues.id, slug: venues.slug, isActive: venues.isActive, menuPdfUrl: venues.menuPdfUrl, ogImageUrl: venues.ogImageUrl }).from(venues).where(eq(venues.userId, user.id)),
+    db.select({ id: venues.id, slug: venues.slug, isActive: venues.isActive, menuPdfUrl: venues.menuPdfUrl, ogImageUrl: venues.ogImageUrl }).from(venues).where(and(eq(venues.userId, user.id), isNull(venues.organizationId))),
   ]);
   const artistIds = ownedArtists.map((profile) => profile.id);
   const venueIds = ownedVenues.map((profile) => profile.id);
@@ -176,7 +225,7 @@ export async function DELETE() {
         autoReplyMessage: null,
         updatedAt: new Date(),
       })
-      .where(eq(venues.userId, user.id));
+      .where(and(eq(venues.userId, user.id), isNull(venues.organizationId)));
     if (artistIds.length > 0) {
       await tx.delete(artistImages).where(inArray(artistImages.artistId, artistIds));
       await tx.delete(artistVideos).where(inArray(artistVideos.artistId, artistIds));
@@ -185,8 +234,18 @@ export async function DELETE() {
       await tx.delete(venueImages).where(inArray(venueImages.venueId, venueIds));
     }
 
+    // CP3 #3 — anonymize the client's bookings BEFORE deleting the user, then
+    // let the SET NULL FK detach them. The booking (and its commission) is kept
+    // as financial evidence with no personal data, so deletion never hits the
+    // commission RESTRICT and never 503s on that path.
+    await tx
+      .update(bookingRequests)
+      .set(BOOKING_CLIENT_ERASURE)
+      .where(eq(bookingRequests.clientUserId, user.id));
+
     // 4. Delete the user row — cascades to event plans, messages,
-    //    conversations, invitations and photos.
+    //    conversations, invitations and photos; booking_requests.client_user_id
+    //    is SET NULL (evidence retained).
     await tx.delete(users).where(eq(users.id, user.id));
     return true;
   }).catch(() => false);

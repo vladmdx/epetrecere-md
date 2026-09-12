@@ -5,8 +5,9 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { users, venues } from "@/lib/db/schema";
 import {
   getVenueBookings,
@@ -45,7 +46,7 @@ export default async function VenueBookingsPage({
       capacityMax: venues.capacityMax,
     })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (!venue) redirect("/dashboard");
 

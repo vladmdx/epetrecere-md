@@ -13,6 +13,7 @@ import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { requireVenueCapability } from "@/lib/venue-access";
 import {
   users,
   venues,
@@ -86,11 +87,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Determine which entity the caller owns on this booking
+  // Determine which entity the caller owns on this booking. ADR 0028 / CP3 #2 —
+  // venue side resolved through the membership chain.
   let kind: "sala" | "artist" | null = null;
-  if (booking.venueId && booking.venueOwner === appUser.id) kind = "sala";
-  else if (booking.artistId && booking.artistOwner === appUser.id)
+  if (booking.venueId) {
+    const access = await requireVenueCapability(booking.venueId, "request_reviews");
+    if (access.ok) kind = "sala";
+  }
+  if (!kind && booking.artistId && booking.artistOwner === appUser.id) {
     kind = "artist";
+  }
 
   if (!kind) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

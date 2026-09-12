@@ -1,12 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
-import { config as loadEnv } from "dotenv";
+import { localE2EBaseUrl } from "./e2e/helpers/safety";
 
-// E2E runs against the LIVE site by default so we verify what real users hit.
-// Override with E2E_BASE_URL for local dev server runs.
-loadEnv({ path: ".env.production.local", override: false });
-loadEnv({ path: ".env.local", override: false });
+// ADR 0028 review (Correction Pass 4) — E2E test safety, P0.
+// Load ONLY the dedicated test env file. Never `.env.local` /
+// `.env.production.local`, so the suite can never inherit production
+// credentials. `safety.ts` loads it with override=true so a shell/.env.local
+// value cannot silently win. There is no production baseURL fallback.
 
-const baseURL = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const baseURL = localE2EBaseUrl();
 
 export default defineConfig({
   testDir: "./e2e",
@@ -14,6 +15,12 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: [["list"], ["html", { open: "never", outputFolder: "e2e-report" }]],
+  webServer: {
+    command: "npx tsx scripts/start-e2e-server.ts",
+    url: baseURL,
+    reuseExistingServer: false,
+    timeout: 120_000,
+  },
   use: {
     baseURL,
     trace: "retain-on-failure",

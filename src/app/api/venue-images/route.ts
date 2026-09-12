@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { venueImages, venues, users } from "@/lib/db/schema";
+import { venueImages } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 // Venue gallery images CRUD — mirrors /api/artist-images.
 //
@@ -19,36 +19,15 @@ const createSchema = z.object({
   isCover: z.boolean().default(false),
 });
 
+// ADR 0028 — ownership resolved through the org→venue membership chain
+// (with legacy venues.user_id fallback + global-admin bypass). Return shape is
+// kept so the handlers below are unchanged.
 async function requireVenueOwner(venueId: number) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
+  const access = await requireVenueCapability(venueId, "manage_profile");
+  if (!access.ok) {
+    return { ok: false as const, status: access.status, error: access.error };
   }
-
-  const [appUser] = await db
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!appUser) {
-    return { ok: false as const, status: 403, error: "Forbidden" };
-  }
-
-  // Admins bypass ownership check.
-  if (appUser.role === "admin" || appUser.role === "super_admin") {
-    return { ok: true as const, userId: appUser.id };
-  }
-
-  const [venue] = await db
-    .select({ id: venues.id })
-    .from(venues)
-    .where(and(eq(venues.id, venueId), eq(venues.userId, appUser.id)))
-    .limit(1);
-  if (!venue) {
-    return { ok: false as const, status: 403, error: "Forbidden" };
-  }
-
-  return { ok: true as const, userId: appUser.id };
+  return { ok: true as const, userId: access.user.id };
 }
 
 // GET /api/venue-images?venue_id=N — public.

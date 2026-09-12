@@ -1,17 +1,24 @@
 import { after } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { artists, venues, users, bookingRequests, calendarEvents } from "@/lib/db/schema";
+import { artists, users, bookingRequests, calendarEvents } from "@/lib/db/schema";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { ensureCommissionForBooking } from "@/lib/commissions/service";
+import { getVenueOwnerUserIds } from "@/lib/venue-access";
 
 type Booking = typeof bookingRequests.$inferSelect;
 
 export async function notifyConfirmationStep(b: Booking, title: string) {
-  const [vendor] = b.venueId
-    ? await db.select({ userId: venues.userId }).from(venues).where(eq(venues.id, b.venueId)).limit(1)
-    : b.artistId ? await db.select({ userId: artists.userId }).from(artists).where(eq(artists.id, b.artistId)).limit(1) : [];
-  for (const userId of [b.clientUserId, vendor?.userId]) {
+  // ADR 0028 — notify the venue's real owners (org members), not "the first
+  // venue's user". Falls back to the artist owner for artist bookings.
+  const vendorUserIds = b.venueId
+    ? await getVenueOwnerUserIds(b.venueId)
+    : b.artistId
+      ? (await db.select({ userId: artists.userId }).from(artists).where(eq(artists.id, b.artistId)).limit(1))
+          .map((a) => a.userId)
+          .filter((x): x is string => Boolean(x))
+      : [];
+  for (const userId of [b.clientUserId, ...vendorUserIds]) {
     if (!userId) continue;
     const [u] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
     const actionUrl = userId === b.clientUserId ? "/cabinet/rezervari" : b.venueId ? "/dashboard/sala/rezervari?tab=acceptate" : "/dashboard/rezervari";

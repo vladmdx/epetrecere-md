@@ -7,6 +7,11 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
+import {
+  getVenueOwnerRecipients,
+  requireVenueCapability,
+  type VenueCapability,
+} from "@/lib/venue-access";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
 import { vendorBookingNotificationPath } from "@/lib/notifications/venue-routing";
@@ -114,7 +119,9 @@ export async function PUT(
 
   // Ownership helper — resolves whether the signed-in user owns the target
   // booking's vendor entity (artist OR venue).
-  async function requireBookingArtistOwner() {
+  async function requireBookingVendorAccess(
+    venueCapability: VenueCapability = "manage_bookings",
+  ) {
     const { userId: clerkId } = await auth();
     if (!clerkId) {
       return { ok: false as const, status: 401, error: "Unauthorized" };
@@ -127,16 +134,11 @@ export async function PUT(
     if (!appUser) {
       return { ok: false as const, status: 401, error: "Unauthorized" };
     }
-    // Venue booking — check venue ownership
+    // Venue booking — ADR 0028 ownership via the membership chain (IDOR-safe).
     if (booking.venueId) {
-      const { venues } = await import("@/lib/db/schema");
-      const [venue] = await db
-        .select({ id: venues.id, userId: venues.userId })
-        .from(venues)
-        .where(eq(venues.id, booking.venueId))
-        .limit(1);
-      if (!venue || venue.userId !== appUser.id) {
-        return { ok: false as const, status: 403, error: "Forbidden" };
+      const access = await requireVenueCapability(booking.venueId, venueCapability);
+      if (!access.ok) {
+        return { ok: false as const, status: access.status, error: access.error };
       }
       return { ok: true as const };
     }
@@ -156,7 +158,7 @@ export async function PUT(
   }
 
   if (action === "accept") {
-    const owner = await requireBookingArtistOwner();
+    const owner = await requireBookingVendorAccess();
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
@@ -250,7 +252,7 @@ export async function PUT(
     after(() => notifyConfirmationStep(offered, "Ofertă primită. Se așteaptă acceptarea clientului"));
     return NextResponse.json({ success: true, status: offered.status });
   } else if (action === "reject") {
-    const owner = await requireBookingArtistOwner();
+    const owner = await requireBookingVendorAccess();
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
@@ -309,7 +311,7 @@ export async function PUT(
     else await finalConfirmationEffects(updated);
     return NextResponse.json({ success: true, status: updated.status, awaitingVenue: next === "awaiting_venue" });
   } else if (action === "venue_confirm") {
-    const owner = await requireBookingArtistOwner();
+    const owner = await requireBookingVendorAccess();
     if (!owner.ok) return NextResponse.json({ error: owner.error }, { status: owner.status });
     if (booking.venueId && booking.status === "confirmed_by_client") {
       await finalConfirmationEffects(booking);
@@ -357,7 +359,7 @@ export async function PUT(
     }).where(eq(bookingRequests.id, Number(id)));
 
   } else if (action === "complete") {
-    const owner = await requireBookingArtistOwner();
+    const owner = await requireBookingVendorAccess();
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
@@ -380,7 +382,7 @@ export async function PUT(
     // Vendor-initiated cancellation of an accepted/confirmed booking. Frees
     // the calendar slot (like reject-after-accept) and notifies the client by
     // email + in-app so they know to find an alternative.
-    const owner = await requireBookingArtistOwner();
+    const owner = await requireBookingVendorAccess();
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
@@ -512,13 +514,11 @@ export async function PUT(
       isVendorOwner = artist?.userId === appUser.id;
     }
     if (!isClient && !isVendorOwner && booking.venueId) {
-      const { venues } = await import("@/lib/db/schema");
-      const [venue] = await db
-        .select({ userId: venues.userId })
-        .from(venues)
-        .where(eq(venues.id, booking.venueId))
-        .limit(1);
-      isVendorOwner = venue?.userId === appUser.id;
+      const access = await requireVenueCapability(
+        booking.venueId,
+        "manage_financials",
+      );
+      isVendorOwner = access.ok;
     }
     if (!isClient && !isVendorOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -569,13 +569,8 @@ export async function PUT(
       isArtistOwner = artist?.userId === appUser.id;
     }
     if (!isClient && !isArtistOwner && booking.venueId) {
-      const { venues } = await import("@/lib/db/schema");
-      const [venue] = await db
-        .select({ userId: venues.userId })
-        .from(venues)
-        .where(eq(venues.id, booking.venueId))
-        .limit(1);
-      isArtistOwner = venue?.userId === appUser.id;
+      const access = await requireVenueCapability(booking.venueId, "manage_bookings");
+      isArtistOwner = access.ok;
     }
     if (!isClient && !isArtistOwner) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -621,6 +616,7 @@ export async function PUT(
 
           // Resolve vendor info
           let vendorInfo: { userId: string | null; nameRo: string; email: string | null } | null = null;
+          let venueRecipients: Awaited<ReturnType<typeof getVenueOwnerRecipients>> = [];
           if (booking.artistId) {
             const [a] = await db
               .select({ userId: artists.userId, nameRo: artists.nameRo, email: artists.email })
@@ -636,21 +632,27 @@ export async function PUT(
               .where(eq(venues.id, booking.venueId))
               .limit(1);
             vendorInfo = v ?? null;
+            venueRecipients = await getVenueOwnerRecipients(booking.venueId);
           }
 
           const { notificationEmail } = await import("@/lib/email/templates/notification-email");
           const priceText = `${agreedPrice}€`;
 
-          if (isClient && vendorInfo?.userId) {
+          if (isClient && (vendorInfo?.userId || venueRecipients.length > 0)) {
             // Client proposed — notify vendor
             const vendorDashboardPath = vendorBookingNotificationPath(booking.venueId);
-            await dispatchNotification({
-              userId: vendorInfo.userId,
+            const recipients = booking.venueId
+              ? venueRecipients
+              : vendorInfo?.userId
+                ? [{ userId: vendorInfo.userId, email: vendorInfo.email }]
+                : [];
+            await Promise.all(recipients.map((recipient) => dispatchNotification({
+              userId: recipient.userId,
               type: "booking_request_new",
               title: `${booking.clientName} a propus un preț`,
               message: `${priceText}${reply ? ` — ${reply}` : ""}`,
               actionUrl: vendorDashboardPath,
-              email: vendorInfo.email ?? undefined,
+              email: recipient.email ?? undefined,
               emailSubject: `💰 Contraofertă: ${priceText} de la ${booking.clientName}`,
               emailHtml: notificationEmail({
                 title: "Contraofertă Nouă",
@@ -659,7 +661,7 @@ export async function PUT(
                 ctaText: "Vezi oferta →",
                 emoji: "💰",
               }),
-            });
+            })));
           } else if (!isClient && booking.clientUserId) {
             // Vendor proposed — notify client
             const [client] = await db

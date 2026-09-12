@@ -10,6 +10,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { requireVenueCapability } from "@/lib/venue-access";
 import { users, venues } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
 import { getAiClient } from "@/lib/ai/provider";
@@ -78,14 +79,16 @@ export async function POST(req: NextRequest) {
   if (!appUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  // ADR 0028 — ownership via the membership chain (IDOR-safe).
+  const access = await requireVenueCapability(parsed.data.venueId, "manage_ai");
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
   const [venue] = await db
-    .select({ userId: venues.userId, nameRo: venues.nameRo })
+    .select({ nameRo: venues.nameRo })
     .from(venues)
     .where(eq(venues.id, parsed.data.venueId))
     .limit(1);
-  if (!venue || venue.userId !== appUser.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const s = parsed.data.stats;
   const facts = [

@@ -10,6 +10,7 @@ import {
   venues,
 } from "@/lib/db/schema";
 import { eq, and, sql, isNull, or } from "drizzle-orm";
+import { getVenueOwnerRecipients, requireVenueAccess } from "@/lib/venue-access";
 import { contactsAreShared } from "@/lib/privacy/booking-contact";
 import { containsContact, redactContact } from "@/lib/privacy/contact-redaction";
 import { chatMessageForViewer } from "@/lib/privacy/chat-message";
@@ -48,12 +49,9 @@ async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
     if (artist) return { status: booking.status };
   }
   if (booking.venueId) {
-    const [venue] = await db
-      .select({ id: venues.id })
-      .from(venues)
-      .where(and(eq(venues.id, booking.venueId), eq(venues.userId, appUser.id)))
-      .limit(1);
-    if (venue) return { status: booking.status };
+    // ADR 0028 — venue ownership via the membership chain.
+    const access = await requireVenueAccess(booking.venueId, "staff");
+    if (access.ok) return { status: booking.status };
   }
   return false;
 }
@@ -257,14 +255,16 @@ export async function POST(req: Request) {
       }
     }
     if (senderType === "client" && booking.venueId) {
-      const [venue] = await db
-        .select({ id: venues.id, nameRo: venues.nameRo })
-        .from(venues)
-        .where(and(eq(venues.id, booking.venueId), eq(venues.userId, appUser.id)))
-        .limit(1);
-      if (venue) {
+      // ADR 0028 — venue ownership via the membership chain.
+      const access = await requireVenueAccess(booking.venueId, "staff");
+      if (access.ok) {
+        const [venue] = await db
+          .select({ nameRo: venues.nameRo })
+          .from(venues)
+          .where(eq(venues.id, booking.venueId))
+          .limit(1);
         senderType = "venue";
-        senderName = venue.nameRo || appUser.name || "Sală";
+        senderName = venue?.nameRo || appUser.name || "Sală";
       }
     }
   }
@@ -348,6 +348,7 @@ export async function POST(req: Request) {
         // Client sent — notify vendor
         let vendorUserId: string | null = null;
         let vendorEmail: string | null = null;
+        let venueRecipients: Awaited<ReturnType<typeof getVenueOwnerRecipients>> = [];
         let vendorDashboardUrl = "/dashboard/mesaje";
         if (booking.artistId) {
           const [a] = await db
@@ -365,18 +366,23 @@ export async function POST(req: Request) {
             .limit(1);
           vendorUserId = v?.userId ?? null;
           vendorEmail = v?.email ?? null;
+          venueRecipients = await getVenueOwnerRecipients(booking.venueId);
           vendorDashboardUrl = "/dashboard/sala/mesaje";
         }
-        if (vendorUserId) {
-          await dispatchNotification({
-            userId: vendorUserId,
+        const recipients = booking.venueId
+          ? venueRecipients
+          : vendorUserId
+            ? [{ userId: vendorUserId, email: vendorEmail }]
+            : [];
+        await Promise.all(recipients.map((recipient) => dispatchNotification({
+            userId: recipient.userId,
             type: "booking_request_new",
             title: `Mesaj nou de la ${senderName}`,
             message: truncated,
             actionUrl: conversationId
               ? `${vendorDashboardUrl}?conversation=${conversationId}`
               : "/dashboard/rezervari",
-            email: vendorEmail ?? undefined,
+            email: recipient.email ?? undefined,
             emailSubject: `💬 Mesaj nou de la ${senderName}`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
@@ -387,8 +393,7 @@ export async function POST(req: Request) {
               ctaText: "Răspunde →",
               emoji: "💬",
             }),
-          });
-        }
+          })));
       }
     } catch (err) {
       console.error("[chat] notification dispatch failed", err);

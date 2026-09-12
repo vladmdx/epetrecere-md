@@ -30,6 +30,19 @@ function createDb(): Db {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
 
+  if (process.env.E2E_RUNTIME === "1") {
+    const expected = process.env.E2E_DATABASE_URL;
+    if (!expected || expected !== url) {
+      throw new Error(
+        "E2E runtime database mismatch: DATABASE_URL must equal E2E_DATABASE_URL.",
+      );
+    }
+    const host = new URL(url).hostname;
+    if (!["localhost", "127.0.0.1", "::1"].includes(host)) {
+      throw new Error("E2E runtime refuses a non-loopback database.");
+    }
+  }
+
   if (isNeon(url)) return drizzleNeon(neon(url), { schema });
 
   // Runtime gets exactly two sockets; production builds get four. A single

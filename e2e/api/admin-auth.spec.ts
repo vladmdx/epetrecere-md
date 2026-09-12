@@ -22,7 +22,7 @@ import { getTestUsers } from "../helpers/db";
 // and is out of scope. A smoke test that an admin CAN access `/admin`
 // would land there if we ever add one.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe("admin layout auth gate (M-SEC)", () => {
   test("anonymous GET /admin → 307 → /sign-in", async () => {

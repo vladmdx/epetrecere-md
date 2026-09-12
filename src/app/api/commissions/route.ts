@@ -8,7 +8,6 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
@@ -16,10 +15,10 @@ import {
   bookingRequests,
   artists,
   venues,
-  users,
 } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/admin";
 import { contactsAreShared } from "@/lib/privacy/booking-contact";
+import { getCurrentAppUser, listAccessibleVenueIds } from "@/lib/venue-access";
 import {
   markCommissionPaid,
   setCommissionStatus,
@@ -27,27 +26,19 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/** Resolve the signed-in user's vendor scope (artist and/or venue they own). */
+/** Resolve the signed-in user's vendor scope (artist and/or venues they
+ *  administer). ADR 0028 — venues come from the membership chain, so a
+ *  multi-venue owner sees every venue's fees, never just "the first". */
 async function getVendorScope() {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) return null;
-  const [u] = await db
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!u) return null;
+  const appUser = await getCurrentAppUser();
+  if (!appUser) return null;
   const [a] = await db
     .select({ id: artists.id })
     .from(artists)
-    .where(eq(artists.userId, u.id))
+    .where(eq(artists.userId, appUser.id))
     .limit(1);
-  const [v] = await db
-    .select({ id: venues.id })
-    .from(venues)
-    .where(eq(venues.userId, u.id))
-    .limit(1);
-  return { user: u, artistId: a?.id ?? null, venueId: v?.id ?? null };
+  const venueIds = await listAccessibleVenueIds(appUser.id);
+  return { user: appUser, artistId: a?.id ?? null, venueIds };
 }
 
 export async function GET(req: NextRequest) {
@@ -62,7 +53,7 @@ export async function GET(req: NextRequest) {
     }
     const parts = [];
     if (scope.artistId) parts.push(eq(commissions.artistId, scope.artistId));
-    if (scope.venueId) parts.push(eq(commissions.venueId, scope.venueId));
+    if (scope.venueIds.length > 0) parts.push(inArray(commissions.venueId, scope.venueIds));
     // A user with neither profile has no fees to see.
     if (parts.length === 0) {
       return NextResponse.json({ items: [], totals: emptyTotals() });

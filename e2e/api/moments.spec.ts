@@ -11,7 +11,7 @@ import { sql, getTestUsers } from "../helpers/db";
 //   5. Slideshow page (`/moments/{slug}/slideshow`) returns 200
 //   6. Teardown removes the plan + photos
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe.serial("Event Moments (MOM-01 / MOM-02)", () => {
   let planId: number;

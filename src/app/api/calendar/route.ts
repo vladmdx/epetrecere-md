@@ -3,7 +3,8 @@ import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users, artists, venues } from "@/lib/db/schema";
+import { requireVenueCapability, authorizeVenueAccess } from "@/lib/venue-access";
+import { users, artists } from "@/lib/db/schema";
 import { calendarEventForViewer } from "@/lib/privacy/booking-text";
 import {
   getCalendarEvents,
@@ -64,10 +65,18 @@ export async function GET(req: NextRequest) {
     if (user) {
       privileged = user.role === "admin" || user.role === "super_admin";
       if (!privileged) {
-        const entity = parsed.data.entity_type === "artist" ? artists : venues;
-        const [owner] = await db.select({ userId: entity.userId }).from(entity)
-          .where(eq(entity.id, parsed.data.entity_id)).limit(1);
-        privileged = owner?.userId === user.id;
+        if (parsed.data.entity_type === "venue") {
+          // ADR 0028 / CP3 #2 — private notes visible to venue members only.
+          const access = await authorizeVenueAccess(
+            { id: user.id, role: user.role, isGlobalAdmin: false },
+            parsed.data.entity_id,
+          );
+          privileged = access.ok;
+        } else {
+          const [owner] = await db.select({ userId: artists.userId }).from(artists)
+            .where(eq(artists.id, parsed.data.entity_id)).limit(1);
+          privileged = owner?.userId === user.id;
+        }
       }
     }
   }
@@ -118,13 +127,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   } else {
-    const [venue] = await db
-      .select({ id: venues.id, userId: venues.userId })
-      .from(venues)
-      .where(eq(venues.id, parsed.data.entity_id))
-      .limit(1);
-    if (!venue || venue.userId !== appUser.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // ADR 0028 — venue ownership via the membership chain (IDOR-safe).
+    const access = await requireVenueCapability(parsed.data.entity_id, "manage_calendar");
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
     }
   }
 

@@ -15,12 +15,11 @@ import { auth } from "@clerk/nextjs/server";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  users,
-  venues,
   venueMenuCategories,
   venueMenuItems,
   venueMenuPackages,
 } from "@/lib/db/schema";
+import { requireVenueCapability } from "@/lib/venue-access";
 import { rateLimit } from "@/lib/rate-limit";
 import { translateMenuStrings } from "@/lib/ai";
 
@@ -59,24 +58,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const [appUser] = await db
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!appUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
-  if (!isAdmin) {
-    const [venue] = await db
-      .select({ userId: venues.userId })
-      .from(venues)
-      .where(eq(venues.id, parsed.data.venueId))
-      .limit(1);
-    if (!venue || venue.userId !== appUser.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  // ADR 0028 — ownership via the membership chain (legacy fallback + admin).
+  const access = await requireVenueCapability(parsed.data.venueId, "manage_menu");
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   const { venueId, overwrite } = parsed.data;

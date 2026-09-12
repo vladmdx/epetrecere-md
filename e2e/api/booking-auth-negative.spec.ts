@@ -24,7 +24,7 @@ import { sql, getIgorArtist, getTestUsers } from "../helpers/db";
 // Together with the positive `booking-lifecycle.spec.ts` these two specs
 // form a complete truth table for the endpoint.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 function futureDate(offsetDays: number) {
   const d = new Date();

@@ -21,7 +21,7 @@ import { sql, getIgorArtist } from "../helpers/db";
 //
 // Each mutation attempt re-reads the DB row and asserts it did not change.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe.serial("artists crud auth (F-A4 lockdown)", () => {
   let artistId: number;

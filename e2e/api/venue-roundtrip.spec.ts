@@ -23,7 +23,7 @@ import { sql, getTestUsers } from "../helpers/db";
 // owns (plus admin notifications linked to it), so the suite can run in a
 // loop without accumulating rows.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe.serial("venue owner round-trip (F-S1..F-S5)", () => {
   let venueId: number;

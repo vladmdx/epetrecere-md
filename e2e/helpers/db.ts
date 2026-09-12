@@ -1,26 +1,47 @@
-import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
-import { config as loadEnv } from "dotenv";
+import postgres from "postgres";
+import {
+  e2eDatabaseConfig,
+  localE2EBaseUrl,
+  verifyE2EDatabase,
+} from "./safety";
 
-loadEnv({ path: ".env.production.local", override: false });
-loadEnv({ path: ".env.local", override: false });
+// ADR 0028 review (Correction Pass 4) — E2E test safety, P0.
+//
+// This suite writes and deletes rows. It must therefore be IMPOSSIBLE to point
+// it at production, even by accident. So:
+//   - we load ONLY `.env.test.local` (never `.env.local` / `.env.production.local`);
+//   - we use a dedicated `E2E_DATABASE_URL` (never the app's `DATABASE_URL`);
+//   - the DB host must be loopback and its stored marker must exactly match
+//     `E2E_DB_MARKER`, before any spec can run a single query;
+//   - Playwright starts its own app server against that exact same URL.
+// There is no ALLOW_PROD override for destructive tests.
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL not set — cannot run e2e tests");
+const { url: E2E_DATABASE_URL } = e2eDatabaseConfig();
+const databaseVerified = verifyE2EDatabase();
+
+/**
+ * Shared SQL client for E2E tests, bound to the dedicated test database.
+ * Tagged-template usage is unchanged (`sql\`...\``); tests MUST clean up
+ * anything they write so the suite stays re-runnable.
+ */
+const unguardedSql = postgres(E2E_DATABASE_URL, { max: 4, prepare: false });
+export const sql = new Proxy(unguardedSql, {
+  apply(target, thisArg, args) {
+    return databaseVerified.then(() => Reflect.apply(target, thisArg, args));
+  },
+});
+
+/**
+ * Guarded base URL for HTTP requests. Never falls back to production. Defaults
+ * to the isolated local server. Remote URLs are always refused.
+ */
+export function testBaseUrl(): string {
+  return localE2EBaseUrl();
 }
 
 /**
- * Shared Neon SQL client for e2e tests. Always resolves tagged-template
- * queries; use `sql\`...\`` directly. Tests MUST clean up anything they
- * write so the suite is re-runnable.
- */
-export const sql: NeonQueryFunction<false, false> = neon(
-  process.env.DATABASE_URL,
-);
-
-/**
- * Canonical test fixtures — these are the DB identities of the two Clerk
- * personas (`igor` = artist, `client` = event-plan owner). They're looked
- * up by email so a re-seed that bumps IDs won't break the suite.
+ * Canonical test fixtures — the DB identities of the two Clerk personas
+ * (`igor` = artist, `client` = event-plan owner), looked up by email.
  */
 export async function getTestUsers() {
   const rows = await sql`
@@ -28,9 +49,7 @@ export async function getTestUsers() {
     from users
     where email in ('igor.nedoseikin@epetrecere.md', 'client.test@epetrecere.md')
   `;
-  const byEmail = Object.fromEntries(
-    rows.map((r) => [r.email as string, r] as const),
-  );
+  const byEmail = Object.fromEntries(rows.map((r) => [r.email as string, r] as const));
   const igor = byEmail["igor.nedoseikin@epetrecere.md"];
   const client = byEmail["client.test@epetrecere.md"];
   if (!igor || !client) {
@@ -41,12 +60,8 @@ export async function getTestUsers() {
   return { igor, client };
 }
 
-/**
- * Igor's artist row. Exists once; we cache per-process.
- */
-let _artistCache:
-  | { id: number; slug: string; userId: string }
-  | undefined;
+/** Igor's artist row. Exists once; cached per-process. */
+let _artistCache: { id: number; slug: string; userId: string } | undefined;
 export async function getIgorArtist() {
   if (_artistCache) return _artistCache;
   const { igor } = await getTestUsers();

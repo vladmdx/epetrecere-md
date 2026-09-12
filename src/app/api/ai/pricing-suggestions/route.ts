@@ -9,11 +9,15 @@
 // the vendor reads the advice and edits manually).
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
+import {
+  authorizeVenueCapability,
+  getCurrentAppUser,
+  resolveSelectedVenue,
+} from "@/lib/venue-access";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users, artists, venues } from "@/lib/db/schema";
+import { artists, venues } from "@/lib/db/schema";
 import { rateLimit } from "@/lib/rate-limit";
 import { getAiClient } from "@/lib/ai/provider";
 
@@ -24,8 +28,8 @@ function getClient() {
 }
 
 export async function POST(req: NextRequest) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
+  const appUser = await getCurrentAppUser();
+  if (!appUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -38,13 +42,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const [appUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!appUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const body = (await req.json().catch(() => ({}))) as { venueId?: unknown };
+  const requestedVenueId =
+    body.venueId == null || body.venueId === "" ? null : Number(body.venueId);
+  if (requestedVenueId != null && !Number.isSafeInteger(requestedVenueId)) {
+    return NextResponse.json({ error: "Invalid venue id" }, { status: 400 });
   }
 
   // Resolve artist or venue owned by this user
@@ -59,17 +61,60 @@ export async function POST(req: NextRequest) {
     .where(eq(artists.userId, appUser.id))
     .limit(1);
 
-  const [venue] = await db
-    .select({
-      id: venues.id,
-      nameRo: venues.nameRo,
-      pricePerPerson: venues.pricePerPerson,
-      capacityMax: venues.capacityMax,
-      city: venues.city,
-    })
-    .from(venues)
-    .where(eq(venues.userId, appUser.id))
-    .limit(1);
+  let venue:
+    | {
+        id: number;
+        nameRo: string;
+        pricePerPerson: number | null;
+        capacityMax: number | null;
+        city: string | null;
+      }
+    | undefined;
+  // An explicit venue selection always wins. For backward compatibility, an
+  // artist-only request continues to analyze the artist; a venue-only account
+  // with exactly one venue is selected automatically. Multi-venue accounts
+  // must send venueId instead of silently analyzing an arbitrary first row.
+  if (requestedVenueId != null || !artist) {
+    const selection = await resolveSelectedVenue(appUser.id, requestedVenueId);
+    if (!selection.ok) {
+      if (selection.reason === "none") {
+        return NextResponse.json(
+          { error: "Nu ai un profil de artist sau local", code: "VENUE_REQUIRED" },
+          { status: 404 },
+        );
+      }
+      if (selection.reason === "ambiguous") {
+        return NextResponse.json(
+          {
+            error: "Alege localul pentru care dorești analiza.",
+            code: "VENUE_REQUIRED",
+            venueIds: selection.venueIds,
+          },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    const access = await authorizeVenueCapability(
+      appUser,
+      selection.venueId,
+      "manage_ai",
+    );
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
+    }
+    [venue] = await db
+      .select({
+        id: venues.id,
+        nameRo: venues.nameRo,
+        pricePerPerson: venues.pricePerPerson,
+        capacityMax: venues.capacityMax,
+        city: venues.city,
+      })
+      .from(venues)
+      .where(eq(venues.id, selection.venueId))
+      .limit(1);
+  }
 
   if (!artist && !venue) {
     return NextResponse.json(
