@@ -14,15 +14,15 @@ export function organizationContractIdentityEquals(
   identity: {
     partnerType: string;
     legalName: string;
-    idNumber: string;
-    legalAddress: string;
+    idNumber?: string | null;
+    legalAddress?: string | null;
   },
 ): boolean {
   return (
     org.type === identity.partnerType &&
     (org.legalName ?? "") === identity.legalName &&
-    (org.idNumber ?? "") === identity.idNumber &&
-    (org.legalAddress ?? "") === identity.legalAddress
+    (org.idNumber ?? "") === (identity.idNumber ?? "") &&
+    (org.legalAddress ?? "") === (identity.legalAddress ?? "")
   );
 }
 

@@ -146,7 +146,13 @@ export async function POST(req: NextRequest) {
     if (!resolved.ok) {
       return NextResponse.json({ error: resolved.code, code: resolved.code }, { status: resolved.status });
     }
-    identity = resolved.identity;
+    identity = {
+      partnerType: resolved.identity.partnerType,
+      legalName: resolved.identity.legalName,
+      idNumber: resolved.identity.idNumber ?? "",
+      legalAddress: resolved.identity.legalAddress ?? "",
+      representativeName: resolved.identity.representativeName ?? null,
+    };
   }
 
   const cu = await currentUser();

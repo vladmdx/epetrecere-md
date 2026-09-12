@@ -2,7 +2,7 @@ import { NextResponse, after } from "next/server";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { plainText } from "@/lib/content/plain-text";
 import { confirmationTransition } from "@/lib/booking/confirmation";
-import { notifyConfirmationStep, replayConfirmationEffects, scheduleConfirmationNotifications } from "@/lib/booking/confirmation-effects";
+import { notifyConfirmationStep, scheduleConfirmationNotifications } from "@/lib/booking/confirmation-effects";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, artists, users } from "@/lib/db/schema";
@@ -23,6 +23,7 @@ import {
   clientCancelBooking,
   confirmBookingWithEffects,
   rejectBooking,
+  replayConfirmationEffects,
   vendorCancelBooking,
 } from "@/lib/booking/booking-transitions";
 

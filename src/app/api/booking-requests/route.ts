@@ -455,7 +455,7 @@ export async function POST(req: NextRequest) {
     agreedPrice,
     packageId: _packageId,
     hallId,
-    reservationScope,
+    reservationScope: _reservationScope,
     ...bookingBase
   } = parsed.data;
 
