@@ -23,30 +23,34 @@ import {
   Globe,
   Menu,
   X,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
 import { publishedVendorProfileHref } from "@/lib/vendors/publication";
 
 const NAV_ITEMS = [
-  { href: "/dashboard/sala", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
-  { href: "/dashboard/sala/calendar", icon: Calendar, labelKey: "dashboard.calendar" },
-  { href: "/dashboard/sala/rezervari", icon: Inbox, labelKey: "dashboard.bookings" },
-  { href: "/dashboard/sala/profil", icon: ImageIcon, labelKey: "vendor.venueSidebar.profileGallery" },
-  { href: "/dashboard/sala/meniu", icon: UtensilsCrossed, labelKey: "vendor.venueSidebar.digitalMenu" },
-  { href: "/dashboard/sala/mesaje", icon: MessageSquare, labelKey: "dashboard.messages" },
-  { href: "/dashboard/sala/recenzii", icon: Star, labelKey: "dashboard.reviews" },
-  { href: "/dashboard/sala/financiar", icon: Wallet, labelKey: "dashboard.financial" },
-  { href: "/dashboard/sala/analitice", icon: BarChart3, labelKey: "vendor.venueSidebar.analytics" },
-  { href: "/dashboard/sala/ai-assistant", icon: Bot, labelKey: "vendor.ai_assistant" },
-  { href: "/dashboard/sala/setari", icon: Settings, labelKey: "dashboard.settings" },
+  { href: "", icon: LayoutDashboard, labelKey: "dashboard.myPanel" },
+  { href: "/calendar", icon: Calendar, labelKey: "dashboard.calendar" },
+  { href: "/rezervari", icon: Inbox, labelKey: "dashboard.bookings" },
+  { href: "/profil", icon: ImageIcon, labelKey: "vendor.venueSidebar.profileGallery" },
+  { href: "/meniu", icon: UtensilsCrossed, labelKey: "vendor.venueSidebar.digitalMenu" },
+  { href: "/mesaje", icon: MessageSquare, labelKey: "dashboard.messages" },
+  { href: "/recenzii", icon: Star, labelKey: "dashboard.reviews" },
+  { href: "/financiar", icon: Wallet, labelKey: "dashboard.financial" },
+  { href: "/analitice", icon: BarChart3, labelKey: "vendor.venueSidebar.analytics" },
+  { href: "/ai-assistant", icon: Bot, labelKey: "vendor.ai_assistant" },
+  { href: "/sali", icon: Building2, labelKey: "vendor.multiHall.halls" },
+  { href: "/setari", icon: Settings, labelKey: "dashboard.settings" },
 ] as const;
 
 function NavList({
   pathname,
+  basePath,
   onNavigate,
 }: {
   pathname: string;
+  basePath: string;
   onNavigate?: () => void;
 }) {
   const { t } = useLocale();
@@ -54,13 +58,14 @@ function NavList({
     <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
       {NAV_ITEMS.map((item) => {
         const Icon = item.icon;
+        const href = `${basePath}${item.href}`;
         const isActive =
-          pathname === item.href ||
-          (item.href !== "/dashboard/sala" && pathname.startsWith(item.href));
+          pathname === href ||
+          (item.href !== "" && pathname.startsWith(href));
         return (
           <Link
-            key={item.href}
-            href={item.href}
+            key={href}
+            href={href}
             onClick={onNavigate}
             className={cn(
               "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors",
@@ -82,10 +87,12 @@ export function VenueSidebar({
   venueName,
   venueSlug,
   isActive = false,
+  basePath = "/dashboard/sala",
 }: {
   venueName?: string | null;
   venueSlug?: string | null;
   isActive?: boolean;
+  basePath?: string;
 }) {
   const { t } = useLocale();
   const profileHref = publishedVendorProfileHref({ slug: venueSlug, isActive }, "venue");
@@ -97,7 +104,7 @@ export function VenueSidebar({
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
         <div className="flex h-14 items-center gap-2 px-5 border-b border-border/20">
-          <Link href="/dashboard/sala" className="flex items-center gap-2">
+          <Link href={basePath} className="flex items-center gap-2">
             <span className="text-lg font-heading font-bold">
               <span className="text-gold">e</span>
               <span className="text-foreground">Sală</span>
@@ -116,9 +123,16 @@ export function VenueSidebar({
           </div>
         )}
 
-        <NavList pathname={pathname} />
+        <NavList pathname={pathname} basePath={basePath} />
 
         {profileHref && <div className="border-t border-border/20 p-3">
+          <Link
+            href="/dashboard/locatii"
+            className="flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:text-gold"
+          >
+            <Building2 className="h-4 w-4 shrink-0" />
+            <span>{t("vendor.venueSidebar.switchVenue")}</span>
+          </Link>
           <Link
             href={profileHref}
             target="_blank"
@@ -151,7 +165,7 @@ export function VenueSidebar({
           <aside className="relative flex h-full w-72 max-w-[85vw] flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl animate-in slide-in-from-left">
             <div className="flex h-14 items-center justify-between px-5 border-b border-border/20">
               <Link
-                href="/dashboard/sala"
+                href={basePath}
                 onClick={() => setMobileOpen(false)}
                 className="flex items-center gap-2"
               >
@@ -183,6 +197,7 @@ export function VenueSidebar({
 
             <NavList
               pathname={pathname}
+              basePath={basePath}
               onNavigate={() => setMobileOpen(false)}
             />
 

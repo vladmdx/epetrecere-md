@@ -401,6 +401,7 @@ export default clerkMiddleware(async (auth, req) => {
   // sitemap, opengraph-image) have no route params to read.
   const headers = new Headers(req.headers);
   headers.set(LOCALE_HEADER, locale);
+  headers.set("x-pathname", pathname);
 
   // Only PAGES live under `[locale]`. Route handlers, the sitemap, robots
   // and the icon stayed at the root of src/app, so rewriting them onto

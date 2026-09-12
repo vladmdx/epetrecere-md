@@ -20,6 +20,7 @@ import {
 import { contactsAreShared } from "@/lib/privacy/booking-contact";
 import { chatMessageForViewer } from "@/lib/privacy/chat-message";
 import { plainText } from "@/lib/content/plain-text";
+import { conversationMatchesVenueScope } from "@/lib/conversations/scope";
 import { escapeHtml } from "@/lib/email/escape";
 
 // M0b #10 — Messages for a persistent client↔artist conversation.
@@ -28,7 +29,7 @@ import { escapeHtml } from "@/lib/email/escape";
 // POST appends a new message, updates lastMessageAt/Preview, and increments
 //      the opposite party's unread counter.
 
-async function loadContext(conversationId: number, clerkId: string) {
+async function loadContext(conversationId: number, clerkId: string, scopedVenueId?: number | null) {
   const [appUser] = await db
     .select({ id: users.id })
     .from(users)
@@ -42,6 +43,7 @@ async function loadContext(conversationId: number, clerkId: string) {
     .where(eq(conversations.id, conversationId))
     .limit(1);
   if (!conv) return null;
+  if (!conversationMatchesVenueScope(conv.venueId, scopedVenueId)) return null;
 
   let side: "client" | "artist" | "venue" | null = null;
   if (conv.clientUserId === appUser.id) {
@@ -87,7 +89,7 @@ async function contactIsUnlocked(conv: typeof conversations.$inferSelect) {
 }
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { userId: clerkId } = await auth();
@@ -101,7 +103,8 @@ export async function GET(
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const ctx = await loadContext(conversationId, clerkId);
+  const scopedVenueId = Number(req.nextUrl.searchParams.get("venueId") ?? "") || null;
+  const ctx = await loadContext(conversationId, clerkId, scopedVenueId);
   if (!ctx) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -177,7 +180,11 @@ export async function POST(
     );
   }
 
-  const ctx = await loadContext(conversationId, clerkId);
+  const ctx = await loadContext(
+    conversationId,
+    clerkId,
+    Number(req.nextUrl.searchParams.get("venueId") ?? "") || null,
+  );
   if (!ctx) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

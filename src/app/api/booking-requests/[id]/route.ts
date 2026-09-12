@@ -2,10 +2,10 @@ import { NextResponse, after } from "next/server";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { plainText } from "@/lib/content/plain-text";
 import { confirmationTransition } from "@/lib/booking/confirmation";
-import { finalConfirmationEffects, notifyConfirmationStep } from "@/lib/booking/confirmation-effects";
+import { notifyConfirmationStep, scheduleConfirmationNotifications } from "@/lib/booking/confirmation-effects";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema";
+import { bookingRequests, artists, users } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import {
   getVenueOwnerRecipients,
@@ -15,6 +15,19 @@ import {
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
 import { vendorBookingNotificationPath } from "@/lib/notifications/venue-routing";
+import type { VenueWriteTx } from "@/lib/booking/venue-booking-write";
+import { VenueAvailabilityError } from "@/lib/booking/venue-booking-write";
+import {
+  BookingChangedError,
+  acceptVenueBooking,
+  casClientConfirm,
+  casSetPaid,
+  clientCancelBooking,
+  confirmBookingWithEffects,
+  rejectBooking,
+  replayConfirmationEffects,
+  vendorCancelBooking,
+} from "@/lib/booking/booking-transitions";
 
 /**
  * Raise the platform fee for a booking that has just reached a fee-bearing
@@ -26,19 +39,6 @@ import { vendorBookingNotificationPath } from "@/lib/notifications/venue-routing
  * client confirmed, or one taken straight from accepted to completed, never
  * produced a commission row and simply went missing from the ledger.
  */
-function dropCommission(bookingId: number, note: string): void {
-  after(async () => {
-    try {
-      const { cancelCommissionForBooking } = await import(
-        "@/lib/commissions/service"
-      );
-      await cancelCommissionForBooking(bookingId, note);
-    } catch (err) {
-      console.error("[commissions] cancel failed for booking", bookingId, err);
-    }
-  });
-}
-
 function raiseCommission(bookingId: number): void {
   after(async () => {
     try {
@@ -168,59 +168,6 @@ export async function PUT(
         { status: 409 },
       );
     }
-    // Re-validate availability on accept — working hours + conflicts.
-    // Same checks as on POST so an artist can't accept a booking that
-    // violates their own schedule.
-    if (booking.artistId) {
-      const { checkArtistAvailability, formatConflictMessage } = await import(
-        "@/lib/booking/availability"
-      );
-      const result = await checkArtistAvailability({
-        artistId: booking.artistId,
-        eventDate: booking.eventDate,
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        excludeBookingId: booking.id,
-      });
-      if (!result.available) {
-        return NextResponse.json(
-          {
-            error:
-              "Nu poți accepta această rezervare — " +
-              formatConflictMessage(result).toLowerCase(),
-            conflict: result.conflict,
-            outsideWorkingHours: result.outsideWorkingHours,
-            workingHours: result.workingHours,
-          },
-          { status: 409 },
-        );
-      }
-    }
-    if (booking.venueId) {
-      const { checkVenueAvailability, formatConflictMessage } = await import(
-        "@/lib/booking/availability"
-      );
-      const result = await checkVenueAvailability({
-        venueId: booking.venueId,
-        eventDate: booking.eventDate,
-        startTime: booking.startTime,
-        endTime: booking.endTime,
-        excludeBookingId: booking.id,
-      });
-      if (!result.available) {
-        return NextResponse.json(
-          {
-            error:
-              "Nu poți accepta această rezervare — " +
-              formatConflictMessage(result).toLowerCase(),
-            conflict: result.conflict,
-            outsideWorkingHours: result.outsideWorkingHours,
-            workingHours: result.workingHours,
-          },
-          { status: 409 },
-        );
-      }
-    }
     // When the artist accepts, they may also declare the final agreed price.
     // That price flows straight into the event plan's budget.
     // If they don't specify, but there have been counter-offers, use the
@@ -237,12 +184,62 @@ export async function PUT(
         finalAgreedPrice = lastOffer.amount;
       }
     }
-    const priceUpdate =
-      finalAgreedPrice !== undefined ? { agreedPrice: finalAgreedPrice } : {};
     if (finalAgreedPrice === undefined) finalAgreedPrice = booking.agreedPrice ?? undefined;
     if (booking.artistId && (!finalAgreedPrice || !Number.isSafeInteger(finalAgreedPrice))) {
       return NextResponse.json({ error: "final_offer_price_required" }, { status: 400 });
     }
+    if (booking.artistId) {
+      try {
+        const { acceptArtistBooking } = await import("@/lib/booking/booking-transitions");
+        const offered = await acceptArtistBooking(booking, {
+          reply,
+          agreedPrice: finalAgreedPrice,
+        });
+        after(() => notifyConfirmationStep(offered, "Ofertă primită. Se așteaptă acceptarea clientului"));
+        return NextResponse.json({ success: true, status: offered.status });
+      } catch (error) {
+        if (error instanceof BookingChangedError) {
+          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+        }
+        if (error instanceof Error && error.message === "artist_unavailable") {
+          const { formatConflictMessage } = await import("@/lib/booking/availability");
+          const availability = (error as Error & { availability?: import("@/lib/booking/availability").AvailabilityResult }).availability;
+          return NextResponse.json(
+            {
+              error: "Nu poți accepta această rezervare — " + (availability ? formatConflictMessage(availability).toLowerCase() : "artist_unavailable"),
+            },
+            { status: 409 },
+          );
+        }
+        throw error;
+      }
+    }
+    if (booking.venueId) {
+      try {
+        const offered = await acceptVenueBooking(booking, {
+          reply,
+          agreedPrice: finalAgreedPrice,
+        });
+        after(() => notifyConfirmationStep(offered, "Ofertă primită. Se așteaptă acceptarea clientului"));
+        return NextResponse.json({ success: true, status: offered.status });
+      } catch (error) {
+        if (error instanceof VenueAvailabilityError) {
+          return NextResponse.json(
+            {
+              error: "Nu poți accepta această rezervare — " + (error.result.message || error.result.code).toLowerCase(),
+              code: error.result.code,
+            },
+            { status: error.status },
+          );
+        }
+        if (error instanceof BookingChangedError) {
+          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+        }
+        throw error;
+      }
+    }
+    const priceUpdate =
+      finalAgreedPrice !== undefined ? { agreedPrice: finalAgreedPrice } : {};
     const [offered] = await db.update(bookingRequests).set({
       status: "accepted", artistReply: reply || "Oferta este pregătită pentru acceptarea clientului.",
       ...priceUpdate, ...(finalAgreedPrice !== undefined ? { agreedPrice: finalAgreedPrice } : {}),
@@ -256,17 +253,14 @@ export async function PUT(
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
-    if (booking.status !== "pending") {
-      return NextResponse.json(
-        { error: "Doar cererile în așteptare pot fi refuzate" },
-        { status: 409 },
-      );
+    try {
+      await rejectBooking(booking.id, reply);
+    } catch (error) {
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "Doar cererile în așteptare pot fi refuzate" }, { status: 409 });
+      }
+      throw error;
     }
-    await db.update(bookingRequests).set({
-      status: "rejected",
-      artistReply: reply || "Ne pare rău, nu suntem disponibili.",
-      updatedAt: new Date(),
-    }).where(eq(bookingRequests.id, Number(id)));
 
   } else if (action === "client_confirm") {
     // Only the original client (matched via users.clerkId → clientUserId) may
@@ -284,8 +278,18 @@ export async function PUT(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
     if (booking.status === "confirmed_by_client") {
-      await finalConfirmationEffects(booking);
-      return NextResponse.json({ success: true, status: booking.status });
+      try {
+        const row = await replayConfirmationEffects(booking);
+        return NextResponse.json({ success: true, status: row.status });
+      } catch (error) {
+        if (error instanceof BookingChangedError) {
+          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+        }
+        throw error;
+      }
+    }
+    if (booking.venueId && booking.clientConfirmedAt) {
+      return NextResponse.json({ success: true, status: booking.status, awaitingVenue: true });
     }
     if (booking.status !== "accepted") {
       return NextResponse.json(
@@ -293,29 +297,62 @@ export async function PUT(
         { status: 409 },
       );
     }
-    if (booking.artistId) {
-      const { checkArtistAvailability } = await import("@/lib/booking/availability");
-      const available = await checkArtistAvailability({ artistId: booking.artistId, eventDate: booking.eventDate, startTime: booking.startTime, endTime: booking.endTime, excludeBookingId: booking.id });
-      if (!available.available) return NextResponse.json({ error: "artist_unavailable" }, { status: 409 });
-    }
     const next = confirmationTransition({ status: booking.status, venue: Boolean(booking.venueId), clientConfirmed: Boolean(booking.clientConfirmedAt), action });
     if (!next) return NextResponse.json({ error: "invalid_confirmation_step" }, { status: 409 });
     const now = new Date();
-    const [updated] = await db.update(bookingRequests).set({
-      status: next === "awaiting_venue" ? "accepted" : "confirmed_by_client",
-      clientConfirmedAt: booking.clientConfirmedAt ?? now,
-      confirmedAt: next === "awaiting_venue" ? null : now, updatedAt: now,
-    }).where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "accepted"))).returning();
-    if (!updated) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+    const applyClientConfirm = async (tx: VenueWriteTx | typeof db) =>
+      casClientConfirm(tx as unknown as typeof db, booking.id, {
+        status: next === "awaiting_venue" ? "accepted" : "confirmed_by_client",
+        clientConfirmedAt: now,
+        confirmedAt: next === "awaiting_venue" ? null : now,
+      });
+    let updated;
+    try {
+      if (next === "awaiting_venue") {
+        updated = await applyClientConfirm(db);
+      } else {
+        updated = await confirmBookingWithEffects(booking, async (tx) => applyClientConfirm(tx));
+      }
+    } catch (error) {
+      if (error instanceof VenueAvailabilityError) {
+        return NextResponse.json({ error: "venue_unavailable", code: error.result.code }, { status: error.status });
+      }
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+      }
+      throw error;
+    }
+    if (!updated) {
+      const [current] = await db
+        .select()
+        .from(bookingRequests)
+        .where(eq(bookingRequests.id, booking.id))
+        .limit(1);
+      if (current?.clientConfirmedAt) {
+        return NextResponse.json({
+          success: true,
+          status: current.status,
+          awaitingVenue: Boolean(current.venueId) && current.status === "accepted",
+        });
+      }
+      return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+    }
     if (next === "awaiting_venue") after(() => notifyConfirmationStep(updated, "Clientul a acceptat oferta. Sala trebuie să confirme rezervarea"));
-    else await finalConfirmationEffects(updated);
+    else scheduleConfirmationNotifications(updated);
     return NextResponse.json({ success: true, status: updated.status, awaitingVenue: next === "awaiting_venue" });
   } else if (action === "venue_confirm") {
     const owner = await requireBookingVendorAccess();
     if (!owner.ok) return NextResponse.json({ error: owner.error }, { status: owner.status });
     if (booking.venueId && booking.status === "confirmed_by_client") {
-      await finalConfirmationEffects(booking);
-      return NextResponse.json({ success: true, status: booking.status });
+      try {
+        const row = await replayConfirmationEffects(booking);
+        return NextResponse.json({ success: true, status: row.status });
+      } catch (error) {
+        if (error instanceof BookingChangedError) {
+          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+        }
+        throw error;
+      }
     }
     const next = confirmationTransition({ status: booking.status, venue: Boolean(booking.venueId), clientConfirmed: Boolean(booking.clientConfirmedAt), action });
     if (!next) return NextResponse.json({ error: "client_acceptance_required" }, { status: 409 });
@@ -324,14 +361,24 @@ export async function PUT(
     if (!computeCommission({ vendorType: "venue", baseAmount: booking.agreedPrice ?? 0, guestCount: booking.guestCount, eventType: booking.eventType }, await getCommissionRules())) {
       return NextResponse.json({ error: "Tariful acestui eveniment necesită clarificare cu administrația înainte de confirmare." }, { status: 409 });
     }
-    const { checkVenueAvailability } = await import("@/lib/booking/availability");
-    const available = await checkVenueAvailability({ venueId: booking.venueId!, eventDate: booking.eventDate, startTime: booking.startTime, endTime: booking.endTime, excludeBookingId: booking.id });
-    if (!available.available) return NextResponse.json({ error: "venue_unavailable" }, { status: 409 });
-    const now = new Date();
-    const [updated] = await db.update(bookingRequests).set({ status: "confirmed_by_client", confirmedAt: now, updatedAt: now })
-      .where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "accepted"))).returning();
-    if (!updated) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-    await finalConfirmationEffects(updated);
+    let updated;
+    try {
+      updated = await confirmBookingWithEffects(booking, async (tx) => {
+        const now = new Date();
+        const [row] = await tx.update(bookingRequests).set({ status: "confirmed_by_client", confirmedAt: now, updatedAt: now })
+          .where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "accepted"))).returning();
+        return row;
+      });
+    } catch (error) {
+      if (error instanceof VenueAvailabilityError) {
+        return NextResponse.json({ error: "venue_unavailable", code: error.result.code }, { status: error.status });
+      }
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+      }
+      throw error;
+    }
+    scheduleConfirmationNotifications(updated);
     return NextResponse.json({ success: true, status: updated.status });
   } else if (action === "cancel") {
     // The client may cancel while the request is still pending.
@@ -347,16 +394,14 @@ export async function PUT(
     if (!appUser || appUser.id !== booking.clientUserId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (!["pending", "accepted"].includes(booking.status)) {
-      return NextResponse.json(
-        { error: "Doar cererile neconfirmate pot fi retrase de client" },
-        { status: 409 },
-      );
+    try {
+      await clientCancelBooking(booking.id);
+    } catch (error) {
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "Doar cererile neconfirmate pot fi retrase de client" }, { status: 409 });
+      }
+      throw error;
     }
-    await db.update(bookingRequests).set({
-      status: "cancelled",
-      updatedAt: new Date(),
-    }).where(eq(bookingRequests.id, Number(id)));
 
   } else if (action === "complete") {
     const owner = await requireBookingVendorAccess();
@@ -386,36 +431,16 @@ export async function PUT(
     if (!owner.ok) {
       return NextResponse.json({ error: owner.error }, { status: owner.status });
     }
-    if (booking.status !== "accepted" && booking.status !== "confirmed_by_client") {
-      return NextResponse.json(
-        { error: "Only accepted/confirmed bookings can be cancelled by the vendor" },
-        { status: 409 },
-      );
-    }
-    await db.update(bookingRequests).set({
-      status: "cancelled",
-      artistReply: reply || "Rezervarea a fost anulată de organizator.",
-      updatedAt: new Date(),
-    }).where(eq(bookingRequests.id, Number(id)));
-    // Tariffs §10 — the fee dies with the event.
-    dropCommission(Number(id), "Anulată de furnizor");
-
-    // Release the auto-blocked calendar slot.
-    if (booking.eventDate) {
-      const entityType = booking.venueId ? "venue" : "artist";
-      const entityId = booking.venueId ?? booking.artistId;
-      if (entityId) {
-        await db
-          .delete(calendarEvents)
-          .where(
-            and(
-              eq(calendarEvents.entityType, entityType),
-              eq(calendarEvents.entityId, entityId),
-              eq(calendarEvents.date, booking.eventDate),
-              eq(calendarEvents.source, "booking"),
-            ),
-          );
+    try {
+      await vendorCancelBooking(booking.id, reply);
+    } catch (error) {
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json(
+          { error: "Only accepted/confirmed bookings can be cancelled by the vendor" },
+          { status: 409 },
+        );
       }
+      throw error;
     }
 
     // Notify the client (in-app + email) — outside the main request flow so
@@ -430,7 +455,10 @@ export async function PUT(
             .from(venues)
             .where(eq(venues.id, booking.venueId))
             .limit(1);
-          if (v) vendorName = `Sala ${v.nameRo}`;
+          if (v) {
+            const { venueHallDisplayName } = await import("@/lib/booking/venue-booking-write");
+            vendorName = await venueHallDisplayName(booking.venueId, booking.hallId ?? null);
+          }
         } else if (booking.artistId) {
           const [a] = await db
             .select({ nameRo: artists.nameRo })
@@ -535,10 +563,10 @@ export async function PUT(
         { status: 409 },
       );
     }
-    await db.update(bookingRequests).set({
-      paidStatus,
-      updatedAt: new Date(),
-    }).where(eq(bookingRequests.id, Number(id)));
+    const paid = await casSetPaid(db, Number(id), paidStatus as "unpaid" | "partial" | "paid");
+    if (!paid) {
+      return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+    }
   } else if (action === "propose_price") {
     // Either party can push a counter-offer onto the priceOffers jsonb log.
     // The offer does NOT change status — it's a negotiation signal only.

@@ -24,7 +24,7 @@ function matchesSignature(agreement: SavedOnboardingAgreement, signature: ESigna
  * data or localStorage. Both registering routes independently enforce the
  * current contract gate again before creating the profile.
  */
-export function useOnboardingAgreement(subjectType: "artist" | "venue", accountId: string | undefined, locale: Locale) {
+export function useOnboardingAgreement(subjectType: "artist" | "venue", accountId: string | undefined, locale: Locale, organizationId?: number) {
   const [remote, setRemote] = useState<RemoteState>({ loading: true, error: false, value: null });
   const requestGeneration = useRef(0);
   const text = onboardingAgreementText[locale];
@@ -38,7 +38,7 @@ export function useOnboardingAgreement(subjectType: "artist" | "venue", accountI
       ? { ...old, error: false }
       : { accountId, loading: true, error: false, value: null });
     try {
-      const response = await fetch("/api/legal/accept", { cache: "no-store" });
+      const response = await fetch(`/api/legal/accept${organizationId ? `?organizationId=${organizationId}` : ""}`, { cache: "no-store" });
       if (!response.ok) throw new Error("agreement_verification_failed");
       const data = await response.json();
       const value = data.onboarding?.[subjectType] as OnboardingAgreementStatus | undefined;
@@ -51,7 +51,7 @@ export function useOnboardingAgreement(subjectType: "artist" | "venue", accountI
       if (generation === requestGeneration.current) setRemote({ accountId, loading: false, error: true, value: null });
       throw error;
     }
-  }, [accountId, subjectType]);
+  }, [accountId, subjectType, organizationId]);
 
   useEffect(() => {
     if (accountId) void refresh().catch(() => {});
@@ -73,7 +73,7 @@ export function useOnboardingAgreement(subjectType: "artist" | "venue", accountI
     try {
       response = await fetch("/api/legal/accept", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ subjectType, accepted: true, packVersion: LEGAL_PACK_VERSION,
+        body: JSON.stringify({ subjectType, organizationId, accepted: true, packVersion: LEGAL_PACK_VERSION,
           signatureName: signature.signatureName, signatureImage: signature.signatureImage,
           documents: signature.documents, identity: signature.identity, locale }),
       });

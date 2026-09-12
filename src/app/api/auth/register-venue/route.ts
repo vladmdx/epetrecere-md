@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import { artists, venues, users, notifications } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { validatePhone } from "@/lib/phone/validate";
+import { jsonIfMultiHallEnabled } from "@/lib/partner/multi-hall-gate";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 
 // Each day is `{ open: HH:mm, close: HH:mm }` or null (closed). Mirrors
@@ -68,6 +69,8 @@ export async function POST(req: Request) {
     if (!clerkId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const blocked = jsonIfMultiHallEnabled();
+    if (blocked) return blocked;
 
     const body = await req.json();
     const parsed = registerSchema.safeParse(body);

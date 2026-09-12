@@ -66,19 +66,18 @@ export function commissionDueDate(confirmedAt: Date): string {
  */
 export async function ensureCommissionForBooking(
   bookingRequestId: number,
+  executor: typeof db = db,
 ): Promise<number | null> {
-  const [b] = await db
+  const [b] = await executor
     .select({
       id: bookingRequests.id,
       artistId: bookingRequests.artistId,
       venueId: bookingRequests.venueId,
+      hallId: bookingRequests.hallId,
       status: bookingRequests.status,
       confirmedAt: bookingRequests.confirmedAt,
       agreedPrice: bookingRequests.agreedPrice,
       guestCount: bookingRequests.guestCount,
-      // The agreement prices a venue by event type as well as by size, so the
-      // fee cannot be worked out without it. It was not selected before,
-      // because until now the venue tiers were a single global threshold.
       eventType: bookingRequests.eventType,
       source: bookingRequests.source,
     })
@@ -95,7 +94,7 @@ export async function ensureCommissionForBooking(
   // a fee on one would bill an artist for their own bookkeeping.
   if (b.source === "manual") return null;
 
-  const [existing] = await db
+  const [existing] = await executor
     .select({ id: commissions.id })
     .from(commissions)
     .where(eq(commissions.bookingRequestId, bookingRequestId))
@@ -135,13 +134,41 @@ export async function ensureCommissionForBooking(
   );
   if (!result) return null;
 
-  const [created] = await db
+  const snapshot = b.venueId
+    ? await (async () => {
+        const { venueHallDisplayName } = await import("@/lib/booking/venue-booking-write");
+        const { venues, venueHalls } = await import("@/lib/db/schema");
+        const [venue] = await executor
+          .select({ nameRo: venues.nameRo })
+          .from(venues)
+          .where(eq(venues.id, b.venueId!))
+          .limit(1);
+        const [hall] = b.hallId
+          ? await executor
+              .select({ nameRo: venueHalls.nameRo })
+              .from(venueHalls)
+              .where(eq(venueHalls.id, b.hallId))
+              .limit(1)
+          : [];
+        void venueHallDisplayName;
+        return {
+          hallId: b.hallId ?? null,
+          hallNameSnapshot: hall?.nameRo ?? null,
+          venueNameSnapshot: venue?.nameRo ?? null,
+        };
+      })()
+    : { hallId: null, hallNameSnapshot: null, venueNameSnapshot: null };
+
+  const [created] = await executor
     .insert(commissions)
     .values({
       bookingRequestId,
       vendorType,
       artistId: b.artistId ?? null,
       venueId: b.venueId ?? null,
+      hallId: snapshot.hallId,
+      hallNameSnapshot: snapshot.hallNameSnapshot,
+      venueNameSnapshot: snapshot.venueNameSnapshot,
       baseAmount,
       currency: result.currency,
       rateBps: result.rateBps,
@@ -206,8 +233,9 @@ export async function setCommissionStatus(
 export async function cancelCommissionForBooking(
   bookingRequestId: number,
   note: string,
+  executor: typeof db = db,
 ): Promise<void> {
-  await db
+  await executor
     .update(commissions)
     .set({
       status: "cancelled",

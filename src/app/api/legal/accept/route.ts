@@ -22,15 +22,16 @@ import { validSignatureImage } from "@/lib/legal/signature-image";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { onboardingAgreementStatus } from "@/lib/legal/onboarding-agreement";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { createHash } from "node:crypto";
 import { describeDevice } from "@/lib/legal/device";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { legalAcceptances, notifications, users, artists, venues } from "@/lib/db/schema";
 import {
+  requireOrganizationCapability,
+} from "@/lib/venue-access";
+import {
   LEGAL_PACK_VERSION,
   getLegalDocument,
-  legalBlocksFor,
   legalTitle,
   PARTNER_REQUIRED_DOCS,
   VENUE_REQUIRED_DOCS,
@@ -46,9 +47,17 @@ function clientIp(req: NextRequest): string | null {
   return value && isIP(value) ? value : null;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const organizationIdRaw = Number(req.nextUrl.searchParams.get("organizationId") ?? "");
+  const organizationId = Number.isFinite(organizationIdRaw) && organizationIdRaw > 0 ? organizationIdRaw : null;
+  if (organizationId) {
+    const orgAccess = await requireOrganizationCapability(organizationId, "manage_legal");
+    if (!orgAccess.ok) {
+      return NextResponse.json({ error: orgAccess.error, code: "FORBIDDEN" }, { status: orgAccess.status });
+    }
+  }
   const [u] = await db
     .select({ id: users.id })
     .from(users)
@@ -85,9 +94,15 @@ export async function GET() {
       email: legalAcceptances.email,
       phone: legalAcceptances.phone,
       contentHash: legalAcceptances.contentHash,
+      organizationId: legalAcceptances.organizationId,
+      acceptanceSessionId: legalAcceptances.acceptanceSessionId,
     })
     .from(legalAcceptances)
-    .where(eq(legalAcceptances.userId, u.id))
+    .where(
+      organizationId
+        ? eq(legalAcceptances.organizationId, organizationId)
+        : eq(legalAcceptances.userId, u.id),
+    )
     .orderBy(desc(legalAcceptances.acceptedAt));
 
   // Name each document server-side: the settings page must not pull the whole
@@ -115,9 +130,15 @@ export async function POST(req: NextRequest) {
     details: parsed.error.issues.map(i => ({ field: i.path.join("."), message: i.message })),
   }, { status: 400 });
   const body = parsed.data;
-  const { subjectType, signatureName, signatureImage, identity } = body;
+  const { subjectType, signatureName, signatureImage, organizationId, identity } = body;
   if (!await validSignatureImage(signatureImage)) {
     return NextResponse.json({ error: "valid_handwritten_signature_required" }, { status: 400 });
+  }
+  if (organizationId) {
+    const orgAccess = await requireOrganizationCapability(organizationId, "manage_legal");
+    if (!orgAccess.ok) {
+      return NextResponse.json({ error: orgAccess.error, code: "FORBIDDEN" }, { status: orgAccess.status });
+    }
   }
 
   const cu = await currentUser();
@@ -164,42 +185,40 @@ export async function POST(req: NextRequest) {
   const ip = clientIp(req);
   const ua = req.headers.get("user-agent")?.slice(0, 1000) ?? null;
   const device = describeDevice(ua, req.headers.get("x-client"));
-  const acceptedAt = new Date();
-  const values = slugs.map(slug => {
-    const doc = getLegalDocument(slug)!;
-    const shown = legalBlocksFor(doc, locale, identity);
-    return {
-      userId: u.id, subjectType, artistId: a?.id ?? null, venueId: v?.id ?? null,
-      documentSlug: slug, documentVersion: doc.version, packVersion: LEGAL_PACK_VERSION,
-      locale, signatureName, signatureImage, representativeRole: body.representativeRole ?? null,
-      documentTitle: legalTitle(doc, locale), documentBlocks: shown, deviceSummary: device,
-      ...identity, ipAddress: ip, userAgent: ua, email: u.email, phone, acceptedAt,
-      contentHash: createHash("sha256").update(shown.map(b => b.text).join("\n")).digest("hex"),
-    };
+  const { recordLegalAcceptancePack } = await import("@/lib/legal/record-acceptance");
+  const recordedPack = await recordLegalAcceptancePack({
+    userId: u.id,
+    subjectType,
+    artistId: a?.id ?? null,
+    venueId: v?.id ?? null,
+    organizationId: organizationId ?? null,
+    locale,
+    signatureName,
+    signatureImage,
+    representativeRole: body.representativeRole ?? null,
+    identity,
+    ipAddress: ip,
+    userAgent: ua,
+    deviceSummary: device,
+    email: u.email,
+    phone,
+    slugs,
   });
-  const previous = await db.select().from(legalAcceptances).where(and(
-    eq(legalAcceptances.userId, u.id), eq(legalAcceptances.subjectType, subjectType),
-  ));
-  // A retry may reuse the same immutable acceptance, never silently substitute
-  // a different party, language or document underneath an existing signature.
-  if (values.some(v => previous.some(p => p.documentSlug === v.documentSlug &&
-      p.documentVersion === v.documentVersion &&
-      (p.contentHash !== v.contentHash || p.signatureName !== signatureName)))) {
-    return NextResponse.json({ error: "signed_document_is_immutable" }, { status: 409 });
+  if (!recordedPack.ok) {
+    return NextResponse.json(
+      { error: recordedPack.error, code: recordedPack.code },
+      { status: recordedPack.status },
+    );
   }
-  // All documents are inserted by ONE statement: either the whole pack lands
-  // or none of it does. Existing signatures remain append-only.
-  const inserted = await db.insert(legalAcceptances).values(values).onConflictDoNothing().returning();
-  const recordedDocs = inserted.map(r => ({
-    slug: r.documentSlug, title: r.documentTitle!, version: r.documentVersion,
-    contentHash: r.contentHash!, acceptedAt: r.acceptedAt,
+  const inserted = recordedPack.rows;
+  const recordedDocs = recordedPack.recorded.map((r) => ({
+    slug: r.slug, title: r.title, version: r.version, contentHash: r.contentHash, acceptedAt: r.acceptedAt,
   }));
-
   const recorded = recordedDocs.map((d) => d.slug);
 
   // The dashboard reads the durable acceptance itself. Emails run with Next
   // after(), which keeps serverless work alive after the HTTP response.
-  if (recordedDocs.length > 0) {
+  if (recordedDocs.length > 0 && !recordedPack.reused) {
     // The stored timestamp, not a fresh one: this value is printed in the
     // signer's copy and the admin mail as the moment of acceptance, and it
     // has to be the moment the row actually records.

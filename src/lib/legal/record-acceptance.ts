@@ -1,0 +1,353 @@
+/**
+ * Atomic legal-pack acceptance. One session either lands completely, is
+ * reused if it is already complete and coherent, or writes nothing.
+ */
+import { createHash, randomUUID } from "node:crypto";
+import { and, eq, isNull } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { legalAcceptances } from "@/lib/db/schema";
+import {
+  LEGAL_PACK_VERSION,
+  PARTNER_REQUIRED_DOCS,
+  VENUE_REQUIRED_DOCS,
+  getLegalDocument,
+  legalBlocksFor,
+  legalTitle,
+  type PartnerIdentity,
+} from "@/lib/legal";
+import { missingCurrentDocuments } from "@/lib/legal/acceptance";
+import { onboardingAgreementStatus } from "@/lib/legal/onboarding-agreement";
+import { acquireLegalScopeLock } from "@/lib/booking/advisory-locks";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
+
+type Executor = typeof db;
+
+export type LegalAcceptanceValue = {
+  userId: string;
+  subjectType: "artist" | "venue";
+  artistId: number | null;
+  venueId: number | null;
+  organizationId: number | null;
+  documentSlug: string;
+  documentVersion: string;
+  packVersion: string;
+  locale: "ro" | "ru" | "en";
+  signatureName: string;
+  signatureImage: string;
+  representativeRole: string | null;
+  documentTitle: string;
+  documentBlocks: { type: string; text: string }[];
+  deviceSummary: string | null;
+  partnerType: string;
+  legalName: string;
+  idNumber: string;
+  legalAddress: string;
+  representativeName: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  email: string | null;
+  phone: string | null;
+  acceptedAt: Date;
+  contentHash: string;
+  acceptanceSessionId: string;
+};
+
+export type RecordedLegalDoc = {
+  slug: string;
+  title: string;
+  version: string;
+  contentHash: string;
+  acceptedAt: Date;
+};
+
+function requiredSlugs(subjectType: "artist" | "venue") {
+  return subjectType === "venue" ? VENUE_REQUIRED_DOCS : PARTNER_REQUIRED_DOCS;
+}
+
+function sessionIsComplete(rows: Array<typeof legalAcceptances.$inferSelect>, subjectType: "artist" | "venue") {
+  return missingCurrentDocuments(rows, subjectType).length === 0;
+}
+
+export function buildAcceptanceValues(input: {
+  userId: string;
+  subjectType: "artist" | "venue";
+  artistId: number | null;
+  venueId: number | null;
+  organizationId: number | null;
+  locale: "ro" | "ru" | "en";
+  signatureName: string;
+  signatureImage: string;
+  representativeRole?: string | null;
+  identity: PartnerIdentity;
+  ipAddress: string | null;
+  userAgent: string | null;
+  deviceSummary: string | null;
+  email: string | null;
+  phone: string | null;
+  acceptedAt: Date;
+  sessionId: string;
+  slugs: readonly string[];
+}): LegalAcceptanceValue[] {
+  return input.slugs.map((slug) => {
+    const doc = getLegalDocument(slug)!;
+    const shown = legalBlocksFor(doc, input.locale, input.identity);
+    return {
+      userId: input.userId,
+      subjectType: input.subjectType,
+      artistId: input.artistId,
+      venueId: input.venueId,
+      organizationId: input.organizationId,
+      documentSlug: slug,
+      documentVersion: doc.version,
+      packVersion: LEGAL_PACK_VERSION,
+      locale: input.locale,
+      signatureName: input.signatureName,
+      signatureImage: input.signatureImage,
+      representativeRole: input.representativeRole ?? null,
+      documentTitle: legalTitle(doc, input.locale),
+      documentBlocks: shown,
+      deviceSummary: input.deviceSummary,
+      partnerType: input.identity.partnerType,
+      legalName: input.identity.legalName,
+      idNumber: input.identity.idNumber ?? "",
+      legalAddress: input.identity.legalAddress ?? "",
+      representativeName: input.identity.representativeName ?? null,
+      ipAddress: input.ipAddress,
+      userAgent: input.userAgent,
+      email: input.email,
+      phone: input.phone,
+      acceptedAt: input.acceptedAt,
+      contentHash: createHash("sha256").update(shown.map((b) => b.text).join("\n")).digest("hex"),
+      acceptanceSessionId: input.sessionId,
+    };
+  });
+}
+
+async function loadScopeRows(
+  executor: Executor,
+  input: { userId: string; subjectType: "artist" | "venue"; organizationId: number | null },
+) {
+  if (input.organizationId) {
+    return executor
+      .select()
+      .from(legalAcceptances)
+      .where(eq(legalAcceptances.organizationId, input.organizationId));
+  }
+  return executor
+    .select()
+    .from(legalAcceptances)
+    .where(
+      and(
+        eq(legalAcceptances.userId, input.userId),
+        eq(legalAcceptances.subjectType, input.subjectType),
+        isNull(legalAcceptances.organizationId),
+      ),
+    );
+}
+
+function rowsForCurrentPack(rows: Array<typeof legalAcceptances.$inferSelect>) {
+  return rows.filter((row) => row.packVersion === LEGAL_PACK_VERSION);
+}
+
+function groupBySession(rows: Array<typeof legalAcceptances.$inferSelect>) {
+  const map = new Map<string, typeof rows>();
+  for (const row of rows) {
+    const key = row.acceptanceSessionId;
+    map.set(key, [...(map.get(key) ?? []), row]);
+  }
+  return [...map.values()].sort(
+    (a, b) => new Date(b[0]!.acceptedAt).getTime() - new Date(a[0]!.acceptedAt).getTime(),
+  );
+}
+
+function immutableConflict(
+  existing: Array<typeof legalAcceptances.$inferSelect>,
+  values: LegalAcceptanceValue[],
+) {
+  return values.some((value) =>
+    existing.some(
+      (row) =>
+        row.documentSlug === value.documentSlug &&
+        row.documentVersion === value.documentVersion &&
+        row.packVersion === value.packVersion &&
+        (row.contentHash !== value.contentHash || row.signatureName !== value.signatureName),
+    ),
+  );
+}
+
+export async function recordLegalAcceptancePack(input: {
+  userId: string;
+  subjectType: "artist" | "venue";
+  artistId: number | null;
+  venueId: number | null;
+  organizationId: number | null;
+  locale: "ro" | "ru" | "en";
+  signatureName: string;
+  signatureImage: string;
+  representativeRole?: string | null;
+  identity: PartnerIdentity;
+  ipAddress: string | null;
+  userAgent: string | null;
+  deviceSummary: string | null;
+  email: string | null;
+  phone: string | null;
+  slugs: readonly string[];
+}): Promise<
+  | {
+      ok: true;
+      reused: boolean;
+      sessionId: string;
+      rows: Array<typeof legalAcceptances.$inferSelect>;
+      recorded: RecordedLegalDoc[];
+    }
+  | { ok: false; status: number; error: string; code: string }
+> {
+  if (input.organizationId && input.subjectType !== "venue") {
+    return {
+      ok: false,
+      status: 400,
+      error: "organizationId is only valid for subjectType=venue",
+      code: "ORGANIZATION_SUBJECT_REQUIRED",
+    };
+  }
+  if (input.organizationId && !isMultiHallEnabled()) {
+    return { ok: false, status: 404, error: "FEATURE_DISABLED", code: "FEATURE_DISABLED" };
+  }
+
+  const required = requiredSlugs(input.subjectType);
+  if (
+    input.slugs.length !== required.length ||
+    required.some((slug) => !input.slugs.includes(slug))
+  ) {
+    return {
+      ok: false,
+      status: 400,
+      error: "all_current_documents_required",
+      code: "all_current_documents_required",
+    };
+  }
+
+  try {
+    return await db.transaction(async (tx) => {
+      const executor = tx as unknown as Executor;
+      await acquireLegalScopeLock(tx, {
+        organizationId: input.organizationId,
+        userId: input.userId,
+      });
+
+      let identity = input.identity;
+      if (input.organizationId) {
+        const { resolveOrganizationSigningIdentity } = await import("@/lib/partner/legal");
+        const resolved = await resolveOrganizationSigningIdentity(
+          input.organizationId,
+          input.identity,
+          executor,
+        );
+        if (!resolved.ok) {
+          return {
+            ok: false as const,
+            status: resolved.status,
+            error: resolved.code,
+            code: resolved.code,
+          };
+        }
+        identity = resolved.identity;
+      }
+
+      const existing = await loadScopeRows(executor, input);
+      const current = rowsForCurrentPack(existing);
+      const sessions = groupBySession(current);
+      const complete = sessions.find((session) => sessionIsComplete(session, input.subjectType));
+      if (complete) {
+        const status = onboardingAgreementStatus(complete, input.subjectType);
+        if (status.status !== "resumable") {
+          return {
+            ok: false as const,
+            status: 409,
+            error: "PACK_SESSION_INCOMPLETE",
+            code: "PACK_SESSION_INCOMPLETE",
+          };
+        }
+        if (immutableConflict(complete, buildAcceptanceValues({
+          ...input,
+          identity,
+          acceptedAt: complete[0]!.acceptedAt,
+          sessionId: complete[0]!.acceptanceSessionId,
+          slugs: input.slugs,
+        }))) {
+          return {
+            ok: false as const,
+            status: 409,
+            error: "signed_document_is_immutable",
+            code: "signed_document_is_immutable",
+          };
+        }
+        const recorded = required.map((slug) => {
+          const row = complete.find((item) => item.documentSlug === slug)!;
+          return {
+            slug: row.documentSlug,
+            title: row.documentTitle ?? row.documentSlug,
+            version: row.documentVersion,
+            contentHash: row.contentHash ?? "",
+            acceptedAt: row.acceptedAt,
+          };
+        });
+        return {
+          ok: true as const,
+          reused: true,
+          sessionId: complete[0]!.acceptanceSessionId,
+          rows: complete,
+          recorded,
+        };
+      }
+
+      if (current.length > 0) {
+        return {
+          ok: false as const,
+          status: 409,
+          error: "PACK_SESSION_INCOMPLETE",
+          code: "PACK_SESSION_INCOMPLETE",
+        };
+      }
+
+      const sessionId = randomUUID();
+      const acceptedAt = new Date();
+      const values = buildAcceptanceValues({
+        ...input,
+        identity,
+        acceptedAt,
+        sessionId,
+        slugs: input.slugs,
+      });
+      const inserted = await executor.insert(legalAcceptances).values(values).returning();
+      if (inserted.length !== values.length) {
+        throw new Error("legal_session_insert_incomplete");
+      }
+      const recorded = inserted.map((row) => ({
+        slug: row.documentSlug,
+        title: row.documentTitle ?? row.documentSlug,
+        version: row.documentVersion,
+        contentHash: row.contentHash ?? "",
+        acceptedAt: row.acceptedAt,
+      }));
+      return {
+        ok: true as const,
+        reused: false,
+        sessionId,
+        rows: inserted,
+        recorded,
+      };
+    });
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    if (code === "23505") {
+      return {
+        ok: false,
+        status: 409,
+        error: "signed_document_is_immutable",
+        code: "signed_document_is_immutable",
+      };
+    }
+    throw error;
+  }
+}

@@ -60,6 +60,7 @@ interface Props {
   chartPoints: ChartPoint[];
   referrerBreakdown: Referrer[];
   cityComparison: CityComparison;
+  basePath?: string;
 }
 
 const PERIOD_OPTIONS: Array<{ key: string; labelKey: string }> = [
@@ -99,6 +100,7 @@ export function VenueAnalyticsClient({
   chartPoints,
   referrerBreakdown,
   cityComparison,
+  basePath = "/dashboard/sala/analitice",
 }: Props) {
   const { t } = useLocale();
   const router = useRouter();
@@ -115,7 +117,7 @@ export function VenueAnalyticsClient({
       : 0;
 
   function changePeriod(next: string) {
-    router.push(`/dashboard/sala/analitice?period=${next}`);
+    router.push(`${basePath}?period=${next}`);
   }
 
   // AI suggestion — fetched on demand (not auto) to avoid AI cost on every

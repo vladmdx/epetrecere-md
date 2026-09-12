@@ -71,6 +71,10 @@ interface Props {
   initialDate: string | null;
   icalUrl: string;
   googleConnected: boolean;
+  basePath?: string;
+  halls?: Array<{ id: number; nameRo: string; status: string }>;
+  selectedHallId?: number | null;
+  writeTarget?: "calendar_events" | "schedule-blocks";
 }
 
 /** Spec 2.8: calendar window capped at 18 months ahead of today. */
@@ -139,6 +143,10 @@ export function VenueCalendarClient({
   initialDate,
   icalUrl,
   googleConnected,
+  basePath = "/dashboard/sala/calendar",
+  halls = [],
+  selectedHallId = null,
+  writeTarget = "calendar_events",
 }: Props) {
   const { t, locale } = useLocale();
   const router = useLocalizedRouter();
@@ -162,10 +170,11 @@ export function VenueCalendarClient({
 
   // Build lookup maps
   const eventsByDate = useMemo(() => {
-    const m = new Map<string, CalendarEvent>();
+    const m = new Map<string, CalendarEvent[]>();
     for (const e of events) {
       const key = typeof e.date === "string" ? e.date.split("T")[0] : e.date;
-      m.set(key, { ...e, date: key });
+      if (!m.has(key)) m.set(key, []);
+      m.get(key)!.push({ ...e, date: key });
     }
     return m;
   }, [events]);
@@ -251,14 +260,14 @@ export function VenueCalendarClient({
     if (y > maxFuture.year || (y === maxFuture.year && m > maxFuture.month)) return;
     if (y < minPast.year || (y === minPast.year && m < minPast.month)) return;
     const monthStr = `${y}-${String(m + 1).padStart(2, "0")}`;
-    router.push(`/dashboard/sala/calendar?month=${monthStr}`);
+    router.push(`${basePath}?month=${monthStr}`);
   }
 
   function jumpToMonth(y: number, m: number) {
     if (y > maxFuture.year || (y === maxFuture.year && m > maxFuture.month)) return;
     if (y < minPast.year || (y === minPast.year && m < minPast.month)) return;
     router.push(
-      `/dashboard/sala/calendar?month=${y}-${String(m + 1).padStart(2, "0")}`,
+      `${basePath}?month=${y}-${String(m + 1).padStart(2, "0")}`,
     );
   }
 
@@ -280,7 +289,7 @@ export function VenueCalendarClient({
 
   function goToday() {
     const ts = toDateStr(today.getFullYear(), today.getMonth(), today.getDate());
-    router.push(`/dashboard/sala/calendar?date=${ts}`);
+    router.push(`${basePath}?date=${ts}`);
   }
 
   async function copyIcalUrl() {
@@ -294,14 +303,51 @@ export function VenueCalendarClient({
 
   function connectGoogle() {
     // Pass the current calendar page as return-to via `state`.
-    const returnPath = "/dashboard/sala/calendar";
+    const returnPath = basePath;
     window.location.href = `/api/auth/google/callback?return=${encodeURIComponent(returnPath)}`;
+  }
+
+  async function saveScheduleBlocks(dates: string[], status: string, noteText: string) {
+    if (status === "tentative") {
+      return { error: "TENTATIVE_NOT_SUPPORTED", message: "Schedule blocks cannot be tentative." };
+    }
+    const wholeVenue = selectedHallId == null;
+    const res = await fetch(`/api/venues/${venueId}/schedule-blocks`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        dates,
+        status: status === "available" ? "available" : "blocked",
+        timezone: "Europe/Chisinau",
+        kind: "manual",
+        reason: noteText || null,
+        ...(wholeVenue ? { wholeVenue: true } : { hallId: selectedHallId, wholeVenue: false }),
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      return err;
+    }
+    return null;
   }
 
   async function saveDayStatus() {
     if (!dayDialog) return;
     setSaving(true);
     try {
+      if (writeTarget === "schedule-blocks") {
+        const err = await saveScheduleBlocks([dayDialog], newStatus, note.trim());
+        if (err) {
+          toast.error(err.message || err.error || t("vendorSalaCalendar.saveFailed"));
+          return;
+        }
+        toast.success(t("vendorSalaCalendar.calendarUpdated"));
+        setDayDialog(null);
+        setNote("");
+        setNewStatus("available");
+        router.refresh();
+        return;
+      }
       const res = await fetch("/api/calendar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -333,6 +379,18 @@ export function VenueCalendarClient({
     setSaving(true);
     try {
       const all = enumerateRange(rangeDialog.start, rangeDialog.end);
+      if (writeTarget === "schedule-blocks") {
+        const err = await saveScheduleBlocks(all, rangeStatus, rangeNote.trim());
+        if (err) {
+          toast.error(err.message || err.error || t("vendorSalaCalendar.saveFailed"));
+          return;
+        }
+        toast.success(t("vendorSalaCalendar.daysUpdated", { count: all.length }));
+        setRangeDialog(null);
+        setRangeNote("");
+        router.refresh();
+        return;
+      }
       // Filter out dates that already have accepted/confirmed bookings (never overwrite real bookings)
       const dates = all.filter((d) => {
         const books = bookingsByDate.get(d);
@@ -427,6 +485,26 @@ export function VenueCalendarClient({
               {t("vendorSalaCalendar.viewList")}
             </button>
           </div>
+
+          {halls.length > 1 && (
+            <select
+              aria-label={t("vendor.multiHall.halls")}
+              value={selectedHallId ?? ""}
+              onChange={(e) => {
+                const monthStr = `${monthYear}-${String(monthIndex + 1).padStart(2, "0")}`;
+                const hall = e.target.value;
+                const qs = new URLSearchParams({ month: monthStr });
+                if (hall) qs.set("hallId", hall);
+                router.push(`${basePath}?${qs.toString()}`);
+              }}
+              className="h-8 rounded-md border border-border/50 bg-background px-2 text-xs"
+            >
+              <option value="">{t("vendor.multiHall.allHalls")}</option>
+              {halls.map((hall) => (
+                <option key={hall.id} value={hall.id}>{hall.nameRo}</option>
+              ))}
+            </select>
+          )}
 
           {/* Month dropdown jumper — spec 2.4.5 */}
           <select
@@ -534,8 +612,10 @@ export function VenueCalendarClient({
           <div className="grid grid-cols-7 gap-1.5 select-none">
             {cells.map((c, i) => {
               if (!c.dateStr || c.day === null) return <div key={i} />;
-              const event = eventsByDate.get(c.dateStr);
+              const dayEvents = eventsByDate.get(c.dateStr) ?? [];
+              const event = dayEvents[0];
               const dayBook = bookingsByDate.get(c.dateStr) ?? [];
+              const extraCount = dayEvents.length + dayBook.length;
               // Prefer a confirmed/accepted booking visual, fall back to pending (tentative)
               const confirmed = dayBook.find(
                 (b) => b.status === "accepted" || b.status === "confirmed_by_client",
@@ -620,11 +700,8 @@ export function VenueCalendarClient({
                       {labelText}
                     </span>
                   )}
-                  {primaryBooking && (
-                    <span className="mt-0.5 truncate text-[10px] opacity-90">
-                      {primaryBooking.clientName.split(" ")[0]}
-                      {primaryBooking.guestCount ? ` · ${primaryBooking.guestCount}p` : ""}
-                    </span>
+                  {extraCount > 1 && (
+                    <span className="mt-0.5 text-[10px] text-muted-foreground">+{extraCount - 1}</span>
                   )}
                 </button>
               );
@@ -647,7 +724,7 @@ export function VenueCalendarClient({
               eventsByDate={eventsByDate}
               bookingsByDate={bookingsByDate}
               onRowClick={(dateStr) => {
-                const event = eventsByDate.get(dateStr);
+                const event = eventsByDate.get(dateStr)?.[0];
                 setDayDialog(dateStr);
                 setNote(event?.note || "");
                 setNewStatus(
@@ -784,7 +861,7 @@ export function VenueCalendarClient({
                 );
               })}
               <Link
-                href="/dashboard/sala/rezervari"
+                href={`${basePath.replace(/\/calendar$/, "")}/rezervari`}
                 className="block text-center text-xs text-gold hover:underline"
               >
                 {t("vendorSalaCalendar.seeAllBookings")}
@@ -798,7 +875,10 @@ export function VenueCalendarClient({
               <div>
                 <Label className="text-xs">{t("vendorSalaCalendar.statusLabel")}</Label>
                 <div className="mt-1 grid grid-cols-3 gap-2">
-                  {(["available", "tentative", "blocked"] as const).map((s) => {
+                  {(writeTarget === "schedule-blocks"
+                    ? (["available", "blocked"] as const)
+                    : (["available", "tentative", "blocked"] as const)
+                  ).map((s) => {
                     const cfg = {
                       available: {
                         labelKey: "common.available",
@@ -908,7 +988,10 @@ export function VenueCalendarClient({
             <div>
               <Label className="text-xs">{t("vendorSalaCalendar.rangeStatusLabel")}</Label>
               <div className="mt-1 grid grid-cols-3 gap-2">
-                {(["available", "tentative", "blocked"] as const).map((s) => {
+                {(writeTarget === "schedule-blocks"
+                  ? (["available", "blocked"] as const)
+                  : (["available", "tentative", "blocked"] as const)
+                ).map((s) => {
                   const cfg = {
                     available: {
                       labelKey: "common.available",
@@ -1013,7 +1096,7 @@ function ListView({
 }: {
   monthYear: number;
   monthIndex: number;
-  eventsByDate: Map<string, CalendarEvent>;
+  eventsByDate: Map<string, CalendarEvent[]>;
   bookingsByDate: Map<string, Booking[]>;
   onRowClick: (dateStr: string) => void;
 }) {
@@ -1039,7 +1122,8 @@ function ListView({
       (b) => b.status === "accepted" || b.status === "confirmed_by_client",
     );
     const pending = dayBookings.find((b) => b.status === "pending");
-    const event = eventsByDate.get(dateStr);
+    const dayEvents = eventsByDate.get(dateStr) ?? [];
+    const event = dayEvents[0];
 
     if (confirmed) {
       const cfg = eventTypeVisual(confirmed.eventType, locale);

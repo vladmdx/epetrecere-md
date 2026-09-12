@@ -58,6 +58,8 @@ export interface DispatchInput {
   emailSubject?: string;
   /** Optional: email HTML body */
   emailHtml?: string;
+  /** Durable idempotency key (unique per user). */
+  dedupeKey?: string;
 }
 
 /**
@@ -127,13 +129,15 @@ export async function dispatchNotification(input: DispatchInput): Promise<void> 
     // In-app notification — always inserted regardless of channel prefs.
     // Users can still see them in the bell dropdown even if they muted
     // email + push for that category.
-    await db.insert(notifications).values({
+    const inserted = await db.insert(notifications).values({
       userId: input.userId,
       type: input.type,
       title: input.title,
       message: input.message,
       actionUrl: input.actionUrl,
-    });
+      dedupeKey: input.dedupeKey ?? null,
+    }).onConflictDoNothing().returning({ id: notifications.id });
+    if (input.dedupeKey && inserted.length === 0) return;
 
     const prefs = await resolvePrefs(input.userId, String(input.type));
 

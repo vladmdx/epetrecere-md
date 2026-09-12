@@ -28,6 +28,7 @@ interface EvidenceRow extends SignedDocumentEvidence {
   partnerType: string | null;
   representativeName: string | null;
   documentTitle: string | null;
+  acceptanceSessionId?: string | null;
 }
 
 /** Only a complete, coherent, current signing session can resume onboarding.
@@ -44,8 +45,9 @@ export function onboardingAgreementStatus(rows: EvidenceRow[], subjectType: "art
   for (const row of current) {
     const date = new Date(row.acceptedAt);
     if (row.packVersion !== LEGAL_PACK_VERSION || Number.isNaN(date.getTime())) continue;
-    const key = JSON.stringify([date.toISOString(), row.locale, row.signatureName, row.signatureImage,
-      row.partnerType, row.legalName, row.idNumber, row.legalAddress, row.representativeName, row.representativeRole]);
+    const key = row.acceptanceSessionId
+      || JSON.stringify([date.toISOString(), row.locale, row.signatureName, row.signatureImage,
+        row.partnerType, row.legalName, row.idNumber, row.legalAddress, row.representativeName, row.representativeRole]);
     sessions.set(key, [...(sessions.get(key) ?? []), row]);
   }
   const ordered = [...sessions.values()].sort((a, b) => new Date(b[0].acceptedAt).getTime() - new Date(a[0].acceptedAt).getTime());

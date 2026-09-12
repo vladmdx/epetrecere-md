@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { venueImages } from "@/lib/db/schema";
+import { venueImages, venueHalls } from "@/lib/db/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { requireVenueCapability } from "@/lib/venue-access";
+import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 
 // Venue gallery images CRUD — mirrors /api/artist-images.
 //
@@ -12,6 +13,7 @@ import { requireVenueCapability } from "@/lib/venue-access";
 
 const createSchema = z.object({
   venueId: z.number().int().positive(),
+  hallId: z.number().int().positive().optional().nullable(),
   url: z.string().url(),
   altRo: z.string().max(500).optional().nullable(),
   altRu: z.string().max(500).optional().nullable(),
@@ -66,6 +68,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: owner.error }, { status: owner.status });
   }
 
+  if (parsed.data.hallId) {
+    const blocked = jsonIfMultiHallDisabled();
+    if (blocked) return blocked;
+    const [hall] = await db
+      .select({ id: venueHalls.id, venueId: venueHalls.venueId })
+      .from(venueHalls)
+      .where(eq(venueHalls.id, parsed.data.hallId))
+      .limit(1);
+    if (!hall || hall.venueId !== parsed.data.venueId) {
+      return NextResponse.json({ error: "Hall does not belong to this venue" }, { status: 403 });
+    }
+  }
+
   // Ensure only one cover image at a time.
   if (parsed.data.isCover) {
     await db
@@ -78,6 +93,7 @@ export async function POST(req: Request) {
     .insert(venueImages)
     .values({
       venueId: parsed.data.venueId,
+      hallId: parsed.data.hallId ?? null,
       url: parsed.data.url,
       altRo: parsed.data.altRo ?? null,
       altRu: parsed.data.altRu ?? null,

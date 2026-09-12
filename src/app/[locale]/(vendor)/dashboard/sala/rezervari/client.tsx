@@ -92,6 +92,7 @@ interface Props {
   initialTab: VenueBookingTab;
   initialBookings: Booking[];
   counts: Record<VenueBookingTab, number>;
+  basePath?: string;
 }
 
 const TABS: Array<{ key: VenueBookingTab; labelKey: string }> = [
@@ -196,6 +197,7 @@ export function VenueBookingsClient({
   initialTab,
   initialBookings,
   counts,
+  basePath = "/dashboard/sala/rezervari",
 }: Props) {
   const { t, locale } = useLocale();
   const router = useLocalizedRouter();
@@ -255,7 +257,7 @@ export function VenueBookingsClient({
   function switchTab(tab: VenueBookingTab) {
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", tab);
-    router.push(`/dashboard/sala/rezervari?${params.toString()}`);
+    router.push(`${basePath}?${params.toString()}`);
   }
 
   /** Unique event types present in the current tab's list — populates the filter dropdown. */

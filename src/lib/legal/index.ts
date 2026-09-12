@@ -34,6 +34,21 @@ export const LEGAL_DOCUMENTS = raw as unknown as LegalDocument[];
  */
 export const LEGAL_PACK_VERSION = "2.2";
 
+/**
+ * Every required document must receive a new document_version when the pack
+ * changes. Pack 2.2 previously left reguli-marketplace at 1.0 (same as 2.1),
+ * which collided on unique (slug, document_version). 0030 also includes
+ * pack_version in the unique keys; these bumps close the remaining 2.1 keys.
+ */
+export const REQUIRED_DOCUMENT_VERSIONS_THIS_PACK: Record<string, string> = {
+  "acord-parteneri": "2.2",
+  "acord-locatii": "2.2",
+  "termeni-generali": "2.2",
+  "politica-confidentialitate": "1.3",
+  "reguli-marketplace": "1.1",
+  tarife: "2.2",
+};
+
 export function getLegalDocument(slug: string): LegalDocument | null {
   return LEGAL_DOCUMENTS.find((d) => d.slug === slug) ?? null;
 }

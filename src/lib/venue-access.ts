@@ -46,6 +46,14 @@ export type VenueCapability =
   | "manage_ai"
   | "manage_financials"
   | "request_reviews"
+  | "manage_members"
+  | "manage_halls";
+
+export type OrganizationCapability =
+  | "view_organization"
+  | "manage_venues"
+  | "manage_billing"
+  | "manage_legal"
   | "manage_members";
 
 export const VENUE_CAPABILITY_MIN_ROLE: Record<VenueCapability, OrgRole> = {
@@ -58,7 +66,24 @@ export const VENUE_CAPABILITY_MIN_ROLE: Record<VenueCapability, OrgRole> = {
   manage_financials: "admin",
   request_reviews: "admin",
   manage_members: "owner",
+  manage_halls: "admin",
 };
+
+export const ORG_CAPABILITY_MIN_ROLE: Record<OrganizationCapability, OrgRole> = {
+  view_organization: "staff",
+  manage_venues: "admin",
+  manage_billing: "admin",
+  manage_legal: "owner",
+  manage_members: "owner",
+};
+
+/** Members may keep working a draft/pending/rejected org; suspended/archived cut access. */
+export const ORG_STATUSES_ALLOWING_ACCESS = [
+  "draft",
+  "pending",
+  "active",
+  "rejected",
+] as const;
 
 const ROLE_RANK: Record<OrgRole, number> = {
   staff: 1,
@@ -136,7 +161,7 @@ async function membershipRole(
         eq(partnerOrganizationMembers.userId, userId),
         eq(partnerOrganizationMembers.organizationId, organizationId),
         eq(partnerOrganizationMembers.isActive, true),
-        eq(partnerOrganizations.status, "active"),
+        inArray(partnerOrganizations.status, [...ORG_STATUSES_ALLOWING_ACCESS]),
       ),
     );
   if (rows.length === 0) return null;
@@ -240,6 +265,18 @@ export async function authorizeVenueCapability(
   return authorizeVenueAccess(user, venueId, VENUE_CAPABILITY_MIN_ROLE[capability]);
 }
 
+export async function authorizeOrganizationCapability(
+  user: AppUser,
+  organizationId: number,
+  capability: OrganizationCapability,
+): Promise<OrgAccess | AccessError> {
+  return authorizeOrganizationAccess(
+    user,
+    organizationId,
+    ORG_CAPABILITY_MIN_ROLE[capability],
+  );
+}
+
 /** Pure hall authorization: resolves the hall's venue, then authorizes it. */
 export async function authorizeHallAccess(
   user: AppUser,
@@ -299,6 +336,15 @@ export async function requireVenueCapability(
   return authorizeVenueCapability(user, venueId, capability);
 }
 
+export async function requireOrganizationCapability(
+  organizationId: number,
+  capability: OrganizationCapability,
+): Promise<OrgAccess | AccessError> {
+  const user = await getCurrentAppUser();
+  if (!user) return { ok: false, status: 401, error: "Unauthorized" };
+  return authorizeOrganizationCapability(user, organizationId, capability);
+}
+
 /**
  * Require access to the venue that owns `hallId`. Guarantees the hall exists
  * and resolves ownership through its venue, so a forged hall id belonging to
@@ -353,7 +399,7 @@ export async function listAccessibleVenueIds(userId: string): Promise<number[]> 
       and(
         eq(partnerOrganizationMembers.userId, userId),
         eq(partnerOrganizationMembers.isActive, true),
-        eq(partnerOrganizations.status, "active"),
+        inArray(partnerOrganizations.status, [...ORG_STATUSES_ALLOWING_ACCESS]),
       ),
     );
   const orgIds = memberships.map((m) => m.organizationId);
@@ -421,7 +467,7 @@ export async function getVenueOwnerRecipients(
           eq(partnerOrganizationMembers.organizationId, venue.organizationId),
           eq(partnerOrganizationMembers.isActive, true),
           inArray(partnerOrganizationMembers.role, ["owner", "admin"]),
-          eq(partnerOrganizations.status, "active"),
+          inArray(partnerOrganizations.status, [...ORG_STATUSES_ALLOWING_ACCESS]),
         ),
       );
     for (const m of members) recipients.set(m.userId, m.email);
@@ -466,4 +512,103 @@ export async function resolveSelectedVenue(
   if (ids.length === 1) return { ok: true, venueId: ids[0] };
   if (ids.length === 0) return { ok: false, reason: "none", venueIds: ids };
   return { ok: false, reason: "ambiguous", venueIds: ids };
+}
+
+export type AccessibleOrganization = {
+  id: number;
+  displayName: string;
+  status: string;
+  role: OrgRole;
+};
+
+/** Organizations the user can administer (active membership, non-cut-off status). */
+export async function listAccessibleOrganizations(
+  userId: string,
+): Promise<AccessibleOrganization[]> {
+  const [appUser] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (appUser && (appUser.role === "admin" || appUser.role === "super_admin")) {
+    const rows = await db
+      .select({
+        id: partnerOrganizations.id,
+        displayName: partnerOrganizations.displayName,
+        status: partnerOrganizations.status,
+      })
+      .from(partnerOrganizations);
+    return rows.map((row) => ({
+      id: row.id,
+      displayName: row.displayName,
+      status: row.status,
+      role: "owner" as const,
+    }));
+  }
+  if (!isMultiHallEnabled()) return [];
+  const rows = await db
+    .select({
+      id: partnerOrganizations.id,
+      displayName: partnerOrganizations.displayName,
+      status: partnerOrganizations.status,
+      role: partnerOrganizationMembers.role,
+    })
+    .from(partnerOrganizationMembers)
+    .innerJoin(
+      partnerOrganizations,
+      eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+    )
+    .where(
+      and(
+        eq(partnerOrganizationMembers.userId, userId),
+        eq(partnerOrganizationMembers.isActive, true),
+        inArray(partnerOrganizations.status, [...ORG_STATUSES_ALLOWING_ACCESS]),
+      ),
+    );
+  const byId = new Map<number, AccessibleOrganization>();
+  for (const row of rows) {
+    const role = row.role as OrgRole;
+    const existing = byId.get(row.id);
+    if (!existing || ROLE_RANK[role] > ROLE_RANK[existing.role]) {
+      byId.set(row.id, {
+        id: row.id,
+        displayName: row.displayName,
+        status: row.status,
+        role,
+      });
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.id - b.id);
+}
+
+export async function countActiveOwners(organizationId: number): Promise<number> {
+  const rows = await db
+    .select({ userId: partnerOrganizationMembers.userId })
+    .from(partnerOrganizationMembers)
+    .where(
+      and(
+        eq(partnerOrganizationMembers.organizationId, organizationId),
+        eq(partnerOrganizationMembers.isActive, true),
+        eq(partnerOrganizationMembers.role, "owner"),
+      ),
+    );
+  return rows.length;
+}
+
+export async function isLastActiveOwner(
+  organizationId: number,
+  userId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ role: partnerOrganizationMembers.role, isActive: partnerOrganizationMembers.isActive })
+    .from(partnerOrganizationMembers)
+    .where(
+      and(
+        eq(partnerOrganizationMembers.organizationId, organizationId),
+        eq(partnerOrganizationMembers.userId, userId),
+      ),
+    )
+    .limit(1);
+  if (!row || !row.isActive || row.role !== "owner") return false;
+  return (await countActiveOwners(organizationId)) <= 1;
 }

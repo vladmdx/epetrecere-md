@@ -5,8 +5,9 @@ import { bookingTextForViewer } from "@/lib/privacy/booking-text";
 import { NextRequest, NextResponse } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { venues, bookingRequests, calendarEvents } from "@/lib/db/schema";
+import { venues, bookingRequests, calendarEvents, venueScheduleBlocks } from "@/lib/db/schema";
 import { verifyVenueIcalToken } from "@/lib/calendar/ical-token";
+import { localDatesIntersecting } from "@/lib/booking/zoned-interval";
 
 export const runtime = "nodejs";
 
@@ -57,7 +58,10 @@ export async function GET(
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const [bookings, blackouts] = await Promise.all([
+  const hallIdRaw = _req.nextUrl.searchParams.get("hallId");
+  const hallId = hallIdRaw ? Number(hallIdRaw) : null;
+
+  const [bookings, blackouts, blocks] = await Promise.all([
     db
       .select()
       .from(bookingRequests)
@@ -77,7 +81,18 @@ export async function GET(
           eq(calendarEvents.status, "blocked"),
         ),
       ),
+    db.select().from(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, venueId)),
   ]);
+
+  const filteredBookings = hallId && Number.isFinite(hallId)
+    ? bookings.filter((b) => b.hallId === hallId || b.reservationScope === "venue" || b.hallId == null)
+    : bookings;
+  const filteredBlackouts = hallId && Number.isFinite(hallId)
+    ? blackouts.filter((c) => c.hallId == null || c.hallId === hallId)
+    : blackouts;
+  const filteredBlocks = hallId && Number.isFinite(hallId)
+    ? blocks.filter((block) => block.hallId == null || block.hallId === hallId)
+    : blocks;
 
   const now = new Date();
   const lines: string[] = [
@@ -90,7 +105,7 @@ export async function GET(
     "X-WR-TIMEZONE:Europe/Chisinau",
   ];
 
-  for (const b of bookings) {
+  for (const b of filteredBookings) {
     const shared = b.status === "confirmed_by_client";
     const clientName = bookingTextForViewer(b.clientName, shared);
     const eventType = bookingTextForViewer(b.eventType, shared) ?? "Eveniment";
@@ -122,7 +137,7 @@ export async function GET(
     );
   }
 
-  for (const c of blackouts) {
+  for (const c of filteredBlackouts) {
     const uid = `venue-blackout-${c.id}@epetrecere.md`;
     const start = formatDate(c.date);
     const endDate = new Date(c.date);
@@ -138,6 +153,58 @@ export async function GET(
       "TRANSP:OPAQUE",
       "END:VEVENT",
     );
+  }
+
+  for (const block of filteredBlocks) {
+    const uid = `venue-block-${block.id}@epetrecere.md`;
+    const fullDay = !block.startsAt || !block.endsAt
+      ? true
+      : localDatesIntersecting({
+          startsAt: block.startsAt,
+          endsAt: block.endsAt,
+          timezone: "Europe/Chisinau",
+          eventDate: block.startsAt.toISOString().slice(0, 10),
+          startTime: null,
+          endTime: null,
+        }).length > 0 &&
+        (block.endsAt.getTime() - block.startsAt.getTime()) >= 20 * 60 * 60 * 1000;
+    if (fullDay) {
+      const dates = localDatesIntersecting({
+        startsAt: block.startsAt,
+        endsAt: block.endsAt,
+        timezone: "Europe/Chisinau",
+        eventDate: block.startsAt.toISOString().slice(0, 10),
+        startTime: null,
+        endTime: null,
+      });
+      for (const date of dates) {
+        const start = formatDate(date);
+        const endDate = new Date(date);
+        endDate.setUTCDate(endDate.getUTCDate() + 1);
+        const end = formatDate(endDate);
+        lines.push(
+          "BEGIN:VEVENT",
+          `UID:${uid}-${date}`,
+          `DTSTAMP:${formatDateTime(block.createdAt ?? now)}`,
+          `DTSTART;VALUE=DATE:${start}`,
+          `DTEND;VALUE=DATE:${end}`,
+          `SUMMARY:${escapeIcs("⛔ Indisponibil")}`,
+          "TRANSP:OPAQUE",
+          "END:VEVENT",
+        );
+      }
+    } else {
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:${uid}`,
+        `DTSTAMP:${formatDateTime(block.createdAt ?? now)}`,
+        `DTSTART:${formatDateTime(block.startsAt)}`,
+        `DTEND:${formatDateTime(block.endsAt)}`,
+        `SUMMARY:${escapeIcs("⛔ Indisponibil")}`,
+        "TRANSP:OPAQUE",
+        "END:VEVENT",
+      );
+    }
   }
 
   lines.push("END:VCALENDAR");

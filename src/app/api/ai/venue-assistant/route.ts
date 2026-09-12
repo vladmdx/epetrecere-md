@@ -239,8 +239,13 @@ export async function POST(req: NextRequest) {
   // capability before doing anything (no implicit "first venue", no staff
   // mutations until the capability matrix exists).
   const body = await req.json().catch(() => null);
+  const requestedVenueIdRaw = body?.venueId;
   const requestedVenueId =
-    typeof body?.venueId === "number" ? body.venueId : undefined;
+    typeof requestedVenueIdRaw === "number"
+      ? requestedVenueIdRaw
+      : typeof requestedVenueIdRaw === "string" && Number(requestedVenueIdRaw) > 0
+        ? Number(requestedVenueIdRaw)
+        : undefined;
   const selection = await resolveSelectedVenue(appUser.id, requestedVenueId);
   if (!selection.ok) {
     if (selection.reason === "ambiguous") {

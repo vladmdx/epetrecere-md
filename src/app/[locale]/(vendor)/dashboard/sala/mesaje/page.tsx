@@ -7,7 +7,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Search,
@@ -93,6 +93,9 @@ function formatBookingBadge(
 export default function VenueMessagesPage() {
   const { t } = useLocale();
   const searchParams = useSearchParams();
+  const params = useParams<{ venueId?: string }>();
+  const scopedVenueId = Number(params.venueId) || undefined;
+  const venueQuery = scopedVenueId ? `&venueId=${scopedVenueId}` : "";
   const initialConv = searchParams.get("conversation");
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -116,7 +119,7 @@ export default function VenueMessagesPage() {
   async function loadList() {
     setLoading(true);
     try {
-      const res = await fetch("/api/conversations?role=vendor");
+      const res = await fetch(`/api/conversations?role=vendor${venueQuery}`);
       const data = await res.json();
       const list: Conversation[] = Array.isArray(data) ? data : [];
       setConversations(list);
@@ -130,7 +133,7 @@ export default function VenueMessagesPage() {
 
   async function openConversation(id: number) {
     setSelectedId(id);
-    const res = await fetch(`/api/conversations/${id}/messages`);
+    const res = await fetch(`/api/conversations/${id}/messages${scopedVenueId ? `?venueId=${scopedVenueId}` : ""}`);
     const data = await res.json();
     setMessages(Array.isArray(data) ? data : []);
     // Reflect unread-cleared state locally.
@@ -184,7 +187,7 @@ export default function VenueMessagesPage() {
     if ((!text && !pendingAttachment) || !selectedId || sending) return;
     setSending(true);
     try {
-      const res = await fetch(`/api/conversations/${selectedId}/messages`, {
+      const res = await fetch(`/api/conversations/${selectedId}/messages${scopedVenueId ? `?venueId=${scopedVenueId}` : ""}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

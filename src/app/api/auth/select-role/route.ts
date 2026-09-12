@@ -165,6 +165,16 @@ export async function POST(req: Request) {
           isFeatured: true,
           facilities: [],
         });
+        if ((await import("@/lib/feature-flags")).isMultiHallEnabled()) {
+          const { ensureDraftOrganization } = await import("@/lib/partner/onboarding");
+          const { users: usersTable } = await import("@/lib/db/schema");
+          const org = await ensureDraftOrganization(
+            { id: appUser.id, role: appUser.role, isGlobalAdmin: false },
+            { displayName: baseName, type: "company" },
+          );
+          await db.update(venues).set({ organizationId: org.id, updatedAt: new Date() }).where(eq(venues.userId, appUser.id));
+          void usersTable;
+        }
       }
       await db
         .update(users)

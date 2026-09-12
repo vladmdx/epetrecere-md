@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { calendarEvents } from "@/lib/db/schema";
-import { eq, and, gte, lte, inArray } from "drizzle-orm";
+import { eq, and, gte, lte, inArray, isNull } from "drizzle-orm";
 import type { EntityType, CalendarStatus } from "@/types";
 
 export async function getCalendarEvents(
@@ -49,6 +49,7 @@ export async function setCalendarEvent(
         eq(calendarEvents.entityType, entityType),
         eq(calendarEvents.entityId, entityId),
         eq(calendarEvents.date, date),
+        eq(calendarEvents.source, "manual"),
       ),
     );
 
@@ -79,7 +80,8 @@ export async function bulkSetCalendarEvents(
 ) {
   if (!dates.length) return;
 
-  // Delete existing entries for these dates
+  // Delete only this source's unscoped venue/artist rows. Never touch
+  // booking projections (different source) or hall-scoped calendar rows.
   await db
     .delete(calendarEvents)
     .where(
@@ -87,10 +89,13 @@ export async function bulkSetCalendarEvents(
         eq(calendarEvents.entityType, entityType),
         eq(calendarEvents.entityId, entityId),
         inArray(calendarEvents.date, dates),
+        eq(calendarEvents.source, source),
+        isNull(calendarEvents.hallId),
       ),
     );
 
-  // Insert new entries
+  if (status === "available") return;
+
   await db.insert(calendarEvents).values(
     dates.map((date) => ({
       entityType,

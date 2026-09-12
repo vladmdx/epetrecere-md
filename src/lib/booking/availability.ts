@@ -12,7 +12,6 @@ import {
   bookingRequests,
   calendarEvents,
   workSchedule,
-  venues,
 } from "@/lib/db/schema";
 
 import { DEFAULT_BUFFER_MINUTES } from "@/lib/moldova-cities";
@@ -95,8 +94,6 @@ function dayOfWeekMonStart(dateStr: string): number {
   return (js + 6) % 7; // 0=Mon..6=Sun
 }
 
-const VENUE_DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
-
 /**
  * Check whether an artist is available for the given date + time slot.
  *
@@ -110,8 +107,19 @@ export async function checkArtistAvailability(opts: {
   startTime?: string | null;
   endTime?: string | null;
   excludeBookingId?: number;
+  /**
+   * Accept/confirm already hold a pending/accepted row. Other pending
+   * requests must not deadlock the artist out of choosing one overlapping
+   * offer; accepted/confirmed rows still block.
+   */
+  ignorePendingBookings?: boolean;
+  executor?: typeof db;
 }): Promise<AvailabilityResult> {
   const { artistId, eventDate, excludeBookingId } = opts;
+  const blockingStatuses = opts.ignorePendingBookings
+    ? (["accepted", "confirmed_by_client"] as const)
+    : BLOCKING_STATUSES;
+  const q = opts.executor ?? db;
   const targetStart = toMinutes(opts.startTime);
   const targetEnd = toEndMinutes(opts.endTime, targetStart);
 
@@ -119,7 +127,7 @@ export async function checkArtistAvailability(opts: {
   // ADDED to the END of every existing booking when checking for conflicts,
   // so a booking ending at 16:00 with a 15-min buffer is treated as taking
   // the slot until 16:15 from the next-client's perspective.
-  const [artistRow] = await db
+  const [artistRow] = await q
     .select({ bufferMinutes: artists.bufferMinutes })
     .from(artists)
     .where(eq(artists.id, artistId))
@@ -132,7 +140,7 @@ export async function checkArtistAvailability(opts: {
   // "no working-hour restriction" (existing artists keep working).
   if (targetStart !== null && targetEnd !== null) {
     const dow = dayOfWeekMonStart(eventDate);
-    const [scheduleRow] = await db
+    const [scheduleRow] = await q
       .select({
         startTime: workSchedule.startTime,
         endTime: workSchedule.endTime,
@@ -177,7 +185,7 @@ export async function checkArtistAvailability(opts: {
   }
 
   // 1. Check if the day is blocked on the calendar (vacation etc.)
-  const [blockedEntry] = await db
+  const [blockedEntry] = await q
     .select({
       status: calendarEvents.status,
       startTime: calendarEvents.startTime,
@@ -204,7 +212,7 @@ export async function checkArtistAvailability(opts: {
   }
 
   // 2. Find all active bookings for this artist on this date
-  const bookings = await db
+  const bookings = await q
     .select({
       id: bookingRequests.id,
       eventDate: bookingRequests.eventDate,
@@ -218,7 +226,7 @@ export async function checkArtistAvailability(opts: {
       and(
         eq(bookingRequests.artistId, artistId),
         eq(bookingRequests.eventDate, eventDate),
-        inArray(bookingRequests.status, [...BLOCKING_STATUSES]),
+        inArray(bookingRequests.status, [...blockingStatuses]),
         excludeBookingId !== undefined
           ? ne(bookingRequests.id, excludeBookingId)
           : undefined,
@@ -251,107 +259,42 @@ export async function checkArtistAvailability(opts: {
 
 /**
  * Check whether a venue is available for the given date + time slot.
- * Validates against the venue's working_hours JSONB and existing bookings.
+ * Delegates to the hall-aware service (phase 4 single source of truth).
  */
 export async function checkVenueAvailability(opts: {
   venueId: number;
+  hallId?: number | null;
+  guestCount?: number | null;
   eventDate: string;
   startTime?: string | null;
   endTime?: string | null;
   excludeBookingId?: number;
 }): Promise<AvailabilityResult> {
-  const { venueId, eventDate, excludeBookingId } = opts;
-  const targetStart = toMinutes(opts.startTime);
-  const targetEnd = toEndMinutes(opts.endTime, targetStart);
-
-  // Pull the venue's bufferMinutes (gap between events on same day).
-  const [venueRow] = await db
-    .select({ bufferMinutes: venues.bufferMinutes })
-    .from(venues)
-    .where(eq(venues.id, venueId))
-    .limit(1);
-  const venueBufferMinutes = venueRow?.bufferMinutes ?? DEFAULT_BUFFER_MINUTES;
-
-  // 0. Check venue working hours
-  if (targetStart !== null && targetEnd !== null) {
-    const [venue] = await db
-      .select({ workingHours: venues.workingHours })
-      .from(venues)
-      .where(eq(venues.id, venueId))
-      .limit(1);
-
-    if (venue?.workingHours) {
-      const dow = dayOfWeekMonStart(eventDate);
-      const dayKey = VENUE_DAY_KEYS[dow];
-      const day = venue.workingHours[dayKey];
-      if (day === null) {
-        return {
-          available: false,
-          outsideWorkingHours: true,
-          workingHours: null,
-        };
-      }
-      if (day) {
-        const wsStart = toMinutes(day.open);
-        const wsEnd = toMinutes(day.close);
-        const wsEndAdjusted = wsEnd === 0 ? 24 * 60 : wsEnd;
-        if (
-          wsStart !== null &&
-          wsEndAdjusted !== null &&
-          (targetStart < wsStart || targetEnd > wsEndAdjusted)
-        ) {
-          return {
-            available: false,
-            outsideWorkingHours: true,
-            workingHours: { start: day.open, end: day.close },
-          };
+  const { evaluateVenueAvailability } = await import("./venue-availability");
+  const result = await evaluateVenueAvailability({
+    ...opts,
+    mode: "owner",
+  });
+  if (result.available) return { available: true };
+  if (result.code === "OUTSIDE_HOURS") {
+    return { available: false, outsideWorkingHours: true };
+  }
+  if (result.code === "VENUE_BLOCK" || result.code === "HALL_BLOCK") {
+    return { available: false, dayBlocked: true };
+  }
+  return {
+    available: false,
+    conflict: result.conflictBookingId
+      ? {
+          bookingId: result.conflictBookingId,
+          eventDate: opts.eventDate,
+          startTime: opts.startTime ?? null,
+          endTime: opts.endTime ?? null,
+          clientName: "client",
+          status: "pending",
         }
-      }
-    }
-  }
-
-  // 1. Existing booking conflicts on the venue
-  const bookings = await db
-    .select({
-      id: bookingRequests.id,
-      eventDate: bookingRequests.eventDate,
-      startTime: bookingRequests.startTime,
-      endTime: bookingRequests.endTime,
-      clientName: bookingRequests.clientName,
-      status: bookingRequests.status,
-    })
-    .from(bookingRequests)
-    .where(
-      and(
-        eq(bookingRequests.venueId, venueId),
-        eq(bookingRequests.eventDate, eventDate),
-        inArray(bookingRequests.status, [...BLOCKING_STATUSES]),
-        excludeBookingId !== undefined
-          ? ne(bookingRequests.id, excludeBookingId)
-          : undefined,
-      ),
-    );
-
-  for (const b of bookings) {
-    const bStart = toMinutes(b.startTime);
-    const bEnd = toEndMinutes(b.endTime, bStart);
-    const bEndPadded = bEnd === null ? null : bEnd + venueBufferMinutes;
-    if (rangesOverlap(targetStart, targetEnd, bStart, bEndPadded)) {
-      return {
-        available: false,
-        conflict: {
-          bookingId: b.id,
-          eventDate: b.eventDate,
-          startTime: b.startTime,
-          endTime: b.endTime,
-          clientName: bookingTextForViewer(b.clientName, false),
-          status: b.status,
-        },
-      };
-    }
-  }
-
-  return { available: true };
+      : undefined,
+  };
 }
 
 /** Human-readable error message for a conflict. */
