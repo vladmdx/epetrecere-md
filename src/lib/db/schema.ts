@@ -843,11 +843,18 @@ export const venueImages = pgTable(
     isCover: boolean("is_cover").default(false).notNull(),
   },
   (t) => [
+    /**
+     * Composite FK (hall_id, venue_id) → venue_halls(id, venue_id).
+     * Do NOT set onDelete() here: Drizzle would SET NULL both columns and
+     * wipe venue_id. Authoritative SQL is 0028:
+     *   PG15+  ON DELETE SET NULL (hall_id)
+     *   PG<15  ON DELETE RESTRICT (archive the hall instead).
+     */
     foreignKey({
       name: "venue_images_hall_venue_fk",
       columns: [t.hallId, t.venueId],
       foreignColumns: [venueHalls.id, venueHalls.venueId],
-    }).onDelete("set null"),
+    }),
     index("venue_images_hall_idx").on(t.hallId),
     check("venue_images_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
   ],
@@ -1091,11 +1098,15 @@ export const reviews = pgTable("reviews", {
   photos: jsonb("photos").$type<string[]>().default([]).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
+  /**
+   * Composite FK — do NOT set onDelete() here. Authoritative SQL is 0028:
+   * PG15+ SET NULL (hall_id) / PG<15 RESTRICT. venue_id must never be nulled.
+   */
   foreignKey({
     name: "reviews_hall_venue_fk",
     columns: [t.hallId, t.venueId],
     foreignColumns: [venueHalls.id, venueHalls.venueId],
-  }).onDelete("set null"),
+  }),
   check("reviews_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
 ]);
 
@@ -1251,10 +1262,15 @@ export const notifications = pgTable("notifications", {
   message: text("message"),
   isRead: boolean("is_read").default(false).notNull(),
   actionUrl: text("action_url"),
+  /** Durable idempotency key. Authoritative unique index: 0030. */
+  dedupeKey: text("dedupe_key"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => [
   index("idx_notif_user_read").on(t.userId, t.isRead),
   index("idx_notif_user_created").on(t.userId, t.createdAt),
+  uniqueIndex("notifications_user_dedupe_unique")
+    .on(t.userId, t.dedupeKey)
+    .where(sql`${t.dedupeKey} IS NOT NULL`),
 ]);
 
 // ═══════════════════════════════════════════════════════
@@ -1419,6 +1435,10 @@ export const legalAcceptances = pgTable(
     documentSlug: text("document_slug").notNull(),
     documentVersion: text("document_version").notNull(),
     packVersion: text("pack_version").notNull(),
+    /** Groups every document of one signing attempt. Authoritative: 0030. */
+    acceptanceSessionId: uuid("acceptance_session_id")
+      .notNull()
+      .default(sql`gen_random_uuid()`),
     locale: text("locale").notNull(),
 
     /** Typed full name of the signing representative. */
@@ -1460,18 +1480,19 @@ export const legalAcceptances = pgTable(
     contentHash: text("content_hash"),
   },
   (t) => [
-    // ADR 0028 #5 — legacy/artist/venue uniqueness only. Scoped to
-    // organization_id IS NULL so the same representative can sign the same
-    // version for two DISTINCT organizations (org rows use the index below).
+    // Pack-scoped uniqueness (0030). Same slug+document_version may exist
+    // across packs (reguli-marketplace stayed 1.0 from 2.1 → 2.2).
     uniqueIndex("legal_acceptances_unique")
-      .on(t.userId, t.subjectType, t.documentSlug, t.documentVersion)
+      .on(t.userId, t.subjectType, t.documentSlug, t.documentVersion, t.packVersion)
       .where(sql`${t.organizationId} IS NULL`),
     index("legal_acceptances_user_idx").on(t.userId),
-    // One organization acceptance per (org, slug, version).
     uniqueIndex("legal_acceptances_org_unique")
-      .on(t.organizationId, t.documentSlug, t.documentVersion)
+      .on(t.organizationId, t.documentSlug, t.documentVersion, t.packVersion)
       .where(sql`${t.organizationId} IS NOT NULL`),
+    uniqueIndex("legal_acceptances_session_document_unique")
+      .on(t.acceptanceSessionId, t.documentSlug),
     index("legal_acceptances_organization_idx").on(t.organizationId),
+    index("legal_acceptances_session_idx").on(t.acceptanceSessionId),
   ],
 );
 
@@ -1543,11 +1564,15 @@ export const commissions = pgTable(
     index("commissions_artist_idx").on(t.artistId),
     index("commissions_venue_idx").on(t.venueId),
     index("commissions_hall_idx").on(t.hallId),
+    /**
+     * Composite FK — do NOT set onDelete() here. Authoritative SQL is 0028:
+     * PG15+ SET NULL (hall_id) / PG<15 RESTRICT. venue_id must never be nulled.
+     */
     foreignKey({
       name: "commissions_hall_venue_fk",
       columns: [t.hallId, t.venueId],
       foreignColumns: [venueHalls.id, venueHalls.venueId],
-    }).onDelete("set null"),
+    }),
     check("commissions_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
   ],
 );
@@ -1641,13 +1666,35 @@ export const bookingRequests = pgTable("booking_requests", {
   index("idx_booking_client_user").on(t.clientUserId),
   index("idx_booking_event_plan").on(t.eventPlanId),
   index("booking_requests_hall_idx").on(t.hallId),
+  /**
+   * Composite FK — do NOT set onDelete() here. Authoritative SQL is 0028:
+   * PG15+ SET NULL (hall_id) / PG<15 RESTRICT. venue_id must never be nulled.
+   */
   foreignKey({
     name: "booking_requests_hall_venue_fk",
     columns: [t.hallId, t.venueId],
     foreignColumns: [venueHalls.id, venueHalls.venueId],
-  }).onDelete("set null"),
+  }),
   check("booking_requests_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
 ]);
+
+/**
+ * One-shot external effects for a booking (emails / in-app notify).
+ * Insert in the same transaction as the status change; skip if the key exists.
+ * Authoritative SQL: 0030.
+ */
+export const bookingEffectOutbox = pgTable(
+  "booking_effect_outbox",
+  {
+    id: serial("id").primaryKey(),
+    bookingId: integer("booking_id")
+      .notNull()
+      .references(() => bookingRequests.id, { onDelete: "cascade" }),
+    effectKey: text("effect_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [unique("booking_effect_outbox_booking_key_unique").on(t.bookingId, t.effectKey)],
+);
 
 /**
  * Artist availability slots — granular "I'm free from 14:00 to 18:00 for

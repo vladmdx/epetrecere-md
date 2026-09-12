@@ -22,9 +22,8 @@ import { validSignatureImage } from "@/lib/legal/signature-image";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { onboardingAgreementStatus } from "@/lib/legal/onboarding-agreement";
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { createHash } from "node:crypto";
 import { describeDevice } from "@/lib/legal/device";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { legalAcceptances, notifications, users, artists, venues } from "@/lib/db/schema";
 import {
@@ -33,7 +32,6 @@ import {
 import {
   LEGAL_PACK_VERSION,
   getLegalDocument,
-  legalBlocksFor,
   legalTitle,
   PARTNER_REQUIRED_DOCS,
   VENUE_REQUIRED_DOCS,
@@ -97,6 +95,7 @@ export async function GET(req: NextRequest) {
       phone: legalAcceptances.phone,
       contentHash: legalAcceptances.contentHash,
       organizationId: legalAcceptances.organizationId,
+      acceptanceSessionId: legalAcceptances.acceptanceSessionId,
     })
     .from(legalAcceptances)
     .where(
@@ -141,18 +140,6 @@ export async function POST(req: NextRequest) {
     if (!orgAccess.ok) {
       return NextResponse.json({ error: orgAccess.error, code: "FORBIDDEN" }, { status: orgAccess.status });
     }
-    const { resolveOrganizationSigningIdentity } = await import("@/lib/partner/legal");
-    const resolved = await resolveOrganizationSigningIdentity(organizationId, identity);
-    if (!resolved.ok) {
-      return NextResponse.json({ error: resolved.code, code: resolved.code }, { status: resolved.status });
-    }
-    identity = {
-      partnerType: resolved.identity.partnerType,
-      legalName: resolved.identity.legalName,
-      idNumber: resolved.identity.idNumber ?? "",
-      legalAddress: resolved.identity.legalAddress ?? "",
-      representativeName: resolved.identity.representativeName ?? null,
-    };
   }
 
   const cu = await currentUser();
@@ -199,46 +186,40 @@ export async function POST(req: NextRequest) {
   const ip = clientIp(req);
   const ua = req.headers.get("user-agent")?.slice(0, 1000) ?? null;
   const device = describeDevice(ua, req.headers.get("x-client"));
-  const acceptedAt = new Date();
-  const values = slugs.map(slug => {
-    const doc = getLegalDocument(slug)!;
-    const shown = legalBlocksFor(doc, locale, identity);
-    return {
-      userId: u.id, subjectType, artistId: a?.id ?? null, venueId: v?.id ?? null,
-      organizationId: organizationId ?? null,
-      documentSlug: slug, documentVersion: doc.version, packVersion: LEGAL_PACK_VERSION,
-      locale, signatureName, signatureImage, representativeRole: body.representativeRole ?? null,
-      documentTitle: legalTitle(doc, locale), documentBlocks: shown, deviceSummary: device,
-      ...identity, ipAddress: ip, userAgent: ua, email: u.email, phone, acceptedAt,
-      contentHash: createHash("sha256").update(shown.map(b => b.text).join("\n")).digest("hex"),
-    };
+  const { recordLegalAcceptancePack } = await import("@/lib/legal/record-acceptance");
+  const recordedPack = await recordLegalAcceptancePack({
+    userId: u.id,
+    subjectType,
+    artistId: a?.id ?? null,
+    venueId: v?.id ?? null,
+    organizationId: organizationId ?? null,
+    locale,
+    signatureName,
+    signatureImage,
+    representativeRole: body.representativeRole ?? null,
+    identity,
+    ipAddress: ip,
+    userAgent: ua,
+    deviceSummary: device,
+    email: u.email,
+    phone,
+    slugs,
   });
-  const previous = await db.select().from(legalAcceptances).where(and(
-    eq(legalAcceptances.userId, u.id), eq(legalAcceptances.subjectType, subjectType),
-    organizationId
-      ? eq(legalAcceptances.organizationId, organizationId)
-      : undefined,
-  ));
-  // A retry may reuse the same immutable acceptance, never silently substitute
-  // a different party, language or document underneath an existing signature.
-  if (values.some(v => previous.some(p => p.documentSlug === v.documentSlug &&
-      p.documentVersion === v.documentVersion &&
-      (p.contentHash !== v.contentHash || p.signatureName !== signatureName)))) {
-    return NextResponse.json({ error: "signed_document_is_immutable" }, { status: 409 });
+  if (!recordedPack.ok) {
+    return NextResponse.json(
+      { error: recordedPack.error, code: recordedPack.code },
+      { status: recordedPack.status },
+    );
   }
-  // All documents are inserted by ONE statement: either the whole pack lands
-  // or none of it does. Existing signatures remain append-only.
-  const inserted = await db.insert(legalAcceptances).values(values).onConflictDoNothing().returning();
-  const recordedDocs = inserted.map(r => ({
-    slug: r.documentSlug, title: r.documentTitle!, version: r.documentVersion,
-    contentHash: r.contentHash!, acceptedAt: r.acceptedAt,
+  const inserted = recordedPack.rows;
+  const recordedDocs = recordedPack.recorded.map((r) => ({
+    slug: r.slug, title: r.title, version: r.version, contentHash: r.contentHash, acceptedAt: r.acceptedAt,
   }));
-
   const recorded = recordedDocs.map((d) => d.slug);
 
   // The dashboard reads the durable acceptance itself. Emails run with Next
   // after(), which keeps serverless work alive after the HTTP response.
-  if (recordedDocs.length > 0) {
+  if (recordedDocs.length > 0 && !recordedPack.reused) {
     // The stored timestamp, not a fresh one: this value is printed in the
     // signer's copy and the admin mail as the moment of acceptance, and it
     // has to be the moment the row actually records.

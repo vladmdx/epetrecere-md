@@ -4,6 +4,9 @@ export const AVAIL_LOCK_VENUE = 280028;
 export const AVAIL_LOCK_HALL = 280029;
 export const AVAIL_LOCK_DAY = 280030;
 export const AVAIL_LOCK_GROUP = 280031;
+export const AVAIL_LOCK_ARTIST = 280033;
+export const LEGAL_LOCK_ORG = 280040;
+export const LEGAL_LOCK_USER = 280041;
 
 export type AvailabilityLockKeys = {
   venueId: number;
@@ -32,5 +35,28 @@ export async function acquireAvailabilityLocks(tx: LockTx, keys: AvailabilityLoc
   const groups = [...new Set(keys.conflictGroupIds)].sort((a, b) => a - b);
   for (const groupId of groups) {
     await tx.execute(sql`select pg_advisory_xact_lock(${AVAIL_LOCK_GROUP}, ${groupId})`);
+  }
+}
+
+export async function acquireArtistAvailabilityLocks(
+  tx: LockTx,
+  artistId: number,
+  eventDate: string,
+): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(${AVAIL_LOCK_ARTIST}, ${artistId})`);
+  await tx.execute(sql`select pg_advisory_xact_lock(${AVAIL_LOCK_DAY}, ${yyyymmdd(eventDate)})`);
+}
+
+/** Serialize organization legal writes (PATCH identity + signing). */
+export async function acquireLegalScopeLock(
+  tx: LockTx,
+  scope: { organizationId?: number | null; userId?: string | null },
+): Promise<void> {
+  if (scope.organizationId) {
+    await tx.execute(sql`select pg_advisory_xact_lock(${LEGAL_LOCK_ORG}, ${scope.organizationId})`);
+    return;
+  }
+  if (scope.userId) {
+    await tx.execute(sql`select pg_advisory_xact_lock(${LEGAL_LOCK_USER}, hashtext(${scope.userId}))`);
   }
 }
