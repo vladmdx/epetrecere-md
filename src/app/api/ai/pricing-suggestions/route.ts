@@ -10,7 +10,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, artists, venues } from "@/lib/db/schema";
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
       city: venues.city,
     })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
 
   if (!artist && !venue) {

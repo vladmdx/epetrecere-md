@@ -1,41 +1,22 @@
-// F-S1 / M12 — Stats for the venue dashboard home, the venue-side
-// counterpart of /api/me/artist/stats. Returns the 5-field stat object
-// from getVenueStats for the signed-in user's venue, or `{ stats: null }`
-// if they don't own one. Anonymous → 401.
+// F-S1 / M12 / ADR 0028 — Stats for the venue dashboard home. Returns the stat
+// object for the signed-in user's venue (resolved via the membership chain), or
+// `{ stats: null }` when they administer none. Anonymous → 401.
 
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { users, venues } from "@/lib/db/schema";
 import { getVenueStats } from "@/lib/db/queries/venue-stats";
+import { getCurrentAppUser, getPrimaryAccessibleVenueId } from "@/lib/venue-access";
 
 export async function GET() {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) {
+  const appUser = await getCurrentAppUser();
+  if (!appUser) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [appUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-
-  if (!appUser) {
+  const venueId = await getPrimaryAccessibleVenueId(appUser.id);
+  if (!venueId) {
     return NextResponse.json({ stats: null });
   }
 
-  const [venue] = await db
-    .select({ id: venues.id })
-    .from(venues)
-    .where(eq(venues.userId, appUser.id))
-    .limit(1);
-
-  if (!venue) {
-    return NextResponse.json({ stats: null });
-  }
-
-  const stats = await getVenueStats(venue.id);
+  const stats = await getVenueStats(venueId);
   return NextResponse.json({ stats });
 }

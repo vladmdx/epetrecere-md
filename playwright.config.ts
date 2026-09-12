@@ -1,12 +1,13 @@
 import { defineConfig, devices } from "@playwright/test";
 import { config as loadEnv } from "dotenv";
 
-// E2E runs against the LIVE site by default so we verify what real users hit.
-// Override with E2E_BASE_URL for local dev server runs.
+// E2E targets a LOCAL dev server by default (ADR 0028 review item #10): the
+// suite writes fixtures and must never mutate production. Use the explicit
+// `npm run test:e2e:prod` (which sets E2E_BASE_URL) for read-only prod checks.
 loadEnv({ path: ".env.production.local", override: false });
 loadEnv({ path: ".env.local", override: false });
 
-const baseURL = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const baseURL = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 export default defineConfig({
   testDir: "./e2e",

@@ -9,6 +9,7 @@ import {
   bookingRequests,
 } from "@/lib/db/schema";
 import { and, eq, desc, isNull, inArray } from "drizzle-orm";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { plainText } from "@/lib/content/plain-text";
 import { contactsAreShared } from "@/lib/privacy/booking-contact";
@@ -212,7 +213,7 @@ export async function GET(req: NextRequest) {
     const [venue] = await db
       .select({ id: venues.id })
       .from(venues)
-      .where(eq(venues.userId, appUser.id))
+      .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
       .limit(1);
     if (!venue) return NextResponse.json([]);
 
@@ -249,7 +250,7 @@ export async function GET(req: NextRequest) {
     const [venue] = await db
       .select({ id: venues.id })
       .from(venues)
-      .where(eq(venues.userId, appUser.id))
+      .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
       .limit(1);
 
     const artistRows = artist

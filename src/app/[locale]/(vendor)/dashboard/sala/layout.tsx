@@ -11,6 +11,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, venues } from "@/lib/db/schema";
+import { getPrimaryAccessibleVenueId } from "@/lib/venue-access";
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 
 export default async function VenueDashboardLayout({
@@ -37,11 +38,15 @@ export default async function VenueDashboardLayout({
     redirect(localizePath("/", locale));
   }
 
-  const [venueRecord] = await db
-    .select({ id: venues.id, nameRo: venues.nameRo, slug: venues.slug, isActive: venues.isActive })
-    .from(venues)
-    .where(eq(venues.userId, appUser.id))
-    .limit(1);
+  // ADR 0028 — resolve the venue through the membership chain, not user_id.
+  const primaryVenueId = await getPrimaryAccessibleVenueId(appUser.id);
+  const [venueRecord] = primaryVenueId
+    ? await db
+        .select({ id: venues.id, nameRo: venues.nameRo, slug: venues.slug, isActive: venues.isActive })
+        .from(venues)
+        .where(eq(venues.id, primaryVenueId))
+        .limit(1)
+    : [];
 
   const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
 

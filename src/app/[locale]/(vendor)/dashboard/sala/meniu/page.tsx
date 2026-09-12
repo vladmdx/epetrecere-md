@@ -7,6 +7,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import {
   users,
   venues,
@@ -37,7 +38,7 @@ export default async function VenueMenuPage() {
       menuPdfUrl: venues.menuPdfUrl,
     })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (!venue) redirect("/dashboard");
 

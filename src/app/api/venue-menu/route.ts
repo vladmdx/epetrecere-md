@@ -5,36 +5,20 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { auth } from "@clerk/nextjs/server";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  venues,
-  users,
   venueMenuCategories,
   venueMenuItems,
   venueMenuPackages,
 } from "@/lib/db/schema";
+import { requireVenueAccess } from "@/lib/venue-access";
 
+// ADR 0028 — ownership resolved through the membership chain (legacy fallback +
+// admin bypass inside requireVenueAccess). Return shape kept for the handlers.
 async function requireVenueOwner(venueId: number) {
-  const { userId: clerkId } = await auth();
-  if (!clerkId) return { ok: false as const, status: 401 };
-  const [appUser] = await db
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!appUser) return { ok: false as const, status: 401 };
-  const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
-  if (isAdmin) return { ok: true as const };
-  const [venue] = await db
-    .select({ userId: venues.userId })
-    .from(venues)
-    .where(eq(venues.id, venueId))
-    .limit(1);
-  if (!venue || venue.userId !== appUser.id) {
-    return { ok: false as const, status: 403 };
-  }
+  const access = await requireVenueAccess(venueId, "manager");
+  if (!access.ok) return { ok: false as const, status: access.status };
   return { ok: true as const };
 }
 

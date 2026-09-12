@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "../db";
 import { artists, bookingRequests, conversations, users, venues } from "../db/schema";
+import { listAccessibleVenueIds } from "../venue-access";
 import { contactsAreShared } from "./booking-contact";
 import { conversationPartyKey, notificationContext, notificationForViewer, notificationHasContact, type NotificationText } from "./notification-context";
 import { legacyVenueNotificationUrl, notificationForVenue } from "../notifications/venue-routing";
@@ -12,13 +13,15 @@ export async function notificationsForUser<T extends NotificationText>(items: T[
   if (!hasContact && !hasLegacyVenueLink) return items;
   const [user] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
   if (user?.role === "admin" || user?.role === "super_admin") return items;
+  // ADR 0028 — resolve the venues this user administers through the membership
+  // chain (flag-gated; legacy owner chain when off), not venues.user_id.
+  const venueIds = await listAccessibleVenueIds(userId);
   // Venue owners use the regular "user" role. Check actual ownership rather
   // than guessing from roles or message text; dual-profile history is ambiguous.
-  const [ownedVenue, ownedArtist] = hasLegacyVenueLink && user ? await Promise.all([
-    db.select({ id: venues.id }).from(venues).where(eq(venues.userId, userId)).limit(1),
-    db.select({ id: artists.id }).from(artists).where(eq(artists.userId, userId)).limit(1),
-  ]) : [[], []];
-  const routed = ownedVenue.length && !ownedArtist.length ? items.map(notificationForVenue) : items;
+  const ownedArtist = hasLegacyVenueLink && user
+    ? await db.select({ id: artists.id }).from(artists).where(eq(artists.userId, userId)).limit(1)
+    : [];
+  const routed = venueIds.length && !ownedArtist.length ? items.map(notificationForVenue) : items;
   if (!hasContact) return routed;
 
   const contexts = routed.map(item => notificationContext(item.actionUrl));
@@ -31,7 +34,7 @@ export async function notificationsForUser<T extends NotificationText>(items: T[
     .leftJoin(artists, eq(artists.id, conversations.artistId))
     .leftJoin(venues, eq(venues.id, conversations.venueId))
     .where(and(inArray(conversations.id, conversationIds), or(
-      eq(conversations.clientUserId, userId), eq(artists.userId, userId), eq(venues.userId, userId),
+      eq(conversations.clientUserId, userId), eq(artists.userId, userId), inArray(venues.id, venueIds),
     ))) : [];
 
   const targets = [
@@ -48,7 +51,7 @@ export async function notificationsForUser<T extends NotificationText>(items: T[
     .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
     .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
     .where(and(or(...targets), or(
-      eq(bookingRequests.clientUserId, userId), eq(artists.userId, userId), eq(venues.userId, userId),
+      eq(bookingRequests.clientUserId, userId), eq(artists.userId, userId), inArray(venues.id, venueIds),
     )))
     .orderBy(desc(bookingRequests.updatedAt), desc(bookingRequests.id)) : [];
 

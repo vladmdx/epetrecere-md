@@ -14,10 +14,11 @@
 import Link from "@/components/shared/locale-link";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Card, CardContent } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
 import { db } from "@/lib/db";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { artists, users, venues } from "@/lib/db/schema";
 import { getArtistStats } from "@/lib/db/queries/artist-stats";
 import {
@@ -64,7 +65,7 @@ export default async function VendorDashboard({
     const [venue] = await db
       .select({ id: venues.id })
       .from(venues)
-      .where(eq(venues.userId, appUser.id))
+      .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
       .limit(1);
     if (venue) {
       redirect(localizePath("/dashboard/sala", locale));

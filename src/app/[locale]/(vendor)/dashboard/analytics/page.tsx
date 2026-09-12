@@ -12,7 +12,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Eye,
@@ -23,6 +23,7 @@ import {
   Percent,
 } from "lucide-react";
 import { db } from "@/lib/db";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { artists, users, venues } from "@/lib/db/schema";
 import {
   getArtistAnalytics,
@@ -72,7 +73,7 @@ async function resolveAnalytics(): Promise<Resolved | "anon" | "none"> {
   const [venue] = await db
     .select({ id: venues.id, nameRo: venues.nameRo })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (venue) {
     return {

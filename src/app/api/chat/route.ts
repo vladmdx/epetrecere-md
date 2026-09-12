@@ -10,6 +10,7 @@ import {
   venues,
 } from "@/lib/db/schema";
 import { eq, and, sql, isNull, or } from "drizzle-orm";
+import { requireVenueAccess } from "@/lib/venue-access";
 import { contactsAreShared } from "@/lib/privacy/booking-contact";
 import { containsContact, redactContact } from "@/lib/privacy/contact-redaction";
 import { chatMessageForViewer } from "@/lib/privacy/chat-message";
@@ -48,12 +49,9 @@ async function verifyBookingAccess(clerkId: string, bookingRequestId: number) {
     if (artist) return { status: booking.status };
   }
   if (booking.venueId) {
-    const [venue] = await db
-      .select({ id: venues.id })
-      .from(venues)
-      .where(and(eq(venues.id, booking.venueId), eq(venues.userId, appUser.id)))
-      .limit(1);
-    if (venue) return { status: booking.status };
+    // ADR 0028 — venue ownership via the membership chain.
+    const access = await requireVenueAccess(booking.venueId, "staff");
+    if (access.ok) return { status: booking.status };
   }
   return false;
 }
@@ -257,14 +255,16 @@ export async function POST(req: Request) {
       }
     }
     if (senderType === "client" && booking.venueId) {
-      const [venue] = await db
-        .select({ id: venues.id, nameRo: venues.nameRo })
-        .from(venues)
-        .where(and(eq(venues.id, booking.venueId), eq(venues.userId, appUser.id)))
-        .limit(1);
-      if (venue) {
+      // ADR 0028 — venue ownership via the membership chain.
+      const access = await requireVenueAccess(booking.venueId, "staff");
+      if (access.ok) {
+        const [venue] = await db
+          .select({ nameRo: venues.nameRo })
+          .from(venues)
+          .where(eq(venues.id, booking.venueId))
+          .limit(1);
         senderType = "venue";
-        senderName = venue.nameRo || appUser.name || "Sală";
+        senderName = venue?.nameRo || appUser.name || "Sală";
       }
     }
   }

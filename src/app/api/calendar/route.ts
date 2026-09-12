@@ -3,6 +3,7 @@ import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { requireVenueAccess } from "@/lib/venue-access";
 import { users, artists, venues } from "@/lib/db/schema";
 import { calendarEventForViewer } from "@/lib/privacy/booking-text";
 import {
@@ -118,13 +119,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
   } else {
-    const [venue] = await db
-      .select({ id: venues.id, userId: venues.userId })
-      .from(venues)
-      .where(eq(venues.id, parsed.data.entity_id))
-      .limit(1);
-    if (!venue || venue.userId !== appUser.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // ADR 0028 — venue ownership via the membership chain (IDOR-safe).
+    const access = await requireVenueAccess(parsed.data.entity_id, "manager");
+    if (!access.ok) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
     }
   }
 

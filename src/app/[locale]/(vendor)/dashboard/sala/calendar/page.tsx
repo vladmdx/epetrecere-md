@@ -8,6 +8,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import {
   users,
   venues,
@@ -42,7 +43,7 @@ export default async function VenueCalendarPage({
   const [venue] = await db
     .select({ id: venues.id, nameRo: venues.nameRo })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (!venue) redirect("/dashboard");
 

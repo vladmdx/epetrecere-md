@@ -35,6 +35,7 @@ import {
   lte,
   sql,
 } from "drizzle-orm";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   generateVenueDescription,
@@ -245,7 +246,7 @@ export async function POST(req: NextRequest) {
       facilities: venues.facilities,
     })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (!venue) {
     return NextResponse.json({ error: "No venue found" }, { status: 403 });

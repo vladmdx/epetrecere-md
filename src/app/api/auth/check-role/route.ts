@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 import {
   users,
   artists,
@@ -8,7 +9,7 @@ import {
   eventPlans,
   bookingRequests,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 
 // This endpoint drives the post-signup role picker. The response MUST
@@ -104,11 +105,11 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Check venue ownership (separate from role)
+  // Check venue ownership (separate from role). ADR 0028 — membership chain.
   const [venue] = await db
     .select({ id: venues.id, slug: venues.slug, isActive: venues.isActive })
     .from(venues)
-    .where(eq(venues.userId, dbUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(dbUser.id)))
     .limit(1);
 
   // If user is an artist, check onboarding status

@@ -99,10 +99,15 @@ A server-only flag gates every behavioural change of later phases. Default
 
 - Module: `src/lib/feature-flags.ts`.
 - Flag: `MULTI_HALL` backed by env `FEATURE_MULTI_HALL` (`"1" | "true"` = on).
-- Phases 0–2 only *read* the model behind the flag; they do not change public,
-  onboarding, catalog or booking behaviour. The access layer added in phase 2
-  is backwards-compatible with single-venue accounts whether the flag is on or
-  off.
+- The access layer's behavioural change **is switchable** (review item #11):
+  `src/lib/venue-access.ts` reads `isMultiHallEnabled()`. With the flag **off**
+  (default) the resolvers use the legacy `venues.user_id` owner chain only, i.e.
+  exactly current production behaviour, and memberships are ignored. With the
+  flag **on**, a venue that has an `organization_id` is membership-only and the
+  legacy `user_id` fallback is *not* consulted (review item #1), so a disabled,
+  removed or demoted member cannot recover owner access. Org-less venues still
+  use the legacy owner as a fallback under either flag state.
+- Phases 0–2 do not change public, onboarding, catalog or booking behaviour.
 
 ## 5. Backwards compatibility strategy (expand → migrate → contract)
 
@@ -168,10 +173,55 @@ membership resolvers. Grouped by zone:
 - `src/lib/planner/ownership.ts`, `src/app/[locale]/(public)/planifica/page.tsx`
 
 Phase 2 introduces `src/lib/venue-access.ts` and routes these gates through it.
-Because the surface is large and behaviour-preserving, phase 2 migrates the
-highest-risk gates first (dashboard, venue APIs, booking/contracts, calendar),
-keeps the rest reading the legacy chain via the same fallback, and adds an IDOR
-regression so organization A cannot reach organization B's venue/hall.
+
+### Migration status (kept honest — do not claim more than is true)
+
+**Migrated to the central resolver** (`requireVenueAccess` / `requireHallAccess`
+for IDOR-sensitive id-from-client gates; `listAccessibleVenueIds` /
+`getPrimaryAccessibleVenueId` / `resolveSelectedVenue` for "my venue" reads;
+`getVenueOwnerUserIds` for notification recipients):
+
+- Dashboard: `dashboard/layout`, `dashboard/page`, `dashboard/analytics/page`,
+  `dashboard/sala/{layout,page,rezervari,calendar,financiar,analitice,recenzii,meniu,setari}`,
+  `cabinet/layout` (partner detection).
+- Venue APIs: `me/venue`, `me/venue/stats`, `venues/[id]` (PUT),
+  `venue-images` (POST/PUT/DELETE), `venue-images/[id]` (PUT/DELETE),
+  `venue-menu` (route/scan/import/translate).
+- Booking/contracts/chat/reviews/calendar/conversations: `booking-requests/[id]`
+  (ownership gate), `booking-requests/[id]/contract`, `.../contract-preview`,
+  `chat` (ownership + sender detection), `conversations` (list),
+  `conversations/[id]/messages` (party detection), `reviews/[id]` (GET/PATCH),
+  `calendar` (write ownership).
+- Commissions: `commissions` (vendor scope now spans all accessible venues).
+- AI: `ai/venue-assistant`, `ai/pricing-suggestions`, `ai/analytics-suggestion`.
+- Notifications/privacy: `booking/confirmation-effects` (recipients),
+  `privacy/notification-view` (participant detection).
+- Client-blocking: `planner/ownership`, `planifica/page`.
+- Detection: `auth/check-role` (hasVenue).
+
+**Not yet migrated (documented, scheduled — NOT claimed as done):**
+
+- Onboarding / role establishment (belongs to phase 3, which is out of scope
+  now): `auth/register-venue`, `auth/register-artist`, `auth/select-role`, and
+  `api/legal/accept` (still links acceptances via the legacy owner; wiring them
+  to write `organization_id` is phase 3 onboarding).
+- Notification-recipient *email* resolution that still reads the legacy owner
+  (not an authorization gate; single-owner-safe today): the vendor-email lookups
+  in `booking-requests/[id]`, `chat`, `conversations/[id]/messages`,
+  `reviews/from-booking`, `reviews/request`, and `booking-requests/route`
+  recipient/creation paths.
+- Admin views (phase 6): `admin/contracte`, `admin/registration-requests`
+  (still map contracts by legacy owner; org-grouping is phase 6).
+- Inngest Google-Calendar sync (`inngest/functions`): kept on the per-user
+  legacy owner chain deliberately, so a co-managed org venue is not double-synced
+  from multiple members' tokens (phase 6).
+- GDPR `me/data-export` and `me/delete-account`: intentionally scoped to venues
+  the user *personally* owns (`venues.user_id`), not org venues co-managed with
+  others; org-wide export/last-owner-transfer is phase 6.
+
+An IDOR regression (`scripts/venue-multihall-access-regression.test.ts`) proves
+organization A cannot reach organization B's venue/hall, that disabled/removed/
+demoted members lose access, and that the flag switches the behaviour off.
 
 ## 7. Known availability defects to fix in phase 4 (recorded, not fixed here)
 

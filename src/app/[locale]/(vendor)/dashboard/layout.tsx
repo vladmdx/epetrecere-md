@@ -2,8 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users, artists, venues } from "@/lib/db/schema";
+import { users, artists } from "@/lib/db/schema";
 import { VendorLayoutChrome } from "@/components/vendor/vendor-layout-chrome";
+import { getPrimaryAccessibleVenueId } from "@/lib/venue-access";
 import { signInPath } from "@/lib/i18n/server-redirect";
 
 export default async function VendorLayout({
@@ -32,11 +33,9 @@ export default async function VendorLayout({
     .where(eq(artists.userId, appUser.id))
     .limit(1);
 
-  const [venueRecord] = await db
-    .select({ id: venues.id })
-    .from(venues)
-    .where(eq(venues.userId, appUser.id))
-    .limit(1);
+  // ADR 0028 — venue partner detection via the membership resolver.
+  const primaryVenueId = await getPrimaryAccessibleVenueId(appUser.id);
+  const venueRecord = primaryVenueId ? { id: primaryVenueId } : undefined;
 
   const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
   // Artists who picked the role on the picker but haven't completed

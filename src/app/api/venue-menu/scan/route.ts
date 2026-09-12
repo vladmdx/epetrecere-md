@@ -20,7 +20,8 @@ import { auth } from "@clerk/nextjs/server";
 import { and, eq } from "drizzle-orm";
 import { createHash } from "crypto";
 import { db } from "@/lib/db";
-import { users, venues, menuScanCache } from "@/lib/db/schema";
+import { menuScanCache } from "@/lib/db/schema";
+import { requireVenueAccess } from "@/lib/venue-access";
 import { rateLimit } from "@/lib/rate-limit";
 import { mdlPerEur } from "@/lib/format/fx";
 
@@ -195,25 +196,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Ownership gate — the signed-in user must own the target venue.
-  const [appUser] = await db
-    .select({ id: users.id, role: users.role })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!appUser) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-  const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
-  if (!isAdmin) {
-    const [venue] = await db
-      .select({ userId: venues.userId })
-      .from(venues)
-      .where(eq(venues.id, parsed.data.venueId))
-      .limit(1);
-    if (!venue || venue.userId !== appUser.id) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+  // ADR 0028 — ownership via the membership chain (legacy fallback + admin
+  // bypass inside requireVenueAccess).
+  const access = await requireVenueAccess(parsed.data.venueId, "manager");
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   // Fetch the file once. We need the raw bytes to (a) compute the cache

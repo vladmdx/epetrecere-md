@@ -7,7 +7,8 @@
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users, eventPlans, artists, venues } from "@/lib/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, sql, inArray } from "drizzle-orm";
+import { listAccessibleVenueIds } from "@/lib/venue-access";
 
 export type OwnershipResult =
   | { ok: true; userId: string; plan: typeof eventPlans.$inferSelect }
@@ -103,7 +104,7 @@ export async function requireClientUser(): Promise<
   const [venueHit] = await db
     .select({ kind: sql<string>`'venue'` })
     .from(venues)
-    .where(eq(venues.userId, appUser.id))
+    .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (venueHit) {
     return {

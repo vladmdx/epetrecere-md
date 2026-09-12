@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
+import { requireVenueAccess } from "@/lib/venue-access";
 import {
   chatMessages,
   conversations,
@@ -53,12 +54,9 @@ async function loadContext(conversationId: number, clerkId: string) {
       .limit(1);
     if (ownsArtist) side = "artist";
   } else if (conv.venueId) {
-    const [ownsVenue] = await db
-      .select({ id: venues.id })
-      .from(venues)
-      .where(and(eq(venues.id, conv.venueId), eq(venues.userId, appUser.id)))
-      .limit(1);
-    if (ownsVenue) side = "venue";
+    // ADR 0028 — venue ownership via the membership chain.
+    const access = await requireVenueAccess(conv.venueId, "staff");
+    if (access.ok) side = "venue";
   }
 
   if (!side) return null;

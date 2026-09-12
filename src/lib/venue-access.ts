@@ -329,6 +329,21 @@ export async function isVenuePartner(userId: string): Promise<boolean> {
 }
 
 /**
+ * Deterministic primary venue id for dashboard server pages that today assume a
+ * single venue. Returns the lowest accessible venue id, or null. Routes through
+ * the membership resolver (flag-gated) instead of `venues.user_id`. Multi-venue
+ * selection UI arrives in a later phase; until then this is stable, not "first
+ * row arbitrary".
+ */
+export async function getPrimaryAccessibleVenueId(
+  userId: string,
+): Promise<number | null> {
+  const ids = await listAccessibleVenueIds(userId);
+  if (ids.length === 0) return null;
+  return ids.slice().sort((a, b) => a - b)[0];
+}
+
+/**
  * The user ids that should receive owner-facing notifications for a venue.
  * Resolves the real recipients rather than "the first venue's user":
  *   - MULTI_HALL on + organization set → active owner/admin members;

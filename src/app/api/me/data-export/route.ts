@@ -86,6 +86,8 @@ export async function GET() {
     db.select().from(invitations).where(eq(invitations.userId, user.id)),
     db.select().from(eventPhotos).where(eq(eventPhotos.userId, user.id)),
     db.select().from(artists).where(eq(artists.userId, user.id)),
+    // ADR 0028 — GDPR export is scoped to venues the user personally owns
+    // (legacy user_id). Org-wide export/transfer semantics are Phase 6.
     db.select().from(venues).where(eq(venues.userId, user.id)),
     db.select().from(bookingRequests).where(eq(bookingRequests.clientUserId, user.id)),
     db.select().from(aiConversations).where(eq(aiConversations.userId, user.id)),

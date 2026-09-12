@@ -7,6 +7,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { bookingRequests, calendarEvents, artists, users } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
+import { requireVenueAccess } from "@/lib/venue-access";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
 import { vendorBookingNotificationPath } from "@/lib/notifications/venue-routing";
@@ -127,16 +128,11 @@ export async function PUT(
     if (!appUser) {
       return { ok: false as const, status: 401, error: "Unauthorized" };
     }
-    // Venue booking — check venue ownership
+    // Venue booking — ADR 0028 ownership via the membership chain (IDOR-safe).
     if (booking.venueId) {
-      const { venues } = await import("@/lib/db/schema");
-      const [venue] = await db
-        .select({ id: venues.id, userId: venues.userId })
-        .from(venues)
-        .where(eq(venues.id, booking.venueId))
-        .limit(1);
-      if (!venue || venue.userId !== appUser.id) {
-        return { ok: false as const, status: 403, error: "Forbidden" };
+      const access = await requireVenueAccess(booking.venueId, "staff");
+      if (!access.ok) {
+        return { ok: false as const, status: access.status, error: access.error };
       }
       return { ok: true as const };
     }
