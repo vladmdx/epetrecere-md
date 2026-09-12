@@ -14,7 +14,7 @@ import { sql, getIgorArtist, getTestUsers } from "../helpers/db";
 //   6. Artist PUT   /api/booking-requests/{id} reject  → rejected (no calendar change after cancel)
 
 const BASE =
-  process.env.E2E_BASE_URL || "https://epetrecere.md";
+  process.env.E2E_BASE_URL || "http://localhost:3000";
 
 // A date far enough in the future that no real bookings could collide.
 function futureDate(offsetDays: number) {

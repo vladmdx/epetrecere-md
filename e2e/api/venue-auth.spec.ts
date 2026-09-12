@@ -18,7 +18,7 @@ import { sql, getTestUsers } from "../helpers/db";
 // Igor's session to attack it — Igor owns an artist row, not a venue,
 // so he's a perfect "signed-in but not the owner" persona.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe.serial("venue auth lockdown (F-S1 / M12)", () => {
   let venueId: number;

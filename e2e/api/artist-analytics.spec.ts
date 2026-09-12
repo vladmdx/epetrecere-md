@@ -20,7 +20,7 @@ import { getTestUsers, getIgorArtist, sql } from "../helpers/db";
 //   snapshot the full DOM — flaky — we just grep for the artist name
 //   in the heading, which changes only when Igor is renamed in the DB.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe("artist analytics page (F-A8)", () => {
   test("anonymous GET /dashboard/analytics → 307 → /sign-in", async () => {

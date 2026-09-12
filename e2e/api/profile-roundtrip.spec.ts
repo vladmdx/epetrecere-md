@@ -15,7 +15,7 @@ import { sql, getIgorArtist } from "../helpers/db";
 // At the end we restore the original values so the spec is idempotent and
 // leaves Igor's profile untouched on the live DB.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe.serial("profile save round-trip (F-A4)", () => {
   let artistId: number;

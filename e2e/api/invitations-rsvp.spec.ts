@@ -11,7 +11,7 @@ import { sql, getTestUsers } from "../helpers/db";
 //   from the test. If the seeded guest comes back in the candidate list,
 //   the cron would pick it up on its next daily run at 10 UTC.
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe.serial("Invitations + RSVP reminder (INV-01..03)", () => {
   let invitationId: number;

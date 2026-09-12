@@ -1,13 +1,16 @@
 import { defineConfig, devices } from "@playwright/test";
 import { config as loadEnv } from "dotenv";
 
-// E2E targets a LOCAL dev server by default (ADR 0028 review item #10): the
-// suite writes fixtures and must never mutate production. Use the explicit
-// `npm run test:e2e:prod` (which sets E2E_BASE_URL) for read-only prod checks.
-loadEnv({ path: ".env.production.local", override: false });
-loadEnv({ path: ".env.local", override: false });
+// ADR 0028 review (Correction Pass 3, item 1) — E2E test safety, P0.
+// Load ONLY the dedicated test env file. Never `.env.local` /
+// `.env.production.local`, so the suite can never inherit production
+// credentials. There is no production baseURL fallback.
+loadEnv({ path: ".env.test.local", override: false });
 
 const baseURL = process.env.E2E_BASE_URL || "http://localhost:3000";
+if (/epetrecere\.md/i.test(baseURL)) {
+  throw new Error("Playwright baseURL points at production — refusing. Set E2E_BASE_URL to a disposable environment.");
+}
 
 export default defineConfig({
   testDir: "./e2e",

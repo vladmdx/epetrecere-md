@@ -15,7 +15,7 @@ import { sql, getIgorArtist } from "../helpers/db";
 //   3. Signed-in artist (Igor) → 200 + numeric stats matching the DB
 //      (we seed one pending booking_request for him and tear it down)
 
-const BASE = process.env.E2E_BASE_URL || "https://epetrecere.md";
+const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
 
 test.describe.serial("artist stats dashboard (F-A1)", () => {
   let seededRequestId: number | null = null;

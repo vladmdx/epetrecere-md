@@ -1,6 +1,6 @@
 import { test, expect, request as pwRequest } from "@playwright/test";
 import { ARTIST_STATE } from "../helpers/paths";
-import { sql, getTestUsers } from "../helpers/db";
+import { sql, getTestUsers, testBaseUrl } from "../helpers/db";
 
 // ADR 0028 / Phase 2 — HTTP-level authorization for the org → venue → hall
 // membership resolver (src/lib/venue-access.ts).
@@ -21,15 +21,9 @@ import { sql, getTestUsers } from "../helpers/db";
 // Requires a running, Clerk-authenticated server + seeded personas (ARTIST_STATE).
 // Run: E2E_BASE_URL=http://localhost:3000 npx playwright test e2e/api/venue-multihall-auth.spec.ts
 
-const BASE = process.env.E2E_BASE_URL || "http://localhost:3000";
-
-// Hard refusal: never let this destructive spec touch production.
-if (/epetrecere\.md/i.test(BASE) && process.env.ALLOW_PROD_E2E !== "1") {
-  throw new Error(`Refusing to run venue-multihall-auth against production baseURL: ${BASE}`);
-}
-if (/epetrecere\.md|prod/i.test(process.env.DATABASE_URL ?? "") && process.env.ALLOW_PROD_E2E !== "1") {
-  throw new Error("Refusing to run venue-multihall-auth against a production database.");
-}
+// Central guards (helpers/db) refuse a non-test database at import time and a
+// production baseURL here. There is no ALLOW_PROD override.
+const BASE = testBaseUrl();
 
 const MARK = "mh_e2e_";
 
