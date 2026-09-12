@@ -965,6 +965,16 @@ export const calendarEvents = pgTable("calendar_events", {
   index("idx_cal_entity_type_date_status").on(t.entityType, t.date, t.status),
   index("idx_cal_booking").on(t.bookingId),
   index("idx_cal_hall").on(t.hallId),
+  // Authoritative delete action is SET NULL (hall_id) in 0029 (PG15+).
+  foreignKey({
+    name: "calendar_events_hall_venue_fk",
+    columns: [t.hallId, t.entityId],
+    foreignColumns: [venueHalls.id, venueHalls.venueId],
+  }).onDelete("set null"),
+  check(
+    "calendar_events_hall_requires_venue_entity_chk",
+    sql`${t.hallId} IS NULL OR ${t.entityType} = 'venue'`,
+  ),
 ]);
 
 // ═══════════════════════════════════════════════════════
