@@ -4,11 +4,17 @@ import { test } from "node:test";
 import {
   LEGAL_PACK_VERSION,
   PARTNER_REQUIRED_DOCS,
+  VENUE_REQUIRED_DOCS,
   REQUIRED_DOCUMENT_VERSIONS_THIS_PACK,
   getLegalDocument,
   legalBlocks,
 } from "../src/lib/legal";
 import { acceptanceSchema } from "../src/lib/legal/acceptance";
+import {
+  LEGAL_PACK_MANIFESTS,
+  LEGAL_PACK_MANIFEST_VARIANTS,
+  legalEvidenceMatchesManifest,
+} from "../src/lib/legal/pack-manifest";
 
 function text(slug: string, locale: "ro" | "ru" | "en" = "ro") {
   const document = getLegalDocument(slug);
@@ -32,6 +38,96 @@ test("legal pack 2.2 separates pack and document versions", () => {
 
   const source = readFileSync("src/content/legal/documents.json", "utf8");
   assert.doesNotMatch(source, /Legal Pack v(?:1\.0|2\.0|2\.1)/);
+});
+
+test("pack manifests preserve historical subject topology and exact versions", () => {
+  assert.deepEqual(
+    LEGAL_PACK_MANIFESTS[LEGAL_PACK_VERSION].artist.map((document) => document.slug),
+    PARTNER_REQUIRED_DOCS,
+  );
+  assert.deepEqual(
+    LEGAL_PACK_MANIFESTS[LEGAL_PACK_VERSION].venue.map((document) => document.slug),
+    VENUE_REQUIRED_DOCS,
+  );
+  assert.equal(LEGAL_PACK_MANIFESTS["1.0"].venue.length, 5);
+  assert.equal(
+    LEGAL_PACK_MANIFESTS["1.0"].venue.map((document) => String(document.slug))
+      .includes("acord-parteneri"),
+    false,
+  );
+  assert.equal(LEGAL_PACK_MANIFESTS["2.0"].venue.length, 6);
+  assert.equal(
+    LEGAL_PACK_MANIFESTS["2.1"].artist.find(
+      (document) => document.slug === "politica-confidentialitate",
+    )?.version,
+    "1.1",
+  );
+  assert.equal(
+    legalEvidenceMatchesManifest(
+      "2.1",
+      "artist",
+      LEGAL_PACK_MANIFESTS["2.1"].artist.map((document) => ({
+        documentSlug: document.slug,
+        documentVersion: document.version,
+      })),
+    ),
+    true,
+  );
+  for (const packVersion of ["2.1", "2.2"] as const) {
+    assert.equal(LEGAL_PACK_MANIFEST_VARIANTS[packVersion].venue.length, 2);
+    for (const manifest of LEGAL_PACK_MANIFEST_VARIANTS[packVersion].venue) {
+      assert.equal(
+        legalEvidenceMatchesManifest(
+          packVersion,
+          "venue",
+          manifest.map((document) => ({
+            documentSlug: document.slug,
+            documentVersion: document.version,
+          })),
+        ),
+        true,
+      );
+    }
+  }
+  assert.equal(
+    LEGAL_PACK_MANIFEST_VARIANTS["2.1"].artist[0].find(
+      (document) => document.slug === "politica-confidentialitate",
+    )?.version,
+    "1.0",
+  );
+  assert.deepEqual(
+    LEGAL_PACK_MANIFEST_VARIANTS["2.2"].artist[0]
+      .filter((document) => [
+        "termeni-generali",
+        "politica-confidentialitate",
+        "reguli-marketplace",
+      ].includes(document.slug))
+      .map((document) => document.version),
+    ["2.0", "1.2", "1.0"],
+  );
+  assert.equal(
+    legalEvidenceMatchesManifest("2.1", "artist", [
+      {
+        documentSlug: LEGAL_PACK_MANIFESTS["2.1"].artist[0].slug,
+        documentVersion: "9.9",
+      },
+      ...LEGAL_PACK_MANIFESTS["2.1"].artist.slice(1).map((document) => ({
+        documentSlug: document.slug,
+        documentVersion: document.version,
+      })),
+    ]),
+    false,
+  );
+  assert.equal(legalEvidenceMatchesManifest("9.9", "artist", []), false);
+
+  for (const path of [
+    "src/components/vendor/signed-documents-card.tsx",
+    "src/components/vendor/organization-dashboard.tsx",
+  ]) {
+    const source = readFileSync(path, "utf8");
+    assert.match(source, /legalEvidenceMatchesManifest/);
+    assert.doesNotMatch(source, /packVersion\s*!==\s*["']1\.0["']\s*\?\s*6\s*:\s*5/);
+  }
 });
 
 test("artist acceptance rejects an organization scope before route authorization", () => {

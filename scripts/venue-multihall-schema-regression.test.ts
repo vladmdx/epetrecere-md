@@ -277,10 +277,17 @@ test("legal evidence uniqueness is session-scoped and delivery is durable", () =
   assert.match(acceptanceSlice, /legal_acceptances_org_subject_chk/);
   assert.match(acceptanceSlice, /legal_acceptances_id_session_unique/);
   assert.match(acceptanceSlice, /export const legalContractDeliveryOutbox/);
-  assert.match(acceptanceSlice, /acceptanceSessionId: uuid\("acceptance_session_id"\)\.primaryKey\(\)/);
+  assert.match(acceptanceSlice, /id: serial\("id"\)\.primaryKey\(\)/);
+  assert.match(acceptanceSlice, /acceptanceSessionId: uuid\("acceptance_session_id"\)\.notNull\(\)/);
+  assert.match(acceptanceSlice, /legal_contract_delivery_recipient_unique/);
+  assert.match(acceptanceSlice, /recipientKey: text\("recipient_key"\)\.notNull\(\)/);
+  assert.match(acceptanceSlice, /recipientEmail: text\("recipient_email"\)\.notNull\(\)/);
+  assert.match(acceptanceSlice, /nextAttemptAt: timestamp\("next_attempt_at"/);
+  assert.match(acceptanceSlice, /deadLetteredAt: timestamp\("dead_lettered_at"/);
   assert.match(acceptanceSlice, /leaseToken: uuid\("lease_token"\)/);
   assert.match(acceptanceSlice, /legal_contract_delivery_anchor_session_fk/);
   assert.match(acceptanceSlice, /legal_contract_delivery_status_chk/);
+  assert.match(acceptanceSlice, /legal_contract_delivery_channel_chk/);
 
   const inngest = readFileSync("src/lib/inngest/functions.ts", "utf8");
   assert.match(inngest, /id: "retry-legal-contract-deliveries"/);
