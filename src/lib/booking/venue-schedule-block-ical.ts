@@ -1,8 +1,28 @@
-import { localDateInZone, zonedWallTimeToUtc } from "./zoned-interval";
+import { DEFAULT_VENUE_TZ, localDateInZone, zonedWallTimeToUtc } from "./zoned-interval";
 
 export type VenueScheduleBlockIcal =
   | { allDay: false }
   | { allDay: true; startDate: string; endDateExclusive: string };
+
+function isIanaTimeZone(value: string): boolean {
+  try {
+    const supported = (
+      Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
+    ).supportedValuesOf?.("timeZone");
+    if (Array.isArray(supported)) return supported.includes(value);
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Venue IANA zone for iCal. Invalid or empty legacy values fall back safely. */
+export function canonicalVenueIcalTimeZone(value: string | null | undefined): string {
+  const trimmed = value?.trim();
+  if (trimmed && isIanaTimeZone(trimmed)) return trimmed;
+  return DEFAULT_VENUE_TZ;
+}
 
 /**
  * All-day iCal (VALUE=DATE) is allowed only when both bounds are exact local

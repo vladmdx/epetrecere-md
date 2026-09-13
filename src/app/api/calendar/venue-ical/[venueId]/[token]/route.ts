@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { venues, bookingRequests, calendarEvents, venueScheduleBlocks } from "@/lib/db/schema";
 import { verifyVenueIcalToken } from "@/lib/calendar/ical-token";
 import {
+  canonicalVenueIcalTimeZone,
   classifyVenueScheduleBlockIcal,
   icsDateValue,
 } from "@/lib/booking/venue-schedule-block-ical";
@@ -53,13 +54,14 @@ export async function GET(
   }
 
   const [venue] = await db
-    .select({ id: venues.id, nameRo: venues.nameRo })
+    .select({ id: venues.id, nameRo: venues.nameRo, timezone: venues.timezone })
     .from(venues)
     .where(eq(venues.id, venueId))
     .limit(1);
   if (!venue) {
     return new NextResponse("Not found", { status: 404 });
   }
+  const timeZone = canonicalVenueIcalTimeZone(venue.timezone);
 
   const hallIdRaw = _req.nextUrl.searchParams.get("hallId");
   const hallId = hallIdRaw ? Number(hallIdRaw) : null;
@@ -105,7 +107,7 @@ export async function GET(
     "CALSCALE:GREGORIAN",
     "METHOD:PUBLISH",
     `X-WR-CALNAME:${escapeIcs(`ePetrecere — ${venue.nameRo}`)}`,
-    "X-WR-TIMEZONE:Europe/Chisinau",
+    `X-WR-TIMEZONE:${escapeIcs(timeZone)}`,
   ];
 
   for (const b of filteredBookings) {
@@ -163,7 +165,7 @@ export async function GET(
     const classified = classifyVenueScheduleBlockIcal(
       block.startsAt,
       block.endsAt,
-      "Europe/Chisinau",
+      timeZone,
     );
     if (classified.allDay) {
       lines.push(
