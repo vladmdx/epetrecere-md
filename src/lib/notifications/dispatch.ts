@@ -294,6 +294,10 @@ export async function dispatchNotificationChannel(
     throw new Error("email_payload_missing");
   }
   const sender = drivers.sendEmail ?? (await import("@/lib/email/send")).sendEmail;
+  // Resend's SDK adapter does not expose AbortSignal. This deadline releases
+  // the worker/DB barrier, but an already-started request may still complete
+  // in the background. Its stable provider idempotency key makes the retry
+  // safe within Resend's idempotency guarantee; this is not transport cancel.
   const result = await withProviderDeadline(options.timeoutMs ?? 15_000, () => sender({
     to: input.email!,
     subject: input.emailSubject || input.title,

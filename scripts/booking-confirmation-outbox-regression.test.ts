@@ -476,6 +476,88 @@ test("provider success is settled before a worker can crash or cancellation can 
   assert.equal((await bookingEffectDeliveriesFor(effect.id))[0]?.status, "delivered");
 });
 
+test("a crash after provider acceptance rolls back dispatching before settlement", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  const [delivery] = await enqueueBookingEffectDeliveries(db, effect.id, [{
+    recipientUserId: userId,
+    channel: "email",
+    dedupeKey: `booking:${booking.id}:${userId}:settlement-crash:email`,
+    payload: {
+      userId,
+      type: "booking_status_changed",
+      title: "Settlement crash",
+      email: MARK + "user@example.com",
+      emailHtml: "<p>settlement crash</p>",
+      dedupeKey: `booking:${booking.id}:${userId}:settlement-crash`,
+    },
+  }]);
+  const claimed = await claimBookingEffectDelivery(delivery.id);
+  assert.ok(claimed);
+  let providerAccepted = 0;
+  await assert.rejects(
+    withBookingEffectDeliveryDispatchPermit(
+      booking.id,
+      claimed,
+      async () => {
+        providerAccepted += 1;
+        // Failure injection at the exact provider-return -> settlement gap.
+        throw new Error("simulated_worker_crash_before_settlement");
+      },
+    ),
+    /simulated_worker_crash_before_settlement/,
+  );
+  assert.equal(providerAccepted, 1);
+  const [rolledBack] = await bookingEffectDeliveriesFor(effect.id);
+  assert.equal(rolledBack?.status, "processing");
+  assert.equal(rolledBack?.dispatchStartedAt, null);
+  assert.equal(rolledBack?.deliveredAt, null);
+  await vendorCancelBooking(booking.id, "cleanup settlement crash test");
+  assert.equal((await bookingEffectDeliveriesFor(effect.id))[0]?.status, "cancelled");
+});
+
+test("a never-resolving provider releases the barrier by deadline for concurrent cancellation", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let signalStarted!: () => void;
+  const providerStarted = new Promise<void>((resolve) => { signalStarted = resolve; });
+  let pushCalls = 0;
+  const worker = processConfirmationNotificationEffect(effect.id, {
+    providerTimeoutMs: 25,
+    drivers: channelDrivers({
+      push: async () => {
+        pushCalls += 1;
+        signalStarted();
+        return new Promise(() => undefined);
+      },
+    }),
+  });
+  await providerStarted;
+  const startedAt = Date.now();
+  const cancellation = vendorCancelBooking(booking.id, "deadline overlap cancellation");
+  let timeout!: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(
+      () => reject(new Error("cancellation did not pass the bounded dispatch barrier")),
+      2_000,
+    );
+  });
+  const [workerResult] = await Promise.race([
+    Promise.all([worker, cancellation]),
+    deadline,
+  ]).finally(() => clearTimeout(timeout));
+  assert.ok(Date.now() - startedAt < 2_000);
+  assert.ok(["failed", "cancelled", "not_due"].includes(workerResult.status));
+  assert.equal(pushCalls, 1, "the worker-first attempt is authorized exactly once");
+  assert.equal((await bookingEffectFor(
+    booking.id,
+    CONFIRMATION_NOTIFICATION_EFFECT,
+  ))?.status, "cancelled");
+  const rows = await bookingEffectDeliveriesFor(effect.id);
+  assert.ok(rows.every((row) => row.status !== "dispatching"));
+  assert.equal(rows.find((row) => row.channel === "push")?.status, "cancelled");
+});
+
 test("scheduler reconciles a legacy dispatching orphan under a cancelled parent", async () => {
   const booking = await createBooking();
   const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
