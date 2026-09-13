@@ -1,5 +1,6 @@
 /** Real DELETE handlers with in-memory DB/auth/cache doubles. No database,
  * Clerk request, browser, Blob deletion or external notification is possible. */
+/* eslint-disable @typescript-eslint/no-require-imports -- this isolated CommonJS regression test intercepts module loading. */
 const assert = require("node:assert/strict");
 const Module = require("node:module");
 const path = require("node:path");
@@ -25,15 +26,16 @@ const db = {
     const rows = () => {
       const name = getTableName(table);
       if (name === "users") return state.userExists ? [{ id: "qa-private-id", clerkId: "qa-private-clerk", role: state.role, email: "qa@example.invalid" }] : [];
-      if (name === "artists") return state.ownedKinds.includes("artist")
-        ? [{ id: 101, slug: "qa-artist", isActive: true, photoUrl: null }]
+      if (name === "artists") return state.artistExists
+        && (state.ownedKinds.includes("artist") || !state.accountDelete)
+        ? [{ id: 101, nameRo: "QA Artist", slug: "qa-artist", isActive: true, photoUrl: null }]
         : [];
       if (name === "venues") return state.venueExists && (state.ownedKinds.includes("venue") || !state.accountDelete)
         ? [{ id: 202, slug: "qa-venue", isActive: true, isFeatured: true, menuPdfUrl: null, ogImageUrl: null }]
         : [];
       return [];
     };
-    const builder = { from(value) { table = value; return builder; }, where() { return builder; }, limit() { return Promise.resolve(rows()); },
+    const builder = { from(value) { table = value; return builder; }, innerJoin() { return builder; }, where() { return builder; }, limit() { return Promise.resolve(rows()); },
       for(value) { assert.equal(value, "update"); assert.equal(state.inTx, true); state.trace.push(`lock:${getTableName(table)}`); return builder; },
       then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
     return builder;
@@ -100,6 +102,13 @@ Module._load = function(request, parent, isMain) {
       reset();
       assert.equal((await invoke(kind)).status, 200);
       const deleted = state.trace.indexOf(`delete:${kind === "artist" ? "artists" : "venues"}`);
+      if (kind === "artist") {
+        const snapshotted = state.trace.indexOf("update:booking_requests");
+        assert.ok(
+          snapshotted >= 0 && snapshotted < deleted,
+          "artist booking identity is snapshotted before profile deletion",
+        );
+      }
       const cached = state.trace.findIndex(entry => entry.startsWith("cache:"));
       assert.ok(deleted >= 0 && cached > deleted, "cache expires only after deletion succeeds");
       const directory = kind === "artist" ? "artisti" : "sali";
