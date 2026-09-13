@@ -49,6 +49,7 @@ export interface PushPayload {
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
+  options: { timeoutMs?: number } = {},
 ): Promise<{ sent: number; pruned: number; failed: number }> {
   if (!ensureConfigured()) return { sent: 0, pruned: 0, failed: 0 };
 
@@ -80,6 +81,7 @@ export async function sendPushToUser(
             keys: { p256dh: s.p256dh, auth: s.auth },
           },
           body,
+          { timeout: options.timeoutMs ?? 15_000 },
         );
         sent += 1;
       } catch (err) {

@@ -22,6 +22,8 @@ interface SendEmailOptions {
   html: string;
   replyTo?: string;
   attachments?: EmailAttachment[];
+  /** Resend keeps the first successful request for this stable key. */
+  idempotencyKey?: string;
 }
 
 export async function sendEmail({
@@ -30,6 +32,7 @@ export async function sendEmail({
   html,
   replyTo,
   attachments,
+  idempotencyKey,
 }: SendEmailOptions) {
   const from = process.env.EMAIL_FROM || "ePetrecere.md <noreply@epetrecere.md>";
 
@@ -48,7 +51,7 @@ export async function sendEmail({
           })),
         }
       : {}),
-  });
+  }, idempotencyKey ? { idempotencyKey } : undefined);
 }
 
 /** Turn a PNG data URL into an attachment Resend accepts. */

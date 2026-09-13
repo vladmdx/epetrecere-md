@@ -65,6 +65,13 @@ export interface DispatchInput {
 
 type PushResult = { sent: number; pruned: number; failed?: number };
 type WhatsAppResult = { sent: boolean; reason?: string };
+export type NotificationProviderOptions = {
+  /** Stable outbox delivery key. Resend maps this to Idempotency-Key. */
+  idempotencyKey?: string;
+  /** Abortable adapters should stop provider I/O when this fires. */
+  signal?: AbortSignal;
+  timeoutMs?: number;
+};
 
 export interface DispatchOptions {
   /**
@@ -78,21 +85,44 @@ export interface DispatchOptions {
     sendPushToUser?: (
       userId: string,
       payload: { title: string; body?: string; actionUrl?: string; tag?: string },
+      options?: NotificationProviderOptions,
     ) => Promise<PushResult>;
     sendWhatsAppToUser?: (
       userId: string,
       payload: { title: string; body: string; actionUrl?: string },
+      options?: NotificationProviderOptions,
     ) => Promise<WhatsAppResult>;
     sendEmail?: (input: {
       to: string;
       subject: string;
       html: string;
+      idempotencyKey?: string;
     }) => Promise<unknown>;
   };
 }
 
 export type NotificationChannel = "in_app" | "push" | "whatsapp" | "email";
 export type NotificationChannelDrivers = NonNullable<DispatchOptions["drivers"]>;
+
+async function withProviderDeadline<T>(
+  timeoutMs: number,
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort(new Error("notification_provider_timeout"));
+      reject(new Error("notification_provider_timeout"));
+    }, timeoutMs);
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([work(controller.signal), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 /**
  * Resolve the recipient's per-type channel preferences. Missing keys (or
@@ -189,11 +219,18 @@ export async function resolveNotificationChannels(
   return channels;
 }
 
-/** Deliver exactly one frozen channel. The outbox owns retry semantics. */
+/**
+ * Deliver one frozen channel. Database notification insertion is exactly-once
+ * through its unique dedupe key. Resend also accepts the stable key at the
+ * provider boundary. Web Push and WhatsApp expose no equivalent guarantee,
+ * so a crash after provider acceptance but before our DB commit remains the
+ * unavoidable at-least-once duplicate window for those two channels.
+ */
 export async function dispatchNotificationChannel(
   input: DispatchInput,
   channel: NotificationChannel,
   drivers: NotificationChannelDrivers = {},
+  options: { timeoutMs?: number; idempotencyKey?: string } = {},
 ): Promise<void> {
   if (!input.dedupeKey) {
     throw new Error("durable_notification_requires_dedupe_key");
@@ -215,12 +252,13 @@ export async function dispatchNotificationChannel(
   if (channel === "push") {
     const sender = drivers.sendPushToUser
       ?? (await import("@/lib/push/send")).sendPushToUser;
-    const result = await sender(input.userId, {
-      title: input.title,
-      body: input.message ?? "",
-      actionUrl: input.actionUrl ?? "/",
-      tag: String(input.type),
-    });
+    const result = await withProviderDeadline(options.timeoutMs ?? 15_000, (signal) =>
+      sender(input.userId, {
+        title: input.title,
+        body: input.message ?? "",
+        actionUrl: input.actionUrl ?? "/",
+        tag: String(input.type),
+      }, { signal, timeoutMs: options.timeoutMs, idempotencyKey: options.idempotencyKey }));
     if ((result.failed ?? 0) > 0) {
       throw new Error(`push_delivery_failed:${result.failed}`);
     }
@@ -229,11 +267,12 @@ export async function dispatchNotificationChannel(
   if (channel === "whatsapp") {
     const sender = drivers.sendWhatsAppToUser
       ?? (await import("@/lib/whatsapp/send")).sendWhatsAppToUser;
-    const result = await sender(input.userId, {
-      title: input.title,
-      body: input.message ?? "",
-      actionUrl: input.actionUrl,
-    });
+    const result = await withProviderDeadline(options.timeoutMs ?? 15_000, (signal) =>
+      sender(input.userId, {
+        title: input.title,
+        body: input.message ?? "",
+        actionUrl: input.actionUrl,
+      }, { signal, timeoutMs: options.timeoutMs, idempotencyKey: options.idempotencyKey }));
     if (result.reason === "api-error") {
       throw new Error("whatsapp_delivery_failed");
     }
@@ -243,11 +282,12 @@ export async function dispatchNotificationChannel(
     throw new Error("email_payload_missing");
   }
   const sender = drivers.sendEmail ?? (await import("@/lib/email/send")).sendEmail;
-  const result = await sender({
-    to: input.email,
+  const result = await withProviderDeadline(options.timeoutMs ?? 15_000, () => sender({
+    to: input.email!,
     subject: input.emailSubject || input.title,
-    html: input.emailHtml,
-  });
+    html: input.emailHtml!,
+    idempotencyKey: options.idempotencyKey,
+  }));
   const error = providerError(result);
   if (error) throw new Error("email_delivery_failed", { cause: error });
 }

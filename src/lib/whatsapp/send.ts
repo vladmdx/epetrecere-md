@@ -52,7 +52,11 @@ function isConfigured(): boolean {
   );
 }
 
-async function callMeta(phoneE164: string, payload: WhatsAppPayload) {
+async function callMeta(
+  phoneE164: string,
+  payload: WhatsAppPayload,
+  signal?: AbortSignal,
+) {
   const token = process.env.WHATSAPP_ACCESS_TOKEN!;
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID!;
   const templateName =
@@ -90,6 +94,7 @@ async function callMeta(phoneE164: string, payload: WhatsAppPayload) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal,
   });
 
   if (!res.ok) {
@@ -104,6 +109,7 @@ async function callMeta(phoneE164: string, payload: WhatsAppPayload) {
 export async function sendWhatsAppToUser(
   userId: string,
   payload: WhatsAppPayload,
+  options: { signal?: AbortSignal } = {},
 ): Promise<{ sent: boolean; reason?: string }> {
   if (!isConfigured()) {
     return { sent: false, reason: "not-configured" };
@@ -119,7 +125,7 @@ export async function sendWhatsAppToUser(
   if (!phone) return { sent: false, reason: "no-phone" };
 
   try {
-    await callMeta(phone, payload);
+    await callMeta(phone, payload, options.signal);
     return { sent: true };
   } catch (err) {
     console.error("[whatsapp] send failed", err);

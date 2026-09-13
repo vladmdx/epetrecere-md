@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { bookingRequests, calendarEvents } from "@/lib/db/schema";
+import { artists, bookingRequests, calendarEvents } from "@/lib/db/schema";
 import { ensureCommissionForBooking } from "@/lib/commissions/service";
 import {
   CONFIRMATION_NOTIFICATION_EFFECT,
@@ -38,22 +38,37 @@ export async function persistConfirmationEffects(executor: Executor, b: Booking)
   }
   await ensureCommissionForBooking(b.id, executor);
   let row = b;
-  if (b.venueId && !b.commercialSnapshot) {
+  if (b.artistId && !b.artistNameSnapshot) {
+    const [artist] = await executor
+      .select({ name: artists.nameRo })
+      .from(artists)
+      .where(eq(artists.id, b.artistId))
+      .limit(1);
+    if (artist?.name) {
+      const [updated] = await executor
+        .update(bookingRequests)
+        .set({ artistNameSnapshot: artist.name, updatedAt: new Date() })
+        .where(eq(bookingRequests.id, b.id))
+        .returning();
+      if (updated) row = updated;
+    }
+  }
+  if (row.venueId && !row.commercialSnapshot) {
     const { commercialSnapshotFor } = await import("@/lib/booking/venue-booking-write");
     const snapshot = await commercialSnapshotFor({
-      venueId: b.venueId,
-      hallId: b.hallId ?? null,
-      reservationScope: b.reservationScope === "venue" ? "venue" : "hall",
-      agreedPrice: b.agreedPrice,
-      currency: b.agreedCurrency,
-      guestCount: b.guestCount,
-      eventType: b.eventType,
+      venueId: row.venueId,
+      hallId: row.hallId ?? null,
+      reservationScope: row.reservationScope === "venue" ? "venue" : "hall",
+      agreedPrice: row.agreedPrice,
+      currency: row.agreedCurrency,
+      guestCount: row.guestCount,
+      eventType: row.eventType,
       executor,
     });
     const [updated] = await executor
       .update(bookingRequests)
       .set({ commercialSnapshot: snapshot, updatedAt: new Date() })
-      .where(eq(bookingRequests.id, b.id))
+      .where(eq(bookingRequests.id, row.id))
       .returning();
     if (updated) row = updated;
   }

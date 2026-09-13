@@ -3,6 +3,9 @@ export const BOOKING_EFFECT_MAX_BACKOFF_MS = 60 * 60 * 1000;
 export const BOOKING_EFFECT_BASE_BACKOFF_MS = 30 * 1000;
 /** Permanent provider failures stop consuming every scheduler run. */
 export const BOOKING_EFFECT_MAX_ATTEMPTS = 8;
+/** Must stay comfortably below the delivery lease so a wedged provider
+ * cannot monopolise a row until another worker is allowed to claim it. */
+export const BOOKING_EFFECT_PROVIDER_TIMEOUT_MS = 15 * 1000;
 
 /**
  * Renew well before expiry. The production cap also keeps one slow provider

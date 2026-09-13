@@ -23,10 +23,12 @@ import {
   bookingEffectFor,
   claimBookingEffect,
   claimBookingEffectDelivery,
+  cancelBookingConfirmationEffects,
   enqueueBookingEffect,
   enqueueBookingEffectDeliveries,
   markBookingEffectDelivered,
   processBookingEffectDelivery,
+  requeueBookingEffectDeadLetter,
 } from "../src/lib/booking/effect-outbox";
 import { persistConfirmationEffects } from "../src/lib/booking/confirmation-persist";
 import {
@@ -309,6 +311,98 @@ test("cancellation committed before claim suppresses every confirmation channel"
   assert.equal((await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT))?.status, "cancelled");
 });
 
+test("cancellation wins the barrier after status check and before provider start", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let providerCalls = 0;
+  let release!: () => void;
+  let reached!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const atBarrier = new Promise<void>((resolve) => { reached = resolve; });
+  let paused = false;
+  const worker = processConfirmationNotificationEffect(effect.id, {
+    beforeDispatchPermit: async () => {
+      if (paused) return;
+      paused = true;
+      reached();
+      await gate;
+    },
+    drivers: channelDrivers({
+      push: async () => { providerCalls += 1; return { sent: 1, pruned: 0, failed: 0 }; },
+      whatsapp: async () => { providerCalls += 1; return { sent: true }; },
+      email: async () => { providerCalls += 1; return { data: { id: "unexpected" }, error: null }; },
+    }),
+  });
+  await atBarrier;
+  await vendorCancelBooking(booking.id, "cancel in controlled dispatch gap");
+  release();
+  const result = await worker;
+  assert.ok(result.status === "not_due" || result.status === "cancelled");
+  assert.equal(providerCalls, 0, "a committed cancellation prevents provider start");
+  assert.ok((await bookingEffectDeliveriesFor(effect.id)).every((row) => row.status === "cancelled"));
+});
+
+test("parent preparation retries do not consume a new email delivery budget", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let referralCalls = 0;
+  const referral = async () => {
+    referralCalls += 1;
+    if (referralCalls <= 7) throw new Error("referral temporarily unavailable");
+  };
+  for (let attempt = 1; attempt <= 7; attempt += 1) {
+    const failed = await processConfirmationNotificationEffect(effect.id, {
+      referral,
+      drivers: channelDrivers(),
+    });
+    assert.equal(failed.status, "failed");
+    await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  }
+  const result = await processConfirmationNotificationEffect(effect.id, {
+    referral,
+    drivers: channelDrivers({
+      email: async () => { throw new Error("first email failure"); },
+    }),
+  });
+  assert.equal(result.status, "failed");
+  const parent = await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  assert.equal(parent?.attempts, 8);
+  assert.equal(parent?.referralAttempts, 8);
+  assert.equal(parent?.referralStatus, "delivered");
+  const email = (await bookingEffectDeliveriesFor(effect.id))
+    .find((row) => row.channel === "email");
+  assert.equal(email?.attempts, 1);
+  assert.equal(email?.status, "failed", "child stays retryable on its own first attempt");
+});
+
+test("cancellation terminalization rolls back parent and children atomically", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  await enqueueBookingEffectDeliveries(db, effect.id, [{
+    recipientUserId: userId,
+    channel: "email",
+    dedupeKey: `booking:${booking.id}:${userId}:rollback:email`,
+    payload: {
+      userId,
+      type: "booking_status_changed",
+      title: "Rollback",
+      email: MARK + "user@example.com",
+      emailHtml: "<p>rollback</p>",
+      dedupeKey: `booking:${booking.id}:${userId}:rollback`,
+    },
+  }]);
+  await assert.rejects(db.transaction(async (tx) => {
+    await cancelBookingConfirmationEffects(
+      tx as unknown as typeof db,
+      booking.id,
+      "failure injection",
+    );
+    throw new Error("rollback terminalization");
+  }), /rollback terminalization/);
+  assert.equal((await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT))?.status, "pending");
+  assert.equal((await bookingEffectDeliveriesFor(effect.id))[0]?.status, "pending");
+});
+
 test("heartbeat protects a slow channel worker beyond the original lease", async () => {
   const booking = await createBooking();
   const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
@@ -366,9 +460,60 @@ test("permanent channel failure dead-letters and does not starve healthy work", 
   });
   assert.ok(drained.delivered >= 1, "healthy rows behind a dead letter still run");
   assert.ok(drained.terminal >= 1, "dead letters remain visible to monitoring");
+
+  const secondDrain = await drainConfirmationNotificationOutbox({
+    limit: 50,
+    drivers: channelDrivers(),
+  });
+  assert.equal(secondDrain.newlyReportedTerminal, 0,
+    "historical dead letters do not fail every scheduler run");
+  assert.equal(await requeueBookingEffectDeadLetter(
+    brokenEffect.id,
+    "provider recovered",
+  ), true);
+  assert.equal((await bookingEffectFor(
+    brokenBooking.id,
+    CONFIRMATION_NOTIFICATION_EFFECT,
+  ))?.status, "pending");
+  await vendorCancelBooking(brokenBooking.id, "end requeue test");
+});
+
+test("provider timeout releases a wedged channel and lets healthy rows behind run", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let emails = 0;
+  let emailIdempotencyKey = "";
+  const started = Date.now();
+  const result = await processConfirmationNotificationEffect(effect.id, {
+    providerTimeoutMs: 25,
+    drivers: {
+      sendPushToUser: async () => new Promise(() => undefined),
+      sendWhatsAppToUser: async () => ({ sent: true }),
+      sendEmail: async (input) => {
+        emails += 1;
+        emailIdempotencyKey = input.idempotencyKey ?? "";
+        return { data: { id: "ok" }, error: null };
+      },
+    },
+  });
+  assert.equal(result.status, "failed");
+  assert.ok(Date.now() - started < 2_000, "never-resolving provider is bounded");
+  assert.equal(emails, 1, "later healthy channel is not starved");
+  assert.match(emailIdempotencyKey, new RegExp(`^booking:${booking.id}:.*:email$`));
+  await vendorCancelBooking(booking.id, "end timeout test");
 });
 
 test("cron auth, Inngest recovery and API confirmation wiring stay active", async () => {
+  const terminalBooking = await createBooking();
+  const terminalEffect = await enqueueBookingEffect(
+    db,
+    terminalBooking.id,
+    CONFIRMATION_NOTIFICATION_EFFECT,
+  );
+  await db
+    .update(bookingEffectOutbox)
+    .set({ status: "dead_letter", lastError: "monitoring test" })
+    .where(eq(bookingEffectOutbox.id, terminalEffect.id));
   const previous = process.env.CRON_SECRET;
   process.env.CRON_SECRET = MARK + "secret";
   try {
@@ -378,9 +523,15 @@ test("cron auth, Inngest recovery and API confirmation wiring stay active", asyn
       "http://localhost/api/cron/booking-confirmation-outbox",
       { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } },
     ));
-    const health = await authorized.json() as { terminal: number };
-    assert.equal(authorized.status, 503, "dead letter must be visible to scheduler monitoring");
+    const health = await authorized.json() as { terminal: number; newlyReportedTerminal: number };
+    assert.equal(authorized.status, 503, "a new dead letter is reported once");
     assert.ok(health.terminal >= 1);
+    assert.ok(health.newlyReportedTerminal >= 1);
+    const quiet = await cronGet(new NextRequest(
+      "http://localhost/api/cron/booking-confirmation-outbox",
+      { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } },
+    ));
+    assert.equal(quiet.status, 200, "reported historical dead letter no longer poisons cron");
   } finally {
     if (previous === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = previous;

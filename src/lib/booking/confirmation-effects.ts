@@ -7,6 +7,7 @@ import {
   bookingRequests,
   users,
   type BookingEffectChannel,
+  type BookingEffectStepStatus,
 } from "@/lib/db/schema";
 import {
   dispatchNotification,
@@ -18,17 +19,26 @@ import {
 import { getVenueOwnerUserIds } from "@/lib/venue-access";
 import { persistConfirmationEffects } from "./confirmation-persist";
 import {
+  BOOKING_EFFECT_MAX_ATTEMPTS,
+  BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
+  bookingEffectError,
+  bookingEffectRetryDelayMs,
+} from "./effect-outbox-policy";
+import {
   BookingEffectCancelledError,
   BookingEffectDeadLetterError,
   CONFIRMATION_NOTIFICATION_EFFECT,
+  acquireBookingConfirmationBarrier,
   bookingEffectDeliveriesFor,
   bookingEffectFor,
-  cancelBookingConfirmationEffects,
   dueBookingEffectDeliveries,
   dueBookingEffects,
   enqueueBookingEffectDeliveries,
   processBookingEffect,
   processBookingEffectDelivery,
+  reconcileCancelledBookingConfirmationEffects,
+  withBookingEffectDeliveryDispatchPermit,
+  reportUnalertedBookingEffectDeadLetters,
   type BookingEffect,
   type BookingEffectClockOptions,
   type BookingEffectDelivery,
@@ -191,6 +201,8 @@ async function materializeConfirmationDeliveries(
     // Lock in the same booking -> outbox order used by cancellation. If
     // cancellation committed first, no children are created. If this lock
     // wins first, cancellation waits and then invalidates every inserted row.
+    const executor = tx as unknown as typeof db;
+    await acquireBookingConfirmationBarrier(executor, b.id);
     const [activeBooking] = await tx
       .select({ status: bookingRequests.status })
       .from(bookingRequests)
@@ -218,11 +230,132 @@ async function materializeConfirmationDeliveries(
     ) {
       throw new BookingEffectCancelledError();
     }
-    const executor = tx as unknown as typeof db;
     const concurrentExisting = await bookingEffectDeliveriesFor(effect.id, executor);
     if (concurrentExisting.length > 0) return concurrentExisting;
     return enqueueBookingEffectDeliveries(executor, effect.id, rows);
   });
+}
+
+type ConfirmationPreparationStep = "referral" | "materialization";
+
+async function beginPreparationStep(
+  effect: BookingEffect,
+  step: ConfirmationPreparationStep,
+  now = new Date(),
+): Promise<number | null> {
+  if (!effect.leaseToken) return null;
+  const attemptsColumn = step === "referral"
+    ? bookingEffectOutbox.referralAttempts
+    : bookingEffectOutbox.materializationAttempts;
+  const statusColumn = step === "referral"
+    ? bookingEffectOutbox.referralStatus
+    : bookingEffectOutbox.materializationStatus;
+  const dueColumn = step === "referral"
+    ? bookingEffectOutbox.referralNextAttemptAt
+    : bookingEffectOutbox.materializationNextAttemptAt;
+  const values = step === "referral"
+    ? {
+        referralAttempts: sql`${bookingEffectOutbox.referralAttempts} + 1`,
+        referralLastError: null,
+        updatedAt: now,
+      }
+    : {
+        materializationAttempts: sql`${bookingEffectOutbox.materializationAttempts} + 1`,
+        materializationLastError: null,
+        updatedAt: now,
+      };
+  const [started] = await db
+    .update(bookingEffectOutbox)
+    .set(values)
+    .where(sql`
+      ${bookingEffectOutbox.id} = ${effect.id}
+      AND ${bookingEffectOutbox.status} = 'processing'
+      AND ${bookingEffectOutbox.leaseToken} = ${effect.leaseToken}
+      AND ${statusColumn} IN ('pending', 'failed')
+      AND ${dueColumn} <= ${now}
+    `)
+    .returning({ attempts: attemptsColumn });
+  return started?.attempts ?? null;
+}
+
+async function preparationStepState(
+  effectId: number,
+  step: ConfirmationPreparationStep,
+): Promise<string | null> {
+  const statusColumn = step === "referral"
+    ? bookingEffectOutbox.referralStatus
+    : bookingEffectOutbox.materializationStatus;
+  const [row] = await db
+    .select({ status: statusColumn })
+    .from(bookingEffectOutbox)
+    .where(eq(bookingEffectOutbox.id, effectId))
+    .limit(1);
+  return row?.status ?? null;
+}
+
+async function finishPreparationStep(
+  effect: BookingEffect,
+  step: ConfirmationPreparationStep,
+  attempts: number,
+  error?: unknown,
+  now = new Date(),
+): Promise<"delivered" | "failed" | "dead_letter"> {
+  if (!effect.leaseToken) throw new Error("booking_effect_lease_lost");
+  const status: BookingEffectStepStatus = error
+    ? attempts >= BOOKING_EFFECT_MAX_ATTEMPTS ? "dead_letter" : "failed"
+    : "delivered";
+  const nextAttemptAt = error
+    ? new Date(now.getTime() + bookingEffectRetryDelayMs(attempts))
+    : now;
+  const values = step === "referral"
+    ? {
+        referralStatus: status,
+        referralNextAttemptAt: nextAttemptAt,
+        referralLastError: error ? bookingEffectError(error) : null,
+        updatedAt: now,
+      }
+    : {
+        materializationStatus: status,
+        materializationNextAttemptAt: nextAttemptAt,
+        materializationLastError: error ? bookingEffectError(error) : null,
+        updatedAt: now,
+      };
+  const [finished] = await db
+    .update(bookingEffectOutbox)
+    .set(values)
+    .where(sql`
+      ${bookingEffectOutbox.id} = ${effect.id}
+      AND ${bookingEffectOutbox.status} = 'processing'
+      AND ${bookingEffectOutbox.leaseToken} = ${effect.leaseToken}
+    `)
+    .returning({ id: bookingEffectOutbox.id });
+  if (!finished) throw new Error("booking_effect_lease_lost");
+  return status;
+}
+
+async function runPreparationStep(
+  effect: BookingEffect,
+  step: ConfirmationPreparationStep,
+  work: () => Promise<void>,
+  now?: Date,
+): Promise<void> {
+  const current = await preparationStepState(effect.id, step);
+  if (current === "delivered") return;
+  if (current === "dead_letter") {
+    throw new BookingEffectDeadLetterError(`${step}_retry_budget_exhausted`);
+  }
+  const attempts = await beginPreparationStep(effect, step, now);
+  if (attempts === null) throw new Error(`${step}_not_due_or_lease_lost`);
+  try {
+    await work();
+  } catch (error) {
+    const result = await finishPreparationStep(effect, step, attempts, error, now);
+    if (result === "dead_letter") {
+      throw new BookingEffectDeadLetterError(`${step}_retry_budget_exhausted`);
+    }
+    throw error;
+  }
+  await finishPreparationStep(effect, step, attempts, undefined, now);
 }
 
 async function runConfirmationDeliveries(
@@ -230,18 +363,26 @@ async function runConfirmationDeliveries(
   effect: BookingEffect,
   options: ConfirmationProcessorOptions,
 ): Promise<void> {
-  if (booking.clientUserId) {
-    const { triggerReferral, isFirstBookingForUser } = await import("@/lib/referrals/trigger");
-    if (await isFirstBookingForUser(booking.clientUserId)) {
-      const result = await triggerReferral(booking.clientUserId, "first_booking", {
-        bookingId: booking.id,
-        eventDate: booking.eventDate,
-      });
-      if (result.reason === "db_error") throw new Error("referral_delivery_failed");
+  await runPreparationStep(effect, "referral", async () => {
+    if (options.referral) {
+      await options.referral(booking, effect);
+      return;
     }
-  }
+    if (booking.clientUserId) {
+      const { triggerReferral, isFirstBookingForUser } = await import("@/lib/referrals/trigger");
+      if (await isFirstBookingForUser(booking.clientUserId)) {
+        const result = await triggerReferral(booking.clientUserId, "first_booking", {
+          bookingId: booking.id,
+          eventDate: booking.eventDate,
+        });
+        if (result.reason === "db_error") throw new Error("referral_delivery_failed");
+      }
+    }
+  }, options.now);
 
-  await materializeConfirmationDeliveries(booking, effect);
+  await runPreparationStep(effect, "materialization", async () => {
+    await materializeConfirmationDeliveries(booking, effect);
+  }, options.now);
   const due = await dueBookingEffectDeliveries(effect.id, 100, options.now);
   for (const row of due) {
     const result = await processBookingEffectDelivery(
@@ -252,11 +393,24 @@ async function runConfirmationDeliveries(
         if (!await confirmedBooking(effect.bookingId)) {
           throw new BookingEffectCancelledError();
         }
-        await dispatchNotificationChannel(
-          claimed.payload as DispatchInput,
-          claimed.channel,
-          options.drivers,
+        await options.beforeDispatchPermit?.(claimed);
+        const dispatch = await withBookingEffectDeliveryDispatchPermit(
+          effect.bookingId,
+          claimed,
+          async () => {
+            await dispatchNotificationChannel(
+              claimed.payload as DispatchInput,
+              claimed.channel,
+              options.drivers,
+              {
+                idempotencyKey: claimed.dedupeKey,
+                timeoutMs: options.providerTimeoutMs ?? BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
+              },
+            );
+          },
+          options.now ?? new Date(),
         );
+        if (!dispatch.permitted) throw new BookingEffectCancelledError();
       },
       options,
     );
@@ -284,6 +438,11 @@ type ConfirmationProcessorOptions = BookingEffectClockOptions & {
   /** Legacy coordinator-level test seam. Production uses per-channel rows. */
   deliver?: (booking: Booking, effect: BookingEffect) => Promise<void>;
   drivers?: NotificationChannelDrivers;
+  /** Controlled race seam immediately before the dispatch barrier. */
+  beforeDispatchPermit?: (delivery: BookingEffectDelivery) => Promise<void>;
+  /** Test seam for preparation retry budgets. */
+  referral?: (booking: Booking, effect: BookingEffect) => Promise<void>;
+  providerTimeoutMs?: number;
 };
 
 export async function processConfirmationNotificationEffect(
@@ -301,7 +460,7 @@ export async function processConfirmationNotificationEffect(
     options,
   );
   if (result.status === "cancelled") {
-    await cancelBookingConfirmationEffects(db, result.effect.bookingId);
+    await reconcileCancelledBookingConfirmationEffects(result.effect.bookingId);
   }
   return result;
 }
@@ -336,6 +495,7 @@ export async function drainConfirmationNotificationOutbox(options: {
     retrying: 0,
     failedBacklog: 0,
     terminal: 0,
+    newlyReportedTerminal: 0,
     errors: [] as Array<{ effectId: number; error: string }>,
   };
   for (const effect of effects) {
@@ -369,6 +529,10 @@ export async function drainConfirmationNotificationOutbox(options: {
     if (state.status === "failed") summary.failedBacklog += Number(state.count);
     if (state.status === "dead_letter") summary.terminal += Number(state.count);
   }
+  summary.newlyReportedTerminal = await reportUnalertedBookingEffectDeadLetters(
+    CONFIRMATION_NOTIFICATION_EFFECT,
+    options.now,
+  );
   return summary;
 }
 

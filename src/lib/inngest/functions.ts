@@ -358,7 +358,11 @@ export const bookingConfirmationOutbox = inngest.createFunction(
       const result = await drainConfirmationNotificationOutbox({ limit: 50 });
       // Throw inside the step so Inngest re-executes the drain on retry instead
       // of memoizing an unhealthy successful step result.
-      if (result.failed > 0 || result.failedBacklog > 0 || result.terminal > 0) {
+      if (
+        result.failed > 0
+        || result.failedBacklog > 0
+        || result.newlyReportedTerminal > 0
+      ) {
         throw new Error(`booking_confirmation_outbox_unhealthy:${JSON.stringify(result)}`);
       }
       return result;

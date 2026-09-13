@@ -9,7 +9,10 @@ import { bookingRequests, calendarEvents } from "@/lib/db/schema";
 import { persistConfirmationEffects } from "./confirmation-persist";
 import { withVenueAvailabilityWrite } from "./venue-booking-write";
 import { cancelCommissionForBooking } from "@/lib/commissions/service";
-import { cancelBookingConfirmationEffects } from "./effect-outbox";
+import {
+  acquireBookingConfirmationBarrier,
+  cancelBookingConfirmationEffects,
+} from "./effect-outbox";
 
 export type BookingRow = typeof bookingRequests.$inferSelect;
 type Executor = typeof db;
@@ -142,6 +145,7 @@ export async function rejectBooking(bookingId: number, reply?: string): Promise<
 export async function clientCancelBooking(bookingId: number): Promise<BookingRow> {
   return db.transaction(async (tx) => {
     const executor = tx as unknown as Executor;
+    await acquireBookingConfirmationBarrier(executor, bookingId);
     const row = await casUpdateBookingStatus(executor, bookingId, ["pending", "accepted"], {
       status: "cancelled",
     });
@@ -153,18 +157,20 @@ export async function clientCancelBooking(bookingId: number): Promise<BookingRow
 
 export async function vendorCancelBooking(bookingId: number, reply?: string): Promise<BookingRow> {
   return db.transaction(async (tx) => {
-    const row = await casUpdateBookingStatus(tx as unknown as Executor, bookingId, ["accepted", "confirmed_by_client"], {
+    const executor = tx as unknown as Executor;
+    await acquireBookingConfirmationBarrier(executor, bookingId);
+    const row = await casUpdateBookingStatus(executor, bookingId, ["accepted", "confirmed_by_client"], {
       status: "cancelled",
       artistReply: reply || "Rezervarea a fost anulată de organizator.",
     });
     if (!row) throw new BookingChangedError();
     await cancelBookingConfirmationEffects(
-      tx as unknown as Executor,
+      executor,
       bookingId,
       "cancelled_by_vendor",
     );
     await tx.delete(calendarEvents).where(eq(calendarEvents.bookingId, bookingId));
-    await cancelCommissionForBooking(bookingId, "Anulată de furnizor", tx as unknown as Executor);
+    await cancelCommissionForBooking(bookingId, "Anulată de furnizor", executor);
     return row;
   });
 }

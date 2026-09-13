@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   BOOKING_EFFECT_MAX_ATTEMPTS,
   BOOKING_EFFECT_MAX_BACKOFF_MS,
+  BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
   bookingEffectError,
   bookingEffectHeartbeatMs,
   bookingEffectRetryDelayMs,
@@ -17,6 +18,7 @@ test("outbox backoff is exponential and capped", () => {
 
 test("attempt and lease policies are bounded", () => {
   assert.equal(BOOKING_EFFECT_MAX_ATTEMPTS, 8);
+  assert.ok(BOOKING_EFFECT_PROVIDER_TIMEOUT_MS < 300_000);
   assert.equal(bookingEffectHeartbeatMs(300_000), 30_000);
   assert.equal(bookingEffectHeartbeatMs(60), 20);
   assert.equal(bookingEffectHeartbeatMs(1), 10);
