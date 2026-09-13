@@ -232,13 +232,24 @@ after(async () => {
     ids.owner, ids.staff, ids.outsider, ids.client, ids.artistUser, ids.owner2,
   ].filter(Boolean)));
   await db.delete(conversations).where(inArray(conversations.clientUserId, [ids.client, ids.outsider].filter(Boolean)));
-  await db.execute(sql`DELETE FROM booking_effect_deliveries
-    WHERE effect_id IN (
-      SELECT o.id FROM booking_effect_outbox o
-      JOIN booking_requests b ON b.id = o.booking_id
-      WHERE b.venue_id IN (${ids.venue}, ${ids.venue2}, ${ids.venueB})
-         OR b.artist_id = ${ids.artist}
-    )`);
+  // Disposable snapshot may lag schema.ts (0031 deliveries table). Skip only
+  // when the relation is absent; do not create/migrate it from this suite.
+  const deliveryTable = await db.execute(sql`
+    SELECT 1 AS present
+    FROM information_schema.tables
+    WHERE table_schema = 'public'
+      AND table_name = 'booking_effect_deliveries'
+    LIMIT 1
+  `) as unknown as Array<{ present: number }>;
+  if (Array.isArray(deliveryTable) && deliveryTable.length > 0) {
+    await db.execute(sql`DELETE FROM booking_effect_deliveries
+      WHERE effect_id IN (
+        SELECT o.id FROM booking_effect_outbox o
+        JOIN booking_requests b ON b.id = o.booking_id
+        WHERE b.venue_id IN (${ids.venue}, ${ids.venue2}, ${ids.venueB})
+           OR b.artist_id = ${ids.artist}
+      )`);
+  }
   await db.execute(sql`DELETE FROM booking_effect_outbox
     WHERE booking_id IN (
       SELECT id FROM booking_requests
