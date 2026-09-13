@@ -439,6 +439,8 @@ test("two dispatch permits reuse their transactions with the production two-sock
     assert.ok((await bookingEffectDeliveriesFor(effect.id))
       .every((row) => row.status === "delivered"));
   }
+  await Promise.all(bookings.map((booking) =>
+    vendorCancelBooking(booking.id, "end two-socket pool test")));
 });
 
 test("provider success is settled before a worker can crash or cancellation can commit", async () => {
@@ -505,7 +507,10 @@ test("scheduler reconciles a legacy dispatching orphan under a cancelled parent"
       cancelRequestedAt: expired,
     }).where(eq(bookingEffectDeliveries.id, delivery.id));
   });
-  await drainConfirmationNotificationOutbox({ limit: 1 });
+  await drainConfirmationNotificationOutbox({
+    limit: 1,
+    drivers: channelDrivers(),
+  });
   const [reconciled] = await bookingEffectDeliveriesFor(effect.id);
   assert.equal(reconciled?.status, "cancelled");
   assert.equal(reconciled?.leaseToken, null);
