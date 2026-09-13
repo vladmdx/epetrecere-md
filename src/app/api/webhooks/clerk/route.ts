@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { bookingRequests, users } from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { BOOKING_CLIENT_ERASURE } from "@/lib/privacy/account-erasure";
+import { acquireUserMembershipMutationLocks } from "@/lib/partner/organization-members";
 
 interface ClerkWebhookEvent {
   type: string;
@@ -94,6 +95,7 @@ export async function POST(req: Request) {
       .limit(1);
     if (user) {
       await db.transaction(async (tx) => {
+        await acquireUserMembershipMutationLocks(tx, user.id);
         // An out-of-band deletion (Clerk dashboard/API) cannot ask the owner
         // to transfer first. Suspend any organization that would become
         // ownerless and create a durable admin-review case before the

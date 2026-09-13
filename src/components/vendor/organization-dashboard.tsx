@@ -7,6 +7,7 @@ import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { legalEvidenceMatchesManifest } from "@/lib/legal/pack-manifest";
 
 type Org = {
   id: number;
@@ -24,6 +25,7 @@ type Contract = {
   acceptanceSessionId: string;
   subjectType: string;
   documentSlug: string;
+  documentVersion: string;
   packVersion: string;
   acceptedAt: string;
   pdfUrl: string;
@@ -188,9 +190,14 @@ export function OrganizationDashboard({ organizationId }: { organizationId?: num
               ) : (
                 [...contractSessions.values()].map((session) => {
                   const anchor = session[0]!;
-                  const expected = anchor.subjectType === "venue" && anchor.packVersion !== "1.0" ? 6 : 5;
-                  const complete = session.length === expected &&
-                    new Set(session.map((row) => row.documentSlug)).size === expected;
+                  const complete = legalEvidenceMatchesManifest(
+                    anchor.packVersion,
+                    anchor.subjectType,
+                    session.map((row) => ({
+                      documentSlug: row.documentSlug,
+                      documentVersion: row.documentVersion,
+                    })),
+                  );
                   return (
                     <div key={anchor.acceptanceSessionId} className="space-y-2 rounded-lg border p-3 text-sm">
                       <p>v{anchor.packVersion} · {new Date(anchor.acceptedAt).toLocaleString("ro-RO")}</p>

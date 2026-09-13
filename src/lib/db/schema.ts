@@ -1503,35 +1503,50 @@ export const legalAcceptances = pgTable(
 );
 
 /**
- * Durable retry state for the complete PDF + email delivery of one signing
- * session. The signed evidence and this job are created in the same database
- * transaction. Resend receives stable idempotency keys per recipient.
+ * Durable per-recipient retry state for complete PDF contract delivery. The
+ * signed evidence and every signer/admin delivery are created in one database
+ * transaction. Resend receives stable idempotency keys per recipient/channel.
  * Authoritative SQL: 0030.
  */
 export const legalContractDeliveryOutbox = pgTable(
   "legal_contract_delivery_outbox",
   {
-    acceptanceSessionId: uuid("acceptance_session_id").primaryKey(),
+    id: serial("id").primaryKey(),
+    acceptanceSessionId: uuid("acceptance_session_id").notNull(),
     anchorAcceptanceId: integer("anchor_acceptance_id")
       .notNull(),
+    channel: text("channel").notNull(),
+    recipientKey: text("recipient_key").notNull(),
+    recipientEmail: text("recipient_email").notNull(),
     status: text("status").default("pending").notNull(),
     attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
     lockedAt: timestamp("locked_at", { withTimezone: true }),
     /** Random ownership token; a stale worker cannot clear a newer lease. */
     leaseToken: uuid("lease_token"),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    deadLetteredAt: timestamp("dead_lettered_at", { withTimezone: true }),
     lastError: text("last_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
-    unique("legal_contract_delivery_anchor_unique").on(t.anchorAcceptanceId),
+    unique("legal_contract_delivery_recipient_unique").on(
+      t.acceptanceSessionId,
+      t.channel,
+      t.recipientKey,
+    ),
     index("legal_contract_delivery_pending_idx")
-      .on(t.status, t.lockedAt)
-      .where(sql`${t.deliveredAt} IS NULL`),
+      .on(t.nextAttemptAt, t.createdAt)
+      .where(sql`${t.deliveredAt} IS NULL AND ${t.deadLetteredAt} IS NULL`),
+    index("legal_contract_delivery_session_idx").on(t.acceptanceSessionId),
     check(
       "legal_contract_delivery_status_chk",
-      sql`${t.status} IN ('pending', 'processing', 'delivered', 'failed')`,
+      sql`${t.status} IN ('pending', 'processing', 'delivered', 'failed', 'dead_letter')`,
+    ),
+    check(
+      "legal_contract_delivery_channel_chk",
+      sql`${t.channel} IN ('signer', 'admin')`,
     ),
     foreignKey({
       name: "legal_contract_delivery_anchor_session_fk",

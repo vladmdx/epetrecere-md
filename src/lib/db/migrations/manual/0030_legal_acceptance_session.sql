@@ -128,28 +128,32 @@ BEGIN
 END $$;
 
 CREATE TABLE IF NOT EXISTS legal_contract_delivery_outbox (
-  acceptance_session_id uuid PRIMARY KEY,
+  id serial PRIMARY KEY,
+  acceptance_session_id uuid NOT NULL,
   anchor_acceptance_id integer NOT NULL,
+  channel text NOT NULL,
+  recipient_key text NOT NULL,
+  recipient_email text NOT NULL,
   status text NOT NULL DEFAULT 'pending',
   attempts integer NOT NULL DEFAULT 0,
+  next_attempt_at timestamptz NOT NULL DEFAULT now(),
   locked_at timestamptz,
   lease_token uuid,
   delivered_at timestamptz,
+  dead_lettered_at timestamptz,
   last_error text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT legal_contract_delivery_status_chk
-    CHECK (status IN ('pending', 'processing', 'delivered', 'failed')),
-  CONSTRAINT legal_contract_delivery_anchor_unique UNIQUE (anchor_acceptance_id),
+    CHECK (status IN ('pending', 'processing', 'delivered', 'failed', 'dead_letter')),
+  CONSTRAINT legal_contract_delivery_channel_chk
+    CHECK (channel IN ('signer', 'admin')),
+  CONSTRAINT legal_contract_delivery_recipient_unique
+    UNIQUE (acceptance_session_id, channel, recipient_key),
   CONSTRAINT legal_contract_delivery_anchor_session_fk
     FOREIGN KEY (anchor_acceptance_id, acceptance_session_id)
     REFERENCES legal_acceptances(id, acceptance_session_id) ON DELETE RESTRICT
 );
-
--- Idempotent upgrade path if an earlier correction-pass draft created the
--- outbox before lease ownership and the composite anchor invariant existed.
-ALTER TABLE legal_contract_delivery_outbox
-  ADD COLUMN IF NOT EXISTS lease_token uuid;
 
 DO $$
 BEGIN
@@ -166,8 +170,11 @@ BEGIN
 END $$;
 
 CREATE INDEX IF NOT EXISTS legal_contract_delivery_pending_idx
-  ON legal_contract_delivery_outbox (status, locked_at)
-  WHERE delivered_at IS NULL;
+  ON legal_contract_delivery_outbox (next_attempt_at, created_at)
+  WHERE delivered_at IS NULL AND dead_lettered_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS legal_contract_delivery_session_idx
+  ON legal_contract_delivery_outbox (acceptance_session_id);
 
 ALTER TABLE legal_contract_delivery_outbox ENABLE ROW LEVEL SECURITY;
 
@@ -178,6 +185,10 @@ BEGIN
     IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) THEN
       EXECUTE format(
         'REVOKE ALL ON TABLE public.legal_contract_delivery_outbox FROM %I',
+        r
+      );
+      EXECUTE format(
+        'REVOKE ALL ON SEQUENCE public.legal_contract_delivery_outbox_id_seq FROM %I',
         r
       );
     END IF;

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { requireOrganizationCapability } from "@/lib/venue-access";
 import { jsonAccess, jsonError } from "@/lib/http/json";
-import { transferOrganizationOwner } from "@/lib/partner/onboarding";
+import { transferOrganizationOwner } from "@/lib/partner/organization-members";
 import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 
 type Ctx = { params: Promise<{ id: string }> };

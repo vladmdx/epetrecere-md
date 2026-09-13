@@ -15,6 +15,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Download, FileSignature, Loader2 } from "lucide-react";
 import { useLocale } from "@/hooks/use-locale";
+import { legalEvidenceMatchesManifest } from "@/lib/legal/pack-manifest";
 
 interface Acceptance {
   /** Frozen copy of what was signed, when the acceptance carries one. */
@@ -97,10 +98,8 @@ export function SignedDocumentsCard() {
         ) : (
           [...groups.values()].map((group) => {
             const g = group[0]!;
-            const expectedDocuments = g.subjectType === "venue" && g.packVersion !== "1.0" ? 6 : 5;
             const completeSession =
-              group.length === expectedDocuments &&
-              new Set(group.map((document) => document.documentSlug)).size === expectedDocuments &&
+              legalEvidenceMatchesManifest(g.packVersion, g.subjectType, group) &&
               group.every((document) => document.documentBlocks?.length);
             return (
               <div

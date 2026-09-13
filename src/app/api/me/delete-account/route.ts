@@ -46,6 +46,7 @@ import { inArray } from "drizzle-orm";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 import { erasePhotoBatch, photoErasureError, PHOTO_ERASURE_BATCH_SIZE } from "@/lib/moments/erase-photo";
 import { BOOKING_CLIENT_ERASURE } from "@/lib/privacy/account-erasure";
+import { acquireUserMembershipMutationLocks } from "@/lib/partner/organization-members";
 
 export async function DELETE() {
   const { userId: clerkId } = await auth();
@@ -141,14 +142,48 @@ export async function DELETE() {
   const deleted = await db.transaction(async tx => {
     await tx.execute(sql`SET LOCAL lock_timeout = '3s'`);
     await tx.execute(sql`SET LOCAL statement_timeout = '8s'`);
+    await acquireUserMembershipMutationLocks(tx, user.id);
     const [current] = await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for("update");
-    if (!current) return true;
+    if (!current) return { ok: true as const };
+
+    // The earlier check protects external cleanup from avoidable work; this
+    // locked check is authoritative against concurrent grant/transfer/sign.
+    const lockedOwnerMemberships = await tx
+      .select({ organizationId: partnerOrganizationMembers.organizationId })
+      .from(partnerOrganizationMembers)
+      .innerJoin(
+        partnerOrganizations,
+        eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+      )
+      .where(and(
+        eq(partnerOrganizationMembers.userId, user.id),
+        eq(partnerOrganizationMembers.role, "owner"),
+        eq(partnerOrganizationMembers.isActive, true),
+        ne(partnerOrganizations.status, "archived"),
+      ));
+    const lockedLastOwnerIds: number[] = [];
+    for (const membership of lockedOwnerMemberships) {
+      const [otherOwner] = await tx
+        .select({ id: partnerOrganizationMembers.id })
+        .from(partnerOrganizationMembers)
+        .where(and(
+          eq(partnerOrganizationMembers.organizationId, membership.organizationId),
+          eq(partnerOrganizationMembers.role, "owner"),
+          eq(partnerOrganizationMembers.isActive, true),
+          ne(partnerOrganizationMembers.userId, user.id),
+        ))
+        .limit(1);
+      if (!otherOwner) lockedLastOwnerIds.push(membership.organizationId);
+    }
+    if (lockedLastOwnerIds.length) {
+      return { ok: false as const, lastOwnerOrganizationIds: lockedLastOwnerIds };
+    }
     // Lock parents and recheck before any profile minimization. A concurrent
     // upload must not make a retry lose the vendor's original media URLs.
     const plans = await tx.select({ id: eventPlans.id }).from(eventPlans).where(eq(eventPlans.userId, user.id)).for("update");
     if (plans.length) {
       const remaining = await tx.select({ id: eventPhotos.id }).from(eventPhotos).where(inArray(eventPhotos.planId, plans.map(plan => plan.id))).limit(1);
-      if (remaining.length) return false;
+      if (remaining.length) return { ok: false as const, remaining: true as const };
     }
 
     // 1. Anonymize leads (vendors legitimately kept them as business records).
@@ -247,9 +282,19 @@ export async function DELETE() {
     //    conversations, invitations and photos; booking_requests.client_user_id
     //    is SET NULL (evidence retained).
     await tx.delete(users).where(eq(users.id, user.id));
-    return true;
-  }).catch(() => false);
-  if (!deleted) return NextResponse.json(photoErasureError("remaining"), { status: 503 });
+    return { ok: true as const };
+  }).catch(() => null);
+  if (deleted && !deleted.ok && "lastOwnerOrganizationIds" in deleted) {
+    return NextResponse.json(
+      {
+        error: "Transferă proprietatea organizației înainte de ștergerea contului.",
+        code: "LAST_ORG_OWNER_TRANSFER_REQUIRED",
+        organizationIds: deleted.lastOwnerOrganizationIds,
+      },
+      { status: 409 },
+    );
+  }
+  if (!deleted?.ok) return NextResponse.json(photoErasureError("remaining"), { status: 503 });
   // Invalidate only after the atomic local erasure committed. Signed legal
   // evidence is unrelated to the public catalog and remains untouched.
   const publishedArtistSlugs = ownedArtists.filter(profile => profile.isActive).map(profile => profile.slug);

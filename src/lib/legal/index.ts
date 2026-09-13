@@ -5,6 +5,7 @@
  */
 
 import raw from "@/content/legal/documents.json";
+import { LEGAL_PACK_MANIFESTS } from "@/lib/legal/pack-manifest";
 
 export type LegalLocale = "ro" | "ru" | "en";
 
@@ -40,14 +41,13 @@ export const LEGAL_PACK_VERSION = "2.2";
  * which collided on unique (slug, document_version). 0030 also includes
  * pack_version in the unique keys; these bumps close the remaining 2.1 keys.
  */
-export const REQUIRED_DOCUMENT_VERSIONS_THIS_PACK: Record<string, string> = {
-  "acord-parteneri": "2.2",
-  "acord-locatii": "2.2",
-  "termeni-generali": "2.2",
-  "politica-confidentialitate": "1.3",
-  "reguli-marketplace": "1.1",
-  tarife: "2.2",
-};
+export const REQUIRED_DOCUMENT_VERSIONS_THIS_PACK: Record<string, string> =
+  Object.fromEntries(
+    LEGAL_PACK_MANIFESTS[LEGAL_PACK_VERSION].venue.map((document) => [
+      document.slug,
+      document.version,
+    ]),
+  );
 
 export function getLegalDocument(slug: string): LegalDocument | null {
   return LEGAL_DOCUMENTS.find((d) => d.slug === slug) ?? null;
@@ -64,25 +64,13 @@ export function legalTitle(doc: LegalDocument, locale: string): string {
 }
 
 /** The documents a vendor must accept when registering. */
-export const PARTNER_REQUIRED_DOCS = [
-  "acord-parteneri",
-  "termeni-generali",
-  "politica-confidentialitate",
-  "reguli-marketplace",
-  "tarife",
-] as const;
+export const PARTNER_REQUIRED_DOCS = LEGAL_PACK_MANIFESTS[
+  LEGAL_PACK_VERSION
+].artist.map((document) => document.slug);
 
-export const VENUE_REQUIRED_DOCS = [
-  // Venues sign the same conditions as partners — §9 of that document is
-  // written for them, and the fixed-fee table in §11.3 applies only to them.
-  // `acord-locatii` stays alongside it for the venue-specific terms.
-  "acord-parteneri",
-  "acord-locatii",
-  "termeni-generali",
-  "politica-confidentialitate",
-  "reguli-marketplace",
-  "tarife",
-] as const;
+export const VENUE_REQUIRED_DOCS = LEGAL_PACK_MANIFESTS[
+  LEGAL_PACK_VERSION
+].venue.map((document) => document.slug);
 
 /* ────────────────────────────────────────────────────────────────────────
  * Naming the other party

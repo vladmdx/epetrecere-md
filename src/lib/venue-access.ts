@@ -98,6 +98,24 @@ export type AppUser = {
   isGlobalAdmin: boolean;
 };
 
+/** Resolve a trusted application user row inside the caller's transaction. */
+export async function getAppUserById(
+  userId: string,
+  executor: typeof db = db,
+): Promise<AppUser | null> {
+  const [row] = await executor
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!row) return null;
+  return {
+    id: row.id,
+    role: row.role,
+    isGlobalAdmin: row.role === "admin" || row.role === "super_admin",
+  };
+}
+
 export type AccessError = { ok: false; status: 401 | 403 | 404; error: string };
 
 export type VenueAccess = {
@@ -148,8 +166,9 @@ function meetsRole(actual: OrgRole, minimum: OrgRole): boolean {
 async function membershipRole(
   userId: string,
   organizationId: number,
+  executor: typeof db = db,
 ): Promise<OrgRole | null> {
-  const rows = await db
+  const rows = await executor
     .select({ role: partnerOrganizationMembers.role })
     .from(partnerOrganizationMembers)
     .innerJoin(
@@ -178,6 +197,7 @@ export async function authorizeOrganizationAccess(
   user: AppUser,
   organizationId: number,
   minimumRole: OrgRole = "staff",
+  executor: typeof db = db,
 ): Promise<OrgAccess | AccessError> {
   if (!Number.isFinite(organizationId)) {
     return { ok: false, status: 404, error: "Invalid organization id" };
@@ -185,7 +205,7 @@ export async function authorizeOrganizationAccess(
   if (user.isGlobalAdmin) {
     return { ok: true, user, organizationId, role: "owner", viaAdmin: true };
   }
-  const role = await membershipRole(user.id, organizationId);
+  const role = await membershipRole(user.id, organizationId, executor);
   if (!role || !meetsRole(role, minimumRole)) {
     return { ok: false, status: 403, error: "Forbidden" };
   }
@@ -269,11 +289,13 @@ export async function authorizeOrganizationCapability(
   user: AppUser,
   organizationId: number,
   capability: OrganizationCapability,
+  executor: typeof db = db,
 ): Promise<OrgAccess | AccessError> {
   return authorizeOrganizationAccess(
     user,
     organizationId,
     ORG_CAPABILITY_MIN_ROLE[capability],
+    executor,
   );
 }
 
@@ -581,8 +603,11 @@ export async function listAccessibleOrganizations(
   return [...byId.values()].sort((a, b) => a.id - b.id);
 }
 
-export async function countActiveOwners(organizationId: number): Promise<number> {
-  const rows = await db
+export async function countActiveOwners(
+  organizationId: number,
+  executor: typeof db = db,
+): Promise<number> {
+  const rows = await executor
     .select({ userId: partnerOrganizationMembers.userId })
     .from(partnerOrganizationMembers)
     .where(
@@ -598,8 +623,9 @@ export async function countActiveOwners(organizationId: number): Promise<number>
 export async function isLastActiveOwner(
   organizationId: number,
   userId: string,
+  executor: typeof db = db,
 ): Promise<boolean> {
-  const [row] = await db
+  const [row] = await executor
     .select({ role: partnerOrganizationMembers.role, isActive: partnerOrganizationMembers.isActive })
     .from(partnerOrganizationMembers)
     .where(
@@ -610,5 +636,5 @@ export async function isLastActiveOwner(
     )
     .limit(1);
   if (!row || !row.isActive || row.role !== "owner") return false;
-  return (await countActiveOwners(organizationId)) <= 1;
+  return (await countActiveOwners(organizationId, executor)) <= 1;
 }

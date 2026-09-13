@@ -3,9 +3,13 @@
  * reused if it is already complete and coherent, or writes nothing.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { legalAcceptances, legalContractDeliveryOutbox } from "@/lib/db/schema";
+import {
+  legalAcceptances,
+  legalContractDeliveryOutbox,
+  users,
+} from "@/lib/db/schema";
 import {
   LEGAL_PACK_VERSION,
   PARTNER_REQUIRED_DOCS,
@@ -19,6 +23,10 @@ import { missingCurrentDocuments } from "@/lib/legal/acceptance";
 import { onboardingAgreementStatus } from "@/lib/legal/onboarding-agreement";
 import { acquireLegalScopeLock } from "@/lib/booking/advisory-locks";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
+import {
+  authorizeOrganizationCapability,
+  getAppUserById,
+} from "@/lib/venue-access";
 
 type Executor = typeof db;
 
@@ -184,14 +192,47 @@ function immutableConflict(
   );
 }
 
-async function ensureDeliveryJob(
+async function ensureDeliveryJobs(
   executor: Executor,
-  sessionId: string,
-  anchorAcceptanceId: number,
+  session: Array<typeof legalAcceptances.$inferSelect>,
 ): Promise<void> {
+  const first = session[0];
+  if (!first) return;
+  const [alreadyMaterialized] = await executor
+    .select({ id: legalContractDeliveryOutbox.id })
+    .from(legalContractDeliveryOutbox)
+    .where(eq(legalContractDeliveryOutbox.acceptanceSessionId, first.acceptanceSessionId))
+    .limit(1);
+  if (alreadyMaterialized) return;
+
+  const admins = await executor
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(inArray(users.role, ["admin", "super_admin"]));
+  const recipients: Array<typeof legalContractDeliveryOutbox.$inferInsert> = [];
+  if (first.email) {
+    recipients.push({
+      acceptanceSessionId: first.acceptanceSessionId,
+      anchorAcceptanceId: first.id,
+      channel: "signer",
+      recipientKey: first.userId ?? `acceptance:${first.id}`,
+      recipientEmail: first.email,
+    });
+  }
+  for (const admin of admins) {
+    if (!admin.email) continue;
+    recipients.push({
+      acceptanceSessionId: first.acceptanceSessionId,
+      anchorAcceptanceId: first.id,
+      channel: "admin",
+      recipientKey: admin.id,
+      recipientEmail: admin.email,
+    });
+  }
+  if (!recipients.length) return;
   await executor
     .insert(legalContractDeliveryOutbox)
-    .values({ acceptanceSessionId: sessionId, anchorAcceptanceId })
+    .values(recipients)
     .onConflictDoNothing();
 }
 
@@ -257,6 +298,33 @@ export async function recordLegalAcceptancePack(input: {
 
       let identity = input.identity;
       if (input.organizationId) {
+        // The route-level check is only an early rejection. Membership can be
+        // revoked while signature validation runs, so the authoritative check
+        // happens after the same organization lock used by member mutations.
+        const actor = await getAppUserById(input.userId, executor);
+        if (!actor) {
+          return {
+            ok: false as const,
+            status: 403,
+            error: "Forbidden",
+            code: "FORBIDDEN",
+          };
+        }
+        const access = await authorizeOrganizationCapability(
+          actor,
+          input.organizationId,
+          "manage_legal",
+          executor,
+        );
+        if (!access.ok) {
+          return {
+            ok: false as const,
+            status: access.status,
+            error: access.error,
+            code: "FORBIDDEN",
+          };
+        }
+
         const { resolveOrganizationSigningIdentity } = await import("@/lib/partner/legal");
         const resolved = await resolveOrganizationSigningIdentity(
           input.organizationId,
@@ -297,11 +365,7 @@ export async function recordLegalAcceptancePack(input: {
             code: "signed_document_is_immutable",
           };
         }
-        await ensureDeliveryJob(
-          executor,
-          complete[0]!.acceptanceSessionId,
-          complete[0]!.id,
-        );
+        await ensureDeliveryJobs(executor, complete);
         const recorded = required.map((slug) => {
           const row = complete.find((item) => item.documentSlug === slug)!;
           return {
@@ -343,7 +407,7 @@ export async function recordLegalAcceptancePack(input: {
       ) {
         throw new Error("legal_session_insert_incomplete");
       }
-      await ensureDeliveryJob(executor, sessionId, inserted[0]!.id);
+      await ensureDeliveryJobs(executor, inserted);
       const recorded = inserted.map((row) => ({
         slug: row.documentSlug,
         title: row.documentTitle ?? row.documentSlug,

@@ -18,7 +18,7 @@ import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
 import {
   authorizeOrganizationCapability,
-  countActiveOwners,
+  getAppUserById,
   listAccessibleOrganizations,
   type AppUser,
 } from "@/lib/venue-access";
@@ -139,29 +139,64 @@ export async function ensureDraftOrganization(
   }
 
   const displayName = input?.displayName?.trim() || "Organizație nouă";
-  const [created] = await db
-    .insert(partnerOrganizations)
-    .values({
-      type: input?.type ?? "company",
-      displayName,
-      status: "draft",
-      legalName: emptyToNull(input?.legalName),
-      idNumber: emptyToNull(input?.idNumber),
-      legalAddress: emptyToNull(input?.legalAddress),
-      billingEmail: emptyToNull(input?.billingEmail),
-      billingPhone: emptyToNull(input?.billingPhone),
-    })
-    .returning();
-  await db
-    .insert(partnerOrganizationMembers)
-    .values({
+  return db.transaction(async (tx) => {
+    // Creating an owner membership is an authorization mutation too. Use the
+    // same user-first lock order as signing, transfers and account deletion so
+    // a stale request cannot grant ownership after the user was deleted.
+    await acquireLegalScopeLock(tx, { userId: user.id });
+    const currentUser = await getAppUserById(user.id, tx as unknown as typeof db);
+    if (!currentUser) {
+      throw new OrganizationDraftUpdateError("FORBIDDEN", 403);
+    }
+
+    // A concurrent first request may have created the draft while this one
+    // waited on the user lock. Re-read inside the serialized section so the
+    // idempotent API never creates two organizations for the same retry.
+    const [concurrentMembership] = await tx
+      .select({ organizationId: partnerOrganizationMembers.organizationId })
+      .from(partnerOrganizationMembers)
+      .innerJoin(
+        partnerOrganizations,
+        eq(partnerOrganizations.id, partnerOrganizationMembers.organizationId),
+      )
+      .where(and(
+        eq(partnerOrganizationMembers.userId, user.id),
+        eq(partnerOrganizationMembers.isActive, true),
+        inArray(partnerOrganizations.status, ["draft", "rejected"]),
+      ))
+      .orderBy(asc(partnerOrganizations.id))
+      .limit(1);
+    if (concurrentMembership) {
+      const [organization] = await tx
+        .select()
+        .from(partnerOrganizations)
+        .where(eq(partnerOrganizations.id, concurrentMembership.organizationId))
+        .limit(1);
+      if (organization) return organization;
+    }
+
+    const [created] = await tx
+      .insert(partnerOrganizations)
+      .values({
+        type: input?.type ?? "company",
+        displayName,
+        status: "draft",
+        legalName: emptyToNull(input?.legalName),
+        idNumber: emptyToNull(input?.idNumber),
+        legalAddress: emptyToNull(input?.legalAddress),
+        billingEmail: emptyToNull(input?.billingEmail),
+        billingPhone: emptyToNull(input?.billingPhone),
+      })
+      .returning();
+    await acquireLegalScopeLock(tx, { organizationId: created.id });
+    await tx.insert(partnerOrganizationMembers).values({
       organizationId: created.id,
       userId: user.id,
       role: "owner",
       isActive: true,
-    })
-    .onConflictDoNothing();
-  return created;
+    });
+    return created;
+  });
 }
 
 export async function saveOrganizationProfile(
@@ -681,52 +716,6 @@ export async function archiveHall(hallId: number) {
     throw error;
   }
   return { ok: true as const, hallId };
-}
-
-export async function transferOrganizationOwner(
-  organizationId: number,
-  fromUserId: string,
-  toUserId: string,
-) {
-  if (fromUserId === toUserId) {
-    return { ok: false as const, error: "SAME_USER", status: 400 as const };
-  }
-  const [target] = await db
-    .select()
-    .from(partnerOrganizationMembers)
-    .where(
-      and(
-        eq(partnerOrganizationMembers.organizationId, organizationId),
-        eq(partnerOrganizationMembers.userId, toUserId),
-      ),
-    )
-    .limit(1);
-  if (!target) {
-    await db.insert(partnerOrganizationMembers).values({
-      organizationId,
-      userId: toUserId,
-      role: "owner",
-      isActive: true,
-    });
-  } else {
-    await db
-      .update(partnerOrganizationMembers)
-      .set({ role: "owner", isActive: true, updatedAt: new Date() })
-      .where(eq(partnerOrganizationMembers.id, target.id));
-  }
-  await db
-    .update(partnerOrganizationMembers)
-    .set({ role: "admin", updatedAt: new Date() })
-    .where(
-      and(
-        eq(partnerOrganizationMembers.organizationId, organizationId),
-        eq(partnerOrganizationMembers.userId, fromUserId),
-      ),
-    );
-  if ((await countActiveOwners(organizationId)) < 1) {
-    return { ok: false as const, error: "TRANSFER_FAILED", status: 500 as const };
-  }
-  return { ok: true as const };
 }
 
 export function multiHallWritesEnabled(): boolean {

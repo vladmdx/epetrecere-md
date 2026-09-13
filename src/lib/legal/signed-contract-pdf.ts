@@ -14,10 +14,8 @@ import {
   rgb,
 } from "pdf-lib";
 import {
-  PARTNER_REQUIRED_DOCS,
-  VENUE_REQUIRED_DOCS,
-  getLegalDocument,
-} from "@/lib/legal";
+  legalPackManifestForEvidence,
+} from "@/lib/legal/pack-manifest";
 
 export interface SignedContractEvidence {
   id: number;
@@ -253,15 +251,6 @@ export function signedContractPdfFilename(row: Pick<SignedContractEvidence, "id"
   return `epetrecere-contract-${subject}-${row.id}.pdf`;
 }
 
-function expectedDocumentSlugs(row: SignedContractEvidence): readonly string[] {
-  if (row.subjectType === "artist") return PARTNER_REQUIRED_DOCS;
-  if (row.subjectType !== "venue") throw new SignedContractPdfError("incomplete_session");
-  // Legal Pack 1.0 predated the shared partner agreement for venues.
-  return row.packVersion === "1.0"
-    ? VENUE_REQUIRED_DOCS.filter((slug) => slug !== "acord-parteneri")
-    : VENUE_REQUIRED_DOCS;
-}
-
 export function validateSignedContractSession(
   rows: SignedContractEvidence[],
 ): SignedContractEvidence[] {
@@ -274,13 +263,12 @@ export function validateSignedContractSession(
   if (!rows.every((row) => signedContractEvidenceKey(row) === evidenceKey)) {
     throw new SignedContractPdfError("incomplete_session");
   }
-  const expected = expectedDocumentSlugs(rows[0]);
-  const slugs = rows.map((row) => row.documentSlug);
-  if (
-    slugs.length !== expected.length ||
-    new Set(slugs).size !== slugs.length ||
-    expected.some((slug) => !slugs.includes(slug))
-  ) {
+  const manifest = legalPackManifestForEvidence(
+    rows[0].packVersion,
+    rows[0].subjectType,
+    rows,
+  );
+  if (!manifest) {
     throw new SignedContractPdfError("incomplete_session");
   }
   if (!rows[0].signatureImage?.startsWith("data:image/png;base64,")) {
@@ -295,11 +283,13 @@ export function validateSignedContractSession(
       .digest("hex");
     if (actual !== row.contentHash) throw new SignedContractPdfError("invalid_snapshot");
   }
-  return [...rows].sort((a, b) => {
-    const ao = getLegalDocument(a.documentSlug)?.order ?? Number.MAX_SAFE_INTEGER;
-    const bo = getLegalDocument(b.documentSlug)?.order ?? Number.MAX_SAFE_INTEGER;
-    return ao - bo || a.id - b.id;
-  });
+  const order = new Map(manifest.map((document, index) => [document.slug, index]));
+  return [...rows].sort(
+    (a, b) =>
+      (order.get(a.documentSlug) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(b.documentSlug) ?? Number.MAX_SAFE_INTEGER) ||
+      a.id - b.id,
+  );
 }
 
 function fontForCharacter(fonts: FontFamily, character: string): PDFFont {

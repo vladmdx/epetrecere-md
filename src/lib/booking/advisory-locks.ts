@@ -47,16 +47,36 @@ export async function acquireArtistAvailabilityLocks(
   await tx.execute(sql`select pg_advisory_xact_lock(${AVAIL_LOCK_DAY}, ${yyyymmdd(eventDate)})`);
 }
 
-/** Serialize organization legal writes (PATCH identity + signing). */
+/**
+ * Serialize legal authority and evidence writes. User locks are always taken
+ * before organization locks; multiple keys use deterministic ordering.
+ */
+export async function acquireLegalScopeLocks(
+  tx: LockTx,
+  scope: {
+    organizationIds?: readonly number[];
+    userIds?: readonly string[];
+  },
+): Promise<void> {
+  const users = [...new Set(scope.userIds?.filter(Boolean) ?? [])].sort();
+  for (const userId of users) {
+    await tx.execute(sql`select pg_advisory_xact_lock(${LEGAL_LOCK_USER}, hashtext(${userId}))`);
+  }
+  const organizations = [...new Set(
+    scope.organizationIds?.filter((id) => Number.isFinite(id) && id > 0) ?? [],
+  )].sort((a, b) => a - b);
+  for (const organizationId of organizations) {
+    await tx.execute(sql`select pg_advisory_xact_lock(${LEGAL_LOCK_ORG}, ${organizationId})`);
+  }
+}
+
+/** Backwards-compatible single-scope helper. */
 export async function acquireLegalScopeLock(
   tx: LockTx,
   scope: { organizationId?: number | null; userId?: string | null },
 ): Promise<void> {
-  if (scope.organizationId) {
-    await tx.execute(sql`select pg_advisory_xact_lock(${LEGAL_LOCK_ORG}, ${scope.organizationId})`);
-    return;
-  }
-  if (scope.userId) {
-    await tx.execute(sql`select pg_advisory_xact_lock(${LEGAL_LOCK_USER}, hashtext(${scope.userId}))`);
-  }
+  await acquireLegalScopeLocks(tx, {
+    userIds: scope.userId ? [scope.userId] : [],
+    organizationIds: scope.organizationId ? [scope.organizationId] : [],
+  });
 }
