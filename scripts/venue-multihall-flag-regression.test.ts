@@ -107,7 +107,11 @@ test("kill-switch is wired at route level for org/hall mutations", () => {
 
   const images = readFileSync("src/app/api/venue-images/route.ts", "utf8");
   assert.match(images, /if \(parsed\.data\.hallId\)/);
-  assert.match(images, /jsonIfMultiHallDisabled\(\)/);
+  assert.match(images, /jsonIfHallSpecificImageDisabled/);
+  const imageById = readFileSync("src/app/api/venue-images/[id]/route.ts", "utf8");
+  assert.match(imageById, /jsonIfHallSpecificImageDisabled/);
+  const adminReg = readFileSync("src/app/api/admin/registration-requests/route.ts", "utf8");
+  assert.match(adminReg, /jsonIfOrganizationBackedVenueDisabled/);
 
   const legal = readFileSync("src/lib/legal/record-acceptance.ts", "utf8");
   assert.match(legal, /FEATURE_DISABLED/);

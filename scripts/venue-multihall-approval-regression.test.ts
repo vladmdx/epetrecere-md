@@ -194,6 +194,7 @@ test("approve first venue activates venue, pending halls and pending org", async
 test("second venue with user_id NULL appears in the queue and approve does not deactivate the first", async () => {
   const venue2 = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
+    createIntent: true,
     name: MARK + "Local 2",
     phone: PHONE,
     city: "Chișinău",

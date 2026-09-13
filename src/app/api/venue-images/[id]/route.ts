@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { venueImages } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { requireVenueCapability } from "@/lib/venue-access";
+import { jsonIfHallSpecificImageDisabled } from "@/lib/partner/multi-hall-gate";
 
 const updateSchema = z.object({
   altRo: z.string().max(500).nullable().optional(),
@@ -24,6 +25,7 @@ async function loadOwnedImage(imageId: number) {
     .select({
       imageId: venueImages.id,
       venueId: venueImages.venueId,
+      hallId: venueImages.hallId,
     })
     .from(venueImages)
     .where(eq(venueImages.id, imageId))
@@ -42,6 +44,7 @@ async function loadOwnedImage(imageId: number) {
     ok: true as const,
     imageId: row.imageId,
     venueId: row.venueId,
+    hallId: row.hallId,
   };
 }
 
@@ -68,6 +71,8 @@ export async function PUT(
   if (!owner.ok) {
     return NextResponse.json({ error: owner.error }, { status: owner.status });
   }
+  const blocked = jsonIfHallSpecificImageDisabled(owner.hallId);
+  if (blocked) return blocked;
 
   // Cover invariant — only one image per venue can be the cover.
   if (parsed.data.isCover === true) {
@@ -105,6 +110,8 @@ export async function DELETE(
   if (!owner.ok) {
     return NextResponse.json({ error: owner.error }, { status: owner.status });
   }
+  const blocked = jsonIfHallSpecificImageDisabled(owner.hallId);
+  if (blocked) return blocked;
 
   await db.delete(venueImages).where(eq(venueImages.id, imageId));
   return NextResponse.json({ success: true });

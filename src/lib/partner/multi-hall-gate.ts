@@ -18,9 +18,35 @@ export function salaUsesLegacyLayout(): boolean {
   return !isMultiHallEnabled();
 }
 
+export class MultiHallFeatureDisabledError extends Error {
+  readonly code = MULTI_HALL_DISABLED_CODE;
+  readonly status = 404;
+  constructor() {
+    super("FEATURE_DISABLED");
+    this.name = "MultiHallFeatureDisabledError";
+  }
+}
+
+export function assertMultiHallMutationsAllowed() {
+  if (!multiHallMutationsAllowed()) {
+    throw new MultiHallFeatureDisabledError();
+  }
+}
+
 export function jsonIfMultiHallDisabled() {
   if (multiHallMutationsAllowed()) return null;
   return jsonError("FEATURE_DISABLED", 404, { code: MULTI_HALL_DISABLED_CODE });
+}
+
+/** Hall-specific image writes stay legacy-editable only when hallId is null. */
+export function jsonIfHallSpecificImageDisabled(hallId: number | null | undefined) {
+  if (hallId == null) return null;
+  return jsonIfMultiHallDisabled();
+}
+
+export function jsonIfOrganizationBackedVenueDisabled(organizationId: number | null | undefined) {
+  if (organizationId == null) return null;
+  return jsonIfMultiHallDisabled();
 }
 
 /** Inverse gate: legacy routes that must not run while multi-hall is ON. */

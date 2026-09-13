@@ -1,6 +1,7 @@
 import { plainText } from "../content/plain-text";
 import { containsContact, redactContact } from "./contact-redaction";
 import { splitLocale } from "../i18n/routing";
+import { resolveConversationPartyXor } from "../conversations/party";
 
 export type NotificationText = { title: string; message: string | null; actionUrl: string | null };
 export type NotificationContext = { kind: "conversation" | "booking"; id: number };
@@ -14,6 +15,11 @@ export function notificationContext(actionUrl: string | null): NotificationConte
     const { pathname } = splitLocale(url.pathname);
     const conversation = url.searchParams.get("conversation");
     if (["/cabinet/mesaje", "/dashboard/mesaje", "/dashboard/sala/mesaje"].includes(pathname) && conversation) {
+      const id = Number(conversation);
+      return Number.isSafeInteger(id) && id > 0 ? { kind: "conversation", id } : null;
+    }
+    const locatiiMesaje = /^\/dashboard\/locatii\/([1-9]\d*)\/mesaje$/.exec(pathname);
+    if (locatiiMesaje && conversation) {
       const id = Number(conversation);
       return Number.isSafeInteger(id) && id > 0 ? { kind: "conversation", id } : null;
     }
@@ -41,7 +47,9 @@ export function notificationForViewer<T extends NotificationText>(item: T, conta
 
 export function conversationPartyKey(clientUserId: string | null, artistId: number | null, venueId: number | null): string | null {
   if (!clientUserId) return null;
-  if (artistId && !venueId) return `${clientUserId}|artist:${artistId}`;
-  if (venueId && !artistId) return `${clientUserId}|venue:${venueId}`;
-  return null;
+  const party = resolveConversationPartyXor(artistId, venueId);
+  if (!party.ok) return null;
+  return party.artistId != null
+    ? `${clientUserId}|artist:${party.artistId}`
+    : `${clientUserId}|venue:${party.venueId}`;
 }

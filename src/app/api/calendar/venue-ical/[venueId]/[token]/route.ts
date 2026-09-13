@@ -7,7 +7,10 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venues, bookingRequests, calendarEvents, venueScheduleBlocks } from "@/lib/db/schema";
 import { verifyVenueIcalToken } from "@/lib/calendar/ical-token";
-import { localDatesIntersecting } from "@/lib/booking/zoned-interval";
+import {
+  classifyVenueScheduleBlockIcal,
+  icsDateValue,
+} from "@/lib/booking/venue-schedule-block-ical";
 
 export const runtime = "nodejs";
 
@@ -157,42 +160,22 @@ export async function GET(
 
   for (const block of filteredBlocks) {
     const uid = `venue-block-${block.id}@epetrecere.md`;
-    const fullDay = !block.startsAt || !block.endsAt
-      ? true
-      : localDatesIntersecting({
-          startsAt: block.startsAt,
-          endsAt: block.endsAt,
-          timezone: "Europe/Chisinau",
-          eventDate: block.startsAt.toISOString().slice(0, 10),
-          startTime: null,
-          endTime: null,
-        }).length > 0 &&
-        (block.endsAt.getTime() - block.startsAt.getTime()) >= 20 * 60 * 60 * 1000;
-    if (fullDay) {
-      const dates = localDatesIntersecting({
-        startsAt: block.startsAt,
-        endsAt: block.endsAt,
-        timezone: "Europe/Chisinau",
-        eventDate: block.startsAt.toISOString().slice(0, 10),
-        startTime: null,
-        endTime: null,
-      });
-      for (const date of dates) {
-        const start = formatDate(date);
-        const endDate = new Date(date);
-        endDate.setUTCDate(endDate.getUTCDate() + 1);
-        const end = formatDate(endDate);
-        lines.push(
-          "BEGIN:VEVENT",
-          `UID:${uid}-${date}`,
-          `DTSTAMP:${formatDateTime(block.createdAt ?? now)}`,
-          `DTSTART;VALUE=DATE:${start}`,
-          `DTEND;VALUE=DATE:${end}`,
-          `SUMMARY:${escapeIcs("⛔ Indisponibil")}`,
-          "TRANSP:OPAQUE",
-          "END:VEVENT",
-        );
-      }
+    const classified = classifyVenueScheduleBlockIcal(
+      block.startsAt,
+      block.endsAt,
+      "Europe/Chisinau",
+    );
+    if (classified.allDay) {
+      lines.push(
+        "BEGIN:VEVENT",
+        `UID:${uid}`,
+        `DTSTAMP:${formatDateTime(block.createdAt ?? now)}`,
+        `DTSTART;VALUE=DATE:${icsDateValue(classified.startDate)}`,
+        `DTEND;VALUE=DATE:${icsDateValue(classified.endDateExclusive)}`,
+        `SUMMARY:${escapeIcs("⛔ Indisponibil")}`,
+        "TRANSP:OPAQUE",
+        "END:VEVENT",
+      );
     } else {
       lines.push(
         "BEGIN:VEVENT",

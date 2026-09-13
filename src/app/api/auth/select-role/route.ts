@@ -16,6 +16,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { artists, users, venues } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 const schema = z.object({
   role: z.enum(["client", "artist", "venue"]),
@@ -138,10 +139,12 @@ export async function POST(req: Request) {
       // Create a stub venue row so /dashboard/sala detects ownership.
       // The user can fill in details via the venue onboarding flow.
       const [existing] = await db
-        .select({ id: venues.id })
+        .select({ id: venues.id, organizationId: venues.organizationId })
         .from(venues)
         .where(eq(venues.userId, appUser.id))
         .limit(1);
+      let venueId = existing?.id ?? null;
+      let organizationId = existing?.organizationId ?? null;
       if (!existing) {
         const baseName = appUser.name || "Sală nouă";
         // Clean slug — same helper as register-venue. Conflicts get -2/-3
@@ -154,7 +157,7 @@ export async function POST(req: Request) {
             .limit(1);
           return !!hit;
         });
-        await db.insert(venues).values({
+        const [created] = await db.insert(venues).values({
           userId: appUser.id,
           nameRo: baseName,
           slug,
@@ -164,22 +167,29 @@ export async function POST(req: Request) {
           // Launch phase parity with register-venue.
           isFeatured: true,
           facilities: [],
-        });
-        if ((await import("@/lib/feature-flags")).isMultiHallEnabled()) {
-          const { ensureDraftOrganization } = await import("@/lib/partner/onboarding");
-          const { users: usersTable } = await import("@/lib/db/schema");
-          const org = await ensureDraftOrganization(
-            { id: appUser.id, role: appUser.role, isGlobalAdmin: false },
-            { displayName: baseName, type: "company" },
-          );
-          await db.update(venues).set({ organizationId: org.id, updatedAt: new Date() }).where(eq(venues.userId, appUser.id));
-          void usersTable;
-        }
+        }).returning({ id: venues.id });
+        venueId = created.id;
+      }
+      if (isMultiHallEnabled() && venueId) {
+        const { ensureDraftOrganization } = await import("@/lib/partner/onboarding");
+        const baseName = appUser.name || "Sală nouă";
+        const org = await ensureDraftOrganization(
+          { id: appUser.id, role: appUser.role, isGlobalAdmin: false },
+          { displayName: baseName, type: "company" },
+        );
+        organizationId = org.id;
+        await db
+          .update(venues)
+          .set({ organizationId: org.id, updatedAt: new Date() })
+          .where(eq(venues.id, venueId));
       }
       await db
         .update(users)
         .set({ onboardingComplete: true, updatedAt: new Date() })
         .where(eq(users.id, appUser.id));
+      if (isMultiHallEnabled()) {
+        return NextResponse.json({ success: true, role, organizationId, venueId });
+      }
     } else {
       // Client — just mark onboarding complete.
       await db

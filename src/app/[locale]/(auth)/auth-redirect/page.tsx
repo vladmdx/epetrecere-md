@@ -235,11 +235,12 @@ export default function AuthRedirectPage() {
     // Persist the chosen role IMMEDIATELY so the user is treated as
     // artist/venue from the next request — not only after onboarding
     // finishes. Falls through to the legacy redirect on failure.
-    await fetch("/api/auth/select-role", {
+    const roleRes = await fetch("/api/auth/select-role", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ role: selectedRole }),
-    }).catch(() => {});
+    }).catch(() => null);
+    const rolePayload = roleRes?.ok ? await roleRes.json().catch(() => null) : null;
 
     if (selectedRole === "client") {
       // Same priority as in checkRole: search-next > deep-link > wizard.
@@ -264,7 +265,20 @@ export default function AuthRedirectPage() {
     } else if (selectedRole === "artist") {
       router.replace("/dashboard/onboarding");
     } else if (selectedRole === "venue") {
-      router.replace("/dashboard/venue-onboarding");
+      const organizationId = Number(rolePayload?.organizationId);
+      const venueId = Number(rolePayload?.venueId);
+      if (
+        Number.isSafeInteger(organizationId) &&
+        organizationId > 0 &&
+        Number.isSafeInteger(venueId) &&
+        venueId > 0
+      ) {
+        router.replace(
+          `/dashboard/venue-onboarding?organizationId=${organizationId}&venueId=${venueId}`,
+        );
+      } else {
+        router.replace("/dashboard/venue-onboarding");
+      }
     }
   }
 

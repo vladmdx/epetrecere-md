@@ -16,6 +16,7 @@ import {
 } from "@/lib/db/schema";
 import { pickUniqueSlug } from "@/lib/utils/slugify";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { assertMultiHallMutationsAllowed } from "./multi-hall-gate";
 import {
   authorizeOrganizationCapability,
   getAppUserById,
@@ -70,6 +71,10 @@ async function uniqueHallSlug(venueId: number, name: string, excludeId?: number)
 }
 
 const ELIGIBLE_DRAFT_STATUSES = new Set(["draft", "rejected"]);
+
+export function isUsableHallStatus(status: string): boolean {
+  return status === "active" || status === "pending";
+}
 
 export type OrganizationDraftInput = {
   displayName?: string;
@@ -329,18 +334,14 @@ export async function saveVenueDraft(user: AppUser, raw: unknown) {
     await db.update(users).set({ phone: phone.e164, updatedAt: new Date() }).where(eq(users.id, user.id));
   };
 
-  if (data.venueId) {
-    const [existing] = await db
-      .select()
-      .from(venues)
-      .where(eq(venues.id, data.venueId))
-      .limit(1);
-    if (!existing || existing.organizationId !== data.organizationId) {
+  const updateExisting = async (existing: typeof venues.$inferSelect) => {
+    if (existing.organizationId != null && existing.organizationId !== data.organizationId) {
       return { ok: false as const, error: "Forbidden", status: 403 as const };
     }
     const [updated] = await db
       .update(venues)
       .set({
+        organizationId: existing.organizationId ?? data.organizationId,
         nameRo: data.name,
         nameRu: emptyToNull(data.nameRu),
         nameEn: emptyToNull(data.nameEn),
@@ -365,6 +366,29 @@ export async function saveVenueDraft(user: AppUser, raw: unknown) {
     await replaceVenueImages(existing.id, null, data.imageUrls);
     await syncLegacyUserPhone();
     return { ok: true as const, venue: updated };
+  };
+
+  const createIntent = data.createIntent === true;
+  if (data.venueId) {
+    const [existing] = await db
+      .select()
+      .from(venues)
+      .where(eq(venues.id, data.venueId))
+      .limit(1);
+    if (!existing) {
+      return { ok: false as const, error: "Forbidden", status: 403 as const };
+    }
+    return updateExisting(existing);
+  }
+  if (!createIntent) {
+    const [ownedStub] = await db
+      .select()
+      .from(venues)
+      .where(eq(venues.userId, user.id))
+      .limit(1);
+    if (ownedStub) {
+      return updateExisting(ownedStub);
+    }
   }
 
   const slug = await uniqueVenueSlug(data.name);
@@ -408,6 +432,9 @@ export async function replaceVenueImages(
   hallId: number | null,
   urls: string[],
 ) {
+  if (hallId != null) {
+    assertMultiHallMutationsAllowed();
+  }
   const existing = await db
     .select({ id: venueImages.id, hallId: venueImages.hallId, url: venueImages.url })
     .from(venueImages)
@@ -675,9 +702,11 @@ export async function archiveHall(hallId: number) {
         .select({ id: venueHalls.id, status: venueHalls.status })
         .from(venueHalls)
         .where(eq(venueHalls.venueId, locked.venueId));
-      const usable = siblings.filter((row) => row.status !== "archived");
-      if (usable.length <= 1) {
-        throw Object.assign(new Error("LAST_USABLE_HALL"), { code: "LAST_USABLE_HALL" });
+      if (isUsableHallStatus(locked.status)) {
+        const usable = siblings.filter((row) => isUsableHallStatus(row.status));
+        if (usable.length <= 1) {
+          throw Object.assign(new Error("LAST_USABLE_HALL"), { code: "LAST_USABLE_HALL" });
+        }
       }
       const [future] = await tx
         .select({ id: bookingRequests.id })

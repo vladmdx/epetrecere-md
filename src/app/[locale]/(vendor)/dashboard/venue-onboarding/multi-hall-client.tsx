@@ -29,7 +29,7 @@ export default function MultiHallVenueOnboarding() {
   const { user } = useUser();
   const presetOrg = Number(search.get("organizationId") || "") || null;
   const presetVenue = Number(search.get("venueId") || "") || null;
-  const createIntent = search.get("intent") === "create" || !presetVenue;
+  const createIntent = search.get("intent") === "create";
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [organizationId, setOrganizationId] = useState<number | null>(presetOrg);
@@ -70,7 +70,12 @@ export default function MultiHallVenueOnboarding() {
         }
         if (createIntent) return;
         const venues = drafts.flatMap((d: { venues?: Array<{ id: number; halls?: unknown[] }> }) => d.venues ?? []);
-        const v = venues.find((item: { id: number }) => item.id === presetVenue) ?? null;
+        const v =
+          (presetVenue
+            ? venues.find((item: { id: number }) => item.id === presetVenue)
+            : null) ??
+          venues[0] ??
+          null;
         if (v) {
           setVenueId(v.id);
           setVenue({
@@ -135,7 +140,15 @@ export default function MultiHallVenueOnboarding() {
       const res = await fetch(`/api/organizations/${organizationId}/venues`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...venue, organizationId, ...(createIntent ? {} : { venueId }) }),
+        body: JSON.stringify({
+          ...venue,
+          organizationId,
+          ...(venueId
+            ? { venueId }
+            : createIntent
+              ? { createIntent: true }
+              : {}),
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

@@ -281,14 +281,20 @@ export async function evaluateVenueAvailability(opts: {
   const groupIds = [...new Set(
     conflictMembers.filter((row) => row.hallId === resolved.hallId).map((row) => row.groupId),
   )];
-  const incompatibleHallIds = [...new Set(
-    conflictMembers.filter((row) => groupIds.includes(row.groupId) && row.hallId !== resolved.hallId).map((row) => row.hallId),
-  )];
-
   const allHalls = await q
-    .select({ id: venueHalls.id })
+    .select({ id: venueHalls.id, status: venueHalls.status })
     .from(venueHalls)
     .where(eq(venueHalls.venueId, venue.id));
+  const archivedHallIds = new Set(
+    allHalls.filter((row) => row.status === "archived").map((row) => row.id),
+  );
+  const incompatibleHallIds = [...new Set(
+    conflictMembers
+      .filter((row) => groupIds.includes(row.groupId) && row.hallId !== resolved.hallId)
+      .map((row) => row.hallId)
+      .filter((hallId) => !archivedHallIds.has(hallId)),
+  )];
+
   const lockKeys: AvailabilityLockKeys = {
     venueId: venue.id,
     hallIds:
@@ -305,6 +311,9 @@ export async function evaluateVenueAvailability(opts: {
     .where(eq(venueScheduleBlocks.venueId, venue.id));
   for (const block of blocks) {
     if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, block.startsAt, block.endsAt)) continue;
+    if (block.hallId != null && archivedHallIds.has(block.hallId) && block.hallId !== resolved.hallId) {
+      continue;
+    }
     if (block.hallId == null) {
       return {
         available: false,
@@ -375,6 +384,9 @@ export async function evaluateVenueAvailability(opts: {
       timezone,
     });
     if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, other.startsAt, other.endsAt)) continue;
+    if (event.hallId != null && archivedHallIds.has(event.hallId) && event.hallId !== resolved.hallId) {
+      continue;
+    }
     if (event.hallId == null || opts.reservationScope === "venue") {
       return {
         available: false,
@@ -429,6 +441,9 @@ export async function evaluateVenueAvailability(opts: {
     });
     const otherEnd = new Date(other.endsAt.getTime() + bufferMinutes * 60_000);
     if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, other.startsAt, otherEnd)) continue;
+    if (booking.hallId != null && archivedHallIds.has(booking.hallId) && booking.hallId !== resolved.hallId) {
+      continue;
+    }
 
     const wholeVenue = booking.reservationScope === "venue" || opts.reservationScope === "venue";
     const sameHall = resolved.hallId != null && booking.hallId === resolved.hallId;

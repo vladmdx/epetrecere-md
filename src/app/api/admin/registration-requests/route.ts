@@ -9,6 +9,7 @@ import { registrationDecisionSchema } from "@/lib/validation/vendor-profile";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
 import { approvePartnerVenue, listPendingPartnerVenues, rejectPartnerVenue } from "@/lib/partner/registration-decision";
+import { jsonIfOrganizationBackedVenueDisabled } from "@/lib/partner/multi-hall-gate";
 import { adminContractsForVenue } from "@/lib/partner/legal";
 
 async function requireAdmin() {
@@ -322,6 +323,7 @@ export async function POST(req: Request) {
           email: venues.email,
           userId: venues.userId,
           isActive: venues.isActive,
+          organizationId: venues.organizationId,
         })
         .from(venues)
         .where(eq(venues.id, id))
@@ -331,11 +333,14 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Venue not found" }, { status: 404 });
       }
 
+      const orgBlocked = jsonIfOrganizationBackedVenueDisabled(venue.organizationId);
+      if (orgBlocked) return orgBlocked;
+
       if (action === "approve") {
         const decided = await approvePartnerVenue(id);
         if (!decided.ok) {
           return NextResponse.json(
-            { error: decided.error, missing: decided.missing },
+            { error: decided.error, missing: decided.missing, code: decided.code },
             { status: decided.status },
           );
         }
@@ -359,7 +364,10 @@ export async function POST(req: Request) {
       } else {
         const decided = await rejectPartnerVenue(id);
         if (!decided.ok) {
-          return NextResponse.json({ error: decided.error }, { status: decided.status });
+          return NextResponse.json(
+            { error: decided.error, code: decided.code },
+            { status: decided.status },
+          );
         }
         const emailTargets = [
           ...new Set([

@@ -270,6 +270,7 @@ test("fresh POST legal fields persist; add venue does not mutate the first local
   const [before] = await db.select().from(venues).where(eq(venues.id, ids.venue));
   const created = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
+    createIntent: true,
     name: MARK + "Local 2",
     phone: PHONE,
     city: "Chișinău",
@@ -317,6 +318,7 @@ test("phone: same number on two venues; owner users.phone unchanged when flag ON
   assert.equal(v1.phone, PHONE);
   const otherAccount = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
+    createIntent: true,
     name: MARK + "Phone Twin",
     phone: "+37369111111",
     city: "Chișinău",
@@ -619,7 +621,7 @@ test("archiveHall concurrent last two halls: one LAST_USABLE_HALL", async () => 
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
   const halls = await db.select({ id: venueHalls.id, status: venueHalls.status })
     .from(venueHalls).where(eq(venueHalls.venueId, ids.venue));
-  const usable = halls.filter((hall) => hall.status !== "archived");
+  const usable = halls.filter((hall) => hall.status === "active" || hall.status === "pending");
   while (usable.length > 2) {
     const extra = usable.pop()!;
     const archived = await archiveHall(extra.id);

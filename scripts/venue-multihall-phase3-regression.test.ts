@@ -219,6 +219,7 @@ before(async () => {
 
   const venue2 = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
+    createIntent: true,
     name: MARK + "Local 2",
     phone: "+37369111111",
     city: "Chișinău",

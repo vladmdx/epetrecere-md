@@ -132,7 +132,14 @@ Module._load = function(request, parent, isMain) {
     assert.equal(state.calls.length, 0);
     passed("real GET and mark-read response redact historical contact text and preserve auth/unread count");
     assert.deepEqual(notificationContext("https://epetrecere.md/en/dashboard/mesaje?conversation=50"), { kind: "conversation", id: 50 });
+    assert.deepEqual(notificationContext("/dashboard/locatii/88/mesaje?conversation=9"), { kind: "conversation", id: 9 });
+    assert.deepEqual(notificationContext("/ru/dashboard/locatii/88/mesaje?conversation=9"), { kind: "conversation", id: 9 });
+    assert.equal(notificationContext("/dashboard/locatii/0/mesaje?conversation=9"), null);
+    assert.equal(notificationContext("/dashboard/locatii/88/mesaje-extra?conversation=9"), null);
+    assert.equal(notificationContext("https://evil.invalid/dashboard/locatii/88/mesaje?conversation=9"), null);
     assert.notEqual(conversationPartyKey("client", 10, null), conversationPartyKey("client", null, 10));
+    assert.equal(conversationPartyKey("client", 10, 20), null);
+    assert.equal(conversationPartyKey("client", null, null), null);
     const venue = readFileSync("src/lib/db/queries/venue-bookings.ts", "utf8");
     const linked = venue.slice(venue.indexOf("const linkedRows"), venue.indexOf("// Count accepted bookings"));
     assert.doesNotMatch(linked, /"accepted"/);

@@ -55,6 +55,7 @@ export const organizationPatchSchema = z.object({
 export const venueDraftSchema = z.object({
   organizationId: z.number().int().positive(),
   venueId: z.number().int().positive().optional(),
+  createIntent: z.boolean().optional(),
   name: z.string().trim().min(2).max(200),
   nameRu: localizedText.optional().nullable(),
   nameEn: localizedText.optional().nullable(),

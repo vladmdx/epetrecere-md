@@ -13,6 +13,7 @@ import {
 } from "@/lib/db/schema";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { jsonIfOrganizationBackedVenueDisabled } from "./multi-hall-gate";
 import { getVenueOwnerRecipients } from "@/lib/venue-access";
 import { collectSubmitMissing } from "./onboarding";
 import { organizationHasValidContract } from "./legal";
@@ -83,6 +84,16 @@ export async function approvePartnerVenue(venueId: number): Promise<
   | { ok: true; venue: typeof venues.$inferSelect; emails: Array<{ userId: string; email: string | null }> }
   | { ok: false; error: string; status: number; missing?: string[]; code?: string }
 > {
+  const [existing] = await db
+    .select({ id: venues.id, organizationId: venues.organizationId })
+    .from(venues)
+    .where(eq(venues.id, venueId))
+    .limit(1);
+  if (!existing) return { ok: false, error: "Venue not found", status: 404 };
+  const blocked = jsonIfOrganizationBackedVenueDisabled(existing.organizationId);
+  if (blocked) {
+    return { ok: false, error: "FEATURE_DISABLED", status: 404, code: "FEATURE_DISABLED" };
+  }
   const missing = await collectSubmitMissing(venueId);
   if (missing.length) {
     return { ok: false, error: "ONBOARDING_INCOMPLETE", status: 400, missing: missing.map((m) => m.path) };
@@ -160,6 +171,10 @@ export async function rejectPartnerVenue(venueId: number): Promise<
 > {
   const snapshot = await pendingWork(venueId);
   if (!snapshot.venue) return { ok: false, error: "Venue not found", status: 404 };
+  const blocked = jsonIfOrganizationBackedVenueDisabled(snapshot.venue.organizationId);
+  if (blocked) {
+    return { ok: false, error: "FEATURE_DISABLED", status: 404, code: "FEATURE_DISABLED" };
+  }
   const venue = snapshot.venue;
   if (!snapshot.pendingHalls.length && !snapshot.orgPending && !snapshot.legacyPending) {
     return { ok: false, error: "booking_changed", status: 409, code: "NOT_PENDING" };

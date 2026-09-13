@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
 import { venueImages, venueHalls } from "@/lib/db/schema";
-import { and, asc, eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { requireVenueCapability } from "@/lib/venue-access";
-import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
+import { jsonIfHallSpecificImageDisabled } from "@/lib/partner/multi-hall-gate";
+import { reorderVenueImages } from "@/lib/partner/venue-image-writes";
 
 // Venue gallery images CRUD — mirrors /api/artist-images.
 //
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
   }
 
   if (parsed.data.hallId) {
-    const blocked = jsonIfMultiHallDisabled();
+    const blocked = jsonIfHallSpecificImageDisabled(parsed.data.hallId);
     if (blocked) return blocked;
     const [hall] = await db
       .select({ id: venueHalls.id, venueId: venueHalls.venueId })
@@ -132,21 +133,13 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: owner.error }, { status: owner.status });
   }
 
-  // Apply updates sequentially — small sets (< 50 rows), so a Promise.all is
-  // fine and avoids a transaction dependency we don't otherwise need.
-  await Promise.all(
-    parsed.data.items.map((it) =>
-      db
-        .update(venueImages)
-        .set({ sortOrder: it.sortOrder })
-        .where(
-          and(
-            eq(venueImages.id, it.id),
-            eq(venueImages.venueId, parsed.data.venueId),
-          ),
-        ),
-    ),
-  );
+  const result = await reorderVenueImages(parsed.data.venueId, parsed.data.items);
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error, code: result.code },
+      { status: result.status },
+    );
+  }
 
   return NextResponse.json({ success: true });
 }
@@ -160,7 +153,7 @@ export async function DELETE(req: NextRequest) {
 
   const imageId = Number(idParam);
   const [img] = await db
-    .select({ id: venueImages.id, venueId: venueImages.venueId })
+    .select({ id: venueImages.id, venueId: venueImages.venueId, hallId: venueImages.hallId })
     .from(venueImages)
     .where(eq(venueImages.id, imageId))
     .limit(1);
@@ -173,6 +166,9 @@ export async function DELETE(req: NextRequest) {
   if (!owner.ok) {
     return NextResponse.json({ error: owner.error }, { status: owner.status });
   }
+
+  const blocked = jsonIfHallSpecificImageDisabled(img.hallId);
+  if (blocked) return blocked;
 
   await db.delete(venueImages).where(eq(venueImages.id, imageId));
   return NextResponse.json({ success: true });
