@@ -723,88 +723,101 @@ export async function processBookingEffectDelivery(
   }
 }
 
+export async function reapExhaustedBookingEffectDeliveries(
+  executor: Executor,
+  effectId: number,
+  now = new Date(),
+): Promise<number> {
+  // Every multi-row terminal transition uses parent -> child lock order.
+  const [parent] = await executor
+    .select({ id: bookingEffectOutbox.id })
+    .from(bookingEffectOutbox)
+    .where(eq(bookingEffectOutbox.id, effectId))
+    .for("update")
+    .limit(1);
+  if (!parent) return 0;
+  await executor
+    .update(bookingEffectDeliveries)
+    .set({
+      status: "cancelled",
+      leaseToken: null,
+      leaseUntil: null,
+      lastError: "booking_cancelled_after_dispatch_crash",
+      updatedAt: now,
+    })
+    .where(and(
+      eq(bookingEffectDeliveries.effectId, effectId),
+      eq(bookingEffectDeliveries.status, "dispatching"),
+      sql`${bookingEffectDeliveries.cancelRequestedAt} IS NOT NULL`,
+      lte(bookingEffectDeliveries.leaseUntil, now),
+    ));
+  const terminal = await executor
+    .update(bookingEffectDeliveries)
+    .set({
+      status: "dead_letter",
+      leaseToken: null,
+      leaseUntil: null,
+      lastError: sql`COALESCE(${bookingEffectDeliveries.lastError}, 'maximum attempts exhausted')`,
+      updatedAt: now,
+    })
+    .where(and(
+      eq(bookingEffectDeliveries.effectId, effectId),
+      isNull(bookingEffectDeliveries.cancelRequestedAt),
+      or(
+        and(
+          inArray(bookingEffectDeliveries.status, ["pending", "failed"]),
+          sql`${bookingEffectDeliveries.attempts} >= ${BOOKING_EFFECT_MAX_ATTEMPTS}`,
+        ),
+        and(
+          inArray(bookingEffectDeliveries.status, ["processing", "dispatching"]),
+          sql`${bookingEffectDeliveries.attempts} >= ${BOOKING_EFFECT_MAX_ATTEMPTS}`,
+          lte(bookingEffectDeliveries.leaseUntil, now),
+        ),
+      ),
+    ))
+    .returning({ id: bookingEffectDeliveries.id });
+  if (terminal.length > 0) {
+    await executor
+      .update(bookingEffectDeliveries)
+      .set({
+        status: "dead_letter",
+        leaseToken: null,
+        leaseUntil: null,
+        lastError: "sibling delivery exhausted retry budget",
+        updatedAt: now,
+      })
+      .where(and(
+        eq(bookingEffectDeliveries.effectId, effectId),
+        inArray(bookingEffectDeliveries.status, ["pending", "processing", "failed"]),
+      ));
+    await executor
+      .update(bookingEffectOutbox)
+      .set({
+        status: "dead_letter",
+        leaseToken: null,
+        leaseUntil: null,
+        lastError: "delivery maximum attempts exhausted",
+        updatedAt: now,
+      })
+      .where(and(
+        eq(bookingEffectOutbox.id, effectId),
+        inArray(bookingEffectOutbox.status, ["pending", "processing", "failed"]),
+      ));
+  }
+  return terminal.length;
+}
+
 export async function dueBookingEffectDeliveries(
   effectId: number,
   limit = 100,
   now = new Date(),
 ): Promise<BookingEffectDelivery[]> {
   await db.transaction(async (tx) => {
-    const executor = tx as unknown as Executor;
-    await executor
-      .update(bookingEffectDeliveries)
-      .set({
-        status: "cancelled",
-        leaseToken: null,
-        leaseUntil: null,
-        lastError: "booking_cancelled_after_dispatch_crash",
-        updatedAt: now,
-      })
-      .where(and(
-        eq(bookingEffectDeliveries.effectId, effectId),
-        eq(bookingEffectDeliveries.status, "dispatching"),
-        sql`${bookingEffectDeliveries.cancelRequestedAt} IS NOT NULL`,
-        lte(bookingEffectDeliveries.leaseUntil, now),
-      ));
-    const [parent] = await executor
-      .select({ id: bookingEffectOutbox.id })
-      .from(bookingEffectOutbox)
-      .where(eq(bookingEffectOutbox.id, effectId))
-      .for("update")
-      .limit(1);
-    if (!parent) return;
-    const terminal = await executor
-      .update(bookingEffectDeliveries)
-      .set({
-        status: "dead_letter",
-        leaseToken: null,
-        leaseUntil: null,
-        lastError: sql`COALESCE(${bookingEffectDeliveries.lastError}, 'maximum attempts exhausted')`,
-        updatedAt: now,
-      })
-      .where(and(
-        eq(bookingEffectDeliveries.effectId, effectId),
-        isNull(bookingEffectDeliveries.cancelRequestedAt),
-        or(
-          and(
-            inArray(bookingEffectDeliveries.status, ["pending", "failed"]),
-            sql`${bookingEffectDeliveries.attempts} >= ${BOOKING_EFFECT_MAX_ATTEMPTS}`,
-          ),
-          and(
-            inArray(bookingEffectDeliveries.status, ["processing", "dispatching"]),
-            sql`${bookingEffectDeliveries.attempts} >= ${BOOKING_EFFECT_MAX_ATTEMPTS}`,
-            lte(bookingEffectDeliveries.leaseUntil, now),
-          ),
-        ),
-      ))
-      .returning({ id: bookingEffectDeliveries.id });
-    if (terminal.length > 0) {
-      await executor
-        .update(bookingEffectDeliveries)
-        .set({
-          status: "dead_letter",
-          leaseToken: null,
-          leaseUntil: null,
-          lastError: "sibling delivery exhausted retry budget",
-          updatedAt: now,
-        })
-        .where(and(
-          eq(bookingEffectDeliveries.effectId, effectId),
-          inArray(bookingEffectDeliveries.status, ["pending", "processing", "failed"]),
-        ));
-      await executor
-        .update(bookingEffectOutbox)
-        .set({
-          status: "dead_letter",
-          leaseToken: null,
-          leaseUntil: null,
-          lastError: "delivery maximum attempts exhausted",
-          updatedAt: now,
-        })
-        .where(and(
-          eq(bookingEffectOutbox.id, effectId),
-          inArray(bookingEffectOutbox.status, ["pending", "processing", "failed"]),
-        ));
-    }
+    await reapExhaustedBookingEffectDeliveries(
+      tx as unknown as Executor,
+      effectId,
+      now,
+    );
   });
   return db
     .select()

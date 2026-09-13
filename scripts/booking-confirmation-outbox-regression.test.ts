@@ -24,10 +24,12 @@ import {
   claimBookingEffect,
   claimBookingEffectDelivery,
   cancelBookingConfirmationEffects,
+  dueBookingEffectDeliveries,
   enqueueBookingEffect,
   enqueueBookingEffectDeliveries,
   markBookingEffectDelivered,
   processBookingEffectDelivery,
+  reapExhaustedBookingEffectDeliveries,
   requeueBookingEffectDeadLetter,
 } from "../src/lib/booking/effect-outbox";
 import { persistConfirmationEffects } from "../src/lib/booking/confirmation-persist";
@@ -342,6 +344,39 @@ test("cancellation wins the barrier after status check and before provider start
   assert.ok((await bookingEffectDeliveriesFor(effect.id)).every((row) => row.status === "cancelled"));
 });
 
+test("provider start wins the barrier and cancellation waits for its timeout-bounded call", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let providerStarted!: () => void;
+  let releaseProvider!: () => void;
+  const started = new Promise<void>((resolve) => { providerStarted = resolve; });
+  const providerGate = new Promise<void>((resolve) => { releaseProvider = resolve; });
+  let pushCalls = 0;
+  const worker = processConfirmationNotificationEffect(effect.id, {
+    providerTimeoutMs: 2_000,
+    drivers: channelDrivers({
+      push: async () => {
+        pushCalls += 1;
+        providerStarted();
+        await providerGate;
+        return { sent: 1, pruned: 0, failed: 0 };
+      },
+    }),
+  });
+  await started;
+  let cancellationCommitted = false;
+  const cancellation = vendorCancelBooking(booking.id, "cancel after provider start")
+    .then(() => { cancellationCommitted = true; });
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  assert.equal(cancellationCommitted, false, "cancellation waits behind the dispatch barrier");
+  releaseProvider();
+  await cancellation;
+  assert.equal(cancellationCommitted, true);
+  assert.equal(pushCalls, 1);
+  const result = await worker;
+  assert.ok(result.status === "not_due" || result.status === "cancelled");
+});
+
 test("parent preparation retries do not consume a new email delivery budget", async () => {
   const booking = await createBooking();
   const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
@@ -401,6 +436,42 @@ test("cancellation terminalization rolls back parent and children atomically", a
   }), /rollback terminalization/);
   assert.equal((await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT))?.status, "pending");
   assert.equal((await bookingEffectDeliveriesFor(effect.id))[0]?.status, "pending");
+});
+
+test("exhaustion reaper terminalizes parent and children in one transaction", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  const [delivery] = await enqueueBookingEffectDeliveries(db, effect.id, [{
+    recipientUserId: userId,
+    channel: "email",
+    dedupeKey: `booking:${booking.id}:${userId}:reaper:email`,
+    payload: {
+      userId,
+      type: "booking_status_changed",
+      title: "Reaper",
+      email: MARK + "user@example.com",
+      emailHtml: "<p>reaper</p>",
+      dedupeKey: `booking:${booking.id}:${userId}:reaper`,
+    },
+  }]);
+  await db
+    .update(bookingEffectDeliveries)
+    .set({ status: "failed", attempts: BOOKING_EFFECT_MAX_ATTEMPTS })
+    .where(eq(bookingEffectDeliveries.id, delivery.id));
+
+  await assert.rejects(db.transaction(async (tx) => {
+    assert.equal(await reapExhaustedBookingEffectDeliveries(
+      tx as unknown as typeof db,
+      effect.id,
+    ), 1);
+    throw new Error("rollback reaper");
+  }), /rollback reaper/);
+  assert.equal((await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT))?.status, "pending");
+  assert.equal((await bookingEffectDeliveriesFor(effect.id))[0]?.status, "failed");
+
+  await dueBookingEffectDeliveries(effect.id);
+  assert.equal((await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT))?.status, "dead_letter");
+  assert.equal((await bookingEffectDeliveriesFor(effect.id))[0]?.status, "dead_letter");
 });
 
 test("heartbeat protects a slow channel worker beyond the original lease", async () => {
