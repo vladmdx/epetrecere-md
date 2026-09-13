@@ -157,6 +157,25 @@ async function withLeaseHeartbeat<T>(
   }
 }
 
+async function withDispatchDeadline<T>(
+  work: () => Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error("booking_effect_dispatch_timeout")),
+      Math.max(1, timeoutMs),
+    );
+    timer.unref?.();
+  });
+  try {
+    return await Promise.race([work(), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 /**
  * Persist the coordinator before the confirmation transaction commits.
  * Explicit replay pulls pending/failed coordinator and child work forward;
@@ -575,7 +594,10 @@ export async function withBookingEffectDeliveryDispatchPermit<T>(
     // production dispatch is bounded by a provider timeout shorter than the
     // lease, so cancellation waits for a finite, defined interval. Database
     // work in the callback must use `executor`, never the global pool.
-    const value = await dispatch(permitted, executor);
+    const value = await withDispatchDeadline(
+      () => dispatch(permitted, executor),
+      statementTimeoutMs + 250,
+    );
     const [settled] = await executor
       .update(bookingEffectDeliveries)
       .set({
@@ -903,13 +925,7 @@ export async function reconcileOrphanedCancelledBookingEffectDeliveries(
       updatedAt: now,
     })
     .where(and(
-      inArray(bookingEffectDeliveries.status, [
-        "pending",
-        "processing",
-        "dispatching",
-        "failed",
-        "dead_letter",
-      ]),
+      eq(bookingEffectDeliveries.status, "dispatching"),
       sql`EXISTS (
         SELECT 1
         FROM ${bookingEffectOutbox}
