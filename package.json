@@ -39,7 +39,7 @@
     "test:multihall:legal-session": "npx tsx scripts/run-guarded-db-test.ts scripts/legal-acceptance-session-regression.test.ts",
     "test:multihall:pass2": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-correction-pass2-regression.test.ts",
     "test:booking-outbox:migration": "npx tsx scripts/booking-confirmation-outbox-migration-verify.ts",
-    "test:booking-outbox": "npx tsx scripts/run-guarded-db-test.ts scripts/booking-confirmation-outbox-regression.test.ts",
+    "test:booking-outbox": "E2E_DB_POOL_MAX=2 npx tsx scripts/run-guarded-db-test.ts scripts/booking-confirmation-outbox-regression.test.ts",
     "test:booking-outbox:api-tx": "npx tsx scripts/run-guarded-db-test.ts scripts/booking-confirmation-outbox-api-transaction.test.cts",
     "test:booking-outbox:policy": "npx tsx --test scripts/booking-confirmation-outbox-policy.test.ts",
     "test:legal-pack": "npx tsx --test scripts/legal-pack-v22-regression.test.ts",

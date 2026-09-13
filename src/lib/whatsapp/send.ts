@@ -109,13 +109,13 @@ async function callMeta(
 export async function sendWhatsAppToUser(
   userId: string,
   payload: WhatsAppPayload,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; executor?: typeof db } = {},
 ): Promise<{ sent: boolean; reason?: string }> {
   if (!isConfigured()) {
     return { sent: false, reason: "not-configured" };
   }
 
-  const [user] = await db
+  const [user] = await (options.executor ?? db)
     .select({ phone: users.phone })
     .from(users)
     .where(eq(users.id, userId))

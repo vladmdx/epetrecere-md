@@ -45,6 +45,16 @@ function createDb(): Db {
 
   if (isNeon(url)) return drizzleNeon(neon(url), { schema });
 
+  const requestedE2EPoolMax = Number(process.env.E2E_DB_POOL_MAX ?? "8");
+  if (
+    process.env.E2E_RUNTIME === "1"
+    && (!Number.isInteger(requestedE2EPoolMax)
+      || requestedE2EPoolMax < 1
+      || requestedE2EPoolMax > 8)
+  ) {
+    throw new Error("E2E_DB_POOL_MAX must be an integer from 1 to 8.");
+  }
+
   // Runtime gets exactly two sockets; production builds get four. A single
   // runtime socket can strand even tiny concurrent reads behind the Supabase
   // transaction pooler. Two is the smallest pool that lets one stalled
@@ -88,7 +98,11 @@ function createDb(): Db {
     // Hosted Postgres (Supabase/Neon session) still requires it.
     ssl: loopback ? false : "require",
     prepare: false,
-    max: isBuild ? 4 : process.env.E2E_RUNTIME === "1" ? 8 : 2,
+    max: isBuild
+      ? 4
+      : process.env.E2E_RUNTIME === "1"
+        ? requestedE2EPoolMax
+        : 2,
     // Do not lower the driver's global pipeline limit: in postgres.js 3.4.9
     // that same boundary controls the BEGIN reservation hook, so low values
     // can make transactions unsafe or leave a queued BEGIN stalled. Critical

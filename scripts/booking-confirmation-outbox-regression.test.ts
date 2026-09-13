@@ -31,6 +31,7 @@ import {
   processBookingEffectDelivery,
   reapExhaustedBookingEffectDeliveries,
   requeueBookingEffectDeadLetter,
+  withBookingEffectDeliveryDispatchPermit,
 } from "../src/lib/booking/effect-outbox";
 import { persistConfirmationEffects } from "../src/lib/booking/confirmation-persist";
 import {
@@ -43,7 +44,10 @@ import {
   vendorCancelBooking,
 } from "../src/lib/booking/booking-transitions";
 import { GET as cronGet } from "../src/app/api/cron/booking-confirmation-outbox/route";
-import type { NotificationChannelDrivers } from "../src/lib/notifications/dispatch";
+import {
+  dispatchNotificationChannel,
+  type NotificationChannelDrivers,
+} from "../src/lib/notifications/dispatch";
 import { BOOKING_EFFECT_MAX_ATTEMPTS } from "../src/lib/booking/effect-outbox-policy";
 
 const MARK = `booking_outbox_${Date.now()}_`;
@@ -375,6 +379,136 @@ test("provider start wins the barrier and cancellation waits for its timeout-bou
   assert.equal(pushCalls, 1);
   const result = await worker;
   assert.ok(result.status === "not_due" || result.status === "cancelled");
+  const rows = await bookingEffectDeliveriesFor(effect.id);
+  assert.equal(rows.find((row) => row.channel === "push")?.status, "delivered");
+  assert.ok(rows.every((row) => row.status !== "dispatching"));
+});
+
+test("two dispatch permits reuse their transactions with the production two-socket pool", async () => {
+  const bookings = await Promise.all([createBooking(), createBooking()]);
+  const effects = await Promise.all(bookings.map((booking) =>
+    enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT)));
+  const deliveries = await Promise.all(effects.map(async (effect, index) => {
+    const [delivery] = await enqueueBookingEffectDeliveries(db, effect.id, [{
+      recipientUserId: userId,
+      channel: "in_app",
+      dedupeKey: `booking:${bookings[index].id}:${userId}:pool-${index}:in_app`,
+      payload: {
+        userId,
+        type: "booking_status_changed",
+        title: `Pool ${index}`,
+        dedupeKey: `booking:${bookings[index].id}:${userId}:pool-${index}`,
+      },
+    }]);
+    const claimed = await claimBookingEffectDelivery(delivery.id);
+    assert.ok(claimed);
+    return claimed;
+  }));
+  let entered = 0;
+  let release!: () => void;
+  const bothEntered = new Promise<void>((resolve) => { release = resolve; });
+  const workers = deliveries.map((delivery, index) =>
+    withBookingEffectDeliveryDispatchPermit(
+      bookings[index].id,
+      delivery,
+      async (_permitted, executor) => {
+        entered += 1;
+        if (entered === 2) release();
+        await bothEntered;
+        await dispatchNotificationChannel(
+          delivery.payload,
+          "in_app",
+          {},
+          { executor: executor as unknown as typeof db, timeoutMs: 1_000 },
+        );
+      },
+      new Date(),
+      1_000,
+    ));
+  let timeout!: ReturnType<typeof setTimeout>;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(
+      () => reject(new Error("two-socket dispatch pool deadlock")),
+      2_000,
+    );
+  });
+  const results = await Promise.race([Promise.all(workers), deadline])
+    .finally(() => clearTimeout(timeout));
+  assert.ok(results.every((result) => result.permitted));
+  for (const effect of effects) {
+    assert.ok((await bookingEffectDeliveriesFor(effect.id))
+      .every((row) => row.status === "delivered"));
+  }
+});
+
+test("provider success is settled before a worker can crash or cancellation can commit", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  const [delivery] = await enqueueBookingEffectDeliveries(db, effect.id, [{
+    recipientUserId: userId,
+    channel: "email",
+    dedupeKey: `booking:${booking.id}:${userId}:atomic-permit:email`,
+    payload: {
+      userId,
+      type: "booking_status_changed",
+      title: "Atomic permit",
+      email: MARK + "user@example.com",
+      emailHtml: "<p>atomic</p>",
+      dedupeKey: `booking:${booking.id}:${userId}:atomic-permit`,
+    },
+  }]);
+  const claimed = await claimBookingEffectDelivery(delivery.id);
+  assert.ok(claimed);
+  const sent = await withBookingEffectDeliveryDispatchPermit(
+    booking.id,
+    claimed,
+    async () => undefined,
+  );
+  assert.equal(sent.permitted, true);
+  assert.equal(
+    (await bookingEffectDeliveriesFor(effect.id))[0]?.status,
+    "delivered",
+    "a crash immediately after permit commit leaves no dispatching row",
+  );
+  await vendorCancelBooking(booking.id, "cancel after atomic dispatch");
+  assert.equal((await bookingEffectDeliveriesFor(effect.id))[0]?.status, "delivered");
+});
+
+test("scheduler reconciles a legacy dispatching orphan under a cancelled parent", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  const [delivery] = await enqueueBookingEffectDeliveries(db, effect.id, [{
+    recipientUserId: userId,
+    channel: "email",
+    dedupeKey: `booking:${booking.id}:${userId}:legacy-orphan:email`,
+    payload: {
+      userId,
+      type: "booking_status_changed",
+      title: "Legacy orphan",
+      email: MARK + "user@example.com",
+      emailHtml: "<p>orphan</p>",
+      dedupeKey: `booking:${booking.id}:${userId}:legacy-orphan`,
+    },
+  }]);
+  const expired = new Date(Date.now() - 60_000);
+  await db.transaction(async (tx) => {
+    await tx.update(bookingEffectOutbox).set({
+      status: "cancelled",
+      lastError: "legacy cancelled parent",
+    }).where(eq(bookingEffectOutbox.id, effect.id));
+    await tx.update(bookingEffectDeliveries).set({
+      status: "dispatching",
+      attempts: 1,
+      leaseToken: randomUUID(),
+      leaseUntil: expired,
+      dispatchStartedAt: expired,
+      cancelRequestedAt: expired,
+    }).where(eq(bookingEffectDeliveries.id, delivery.id));
+  });
+  await drainConfirmationNotificationOutbox({ limit: 1 });
+  const [reconciled] = await bookingEffectDeliveriesFor(effect.id);
+  assert.equal(reconciled?.status, "cancelled");
+  assert.equal(reconciled?.leaseToken, null);
 });
 
 test("parent preparation retries do not consume a new email delivery budget", async () => {
@@ -408,6 +542,15 @@ test("parent preparation retries do not consume a new email delivery budget", as
     .find((row) => row.channel === "email");
   assert.equal(email?.attempts, 1);
   assert.equal(email?.status, "failed", "child stays retryable on its own first attempt");
+  assert.equal(
+    parent?.nextAttemptAt.getTime(),
+    email?.nextAttemptAt.getTime(),
+    "the coordinator wakes with the retryable child instead of its eighth-attempt backoff",
+  );
+  assert.ok(
+    parent && parent.nextAttemptAt.getTime() - parent.updatedAt.getTime() < 60_000,
+    "the first email retry stays on the child attempt-one budget",
+  );
 });
 
 test("cancellation terminalization rolls back parent and children atomically", async () => {

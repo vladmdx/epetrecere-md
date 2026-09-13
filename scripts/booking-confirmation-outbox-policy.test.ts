@@ -8,6 +8,8 @@ import {
   bookingEffectHeartbeatMs,
   bookingEffectRetryDelayMs,
 } from "../src/lib/booking/effect-outbox-policy";
+import { db } from "../src/lib/db";
+import { dispatchNotificationChannel } from "../src/lib/notifications/dispatch";
 
 test("outbox backoff is exponential and capped", () => {
   assert.equal(bookingEffectRetryDelayMs(1), 30_000);
@@ -38,4 +40,32 @@ test("stored provider errors are bounded and never blank", () => {
     "confirmation failed: nested email down",
   );
   assert.equal(bookingEffectError("x".repeat(3_000)).length, 2_000);
+});
+
+test("durable channel dispatch reuses the supplied transaction executor", async () => {
+  let inserts = 0;
+  const executor = {
+    insert: () => ({
+      values: () => ({
+        onConflictDoNothing: async () => { inserts += 1; },
+      }),
+    }),
+  } as unknown as typeof db;
+  const input = {
+    userId: "test-user",
+    type: "booking_status_changed",
+    title: "Confirmed",
+    dedupeKey: "booking:1:test-user:confirmed",
+  };
+  await dispatchNotificationChannel(input, "in_app", {}, { executor });
+  assert.equal(inserts, 1);
+
+  let forwarded: typeof db | undefined;
+  await dispatchNotificationChannel(input, "push", {
+    sendPushToUser: async (_userId, _payload, options) => {
+      forwarded = options?.executor;
+      return { sent: 1, pruned: 0, failed: 0 };
+    },
+  }, { executor, timeoutMs: 100 });
+  assert.equal(forwarded, executor);
 });

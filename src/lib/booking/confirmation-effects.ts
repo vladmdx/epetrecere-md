@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   artists,
+  bookingEffectDeliveries,
   bookingEffectOutbox,
   bookingRequests,
   users,
@@ -27,6 +28,7 @@ import {
 import {
   BookingEffectCancelledError,
   BookingEffectDeadLetterError,
+  BookingEffectRetryAtError,
   CONFIRMATION_NOTIFICATION_EFFECT,
   acquireBookingConfirmationBarrier,
   bookingEffectDeliveriesFor,
@@ -36,6 +38,7 @@ import {
   enqueueBookingEffectDeliveries,
   processBookingEffect,
   processBookingEffectDelivery,
+  reconcileOrphanedCancelledBookingEffectDeliveries,
   reconcileCancelledBookingConfirmationEffects,
   withBookingEffectDeliveryDispatchPermit,
   reportUnalertedBookingEffectDeadLetters,
@@ -397,7 +400,7 @@ async function runConfirmationDeliveries(
         const dispatch = await withBookingEffectDeliveryDispatchPermit(
           effect.bookingId,
           claimed,
-          async () => {
+          async (_permitted, executor) => {
             await dispatchNotificationChannel(
               claimed.payload as DispatchInput,
               claimed.channel,
@@ -405,10 +408,12 @@ async function runConfirmationDeliveries(
               {
                 idempotencyKey: claimed.dedupeKey,
                 timeoutMs: options.providerTimeoutMs ?? BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
+                executor: executor as unknown as typeof db,
               },
             );
           },
           options.now ?? new Date(),
+          options.providerTimeoutMs ?? BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
         );
         if (!dispatch.permitted) throw new BookingEffectCancelledError();
       },
@@ -434,6 +439,46 @@ async function runConfirmationDeliveries(
   }
 }
 
+async function nextConfirmationRetryAt(
+  effectId: number,
+  now = new Date(),
+): Promise<Date> {
+  const [parent] = await db
+    .select({
+      referralStatus: bookingEffectOutbox.referralStatus,
+      referralNextAttemptAt: bookingEffectOutbox.referralNextAttemptAt,
+      materializationStatus: bookingEffectOutbox.materializationStatus,
+      materializationNextAttemptAt: bookingEffectOutbox.materializationNextAttemptAt,
+    })
+    .from(bookingEffectOutbox)
+    .where(eq(bookingEffectOutbox.id, effectId))
+    .limit(1);
+  if (parent?.referralStatus !== "delivered") {
+    return parent?.referralNextAttemptAt
+      ?? new Date(now.getTime() + bookingEffectRetryDelayMs(1));
+  }
+  if (parent.materializationStatus !== "delivered") {
+    return parent.materializationNextAttemptAt;
+  }
+  const [delivery] = await db
+    .select({
+      next: sql<Date | null>`min(
+        CASE
+          WHEN ${bookingEffectDeliveries.status} IN ('pending', 'failed')
+            THEN ${bookingEffectDeliveries.nextAttemptAt}
+          WHEN ${bookingEffectDeliveries.status} IN ('processing', 'dispatching')
+            THEN ${bookingEffectDeliveries.leaseUntil}
+          ELSE NULL
+        END
+      )`,
+    })
+    .from(bookingEffectDeliveries)
+    .where(eq(bookingEffectDeliveries.effectId, effectId));
+  return delivery?.next
+    ? new Date(delivery.next)
+    : new Date(now.getTime() + bookingEffectRetryDelayMs(1));
+}
+
 type ConfirmationProcessorOptions = BookingEffectClockOptions & {
   /** Legacy coordinator-level test seam. Production uses per-channel rows. */
   deliver?: (booking: Booking, effect: BookingEffect) => Promise<void>;
@@ -455,7 +500,22 @@ export async function processConfirmationNotificationEffect(
       const booking = await confirmedBooking(effect.bookingId);
       if (!booking) throw new BookingEffectCancelledError();
       if (options.deliver) await options.deliver(booking, effect);
-      else await runConfirmationDeliveries(booking, effect, options);
+      else {
+        try {
+          await runConfirmationDeliveries(booking, effect, options);
+        } catch (error) {
+          if (
+            error instanceof BookingEffectCancelledError
+            || error instanceof BookingEffectDeadLetterError
+          ) {
+            throw error;
+          }
+          throw new BookingEffectRetryAtError(
+            error,
+            await nextConfirmationRetryAt(effect.id, options.now),
+          );
+        }
+      }
     },
     options,
   );
@@ -480,6 +540,7 @@ export async function drainConfirmationNotificationOutbox(options: {
   deliver?: ConfirmationProcessorOptions["deliver"];
   drivers?: NotificationChannelDrivers;
 } = {}) {
+  await reconcileOrphanedCancelledBookingEffectDeliveries(db, options.now);
   const effects = await dueBookingEffects(
     CONFIRMATION_NOTIFICATION_EFFECT,
     options.limit ?? 25,

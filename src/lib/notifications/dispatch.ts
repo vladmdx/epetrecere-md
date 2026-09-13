@@ -71,6 +71,8 @@ export type NotificationProviderOptions = {
   /** Abortable adapters should stop provider I/O when this fires. */
   signal?: AbortSignal;
   timeoutMs?: number;
+  /** Reuse the booking dispatch transaction instead of checking out another pool socket. */
+  executor?: typeof db;
 };
 
 export interface DispatchOptions {
@@ -230,13 +232,13 @@ export async function dispatchNotificationChannel(
   input: DispatchInput,
   channel: NotificationChannel,
   drivers: NotificationChannelDrivers = {},
-  options: { timeoutMs?: number; idempotencyKey?: string } = {},
+  options: NotificationProviderOptions = {},
 ): Promise<void> {
   if (!input.dedupeKey) {
     throw new Error("durable_notification_requires_dedupe_key");
   }
   if (channel === "in_app") {
-    await db
+    await (options.executor ?? db)
       .insert(notifications)
       .values({
         userId: input.userId,
@@ -258,7 +260,12 @@ export async function dispatchNotificationChannel(
         body: input.message ?? "",
         actionUrl: input.actionUrl ?? "/",
         tag: String(input.type),
-      }, { signal, timeoutMs: options.timeoutMs, idempotencyKey: options.idempotencyKey }));
+      }, {
+        signal,
+        timeoutMs: options.timeoutMs,
+        idempotencyKey: options.idempotencyKey,
+        executor: options.executor,
+      }));
     if ((result.failed ?? 0) > 0) {
       throw new Error(`push_delivery_failed:${result.failed}`);
     }
@@ -272,7 +279,12 @@ export async function dispatchNotificationChannel(
         title: input.title,
         body: input.message ?? "",
         actionUrl: input.actionUrl,
-      }, { signal, timeoutMs: options.timeoutMs, idempotencyKey: options.idempotencyKey }));
+      }, {
+        signal,
+        timeoutMs: options.timeoutMs,
+        idempotencyKey: options.idempotencyKey,
+        executor: options.executor,
+      }));
     if (result.reason === "api-error") {
       throw new Error("whatsapp_delivery_failed");
     }

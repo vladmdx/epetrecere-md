@@ -49,11 +49,12 @@ export interface PushPayload {
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
-  options: { timeoutMs?: number } = {},
+  options: { timeoutMs?: number; signal?: AbortSignal; executor?: typeof db } = {},
 ): Promise<{ sent: number; pruned: number; failed: number }> {
   if (!ensureConfigured()) return { sent: 0, pruned: 0, failed: 0 };
 
-  const subs = await db
+  const executor = options.executor ?? db;
+  const subs = await executor
     .select()
     .from(pushSubscriptions)
     .where(eq(pushSubscriptions.userId, userId));
@@ -102,7 +103,7 @@ export async function sendPushToUser(
     // Delete dead rows. `inArray` would work but we'd need to import it;
     // a single OR'd delete via raw SQL is just as concise.
     for (const e of deadEndpoints) {
-      await db
+      await executor
         .delete(pushSubscriptions)
         .where(eq(pushSubscriptions.endpoint, e));
     }

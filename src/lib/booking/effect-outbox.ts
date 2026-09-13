@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import {
   BOOKING_EFFECT_LEASE_MS,
   BOOKING_EFFECT_MAX_ATTEMPTS,
+  BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
   bookingEffectError,
   bookingEffectHeartbeatMs,
   bookingEffectRetryDelayMs,
@@ -59,6 +60,16 @@ export class BookingEffectDeadLetterError extends Error {
   constructor(message = "booking_effect_delivery_dead_letter") {
     super(message);
     this.name = "BookingEffectDeadLetterError";
+  }
+}
+
+export class BookingEffectRetryAtError extends Error {
+  readonly retryAt: Date;
+
+  constructor(error: unknown, retryAt: Date) {
+    super(bookingEffectError(error), { cause: error });
+    this.name = "BookingEffectRetryAtError";
+    this.retryAt = retryAt;
   }
 }
 
@@ -292,7 +303,9 @@ async function finishBookingEffect(
       .set({
         status,
         nextAttemptAt: status === "failed"
-          ? new Date(now.getTime() + bookingEffectRetryDelayMs(effect.attempts))
+          ? error instanceof BookingEffectRetryAtError
+            ? error.retryAt
+            : new Date(now.getTime() + bookingEffectRetryDelayMs(effect.attempts))
           : now,
         leaseToken: null,
         leaseUntil: null,
@@ -509,19 +522,31 @@ export async function renewBookingEffectDeliveryLease(
  *   never started;
  * - this transaction takes the barrier first: provider I/O starts while the
  *   barrier is held, so cancellation cannot commit until the bounded call
- *   finishes; after that it records cancel_requested_at if DB settlement is
- *   still pending.
+ *   and its delivery settlement finish. The provider result and child state
+ *   therefore become visible before cancellation can inspect the row.
  */
 export async function withBookingEffectDeliveryDispatchPermit<T>(
   bookingId: number,
   delivery: Pick<BookingEffectDelivery, "id" | "leaseToken">,
-  dispatch: (permitted: BookingEffectDelivery) => Promise<T>,
+  dispatch: (permitted: BookingEffectDelivery, executor: Executor) => Promise<T>,
   now = new Date(),
+  statementTimeoutMs = BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
 ): Promise<{ permitted: false } | { permitted: true; value: T }> {
   const leaseToken = delivery.leaseToken;
   if (!leaseToken) return { permitted: false };
   return db.transaction(async (tx) => {
     const executor = tx as unknown as Executor;
+    // The callback reuses this executor. Besides avoiding pool re-entry while
+    // the advisory lock is held, this server-side deadline also bounds the
+    // lock wait and in-app insert (Promise.race cannot safely cancel a
+    // database statement).
+    await executor.execute(sql`
+      SELECT set_config(
+        'statement_timeout',
+        ${String(Math.max(1, Math.floor(statementTimeoutMs)))},
+        true
+      )
+    `);
     await acquireBookingConfirmationBarrier(executor, bookingId);
     const [active] = await executor
       .select({ status: bookingRequests.status })
@@ -548,8 +573,28 @@ export async function withBookingEffectDeliveryDispatchPermit<T>(
     if (!permitted) return { permitted: false } as const;
     // This is intentionally inside the transaction-level advisory lock. Every
     // production dispatch is bounded by a provider timeout shorter than the
-    // lease, so cancellation waits for a finite, defined interval.
-    const value = await dispatch(permitted);
+    // lease, so cancellation waits for a finite, defined interval. Database
+    // work in the callback must use `executor`, never the global pool.
+    const value = await dispatch(permitted, executor);
+    const [settled] = await executor
+      .update(bookingEffectDeliveries)
+      .set({
+        status: "delivered",
+        nextAttemptAt: now,
+        leaseToken: null,
+        leaseUntil: null,
+        lastError: null,
+        deliveredAt: now,
+        updatedAt: now,
+      })
+      .where(and(
+        eq(bookingEffectDeliveries.id, permitted.id),
+        eq(bookingEffectDeliveries.status, "dispatching"),
+        eq(bookingEffectDeliveries.leaseToken, leaseToken),
+        isNull(bookingEffectDeliveries.cancelRequestedAt),
+      ))
+      .returning({ id: bookingEffectDeliveries.id });
+    if (!settled) throw new Error("booking_effect_delivery_settlement_lost");
     return { permitted: true, value } as const;
   });
 }
@@ -688,6 +733,16 @@ export async function processBookingEffectDelivery(
       null,
       options.now ?? new Date(),
     );
+    if (!delivered) {
+      const [settled] = await db
+        .select()
+        .from(bookingEffectDeliveries)
+        .where(eq(bookingEffectDeliveries.id, claimed.id))
+        .limit(1);
+      if (settled?.status === "delivered") {
+        return { status: "delivered", delivery: settled };
+      }
+    }
     return delivered
       ? { status: "delivered", delivery: delivered }
       : { status: "not_due" };
@@ -830,6 +885,42 @@ export async function dueBookingEffectDeliveries(
     .limit(Math.max(1, Math.min(limit, 200)));
 }
 
+/** Recover rows left by an older worker after its parent was cancelled. */
+export async function reconcileOrphanedCancelledBookingEffectDeliveries(
+  executor: Executor = db,
+  now = new Date(),
+): Promise<number> {
+  const rows = await executor
+    .update(bookingEffectDeliveries)
+    .set({
+      status: "cancelled",
+      nextAttemptAt: now,
+      leaseToken: null,
+      leaseUntil: null,
+      cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now})`,
+      lastError: sql`COALESCE(${bookingEffectDeliveries.lastError}, 'booking_cancelled_reconciled')`,
+      deliveredAt: null,
+      updatedAt: now,
+    })
+    .where(and(
+      inArray(bookingEffectDeliveries.status, [
+        "pending",
+        "processing",
+        "dispatching",
+        "failed",
+        "dead_letter",
+      ]),
+      sql`EXISTS (
+        SELECT 1
+        FROM ${bookingEffectOutbox}
+        WHERE ${bookingEffectOutbox.id} = ${bookingEffectDeliveries.effectId}
+          AND ${bookingEffectOutbox.status} = 'cancelled'
+      )`,
+    ))
+    .returning({ id: bookingEffectDeliveries.id });
+  return rows.length;
+}
+
 /**
  * Invalidates every confirmation delivery not already complete. The caller
  * must pass its status-transition transaction so booking + parent + children
@@ -868,25 +959,23 @@ export async function cancelBookingConfirmationEffects(
     .update(bookingEffectDeliveries)
     .set({
       status: "cancelled",
+      nextAttemptAt: now,
       leaseToken: null,
       leaseUntil: null,
-      lastError: reason,
-      updatedAt: now,
-    })
-    .where(and(
-      inArray(bookingEffectDeliveries.effectId, ids),
-      inArray(bookingEffectDeliveries.status, ["pending", "processing", "failed", "dead_letter"]),
-    ));
-  await executor
-    .update(bookingEffectDeliveries)
-    .set({
       cancelRequestedAt: now,
-      lastError: sql`COALESCE(${bookingEffectDeliveries.lastError}, ${reason})`,
+      lastError: reason,
+      deliveredAt: null,
       updatedAt: now,
     })
     .where(and(
       inArray(bookingEffectDeliveries.effectId, ids),
-      eq(bookingEffectDeliveries.status, "dispatching"),
+      inArray(bookingEffectDeliveries.status, [
+        "pending",
+        "processing",
+        "dispatching",
+        "failed",
+        "dead_letter",
+      ]),
     ));
 }
 
