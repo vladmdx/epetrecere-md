@@ -414,6 +414,123 @@ test("B: archived hall block/conflict does not hit sister; sister data stays int
   await db.delete(venues).where(eq(venues.id, venue.id));
 });
 
+test("B: unusable hall statuses do not conflict a usable sister", async () => {
+  flagOn();
+  for (const status of ["draft", "rejected", "suspended", "archived"] as const) {
+    const [venue] = await db.insert(venues).values({
+      nameRo: MARK + "unusable-" + status,
+      slug: MARK + "unusable-" + status,
+      organizationId: ids.org,
+      isActive: true,
+      phone: PHONE,
+      city: "Chișinău",
+      address: "str. Unusable 1",
+    }).returning({ id: venues.id });
+    const [hallA] = await db.insert(venueHalls).values({
+      venueId: venue.id, slug: "a", nameRo: "A", status, capacityMin: 10, capacityMax: 80,
+    }).returning({ id: venueHalls.id });
+    const [hallB] = await db.insert(venueHalls).values({
+      venueId: venue.id, slug: "b", nameRo: "B", status: "active", capacityMin: 10, capacityMax: 80,
+    }).returning({ id: venueHalls.id });
+    const [group] = await db.insert(venueHallConflictGroups).values({
+      venueId: venue.id, name: "AB-" + status,
+    }).returning({ id: venueHallConflictGroups.id });
+    await db.insert(venueHallConflictGroupMembers).values([
+      { groupId: group.id, hallId: hallA.id, venueId: venue.id },
+      { groupId: group.id, hallId: hallB.id, venueId: venue.id },
+    ]);
+    const occupied = canonicalVenueInterval({
+      eventDate: "2028-10-01",
+      startTime: "18:00",
+      endTime: "22:00",
+      timezone: TZ,
+    });
+    await db.insert(venueScheduleBlocks).values({
+      venueId: venue.id,
+      hallId: hallA.id,
+      startsAt: occupied.startsAt,
+      endsAt: occupied.endsAt,
+      kind: "manual",
+      source: "manual",
+    });
+    await db.insert(bookingRequests).values({
+      clientUserId: ids.client,
+      venueId: venue.id,
+      hallId: hallA.id,
+      reservationScope: "hall",
+      clientName: "Unusable " + status,
+      clientPhone: "+37360000002",
+      eventDate: "2028-10-01",
+      startTime: "18:00",
+      endTime: "22:00",
+      status: "accepted",
+      timezone: TZ,
+    });
+    const sister = await evaluateVenueAvailability({
+      venueId: venue.id,
+      hallId: hallB.id,
+      eventDate: "2028-10-01",
+      startTime: "18:00",
+      endTime: "22:00",
+      timezone: TZ,
+      mode: "owner",
+    });
+    assert.equal(sister.available, true, status + " " + JSON.stringify(sister));
+    await db.delete(bookingRequests).where(eq(bookingRequests.venueId, venue.id));
+    await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, venue.id));
+    await db.delete(venueHallConflictGroupMembers).where(eq(venueHallConflictGroupMembers.groupId, group.id));
+    await db.delete(venueHallConflictGroups).where(eq(venueHallConflictGroups.id, group.id));
+    await db.delete(venueHalls).where(eq(venueHalls.venueId, venue.id));
+    await db.delete(venues).where(eq(venues.id, venue.id));
+  }
+});
+
+test("B: whole-venue booking blocks sisters even with leftover archived hallId", async () => {
+  flagOn();
+  const [venue] = await db.insert(venues).values({
+    nameRo: MARK + "whole-arch",
+    slug: MARK + "whole-arch",
+    organizationId: ids.org,
+    isActive: true,
+    phone: PHONE,
+    city: "Chișinău",
+    address: "str. Whole 1",
+  }).returning({ id: venues.id });
+  const [hallA] = await db.insert(venueHalls).values({
+    venueId: venue.id, slug: "archived", nameRo: "Archived", status: "archived", capacityMin: 10, capacityMax: 80,
+  }).returning({ id: venueHalls.id });
+  const [hallB] = await db.insert(venueHalls).values({
+    venueId: venue.id, slug: "live", nameRo: "Live", status: "active", capacityMin: 10, capacityMax: 80,
+  }).returning({ id: venueHalls.id });
+  await db.insert(bookingRequests).values({
+    clientUserId: ids.client,
+    venueId: venue.id,
+    hallId: hallA.id,
+    reservationScope: "venue",
+    clientName: "Whole venue leftover hall",
+    clientPhone: "+37360000003",
+    eventDate: "2028-11-01",
+    startTime: "18:00",
+    endTime: "22:00",
+    status: "accepted",
+    timezone: TZ,
+  });
+  const sister = await evaluateVenueAvailability({
+    venueId: venue.id,
+    hallId: hallB.id,
+    eventDate: "2028-11-01",
+    startTime: "18:00",
+    endTime: "22:00",
+    timezone: TZ,
+    mode: "owner",
+  });
+  assert.equal(sister.available, false, JSON.stringify(sister));
+  assert.equal(sister.code, "BOOKING_CONFLICT");
+  await db.delete(bookingRequests).where(eq(bookingRequests.venueId, venue.id));
+  await db.delete(venueHalls).where(eq(venueHalls.venueId, venue.id));
+  await db.delete(venues).where(eq(venues.id, venue.id));
+});
+
 test("C: iCal feed emits DATE only for local midnight-to-midnight blocks", async () => {
   flagOn();
   const [icalUser] = await db.insert(users).values({
@@ -443,10 +560,55 @@ test("C: iCal feed emits DATE only for local midnight-to-midnight blocks", async
     { params: Promise.resolve({ venueId: String(venue.id), token: token! }) },
   );
   const body = await res.text();
+  assert.match(body, /X-WR-TIMEZONE:Europe\/Chisinau/);
   assert.match(body, /DTSTART:20260601T010000Z/);
   assert.match(body, /DTSTART;VALUE=DATE:20260603/);
   assert.match(body, /DTEND;VALUE=DATE:20260605/);
   assert.doesNotMatch(body, /DTSTART;VALUE=DATE:20260601/);
+  await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, venue.id));
+  await db.delete(venues).where(eq(venues.id, venue.id));
+});
+
+test("C: non-Chișinău venue midnight block is DATE in venue TZ, not Europe/Chisinau", async () => {
+  flagOn();
+  const nyTz = "America/New_York";
+  const [icalUser] = await db.insert(users).values({
+    clerkId: MARK + "ical-ny",
+    email: `${MARK}ical-ny@example.com`,
+    name: "ical-ny",
+  }).returning({ id: users.id });
+  const [venue] = await db.insert(venues).values({
+    nameRo: MARK + "ical-ny",
+    slug: MARK + "ical-ny",
+    userId: icalUser.id,
+    timezone: nyTz,
+    phone: PHONE,
+    city: "New York",
+    address: "1 Broadway",
+  }).returning({ id: venues.id, timezone: venues.timezone });
+  assert.equal(venue.timezone, nyTz);
+  const allDay = intervalTimes("2026-06-01", "00:00", "2026-06-02", "00:00", nyTz);
+  assert.equal(classifyVenueScheduleBlockIcal(allDay.startsAt, allDay.endsAt, nyTz).allDay, true);
+  assert.equal(classifyVenueScheduleBlockIcal(allDay.startsAt, allDay.endsAt, TZ).allDay, false);
+  await db.insert(venueScheduleBlocks).values({
+    venueId: venue.id,
+    hallId: null,
+    startsAt: allDay.startsAt,
+    endsAt: allDay.endsAt,
+    kind: "manual",
+  });
+  const token = await getVenueIcalTokenForUser(venue.id, icalUser.id);
+  assert.ok(token);
+  const res = await venueIcalGet(
+    new NextRequest(`http://127.0.0.1/api/calendar/venue-ical/${venue.id}/${token}`),
+    { params: Promise.resolve({ venueId: String(venue.id), token: token! }) },
+  );
+  const body = await res.text();
+  assert.match(body, /X-WR-TIMEZONE:America\/New_York/);
+  assert.match(body, /DTSTART;VALUE=DATE:20260601/);
+  assert.match(body, /DTEND;VALUE=DATE:20260602/);
+  assert.doesNotMatch(body, /X-WR-TIMEZONE:Europe\/Chisinau/);
+  assert.doesNotMatch(body, /DTSTART:20260601T040000Z/);
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, venue.id));
   await db.delete(venues).where(eq(venues.id, venue.id));
 });
@@ -599,9 +761,15 @@ test("E: hall-specific image writes are blocked with FEATURE_DISABLED and no par
 });
 });
 
-function intervalTimes(startDate: string, startTime: string, endDate: string, endTime: string) {
+function intervalTimes(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+  timeZone = TZ,
+) {
   return {
-    startsAt: zonedWallTimeToUtc(startDate, startTime, TZ),
-    endsAt: zonedWallTimeToUtc(endDate, endTime, TZ),
+    startsAt: zonedWallTimeToUtc(startDate, startTime, timeZone),
+    endsAt: zonedWallTimeToUtc(endDate, endTime, timeZone),
   };
 }

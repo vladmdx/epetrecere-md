@@ -31,6 +31,11 @@ const BLOCKING_STATUSES = ["pending", "accepted", "confirmed_by_client", "comple
 type AvailabilityExecutor = typeof db;
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
+/** Conflict expansion uses the same usable set as archive: active|pending only. */
+function isUsableAvailabilityHallStatus(status: string): boolean {
+  return status === "active" || status === "pending";
+}
+
 export type AvailabilityMode = "public" | "owner" | "admin";
 
 export type AvailabilityCode =
@@ -288,12 +293,16 @@ export async function evaluateVenueAvailability(opts: {
   const archivedHallIds = new Set(
     allHalls.filter((row) => row.status === "archived").map((row) => row.id),
   );
+  const unusableHallIds = new Set(
+    allHalls.filter((row) => !isUsableAvailabilityHallStatus(row.status)).map((row) => row.id),
+  );
   const incompatibleHallIds = [...new Set(
     conflictMembers
       .filter((row) => groupIds.includes(row.groupId) && row.hallId !== resolved.hallId)
       .map((row) => row.hallId)
       .filter((hallId) => !archivedHallIds.has(hallId)),
   )];
+  const conflictingUsableHallIds = incompatibleHallIds.filter((hallId) => !unusableHallIds.has(hallId));
 
   const lockKeys: AvailabilityLockKeys = {
     venueId: venue.id,
@@ -311,9 +320,6 @@ export async function evaluateVenueAvailability(opts: {
     .where(eq(venueScheduleBlocks.venueId, venue.id));
   for (const block of blocks) {
     if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, block.startsAt, block.endsAt)) continue;
-    if (block.hallId != null && archivedHallIds.has(block.hallId) && block.hallId !== resolved.hallId) {
-      continue;
-    }
     if (block.hallId == null) {
       return {
         available: false,
@@ -323,6 +329,9 @@ export async function evaluateVenueAvailability(opts: {
         interval,
         lockKeys,
       };
+    }
+    if (unusableHallIds.has(block.hallId) && block.hallId !== resolved.hallId) {
+      continue;
     }
     if (resolved.hallId != null && block.hallId === resolved.hallId) {
       return {
@@ -344,7 +353,7 @@ export async function evaluateVenueAvailability(opts: {
         lockKeys,
       };
     }
-    if (incompatibleHallIds.includes(block.hallId)) {
+    if (conflictingUsableHallIds.includes(block.hallId)) {
       return {
         available: false,
         code: "CONFLICT_GROUP",
@@ -384,10 +393,20 @@ export async function evaluateVenueAvailability(opts: {
       timezone,
     });
     if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, other.startsAt, other.endsAt)) continue;
-    if (event.hallId != null && archivedHallIds.has(event.hallId) && event.hallId !== resolved.hallId) {
+    if (event.hallId == null) {
+      return {
+        available: false,
+        code: "VENUE_BLOCK",
+        message: PUBLIC_UNAVAILABLE,
+        hallId: resolved.hallId,
+        interval,
+        lockKeys,
+      };
+    }
+    if (unusableHallIds.has(event.hallId) && event.hallId !== resolved.hallId) {
       continue;
     }
-    if (event.hallId == null || opts.reservationScope === "venue") {
+    if (opts.reservationScope === "venue") {
       return {
         available: false,
         code: "VENUE_BLOCK",
@@ -407,7 +426,7 @@ export async function evaluateVenueAvailability(opts: {
         lockKeys,
       };
     }
-    if (incompatibleHallIds.includes(event.hallId)) {
+    if (conflictingUsableHallIds.includes(event.hallId)) {
       return {
         available: false,
         code: "CONFLICT_GROUP",
@@ -441,13 +460,27 @@ export async function evaluateVenueAvailability(opts: {
     });
     const otherEnd = new Date(other.endsAt.getTime() + bufferMinutes * 60_000);
     if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, other.startsAt, otherEnd)) continue;
-    if (booking.hallId != null && archivedHallIds.has(booking.hallId) && booking.hallId !== resolved.hallId) {
+    const bookingIsWholeVenue = booking.reservationScope === "venue";
+    if (bookingIsWholeVenue) {
+      return {
+        available: false,
+        code: "BOOKING_CONFLICT",
+        message: redact
+          ? PUBLIC_UNAVAILABLE
+          : `Conflict: există deja o rezervare în acest interval${booking.hallId ? "" : ""}.`,
+        hallId: resolved.hallId,
+        interval,
+        lockKeys,
+        conflictBookingId: booking.id,
+      };
+    }
+    if (booking.hallId != null && unusableHallIds.has(booking.hallId) && booking.hallId !== resolved.hallId) {
       continue;
     }
 
-    const wholeVenue = booking.reservationScope === "venue" || opts.reservationScope === "venue";
+    const wholeVenue = opts.reservationScope === "venue";
     const sameHall = resolved.hallId != null && booking.hallId === resolved.hallId;
-    const otherIncompatible = booking.hallId != null && incompatibleHallIds.includes(booking.hallId);
+    const otherIncompatible = booking.hallId != null && conflictingUsableHallIds.includes(booking.hallId);
     const legacyVenueWide = booking.hallId == null && resolved.hallId == null;
 
     if (wholeVenue || sameHall || legacyVenueWide) {

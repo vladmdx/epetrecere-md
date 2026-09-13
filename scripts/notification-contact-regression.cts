@@ -1,11 +1,14 @@
 /** Read-only projection tests, real notification APIs with in-memory DB/auth. */
-const assert = require("node:assert/strict");
-const Module = require("node:module");
-const path = require("node:path");
-const { readFileSync } = require("node:fs");
-const { getTableName } = require("drizzle-orm");
-const { PgDialect } = require("drizzle-orm/pg-core");
-const { NextRequest } = require("next/server");
+import assert from "node:assert/strict";
+import Module from "node:module";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { getTableName } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
+import { NextRequest } from "next/server";
+
+const loadAfterMocks = createRequire(__filename);
 const root = path.resolve(__dirname, "..");
 const oldLoad = Module._load;
 const oldFetch = global.fetch;
@@ -55,10 +58,10 @@ Module._load = function(request, parent, isMain) {
 
 (async () => {
   try {
-    const { notificationsForUser } = require("../src/lib/privacy/notification-view");
-    const { notificationContext, notificationHasContact, conversationPartyKey } = require("../src/lib/privacy/notification-context");
-    const api = require("../src/app/api/notifications/route");
-    const single = require("../src/app/api/notifications/[id]/route");
+    const { notificationsForUser } = loadAfterMocks("../src/lib/privacy/notification-view");
+    const { notificationContext, notificationHasContact, conversationPartyKey } = loadAfterMocks("../src/lib/privacy/notification-context");
+    const api = loadAfterMocks("../src/app/api/notifications/route");
+    const single = loadAfterMocks("../src/app/api/notifications/[id]/route");
     const req = new NextRequest("https://example.invalid/api/notifications");
     let count = 0;
     const passed = label => { count++; console.log("PASS", label); };
