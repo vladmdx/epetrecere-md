@@ -22,6 +22,7 @@ const db = {
       const params = condition ? dialect.sqlToQuery(condition).params : [];
       state.calls.push({ name, params });
       if (name === "users") { assert.ok(params.includes("viewer")); return [{ role: state.role }]; }
+      if (name === "partner_organization_members" || name === "partner_organizations") return [];
       if (name === "venues" || name === "artists") {
         assert.ok(params.includes("viewer"), "actual profile ownership is checked");
         return (name === "venues" ? state.ownsVenue : state.ownsArtist) ? [{ id: 45 }] : [];
@@ -40,7 +41,7 @@ const db = {
       }
       throw Error(`Unexpected select ${name}`);
     };
-    const q = { from(value) { table = value; return q; }, leftJoin() { return q; }, where(value) { condition = value; return q; }, orderBy() { return q; }, limit() { return Promise.resolve(rows()); }, then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
+    const q = { from(value) { table = value; return q; }, leftJoin() { return q; }, innerJoin() { return q; }, where(value) { condition = value; return q; }, orderBy() { return q; }, limit() { return Promise.resolve(rows()); }, then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
     return q;
   },
   update(table) { assert.equal(getTableName(table), "notifications"); return { set(value) { assert.deepEqual(value, { isRead: true }); return { where() { return { returning: async () => state.items }; } }; } }; },

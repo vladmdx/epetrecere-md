@@ -5,7 +5,7 @@
 import { test, before, after, describe } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
 import {
@@ -94,6 +94,8 @@ const venueFields = {
 describe("simple corrections A–E", { concurrency: false }, () => {
 before(async () => {
   flagOn();
+  // Disposable snapshots can lag schema.ts (artist_name_snapshot on 6d5bec5).
+  await db.execute(sql`ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS artist_name_snapshot text`);
   ids.owner = await mkUser("owner", "+37369111111");
   ids.client = await mkUser("client");
   ids.artistUser = await mkUser("artist");
@@ -414,11 +416,15 @@ test("B: archived hall block/conflict does not hit sister; sister data stays int
 
 test("C: iCal feed emits DATE only for local midnight-to-midnight blocks", async () => {
   flagOn();
+  const [icalUser] = await db.insert(users).values({
+    clerkId: MARK + "ical",
+    email: `${MARK}ical@example.com`,
+    name: "ical",
+  }).returning({ id: users.id });
   const [venue] = await db.insert(venues).values({
     nameRo: MARK + "ical",
     slug: MARK + "ical",
-    organizationId: ids.org,
-    userId: ids.owner,
+    userId: icalUser.id,
     phone: PHONE,
     city: "Chișinău",
     address: "str. Ical 1",
@@ -430,7 +436,7 @@ test("C: iCal feed emits DATE only for local midnight-to-midnight blocks", async
     { venueId: venue.id, hallId: null, startsAt: allDay.startsAt, endsAt: allDay.endsAt, kind: "manual" },
   ]);
   assert.equal(classifyVenueScheduleBlockIcal(timed20.startsAt, timed20.endsAt, TZ).allDay, false);
-  const token = await getVenueIcalTokenForUser(venue.id, ids.owner);
+  const token = await getVenueIcalTokenForUser(venue.id, icalUser.id);
   assert.ok(token);
   const res = await venueIcalGet(
     new NextRequest(`http://127.0.0.1/api/calendar/venue-ical/${venue.id}/${token}`),
@@ -467,15 +473,24 @@ test("D: XOR create paths and invalid legacy rows are refused without mutation",
   const before = await db.select().from(conversations).where(eq(conversations.id, legacy.id));
   const viaBooking = await db.insert(bookingRequests).values({
     clientUserId: ids.client,
-    artistId: ids.artist,
     venueId: ids.venue,
-    clientName: "Both",
+    clientName: "Venue only",
     clientPhone: "+37360000001",
     eventDate: "2028-01-01",
     status: "pending",
+    reservationScope: "venue",
+    timezone: TZ,
   }).returning({ id: bookingRequests.id });
   const created = await findOrCreateConversationForBooking(viaBooking[0]!.id);
-  assert.equal(created, null);
+  assert.ok(created);
+  const createdAgain = await findOrCreateConversationForBooking(viaBooking[0]!.id);
+  assert.equal(createdAgain, created);
+  const bothBooking = await findOrCreateConversation({
+    clientUserId: ids.client,
+    artistId: ids.artist,
+    venueId: ids.venue,
+  });
+  assert.equal(bothBooking.ok, false);
   const after = await db.select().from(conversations).where(eq(conversations.id, legacy.id));
   assert.equal(after[0]!.lastMessagePreview, before[0]!.lastMessagePreview);
   assert.equal(after[0]!.clientUnread, before[0]!.clientUnread);
@@ -507,10 +522,15 @@ test("E: org-backed approve/reject is FEATURE_DISABLED before mutation when flag
   assert.equal(orgAfter.status, org.status);
   assert.equal(venueAfter.isActive, venue.isActive);
 
+  const [legacyUser] = await db.insert(users).values({
+    clerkId: MARK + "legacy",
+    email: `${MARK}legacy@example.com`,
+    name: "legacy",
+  }).returning({ id: users.id });
   const [legacy] = await db.insert(venues).values({
     nameRo: MARK + "legacy",
     slug: MARK + "legacy",
-    userId: ids.owner,
+    userId: legacyUser.id,
     organizationId: null,
     isActive: false,
     phone: PHONE,
