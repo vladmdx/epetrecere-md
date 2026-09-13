@@ -61,7 +61,14 @@ const db = {
   },
   execute: async query => {
     assert.equal(state.inTx, true);
-    assert.match(dialect.sqlToQuery(query).sql, /SET LOCAL (lock_timeout|statement_timeout)/);
+    const statement = dialect.sqlToQuery(query).sql;
+    assert.match(
+      statement,
+      /SET LOCAL (lock_timeout|statement_timeout)|select pg_advisory_xact_lock/,
+    );
+    if (statement.includes("pg_advisory_xact_lock")) {
+      state.trace.push("lock:legal-scope");
+    }
   },
   transaction: async callback => {
     assert.equal(state.inTx, false);
@@ -147,6 +154,7 @@ Module._load = function(request, parent, isMain) {
     for (const ownedKinds of [[], ["artist"], ["venue"], ["artist", "venue"]]) {
       reset({ ownedKinds, accountDelete: true });
       assert.equal((await account.DELETE()).status, 200);
+      assert.ok(state.trace.includes("lock:legal-scope"), "account erasure is serialized with membership/signing mutations");
       const cache = state.trace.filter(entry => entry.startsWith("cache:"));
       assert.equal(cache.length, ownedKinds.length * 16);
       for (const kind of ownedKinds) {
