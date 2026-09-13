@@ -91,6 +91,9 @@ export interface DispatchOptions {
   };
 }
 
+export type NotificationChannel = "in_app" | "push" | "whatsapp" | "email";
+export type NotificationChannelDrivers = NonNullable<DispatchOptions["drivers"]>;
+
 /**
  * Resolve the recipient's per-type channel preferences. Missing keys (or
  * missing user row) default to BOTH channels ON, so existing behavior is
@@ -156,6 +159,97 @@ async function resolvePrefs(
 function providerError(result: unknown): unknown {
   if (!result || typeof result !== "object" || !("error" in result)) return null;
   return (result as { error?: unknown }).error ?? null;
+}
+
+/**
+ * Freeze the enabled channel set when a durable notification is expanded.
+ * Retries then operate only on the individual rows created for these channels.
+ */
+export async function resolveNotificationChannels(
+  input: DispatchInput,
+): Promise<NotificationChannel[]> {
+  const prefs = await resolvePrefs(input.userId, String(input.type));
+  const channels: NotificationChannel[] = ["in_app"];
+  if (prefs.push) channels.push("push");
+  if (CRITICAL_TYPES.has(String(input.type))) channels.push("whatsapp");
+  if (input.email && input.emailHtml && prefs.email) {
+    const isCritical = CRITICAL_TYPES.has(String(input.type));
+    let shouldEmailNow = true;
+    if (!isCritical) {
+      const [userRow] = await db
+        .select({ freq: users.notificationDigestFrequency })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .limit(1);
+      const frequency = (userRow?.freq ?? "instant").toLowerCase();
+      shouldEmailNow = frequency !== "daily" && frequency !== "weekly";
+    }
+    if (shouldEmailNow) channels.push("email");
+  }
+  return channels;
+}
+
+/** Deliver exactly one frozen channel. The outbox owns retry semantics. */
+export async function dispatchNotificationChannel(
+  input: DispatchInput,
+  channel: NotificationChannel,
+  drivers: NotificationChannelDrivers = {},
+): Promise<void> {
+  if (!input.dedupeKey) {
+    throw new Error("durable_notification_requires_dedupe_key");
+  }
+  if (channel === "in_app") {
+    await db
+      .insert(notifications)
+      .values({
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        message: input.message,
+        actionUrl: input.actionUrl,
+        dedupeKey: input.dedupeKey,
+      })
+      .onConflictDoNothing();
+    return;
+  }
+  if (channel === "push") {
+    const sender = drivers.sendPushToUser
+      ?? (await import("@/lib/push/send")).sendPushToUser;
+    const result = await sender(input.userId, {
+      title: input.title,
+      body: input.message ?? "",
+      actionUrl: input.actionUrl ?? "/",
+      tag: String(input.type),
+    });
+    if ((result.failed ?? 0) > 0) {
+      throw new Error(`push_delivery_failed:${result.failed}`);
+    }
+    return;
+  }
+  if (channel === "whatsapp") {
+    const sender = drivers.sendWhatsAppToUser
+      ?? (await import("@/lib/whatsapp/send")).sendWhatsAppToUser;
+    const result = await sender(input.userId, {
+      title: input.title,
+      body: input.message ?? "",
+      actionUrl: input.actionUrl,
+    });
+    if (result.reason === "api-error") {
+      throw new Error("whatsapp_delivery_failed");
+    }
+    return;
+  }
+  if (!input.email || !input.emailHtml) {
+    throw new Error("email_payload_missing");
+  }
+  const sender = drivers.sendEmail ?? (await import("@/lib/email/send")).sendEmail;
+  const result = await sender({
+    to: input.email,
+    subject: input.emailSubject || input.title,
+    html: input.emailHtml,
+  });
+  const error = providerError(result);
+  if (error) throw new Error("email_delivery_failed", { cause: error });
 }
 
 async function performDispatch(

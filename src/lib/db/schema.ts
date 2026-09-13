@@ -1678,7 +1678,14 @@ export const bookingRequests = pgTable("booking_requests", {
   check("booking_requests_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
 ]);
 
-export type BookingEffectStatus = "pending" | "processing" | "failed" | "delivered";
+export type BookingEffectStatus =
+  | "pending"
+  | "processing"
+  | "failed"
+  | "delivered"
+  | "cancelled"
+  | "dead_letter";
+export type BookingEffectChannel = "in_app" | "push" | "whatsapp" | "email";
 
 /**
  * Durable external effects for a booking (emails / push / in-app notify).
@@ -1691,9 +1698,9 @@ export const bookingEffectOutbox = pgTable(
   "booking_effect_outbox",
   {
     id: serial("id").primaryKey(),
-    bookingId: integer("booking_id")
-      .notNull()
-      .references(() => bookingRequests.id, { onDelete: "cascade" }),
+    // Confirmation delivery is evidence. A booking must be archived/cancelled,
+    // never deleted out from underneath a still-retryable external effect.
+    bookingId: integer("booking_id").notNull(),
     effectKey: text("effect_key").notNull(),
     status: text("status")
       .$type<BookingEffectStatus>()
@@ -1711,15 +1718,24 @@ export const bookingEffectOutbox = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
+    foreignKey({
+      name: "booking_effect_outbox_booking_fk",
+      columns: [t.bookingId],
+      foreignColumns: [bookingRequests.id],
+    }).onDelete("restrict"),
     unique("booking_effect_outbox_booking_key_unique").on(t.bookingId, t.effectKey),
     index("booking_effect_outbox_due_idx").on(
       t.effectKey,
       t.status,
       t.nextAttemptAt,
-    ),
+      t.id,
+    ).where(sql`${t.status} IN ('pending', 'failed')`),
+    index("booking_effect_outbox_expired_lease_idx")
+      .on(t.effectKey, t.leaseUntil, t.id)
+      .where(sql`${t.status} = 'processing'`),
     check(
       "booking_effect_outbox_status_chk",
-      sql`${t.status} IN ('pending', 'processing', 'failed', 'delivered')`,
+      sql`${t.status} IN ('pending', 'processing', 'failed', 'delivered', 'cancelled', 'dead_letter')`,
     ),
     check("booking_effect_outbox_attempts_chk", sql`${t.attempts} >= 0`),
     check(
@@ -1727,7 +1743,92 @@ export const bookingEffectOutbox = pgTable(
       sql`(
         (${t.status} = 'processing' AND ${t.leaseToken} IS NOT NULL AND ${t.leaseUntil} IS NOT NULL AND ${t.deliveredAt} IS NULL)
         OR (${t.status} = 'delivered' AND ${t.deliveredAt} IS NOT NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
-        OR (${t.status} IN ('pending', 'failed') AND ${t.deliveredAt} IS NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
+        OR (${t.status} IN ('pending', 'failed', 'cancelled', 'dead_letter') AND ${t.deliveredAt} IS NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
+      )`,
+    ),
+  ],
+);
+
+/**
+ * Per-recipient/per-channel delivery state for a booking effect.
+ *
+ * The immutable payload makes a retry independent from mutable presentation
+ * copy. External channels are at-least-once; the in-app channel additionally
+ * uses notifications.dedupe_key for exactly-once database insertion.
+ */
+export const bookingEffectDeliveries = pgTable(
+  "booking_effect_deliveries",
+  {
+    id: serial("id").primaryKey(),
+    effectId: integer("effect_id").notNull(),
+    // Deliberately not an FK: deleting/anonymising a user must not erase the
+    // delivery audit row. Unavailable recipients naturally dead-letter.
+    recipientUserId: uuid("recipient_user_id").notNull(),
+    channel: text("channel").$type<BookingEffectChannel>().notNull(),
+    dedupeKey: text("dedupe_key").notNull(),
+    payload: jsonb("payload")
+      .$type<{
+        userId: string;
+        type: string;
+        title: string;
+        message?: string;
+        actionUrl?: string;
+        email?: string;
+        emailSubject?: string;
+        emailHtml?: string;
+        dedupeKey: string;
+      }>()
+      .notNull(),
+    status: text("status")
+      .$type<BookingEffectStatus>()
+      .default("pending")
+      .notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    foreignKey({
+      name: "booking_effect_deliveries_effect_fk",
+      columns: [t.effectId],
+      foreignColumns: [bookingEffectOutbox.id],
+    }).onDelete("restrict"),
+    unique("booking_effect_deliveries_effect_recipient_channel_unique").on(
+      t.effectId,
+      t.recipientUserId,
+      t.channel,
+    ),
+    unique("booking_effect_deliveries_dedupe_unique").on(t.dedupeKey),
+    index("booking_effect_deliveries_due_idx").on(
+      t.status,
+      t.nextAttemptAt,
+      t.id,
+    ).where(sql`${t.status} IN ('pending', 'failed')`),
+    index("booking_effect_deliveries_expired_lease_idx")
+      .on(t.leaseUntil, t.id)
+      .where(sql`${t.status} = 'processing'`),
+    check(
+      "booking_effect_deliveries_channel_chk",
+      sql`${t.channel} IN ('in_app', 'push', 'whatsapp', 'email')`,
+    ),
+    check(
+      "booking_effect_deliveries_status_chk",
+      sql`${t.status} IN ('pending', 'processing', 'failed', 'delivered', 'cancelled', 'dead_letter')`,
+    ),
+    check("booking_effect_deliveries_attempts_chk", sql`${t.attempts} >= 0`),
+    check(
+      "booking_effect_deliveries_state_chk",
+      sql`(
+        (${t.status} = 'processing' AND ${t.leaseToken} IS NOT NULL AND ${t.leaseUntil} IS NOT NULL AND ${t.deliveredAt} IS NULL)
+        OR (${t.status} = 'delivered' AND ${t.deliveredAt} IS NOT NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
+        OR (${t.status} IN ('pending', 'failed', 'cancelled', 'dead_letter') AND ${t.deliveredAt} IS NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
       )`,
     ),
   ],

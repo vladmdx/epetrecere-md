@@ -9,7 +9,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { NextRequest } from "next/server";
 
 import { db } from "../src/lib/db";
@@ -232,6 +232,19 @@ after(async () => {
     ids.owner, ids.staff, ids.outsider, ids.client, ids.artistUser, ids.owner2,
   ].filter(Boolean)));
   await db.delete(conversations).where(inArray(conversations.clientUserId, [ids.client, ids.outsider].filter(Boolean)));
+  await db.execute(sql`DELETE FROM booking_effect_deliveries
+    WHERE effect_id IN (
+      SELECT o.id FROM booking_effect_outbox o
+      JOIN booking_requests b ON b.id = o.booking_id
+      WHERE b.venue_id IN (${ids.venue}, ${ids.venue2}, ${ids.venueB})
+         OR b.artist_id = ${ids.artist}
+    )`);
+  await db.execute(sql`DELETE FROM booking_effect_outbox
+    WHERE booking_id IN (
+      SELECT id FROM booking_requests
+      WHERE venue_id IN (${ids.venue}, ${ids.venue2}, ${ids.venueB})
+         OR artist_id = ${ids.artist}
+    )`);
   await db.delete(bookingRequests).where(inArray(bookingRequests.venueId, [ids.venue, ids.venue2, ids.venueB].filter(Boolean)));
   await db.delete(bookingRequests).where(eq(bookingRequests.artistId, ids.artist));
   await db.delete(venueScheduleBlocks).where(inArray(venueScheduleBlocks.venueId, [ids.venue, ids.venue2, ids.venueB].filter(Boolean)));

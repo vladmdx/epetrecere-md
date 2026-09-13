@@ -109,10 +109,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS notifications_user_dedupe_unique
 
 CREATE TABLE IF NOT EXISTS booking_effect_outbox (
   id serial PRIMARY KEY,
-  booking_id integer NOT NULL REFERENCES booking_requests(id) ON DELETE CASCADE,
+  booking_id integer NOT NULL,
   effect_key text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (booking_id, effect_key)
+  CONSTRAINT booking_effect_outbox_booking_fk
+    FOREIGN KEY (booking_id) REFERENCES booking_requests(id) ON DELETE RESTRICT,
+  CONSTRAINT booking_effect_outbox_booking_key_unique
+    UNIQUE (booking_id, effect_key)
 );
 
 ALTER TABLE booking_effect_outbox ENABLE ROW LEVEL SECURITY;

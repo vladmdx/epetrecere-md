@@ -354,9 +354,15 @@ export const bookingConfirmationOutbox = inngest.createFunction(
     concurrency: { limit: 1 },
   },
   async ({ step }) => {
-    return step.run("deliver-booking-confirmations", async () =>
-      drainConfirmationNotificationOutbox({ limit: 50 }),
-    );
+    return step.run("deliver-booking-confirmations", async () => {
+      const result = await drainConfirmationNotificationOutbox({ limit: 50 });
+      // Throw inside the step so Inngest re-executes the drain on retry instead
+      // of memoizing an unhealthy successful step result.
+      if (result.failed > 0 || result.failedBacklog > 0 || result.terminal > 0) {
+        throw new Error(`booking_confirmation_outbox_unhealthy:${JSON.stringify(result)}`);
+      }
+      return result;
+    });
   },
 );
 

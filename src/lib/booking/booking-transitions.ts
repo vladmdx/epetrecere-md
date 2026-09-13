@@ -9,6 +9,7 @@ import { bookingRequests, calendarEvents } from "@/lib/db/schema";
 import { persistConfirmationEffects } from "./confirmation-persist";
 import { withVenueAvailabilityWrite } from "./venue-booking-write";
 import { cancelCommissionForBooking } from "@/lib/commissions/service";
+import { cancelBookingConfirmationEffects } from "./effect-outbox";
 
 export type BookingRow = typeof bookingRequests.$inferSelect;
 type Executor = typeof db;
@@ -139,11 +140,15 @@ export async function rejectBooking(bookingId: number, reply?: string): Promise<
 }
 
 export async function clientCancelBooking(bookingId: number): Promise<BookingRow> {
-  const row = await casUpdateBookingStatus(db, bookingId, ["pending", "accepted"], {
-    status: "cancelled",
+  return db.transaction(async (tx) => {
+    const executor = tx as unknown as Executor;
+    const row = await casUpdateBookingStatus(executor, bookingId, ["pending", "accepted"], {
+      status: "cancelled",
+    });
+    if (!row) throw new BookingChangedError();
+    await cancelBookingConfirmationEffects(executor, bookingId, "cancelled_by_client");
+    return row;
   });
-  if (!row) throw new BookingChangedError();
-  return row;
 }
 
 export async function vendorCancelBooking(bookingId: number, reply?: string): Promise<BookingRow> {
@@ -153,6 +158,11 @@ export async function vendorCancelBooking(bookingId: number, reply?: string): Pr
       artistReply: reply || "Rezervarea a fost anulată de organizator.",
     });
     if (!row) throw new BookingChangedError();
+    await cancelBookingConfirmationEffects(
+      tx as unknown as Executor,
+      bookingId,
+      "cancelled_by_vendor",
+    );
     await tx.delete(calendarEvents).where(eq(calendarEvents.bookingId, bookingId));
     await cancelCommissionForBooking(bookingId, "Anulată de furnizor", tx as unknown as Executor);
     return row;

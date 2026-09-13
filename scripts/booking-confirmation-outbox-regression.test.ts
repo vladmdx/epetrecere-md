@@ -1,31 +1,46 @@
 /**
  * Durable booking-confirmation outbox regression suite.
- * Guarded disposable local DB only.
- * Run after migration 0031: npm run test:booking-outbox
+ * Guarded disposable local DB only. Run after migration 0031.
  */
 import { after, before, test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { readFileSync } from "node:fs";
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { NextRequest } from "next/server";
 
 import { db } from "../src/lib/db";
 import {
+  bookingEffectDeliveries,
+  bookingEffectOutbox,
   bookingRequests,
   notifications,
   users,
 } from "../src/lib/db/schema";
 import {
   CONFIRMATION_NOTIFICATION_EFFECT,
+  bookingEffectDeliveriesFor,
   bookingEffectFor,
   claimBookingEffect,
+  claimBookingEffectDelivery,
   enqueueBookingEffect,
+  enqueueBookingEffectDeliveries,
   markBookingEffectDelivered,
+  processBookingEffectDelivery,
 } from "../src/lib/booking/effect-outbox";
 import { persistConfirmationEffects } from "../src/lib/booking/confirmation-persist";
 import {
+  drainConfirmationNotificationOutbox,
   processConfirmationNotificationEffect,
 } from "../src/lib/booking/confirmation-effects";
-import { dispatchNotification } from "../src/lib/notifications/dispatch";
+import {
+  casClientConfirm,
+  confirmBookingWithEffects,
+  vendorCancelBooking,
+} from "../src/lib/booking/booking-transitions";
+import { GET as cronGet } from "../src/app/api/cron/booking-confirmation-outbox/route";
+import type { NotificationChannelDrivers } from "../src/lib/notifications/dispatch";
+import { BOOKING_EFFECT_MAX_ATTEMPTS } from "../src/lib/booking/effect-outbox-policy";
 
 const MARK = `booking_outbox_${Date.now()}_`;
 let userId = "";
@@ -46,18 +61,28 @@ async function createBooking(status: "accepted" | "confirmed_by_client" = "confi
   return booking;
 }
 
+function channelDrivers(overrides: {
+  email?: () => Promise<unknown>;
+  push?: () => Promise<{ sent: number; pruned: number; failed: number }>;
+  whatsapp?: () => Promise<{ sent: boolean; reason?: string }>;
+} = {}): NotificationChannelDrivers {
+  return {
+    sendPushToUser: overrides.push ?? (async () => ({ sent: 1, pruned: 0, failed: 0 })),
+    sendWhatsAppToUser: overrides.whatsapp ?? (async () => ({ sent: true })),
+    sendEmail: overrides.email ?? (async () => ({ data: { id: "ok" }, error: null })),
+  };
+}
+
 before(async () => {
-  // Fail clearly instead of running against a pre-0031 disposable schema.
-  // `run-guarded-db-test` has already verified the local marker.
   const columns = await db.execute(sql`
     SELECT column_name
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'booking_effect_outbox'
-      AND column_name = 'status'
+      AND table_name = 'booking_effect_deliveries'
+      AND column_name = 'payload'
   `) as unknown as Array<{ column_name: string }>;
   if (!Array.isArray(columns) || columns.length === 0) {
-    throw new Error("Migration 0031 is required before the booking outbox regression suite.");
+    throw new Error("Current migration 0031 is required before booking outbox tests.");
   }
   const [user] = await db
     .insert(users)
@@ -73,11 +98,27 @@ before(async () => {
 after(async () => {
   if (!userId) return;
   await db.delete(notifications).where(eq(notifications.userId, userId));
-  await db.delete(bookingRequests).where(eq(bookingRequests.clientUserId, userId));
+  const bookings = await db
+    .select({ id: bookingRequests.id })
+    .from(bookingRequests)
+    .where(eq(bookingRequests.clientUserId, userId));
+  const bookingIds = bookings.map(({ id }) => id);
+  if (bookingIds.length > 0) {
+    const effects = await db
+      .select({ id: bookingEffectOutbox.id })
+      .from(bookingEffectOutbox)
+      .where(inArray(bookingEffectOutbox.bookingId, bookingIds));
+    const effectIds = effects.map(({ id }) => id);
+    if (effectIds.length > 0) {
+      await db.delete(bookingEffectDeliveries).where(inArray(bookingEffectDeliveries.effectId, effectIds));
+      await db.delete(bookingEffectOutbox).where(inArray(bookingEffectOutbox.id, effectIds));
+    }
+    await db.delete(bookingRequests).where(inArray(bookingRequests.id, bookingIds));
+  }
   await db.delete(users).where(eq(users.id, userId));
 });
 
-test("confirmation and pending outbox row commit or roll back together", async () => {
+test("real confirmation transition and outbox row commit or roll back together", async () => {
   const booking = await createBooking("accepted");
   await assert.rejects(
     db.transaction(async (tx) => {
@@ -98,26 +139,19 @@ test("confirmation and pending outbox row commit or roll back together", async (
   assert.equal(rolledBack.status, "accepted");
   assert.equal(await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT), null);
 
-  const confirmed = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(bookingRequests)
-      .set({ status: "confirmed_by_client", confirmedAt: new Date() })
-      .where(eq(bookingRequests.id, booking.id))
-      .returning();
-    return persistConfirmationEffects(tx as unknown as typeof db, row);
-  });
+  const confirmed = await confirmBookingWithEffects(booking, (executor) =>
+    casClientConfirm(executor, booking.id, {
+      status: "confirmed_by_client",
+      clientConfirmedAt: new Date(),
+      confirmedAt: new Date(),
+    }),
+  );
+  assert.equal(confirmed.status, "confirmed_by_client");
   const pending = await bookingEffectFor(confirmed.id, CONFIRMATION_NOTIFICATION_EFFECT);
   assert.equal(pending?.status, "pending");
-
-  let deliveries = 0;
-  const result = await processConfirmationNotificationEffect(pending!.id, {
-    deliver: async () => { deliveries += 1; },
-  });
-  assert.equal(result.status, "delivered");
-  assert.equal(deliveries, 1);
 });
 
-test("expired lease recovers crashes before/after delivery and fences stale worker", async () => {
+test("expired lease recovers a crash and fences the stale coordinator", async () => {
   const booking = await createBooking();
   const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
   const now = new Date("2028-01-01T00:00:00.000Z");
@@ -127,7 +161,6 @@ test("expired lease recovers crashes before/after delivery and fences stale work
     leaseToken: randomUUID(),
   });
   assert.equal(stale?.status, "processing");
-  assert.equal(stale?.attempts, 1);
 
   const early = await processConfirmationNotificationEffect(effect.id, {
     now: new Date(now.getTime() + 999),
@@ -135,20 +168,17 @@ test("expired lease recovers crashes before/after delivery and fences stale work
   });
   assert.equal(early.status, "not_due");
 
-  // A provider may have accepted the first delivery just before the process
-  // died. Recovery deliberately sends again (external at-least-once).
-  let externalAttempts = 1;
-  const retried = await processConfirmationNotificationEffect(effect.id, {
+  let deliveries = 1; // first worker may have reached the provider before crash
+  const recovered = await processConfirmationNotificationEffect(effect.id, {
     now: new Date(now.getTime() + 1_001),
-    deliver: async () => { externalAttempts += 1; },
+    deliver: async () => { deliveries += 1; },
   });
-  assert.equal(retried.status, "delivered");
-  if (retried.status === "delivered") assert.equal(retried.effect.attempts, 2);
-  assert.equal(externalAttempts, 2);
-  assert.equal(await markBookingEffectDelivered(stale!), null, "stale lease token is fenced");
+  assert.equal(recovered.status, "delivered");
+  assert.equal(deliveries, 2);
+  assert.equal(await markBookingEffectDelivered(stale!), null, "stale token is fenced");
 });
 
-test("failure stays retryable; replay pulls it forward; delivered is last", async () => {
+test("failure remains retryable and explicit replay pulls it forward", async () => {
   const booking = await createBooking();
   const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
   const failed = await processConfirmationNotificationEffect(effect.id, {
@@ -168,20 +198,14 @@ test("failure stays retryable; replay pulls it forward; delivered is last", asyn
 
   const rescheduled = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
   assert.equal(rescheduled.status, "pending");
-  let retries = 0;
   const delivered = await processConfirmationNotificationEffect(effect.id, {
     now: new Date(rescheduled.nextAttemptAt.getTime() + 1),
-    deliver: async () => { retries += 1; },
+    deliver: async () => undefined,
   });
   assert.equal(delivered.status, "delivered");
-  if (delivered.status === "delivered") {
-    assert.equal(delivered.effect.attempts, 2);
-    assert.ok(delivered.effect.deliveredAt);
-  }
-  assert.equal(retries, 1);
 });
 
-test("concurrent workers cannot hold the same live lease", async () => {
+test("concurrent workers cannot hold the same coordinator lease", async () => {
   const booking = await createBooking();
   const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
   let deliveries = 0;
@@ -195,44 +219,181 @@ test("concurrent workers cannot hold the same live lease", async () => {
   assert.equal(deliveries, 1);
 });
 
-test("durable retry keeps one DB notification and retries external channels", async () => {
-  const dedupeKey = MARK + "durable-notification";
+test("email retry does not resend already delivered push or WhatsApp", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
   let pushes = 0;
   let whatsapps = 0;
   let emails = 0;
-  let failEmail = true;
-  const drivers = {
-    sendPushToUser: async () => { pushes += 1; return { sent: 1, pruned: 0, failed: 0 }; },
-    sendWhatsAppToUser: async () => { whatsapps += 1; return { sent: true }; },
-    sendEmail: async () => {
+  let emailFails = true;
+  const drivers = channelDrivers({
+    push: async () => { pushes += 1; return { sent: 1, pruned: 0, failed: 0 }; },
+    whatsapp: async () => { whatsapps += 1; return { sent: true }; },
+    email: async () => {
       emails += 1;
-      if (failEmail) throw new Error("email down");
+      if (emailFails) throw new Error("email down");
       return { data: { id: "ok" }, error: null };
     },
-  };
-  const input = {
-    userId,
-    type: "booking_status_changed",
-    title: "Confirmată",
-    message: "Booking confirmed",
-    actionUrl: "/cabinet/rezervari",
-    email: MARK + "user@example.com",
-    emailHtml: "<p>Confirmed</p>",
-    dedupeKey,
-  };
-  await assert.rejects(
-    dispatchNotification(input, { delivery: "durable", drivers }),
-    /notification_channel_delivery_failed/,
-  );
-  failEmail = false;
-  await dispatchNotification(input, { delivery: "durable", drivers });
+  });
 
-  const rows = await db
-    .select({ id: notifications.id })
-    .from(notifications)
-    .where(and(eq(notifications.userId, userId), eq(notifications.dedupeKey, dedupeKey)));
-  assert.equal(rows.length, 1);
-  assert.equal(pushes, 2, "at-least-once push retries after partial delivery");
-  assert.equal(whatsapps, 2);
+  const first = await processConfirmationNotificationEffect(effect.id, { drivers });
+  assert.equal(first.status, "failed");
+  assert.equal(pushes, 1);
+  assert.equal(whatsapps, 1);
+  assert.equal(emails, 1);
+  const firstRows = await bookingEffectDeliveriesFor(effect.id);
+  assert.equal(firstRows.find((row) => row.channel === "email")?.status, "failed");
+  assert.equal(firstRows.find((row) => row.channel === "push")?.status, "delivered");
+  assert.equal(firstRows.find((row) => row.channel === "whatsapp")?.status, "delivered");
+
+  emailFails = false;
+  const replayed = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  const second = await processConfirmationNotificationEffect(effect.id, {
+    now: new Date(replayed.nextAttemptAt.getTime() + 1),
+    drivers,
+  });
+  assert.equal(second.status, "delivered");
+  assert.equal(pushes, 1);
+  assert.equal(whatsapps, 1);
   assert.equal(emails, 2);
+  const inApp = await db
+    .select({ id: notifications.id, key: notifications.dedupeKey })
+    .from(notifications)
+    .where(and(
+      eq(notifications.userId, userId),
+      eq(notifications.dedupeKey, `booking:${booking.id}:${userId}:confirmed`),
+    ));
+  assert.equal(inApp.length, 1, "in-app notification is exactly once");
+});
+
+test("cancel after a failed channel closes retry without sending confirmation", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let emails = 0;
+  const drivers = channelDrivers({
+    email: async () => {
+      emails += 1;
+      throw new Error("email temporarily down");
+    },
+  });
+  const failed = await processConfirmationNotificationEffect(effect.id, { drivers });
+  assert.equal(failed.status, "failed");
+  assert.equal(emails, 1);
+
+  await vendorCancelBooking(booking.id, "test cancellation");
+  const cancelled = await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  assert.equal(cancelled?.status, "cancelled");
+  const rows = await bookingEffectDeliveriesFor(effect.id);
+  assert.equal(rows.find((row) => row.channel === "email")?.status, "cancelled");
+  assert.ok(rows.filter((row) => row.channel !== "email").every((row) => row.status === "delivered"));
+
+  const retry = await processConfirmationNotificationEffect(effect.id, { drivers });
+  assert.equal(retry.status, "not_due");
+  assert.equal(emails, 1);
+});
+
+test("cancellation committed before claim suppresses every confirmation channel", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let externalCalls = 0;
+  await vendorCancelBooking(booking.id, "cancel before worker");
+  const result = await processConfirmationNotificationEffect(effect.id, {
+    drivers: channelDrivers({
+      push: async () => { externalCalls += 1; return { sent: 1, pruned: 0, failed: 0 }; },
+      whatsapp: async () => { externalCalls += 1; return { sent: true }; },
+      email: async () => { externalCalls += 1; return { data: { id: "unexpected" }, error: null }; },
+    }),
+  });
+  assert.equal(result.status, "not_due");
+  assert.equal(externalCalls, 0);
+  assert.equal((await bookingEffectFor(booking.id, CONFIRMATION_NOTIFICATION_EFFECT))?.status, "cancelled");
+});
+
+test("heartbeat protects a slow channel worker beyond the original lease", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  const [delivery] = await enqueueBookingEffectDeliveries(db, effect.id, [{
+    recipientUserId: userId,
+    channel: "email",
+    dedupeKey: `booking:${booking.id}:${userId}:slow-test:email`,
+    payload: {
+      userId,
+      type: "booking_status_changed",
+      title: "Slow test",
+      email: MARK + "user@example.com",
+      emailHtml: "<p>slow</p>",
+      dedupeKey: `booking:${booking.id}:${userId}:slow-test`,
+    },
+  }]);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const worker = processBookingEffectDelivery(
+    delivery.id,
+    async () => gate,
+    { leaseMs: 120, heartbeatMs: 20 },
+  );
+  await new Promise((resolve) => setTimeout(resolve, 220));
+  const stolen = await claimBookingEffectDelivery(delivery.id, { leaseMs: 120 });
+  assert.equal(stolen, null, "renewed lease cannot be stolen by a second worker");
+  release();
+  assert.equal((await worker).status, "delivered");
+});
+
+test("permanent channel failure dead-letters and does not starve healthy work", async () => {
+  const brokenBooking = await createBooking();
+  const brokenEffect = await enqueueBookingEffect(db, brokenBooking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let terminalStatus = "";
+  for (let attempt = 1; attempt <= BOOKING_EFFECT_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 1) {
+      await enqueueBookingEffect(db, brokenBooking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+    }
+    const result = await processConfirmationNotificationEffect(brokenEffect.id, {
+      drivers: channelDrivers({ email: async () => { throw new Error("permanent email failure"); } }),
+    });
+    terminalStatus = result.status;
+  }
+  assert.equal(terminalStatus, "dead_letter");
+  const dead = (await bookingEffectDeliveriesFor(brokenEffect.id))
+    .find((row) => row.channel === "email");
+  assert.equal(dead?.status, "dead_letter");
+  assert.equal(dead?.attempts, BOOKING_EFFECT_MAX_ATTEMPTS);
+
+  const healthyBooking = await createBooking();
+  await enqueueBookingEffect(db, healthyBooking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  const drained = await drainConfirmationNotificationOutbox({
+    limit: 50,
+    drivers: channelDrivers(),
+  });
+  assert.ok(drained.delivered >= 1, "healthy rows behind a dead letter still run");
+  assert.ok(drained.terminal >= 1, "dead letters remain visible to monitoring");
+});
+
+test("cron auth, Inngest recovery and API confirmation wiring stay active", async () => {
+  const previous = process.env.CRON_SECRET;
+  process.env.CRON_SECRET = MARK + "secret";
+  try {
+    const response = await cronGet(new NextRequest("http://localhost/api/cron/booking-confirmation-outbox"));
+    assert.equal(response.status, 403);
+    const authorized = await cronGet(new NextRequest(
+      "http://localhost/api/cron/booking-confirmation-outbox",
+      { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } },
+    ));
+    const health = await authorized.json() as { terminal: number };
+    assert.equal(authorized.status, 503, "dead letter must be visible to scheduler monitoring");
+    assert.ok(health.terminal >= 1);
+  } finally {
+    if (previous === undefined) delete process.env.CRON_SECRET;
+    else process.env.CRON_SECRET = previous;
+  }
+
+  const inngest = readFileSync("src/lib/inngest/functions.ts", "utf8");
+  assert.match(inngest, /id:\s*"booking-confirmation-outbox"/);
+  assert.match(inngest, /cron:\s*"\*\/5 \* \* \* \*"/);
+  assert.match(inngest, /booking_confirmation_outbox_unhealthy/);
+  const route = readFileSync("src/app/api/booking-requests/[id]/route.ts", "utf8");
+  assert.match(route, /confirmBookingWithEffects/);
+  assert.match(route, /replayConfirmationEffects/);
+  assert.match(route, /scheduleConfirmationNotifications\(updated\)/);
+  assert.match(route, /clientCancelBooking/);
+  assert.match(route, /vendorCancelBooking/);
 });

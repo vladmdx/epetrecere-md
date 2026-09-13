@@ -17,5 +17,9 @@ export async function GET(req: NextRequest) {
   }
 
   const result = await drainConfirmationNotificationOutbox({ limit: 50 });
-  return NextResponse.json(result);
+  // Non-2xx is intentional observability: durable rows remain retryable in
+  // the database, while Vercel monitoring can no longer mistake a provider
+  // outage or dead letter for a healthy run.
+  const unhealthy = result.failed > 0 || result.failedBacklog > 0 || result.terminal > 0;
+  return NextResponse.json(result, { status: unhealthy ? 503 : 200 });
 }

@@ -5,7 +5,7 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
 import {
@@ -190,6 +190,14 @@ after(async () => {
   await db.delete(commissions).where(eq(commissions.venueId, ids.venue));
   await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.venue));
   await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.extraVenue));
+  await db.execute(sql`DELETE FROM booking_effect_deliveries
+    WHERE effect_id IN (
+      SELECT o.id FROM booking_effect_outbox o
+      JOIN booking_requests b ON b.id = o.booking_id
+      WHERE b.venue_id = ${ids.venue}
+    )`);
+  await db.execute(sql`DELETE FROM booking_effect_outbox
+    WHERE booking_id IN (SELECT id FROM booking_requests WHERE venue_id = ${ids.venue})`);
   await db.delete(bookingRequests).where(eq(bookingRequests.venueId, ids.venue));
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
   await db.delete(venueHallConflictGroupMembers).where(eq(venueHallConflictGroupMembers.venueId, ids.venue));
@@ -667,6 +675,9 @@ test("concurrent confirm and retry keep a single calendar projection", async () 
   assert.equal(projections.length, 1);
   await db.delete(commissions).where(eq(commissions.bookingRequestId, confirmed.id));
   await db.delete(calendarEvents).where(eq(calendarEvents.bookingId, confirmed.id));
+  await db.execute(sql`DELETE FROM booking_effect_deliveries
+    WHERE effect_id IN (SELECT id FROM booking_effect_outbox WHERE booking_id = ${confirmed.id})`);
+  await db.execute(sql`DELETE FROM booking_effect_outbox WHERE booking_id = ${confirmed.id}`);
   await db.delete(bookingRequests).where(eq(bookingRequests.id, confirmed.id));
 });
 

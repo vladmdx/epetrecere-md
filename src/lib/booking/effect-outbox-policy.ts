@@ -1,6 +1,16 @@
 export const BOOKING_EFFECT_LEASE_MS = 5 * 60 * 1000;
 export const BOOKING_EFFECT_MAX_BACKOFF_MS = 60 * 60 * 1000;
 export const BOOKING_EFFECT_BASE_BACKOFF_MS = 30 * 1000;
+/** Permanent provider failures stop consuming every scheduler run. */
+export const BOOKING_EFFECT_MAX_ATTEMPTS = 8;
+
+/**
+ * Renew well before expiry. The production cap also keeps one slow provider
+ * from leaving a worker silent for minutes without refreshing its claim.
+ */
+export function bookingEffectHeartbeatMs(leaseMs: number): number {
+  return Math.max(10, Math.min(30_000, Math.floor(leaseMs / 3)));
+}
 
 function leafErrorMessages(error: unknown): string[] {
   if (error instanceof AggregateError) {

@@ -298,6 +298,15 @@ let planId: number | null = null;
 
     // ─── Cleanup ────────────────────────────────────────────────
     await c.query(
+      `DELETE FROM booking_effect_deliveries
+       WHERE effect_id IN (SELECT id FROM booking_effect_outbox WHERE booking_id = $1)`,
+      [bookingId],
+    );
+    await c.query(
+      `DELETE FROM booking_effect_outbox WHERE booking_id = $1`,
+      [bookingId],
+    );
+    await c.query(
       `DELETE FROM booking_requests WHERE id = $1`,
       [bookingId],
     );
@@ -331,6 +340,14 @@ let planId: number | null = null;
   // Best-effort cleanup on crash.
   try {
     const c = await pool.connect();
+    await c.query(`DELETE FROM booking_effect_deliveries WHERE effect_id IN (
+      SELECT o.id FROM booking_effect_outbox o
+      JOIN booking_requests b ON b.id = o.booking_id
+      WHERE b.message LIKE '%${TAG}%'
+    )`);
+    await c.query(`DELETE FROM booking_effect_outbox WHERE booking_id IN (
+      SELECT id FROM booking_requests WHERE message LIKE '%${TAG}%'
+    )`);
     await c.query(`DELETE FROM booking_requests WHERE message LIKE '%${TAG}%'`);
     await c.query(`DELETE FROM artist_availability_slots WHERE note LIKE '%${TAG}%'`);
     await c.query(`DELETE FROM event_plans WHERE title LIKE '%${TAG}%'`);
