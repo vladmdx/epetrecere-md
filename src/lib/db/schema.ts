@@ -1597,8 +1597,9 @@ export type BookingPriceOffer = {
 export const bookingRequests = pgTable("booking_requests", {
   id: serial("id").primaryKey(),
   /** Either artistId OR venueId is set — a booking targets one entity. */
-  artistId: integer("artist_id")
-    .references(() => artists.id, { onDelete: "cascade" }),
+  artistId: integer("artist_id"),
+  /** Historical display identity retained after an artist profile is deleted. */
+  artistNameSnapshot: text("artist_name_snapshot"),
   venueId: integer("venue_id")
     .references(() => venues.id, { onDelete: "set null" }),
   /** ADR 0028 — concrete hall for venue bookings. Nullable in the expand
@@ -1666,6 +1667,11 @@ export const bookingRequests = pgTable("booking_requests", {
   index("idx_booking_client_user").on(t.clientUserId),
   index("idx_booking_event_plan").on(t.eventPlanId),
   index("booking_requests_hall_idx").on(t.hallId),
+  foreignKey({
+    name: "booking_requests_artist_fk",
+    columns: [t.artistId],
+    foreignColumns: [artists.id],
+  }).onDelete("set null"),
   /**
    * Composite FK — do NOT set onDelete() here. Authoritative SQL is 0028:
    * PG15+ SET NULL (hall_id) / PG<15 RESTRICT. venue_id must never be nulled.
@@ -1684,6 +1690,12 @@ export type BookingEffectStatus =
   | "failed"
   | "delivered"
   | "cancelled"
+  | "dead_letter";
+export type BookingEffectDeliveryStatus = BookingEffectStatus | "dispatching";
+export type BookingEffectStepStatus =
+  | "pending"
+  | "failed"
+  | "delivered"
   | "dead_letter";
 export type BookingEffectChannel = "in_app" | "push" | "whatsapp" | "email";
 
@@ -1710,10 +1722,31 @@ export const bookingEffectOutbox = pgTable(
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+    referralStatus: text("referral_status")
+      .$type<BookingEffectStepStatus>()
+      .default("pending")
+      .notNull(),
+    referralAttempts: integer("referral_attempts").default(0).notNull(),
+    referralNextAttemptAt: timestamp("referral_next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    referralLastError: text("referral_last_error"),
+    materializationStatus: text("materialization_status")
+      .$type<BookingEffectStepStatus>()
+      .default("pending")
+      .notNull(),
+    materializationAttempts: integer("materialization_attempts").default(0).notNull(),
+    materializationNextAttemptAt: timestamp("materialization_next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    materializationLastError: text("materialization_last_error"),
     leaseToken: uuid("lease_token"),
     leaseUntil: timestamp("lease_until", { withTimezone: true }),
     lastError: text("last_error"),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    alertedAt: timestamp("alerted_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolutionNote: text("resolution_note"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -1738,6 +1771,14 @@ export const bookingEffectOutbox = pgTable(
       sql`${t.status} IN ('pending', 'processing', 'failed', 'delivered', 'cancelled', 'dead_letter')`,
     ),
     check("booking_effect_outbox_attempts_chk", sql`${t.attempts} >= 0`),
+    check(
+      "booking_effect_outbox_step_status_chk",
+      sql`${t.referralStatus} IN ('pending', 'failed', 'delivered', 'dead_letter') AND ${t.materializationStatus} IN ('pending', 'failed', 'delivered', 'dead_letter')`,
+    ),
+    check(
+      "booking_effect_outbox_step_attempts_chk",
+      sql`${t.referralAttempts} >= 0 AND ${t.materializationAttempts} >= 0`,
+    ),
     check(
       "booking_effect_outbox_state_chk",
       sql`(
@@ -1780,7 +1821,7 @@ export const bookingEffectDeliveries = pgTable(
       }>()
       .notNull(),
     status: text("status")
-      .$type<BookingEffectStatus>()
+      .$type<BookingEffectDeliveryStatus>()
       .default("pending")
       .notNull(),
     attempts: integer("attempts").default(0).notNull(),
@@ -1789,6 +1830,8 @@ export const bookingEffectDeliveries = pgTable(
       .notNull(),
     leaseToken: uuid("lease_token"),
     leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    dispatchStartedAt: timestamp("dispatch_started_at", { withTimezone: true }),
+    cancelRequestedAt: timestamp("cancel_requested_at", { withTimezone: true }),
     lastError: text("last_error"),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -1813,20 +1856,21 @@ export const bookingEffectDeliveries = pgTable(
     ).where(sql`${t.status} IN ('pending', 'failed')`),
     index("booking_effect_deliveries_expired_lease_idx")
       .on(t.leaseUntil, t.id)
-      .where(sql`${t.status} = 'processing'`),
+      .where(sql`${t.status} IN ('processing', 'dispatching')`),
     check(
       "booking_effect_deliveries_channel_chk",
       sql`${t.channel} IN ('in_app', 'push', 'whatsapp', 'email')`,
     ),
     check(
       "booking_effect_deliveries_status_chk",
-      sql`${t.status} IN ('pending', 'processing', 'failed', 'delivered', 'cancelled', 'dead_letter')`,
+      sql`${t.status} IN ('pending', 'processing', 'dispatching', 'failed', 'delivered', 'cancelled', 'dead_letter')`,
     ),
     check("booking_effect_deliveries_attempts_chk", sql`${t.attempts} >= 0`),
     check(
       "booking_effect_deliveries_state_chk",
       sql`(
         (${t.status} = 'processing' AND ${t.leaseToken} IS NOT NULL AND ${t.leaseUntil} IS NOT NULL AND ${t.deliveredAt} IS NULL)
+        OR (${t.status} = 'dispatching' AND ${t.leaseToken} IS NOT NULL AND ${t.leaseUntil} IS NOT NULL AND ${t.dispatchStartedAt} IS NOT NULL AND ${t.deliveredAt} IS NULL)
         OR (${t.status} = 'delivered' AND ${t.deliveredAt} IS NOT NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
         OR (${t.status} IN ('pending', 'failed', 'cancelled', 'dead_letter') AND ${t.deliveredAt} IS NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL)
       )`,

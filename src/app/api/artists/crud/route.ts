@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { artists, redirects, users } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { artists, bookingRequests, redirects, users } from "@/lib/db/schema";
+import { eq, sql } from "drizzle-orm";
 import { slugify } from "@/lib/utils/slugify";
 import { artistLocationUpdate, artistTravelShape } from "@/lib/validation/vendor-profile";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
@@ -304,10 +304,36 @@ export async function DELETE(req: NextRequest) {
   if (!Number.isSafeInteger(artistId) || artistId <= 0) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
-  const [deleted] = await db.delete(artists).where(eq(artists.id, artistId)).returning({
-    id: artists.id,
-    slug: artists.slug,
-    isActive: artists.isActive,
+  const deleted = await db.transaction(async (tx) => {
+    // Lock the profile before taking the historical snapshot. The lock also
+    // serializes a concurrent booking FK check, so no booking can slip between
+    // the snapshot update and the profile deletion.
+    const [existing] = await tx
+      .select({
+        id: artists.id,
+        nameRo: artists.nameRo,
+        slug: artists.slug,
+        isActive: artists.isActive,
+      })
+      .from(artists)
+      .where(eq(artists.id, artistId))
+      .for("update")
+      .limit(1);
+    if (!existing) return null;
+
+    await tx
+      .update(bookingRequests)
+      .set({
+        artistNameSnapshot: sql`COALESCE(NULLIF(BTRIM(${bookingRequests.artistNameSnapshot}), ''), ${existing.nameRo})`,
+      })
+      .where(eq(bookingRequests.artistId, artistId));
+
+    const [removed] = await tx
+      .delete(artists)
+      .where(eq(artists.id, artistId))
+      .returning({ id: artists.id });
+
+    return removed ? existing : null;
   });
   if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (deleted.isActive) {
