@@ -238,6 +238,7 @@ async function assertEffectivePrivilegesRevoked() {
 }
 
 async function assertCurrentShape(current: Awaited<ReturnType<typeof shape>>) {
+  requireColumn(current.columns, "booking_requests", "artist_id", "YES");
   requireColumn(current.columns, "booking_requests", "artist_name_snapshot", "YES");
 
   for (const name of [
@@ -428,6 +429,7 @@ async function main() {
   const [baseline] = await client<{
     outbox: boolean;
     status_column: boolean;
+    artist_id_not_null: boolean;
   }[]>`
     SELECT
       to_regclass('public.booking_effect_outbox') IS NOT NULL AS outbox,
@@ -436,9 +438,21 @@ async function main() {
         WHERE table_schema = 'public'
           AND table_name = 'booking_effect_outbox'
           AND column_name = 'status'
-      ) AS status_column
+      ) AS status_column,
+      COALESCE((
+        SELECT is_nullable = 'NO'
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'booking_requests'
+          AND column_name = 'artist_id'
+      ), false) AS artist_id_not_null
   `;
   if (!baseline?.outbox) throw new Error("Migration 0030 must be applied first.");
+  if (!baseline.status_column && !baseline.artist_id_not_null) {
+    throw new Error(
+      "0030-only baseline must preserve the historical NOT NULL artist_id so 0031 proves the nullable transition.",
+    );
+  }
 
   const marker = `outbox-migration-${Date.now()}`;
   let bookingId: number | null = null;

@@ -17,6 +17,12 @@ SET LOCAL statement_timeout = '15min';
 ALTER TABLE booking_requests
   ADD COLUMN IF NOT EXISTS artist_name_snapshot text;
 
+-- The original schema declared artist_id NOT NULL. ON DELETE SET NULL is not
+-- usable until the column itself permits NULL, and Drizzle's current nullable
+-- declaration does not alter an existing database by itself.
+ALTER TABLE booking_requests
+  ALTER COLUMN artist_id DROP NOT NULL;
+
 UPDATE booking_requests AS booking
 SET artist_name_snapshot = artist.name_ro
 FROM artists AS artist
