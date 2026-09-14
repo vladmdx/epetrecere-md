@@ -512,6 +512,30 @@ export async function requireHallAccess(
  * get every venue.
  */
 export async function listAccessibleVenueIds(userId: string): Promise<number[]> {
+  return listVenueIdsAtMinimumRole(userId, "staff");
+}
+
+/**
+ * All venue ids on which the user may exercise a specific capability.
+ *
+ * This is deliberately different from `listAccessibleVenueIds`: a staff
+ * member may open a venue dashboard, but must not inherit owner/admin-only
+ * financial or legal data merely because the venue is visible to them.
+ */
+export async function listVenueIdsForCapability(
+  userId: string,
+  capability: VenueCapability,
+): Promise<number[]> {
+  return listVenueIdsAtMinimumRole(
+    userId,
+    VENUE_CAPABILITY_MIN_ROLE[capability],
+  );
+}
+
+async function listVenueIdsAtMinimumRole(
+  userId: string,
+  minimumRole: OrgRole,
+): Promise<number[]> {
   const [appUser] = await db
     .select({ role: users.role })
     .from(users)
@@ -546,6 +570,12 @@ export async function listAccessibleVenueIds(userId: string): Promise<number[]> 
       and(
         eq(partnerOrganizationMembers.userId, userId),
         eq(partnerOrganizationMembers.isActive, true),
+        inArray(
+          partnerOrganizationMembers.role,
+          (Object.keys(ROLE_RANK) as OrgRole[]).filter((role) =>
+            meetsRole(role, minimumRole),
+          ),
+        ),
         inArray(partnerOrganizations.status, [...ORG_STATUSES_ALLOWING_ACCESS]),
       ),
     );

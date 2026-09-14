@@ -47,7 +47,12 @@ export type VenueStats = {
   legacy: VenueLegacySummary;
 };
 
-export async function getVenueStats(venueId: number, now = new Date()): Promise<VenueStats> {
+export async function getVenueStats(
+  venueId: number,
+  now = new Date(),
+  options: { includeFinancials?: boolean } = {},
+): Promise<VenueStats> {
+  const includeFinancials = options.includeFinancials === true;
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const { monthStart, nextMonthStart, lastMonthStart, daysInMonth } = venueDashboardMonths(now);
   const currentMonthBookings = finalizedVenueBookingsInMonth(venueId, monthStart, nextMonthStart);
@@ -59,8 +64,6 @@ export async function getVenueStats(venueId: number, now = new Date()): Promise<
     ratingRow,
     bookedRow,
     occupancyRow,
-    revenueRow,
-    revenueLastRow,
     legacyRow,
   ] = await Promise.all([
     db
@@ -103,31 +106,47 @@ export async function getVenueStats(venueId: number, now = new Date()): Promise<
           inArray(calendarEvents.status, ["booked", "blocked"]),
         ),
       ),
-    // Revenue this month: sum of agreed prices for confirmed/completed
-    db
-      .select({
-        value: sql<number>`COALESCE(SUM(${bookingRequests.agreedPrice}), 0)`,
-      })
-      .from(bookingRequests)
-      .where(currentMonthBookings),
-    // Revenue last month
-    db
-      .select({
-        value: sql<number>`COALESCE(SUM(${bookingRequests.agreedPrice}), 0)`,
-      })
-      .from(bookingRequests)
-      .where(lastMonthBookings),
     db
       .select({
         totalBookings: count(),
         pendingBookings: sql<number>`count(*) filter (where ${bookings.status} = 'pending')`,
         confirmedThisMonth: sql<number>`count(*) filter (where ${finalizedLegacyVenueBookingsInMonth(monthStart, nextMonthStart)})`,
-        revenueThisMonth: sql<number>`coalesce(sum(${bookings.priceAgreed}) filter (where ${finalizedLegacyVenueBookingsInMonth(monthStart, nextMonthStart)}), 0)`,
-        revenueLastMonth: sql<number>`coalesce(sum(${bookings.priceAgreed}) filter (where ${finalizedLegacyVenueBookingsInMonth(lastMonthStart, monthStart)}), 0)`,
       })
       .from(bookings)
       .where(eq(bookings.venueId, venueId)),
   ]);
+
+  let revenueThisMonth = 0;
+  let revenueLastMonth = 0;
+  let legacyRevenueThisMonth = 0;
+  let legacyRevenueLastMonth = 0;
+  if (includeFinancials) {
+    const [revenueRow, revenueLastRow, legacyRevenueRow] = await Promise.all([
+      db
+        .select({
+          value: sql<number>`COALESCE(SUM(${bookingRequests.agreedPrice}), 0)`,
+        })
+        .from(bookingRequests)
+        .where(currentMonthBookings),
+      db
+        .select({
+          value: sql<number>`COALESCE(SUM(${bookingRequests.agreedPrice}), 0)`,
+        })
+        .from(bookingRequests)
+        .where(lastMonthBookings),
+      db
+        .select({
+          current: sql<number>`coalesce(sum(${bookings.priceAgreed}) filter (where ${finalizedLegacyVenueBookingsInMonth(monthStart, nextMonthStart)}), 0)`,
+          previous: sql<number>`coalesce(sum(${bookings.priceAgreed}) filter (where ${finalizedLegacyVenueBookingsInMonth(lastMonthStart, monthStart)}), 0)`,
+        })
+        .from(bookings)
+        .where(eq(bookings.venueId, venueId)),
+    ]);
+    revenueThisMonth = Number(revenueRow[0]?.value ?? 0);
+    revenueLastMonth = Number(revenueLastRow[0]?.value ?? 0);
+    legacyRevenueThisMonth = Number(legacyRevenueRow[0]?.current ?? 0);
+    legacyRevenueLastMonth = Number(legacyRevenueRow[0]?.previous ?? 0);
+  }
 
   const occupancyBusyDays = Number(occupancyRow[0]?.value ?? 0);
   const occupancyRate =
@@ -142,14 +161,14 @@ export async function getVenueStats(venueId: number, now = new Date()): Promise<
     occupancyRate,
     occupancyBusyDays,
     occupancyTotalDays: daysInMonth,
-    revenueThisMonth: Number(revenueRow[0]?.value ?? 0),
-    revenueLastMonth: Number(revenueLastRow[0]?.value ?? 0),
+    revenueThisMonth,
+    revenueLastMonth,
     legacy: {
       totalBookings: Number(legacyRow[0]?.totalBookings ?? 0),
       pendingBookings: Number(legacyRow[0]?.pendingBookings ?? 0),
       confirmedThisMonth: Number(legacyRow[0]?.confirmedThisMonth ?? 0),
-      revenueThisMonth: Number(legacyRow[0]?.revenueThisMonth ?? 0),
-      revenueLastMonth: Number(legacyRow[0]?.revenueLastMonth ?? 0),
+      revenueThisMonth: legacyRevenueThisMonth,
+      revenueLastMonth: legacyRevenueLastMonth,
     },
   };
 }
@@ -203,6 +222,7 @@ export type VenueRecentBooking = {
 export async function getVenueRecentBookings(
   venueId: number,
   limit = 5,
+  options: { includeFinancials?: boolean } = {},
 ): Promise<VenueRecentBooking[]> {
   const rows = await db
     .select({
@@ -212,7 +232,9 @@ export async function getVenueRecentBookings(
       eventDate: bookingRequests.eventDate,
       guestCount: bookingRequests.guestCount,
       status: bookingRequests.status,
-      priceAgreed: bookingRequests.agreedPrice,
+      priceAgreed: options.includeFinancials === true
+        ? bookingRequests.agreedPrice
+        : sql<number | null>`null`,
     })
     .from(bookingRequests)
     .where(eq(bookingRequests.venueId, venueId))
@@ -222,12 +244,17 @@ export async function getVenueRecentBookings(
   return rows.map(row => ({ ...row,
     clientName: bookingTextForViewer(row.clientName, contactsAreShared(row.status)),
     eventType: bookingTextForViewer(row.eventType, contactsAreShared(row.status)),
+    priceAgreed: options.includeFinancials === true ? row.priceAgreed : null,
   }));
 }
 
 /** Read-only historical rows, kept separate so legacy numeric IDs cannot be
  * mistaken for actionable booking_requests IDs with the same value. */
-export async function getVenueLegacyRecentBookings(venueId: number, limit = 5): Promise<VenueRecentBooking[]> {
+export async function getVenueLegacyRecentBookings(
+  venueId: number,
+  limit = 5,
+  options: { includeFinancials?: boolean } = {},
+): Promise<VenueRecentBooking[]> {
   const rows = await db
     .select({
       id: bookings.id,
@@ -236,7 +263,9 @@ export async function getVenueLegacyRecentBookings(venueId: number, limit = 5): 
       eventDate: bookings.eventDate,
       guestCount: leads.guestCount,
       status: bookings.status,
-      priceAgreed: bookings.priceAgreed,
+      priceAgreed: options.includeFinancials === true
+        ? bookings.priceAgreed
+        : sql<number | null>`null`,
     })
     .from(bookings)
     .leftJoin(leads, eq(bookings.leadId, leads.id))
@@ -246,5 +275,6 @@ export async function getVenueLegacyRecentBookings(venueId: number, limit = 5): 
   return rows.map((row) => ({ ...row,
     clientName: bookingTextForViewer(row.clientName ?? "", ["confirmed", "completed"].includes(row.status)),
     eventType: bookingTextForViewer(row.eventType, ["confirmed", "completed"].includes(row.status)),
+    priceAgreed: options.includeFinancials === true ? row.priceAgreed : null,
   }));
 }

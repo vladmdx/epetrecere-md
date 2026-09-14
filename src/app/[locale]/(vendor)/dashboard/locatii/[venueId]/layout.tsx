@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 import { requireLocatieVenue, venueDashboardBase } from "@/lib/venues/dashboard-scope";
 import { salaUsesLegacyLayout } from "@/lib/partner/multi-hall-gate";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 export default async function LocatieDashboardLayout({
   children,
@@ -18,6 +19,10 @@ export default async function LocatieDashboardLayout({
     redirect(localizePath("/dashboard/sala", locale));
   }
   const venue = await requireLocatieVenue(venueId, locale);
+  const financialAccess = await requireVenueCapability(
+    venue.id,
+    "manage_financials",
+  );
 
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -26,6 +31,7 @@ export default async function LocatieDashboardLayout({
         venueSlug={venue.slug}
         isActive={venue.isActive}
         basePath={venueDashboardBase(venue.id)}
+        canManageFinancials={financialAccess.ok}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <AdminTopbar />

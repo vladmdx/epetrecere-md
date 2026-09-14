@@ -32,6 +32,7 @@ import {
   authorizeVenueCapability,
   authorizeHallAccess,
   getVenueOwnerRecipients,
+  listVenueIdsForCapability,
   type AppUser,
 } from "../src/lib/venue-access";
 import { eq, and } from "drizzle-orm";
@@ -122,6 +123,21 @@ test("[flag on] cross-org access is denied (IDOR)", async () => {
   if (!r.ok) assert.equal(r.status, 403);
 });
 
+test("[flag on] financial venue listing excludes staff and includes admin", async () => {
+  flag(true);
+  const staffVenueIds = await listVenueIdsForCapability(
+    ids.staffA,
+    "manage_financials",
+  );
+  const adminVenueIds = await listVenueIdsForCapability(
+    ids.orgAdminA,
+    "manage_financials",
+  );
+  assert.equal(staffVenueIds.includes(ids.venueA), false);
+  assert.equal(adminVenueIds.includes(ids.venueA), true);
+  assert.equal(adminVenueIds.includes(ids.venueB), false);
+});
+
 test("[flag on] forged hall id from another org is denied (IDOR)", async () => {
   flag(true);
   const r = await authorizeHallAccess(appUser(ids.userA), ids.hallB, "staff");
@@ -135,6 +151,10 @@ test("[#1] DISABLED membership does not recover owner access via legacy user_id"
   const r = await authorizeVenueAccess(appUser(ids.userA), ids.venueA, "staff");
   assert.equal(r.ok, false, "disabled member must be denied even though venue.user_id === user");
   if (!r.ok) assert.equal(r.status, 403);
+  assert.equal(
+    (await listVenueIdsForCapability(ids.userA, "manage_financials")).includes(ids.venueA),
+    false,
+  );
   await setMembership(ids.userA, ids.orgA, "owner", true); // restore
 });
 
@@ -144,6 +164,10 @@ test("[#1] DELETED membership does not recover owner access via legacy user_id",
   const r = await authorizeVenueAccess(appUser(ids.userA), ids.venueA, "staff");
   assert.equal(r.ok, false, "removed member must be denied even though venue.user_id === user");
   if (!r.ok) assert.equal(r.status, 403);
+  assert.equal(
+    (await listVenueIdsForCapability(ids.userA, "manage_financials")).includes(ids.venueA),
+    false,
+  );
   await db.insert(partnerOrganizationMembers).values({ organizationId: ids.orgA, userId: ids.userA, role: "owner" }); // restore
 });
 
@@ -155,6 +179,10 @@ test("[#1] DEMOTED member cannot perform owner-level actions", async () => {
   if (!ownerLevel.ok) assert.equal(ownerLevel.status, 403);
   const staffLevel = await authorizeVenueAccess(appUser(ids.userA), ids.venueA, "staff");
   assert.equal(staffLevel.ok, true);
+  assert.equal(
+    (await listVenueIdsForCapability(ids.userA, "manage_financials")).includes(ids.venueA),
+    false,
+  );
   await setMembership(ids.userA, ids.orgA, "owner", true); // restore
 });
 
@@ -164,9 +192,17 @@ test("[#11 flag off] resolver uses legacy owner chain only (switchable)", async 
   const legacy = await authorizeVenueAccess(appUser(ids.userA), ids.venueA, "owner");
   assert.equal(legacy.ok, true);
   if (legacy.ok) assert.equal(legacy.viaLegacy, true);
+  assert.equal(
+    (await listVenueIdsForCapability(ids.userA, "manage_financials")).includes(ids.venueA),
+    true,
+  );
   // …but a pure member with no legacy user_id is ignored while the flag is off.
   const memberOnly = await authorizeVenueAccess(appUser(ids.staffA), ids.venueA, "staff");
   assert.equal(memberOnly.ok, false);
+  assert.equal(
+    (await listVenueIdsForCapability(ids.staffA, "manage_financials")).includes(ids.venueA),
+    false,
+  );
   flag(true);
 });
 

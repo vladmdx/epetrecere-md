@@ -4,7 +4,11 @@
 
 import { NextResponse } from "next/server";
 import { getVenueStats } from "@/lib/db/queries/venue-stats";
-import { getCurrentAppUser, resolveSelectedVenue } from "@/lib/venue-access";
+import {
+  authorizeVenueCapability,
+  getCurrentAppUser,
+  resolveSelectedVenue,
+} from "@/lib/venue-access";
 
 export async function GET(req: Request) {
   const appUser = await getCurrentAppUser();
@@ -28,6 +32,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ stats: null });
   }
 
-  const stats = await getVenueStats(selection.venueId);
-  return NextResponse.json({ stats });
+  const financialAccess = await authorizeVenueCapability(
+    appUser,
+    selection.venueId,
+    "manage_financials",
+  );
+  const canManageFinancials = financialAccess.ok;
+  const stats = await getVenueStats(selection.venueId, new Date(), {
+    includeFinancials: canManageFinancials,
+  });
+  return NextResponse.json({ stats, canManageFinancials }, {
+    headers: { "Cache-Control": "private, no-store" },
+  });
 }

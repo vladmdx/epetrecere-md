@@ -47,16 +47,20 @@ const NAV_ITEMS = [
 function NavList({
   pathname,
   basePath,
+  canManageFinancials,
   onNavigate,
 }: {
   pathname: string;
   basePath: string;
+  canManageFinancials: boolean;
   onNavigate?: () => void;
 }) {
   const { t } = useLocale();
   return (
     <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-0.5">
-      {NAV_ITEMS.map((item) => {
+      {NAV_ITEMS.filter(
+        (item) => item.href !== "/financiar" || canManageFinancials,
+      ).map((item) => {
         const Icon = item.icon;
         const href = `${basePath}${item.href}`;
         const isActive =
@@ -88,11 +92,13 @@ export function VenueSidebar({
   venueSlug,
   isActive = false,
   basePath = "/dashboard/sala",
+  canManageFinancials = false,
 }: {
   venueName?: string | null;
   venueSlug?: string | null;
   isActive?: boolean;
   basePath?: string;
+  canManageFinancials?: boolean;
 }) {
   const { t } = useLocale();
   const profileHref = publishedVendorProfileHref({ slug: venueSlug, isActive }, "venue");
@@ -123,7 +129,11 @@ export function VenueSidebar({
           </div>
         )}
 
-        <NavList pathname={pathname} basePath={basePath} />
+        <NavList
+          pathname={pathname}
+          basePath={basePath}
+          canManageFinancials={canManageFinancials}
+        />
 
         {profileHref && <div className="border-t border-border/20 p-3">
           <Link
@@ -198,6 +208,7 @@ export function VenueSidebar({
             <NavList
               pathname={pathname}
               basePath={basePath}
+              canManageFinancials={canManageFinancials}
               onNavigate={() => setMobileOpen(false)}
             />
 

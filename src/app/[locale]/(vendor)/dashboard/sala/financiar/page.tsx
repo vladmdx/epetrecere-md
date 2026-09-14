@@ -22,6 +22,7 @@ import {
 } from "@/lib/db/schema";
 import { VenueFinanciarClient } from "./client";
 import { CommissionPanel } from "@/components/vendor/commission-panel";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -181,6 +182,8 @@ export default async function VenueFinanciarPage() {
       }}
       bookings={confirmedBookings.map((b) => ({
         ...b,
+        clientName: contactsAreShared(b.status) ? b.clientName : `#${b.id}`,
+        eventType: contactsAreShared(b.status) ? b.eventType : null,
         eventDate: b.eventDate,
         updatedAt: b.updatedAt.toISOString(),
         createdAt: b.createdAt.toISOString(),
@@ -188,7 +191,7 @@ export default async function VenueFinanciarPage() {
       chartData={chartData}
       commissionByBooking={commissionByBooking}
     />
-    <div className="px-6 pb-6"><CommissionPanel /></div>
+    <div className="px-6 pb-6"><CommissionPanel venueId={venue.id} /></div>
     </>
   );
 }

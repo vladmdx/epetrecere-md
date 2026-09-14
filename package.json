@@ -35,6 +35,7 @@
     "test:multihall:phase4": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-phase4-regression.test.ts",
     "test:multihall:availability-scope-source": "npx tsx --test scripts/venue-availability-scope-source.test.ts",
     "test:phase5:source": "npx tsx --test scripts/phase5-public-catalog-source.test.ts scripts/phase5-catalog-pure.test.ts scripts/booking-create-client-idempotency.test.ts",
+    "test:phase6:financial-source": "npx tsx --test scripts/commission-financial-authorization-source.test.ts",
     "test:multihall:flag": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-flag-regression.test.ts",
     "test:multihall:approval": "npx tsx scripts/run-guarded-db-test.ts scripts/venue-multihall-approval-regression.test.ts",
     "test:multihall:migration0030": "npx tsx scripts/venue-multihall-migration-0030-verify.ts",

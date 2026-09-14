@@ -3,8 +3,9 @@
 /**
  * Vendor-facing view of what they owe the platform. Read-only by design —
  * only an admin can mark a fee settled, since the money moves off-platform.
- * The API scopes rows to the signed-in vendor, so this component never needs
- * to pass an id.
+ * The API scopes rows to the signed-in vendor. Venue pages additionally pass
+ * their explicit venue id so one local can never display another local's
+ * ledger.
  */
 
 import { useEffect, useState } from "react";
@@ -37,7 +38,7 @@ const STATUS_KEY: Record<string, string> = {
   waived: "vendor.commission.statusWaived",
 };
 
-export function CommissionPanel() {
+export function CommissionPanel({ venueId }: { venueId?: number }) {
   const { t } = useLocale();
   const [rows, setRows] = useState<Row[]>([]);
   const [totals, setTotals] = useState({ pending: 0, paid: 0, overdue: 0, count: 0 });
@@ -45,9 +46,15 @@ export function CommissionPanel() {
 
   useEffect(() => {
     let alive = true;
+    setLoading(true);
+    setRows([]);
+    setTotals({ pending: 0, paid: 0, overdue: 0, count: 0 });
     (async () => {
       try {
-        const res = await fetch("/api/commissions", { cache: "no-store" });
+        const query = venueId == null
+          ? ""
+          : `?venueId=${encodeURIComponent(String(venueId))}`;
+        const res = await fetch(`/api/commissions${query}`, { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
         if (!alive) return;
@@ -60,7 +67,7 @@ export function CommissionPanel() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [venueId]);
 
   if (loading) return null;
   if (rows.length === 0 && totals.count === 0) return null;
