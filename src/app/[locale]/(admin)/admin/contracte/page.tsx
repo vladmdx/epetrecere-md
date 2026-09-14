@@ -10,13 +10,15 @@ import { redirect } from "next/navigation";
 import { desc, eq, inArray } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { db } from "@/lib/db";
-import { legalAcceptances, users, artists, venues } from "@/lib/db/schema";
+import { legalAcceptances, users, artists, venues, partnerOrganizations } from "@/lib/db/schema";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getLegalDocument } from "@/lib/legal";
 import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { Download, ShieldCheck } from "lucide-react";
+import { groupAdminContractSessions } from "@/lib/admin/contract-sessions";
+import { mapAdminOrganizationSummary } from "@/lib/admin/organization-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +60,8 @@ export default async function AdminContractsPage({
       documentTitleStored: legalAcceptances.documentTitle,
       documentBlocks: legalAcceptances.documentBlocks,
       deviceSummary: legalAcceptances.deviceSummary,
+      organizationId: legalAcceptances.organizationId,
+      acceptanceSessionId: legalAcceptances.acceptanceSessionId,
       userEmail: users.email,
       userName: users.name,
     })
@@ -116,15 +120,35 @@ export default async function AdminContractsPage({
     venueRows.flatMap((v): [string, string][] => (v.userId ? [[v.userId, v.name]] : [])),
   );
 
-  // One card per signer+session rather than per document, since a vendor
-  // accepts the whole pack in one action.
-  const groups = new Map<string, typeof rows>();
-  for (const r of rows) {
-    const key = `${r.userId ?? r.email ?? "?"}|${r.subjectType}|${r.packVersion}|${r.signatureName}|${new Date(r.acceptedAt).toISOString()}`;
-    const arr = groups.get(key);
-    if (arr) arr.push(r);
-    else groups.set(key, [r]);
-  }
+  const organizationIds = [
+    ...new Set(rows.map((r) => r.organizationId).filter((id): id is number => id != null)),
+  ];
+  const organizationRows = organizationIds.length
+    ? await db
+        .select({
+          id: partnerOrganizations.id,
+          displayName: partnerOrganizations.displayName,
+          legalName: partnerOrganizations.legalName,
+          type: partnerOrganizations.type,
+          status: partnerOrganizations.status,
+        })
+        .from(partnerOrganizations)
+        .where(inArray(partnerOrganizations.id, organizationIds))
+    : [];
+  const orgById = new Map(
+    organizationRows
+      .map((row) => mapAdminOrganizationSummary(row))
+      .filter((row): row is NonNullable<typeof row> => row != null)
+      .map((row) => [row.id, row]),
+  );
+
+  const sessions = groupAdminContractSessions(rows, {
+    orgById,
+    artistById,
+    venueById,
+    artistByUser,
+    venueByUser,
+  });
 
   return (
     <div data-no-auto-translate translate="no" className="space-y-6 p-6">
@@ -135,7 +159,7 @@ export default async function AdminContractsPage({
         </p>
       </div>
 
-      {groups.size === 0 ? (
+      {sessions.length === 0 ? (
         <Card>
           <CardContent className="p-6 text-sm text-muted-foreground">
             {t("adminUi.contracts.empty", locale)}
@@ -143,22 +167,12 @@ export default async function AdminContractsPage({
         </Card>
       ) : (
         <div className="space-y-4">
-          {[...groups.values()].map((group) => {
+          {[...sessions].map((session) => {
+            const group = session.documents;
             const g = group[0]!;
-            const who =
-              (g.artistId != null ? artistById.get(g.artistId) : null) ??
-              (g.venueId != null ? venueById.get(g.venueId) : null) ??
-              (g.userId
-                ? g.subjectType === "venue"
-                  ? venueByUser.get(g.userId)
-                  : artistByUser.get(g.userId)
-                : null) ??
-              g.userName ??
-              g.userEmail ??
-              g.email ??
-              "—";
+            const who = session.holder.name;
             return (
-              <Card key={g.id}>
+              <Card key={session.sessionId}>
                 <CardContent className="p-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
@@ -170,6 +184,13 @@ export default async function AdminContractsPage({
                             ? t("adminUi.contracts.subjectVenue", locale)
                             : t("adminUi.contracts.subjectArtist", locale)}
                         </Badge>
+                        {session.holder.organizationId != null && (
+                          <Badge variant="outline">
+                            {t("adminUi.contracts.organizationId", locale, {
+                              id: session.holder.organizationId,
+                            })}
+                          </Badge>
+                        )}
                         {!g.userId && (
                           <Badge variant="outline" className="border-amber-500/40 text-amber-500">
                             {t("adminUi.contracts.accountDeleted", locale)}
@@ -190,7 +211,7 @@ export default async function AdminContractsPage({
                       </p>
                       {group.every((document) => document.documentBlocks?.length) ? (
                         <a
-                          href={`/api/legal/accept/${g.id}/pdf`}
+                          href={`/api/legal/accept/${session.pdfAnchorId}/pdf`}
                           className="mt-3 inline-flex items-center gap-2 rounded-md bg-gold px-3 py-2 text-xs font-semibold text-black transition-colors hover:bg-gold/90"
                         >
                           <Download className="h-3.5 w-3.5" />

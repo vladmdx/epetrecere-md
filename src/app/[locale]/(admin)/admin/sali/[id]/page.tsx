@@ -6,7 +6,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useParams } from "next/navigation";
-import Link from "next/link";
+import Link, { useLocalizePath } from "@/components/shared/locale-link";
 import {
   ArrowLeft,
   Save,
@@ -62,11 +62,44 @@ interface VenueData {
   seoDescEn: string | null;
 }
 
+interface AdminOrganization {
+  id: number;
+  displayName: string;
+  legalName: string | null;
+  type: string;
+  status: string;
+}
+
+interface AdminHall {
+  id: number;
+  nameRo: string;
+  nameRu: string | null;
+  nameEn: string | null;
+  slug: string;
+  status: string;
+  isLegacyDefault: boolean;
+  capacityMin: number | null;
+  capacityMax: number | null;
+  pricingModel: string;
+  basePrice: number | null;
+  minimumOrder: number | null;
+  currency: string;
+  depositType: string;
+  depositValue: number | null;
+  sortOrder: number;
+  updatedAt: string | null;
+  photoCount: number;
+  publicHref: string | null;
+}
+
 export default function AdminEditVenuePage() {
   const { t } = useLocale();
+  const localizePath = useLocalizePath();
   const params = useParams();
   const id = Number(params?.id);
   const [venue, setVenue] = useState<VenueData | null>(null);
+  const [organization, setOrganization] = useState<AdminOrganization | null>(null);
+  const [halls, setHalls] = useState<AdminHall[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -74,12 +107,16 @@ export default function AdminEditVenuePage() {
   useEffect(() => {
     if (!Number.isFinite(id)) return;
     let cancelled = false;
-    fetch(`/api/venues/${id}`)
+    fetch(`/api/admin/venues/${id}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled) return;
-        if (data) setVenue(data);
-        else toast.error(t("admin.venueEdit.notFoundToast"));
+        if (data) {
+          const { organization: org, halls: nextHalls, ...venueFields } = data;
+          setVenue(venueFields);
+          setOrganization(org ?? null);
+          setHalls(Array.isArray(nextHalls) ? nextHalls : []);
+        } else toast.error(t("admin.venueEdit.notFoundToast"));
       })
       .catch(() => toast.error(t("admin.venueEdit.loadError")))
       .finally(() => !cancelled && setLoading(false));
@@ -154,8 +191,7 @@ export default function AdminEditVenuePage() {
         return;
       }
       toast.success(t("admin.venueEdit.deleted"));
-      // Hard navigate so the list re-fetches
-      window.location.href = "/admin/sali";
+      window.location.href = localizePath("/admin/sali");
     } finally {
       setDeleting(false);
     }
@@ -273,6 +309,68 @@ export default function AdminEditVenuePage() {
               onCheckedChange={(v) => update({ isFeatured: v })}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("adminUi.venues.companyHolder")}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-1 text-sm">
+          {organization ? (
+            <>
+              <p className="font-medium">{organization.legalName || organization.displayName}</p>
+              <p className="text-xs text-muted-foreground">
+                {t("adminUi.venues.organizationId", { id: organization.id })} · {organization.type} · {organization.status}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t("adminUi.venues.noOrganization")}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>{t("adminUi.venues.hallsSection")}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {halls.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t("adminUi.venues.noHalls")}</p>
+          ) : (
+            <ul className="space-y-3">
+              {halls.map((hall) => (
+                <li key={hall.id} className="rounded-lg border border-border/60 p-3">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{hall.nameRo}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {t("adminUi.venues.hallStatus")}: {hall.status}
+                        {hall.isLegacyDefault ? ` · ${t("adminUi.venues.legacyDefault")}` : ""}
+                        {` · ${t("adminUi.venues.hallPhotos", { count: hall.photoCount })}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {hall.capacityMin ?? "—"}–{hall.capacityMax ?? "—"} · {hall.pricingModel}
+                        {hall.basePrice != null ? ` · ${hall.basePrice} ${hall.currency}` : ""}
+                      </p>
+                    </div>
+                    {hall.publicHref ? (
+                      <Link
+                        href={hall.publicHref}
+                        target="_blank"
+                        rel="noopener"
+                        className="text-xs text-gold hover:underline"
+                      >
+                        {t("adminUi.venues.publicHallLink")}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">{t("adminUi.venues.hallNotPublic")}</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 

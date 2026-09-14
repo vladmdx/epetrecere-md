@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import { artists, venues, users, categories, venueImages, artistPackages, legalAcceptances } from "@/lib/db/schema";
-import { eq, and, sql, inArray, asc, desc } from "drizzle-orm";
+import { artists, venues, users, categories, venueImages, artistPackages, legalAcceptances, partnerOrganizations, venueHalls } from "@/lib/db/schema";
+import { eq, and, sql, inArray, asc, desc, count } from "drizzle-orm";
+import { attachRegistrationVenueAudit } from "@/lib/admin/registration-queue";
+import { mapAdminOrganizationSummary } from "@/lib/admin/organization-summary";
 import { sendEmail } from "@/lib/email/send";
 import { registrationStatusEmail } from "@/lib/email/templates/registration-status";
 import { registrationDecisionSchema } from "@/lib/validation/vendor-profile";
@@ -81,6 +83,67 @@ export async function GET() {
   const venueCoverMap = new Map<number, string>();
   for (const row of venueImageRows) {
     if (!venueCoverMap.has(row.venueId)) venueCoverMap.set(row.venueId, row.url);
+  }
+
+  const registrationOrgIds = [
+    ...new Set(pendingVenues.map((v) => v.organizationId).filter((id): id is number => id != null)),
+  ];
+  const registrationOrgRows = registrationOrgIds.length
+    ? await db
+        .select({
+          id: partnerOrganizations.id,
+          displayName: partnerOrganizations.displayName,
+          legalName: partnerOrganizations.legalName,
+          type: partnerOrganizations.type,
+          status: partnerOrganizations.status,
+        })
+        .from(partnerOrganizations)
+        .where(inArray(partnerOrganizations.id, registrationOrgIds))
+    : [];
+  const organizationsById = new Map(
+    registrationOrgRows
+      .map((row) => mapAdminOrganizationSummary(row))
+      .filter((row): row is NonNullable<typeof row> => row != null)
+      .map((row) => [row.id, row]),
+  );
+
+  const registrationHallRows = venueIds.length
+    ? await db
+        .select({
+          id: venueHalls.id,
+          venueId: venueHalls.venueId,
+          nameRo: venueHalls.nameRo,
+          nameRu: venueHalls.nameRu,
+          nameEn: venueHalls.nameEn,
+          slug: venueHalls.slug,
+          status: venueHalls.status,
+          isLegacyDefault: venueHalls.isLegacyDefault,
+          capacityMin: venueHalls.capacityMin,
+          capacityMax: venueHalls.capacityMax,
+          pricingModel: venueHalls.pricingModel,
+          basePrice: venueHalls.basePrice,
+          minimumOrder: venueHalls.minimumOrder,
+          currency: venueHalls.currency,
+          sortOrder: venueHalls.sortOrder,
+        })
+        .from(venueHalls)
+        .where(inArray(venueHalls.venueId, venueIds))
+        .orderBy(asc(venueHalls.sortOrder), asc(venueHalls.id))
+    : [];
+  const registrationHallIds = registrationHallRows.map((hall) => hall.id);
+  const registrationHallPhotoRows = registrationHallIds.length
+    ? await db
+        .select({
+          hallId: venueImages.hallId,
+          photoCount: count(),
+        })
+        .from(venueImages)
+        .where(inArray(venueImages.hallId, registrationHallIds))
+        .groupBy(venueImages.hallId)
+    : [];
+  const photoCountByHallId = new Map<number, number>();
+  for (const row of registrationHallPhotoRows) {
+    if (row.hallId != null) photoCountByHallId.set(row.hallId, Number(row.photoCount));
   }
 
   // Get all categories for artist category names
@@ -180,6 +243,13 @@ export async function GET() {
           : v.capacityMax
             ? `până la ${v.capacityMax}`
             : null;
+      const audit = attachRegistrationVenueAudit({
+        venueId: v.id,
+        organizationId: v.organizationId,
+        organizationsById,
+        halls: registrationHallRows,
+        photoCountByHallId,
+      });
       return {
         id: v.id,
         type: "venue" as const,
@@ -205,6 +275,9 @@ export async function GET() {
         userId: v.userId,
         userName: u?.name ?? null,
         userEmail: u?.email ?? null,
+        organization: audit.organization,
+        halls: audit.halls,
+        summaries: audit.summaries,
       };
     }),
   ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
