@@ -3,7 +3,14 @@ import { db } from "../db";
 import { artists, bookingRequests, conversations, users, venues } from "../db/schema";
 import { listAccessibleVenueIds } from "../venue-access";
 import { contactsAreShared } from "./booking-contact";
-import { conversationPartyKey, notificationContext, notificationForViewer, notificationHasContact, type NotificationText } from "./notification-context";
+import {
+  conversationPartyKey,
+  notificationContext,
+  notificationContextMatchesResource,
+  notificationForViewer,
+  notificationHasContact,
+  type NotificationText,
+} from "./notification-context";
 import { legacyVenueNotificationUrl, notificationForVenue } from "../notifications/venue-routing";
 
 /** Read projection only: never rewrites notification/chat history or sends mail. */
@@ -55,7 +62,6 @@ export async function notificationsForUser<T extends NotificationText>(items: T[
     )))
     .orderBy(desc(bookingRequests.updatedAt), desc(bookingRequests.id)) : [];
 
-  const bookingStatus = new Map(relatedBookings.map(booking => [booking.id, booking.status]));
   const latestPairStatus = new Map<string, string>();
   for (const booking of relatedBookings) {
     const key = conversationPartyKey(booking.clientUserId, booking.artistId, booking.venueId);
@@ -65,10 +71,24 @@ export async function notificationsForUser<T extends NotificationText>(items: T[
     conv.id,
     latestPairStatus.get(conversationPartyKey(conv.clientUserId, conv.artistId, conv.venueId) ?? "") ?? "",
   ]));
+  const bookingsById = new Map(relatedBookings.map((booking) => [booking.id, booking]));
+  const conversationsById = new Map(ownedConversations.map((conv) => [conv.id, conv]));
   return routed.map((item, index) => {
     const context = contexts[index];
-    const status = context?.kind === "booking" ? bookingStatus.get(context.id)
-      : context?.kind === "conversation" ? conversationStatus.get(context.id) : null;
-    return notificationForViewer(item, !!status && contactsAreShared(status));
+    if (!context) return notificationForViewer(item, false);
+    if (context.kind === "booking") {
+      const booking = bookingsById.get(context.id);
+      const unlocked = !!booking
+        && notificationContextMatchesResource(context, booking)
+        && contactsAreShared(booking.status);
+      return notificationForViewer(item, unlocked);
+    }
+    const conversation = conversationsById.get(context.id);
+    const status = conversationStatus.get(context.id);
+    const unlocked = !!conversation
+      && notificationContextMatchesResource(context, conversation)
+      && !!status
+      && contactsAreShared(status);
+    return notificationForViewer(item, unlocked);
   });
 }

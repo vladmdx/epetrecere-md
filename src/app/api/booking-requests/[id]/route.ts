@@ -841,7 +841,10 @@ export async function PUT(
 
         if (isClient && (vendorInfo?.userId || venueRecipients.length > 0)) {
             // Client proposed — notify vendor
-            const vendorDashboardPath = vendorBookingNotificationPath(booking.venueId);
+            const vendorDashboardPath = vendorBookingNotificationPath({
+              venueId: booking.venueId,
+              bookingId: booking.id,
+            });
             const recipients = booking.venueId
               ? venueRecipients
               : vendorInfo?.userId
