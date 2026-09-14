@@ -9,6 +9,7 @@ import {
   localizePath,
   splitLocale,
 } from "@/lib/i18n/routing";
+import { legacySalaPathForCanonicalVenue } from "@/lib/partner/multi-hall-redirect";
 
 const isProtectedRoute = createRouteMatcher(["/admin(.*)", "/dashboard(.*)"]);
 
@@ -341,6 +342,17 @@ export default clerkMiddleware(async (auth, req) => {
       url.pathname = localizePath(pathname, cookieLocale);
       return NextResponse.redirect(url, 307);
     }
+  }
+
+  // A notification may have been persisted while MULTI_HALL was enabled.
+  // During a rollback, keep its exact legacy section and query (`expand`,
+  // `conversation`, etc.) instead of letting the canonical layout collapse
+  // every URL to the venue home page.
+  const legacySalaPath = legacySalaPathForCanonicalVenue(pathname);
+  if (req.method === "GET" && legacySalaPath) {
+    const url = req.nextUrl.clone();
+    url.pathname = localizePath(legacySalaPath, locale);
+    return NextResponse.redirect(url, 307);
   }
 
   // Legacy SEO redirects must run BEFORE auth logic so public crawlers

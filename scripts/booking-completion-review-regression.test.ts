@@ -32,10 +32,10 @@ test("both vendor completion buttons share the server-equivalent status and loca
   assert.match(venue, /disabled=\{busy === b\.id \|\| !canCompleteBooking\(b\)\}/);
   const route = readFileSync("src/app/api/booking-requests/[id]/route.ts", "utf8");
   const complete = route.slice(route.indexOf('} else if (action === "complete")'), route.indexOf('} else if (action === "vendor_cancel")'));
-  assert.match(complete, /requireBookingArtistOwner\(\)/);
-  assert.match(complete, /booking\.status !== "confirmed_by_client"/);
-  assert.match(complete, /booking\.eventDate > new Date\(\)\.toLocaleDateString\("en-CA", \{ timeZone: "Europe\/Chisinau" \}\)/);
-  assert.match(complete, /eq\(bookingRequests\.status, "confirmed_by_client"\)/);
+  assert.match(complete, /access: \{ mode: "vendor", venueCapability: "manage_bookings" \}/);
+  assert.match(complete, /current\.status !== "confirmed_by_client"/);
+  assert.match(complete, /localDateInZone\([\s\S]*?current\.timezone \|\| DEFAULT_VENUE_TZ/);
+  assert.match(complete, /casUpdateBookingStatus\([\s\S]*?\["confirmed_by_client"\]/);
 });
 
 test("admin moderation rejects HTTP failures and never reaches the success continuation", async () => {
@@ -106,6 +106,6 @@ test("review creation/list require owner, final confirmation, strictly past UTC 
   const update = readFileSync("src/app/api/reviews/[id]/route.ts", "utf8");
   assert.match(update, /if \(action === "approve" \|\| action === "reject"\) \{\s*const admin = await requireAdmin\(\)/);
   assert.match(update, /eq\(artists\.id, review\.artistId\), eq\(artists\.userId, appUser\.id\)/);
-  assert.match(update, /eq\(venues\.id, review\.venueId\), eq\(venues\.userId, appUser\.id\)/);
+  assert.match(update, /requireVenueCapability\(review\.venueId, "request_reviews"\)/);
   assert.match(update, /if \(!owns\) return NextResponse\.json\(\{ error: "Forbidden" \}, \{ status: 403 \}\)/);
 });

@@ -16,7 +16,6 @@ import {
 import {
   filterLegalAcceptancesForScope,
   legalAcceptancesListScope,
-  organizationLegalListAccess,
   parseLegalListOrganizationId,
 } from "../src/lib/legal/acceptance-list-scope";
 
@@ -155,7 +154,10 @@ test("same user in two organizations sees each organization's documents separate
 
 test("without organizationId the list is personal/legacy only, never organizational rows", () => {
   assert.equal(parseLegalListOrganizationId(null), null);
-  assert.equal(parseLegalListOrganizationId("abc"), null);
+  assert.equal(parseLegalListOrganizationId("abc"), undefined);
+  assert.equal(parseLegalListOrganizationId("0"), undefined);
+  assert.equal(parseLegalListOrganizationId("1.5"), undefined);
+  assert.equal(parseLegalListOrganizationId(" 1"), undefined);
   const personal = legalAcceptancesListScope({
     userId: "user-a",
     organizationId: null,
@@ -182,34 +184,15 @@ test("without organizationId the list is personal/legacy only, never organizatio
   );
 });
 
-test("deactivated, deleted, or refused membership is 403 for organization legal list", () => {
-  assert.deepEqual(organizationLegalListAccess(null), { ok: false, status: 403 });
-  assert.deepEqual(
-    organizationLegalListAccess({ present: false, isActive: true, role: "owner" }),
-    { ok: false, status: 403 },
-  );
-  assert.deepEqual(
-    organizationLegalListAccess({ present: true, isActive: false, role: "owner" }),
-    { ok: false, status: 403 },
-  );
-  assert.deepEqual(
-    organizationLegalListAccess({ present: true, isActive: true, role: "staff" }),
-    { ok: false, status: 403 },
-  );
-  assert.deepEqual(
-    organizationLegalListAccess({ present: true, isActive: true, role: "admin" }),
-    { ok: false, status: 403 },
-  );
-  assert.deepEqual(
-    organizationLegalListAccess({ present: true, isActive: true, role: "owner" }),
-    { ok: true },
-  );
+test("a denied central organization access result keeps legal list scope closed", () => {
   const denied = legalAcceptancesListScope({
     userId: "user-a",
     organizationId: 9,
     orgAccessOk: false,
   });
   assert.deepEqual(denied, { ok: false, status: 403 });
+  const route = readFileSync("src/app/api/legal/accept/route.ts", "utf8");
+  assert.match(route, /organizationId === undefined[\s\S]*INVALID_ORGANIZATION_ID/);
   const card = readFileSync("src/components/vendor/signed-documents-card.tsx", "utf8");
   assert.match(card, /params\.set\("organizationId", String\(organizationId\)\)/);
   const settings = readFileSync(

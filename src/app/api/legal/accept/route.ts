@@ -60,9 +60,14 @@ function clientIp(req: NextRequest): string | null {
 export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const organizationId = parseLegalListOrganizationId(
-    req.nextUrl.searchParams.get("organizationId"),
-  );
+  const organizationIdRaw = req.nextUrl.searchParams.get("organizationId");
+  const organizationId = parseLegalListOrganizationId(organizationIdRaw);
+  if (organizationId === undefined) {
+    return NextResponse.json(
+      { error: "Invalid organizationId", code: "INVALID_ORGANIZATION_ID" },
+      { status: 400, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
   let orgAccessOk = false;
   if (organizationId) {
     const orgAccess = await requireOrganizationCapability(organizationId, "manage_legal");
