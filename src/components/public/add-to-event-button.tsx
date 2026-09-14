@@ -58,6 +58,7 @@ interface Props {
   artistSlug?: string;
   venueId?: number;
   venueSlug?: string;
+  venueHallSlug?: string | null;
   /** When the user came here via a /cabinet/planifica/[id] deep-link
    *  the parent already knows which plan to target. We honour that and
    *  skip the picker entirely. */
@@ -69,6 +70,7 @@ export function AddToEventButton({
   artistSlug,
   venueId,
   venueSlug,
+  venueHallSlug,
   presetEventPlanId,
 }: Props) {
   const router = useLocalizedRouter();
@@ -208,8 +210,11 @@ export function AddToEventButton({
       return;
     }
     if (presetEventPlanId) {
+      const hallQuery = venueId && venueHallSlug
+        ? `&venue=${venueId}&hall=${encodeURIComponent(venueHallSlug)}`
+        : "";
       router.push(
-        `/cabinet/planifica/${presetEventPlanId}?tab=${artistId ? "bookings" : "venues"}`,
+        `/cabinet/planifica/${presetEventPlanId}?tab=${artistId ? "bookings" : "venues"}${hallQuery}`,
       );
       return;
     }
@@ -252,8 +257,11 @@ export function AddToEventButton({
 
   function selectPlan(planId: number) {
     setOpen(false);
+    const hallQuery = venueId && venueHallSlug
+      ? `&venue=${venueId}&hall=${encodeURIComponent(venueHallSlug)}`
+      : "";
     router.push(
-      `/cabinet/planifica/${planId}?tab=${artistId ? "bookings" : "venues"}`,
+      `/cabinet/planifica/${planId}?tab=${artistId ? "bookings" : "venues"}${hallQuery}`,
     );
   }
 

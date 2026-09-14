@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "@/components/shared/locale-link";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Building2,
@@ -20,7 +20,7 @@ import {
 import { formatWorkingHours } from "@/components/vendor/working-hours-editor";
 import { useUser } from "@clerk/nextjs";
 import { Badge } from "@/components/ui/badge";
-import { RequestPriceForm } from "@/components/public/request-form";
+import { RequestBookingForm, RequestPriceForm } from "@/components/public/request-form";
 import { AddToEventButton } from "@/components/public/add-to-event-button";
 import { ChatWidget } from "@/components/public/chat-widget";
 import { WishlistButton } from "@/components/public/wishlist-button";
@@ -31,10 +31,15 @@ import { getLocalized } from "@/i18n";
 import { cn } from "@/lib/utils";
 import { trackClick } from "@/lib/analytics/track-click";
 import { plural, NOUNS } from "@/lib/i18n/plural";
-import { formatPrice, currencySymbol } from "@/lib/format/price";
+import { formatAmount, formatPrice, currencySymbol } from "@/lib/format/price";
 import { useGatedDetails } from "@/hooks/use-gated-details";
 import { useLocalizePath } from "@/components/shared/locale-link";
 import { PublicReviewReply } from "@/components/public/review-reply";
+import { resolveSelectedHall } from "@/lib/venues/hall-selection";
+import {
+  bookingCreateScope,
+  pendingBookingCreateHallId,
+} from "@/lib/booking/booking-create-client";
 
 interface VenueData {
   id: number;
@@ -50,13 +55,13 @@ interface VenueData {
   capacityMin: number | null;
   capacityMax: number | null;
   pricePerPerson: number | null;
-  phone: string | null;
-  email: string | null;
-  website: string | null;
+  phone?: string | null;
+  email?: string | null;
+  website?: string | null;
   facilities: string[] | null;
-  menuUrl: string | null;
-  menuPdfUrl: string | null;
-  virtualTourUrl: string | null;
+  menuUrl?: string | null;
+  menuPdfUrl?: string | null;
+  virtualTourUrl?: string | null;
   lat: number | null;
   lng: number | null;
   calendarEnabled: boolean;
@@ -72,6 +77,7 @@ interface VenueData {
   ratingAvg: number | null;
   ratingCount: number | null;
   images: Array<{ id: number; url: string; altRo: string | null }>;
+  hallImages?: Array<{ id: number; hallId: number; url: string; altRo: string | null }>;
   reviews: Array<{
     id: number;
     authorName: string;
@@ -82,6 +88,42 @@ interface VenueData {
     photos: string[] | null;
     createdAt: Date;
   }>;
+  halls?: Array<{
+    id: number;
+    slug: string;
+    nameRo: string;
+    nameRu: string | null;
+    nameEn: string | null;
+    capacityMin: number | null;
+    capacityMax: number | null;
+    suitable: boolean;
+    available: boolean | null;
+    minEffectivePrice?: number | null;
+    unitPrice?: number | null;
+    currency?: string | null;
+    pricingModel?: string;
+    descriptionRo?: string | null;
+    descriptionRu?: string | null;
+    descriptionEn?: string | null;
+    facilities?: string[] | null;
+    workingHours?: VenueData["workingHours"];
+    bookingTermsRo?: string | null;
+    bookingTermsRu?: string | null;
+    bookingTermsEn?: string | null;
+    seatingOptions?: Array<{
+      type?: string;
+      labelRo?: string | null;
+      labelRu?: string | null;
+      labelEn?: string | null;
+      capacityMin: number | null;
+      capacityMax: number | null;
+      notesRo?: string | null;
+      notesRu?: string | null;
+      notesEn?: string | null;
+    }>;
+  }>;
+  minEffectivePrice?: number | null;
+  minUnitPrice?: number | null;
 }
 
 /** Shown only when the owner listed no facilities of their own. */
@@ -113,6 +155,12 @@ export function VenueDetailClient({
   venue,
   menu: initialMenu,
   similar = [],
+  requestedHallSlug = null,
+  intervalComplete = false,
+  guestCount = null,
+  eventDate = null,
+  startTime = null,
+  endTime = null,
 }: {
   venue: VenueData;
   menu?: {
@@ -136,39 +184,185 @@ export function VenueDetailClient({
     isFeatured: boolean;
     coverImageUrl?: string | null;
   }>;
+  requestedHallSlug?: string | null;
+  intervalComplete?: boolean;
+  guestCount?: number | null;
+  eventDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
 }) {
   const { locale, t } = useLocale();
   const lp = useLocalizePath();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const name = getLocalized(venue, "name", locale);
   const description = getLocalized(venue, "description", locale);
   // M0a #8 — price gated behind login
   const canSeePrice = isLoaded && isSignedIn;
-  const hasWorkingHours = Boolean(venue.workingHours && Object.values(venue.workingHours).some(Boolean));
+  const baseHalls = useMemo(() => venue.halls ?? [], [venue.halls]);
+  const initialHallSelection = resolveSelectedHall({
+    halls: baseHalls,
+    requestedSlug: requestedHallSlug,
+    intervalComplete,
+  });
+  const [selectedHallSlug, setSelectedHallSlug] = useState<string | null>(
+    initialHallSelection.slug,
+  );
+  const serverHallSlugRef = useRef(requestedHallSlug);
+  const [, startHallNavigation] = useTransition();
 
-  // Prerendered anonymously — the price and the venue's website arrive from
-  // the authenticated endpoint once Clerk confirms a session.
+  // Prerendered anonymously — the price arrives from the authenticated
+  // endpoint once Clerk confirms a session. Only the selected Hall is asked
+  // for; the public Hall DTO remains the canonical structural source.
+  const gatedQuery = [
+    guestCount != null && guestCount > 0 ? `guest_count=${guestCount}` : null,
+    selectedHallSlug ? `hall=${encodeURIComponent(selectedHallSlug)}` : null,
+  ].filter(Boolean).join("&") || undefined;
   const gated = useGatedDetails<{
     pricePerPerson: number | null;
+    minEffectivePrice?: number | null;
+    currency?: string | null;
+    halls?: VenueData["halls"];
     menu?: typeof initialMenu;
-  }>("venue", venue.slug);
-  const menu = gated?.menu ?? initialMenu;
-  const shown = gated ? { ...venue, ...gated } : venue;
-
-  const realImages = Array.from(
-    new Set(venue.images.map((image) => image.url).filter(Boolean)),
+  }>(
+    "venue",
+    venue.slug,
+    gatedQuery,
   );
-  const venueHeroImage = realImages[0] || "/images/venues/placeholder.svg";
-  // A gallery must represent this venue, not silently borrow stock photos
-  // used by other listings. When the owner uploaded one photo, show one.
-  const galleryImages = realImages
-    .filter((url) => url !== venueHeroImage)
-    .slice(0, 4);
+  const menu = gated?.menu ?? initialMenu;
+  const shownHalls = useMemo(
+    () => baseHalls.map((hall) => {
+      const overlay = gated?.halls?.find((row) => row.id === hall.id);
+      return overlay ? { ...hall, ...overlay } : hall;
+    }),
+    [baseHalls, gated?.halls],
+  );
+  const shown = gated
+    ? {
+        ...venue,
+        ...gated,
+        halls: shownHalls,
+      }
+    : venue;
+
   const planParam = Number(searchParams.get("plan"));
   const eventPlanId = Number.isFinite(planParam) && planParam > 0
     ? planParam
     : null;
+  const hallSelection = resolveSelectedHall({
+    halls: shownHalls,
+    requestedSlug: selectedHallSlug,
+    intervalComplete,
+  });
+  const selectedHall = shownHalls.find((hall) => hall.id === hallSelection.hallId) ?? null;
+  const hallDescription = selectedHall
+    ? { ro: selectedHall.descriptionRo, ru: selectedHall.descriptionRu, en: selectedHall.descriptionEn }[locale]
+    : null;
+  const activeDescription = hallDescription || description;
+  const activeFacilities = selectedHall?.facilities?.length
+    ? selectedHall.facilities
+    : venue.facilities ?? [];
+  const activeWorkingHours = selectedHall?.workingHours ?? venue.workingHours;
+  const hasWorkingHours = Boolean(activeWorkingHours && Object.values(activeWorkingHours).some(Boolean));
+  const hallBookingTerms = selectedHall
+    ? { ro: selectedHall.bookingTermsRo, ru: selectedHall.bookingTermsRu, en: selectedHall.bookingTermsEn }[locale]
+    : null;
+  const hallImageUrls = selectedHall
+    ? (venue.hallImages ?? [])
+      .filter((image) => image.hallId === selectedHall.id)
+      .map((image) => image.url)
+    : [];
+  const realImages = Array.from(new Set([
+    ...hallImageUrls,
+    ...venue.images.map((image) => image.url),
+  ].filter(Boolean)));
+  const venueHeroImage = realImages[0] || "/images/venues/placeholder.svg";
+  // Hall photos lead when a Hall is selected; general location photos remain
+  // as context and as the fallback for Halls without their own gallery.
+  const galleryImages = realImages
+    .filter((url) => url !== venueHeroImage)
+    .slice(0, 4);
+  const [lockedHallId, setLockedHallId] = useState<number | null>(null);
+  const hallLocked = lockedHallId != null;
+  const pendingRetry = lockedHallId != null && selectedHall?.id === lockedHallId;
+  const hallUnavailable = Boolean(
+    selectedHall
+      && (!selectedHall.suitable || (intervalComplete && selectedHall.available !== true))
+      && !pendingRetry,
+  );
+  const displayedHalls = shownHalls.filter((hall) => (
+    hall.id === selectedHall?.id
+    || (hall.suitable && (!intervalComplete || hall.available === true))
+  ));
+
+  useEffect(() => {
+    try {
+      const pendingHallId = pendingBookingCreateHallId(
+        window.sessionStorage,
+        bookingCreateScope({
+          actorId: user?.id,
+          venueId: venue.id,
+          eventPlanId: eventPlanId,
+        }),
+      );
+      setLockedHallId(pendingHallId);
+      const pendingHall = shownHalls.find((hall) => hall.id === pendingHallId);
+      if (pendingHall) setSelectedHallSlug(pendingHall.slug);
+    } catch {
+      setLockedHallId(null);
+    }
+  }, [user?.id, venue.id, eventPlanId, shownHalls]);
+
+  // The prop changes on URL navigation/back/forward. A local Hall click is
+  // intentionally applied before the RSC navigation completes, so a quick
+  // CTA click can never submit the previously selected Hall.
+  useEffect(() => {
+    if (serverHallSlugRef.current === requestedHallSlug) return;
+    serverHallSlugRef.current = requestedHallSlug;
+    if (hallLocked) return;
+    setSelectedHallSlug(resolveSelectedHall({
+      halls: shownHalls,
+      requestedSlug: requestedHallSlug,
+      intervalComplete,
+    }).slug);
+  }, [hallLocked, intervalComplete, requestedHallSlug, shownHalls]);
+
+  useEffect(() => {
+    const current = searchParams.get("hall");
+    if (selectedHallSlug && !shownHalls.some((hall) => hall.slug === selectedHallSlug)) {
+      if (current) {
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete("hall");
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+      }
+      return;
+    }
+    if (current !== hallSelection.slug && hallSelection.slug) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("hall", hallSelection.slug);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+  }, [
+    hallSelection.slug,
+    pathname,
+    selectedHallSlug,
+    router,
+    searchParams,
+    shownHalls,
+  ]);
+
+  function selectHall(slug: string) {
+    if (hallLocked) return;
+    setSelectedHallSlug(slug);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("hall", slug);
+    startHallNavigation(() => {
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    });
+  }
 
   useEffect(() => {
     import("@/hooks/use-recently-viewed").then(({ trackRecentView }) => {
@@ -217,10 +411,10 @@ export function VenueDetailClient({
               {venue.ratingAvg && venue.ratingAvg > 0 ? venue.ratingAvg.toFixed(1) : t("venue.detail.new")}
               {venue.ratingCount ? <span className="text-white/36">({plural(venue.ratingCount, locale, NOUNS.reviews)})</span> : null}
             </span>
-            {hasWorkingHours && venue.workingHours && (
+            {hasWorkingHours && activeWorkingHours && (
               <span className="flex items-center gap-1" title={t("venue.detail.workingHours")}>
                 <Clock className="h-3.5 w-3.5" />
-                {formatWorkingHours(venue.workingHours)}
+                {formatWorkingHours(activeWorkingHours)}
               </span>
             )}
           </div>
@@ -246,7 +440,7 @@ export function VenueDetailClient({
               <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
               <span className="absolute bottom-4 left-4 rounded-lg border border-white/20 bg-black/46 px-4 py-2 text-xs font-medium text-white backdrop-blur">
                 {t("venue.detail.viewGallery", {
-                  count: Math.max(venue.images.length, galleryImages.length + 1),
+                  count: realImages.length,
                 })}
               </span>
             </a>
@@ -265,15 +459,68 @@ export function VenueDetailClient({
                       className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                       loading="lazy"
                     />
-                    {index === 3 && venue.images.length > 4 && (
+                    {index === 3 && realImages.length > 5 && (
                       <span className="absolute inset-0 flex items-center justify-center bg-black/55 font-heading text-xl text-white">
-                        +{venue.images.length - 4}
+                        +{realImages.length - 5}
                       </span>
                     )}
                   </a>
                 ))}
               </div>
           </div>
+
+          {shownHalls.length > 0 && (
+            <section className="mt-7 rounded-xl border border-white/8 bg-[#0c111b] p-4">
+              <h2 className="font-heading text-lg font-semibold text-[#fbf7ee]">
+                {t("venue.detail.selectHall")}
+              </h2>
+              <p className="mt-1 text-xs text-white/48">
+                {shownHalls.filter((hall) => hall.suitable && (!intervalComplete || hall.available)).length === 1
+                  ? t("venue.detail.chooseHallToBook")
+                  : t("venue.detail.chooseHallToBook")}
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {displayedHalls.map((hall) => {
+                  const selected = selectedHall?.id === hall.id;
+                  const lockedOut = hallLocked && lockedHallId !== hall.id;
+                  const eligible = hall.suitable && (!intervalComplete || hall.available === true);
+                  return (
+                    <button
+                      key={hall.id}
+                      type="button"
+                      disabled={lockedOut || !eligible}
+                      onClick={() => selectHall(hall.slug)}
+                      className={cn(
+                        "rounded-lg border px-3 py-3 text-left text-sm transition-colors",
+                        selected
+                          ? "border-[#e6b84d] bg-[#e6b84d]/12 text-[#fbf7ee]"
+                          : "border-white/10 text-white/70 hover:border-[#e6b84d]/40",
+                        (lockedOut || !eligible) && "cursor-not-allowed opacity-50",
+                      )}
+                    >
+                      <span className="block font-medium">{getLocalized(hall, "name", locale) || hall.nameRo}</span>
+                      <span className="mt-1 block text-[11px] text-white/48">
+                        {hall.capacityMin || 1}–{hall.capacityMax || "?"} {t("common.guests")}
+                      </span>
+                      {!hall.suitable && guestCount != null && (
+                        <span className="mt-1 block text-[11px] text-amber-400">
+                          {t("venue.detail.hallTooSmall", { count: guestCount })}
+                        </span>
+                      )}
+                      {intervalComplete && hall.available === false && (
+                        <span className="mt-1 block text-[11px] text-amber-400">
+                          {t("venue.detail.hallUnavailable")}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {hallLocked && (
+                <p className="mt-2 text-xs text-amber-400">{t("requestForm.hallLockedRetry")}</p>
+              )}
+            </section>
+          )}
 
           <nav className="mt-7 flex gap-1 overflow-x-auto rounded-xl border border-white/8 bg-[#0c111b] p-1 text-xs">
             {[
@@ -295,7 +542,7 @@ export function VenueDetailClient({
             <div className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
               <div className="rounded-xl border border-white/8 bg-white/[.025] p-5">
                 <p className="text-sm leading-7 text-white/62">
-                  {description || t("venue.detail.descriptionFallback", { name })}
+                  {activeDescription || t("venue.detail.descriptionFallback", { name })}
                 </p>
               </div>
               <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-white/8 bg-[#0d1119]">
@@ -303,8 +550,8 @@ export function VenueDetailClient({
                   icon={Users}
                   label={t("venue.capacity")}
                   value={
-                    venue.capacityMax
-                      ? `${venue.capacityMin || 1}–${venue.capacityMax} ${t("common.guests")}`
+                    (selectedHall?.capacityMax ?? venue.capacityMax)
+                      ? `${selectedHall?.capacityMin ?? venue.capacityMin ?? 1}–${selectedHall?.capacityMax ?? venue.capacityMax} ${t("common.guests")}`
                       : t("venue.detail.onRequest")
                   }
                 />
@@ -312,18 +559,41 @@ export function VenueDetailClient({
                 <VenueFact
                   icon={Clock}
                   label={t("venue.detail.factSchedule")}
-                  value={hasWorkingHours && venue.workingHours ? formatWorkingHours(venue.workingHours) : t("venue.detail.onRequest")}
+                  value={activeWorkingHours && Object.values(activeWorkingHours).some(Boolean) ? formatWorkingHours(activeWorkingHours) : t("venue.detail.onRequest")}
                 />
                 <VenueFact icon={Building2} label={t("venue.detail.factSpaceType")} value={t("venue.detail.eventHall")} />
               </div>
             </div>
+            {selectedHall?.seatingOptions && selectedHall.seatingOptions.length > 0 && (
+              <div className="mt-4 rounded-xl border border-white/8 bg-white/[.025] p-5">
+                <h3 className="text-sm font-semibold text-[#fbf7ee]">{t("venue.detail.seatingOptions")}</h3>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedHall.seatingOptions.map((option, index) => {
+                    const label = { ro: option.labelRo, ru: option.labelRu, en: option.labelEn }[locale]
+                      || option.type
+                      || t("venue.detail.seatingOption");
+                    return (
+                      <Badge key={`${option.type ?? "option"}-${index}`} variant="secondary">
+                        {label}: {option.capacityMin ?? 1}–{option.capacityMax ?? "?"} {t("common.guests")}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {hallBookingTerms && (
+              <div className="mt-4 rounded-xl border border-white/8 bg-white/[.025] p-5">
+                <h3 className="text-sm font-semibold text-[#fbf7ee]">{t("venue.detail.bookingTerms")}</h3>
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-white/62">{hallBookingTerms}</p>
+              </div>
+            )}
           </section>
 
           {/* Facilities */}
           <section id="facilitati" className="mt-8 scroll-mt-24">
               <h2 className="mb-4 font-heading text-2xl font-semibold">{t("venue.facilities")}</h2>
               <div className="flex flex-wrap gap-2">
-                {(venue.facilities ?? []).map((f) => (
+                {activeFacilities.map((f) => (
                   <Badge key={f} variant="secondary" className="gap-1 border border-[#e6b84d]/20 bg-[#e6b84d]/7 text-white/68">
                     <Check className="h-3 w-3 text-[#e6b84d]" /> {f}
                   </Badge>
@@ -559,35 +829,74 @@ export function VenueDetailClient({
               </div>
             </div>
             <div className="py-1 text-center">
-              {shown.pricePerPerson ? (
-                canSeePrice ? (
-                  <>
-                    <p className="font-accent text-3xl font-semibold text-gold">{formatPrice(shown.pricePerPerson, null, locale)}</p>
-                    <p className="text-sm text-muted-foreground">{t("venue.price_per_person")}</p>
-                  </>
-                ) : (
-                  <a
-                    href={`/sign-in?redirect_url=${encodeURIComponent(lp(`/sali/${venue.slug}`))}`}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
-                  >
-                    <Lock className="h-4 w-4" /> {t("venue.detail.priceOnLogin")}
-                  </a>
-                )
-              ) : !canSeePrice ? (
-                <a
-                  href={`/sign-in?redirect_url=${encodeURIComponent(lp(`/sali/${venue.slug}`))}`}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
-                >
-                  <Lock className="h-4 w-4" /> {t("venue.detail.priceOnLogin")}
-                </a>
-              ) : (
-                <p className="text-sm text-white/54">{t("venue.detail.customOffer")}</p>
-              )}
+              {(() => {
+                const displayPrice = selectedHall?.unitPrice != null && selectedHall.pricingModel === "per_person" && !guestCount
+                  ? selectedHall.unitPrice
+                  : selectedHall?.minEffectivePrice
+                  ?? shown.minEffectivePrice
+                  ?? shown.minUnitPrice
+                  ?? shown.pricePerPerson;
+                if (displayPrice != null && displayPrice >= 0) {
+                  if (!canSeePrice) {
+                    return (
+                      <a
+                        href={`/sign-in?redirect_url=${encodeURIComponent(lp(`/sali/${venue.slug}`))}`}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
+                      >
+                        <Lock className="h-4 w-4" /> {t("venue.detail.priceOnLogin")}
+                      </a>
+                    );
+                  }
+                  return (
+                    <>
+                      <p className="font-accent text-3xl font-semibold text-gold">
+                        {formatPrice(displayPrice, null, locale) ?? formatAmount(displayPrice, null, locale)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedHall?.pricingModel === "fixed"
+                          ? t("venue.detail.fixedPrice")
+                          : selectedHall?.pricingModel === "minimum_order"
+                            ? t("venue.detail.minimumOrder")
+                            : selectedHall?.pricingModel === "per_person" && guestCount
+                              ? t("venue.detail.estimatedTotal")
+                              : t("venue.price_per_person")}
+                      </p>
+                    </>
+                  );
+                }
+                if (!canSeePrice) {
+                  return (
+                    <a
+                      href={`/sign-in?redirect_url=${encodeURIComponent(lp(`/sali/${venue.slug}`))}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-sm font-medium text-gold/90 hover:text-gold"
+                    >
+                      <Lock className="h-4 w-4" /> {t("venue.detail.priceOnLogin")}
+                    </a>
+                  );
+                }
+                return <p className="text-sm text-white/54">{t("venue.detail.customOffer")}</p>;
+              })()}
             </div>
+            <RequestBookingForm
+              venueId={venue.id}
+              eventPlanId={eventPlanId ?? undefined}
+              preselectedDate={eventDate ?? undefined}
+              startTime={startTime ?? undefined}
+              endTime={endTime ?? undefined}
+              defaultGuestCount={guestCount ?? undefined}
+              hallId={selectedHall?.id ?? null}
+              hallRequired={shownHalls.length > 0}
+              hallLocked={hallLocked && !pendingRetry}
+              hallUnavailable={hallUnavailable}
+              onPendingHallChange={setLockedHallId}
+              capacityMax={selectedHall?.capacityMax ?? venue.capacityMax}
+              variant="primary"
+            />
             <RequestPriceForm venueId={venue.id} />
             <AddToEventButton
               venueId={venue.id}
               venueSlug={venue.slug}
+              venueHallSlug={selectedHall?.slug ?? null}
               presetEventPlanId={eventPlanId}
             />
             <ChatWidget
@@ -653,6 +962,7 @@ function VenueFact({
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept as the unpriced package fallback
 function GenericVenuePackages() {
   const { t } = useLocale();
   const packages = [

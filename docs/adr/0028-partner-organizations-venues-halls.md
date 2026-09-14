@@ -335,4 +335,11 @@ The feature remains behind `FEATURE_MULTI_HALL`. PostgreSQL migration and
 concurrency suites must still pass on a disposable guarded database through
 `0033` before Preview/staging. Migration `0033` has not been applied to any
 shared Preview, staging, or Production database by this correction branch, and
-phase 5 public catalog work has not started.
+phase 5 public catalog, venue page and public booking are Hall-aware behind
+`FEATURE_MULTI_HALL`. Flag OFF keeps the legacy public contract and does not
+query Hall or organization tables. Flag ON publishes only active venues with an
+active organization (when set) and at least one active Hall, lists one row per
+venue after aggregation, and requires `hallId` on public booking writes.
+Anonymous visitors never receive prices. This phase does not add migration
+`0040` and does not change the booking write path beyond existing Hall
+revalidation.

@@ -8,7 +8,7 @@ import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { WishlistButton } from "@/components/public/wishlist-button";
 import { CompareButton } from "@/components/public/compare-button";
-import { formatPrice } from "@/lib/format/price";
+import { formatAmount, formatPrice } from "@/lib/format/price";
 
 interface VenueCardProps {
   venue: {
@@ -22,10 +22,16 @@ interface VenueCardProps {
     capacityMin: number | null;
     capacityMax: number | null;
     pricePerPerson: number | null;
+    minEffectivePrice?: number | null;
+    minUnitPrice?: number | null;
     ratingAvg: number | null;
     ratingCount: number | null;
     isFeatured: boolean;
     coverImageUrl?: string | null;
+    totalHallCount?: number;
+    suitableHallCount?: number;
+    availableHallCount?: number | null;
+    availabilityStatus?: string;
   };
   imageIndex?: number;
   /**
@@ -33,6 +39,7 @@ interface VenueCardProps {
    * claim availability: getVenues({ availableDate }) drops every venue booked
    * or blocked on it, so "in this result set" means "free on that day".
    * Without a date nothing is known, so the badge stays hidden.
+   * Flag ON requires a complete date+start+end interval and availableHallCount.
    */
   availableOn?: string | null;
 }
@@ -43,6 +50,13 @@ export function VenueCard({ venue, availableOn }: VenueCardProps) {
   const name = getLocalized(venue, "name", locale);
   const showPrice = isLoaded && isSignedIn;
   const image = venue.coverImageUrl || "/images/venues/placeholder.svg";
+  const unitPriceOnly = venue.minEffectivePrice == null && venue.minUnitPrice != null;
+  const minPrice = venue.minEffectivePrice ?? venue.minUnitPrice ?? venue.pricePerPerson;
+  const showAvailable = Boolean(
+    availableOn
+    && (venue.availabilityStatus == null || venue.availabilityStatus === "available")
+    && (venue.availableHallCount == null || venue.availableHallCount > 0),
+  );
 
   return (
     <Link
@@ -59,7 +73,7 @@ export function VenueCard({ venue, availableOn }: VenueCardProps) {
           unoptimized={image.includes("r2.cloudflarestorage.com")}
         />
         <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#111522] to-transparent" />
-        {availableOn && (
+        {showAvailable && (
           <span className="absolute bottom-2 left-2 inline-flex items-center gap-1 rounded-full bg-[#06110d]/85 px-2 py-1 text-[9px] font-medium text-[#53df86] backdrop-blur">
             <span className="h-1.5 w-1.5 rounded-full bg-[#4fe47f]" />
             {t("venue.card.available")}
@@ -83,6 +97,14 @@ export function VenueCard({ venue, availableOn }: VenueCardProps) {
 
       <div className="flex flex-1 flex-col p-3.5">
         <h3 className="line-clamp-1 font-heading text-base font-semibold text-white">{name}</h3>
+        {(venue.totalHallCount != null && venue.totalHallCount > 0) && (
+          <p className="mt-1 text-[10px] text-white/55">
+            {t("venue.card.hallsSummary", {
+              total: venue.totalHallCount,
+              suitable: venue.suitableHallCount ?? venue.totalHallCount,
+            })}
+          </p>
+        )}
 
         {venue.city && (
           <p className="mt-1 flex items-center gap-1 text-[10px] text-white/47">
@@ -107,16 +129,16 @@ export function VenueCard({ venue, availableOn }: VenueCardProps) {
             ) : <span className="text-[#e6b84d]/70">{t("venue.card.newVenue")}</span>}
           </div>
 
-          {venue.pricePerPerson ? (
-            showPrice ? (
+          {!showPrice ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">
+              <Lock className="h-3 w-3" /> {t("common.priceOnLogin")}
+            </span>
+          ) : minPrice != null && minPrice >= 0 ? (
               <p className="text-[10px] font-semibold text-white/76">
-                {formatPrice(venue.pricePerPerson, null, locale)} {t("common.perPerson")}
+                {t("venue.card.fromPrice", {
+                  price: formatPrice(minPrice, null, locale) ?? formatAmount(minPrice, null, locale),
+                })}{unitPriceOnly ? ` ${t("venue.card.perPersonSuffix")}` : ""}
               </p>
-            ) : (
-              <span className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-gold/10 px-2 py-0.5 text-[11px] font-medium text-gold/90">
-                <Lock className="h-3 w-3" /> {t("common.priceOnLogin")}
-              </span>
-            )
           ) : null}
         </div>
       </div>

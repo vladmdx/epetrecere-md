@@ -13,6 +13,7 @@ import {
   reorderVenueImages,
   type VenueImageWriteFailure,
 } from "@/lib/partner/venue-image-writes";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
 
 // Venue gallery images CRUD — mirrors /api/artist-images.
 //
@@ -51,15 +52,20 @@ export async function GET(req: NextRequest) {
   }
 
   const [venue] = await db
-    .select({ isActive: venues.isActive })
+    .select({ id: venues.id })
     .from(venues)
     .where(eq(venues.id, venueId))
     .limit(1);
   if (!venue) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  let canViewInactive = false;
-  if (!venue.isActive) {
+  const [published] = await db
+    .select({ id: venues.id })
+    .from(venues)
+    .where(and(eq(venues.id, venueId), publishedVenuePredicateSql()))
+    .limit(1);
+  let canViewPrivate = false;
+  if (!published) {
     const actor = await getCurrentAppUser();
     if (!actor) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -68,7 +74,7 @@ export async function GET(req: NextRequest) {
     if (!access.ok) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    canViewInactive = true;
+    canViewPrivate = true;
   }
 
   const rows = await db
@@ -90,7 +96,7 @@ export async function GET(req: NextRequest) {
     .where(and(
       eq(venueImages.venueId, venueId),
       isNull(venueImages.hallId),
-      canViewInactive ? undefined : eq(venues.isActive, true),
+      canViewPrivate ? undefined : publishedVenuePredicateSql(),
     ))
     .orderBy(asc(venueImages.sortOrder), asc(venueImages.id));
 

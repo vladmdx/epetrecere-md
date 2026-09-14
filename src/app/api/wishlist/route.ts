@@ -19,6 +19,8 @@ import {
   wishlistItems,
   categories,
 } from "@/lib/db/schema";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 async function resolveUser() {
   const { userId: clerkId } = await auth();
@@ -35,6 +37,7 @@ async function resolveUser() {
 export async function GET() {
   const user = await resolveUser();
   if (!user) return NextResponse.json({ items: [] });
+  const multiHallEnabled = isMultiHallEnabled();
 
   const rows = await db
     .select({
@@ -85,6 +88,7 @@ export async function GET() {
           .where(and(
             inArray(venues.id, venueIds),
             eq(venues.isActive, true),
+            publishedVenuePredicateSql(),
           ))
       : Promise.resolve([]),
     venueIds.length
@@ -101,6 +105,7 @@ export async function GET() {
               eq(venueImages.isCover, true),
               isNull(venueImages.hallId),
               eq(venues.isActive, true),
+              publishedVenuePredicateSql(),
             ),
           )
       : Promise.resolve([]),
@@ -147,7 +152,7 @@ export async function GET() {
         name: v.nameRo,
         slug: v.slug,
         coverImageUrl: venueCoverMap.get(r.entityId) ?? null,
-        priceFrom: v.pricePerPerson,
+        priceFrom: multiHallEnabled ? null : v.pricePerPerson,
         city: v.city,
         categories: [],
         addedAt: r.createdAt,
@@ -197,6 +202,7 @@ export async function POST(req: NextRequest) {
       .where(and(
         eq(venues.id, parsed.data.entityId),
         eq(venues.isActive, true),
+        publishedVenuePredicateSql(),
       ))
       .limit(1);
     if (!v) return NextResponse.json({ error: "Not found" }, { status: 404 });

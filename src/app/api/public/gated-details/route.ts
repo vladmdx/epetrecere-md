@@ -2,8 +2,15 @@ import { NextResponse, type NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { artists, venues, artistPackages, venueMenuCategories, venueMenuItems, venueMenuPackages } from "@/lib/db/schema";
+import { artists, venues, artistPackages, venueMenuCategories, venueMenuItems, venueMenuPackages, venueHalls } from "@/lib/db/schema";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
+import { rateLimit } from "@/lib/rate-limit";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
+import { parseCatalogFilters } from "@/lib/venues/catalog-filters";
+import { hallEffectivePrice } from "@/lib/venues/effective-price";
+import { hallPriceFields } from "@/lib/venues/catalog-dto";
+import { getVenueMenuForHall } from "@/lib/venues/menu-query";
 
 /**
  * The handful of fields an artist or venue profile shows only to signed-in
@@ -31,6 +38,12 @@ export async function GET(req: NextRequest) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const ip = req.headers.get("x-forwarded-for") || "anonymous";
+  const { success } = await rateLimit(`gated-details:${userId}:${ip}`, 60, 60_000);
+  if (!success) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
   }
 
   const type = req.nextUrl.searchParams.get("type");
@@ -62,13 +75,66 @@ export async function GET(req: NextRequest) {
       pricePerPerson: venues.pricePerPerson,
     })
     .from(venues)
-    .where(and(eq(venues.slug, slug), eq(venues.isActive, true)))
+    .where(and(eq(venues.slug, slug), publishedVenuePredicateSql()))
     .limit(1);
   if (!row) return NextResponse.json({ error: "not_found" }, { status: 404 });
-  const categories = await db.select().from(venueMenuCategories).where(eq(venueMenuCategories.venueId, row.id));
-  const packages = await db.select().from(venueMenuPackages).where(eq(venueMenuPackages.venueId, row.id));
-  const items = categories.length ? await db.select().from(venueMenuItems).where(inArray(venueMenuItems.categoryId, categories.map(c => c.id))) : [];
-  return NextResponse.json(publicCatalogData({ ...row, menu: { categories, packages, items } }, true), {
+  if (!isMultiHallEnabled()) {
+    const categories = await db.select().from(venueMenuCategories).where(eq(venueMenuCategories.venueId, row.id));
+    const packages = await db.select().from(venueMenuPackages).where(eq(venueMenuPackages.venueId, row.id));
+    const items = categories.length ? await db.select().from(venueMenuItems).where(inArray(venueMenuItems.categoryId, categories.map(c => c.id))) : [];
+    return NextResponse.json(publicCatalogData({ ...row, menu: { categories, packages, items } }, true), {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  }
+
+  const guestCount = parseCatalogFilters({
+    guest_count: req.nextUrl.searchParams.get("guest_count") ?? req.nextUrl.searchParams.get("guests"),
+  }).guestCount;
+  const requestedHallSlug = req.nextUrl.searchParams.get("hall")?.trim() || null;
+  if (!requestedHallSlug) {
+    return NextResponse.json({ error: "hall_required" }, { status: 400 });
+  }
+  const halls = await db
+    .select({
+      id: venueHalls.id,
+      slug: venueHalls.slug,
+      pricingModel: venueHalls.pricingModel,
+      basePrice: venueHalls.basePrice,
+      minimumOrder: venueHalls.minimumOrder,
+      currency: venueHalls.currency,
+    })
+    .from(venueHalls)
+    .where(and(
+      eq(venueHalls.venueId, row.id),
+      eq(venueHalls.status, "active"),
+      eq(venueHalls.slug, requestedHallSlug),
+    ))
+    .limit(1);
+  if (!halls.length) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
+  const hallPrices = halls.map((hall) => {
+    const price = hallEffectivePrice(hall, guestCount);
+    return {
+      id: hall.id,
+      slug: hall.slug,
+      ...hallPriceFields(true, price),
+      pricingModel: hall.pricingModel,
+    };
+  });
+  const selectedPrice = halls.length ? hallEffectivePrice(halls[0], guestCount) : null;
+  const selectedComparable = selectedPrice?.comparable ? selectedPrice : null;
+  const menu = halls.length
+    ? await getVenueMenuForHall(row.id, halls[0].id)
+    : { categories: [], items: [], packages: [] };
+  return NextResponse.json(publicCatalogData({
+    id: row.id,
+    pricePerPerson: null,
+    minEffectivePrice: selectedComparable?.amount ?? null,
+    currency: selectedComparable?.currency ?? null,
+    halls: hallPrices,
+    menu,
+  }, true), {
     headers: { "Cache-Control": "private, no-store" },
   });
 }

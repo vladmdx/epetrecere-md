@@ -4,6 +4,7 @@
 // POST             — owner-gated writes via action field
 
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -11,8 +12,19 @@ import {
   venueMenuCategories,
   venueMenuItems,
   venueMenuPackages,
+  venueHalls,
+  venues,
 } from "@/lib/db/schema";
-import { requireVenueCapability } from "@/lib/venue-access";
+import {
+  authorizeVenueCapability,
+  getCurrentAppUser,
+  requireVenueCapability,
+} from "@/lib/venue-access";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { publicCatalogData } from "@/lib/privacy/public-catalog";
+import { rateLimit } from "@/lib/rate-limit";
+import { getVenueMenuForHall } from "@/lib/venues/menu-query";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
 
 // ADR 0028 — ownership resolved through the membership chain (legacy fallback +
 // admin bypass inside requireVenueAccess). Return shape kept for the handlers.
@@ -26,6 +38,50 @@ export async function GET(req: NextRequest) {
   const venueId = Number(req.nextUrl.searchParams.get("venue_id"));
   if (!Number.isFinite(venueId) || venueId < 1) {
     return NextResponse.json({ error: "venue_id required" }, { status: 400 });
+  }
+
+  const { userId } = await auth();
+  const ip = req.headers.get("x-forwarded-for") || "anonymous";
+  const limited = await rateLimit(`venue-menu:${userId ?? "anonymous"}:${ip}`, 60, 60_000);
+  if (!limited.success) {
+    return NextResponse.json({ error: "rate_limited" }, { status: 429 });
+  }
+
+  const actor = userId ? await getCurrentAppUser() : null;
+  const access = actor ? await authorizeVenueCapability(actor, venueId, "view_private") : null;
+  const privileged = Boolean(access?.ok);
+  if (!privileged) {
+    const [published] = await db
+      .select({ id: venues.id })
+      .from(venues)
+      .where(and(eq(venues.id, venueId), publishedVenuePredicateSql()))
+      .limit(1);
+    if (!published) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  let selectedHallId: number | null = null;
+  if (isMultiHallEnabled()) {
+    const hallIdRaw = req.nextUrl.searchParams.get("hall_id");
+    if (hallIdRaw != null) {
+      const hallId = Number(hallIdRaw);
+      if (!Number.isSafeInteger(hallId) || hallId <= 0) {
+        return NextResponse.json({ error: "Invalid hall_id" }, { status: 400 });
+      }
+      const [hall] = await db
+        .select({ id: venueHalls.id, status: venueHalls.status })
+        .from(venueHalls)
+        .where(and(eq(venueHalls.id, hallId), eq(venueHalls.venueId, venueId)))
+        .limit(1);
+      if (!hall || (!privileged && hall.status !== "active")) {
+        return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      selectedHallId = hall.id;
+    }
+    const menu = await getVenueMenuForHall(venueId, selectedHallId);
+    return NextResponse.json(
+      privileged ? menu : publicCatalogData(menu, Boolean(userId)),
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
   }
 
   const [categories, packages] = await Promise.all([
@@ -60,7 +116,11 @@ export async function GET(req: NextRequest) {
           .orderBy(asc(venueMenuItems.sortOrder), asc(venueMenuItems.id))
       : [];
 
-  return NextResponse.json({ categories, items, packages });
+  const menu = { categories, items, packages };
+  return NextResponse.json(
+    privileged ? menu : publicCatalogData(menu, Boolean(userId)),
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
 
 // Action-based POST

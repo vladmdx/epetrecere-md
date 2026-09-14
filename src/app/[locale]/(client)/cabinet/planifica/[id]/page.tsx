@@ -96,9 +96,12 @@ import { guestHeadcount, assignedHeadcount } from "@/lib/planner/guest-headcount
 import { checklistDisplayTitle } from "@/lib/planner/checklist-copy";
 import {
   bookingCreateScope,
+  BookingCreateHallConflictError,
   isAmbiguousBookingCreateStatus,
+  pendingBookingCreateHallId,
   submitBookingCreateRequest,
 } from "@/lib/booking/booking-create-client";
+import { resolveSelectedHall } from "@/lib/venues/hall-selection";
 const DATE_LOCALES = { ro: "ro-MD", ru: "ru-RU", en: "en-GB" } as const;
 
 function eventRateLabel(tier: PricingTier | undefined, locale: keyof typeof DATE_LOCALES, fallback: string): string {
@@ -3861,8 +3864,17 @@ interface DiscoveryVenue {
   capacityMax: number | null;
   pricePerPerson: number | null;
   coverUrl?: string | null;
+  coverImageUrl?: string | null;
   ratingAvg: number;
   ratingCount: number;
+  halls?: Array<{
+    id: number;
+    slug: string;
+    nameRo: string;
+    suitable: boolean;
+    available: boolean | null;
+  }>;
+  eligibleHallIds?: number[];
 }
 
 function VenuesTab({
@@ -3927,14 +3939,23 @@ function VenuesTab({
     } else if (plan.location && radius < 999) {
       params.set("city", plan.location);
     }
-    if (plan.guestCountTarget) params.set("capacity_min", String(plan.guestCountTarget));
+    if (plan.guestCountTarget) {
+      params.set("capacity_min", String(plan.guestCountTarget));
+      params.set("guest_count", String(plan.guestCountTarget));
+    }
+    const interval = venueRequestInterval({
+      startTime: plan.startTime,
+      durationHours: plan.durationHours,
+    });
+    if (interval.startTime) params.set("start", interval.startTime);
+    if (interval.endTime) params.set("end", interval.endTime);
     params.set("limit", "24");
     fetch(`/api/venues?${params.toString()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { venues: [] }))
       .then((data) => setVenues(data.items ?? data.venues ?? data ?? []))
       .catch(() => setVenues([]))
       .finally(() => setLoading(false));
-  }, [plan.eventDate, plan.location, plan.guestCountTarget, expandedCities, radius]);
+  }, [plan.eventDate, plan.location, plan.guestCountTarget, plan.startTime, plan.durationHours, expandedCities, radius]);
 
   return (
     <div className="space-y-8">
@@ -5112,8 +5133,69 @@ function VenueDiscoveryCard({
 }) {
   const { user } = useUser();
   const router = useLocalizedRouter();
+  const searchParams = useSearchParams();
   const { t } = useLocale();
   const [submitting, setSubmitting] = useState(false);
+  const halls = v.halls ?? [];
+  const interval = venueRequestInterval(plan);
+  const intervalComplete = Boolean(plan.eventDate && interval.startTime && interval.endTime);
+  const deepLinkedHallSlug = Number(searchParams.get("venue")) === v.id
+    ? searchParams.get("hall")
+    : null;
+  const [hallSlug, setHallSlug] = useState<string | null>(deepLinkedHallSlug);
+  const selection = resolveSelectedHall({
+    halls,
+    requestedSlug: hallSlug,
+    intervalComplete,
+  });
+  const selectedHallId = selection.hallId;
+  const selectedHall = halls.find((hall) => hall.id === selectedHallId) ?? null;
+  const [pendingHallId, setPendingHallId] = useState<number | null>(null);
+  const hallLocked = pendingHallId != null;
+  const pendingRetry = pendingHallId != null && pendingHallId === selectedHallId;
+  const hallRequired = halls.length > 0;
+  const ctaNeedsHall = hallRequired && !selectedHallId;
+  const hallUnavailable = Boolean(
+    selectedHall
+      && (!selectedHall.suitable || (intervalComplete && selectedHall.available !== true))
+      && !pendingRetry,
+  );
+  const displayedHalls = halls.filter((hall) => (
+    hall.id === selectedHallId
+    || (hall.suitable && (!intervalComplete || hall.available === true))
+  ));
+
+  function refreshPendingHall() {
+    if (!user?.id) return;
+    try {
+      const nextPendingHallId = pendingBookingCreateHallId(
+        window.sessionStorage,
+        bookingCreateScope({
+          actorId: user.id,
+          venueId: v.id,
+          eventPlanId: plan.id,
+        }),
+      );
+      setPendingHallId(nextPendingHallId);
+      const pendingHall = halls.find((hall) => hall.id === nextPendingHallId);
+      if (pendingHall) setHallSlug(pendingHall.slug);
+    } catch {
+      setPendingHallId(null);
+    }
+  }
+
+  useEffect(() => {
+    refreshPendingHall();
+    // Reading the immutable retry envelope is intentionally keyed by scope,
+    // not by the currently selected Hall.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, v.id, plan.id]);
+
+  useEffect(() => {
+    if (!hallSlug && selection.preselected && selection.slug) {
+      setHallSlug(selection.slug);
+    }
+  }, [hallSlug, selection.preselected, selection.slug]);
 
   const isHolder = !!existingBooking && existingBooking.status === "pending";
   const isConfirmed =
@@ -5133,6 +5215,18 @@ function VenueDiscoveryCard({
       toast.error(t("cabinet.plan.venueCard.needDate"));
       return;
     }
+    if (hallRequired && !selectedHallId) {
+      toast.error(t("requestForm.errorNoHall"));
+      return;
+    }
+    if (hallLocked && pendingHallId !== selectedHallId) {
+      toast.error(t("requestForm.hallLockedRetry"));
+      return;
+    }
+    if (hallUnavailable) {
+      toast.error(t("requestForm.hallUnavailable"));
+      return;
+    }
     setSubmitting(true);
     try {
       const payload = {
@@ -5146,6 +5240,7 @@ function VenueDiscoveryCard({
         eventType: plan.eventType ?? undefined,
         guestCount: plan.guestCountTarget ?? undefined,
         message: `Cerere din planul ${plan.title}`,
+        ...(selectedHallId ? { hallId: selectedHallId } : {}),
       };
       const res = await submitBookingCreateRequest({
         scope: bookingCreateScope({
@@ -5156,9 +5251,11 @@ function VenueDiscoveryCard({
         payload,
       });
       if (!res.ok) {
+        refreshPendingHall();
         const err = await res.response.json().catch(() => ({}));
         throw new Error(err.error || t("cabinet.plan.sendError"));
       }
+      refreshPendingHall();
       toast.success(t("cabinet.plan.venueCard.requestSent", { name: v.nameRo }));
       await onRefresh();
       // Hand control to the partners tab — booking the venue is the
@@ -5169,30 +5266,45 @@ function VenueDiscoveryCard({
         router.replace(planTabHref(plan.id, "bookings"), { scroll: false });
       }, 2500);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("cabinet.plan.genericError"));
+      refreshPendingHall();
+      toast.error(
+        err instanceof BookingCreateHallConflictError
+          ? t("requestForm.hallLockedRetry")
+          : err instanceof Error ? err.message : t("cabinet.plan.genericError"),
+      );
     } finally {
       setSubmitting(false);
     }
   }
 
+  const detailParams = new URLSearchParams({ plan: String(plan.id) });
+  if (selection.slug) detailParams.set("hall", selection.slug);
+  if (plan.eventDate) detailParams.set("date", plan.eventDate);
+  if (interval.startTime) detailParams.set("start", interval.startTime);
+  if (interval.endTime) detailParams.set("end", interval.endTime);
+  if (plan.guestCountTarget) detailParams.set("guest_count", String(plan.guestCountTarget));
+  const detailHref = `/sali/${v.slug}?${detailParams.toString()}`;
+
   return (
     <div className="group rounded-xl border border-border/40 bg-card p-4 transition-all hover:border-gold/40">
       <Link
-        href={`/sali/${v.slug}?plan=${plan.id}`}
+        href={detailHref}
         className="flex items-start gap-3"
       >
-        {v.coverUrl ? (
-
+        {(() => {
+          const cover = v.coverUrl || v.coverImageUrl;
+          return cover ? (
           <img
-            src={v.coverUrl}
+            src={cover}
             alt=""
             className="h-16 w-16 rounded-lg object-cover shrink-0"
           />
-        ) : (
+          ) : (
           <div className="h-16 w-16 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
             <MapPin className="h-6 w-6 text-gold" />
           </div>
-        )}
+          );
+        })()}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold truncate group-hover:text-gold">
             {v.nameRo}
@@ -5257,9 +5369,30 @@ function VenueDiscoveryCard({
       )}
 
       <div className="mt-3 flex gap-2 border-t border-border/30 pt-3">
+        {halls.length > 0 && (
+          <select
+            className="h-9 min-w-0 flex-1 rounded-md border border-border/40 bg-background px-2 text-xs"
+            value={selection.slug ?? ""}
+            disabled={hallLocked || submitting || sent}
+            onChange={(event) => setHallSlug(event.target.value || null)}
+          >
+            {halls.length !== 1 || !selection.preselected ? (
+              <option value="">{t("venue.detail.selectHall")}</option>
+            ) : null}
+            {displayedHalls.map((hall) => (
+              <option
+                key={hall.id}
+                value={hall.slug}
+                disabled={!hall.suitable || (intervalComplete && hall.available !== true)}
+              >
+                {hall.nameRo}
+              </option>
+            ))}
+          </select>
+        )}
         <Button
           onClick={sendRequest}
-          disabled={ctaDisabled}
+          disabled={ctaDisabled || ctaNeedsHall || hallUnavailable || (hallLocked && pendingHallId !== selectedHallId)}
           size="sm"
           className="flex-1 gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
           title={
@@ -5289,7 +5422,7 @@ function VenueDiscoveryCard({
                   ? t("cabinet.plan.venueCard.ctaUnavailable")
                   : t("booking.card.requestBooking")}
         </Button>
-        <Link href={`/sali/${v.slug}?plan=${plan.id}`} target="_blank">
+        <Link href={detailHref} target="_blank">
           <Button size="sm" variant="outline" className="gap-1.5">
             <ExternalLink className="h-3.5 w-3.5" />
             {t("cabinet.plan.venueCard.details")}

@@ -1,7 +1,9 @@
 import { db } from "@/lib/db";
 import { artists, venues } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { getMeiliClient } from "./meilisearch";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 /** Sync a single artist to Meilisearch index */
 export async function syncArtistToIndex(artistId: number) {
@@ -52,6 +54,16 @@ export async function syncVenueToIndex(venueId: number) {
     return;
   }
 
+  const [published] = await db
+    .select({ id: venues.id })
+    .from(venues)
+    .where(and(eq(venues.id, venueId), publishedVenuePredicateSql()))
+    .limit(1);
+  if (!published) {
+    try { await client.index("venues").deleteDocument(venueId); } catch {}
+    return;
+  }
+
   await client.index("venues").addDocuments([{
     id: venue.id,
     slug: venue.slug,
@@ -61,7 +73,7 @@ export async function syncVenueToIndex(venueId: number) {
     description_ro: venue.descriptionRo,
     city: venue.city,
     capacity_max: venue.capacityMax,
-    price_per_person: venue.pricePerPerson,
+    ...(!isMultiHallEnabled() ? { price_per_person: venue.pricePerPerson } : {}),
     rating_avg: venue.ratingAvg,
     type: "venue",
   }], { primaryKey: "id" });
@@ -80,7 +92,7 @@ export async function fullReindex() {
   const allVenues = await db
     .select()
     .from(venues)
-    .where(eq(venues.isActive, true));
+    .where(publishedVenuePredicateSql());
 
   if (allArtists.length) {
     await client.index("artists").addDocuments(
@@ -113,7 +125,7 @@ export async function fullReindex() {
         description_ro: v.descriptionRo,
         city: v.city,
         capacity_max: v.capacityMax,
-        price_per_person: v.pricePerPerson,
+        ...(!isMultiHallEnabled() ? { price_per_person: v.pricePerPerson } : {}),
         rating_avg: v.ratingAvg,
         type: "venue" as const,
       })),

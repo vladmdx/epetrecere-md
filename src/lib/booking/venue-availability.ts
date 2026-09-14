@@ -19,6 +19,7 @@ import { isMultiHallEnabled } from "@/lib/feature-flags";
 import { DEFAULT_BUFFER_MINUTES } from "@/lib/moldova-cities";
 import {
   canonicalVenueInterval,
+  canonicalVenueIntervalStrict,
   intervalsOverlapHalfOpen,
   localDatesIntersecting,
   weekdayMonStart,
@@ -192,7 +193,7 @@ export async function evaluateVenueAvailability(opts: {
   const timezone = opts.timezone || venue.timezone || "Europe/Chisinau";
   let interval: CanonicalInterval;
   try {
-    interval = canonicalVenueInterval({
+    interval = canonicalVenueIntervalStrict({
       eventDate: opts.eventDate,
       startTime: opts.startTime,
       endTime: opts.endTime,
@@ -503,7 +504,9 @@ export async function evaluateVenueAvailability(opts: {
 
     const sameHall = resolved.hallId != null && booking.hallId === resolved.hallId;
     const otherIncompatible = booking.hallId != null && conflictingUsableHallIds.includes(booking.hallId);
-    const legacyVenueWide = booking.hallId == null && resolved.hallId == null;
+    // Legacy rows without a Hall predate multi-Hall and represented the whole
+    // venue. They must block every Hall, matching the catalog evaluator.
+    const legacyVenueWide = booking.hallId == null;
 
     if (sameHall || legacyVenueWide) {
       return {

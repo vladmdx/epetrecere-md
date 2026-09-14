@@ -6,6 +6,8 @@ import { db } from "@/lib/db";
 import { artists, venues } from "@/lib/db/schema";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 export async function GET(req: NextRequest) {
   // Rate limit: 30 searches per minute per IP
@@ -21,6 +23,10 @@ export async function GET(req: NextRequest) {
   }
 
   const { userId } = await auth();
+  const multiHallEnabled = isMultiHallEnabled();
+  const withoutStaleVenuePrices = <T extends { price_per_person?: unknown }>(rows: T[]) => (
+    multiHallEnabled ? rows.map((row) => ({ ...row, price_per_person: null })) : rows
+  );
   const respond = (data: unknown) => NextResponse.json(publicCatalogData(data, Boolean(userId)), {headers:{"Cache-Control":"private, no-store"}});
   // Try Meilisearch first, fallback to DB search
   try {
@@ -29,11 +35,11 @@ export async function GET(req: NextRequest) {
       // The index may lag deletions/moderation. The database is authoritative.
       const [activeArtists, activeVenues] = await Promise.all([
         results.artists.length ? db.select({id: artists.id}).from(artists).where(and(eq(artists.isActive, true), inArray(artists.id, results.artists.map(a => a.id)))) : [],
-        results.venues.length ? db.select({id: venues.id}).from(venues).where(and(eq(venues.isActive, true), inArray(venues.id, results.venues.map(v => v.id)))) : [],
+        results.venues.length ? db.select({id: venues.id}).from(venues).where(and(publishedVenuePredicateSql(), inArray(venues.id, results.venues.map(v => v.id)))) : [],
       ]);
       return respond({
         artists: results.artists.filter(a => activeArtists.some(x => x.id === a.id)),
-        venues: results.venues.filter(v => activeVenues.some(x => x.id === v.id)),
+        venues: withoutStaleVenuePrices(results.venues.filter(v => activeVenues.some(x => x.id === v.id))),
       });
     }
   } catch {
@@ -73,13 +79,16 @@ export async function GET(req: NextRequest) {
       })
       .from(venues)
       .where(
-        sql`${venues.isActive} = true AND (${venues.nameRo} ILIKE ${searchPattern} OR ${venues.nameRu} ILIKE ${searchPattern} OR ${venues.nameEn} ILIKE ${searchPattern})`,
+        and(
+          publishedVenuePredicateSql(),
+          sql`(${venues.nameRo} ILIKE ${searchPattern} OR ${venues.nameRu} ILIKE ${searchPattern} OR ${venues.nameEn} ILIKE ${searchPattern})`,
+        ),
       )
       .limit(5),
   ]);
 
   return respond({
     artists: artistResults,
-    venues: venueResults,
+    venues: withoutStaleVenuePrices(venueResults),
   });
 }
