@@ -13,6 +13,7 @@ const comparePage = readFileSync(
   "src/app/[locale]/(public)/sali/compare/page.tsx",
   "utf8",
 );
+const wishlistRoute = readFileSync("src/app/api/wishlist/route.ts", "utf8");
 
 test("venue image routes delegate every mutation with an authenticated actor id", () => {
   assert.match(collectionRoute, /hallId:\s*z\.null\(\)\.optional\(\)/);
@@ -76,6 +77,20 @@ test("the public gallery never exposes inactive venue images to anonymous caller
   assert.ok(
     getBody.indexOf("if (!venue.isActive)") < getBody.indexOf(".from(venueImages)"),
   );
+
+  assert.match(
+    wishlistRoute,
+    /\.from\(venues\)[\s\S]*inArray\(venues\.id, venueIds\)[\s\S]*eq\(venues\.isActive, true\)/,
+  );
+  assert.match(
+    wishlistRoute,
+    /\.from\(venueImages\)[\s\S]*\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)[\s\S]*eq\(venues\.isActive, true\)/,
+  );
+  const postStart = wishlistRoute.indexOf("export async function POST");
+  const postEnd = wishlistRoute.indexOf("// ─── DELETE", postStart);
+  const postBody = wishlistRoute.slice(postStart, postEnd);
+  assert.match(postBody, /eq\(artists\.isActive, true\)/);
+  assert.match(postBody, /eq\(venues\.isActive, true\)/);
 });
 
 test("transactional authority follows the shared lock order", () => {

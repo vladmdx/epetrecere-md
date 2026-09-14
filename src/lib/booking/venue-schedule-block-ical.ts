@@ -4,24 +4,24 @@ export type VenueScheduleBlockIcal =
   | { allDay: false }
   | { allDay: true; startDate: string; endDateExclusive: string };
 
-function isIanaTimeZone(value: string): boolean {
+function resolvedIanaTimeZone(value: string): string | null {
   try {
-    const supported = (
-      Intl as typeof Intl & { supportedValuesOf?: (key: string) => string[] }
-    ).supportedValuesOf?.("timeZone");
-    if (Array.isArray(supported)) return supported.includes(value);
-    new Intl.DateTimeFormat("en-US", { timeZone: value });
-    return true;
+    // `Intl.supportedValuesOf("timeZone")` is not a validation API: engines
+    // may omit valid aliases such as UTC, Etc/UTC, or US/Eastern. Let the
+    // formatter validate and canonicalize the exact value instead.
+    return new Intl.DateTimeFormat("en-US", { timeZone: value })
+      .resolvedOptions()
+      .timeZone;
   } catch {
-    return false;
+    return null;
   }
 }
 
 /** Venue IANA zone for iCal. Invalid or empty legacy values fall back safely. */
 export function canonicalVenueIcalTimeZone(value: string | null | undefined): string {
   const trimmed = value?.trim();
-  if (trimmed && isIanaTimeZone(trimmed)) return trimmed;
-  return DEFAULT_VENUE_TZ;
+  if (!trimmed) return DEFAULT_VENUE_TZ;
+  return resolvedIanaTimeZone(trimmed) ?? DEFAULT_VENUE_TZ;
 }
 
 /**

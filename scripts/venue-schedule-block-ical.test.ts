@@ -96,3 +96,10 @@ test("invalid or empty venue timezones fall back to the default IANA zone", () =
   assert.equal(canonicalVenueIcalTimeZone("Not/AZone"), DEFAULT_VENUE_TZ);
   assert.equal(canonicalVenueIcalTimeZone("America/New_York"), NY);
 });
+
+test("valid ICU timezone aliases are accepted even when supportedValuesOf omits them", () => {
+  assert.equal(canonicalVenueIcalTimeZone("UTC"), "UTC");
+  assert.equal(canonicalVenueIcalTimeZone("Etc/UTC"), "UTC");
+  assert.equal(canonicalVenueIcalTimeZone("US/Eastern"), NY);
+  assert.equal(canonicalVenueIcalTimeZone("Europe/Kyiv"), "Europe/Kiev");
+});

@@ -38,6 +38,21 @@ test("unknown admin action cannot fall through into destructive rejection", () =
   }
 });
 
+test("same-name artist registrations claim a unique slug inside the serialized write", () => {
+  const source = readFileSync("src/app/api/auth/register-artist/route.ts", "utf8");
+  const claimStart = source.indexOf("claimArtistRegistrationInDatabase({");
+  const claimEnd = source.indexOf("if (!claimed.ok)", claimStart);
+  assert.ok(claimStart >= 0 && claimEnd > claimStart);
+  const claimBody = source.slice(claimStart, claimEnd);
+  assert.match(claimBody, /pickUniqueSlug\(data\.name/);
+  assert.match(claimBody, /await executor[\s\S]*\.from\(artists\)/);
+  assert.match(
+    claimBody,
+    /\.insert\(artists\)[\s\S]*\.onConflictDoNothing\(\{ target: artists\.slug \}\)[\s\S]*\.returning\(\)/,
+  );
+  assert.doesNotMatch(source.slice(0, claimStart), /pickUniqueSlug\(data\.name/);
+});
+
 test("partner event types are canonical, ordered and backward compatible", () => {
   assert.deepEqual(normalizeArtistEventTypes(null), ALL_EVENT_TYPES);
   assert.deepEqual(

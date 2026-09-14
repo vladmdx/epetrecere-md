@@ -208,17 +208,6 @@ export async function POST(req: Request) {
     const data = parsed.data;
     const [category] = await db.select({ id: categories.id }).from(categories).where(and(eq(categories.id, data.categoryId), eq(categories.isActive, true))).limit(1);
     if (!category) return NextResponse.json({ error: "invalid_category" }, { status: 400 });
-    // Clean slug derived from the artist's name. We collide-check against
-    // existing artists.slug; -2/-3 suffixes are added only when needed.
-    const slug = await pickUniqueSlug(data.name, async (candidate) => {
-      const [hit] = await db
-        .select({ id: artists.id })
-        .from(artists)
-        .where(eq(artists.slug, candidate))
-        .limit(1);
-      return !!hit;
-    });
-
     // An omitted legacy/mobile field means "preserve the account phone", not
     // "write the pre-transaction snapshot back". Only an explicit value is
     // normalized here; the callback reads the locked account value below.
@@ -277,38 +266,55 @@ export async function POST(req: Request) {
       write: async (executor, lockedUser) => {
         const finalPhone = requestedPhone ?? lockedUser.phone;
         if (!finalPhone) throw new Error("artist_registration_phone_invariant_failed");
-        const [artist] = await executor
-          .insert(artists)
-          .values({
-            userId: lockedUser.id,
-            nameRo: data.name,
-            nameRu: data.name,
-            nameEn: data.name,
-            slug,
-            phone: finalPhone,
-            email: lockedUser.email,
-            photoUrl: data.imageUrl || null,
-            descriptionRo: descriptions.ro,
-            descriptionRu: descriptions.ru,
-            descriptionEn: descriptions.en,
-            ...artistLocationUpdate({ baseCity: data.baseCity, location: data.location || "Chișinău" }),
-            travelDistanceKm: data.travelDistanceKm ?? 30,
-            travelSurchargeEnabled: data.travelSurchargeEnabled ?? false,
-            travelSurchargeAmount: data.travelSurchargeEnabled ? data.travelSurchargeAmount ?? null : null,
-            priceHidden: data.priceHidden ?? false,
-            priceFrom: resolvedPriceFrom,
-            categoryIds: [data.categoryId],
-            // Older mobile builds do not send this field yet. They retain the
-            // all-events behaviour while the current onboarding requires a choice.
-            eventTypes: data.eventTypes ?? [...EVENT_TYPE_KEYS],
-            isActive: false,
-            isVerified: false,
-            isFeatured: false,
-            isPremium: false,
-            calendarEnabled: false,
-            seoTitleRo: `${data.name} — Artist Evenimente | ePetrecere.md`,
-          })
-          .returning();
+        let artist: typeof artists.$inferSelect | undefined;
+        // Different users do not share an account lock. Resolve and claim the
+        // unique slug inside this transaction, retrying only a slug conflict
+        // if another same-name registration commits first.
+        for (let attempt = 0; attempt < 64 && !artist; attempt += 1) {
+          const slug = await pickUniqueSlug(data.name, async (candidate) => {
+            const [hit] = await executor
+              .select({ id: artists.id })
+              .from(artists)
+              .where(eq(artists.slug, candidate))
+              .limit(1);
+            return Boolean(hit);
+          });
+          const [created] = await executor
+            .insert(artists)
+            .values({
+              userId: lockedUser.id,
+              nameRo: data.name,
+              nameRu: data.name,
+              nameEn: data.name,
+              slug,
+              phone: finalPhone,
+              email: lockedUser.email,
+              photoUrl: data.imageUrl || null,
+              descriptionRo: descriptions.ro,
+              descriptionRu: descriptions.ru,
+              descriptionEn: descriptions.en,
+              ...artistLocationUpdate({ baseCity: data.baseCity, location: data.location || "Chișinău" }),
+              travelDistanceKm: data.travelDistanceKm ?? 30,
+              travelSurchargeEnabled: data.travelSurchargeEnabled ?? false,
+              travelSurchargeAmount: data.travelSurchargeEnabled ? data.travelSurchargeAmount ?? null : null,
+              priceHidden: data.priceHidden ?? false,
+              priceFrom: resolvedPriceFrom,
+              categoryIds: [data.categoryId],
+              // Older mobile builds do not send this field yet. They retain the
+              // all-events behaviour while the current onboarding requires a choice.
+              eventTypes: data.eventTypes ?? [...EVENT_TYPE_KEYS],
+              isActive: false,
+              isVerified: false,
+              isFeatured: false,
+              isPremium: false,
+              calendarEnabled: false,
+              seoTitleRo: `${data.name} — Artist Evenimente | ePetrecere.md`,
+            })
+            .onConflictDoNothing({ target: artists.slug })
+            .returning();
+          artist = created;
+        }
+        if (!artist) throw new Error("artist_slug_allocation_exhausted");
 
         if (validTiers.length > 0) {
           await executor.insert(artistPackages).values(

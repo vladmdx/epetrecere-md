@@ -67,7 +67,10 @@ export async function GET() {
             categoryIds: artists.categoryIds,
           })
           .from(artists)
-          .where(inArray(artists.id, artistIds))
+          .where(and(
+            inArray(artists.id, artistIds),
+            eq(artists.isActive, true),
+          ))
       : Promise.resolve([]),
     venueIds.length
       ? db
@@ -79,7 +82,10 @@ export async function GET() {
             pricePerPerson: venues.pricePerPerson,
           })
           .from(venues)
-          .where(inArray(venues.id, venueIds))
+          .where(and(
+            inArray(venues.id, venueIds),
+            eq(venues.isActive, true),
+          ))
       : Promise.resolve([]),
     venueIds.length
       ? db
@@ -88,11 +94,13 @@ export async function GET() {
             url: venueImages.url,
           })
           .from(venueImages)
+          .innerJoin(venues, eq(venues.id, venueImages.venueId))
           .where(
             and(
               inArray(venueImages.venueId, venueIds),
               eq(venueImages.isCover, true),
               isNull(venueImages.hallId),
+              eq(venues.isActive, true),
             ),
           )
       : Promise.resolve([]),
@@ -175,14 +183,20 @@ export async function POST(req: NextRequest) {
     const [a] = await db
       .select({ id: artists.id })
       .from(artists)
-      .where(eq(artists.id, parsed.data.entityId))
+      .where(and(
+        eq(artists.id, parsed.data.entityId),
+        eq(artists.isActive, true),
+      ))
       .limit(1);
     if (!a) return NextResponse.json({ error: "Not found" }, { status: 404 });
   } else {
     const [v] = await db
       .select({ id: venues.id })
       .from(venues)
-      .where(eq(venues.id, parsed.data.entityId))
+      .where(and(
+        eq(venues.id, parsed.data.entityId),
+        eq(venues.isActive, true),
+      ))
       .limit(1);
     if (!v) return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
