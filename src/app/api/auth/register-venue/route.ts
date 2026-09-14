@@ -6,13 +6,23 @@
 import { NextResponse, after } from "next/server";
 import { auth, currentUser } from "@clerk/nextjs/server";
 import { z } from "zod/v4";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { artists, venues, users, notifications } from "@/lib/db/schema";
-import { pickUniqueSlug } from "@/lib/utils/slugify";
+import {
+  notifications,
+  legalAcceptances,
+  users,
+  venueHalls,
+  venueImages,
+  venues,
+} from "@/lib/db/schema";
+import { slugify } from "@/lib/utils/slugify";
 import { validatePhone } from "@/lib/phone/validate";
 import { jsonIfMultiHallEnabled } from "@/lib/partner/multi-hall-gate";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
+import { claimLegacyVenueRegistrationInDatabase } from "@/lib/auth/select-role";
+import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
+import { bootstrapAccountUserUnlessErased } from "@/lib/privacy/account-erasure-identity";
 
 // Each day is `{ open: HH:mm, close: HH:mm }` or null (closed). Mirrors
 // venues.workingHours so we can pass it straight through.
@@ -113,223 +123,215 @@ export async function POST(req: Request) {
         );
       }
 
-      const [created] = await db
-        .insert(users)
-        .values({
-          clerkId,
-          email,
-          name: [clerkUser.firstName, clerkUser.lastName]
-            .filter(Boolean)
-            .join(" ") || null,
-          phone: clerkUser.phoneNumbers?.[0]?.phoneNumber || null,
-          avatarUrl: clerkUser.imageUrl || null,
-          role: "user",
-        })
-        .onConflictDoNothing()
-        .returning({ id: users.id, email: users.email });
-
-      if (created) {
-        appUser = created;
-      } else {
-        const [existing] = await db
-          .select({ id: users.id, email: users.email })
-          .from(users)
-          .where(eq(users.clerkId, clerkId))
-          .limit(1);
-        if (!existing) {
-          return NextResponse.json(
-            { error: "User creation failed" },
-            { status: 500 },
-          );
-        }
-        appUser = existing;
+      const bootstrapped = await bootstrapAccountUserUnlessErased({
+        clerkId,
+        email,
+        name: [clerkUser.firstName, clerkUser.lastName]
+          .filter(Boolean)
+          .join(" ") || null,
+        avatarUrl: clerkUser.imageUrl || null,
+      });
+      if (!bootstrapped) {
+        return NextResponse.json(
+          { error: "Account erased", code: "ACCOUNT_ERASED" },
+          { status: 410 },
+        );
       }
+      appUser = bootstrapped;
     }
 
     const missing = await missingRegistrationDocuments(appUser.id, "venue");
     if (missing.length) return NextResponse.json({ error: "current_signed_contract_required", missing }, { status: 409 });
 
-    const [existingArtist] = await db
-      .select({ id: artists.id })
-      .from(artists)
-      .where(eq(artists.userId, appUser.id))
-      .limit(1);
-    if (existingArtist) {
-      return NextResponse.json(
-        { error: "Un cont de artist nu poate fi înregistrat și ca sală." },
-        { status: 409 },
-      );
-    }
+    const data = parsed.data;
+    const claimed = await claimLegacyVenueRegistrationInDatabase({
+      userId: appUser.id,
+      normalizedPhone,
+      write: async (executor, lockedUser, existing) => {
+        let venue: typeof venues.$inferSelect;
+        if (existing) {
+          // Re-submission of a still-pending venue — overwrite all editable
+          // fields, keep the original id + slug + createdAt so any in-flight
+          // admin notifications still resolve.
+          const [updated] = await executor
+            .update(venues)
+            .set({
+              nameRo: data.name,
+              phone: normalizedPhone,
+              email: data.email ?? lockedUser.email ?? null,
+              city: data.city ?? "Chișinău",
+              address: data.address ?? null,
+              capacityMin: data.capacityMin ?? null,
+              capacityMax: data.capacityMax ?? null,
+              descriptionRo: data.description ?? null,
+              website: data.websiteUrl ?? null,
+              menuUrl: data.menuUrl ?? null,
+              menuPdfUrl: data.menuPdfUrl ?? null,
+              virtualTourUrl: data.virtualTourUrl ?? null,
+              // Map data: only overwrite when the new submission carries fresh
+              // values, so a partner who removed the URL doesn't lose previously
+              // resolved coordinates.
+              ...(typeof data.lat === "number" ? { lat: data.lat } : {}),
+              ...(typeof data.lng === "number" ? { lng: data.lng } : {}),
+              ...(data.workingHours ? { workingHours: data.workingHours } : {}),
+              seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
+              updatedAt: new Date(),
+            })
+            .where(eq(venues.id, existing.id))
+            .returning();
+          venue = updated;
+        } else {
+          // SELECT-then-INSERT slug allocation is racy across two unrelated
+          // users choosing the same venue name. Let the unique index decide
+          // each candidate atomically, and retry only a slug conflict.
+          const baseSlug = slugify(data.name) || "venue";
+          let created: typeof venues.$inferSelect | undefined;
+          for (let attempt = 0; attempt < 20 && !created; attempt += 1) {
+            const suffix = attempt === 0 ? "" : `-${attempt + 1}`;
+            const candidate = `${baseSlug.slice(0, 80 - suffix.length)}${suffix}`;
+            [created] = await executor
+              .insert(venues)
+              .values({
+                userId: lockedUser.id,
+                nameRo: data.name,
+                slug: candidate,
+                phone: normalizedPhone,
+                email: data.email ?? lockedUser.email ?? null,
+                city: data.city ?? "Chișinău",
+                address: data.address ?? null,
+                capacityMin: data.capacityMin ?? null,
+                capacityMax: data.capacityMax ?? null,
+                descriptionRo: data.description ?? null,
+                website: data.websiteUrl ?? null,
+                menuUrl: data.menuUrl ?? null,
+                menuPdfUrl: data.menuPdfUrl ?? null,
+                virtualTourUrl: data.virtualTourUrl ?? null,
+                // Coordinates and weekly schedule when the partner pasted a Maps
+                // URL during onboarding. Null otherwise — public page renders the
+                // map only when both lat & lng are present.
+                lat: typeof data.lat === "number" ? data.lat : null,
+                lng: typeof data.lng === "number" ? data.lng : null,
+                workingHours: data.workingHours ?? null,
+                isActive: false,
+                // Launch-phase: every approved venue gets the premium homepage
+                // placement. Will revert to false once paid tiers are introduced.
+                isFeatured: true,
+                facilities: [],
+                seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
+              })
+              .onConflictDoNothing({ target: venues.slug })
+              .returning();
+          }
+          if (!created) throw new Error("legacy_venue_slug_exhausted");
+          venue = created;
+        }
 
-    // A user may own only one APPROVED venue through this flow. If they
-    // already have one that's still pending (isActive=false), treat this
-    // submission as a re-submission and UPDATE the pending row instead of
-    // hard-blocking. The previous behavior locked users out forever after
-    // their first incomplete attempt.
-    const [existing] = await db
-      .select({ id: venues.id, isActive: venues.isActive })
-      .from(venues)
-      .where(eq(venues.userId, appUser.id))
-      .limit(1);
+        // Keep the flag-off model forward-compatible with the expanded schema.
+        // The default hall is the explicit review-state carrier for a legacy
+        // registration: a rejected venue only returns to the queue after this
+        // endpoint deliberately moves its hall back to pending.
+        const [legacyDefault] = await executor
+          .select({ id: venueHalls.id })
+          .from(venueHalls)
+          .where(and(
+            eq(venueHalls.venueId, venue.id),
+            eq(venueHalls.isLegacyDefault, true),
+          ))
+          .for("update")
+          .limit(1);
+        const legacyHallValues = {
+          nameRo: venue.nameRo || "Sala principală",
+          nameRu: venue.nameRu,
+          nameEn: venue.nameEn,
+          capacityMin: venue.capacityMin,
+          capacityMax: venue.capacityMax,
+          pricingModel: "per_person" as const,
+          basePrice: venue.pricePerPerson,
+          currency: "EUR",
+          facilities: venue.facilities ?? [],
+          workingHours: venue.workingHours,
+          bufferMinutes: venue.bufferMinutes,
+          isLegacyDefault: true,
+          status: "pending" as const,
+          sortOrder: 0,
+          updatedAt: new Date(),
+        };
+        if (legacyDefault) {
+          await executor
+            .update(venueHalls)
+            .set(legacyHallValues)
+            .where(eq(venueHalls.id, legacyDefault.id));
+        } else {
+          // Never repurpose an existing real hall just because an older or
+          // partially migrated baseline lacks the legacy marker. Create a
+          // separate default row and allocate its per-venue slug atomically.
+          let createdLegacyDefault = false;
+          for (let attempt = 0; attempt < 20 && !createdLegacyDefault; attempt += 1) {
+            const slug = attempt === 0 ? "principal" : `principal-${attempt + 1}`;
+            const [createdHall] = await executor
+              .insert(venueHalls)
+              .values({
+                venueId: venue.id,
+                slug,
+                ...legacyHallValues,
+              })
+              .onConflictDoNothing({
+                target: [venueHalls.venueId, venueHalls.slug],
+              })
+              .returning({ id: venueHalls.id });
+            createdLegacyDefault = Boolean(createdHall);
+          }
+          if (!createdLegacyDefault) {
+            throw new Error("legacy_default_hall_slug_exhausted");
+          }
+        }
 
-    if (existing && existing.isActive) {
-      return NextResponse.json(
-        { error: "Venue already registered", venueId: existing.id },
-        { status: 409 },
-      );
-    }
-
-    // Phone uniqueness across users — partner contacts must be unique so
-    // SMS/email dedupe and bulk admin lookups stay correct.
-    const [phoneCollision] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(and(eq(users.phone, normalizedPhone), ne(users.id, appUser.id)))
-      .limit(1);
-    if (phoneCollision) {
+        // Image replacement is part of the same transaction so a losing role
+        // claim cannot partially replace the pending venue gallery.
+        if (data.imageUrls.length > 0) {
+          if (existing) {
+            await executor
+              .delete(venueImages)
+              .where(and(
+                eq(venueImages.venueId, venue.id),
+                isNull(venueImages.hallId),
+              ));
+          }
+          await executor.insert(venueImages).values(
+            data.imageUrls.map((url, idx) => ({
+              venueId: venue.id,
+              url,
+              isCover: idx === 0,
+              sortOrder: idx,
+              altRo: data.name,
+            })),
+          );
+        }
+        // Contract evidence and the profile become linked atomically. A lost
+        // response can safely retry without leaving an orphaned signature.
+        await executor
+          .update(legalAcceptances)
+          .set({ venueId: venue.id })
+          .where(and(
+            eq(legalAcceptances.userId, lockedUser.id),
+            eq(legalAcceptances.subjectType, "venue"),
+            isNull(legalAcceptances.organizationId),
+            isNull(legalAcceptances.venueId),
+          ));
+        return venue;
+      },
+    });
+    if (!claimed.ok) {
       return NextResponse.json(
         {
-          code: "phone_in_use",
-          error: "Acest număr de telefon este deja folosit de un alt cont.",
+          error: claimed.error,
+          code: claimed.code === "PHONE_IN_USE" ? "phone_in_use" : claimed.code,
+          ...(claimed.profileId ? { venueId: claimed.profileId } : {}),
         },
-        { status: 409 },
+        { status: claimed.status },
       );
     }
-    // Persist the normalized phone on the user row so future lookups use
-    // the same canonical form.
-    await db
-      .update(users)
-      .set({ phone: normalizedPhone, updatedAt: new Date() })
-      .where(eq(users.id, appUser.id));
-
-    const data = parsed.data;
-    // Clean slug from venue name. If a previous venue is using it, the
-    // helper appends -2, -3, etc. — never a timestamp.
-    const slug = await pickUniqueSlug(data.name, async (candidate) => {
-      const [hit] = await db
-        .select({ id: venues.id })
-        .from(venues)
-        .where(eq(venues.slug, candidate))
-        .limit(1);
-      return !!hit;
-    });
-
-    let venue: typeof venues.$inferSelect;
-    if (existing) {
-      // Re-submission of a still-pending venue — overwrite all editable
-      // fields, keep the original id + slug + createdAt so any in-flight
-      // admin notifications still resolve.
-      const [updated] = await db
-        .update(venues)
-        .set({
-          nameRo: data.name,
-          phone: normalizedPhone,
-          email: data.email ?? appUser.email ?? null,
-          city: data.city ?? "Chișinău",
-          address: data.address ?? null,
-          capacityMin: data.capacityMin ?? null,
-          capacityMax: data.capacityMax ?? null,
-          descriptionRo: data.description ?? null,
-          website: data.websiteUrl ?? null,
-          menuUrl: data.menuUrl ?? null,
-          menuPdfUrl: data.menuPdfUrl ?? null,
-          virtualTourUrl: data.virtualTourUrl ?? null,
-          // Map data: only overwrite when the new submission carries fresh
-          // values, so a partner who removed the URL doesn't lose previously
-          // resolved coordinates.
-          ...(typeof data.lat === "number" ? { lat: data.lat } : {}),
-          ...(typeof data.lng === "number" ? { lng: data.lng } : {}),
-          ...(data.workingHours ? { workingHours: data.workingHours } : {}),
-          seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
-          updatedAt: new Date(),
-        })
-        .where(eq(venues.id, existing.id))
-        .returning();
-      venue = updated;
-    } else {
-      const [created] = await db
-        .insert(venues)
-        .values({
-          userId: appUser.id,
-          nameRo: data.name,
-          slug,
-          phone: normalizedPhone,
-          email: data.email ?? appUser.email ?? null,
-          city: data.city ?? "Chișinău",
-          address: data.address ?? null,
-          capacityMin: data.capacityMin ?? null,
-          capacityMax: data.capacityMax ?? null,
-          descriptionRo: data.description ?? null,
-          website: data.websiteUrl ?? null,
-          menuUrl: data.menuUrl ?? null,
-          menuPdfUrl: data.menuPdfUrl ?? null,
-          virtualTourUrl: data.virtualTourUrl ?? null,
-          // Coordinates and weekly schedule when the partner pasted a Maps
-          // URL during onboarding. Null otherwise — public page renders the
-          // map only when both lat & lng are present.
-          lat: typeof data.lat === "number" ? data.lat : null,
-          lng: typeof data.lng === "number" ? data.lng : null,
-          workingHours: data.workingHours ?? null,
-          isActive: false,
-          // Launch-phase: every approved venue gets the premium homepage
-          // placement. Will revert to false once paid tiers are introduced.
-          isFeatured: true,
-          facilities: [],
-          seoTitleRo: `${data.name} — Sală Evenimente | ePetrecere.md`,
-        })
-        .returning();
-      venue = created;
-    }
-
-    // Create venue_images rows. First image is the cover (isCover=true).
-    // On re-submission we wipe the previous images and re-insert — keeps
-    // the new uploads as the source of truth and avoids accumulating
-    // stale URLs from earlier failed attempts.
-    if (data.imageUrls && data.imageUrls.length > 0) {
-      const { venueImages } = await import("@/lib/db/schema");
-      if (existing) {
-        await db.delete(venueImages).where(eq(venueImages.venueId, venue.id));
-      }
-      await db.insert(venueImages).values(
-        data.imageUrls.map((url, idx) => ({
-          venueId: venue.id,
-          url,
-          isCover: idx === 0,
-          sortOrder: idx,
-          altRo: data.name,
-        })),
-      );
-    }
-
-    // Mark onboarding complete
-    await db
-      .update(users)
-      .set({ onboardingComplete: true })
-      .where(eq(users.id, appUser.id));
-
-    // Link the Legal Pack signature to the venue that has just been created.
-    // Onboarding records the acceptance BEFORE the venue row exists —
-    // deliberately, so nobody goes live without a contract — which left
-    // venue_id NULL on every signature and made the admin contracts page
-    // fall back to a bare e-mail instead of the partner's name. The
-    // append-only trigger on legal_acceptances allows exactly this
-    // NULL → id transition and nothing else.
-    try {
-      const { legalAcceptances } = await import("@/lib/db/schema");
-      const { isNull } = await import("drizzle-orm");
-      await db
-        .update(legalAcceptances)
-        .set({ venueId: venue.id })
-        .where(
-          and(
-            eq(legalAcceptances.userId, appUser.id),
-            eq(legalAcceptances.subjectType, "venue"),
-            isNull(legalAcceptances.venueId),
-          ),
-        );
-    } catch (err) {
-      console.error("[register-venue] linking signature to venue failed", err);
-    }
+    const venue = claimed.value;
 
     // Auto-improve the description with AI in the background. The seed
     // can come from either the partner or the Maps autofill summary —
@@ -350,10 +352,16 @@ export async function POST(req: Request) {
             language: "ro",
           });
           if (html && html.trim().length > 0) {
-            await db
+            const [rewrittenVenue] = await db
               .update(venues)
               .set({ descriptionRo: html, updatedAt: new Date() })
-              .where(and(eq(venues.id, venue.id), eq(venues.descriptionRo, data.description!)));
+              .where(and(eq(venues.id, venue.id), eq(venues.descriptionRo, data.description!)))
+              .returning({ slug: venues.slug, isActive: venues.isActive });
+            if (rewrittenVenue?.isActive) {
+              revalidateVendorCatalog("venue", {
+                profileSlugs: [rewrittenVenue.slug],
+              });
+            }
           }
         } catch (err) {
           console.error("[register-venue] auto AI rewrite failed:", err);
@@ -365,10 +373,7 @@ export async function POST(req: Request) {
     after(async () => {
       try {
         const { triggerReferral } = await import("@/lib/referrals/trigger");
-        await triggerReferral(appUser.id, "onboarded", {
-          kind: "venue",
-          venueId: venue.id,
-        });
+        await triggerReferral(appUser.id, "onboarded");
       } catch (err) {
         console.error("[referral] venue onboarded trigger failed", err);
       }
@@ -427,7 +432,7 @@ export async function POST(req: Request) {
                   <img src="${coverUrl}" alt="${data.name}" style="width:100%;max-width:420px;height:200px;border-radius:8px;object-fit:cover;border:1px solid #C9A84C;" />
                 </div>`
               : "";
-            sendEmail({
+            await sendEmail({
               to: admin.email,
               subject: `🔔 Sală nouă: ${data.name} așteaptă aprobare`,
               html: `<div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:20px;background:#1A1A2E;border-radius:12px;color:#FAF8F2;">
@@ -448,7 +453,7 @@ export async function POST(req: Request) {
       }
     });
 
-    return NextResponse.json({ success: true, venueId: venue.id, slug });
+    return NextResponse.json({ success: true, venueId: venue.id, slug: venue.slug });
   } catch (err) {
     console.error("[register-venue] Error:", err);
     return NextResponse.json(

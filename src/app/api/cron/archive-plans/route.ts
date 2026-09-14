@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
     .returning({ id: aiConversations.id });
 
   const expiredMessages = await db
-    .select({ id: chatMessages.id, attachmentUrl: chatMessages.attachmentUrl })
+    .select({ id: chatMessages.id })
     .from(chatMessages)
     .where(sql`
       ${chatMessages.createdAt} < NOW() - INTERVAL '36 months'
@@ -151,20 +151,13 @@ export async function GET(req: NextRequest) {
             AND b.updated_at < NOW() - INTERVAL '36 months'
         ))
       )
-    `)
+  `)
     .limit(500);
   if (expiredMessages.length > 0) {
-    const attachmentUrls = expiredMessages
-      .map((message) => message.attachmentUrl)
-      .filter((url): url is string => Boolean(url?.startsWith("https://")));
-    if (attachmentUrls.length > 0 && process.env.BLOB_READ_WRITE_TOKEN) {
-      try {
-        const { del } = await import("@vercel/blob");
-        await del(attachmentUrls);
-      } catch (error) {
-        console.error("[cron/archive-plans] expired chat attachment cleanup failed", error);
-      }
-    }
+    // The row-delete trigger removes its durable claim. Only a server-upload
+    // receipt with no surviving claims can then enter the erasure outbox.
+    // Never treat a URL read from chat history as Blob deletion authority;
+    // legacy/unregistered attachments remain for explicit reconciliation.
     await db.delete(chatMessages).where(inArray(chatMessages.id, expiredMessages.map((m) => m.id)));
   }
 

@@ -1,10 +1,11 @@
 # ADR 0028 — Partner organizations → venues (locations) → halls
 
-- Status: Accepted (implementation in progress — phases 0–2)
+- Status: Accepted (phases 0–4 implemented on stacked draft PRs; rollout pending)
 - Date: 2026-09-12
-- Scope of this ADR + phases 0–2: data model, an idempotent expand migration,
-  a single membership-based authorization layer, and a server-side feature
-  flag. **No public/UI change, no booking change, no production migration.**
+- Original scope of this ADR + phases 0–2: data model, an idempotent expand
+  migration, a single membership-based authorization layer, and a server-side
+  feature flag. Later sections record the phase 3–4 implementation status.
+  **No production migration or rollout has been performed.**
 
 This ADR is the durable record for the work described in
 `INSTRUCTIUNI_CODEX_EPETRECERE_COMPANII_LOCALURI_SALI`. It captures the
@@ -126,6 +127,7 @@ Ownership currently flows through `venues.user_id` in **52 files / 73 sites**
 membership resolvers. Grouped by zone:
 
 ### Dashboard (vendor) — server pages/layouts
+
 - `src/app/[locale]/(vendor)/dashboard/layout.tsx`
 - `src/app/[locale]/(vendor)/dashboard/page.tsx`
 - `src/app/[locale]/(vendor)/dashboard/analytics/page.tsx`
@@ -136,6 +138,7 @@ membership resolvers. Grouped by zone:
 - `src/app/[locale]/(client)/cabinet/layout.tsx` (partner detection)
 
 ### Venue APIs
+
 - `src/app/api/me/venue/route.ts`, `src/app/api/me/venue/stats/route.ts`
 - `src/app/api/venues/[id]/route.ts`
 - `src/app/api/venue-images/route.ts`, `src/app/api/venue-images/[id]/route.ts`
@@ -145,10 +148,12 @@ membership resolvers. Grouped by zone:
   `.../ai/analytics-suggestion/route.ts`
 
 ### Auth / onboarding
+
 - `src/app/api/auth/register-venue/route.ts`, `.../auth/select-role/route.ts`,
   `.../auth/check-role/route.ts`, `.../auth/register-artist/route.ts`
 
 ### Booking / contracts / chat / reviews / commissions
+
 - `src/app/api/booking-requests/route.ts`, `.../booking-requests/[id]/route.ts`,
   `.../booking-requests/[id]/contract/route.ts`,
   `.../booking-requests/[id]/contract-preview/route.ts`
@@ -160,11 +165,13 @@ membership resolvers. Grouped by zone:
 - `src/lib/booking/confirmation-effects.ts`
 
 ### Calendar / iCal / Inngest
+
 - `src/app/api/calendar/route.ts`,
   `src/app/api/calendar/venue-ical/[venueId]/[token]/route.ts`
 - `src/lib/inngest/functions.ts`
 
 ### Admin / legal / privacy / export / delete / planner
+
 - `src/app/[locale]/(admin)/admin/contracte/page.tsx`
 - `src/app/api/admin/registration-requests/route.ts`
 - `src/app/api/legal/accept/route.ts`
@@ -283,11 +290,49 @@ current behaviour and does not regress.
 - `drizzle-kit push/generate` package scripts were removed. Until migration
   history is consolidated, reviewed manual SQL is the sole DDL authority.
 
-## 7. Known availability defects to fix in phase 4 (recorded, not fixed here)
+## 7. Phase 4 availability defects — implementation status
 
-Documented so phase 4 addresses them: `checkVenueAvailability()` ignores manual/
-Google blocks that search honours; `bulkSetCalendarEvents()` deletes sibling
-events; the calendar UI collapses to one event/day; cancellation deletes by
-entity+date+source instead of by booking; confirmation does not set
-`calendar_events.booking_id`; create/confirm is check-then-write without a
-transaction. Out of scope for phases 0–2.
+The phase 4 implementation replaces the divergent Venue checks with
+`src/lib/booking/venue-availability.ts` and coordinated transactional writers.
+It now checks bookings, schedule blocks and legacy/manual/Google projections;
+uses deterministic advisory locks for booking, block and conflict-group
+mutations; preserves sibling Hall events; projects and removes legacy calendar
+rows by the exact booking ID; and returns all simultaneous calendar events.
+
+Whole-Venue conflicts are symmetric even when a historical row references a
+Hall that later became unusable. Canonical intervals are half-open and
+timezone-aware. iCal all-day classification uses actual local-day boundaries,
+including zones where a DST jump skips local midnight.
+
+Artist availability still stores a civil `event_date` plus wall-clock times.
+Overnight intervals are anchored to adjacent civil dates, but an ambiguous
+wall-clock time during a DST fall-back cannot select the first versus second
+occurrence. Persisting canonical instants (and an artist timezone) is a schema
+backlog item; it must be completed before offering fold-time disambiguation.
+
+## 8. Phase 3–4 implementation and rollout boundary
+
+- Organization → Venue → Hall onboarding is resumable and request-id
+  idempotent. The final submit remains actionable and returns structured
+  missing-field feedback.
+- Canonical `/dashboard/locatii/[venueId]` routes and Hall CRUD use the central
+  membership/capability resolver; active Hall edits re-enter moderation without
+  exposing draft values publicly.
+- Venue bookings carry Hall/scope, canonical interval, currency and commercial
+  snapshots. Confirmation/cancellation and their durable external effects are
+  transactional and retry-safe.
+- Manual whole-Venue/Hall blocks, conflict groups, aggregated calendar and iCal
+  are Hall-aware. Inngest is the frequent durable-outbox runner; the Vercel
+  Hobby-compatible cron is a daily fallback.
+- Manual migrations `0029`–`0033` extend the expand model with Hall-aware
+  calendar integrity, legal acceptance sessions, durable booking-effect outbox
+  state, onboarding/publication hardening, and durable idempotent creation of a
+  booking plus its one-to-one CRM offer projection. Migration `0033` also
+  preserves offer history when an artist or Venue is deleted by detaching that
+  target instead of cascading the offer.
+
+The feature remains behind `FEATURE_MULTI_HALL`. PostgreSQL migration and
+concurrency suites must still pass on a disposable guarded database through
+`0033` before Preview/staging. Migration `0033` has not been applied to any
+shared Preview, staging, or Production database by this correction branch, and
+phase 5 public catalog work has not started.

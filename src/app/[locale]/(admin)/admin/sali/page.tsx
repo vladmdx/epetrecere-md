@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
 import {  Edit, Eye, MapPin, Users, Star, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -64,25 +63,7 @@ export default function AdminVenuesPage() {
         setLoading(false);
       }
     })();
-  }, []);
-
-  async function toggleActive(venueId: number, currentState: boolean) {
-    try {
-      const res = await fetch(`/api/venues/${venueId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isActive: !currentState }),
-      });
-      if (res.ok) {
-        setVenues((prev) => prev.map((v) => v.id === venueId ? { ...v, isActive: !currentState } : v));
-        toast.success(!currentState ? t("adminUi.venues.toastActivated") : t("adminUi.venues.toastDeactivated"));
-      } else {
-        toast.error(t("adminUi.venues.toastStatusError"));
-      }
-    } catch {
-      toast.error(t("adminUi.venues.toastUpdateError"));
-    }
-  }
+  }, [t]);
 
   if (loading) {
     return (
@@ -141,10 +122,11 @@ export default function AdminVenuesPage() {
                     {venue.ratingAvg && <span className="flex items-center gap-1"><Star className="h-3 w-3 fill-gold text-gold" /> {Number(venue.ratingAvg).toFixed(1)}</span>}
                   </div>
                 </div>
-                <Switch
-                  checked={venue.isActive}
-                  onCheckedChange={() => toggleActive(venue.id, venue.isActive)}
-                />
+                <Badge variant={venue.isActive ? "default" : "secondary"}>
+                  {venue.isActive
+                    ? t("admin.venueEdit.published")
+                    : t("adminUi.artists.badgeDraft")}
+                </Badge>
                 <Link href={`/admin/sali/${venue.id}`}>
                   <Button variant="ghost" size="icon" aria-label={t("adminUi.venues.editVenue")}><Edit className="h-4 w-4" /></Button>
                 </Link>

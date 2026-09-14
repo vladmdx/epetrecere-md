@@ -1,6 +1,14 @@
 import { db } from "@/lib/db";
-import { venues, venueImages, reviews, calendarEvents } from "@/lib/db/schema";
-import { eq, and, desc, asc, sql, gte, lte, ilike, or } from "drizzle-orm";
+import {
+  venues,
+  venueImages,
+  reviews,
+  calendarEvents,
+  partnerOrganizations,
+  venueHalls,
+} from "@/lib/db/schema";
+import { eq, and, desc, asc, sql, gte, lte, ilike, isNull, or } from "drizzle-orm";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 export interface VenueFilters {
   capacityMin?: number;
@@ -15,6 +23,61 @@ export interface VenueFilters {
   sort?: "popular" | "price_asc" | "price_desc" | "rating" | "capacity";
   page?: number;
   limit?: number;
+}
+
+/**
+ * Minimal, fail-closed public projection for the dynamic Open Graph route.
+ *
+ * The flag-off branch deliberately touches only the legacy `venues` table so
+ * the rollout kill switch remains usable before the multi-Hall migrations are
+ * present. Once enabled, publication is decided atomically in one statement:
+ * the Venue must be active, an organization-backed Venue must belong to an
+ * active organization, and at least one approved Hall must remain.
+ */
+export async function getPublicVenueOgBySlug(slug: string) {
+  const projection = {
+    nameRo: venues.nameRo,
+    city: venues.city,
+    capacityMin: venues.capacityMin,
+    capacityMax: venues.capacityMax,
+  };
+  const legacyWhere = and(eq(venues.slug, slug), eq(venues.isActive, true));
+
+  if (!isMultiHallEnabled()) {
+    const [venue] = await db
+      .select(projection)
+      .from(venues)
+      .where(legacyWhere)
+      .limit(1);
+    return venue ?? null;
+  }
+
+  const [venue] = await db
+    .select(projection)
+    .from(venues)
+    .innerJoin(
+      venueHalls,
+      and(
+        eq(venueHalls.venueId, venues.id),
+        eq(venueHalls.status, "active"),
+      ),
+    )
+    .leftJoin(
+      partnerOrganizations,
+      eq(partnerOrganizations.id, venues.organizationId),
+    )
+    .where(
+      and(
+        legacyWhere,
+        or(
+          isNull(venues.organizationId),
+          eq(partnerOrganizations.status, "active"),
+        ),
+      ),
+    )
+    .limit(1);
+
+  return venue ?? null;
 }
 
 export async function getVenues(filters: VenueFilters = {}) {
@@ -95,7 +158,12 @@ export async function getVenues(filters: VenueFilters = {}) {
           sortOrder: venueImages.sortOrder,
         })
         .from(venueImages)
-        .where(sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`)
+        .innerJoin(venues, eq(venues.id, venueImages.venueId))
+        .where(and(
+          sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`,
+          isNull(venueImages.hallId),
+          eq(venues.isActive, true),
+        ))
         .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder))
     : [];
   const coverMap = new Map<number, string>();
@@ -126,9 +194,24 @@ export async function getVenueBySlug(slug: string) {
 
   const [images, venueReviews] = await Promise.all([
     db
-      .select()
+      .select({
+        id: venueImages.id,
+        venueId: venueImages.venueId,
+        hallId: venueImages.hallId,
+        url: venueImages.url,
+        altRo: venueImages.altRo,
+        altRu: venueImages.altRu,
+        altEn: venueImages.altEn,
+        sortOrder: venueImages.sortOrder,
+        isCover: venueImages.isCover,
+      })
       .from(venueImages)
-      .where(eq(venueImages.venueId, venue.id))
+      .innerJoin(venues, eq(venues.id, venueImages.venueId))
+      .where(and(
+        eq(venueImages.venueId, venue.id),
+        isNull(venueImages.hallId),
+        eq(venues.isActive, true),
+      ))
       .orderBy(asc(venueImages.sortOrder)),
     db
       .select()
@@ -159,7 +242,12 @@ export async function getFeaturedVenues(limit = 6) {
       sortOrder: venueImages.sortOrder,
     })
     .from(venueImages)
-    .where(sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`)
+    .innerJoin(venues, eq(venues.id, venueImages.venueId))
+    .where(and(
+      sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`,
+      isNull(venueImages.hallId),
+      eq(venues.isActive, true),
+    ))
     .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder));
 
   const coverMap = new Map<number, string>();

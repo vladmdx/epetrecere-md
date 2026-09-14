@@ -28,8 +28,10 @@ export const PAYMENT_TERM_DAYS = 30;
 /** Booking statuses that mean "the order is confirmed" and the fee is due. */
 export const FEE_TRIGGER_STATUSES = ["confirmed_by_client", "completed"] as const;
 
-export async function getCommissionRules(): Promise<CommissionRules> {
-  const [row] = await db
+export async function getCommissionRules(
+  executor: typeof db = db,
+): Promise<CommissionRules> {
+  const [row] = await executor
     .select({ value: siteSettings.value })
     .from(siteSettings)
     .where(eq(siteSettings.key, COMMISSION_RULES_KEY))
@@ -67,6 +69,7 @@ export function commissionDueDate(confirmedAt: Date): string {
 export async function ensureCommissionForBooking(
   bookingRequestId: number,
   executor: typeof db = db,
+  rulesSnapshot?: CommissionRules,
 ): Promise<number | null> {
   const [b] = await executor
     .select({
@@ -122,7 +125,10 @@ export async function ensureCommissionForBooking(
   // The order value is the negotiated price. Without one there is nothing to
   // charge a percentage of — Tariffs §3 requires the partner to state it.
   const baseAmount = b.agreedPrice ?? 0;
-  const rules = await getCommissionRules();
+  // Confirmation callers pass the exact rules they validated inside their
+  // transaction. Other recovery paths read through the same executor, never
+  // through a second pool connection with a different MVCC snapshot.
+  const rules = rulesSnapshot ?? await getCommissionRules(executor);
   const result = computeCommission(
     {
       vendorType,
@@ -180,7 +186,16 @@ export async function ensureCommissionForBooking(
     .onConflictDoNothing({ target: commissions.bookingRequestId })
     .returning({ id: commissions.id });
 
-  return created?.id ?? null;
+  if (created) return created.id;
+  // A concurrent idempotent recovery may have won the unique insert after
+  // our first existence check. Return that durable row rather than reporting
+  // a false "no commission" result.
+  const [winner] = await executor
+    .select({ id: commissions.id })
+    .from(commissions)
+    .where(eq(commissions.bookingRequestId, bookingRequestId))
+    .limit(1);
+  return winner?.id ?? null;
 }
 
 /** Admin records a manual settlement. */

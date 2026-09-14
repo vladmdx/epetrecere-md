@@ -3,9 +3,13 @@
  * reused if it is already complete and coherent, or writes nothing.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { legalAcceptances } from "@/lib/db/schema";
+import {
+  legalAcceptances,
+  legalContractDeliveryOutbox,
+  users,
+} from "@/lib/db/schema";
 import {
   LEGAL_PACK_VERSION,
   PARTNER_REQUIRED_DOCS,
@@ -19,8 +23,72 @@ import { missingCurrentDocuments } from "@/lib/legal/acceptance";
 import { onboardingAgreementStatus } from "@/lib/legal/onboarding-agreement";
 import { acquireLegalScopeLock } from "@/lib/booking/advisory-locks";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { canonicalLegalDeliveryEmail } from "@/lib/legal/contract-delivery-policy";
+import {
+  authorizeOrganizationCapabilityLocked,
+} from "@/lib/venue-access";
 
 type Executor = typeof db;
+
+export async function syncVerifiedLegalEmail(input: {
+  userId: string;
+  verifiedEmail: string;
+}): Promise<
+  | { ok: true; email: string }
+  | { ok: false; status: 403 | 409; code: string }
+> {
+  const email = canonicalLegalDeliveryEmail(input.verifiedEmail);
+  if (!email) {
+    return { ok: false, status: 403, code: "VERIFIED_EMAIL_REQUIRED" };
+  }
+  try {
+    return await db.transaction(async (tx) => {
+      const executor = tx as unknown as Executor;
+      await acquireLegalScopeLock(tx, { userId: input.userId });
+      const [current] = await tx
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(eq(users.id, input.userId))
+        .for("update")
+        .limit(1);
+      if (!current) {
+        return { ok: false as const, status: 403 as const, code: "FORBIDDEN" };
+      }
+
+      // `users.email` is case-sensitive UNIQUE. Explicitly reject a logical
+      // case-insensitive owner first, then store the verified address in one
+      // canonical case so the ordinary unique constraint fences concurrent
+      // claims as well.
+      const [conflict] = await executor
+        .select({ id: users.id })
+        .from(users)
+        .where(and(
+          ne(users.id, input.userId),
+          sql`lower(btrim(${users.email})) = ${email}`,
+        ))
+        .limit(1);
+      if (conflict) {
+        return {
+          ok: false as const,
+          status: 409 as const,
+          code: "VERIFIED_EMAIL_CONFLICT",
+        };
+      }
+      if (current.email !== email) {
+        await executor
+          .update(users)
+          .set({ email, updatedAt: new Date() })
+          .where(eq(users.id, input.userId));
+      }
+      return { ok: true as const, email };
+    });
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") {
+      return { ok: false, status: 409, code: "VERIFIED_EMAIL_CONFLICT" };
+    }
+    throw error;
+  }
+}
 
 export type LegalAcceptanceValue = {
   userId: string;
@@ -170,9 +238,81 @@ function immutableConflict(
         row.documentSlug === value.documentSlug &&
         row.documentVersion === value.documentVersion &&
         row.packVersion === value.packVersion &&
-        (row.contentHash !== value.contentHash || row.signatureName !== value.signatureName),
+        (row.contentHash !== value.contentHash ||
+          row.signatureName !== value.signatureName ||
+          row.signatureImage !== value.signatureImage ||
+          row.representativeRole !== value.representativeRole ||
+          row.locale !== value.locale ||
+          row.partnerType !== value.partnerType ||
+          row.legalName !== value.legalName ||
+          row.idNumber !== value.idNumber ||
+          row.legalAddress !== value.legalAddress ||
+          row.representativeName !== value.representativeName),
     ),
   );
+}
+
+async function ensureDeliveryJobs(
+  executor: Executor,
+  session: Array<typeof legalAcceptances.$inferSelect>,
+  lockedAudience: Array<{ id: string; email: string; role: string }>,
+): Promise<void> {
+  const first = session[0];
+  if (!first) return;
+  const [alreadyMaterialized] = await executor
+    .select({ id: legalContractDeliveryOutbox.id })
+    .from(legalContractDeliveryOutbox)
+    .where(eq(legalContractDeliveryOutbox.acceptanceSessionId, first.acceptanceSessionId))
+    .limit(1);
+  if (alreadyMaterialized) return;
+
+  let audience = lockedAudience;
+  if (first.userId && !audience.some((candidate) => candidate.id === first.userId)) {
+    const [signer] = await executor
+      .select({ id: users.id, email: users.email, role: users.role })
+      .from(users)
+      .where(eq(users.id, first.userId))
+      .for("share")
+      .limit(1);
+    if (!signer) return;
+    audience = [...audience, signer];
+  }
+  const signer = first.userId
+    ? audience.find((candidate) => candidate.id === first.userId)
+    : undefined;
+  if (!signer) return;
+  const admins = audience.filter(
+    (candidate) => candidate.role === "admin" || candidate.role === "super_admin",
+  );
+  const recipients: Array<typeof legalContractDeliveryOutbox.$inferInsert> = [];
+  if (first.email && first.userId) {
+    recipients.push({
+      acceptanceSessionId: first.acceptanceSessionId,
+      anchorAcceptanceId: first.id,
+      channel: "signer",
+      recipientUserId: first.userId,
+      recipientRoleSnapshot: "signer",
+      recipientKey: first.userId,
+      recipientEmail: first.email,
+    });
+  }
+  for (const admin of admins) {
+    if (!admin.email) continue;
+    recipients.push({
+      acceptanceSessionId: first.acceptanceSessionId,
+      anchorAcceptanceId: first.id,
+      channel: "admin",
+      recipientUserId: admin.id,
+      recipientRoleSnapshot: admin.role,
+      recipientKey: admin.id,
+      recipientEmail: admin.email,
+    });
+  }
+  if (!recipients.length) return;
+  await executor
+    .insert(legalContractDeliveryOutbox)
+    .values(recipients)
+    .onConflictDoNothing();
 }
 
 export async function recordLegalAcceptancePack(input: {
@@ -210,6 +350,14 @@ export async function recordLegalAcceptancePack(input: {
       code: "ORGANIZATION_SUBJECT_REQUIRED",
     };
   }
+  if (input.organizationId && (input.artistId != null || input.venueId != null)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "organization evidence cannot be linked to one profile",
+      code: "ORGANIZATION_PROFILE_LINK_NOT_ALLOWED",
+    };
+  }
   if (input.organizationId && !isMultiHallEnabled()) {
     return { ok: false, status: 404, error: "FEATURE_DISABLED", code: "FEATURE_DISABLED" };
   }
@@ -235,8 +383,68 @@ export async function recordLegalAcceptancePack(input: {
         userId: input.userId,
       });
 
+      // Freeze the signer and the complete current administrator audience in
+      // deterministic UUID order. Their role/address/delete mutations cannot
+      // race the outbox FK inserts and roll back an otherwise valid signing.
+      const lockedAudience = await tx
+        .select({ id: users.id, email: users.email, role: users.role })
+        .from(users)
+        .where(or(
+          eq(users.id, input.userId),
+          inArray(users.role, ["admin", "super_admin"]),
+        ))
+        .orderBy(asc(users.id))
+        .for("share");
+      const lockedActor = lockedAudience.find(
+        (candidate) => candidate.id === input.userId,
+      );
+      if (!lockedActor) {
+        return {
+          ok: false as const,
+          status: 403,
+          error: "Forbidden",
+          code: "FORBIDDEN",
+        };
+      }
+      if (
+        !input.email
+        || canonicalLegalDeliveryEmail(lockedActor.email)
+          !== canonicalLegalDeliveryEmail(input.email)
+      ) {
+        return {
+          ok: false as const,
+          status: 409,
+          error: "verified_email_not_bound",
+          code: "VERIFIED_EMAIL_NOT_BOUND",
+        };
+      }
+
       let identity = input.identity;
       if (input.organizationId) {
+        // The route-level check is only an early rejection. Membership can be
+        // revoked while signature validation runs, so the authoritative check
+        // happens after the same organization lock used by member mutations.
+        const actor = {
+          id: lockedActor.id,
+          role: lockedActor.role,
+          isGlobalAdmin:
+            lockedActor.role === "admin" || lockedActor.role === "super_admin",
+        };
+        const access = await authorizeOrganizationCapabilityLocked(
+          actor,
+          input.organizationId,
+          "manage_legal",
+          executor,
+        );
+        if (!access.ok) {
+          return {
+            ok: false as const,
+            status: access.status,
+            error: access.error,
+            code: "FORBIDDEN",
+          };
+        }
+
         const { resolveOrganizationSigningIdentity } = await import("@/lib/partner/legal");
         const resolved = await resolveOrganizationSigningIdentity(
           input.organizationId,
@@ -257,17 +465,12 @@ export async function recordLegalAcceptancePack(input: {
       const existing = await loadScopeRows(executor, input);
       const current = rowsForCurrentPack(existing);
       const sessions = groupBySession(current);
-      const complete = sessions.find((session) => sessionIsComplete(session, input.subjectType));
+      const complete = sessions.find(
+        (session) =>
+          sessionIsComplete(session, input.subjectType) &&
+          onboardingAgreementStatus(session, input.subjectType).status === "resumable",
+      );
       if (complete) {
-        const status = onboardingAgreementStatus(complete, input.subjectType);
-        if (status.status !== "resumable") {
-          return {
-            ok: false as const,
-            status: 409,
-            error: "PACK_SESSION_INCOMPLETE",
-            code: "PACK_SESSION_INCOMPLETE",
-          };
-        }
         if (immutableConflict(complete, buildAcceptanceValues({
           ...input,
           identity,
@@ -282,6 +485,7 @@ export async function recordLegalAcceptancePack(input: {
             code: "signed_document_is_immutable",
           };
         }
+        await ensureDeliveryJobs(executor, complete, lockedAudience);
         const recorded = required.map((slug) => {
           const row = complete.find((item) => item.documentSlug === slug)!;
           return {
@@ -301,15 +505,9 @@ export async function recordLegalAcceptancePack(input: {
         };
       }
 
-      if (current.length > 0) {
-        return {
-          ok: false as const,
-          status: 409,
-          error: "PACK_SESSION_INCOMPLETE",
-          code: "PACK_SESSION_INCOMPLETE",
-        };
-      }
-
+      // Partial sessions remain immutable evidence. Because uniqueness is
+      // session-scoped, append a fresh, complete canonical session instead of
+      // trying to mutate/delete the failed attempt.
       const sessionId = randomUUID();
       const acceptedAt = new Date();
       const values = buildAcceptanceValues({
@@ -323,6 +521,13 @@ export async function recordLegalAcceptancePack(input: {
       if (inserted.length !== values.length) {
         throw new Error("legal_session_insert_incomplete");
       }
+      if (
+        !sessionIsComplete(inserted, input.subjectType) ||
+        onboardingAgreementStatus(inserted, input.subjectType).status !== "resumable"
+      ) {
+        throw new Error("legal_session_insert_incomplete");
+      }
+      await ensureDeliveryJobs(executor, inserted, lockedAudience);
       const recorded = inserted.map((row) => ({
         slug: row.documentSlug,
         title: row.documentTitle ?? row.documentSlug,

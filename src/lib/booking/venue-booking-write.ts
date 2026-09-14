@@ -35,6 +35,30 @@ export class VenueAvailabilityError extends Error {
 export type VenueWriteTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
+ * Run the hall-aware availability protocol on an existing transaction.
+ *
+ * Callers that also serialize on a parent resource (for example an event
+ * plan) must acquire that parent lock before entering this helper. Keeping
+ * the order parent -> venue -> day -> hall -> conflict group prevents a
+ * different-venue request for one plan from introducing a lock inversion.
+ */
+export async function withVenueAvailabilityWriteInTransaction<T>(
+  tx: VenueWriteTx,
+  input: VenueBookingWrite,
+  write: (tx: VenueWriteTx, result: VenueAvailabilityResult) => Promise<T>,
+): Promise<T> {
+  const executor = tx as unknown as typeof db;
+  const first = await evaluateVenueAvailability({ ...input, executor });
+  if (!first.available || !first.lockKeys) {
+    throw new VenueAvailabilityError(first);
+  }
+  await acquireAvailabilityLocks(tx, first.lockKeys);
+  const second = await evaluateVenueAvailability({ ...input, executor });
+  if (!second.available) throw new VenueAvailabilityError(second);
+  return write(tx, second);
+}
+
+/**
  * Lock + re-check + write in one transaction. Advisory locks are
  * transaction-scoped, so the insert/update must happen before COMMIT.
  */
@@ -42,17 +66,9 @@ export async function withVenueAvailabilityWrite<T>(
   input: VenueBookingWrite,
   write: (tx: VenueWriteTx, result: VenueAvailabilityResult) => Promise<T>,
 ): Promise<T> {
-  return db.transaction(async (tx) => {
-    const executor = tx as unknown as typeof db;
-    const first = await evaluateVenueAvailability({ ...input, executor });
-    if (!first.available || !first.lockKeys) {
-      throw new VenueAvailabilityError(first);
-    }
-    await acquireAvailabilityLocks(tx, first.lockKeys);
-    const second = await evaluateVenueAvailability({ ...input, executor });
-    if (!second.available) throw new VenueAvailabilityError(second);
-    return write(tx, second);
-  });
+  return db.transaction((tx) =>
+    withVenueAvailabilityWriteInTransaction(tx, input, write),
+  );
 }
 
 export async function assertVenueAvailableForWrite(
@@ -128,14 +144,18 @@ export async function commercialSnapshotFor(opts: {
   };
 }
 
-export async function venueHallDisplayName(venueId: number, hallId: number | null): Promise<string> {
-  const [venue] = await db
+export async function venueHallDisplayName(
+  venueId: number,
+  hallId: number | null,
+  executor: typeof db = db,
+): Promise<string> {
+  const [venue] = await executor
     .select({ nameRo: venues.nameRo })
     .from(venues)
     .where(eq(venues.id, venueId))
     .limit(1);
   if (!hallId) return venue?.nameRo ?? "Local";
-  const [hall] = await db
+  const [hall] = await executor
     .select({ nameRo: venueHalls.nameRo })
     .from(venueHalls)
     .where(eq(venueHalls.id, hallId))

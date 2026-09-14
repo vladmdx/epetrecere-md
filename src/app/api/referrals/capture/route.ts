@@ -16,6 +16,7 @@ import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { captureReferralAttribution } from "@/lib/referrals/capture";
 
 const schema = z.object({
   code: z.string().min(3).max(24),
@@ -35,30 +36,22 @@ export async function POST(req: NextRequest) {
 
   const cleanCode = parsed.data.code.trim().toLowerCase();
 
-  const [user] = await db
+  const [userCandidate] = await db
     .select({
       id: users.id,
       referralCode: users.referralCode,
-      referredByCode: users.referredByCode,
     })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
-  if (!user) {
+  if (!userCandidate) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  // Already captured — idempotent noop.
-  if (user.referredByCode) {
-    return NextResponse.json({
-      ok: true,
-      alreadyCaptured: true,
-      code: user.referredByCode,
-    });
-  }
-
-  // Self-referral guard.
-  if (user.referralCode && user.referralCode.toLowerCase() === cleanCode) {
+  if (
+    userCandidate.referralCode &&
+    userCandidate.referralCode.toLowerCase() === cleanCode
+  ) {
     return NextResponse.json(
       { error: "Nu te poți referi singur" },
       { status: 400 },
@@ -66,19 +59,48 @@ export async function POST(req: NextRequest) {
   }
 
   // Verify the referrer code exists.
-  const [referrer] = await db
+  const [referrerCandidate] = await db
     .select({ id: users.id })
     .from(users)
     .where(eq(users.referralCode, cleanCode))
     .limit(1);
-  if (!referrer) {
+  if (!referrerCandidate) {
     return NextResponse.json({ error: "Cod invalid" }, { status: 404 });
   }
 
-  await db
-    .update(users)
-    .set({ referredByCode: cleanCode, updatedAt: new Date() })
-    .where(eq(users.id, user.id));
+  const result = await db.transaction((tx) =>
+    captureReferralAttribution(tx as unknown as typeof db, {
+      userId: userCandidate.id,
+      clerkId,
+      referrerId: referrerCandidate.id,
+      cleanCode,
+    }),
+  );
 
-  return NextResponse.json({ ok: true, code: cleanCode });
+  if (result.status === "captured") {
+    return NextResponse.json({ ok: true, code: result.code });
+  }
+  if (result.status === "already_captured") {
+    return NextResponse.json({
+      ok: true,
+      alreadyCaptured: true,
+      code: result.code,
+    });
+  }
+  if (result.status === "user_not_found") {
+    return NextResponse.json({ error: "User not found" }, { status: 404 });
+  }
+  if (result.status === "referrer_invalid") {
+    return NextResponse.json({ error: "Cod invalid" }, { status: 404 });
+  }
+  if (result.status === "cycle") {
+    return NextResponse.json(
+      { error: "Lanț de recomandare invalid", code: "REFERRAL_CYCLE" },
+      { status: 409 },
+    );
+  }
+  return NextResponse.json(
+    { error: "Atribuirea nu a putut fi salvată" },
+    { status: 409 },
+  );
 }

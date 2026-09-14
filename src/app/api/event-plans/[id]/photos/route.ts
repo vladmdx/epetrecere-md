@@ -5,9 +5,10 @@ import { eventPhotos } from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { requirePlanOwnership } from "@/lib/planner/ownership";
 import sharp from "sharp";
-import { deleteManagedPhoto, storePrivatePhoto } from "@/lib/moments/managed-photo";
+import { storePrivatePhoto } from "@/lib/moments/managed-photo";
 import { serializePhoto } from "@/lib/moments/photo-url";
 import { rateLimit } from "@/lib/rate-limit";
+import { enqueueRegisteredBlobCleanup } from "@/lib/privacy/account-asset-erasure";
 
 export const runtime = "nodejs";
 
@@ -77,7 +78,7 @@ export async function POST(
   if (cleaned.byteLength > 4 * 1024 * 1024) return NextResponse.json({ error: "Processed image must be at most 4 MB" }, { status: 413 });
   let url: string;
   try {
-    url = await storePrivatePhoto(cleaned, planId);
+    url = await storePrivatePhoto(cleaned, planId, owned.userId);
   } catch { return NextResponse.json({ error: "Photo storage unavailable" }, { status: 503 }); }
   try {
     const [photo] = await db
@@ -94,7 +95,7 @@ export async function POST(
 
     return NextResponse.json({ photo: serializePhoto(photo) }, { status: 201, headers: { "Cache-Control": "private, no-store" } });
   } catch {
-    await deleteManagedPhoto(url, owned.plan);
+    await enqueueRegisteredBlobCleanup(url).catch(() => false);
     return NextResponse.json({ error: "Photo could not be saved" }, { status: 503 });
   }
 }

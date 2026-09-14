@@ -5,7 +5,7 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { db } from "../src/lib/db";
 import {
@@ -35,9 +35,9 @@ import {
   BookingChangedError,
   clientCancelBooking,
   confirmBookingWithEffects,
+  replayConfirmationEffects,
   vendorCancelBooking,
 } from "../src/lib/booking/booking-transitions";
-import { persistConfirmationEffects } from "../src/lib/booking/confirmation-persist";
 import { createVenueScheduleBlock, deleteVenueScheduleBlocks } from "../src/lib/booking/venue-schedule-write";
 import { getMergedVenueCalendar } from "../src/lib/booking/merged-calendar";
 import {
@@ -190,6 +190,14 @@ after(async () => {
   await db.delete(commissions).where(eq(commissions.venueId, ids.venue));
   await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.venue));
   await db.delete(calendarEvents).where(eq(calendarEvents.entityId, ids.extraVenue));
+  await db.execute(sql`DELETE FROM booking_effect_deliveries
+    WHERE effect_id IN (
+      SELECT o.id FROM booking_effect_outbox o
+      JOIN booking_requests b ON b.id = o.booking_id
+      WHERE b.venue_id = ${ids.venue}
+    )`);
+  await db.execute(sql`DELETE FROM booking_effect_outbox
+    WHERE booking_id IN (SELECT id FROM booking_requests WHERE venue_id = ${ids.venue})`);
   await db.delete(bookingRequests).where(eq(bookingRequests.venueId, ids.venue));
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
   await db.delete(venueHallConflictGroupMembers).where(eq(venueHallConflictGroupMembers.venueId, ids.venue));
@@ -275,6 +283,209 @@ test("whole-venue block makes every hall unavailable", async () => {
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.id, block.id));
 });
 
+test("whole-venue scope and unusable Hall conflicts are symmetric", async () => {
+  const [retiredHall] = await db
+    .insert(venueHalls)
+    .values({
+      venueId: ids.venue,
+      slug: "retired-scope-conflicts",
+      nameRo: "Retired scope conflicts",
+      capacityMin: 10,
+      capacityMax: 40,
+      status: "archived",
+      bufferMinutes: 0,
+    })
+    .returning({ id: venueHalls.id });
+
+  const hallBlockDate = "2027-12-01";
+  const hallBlockInterval = canonicalVenueInterval({
+    eventDate: hallBlockDate,
+    startTime: "18:00",
+    endTime: "22:00",
+    timezone: "Europe/Chisinau",
+  });
+  const [hallBlock] = await db
+    .insert(venueScheduleBlocks)
+    .values({
+      venueId: ids.venue,
+      hallId: retiredHall.id,
+      startsAt: hallBlockInterval.startsAt,
+      endsAt: hallBlockInterval.endsAt,
+      kind: "manual",
+      source: "manual",
+    })
+    .returning({ id: venueScheduleBlocks.id });
+
+  const sisterAgainstRetiredBlock = await availability({
+    hallId: ids.grand,
+    eventDate: hallBlockDate,
+    reservationScope: "hall",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(sisterAgainstRetiredBlock.available, true);
+  const venueAgainstRetiredBlock = await availability({
+    eventDate: hallBlockDate,
+    reservationScope: "venue",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(venueAgainstRetiredBlock.available, false);
+  assert.equal(venueAgainstRetiredBlock.code, "HALL_BLOCK");
+  await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.id, hallBlock.id));
+
+  const wholeBlockDate = "2027-12-02";
+  const wholeBlockInterval = canonicalVenueInterval({
+    eventDate: wholeBlockDate,
+    startTime: "18:00",
+    endTime: "22:00",
+    timezone: "Europe/Chisinau",
+  });
+  const [wholeBlock] = await db
+    .insert(venueScheduleBlocks)
+    .values({
+      venueId: ids.venue,
+      hallId: null,
+      startsAt: wholeBlockInterval.startsAt,
+      endsAt: wholeBlockInterval.endsAt,
+      kind: "manual",
+      source: "manual",
+    })
+    .returning({ id: venueScheduleBlocks.id });
+  const hallAgainstWholeBlock = await availability({
+    hallId: ids.grand,
+    eventDate: wholeBlockDate,
+    reservationScope: "hall",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(hallAgainstWholeBlock.available, false);
+  assert.equal(hallAgainstWholeBlock.code, "VENUE_BLOCK");
+  await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.id, wholeBlock.id));
+
+  const hallGoogleDate = "2027-12-03";
+  const [hallGoogleEvent] = await db
+    .insert(calendarEvents)
+    .values({
+      entityType: "venue",
+      entityId: ids.venue,
+      date: hallGoogleDate,
+      status: "blocked",
+      source: "google_sync",
+      hallId: retiredHall.id,
+      startTime: "18:00",
+      endTime: "22:00",
+    })
+    .returning({ id: calendarEvents.id });
+  const sisterAgainstRetiredGoogleEvent = await availability({
+    hallId: ids.grand,
+    eventDate: hallGoogleDate,
+    reservationScope: "hall",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(sisterAgainstRetiredGoogleEvent.available, true);
+  const venueAgainstRetiredGoogleEvent = await availability({
+    eventDate: hallGoogleDate,
+    reservationScope: "venue",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(venueAgainstRetiredGoogleEvent.available, false);
+  assert.equal(venueAgainstRetiredGoogleEvent.code, "VENUE_BLOCK");
+  await db.delete(calendarEvents).where(eq(calendarEvents.id, hallGoogleEvent.id));
+
+  const wholeGoogleDate = "2027-12-04";
+  const [wholeGoogleEvent] = await db
+    .insert(calendarEvents)
+    .values({
+      entityType: "venue",
+      entityId: ids.venue,
+      date: wholeGoogleDate,
+      status: "blocked",
+      source: "google_sync",
+      hallId: null,
+      startTime: "18:00",
+      endTime: "22:00",
+    })
+    .returning({ id: calendarEvents.id });
+  const hallAgainstWholeGoogleEvent = await availability({
+    hallId: ids.grand,
+    eventDate: wholeGoogleDate,
+    reservationScope: "hall",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(hallAgainstWholeGoogleEvent.available, false);
+  assert.equal(hallAgainstWholeGoogleEvent.code, "VENUE_BLOCK");
+  await db.delete(calendarEvents).where(eq(calendarEvents.id, wholeGoogleEvent.id));
+
+  const hallBookingDate = "2027-12-05";
+  const [hallBooking] = await db
+    .insert(bookingRequests)
+    .values({
+      venueId: ids.venue,
+      hallId: retiredHall.id,
+      reservationScope: "hall",
+      clientName: "Retired Hall booking",
+      clientPhone: "+37360000031",
+      eventDate: hallBookingDate,
+      startTime: "18:00",
+      endTime: "22:00",
+      status: "accepted",
+      timezone: "Europe/Chisinau",
+    })
+    .returning({ id: bookingRequests.id });
+  const sisterAgainstRetiredBooking = await availability({
+    hallId: ids.grand,
+    eventDate: hallBookingDate,
+    reservationScope: "hall",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(sisterAgainstRetiredBooking.available, true);
+  const venueAgainstRetiredBooking = await availability({
+    eventDate: hallBookingDate,
+    reservationScope: "venue",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(venueAgainstRetiredBooking.available, false);
+  assert.equal(venueAgainstRetiredBooking.code, "BOOKING_CONFLICT");
+  assert.equal(venueAgainstRetiredBooking.conflictBookingId, hallBooking.id);
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, hallBooking.id));
+
+  const wholeBookingDate = "2027-12-06";
+  const [wholeBooking] = await db
+    .insert(bookingRequests)
+    .values({
+      venueId: ids.venue,
+      // Historical data can retain a Hall reference even though the explicit
+      // reservation scope closes the entire venue.
+      hallId: retiredHall.id,
+      reservationScope: "venue",
+      clientName: "Whole venue stale Hall booking",
+      clientPhone: "+37360000032",
+      eventDate: wholeBookingDate,
+      startTime: "18:00",
+      endTime: "22:00",
+      status: "accepted",
+      timezone: "Europe/Chisinau",
+    })
+    .returning({ id: bookingRequests.id });
+  const hallAgainstWholeBooking = await availability({
+    hallId: ids.grand,
+    eventDate: wholeBookingDate,
+    reservationScope: "hall",
+    startTime: "18:00",
+    endTime: "22:00",
+  });
+  assert.equal(hallAgainstWholeBooking.available, false);
+  assert.equal(hallAgainstWholeBooking.code, "BOOKING_CONFLICT");
+  assert.equal(hallAgainstWholeBooking.conflictBookingId, wholeBooking.id);
+  await db.delete(bookingRequests).where(eq(bookingRequests.id, wholeBooking.id));
+});
+
 test("Grand–Garden conflict group blocks Garden, not VIP", async () => {
   const [group] = await db
     .insert(venueHallConflictGroups)
@@ -349,6 +560,127 @@ test("adjacent intervals respect half-open [start,end) and buffer", async () => 
   assert.equal(buffered.code, "BOOKING_CONFLICT");
   await db.update(venueHalls).set({ bufferMinutes: 0 }).where(eq(venueHalls.id, ids.vip));
   await db.delete(bookingRequests).where(eq(bookingRequests.id, booking.id));
+});
+
+test("whole-venue and conflict-group checks use each booking resource buffer", async () => {
+  const insertBooking = async (input: {
+    date: string;
+    hallId: number | null;
+    reservationScope: "hall" | "venue";
+  }) => {
+    const interval = canonicalVenueInterval({
+      eventDate: input.date,
+      startTime: "18:00",
+      endTime: "22:00",
+      timezone: "Europe/Chisinau",
+    });
+    const [booking] = await db
+      .insert(bookingRequests)
+      .values({
+        venueId: ids.venue,
+        hallId: input.hallId,
+        clientName: "Asymmetric buffer",
+        clientPhone: "+37360000033",
+        eventDate: input.date,
+        startTime: "18:00",
+        endTime: "22:00",
+        status: "accepted",
+        reservationScope: input.reservationScope,
+        timezone: "Europe/Chisinau",
+        startsAt: interval.startsAt,
+        endsAt: interval.endsAt,
+      })
+      .returning({ id: bookingRequests.id });
+    return booking;
+  };
+
+  const bookingIds: number[] = [];
+  let groupId: number | null = null;
+  try {
+    // A Hall override must survive a whole-venue request whose venue-level
+    // buffer is shorter.
+    await db.update(venues).set({ bufferMinutes: 0 }).where(eq(venues.id, ids.venue));
+    await db.update(venueHalls).set({ bufferMinutes: 60 }).where(eq(venueHalls.id, ids.grand));
+    const hallBooking = await insertBooking({
+      date: "2027-12-10",
+      hallId: ids.grand,
+      reservationScope: "hall",
+    });
+    bookingIds.push(hallBooking.id);
+    const wholeAfterHall = await availability({
+      eventDate: "2027-12-10",
+      reservationScope: "venue",
+      startTime: "22:30",
+      endTime: "23:30",
+    });
+    assert.equal(wholeAfterHall.available, false);
+    assert.equal(wholeAfterHall.code, "BOOKING_CONFLICT");
+
+    // Conversely, an existing whole-venue booking owns the venue buffer even
+    // when the Hall requested afterwards has a shorter override.
+    await db.update(venues).set({ bufferMinutes: 60 }).where(eq(venues.id, ids.venue));
+    await db.update(venueHalls).set({ bufferMinutes: 0 }).where(eq(venueHalls.id, ids.vip));
+    const wholeBooking = await insertBooking({
+      date: "2027-12-11",
+      hallId: null,
+      reservationScope: "venue",
+    });
+    bookingIds.push(wholeBooking.id);
+    const hallAfterWhole = await availability({
+      hallId: ids.vip,
+      eventDate: "2027-12-11",
+      startTime: "22:30",
+      endTime: "23:30",
+    });
+    assert.equal(hallAfterWhole.available, false);
+    assert.equal(hallAfterWhole.code, "BOOKING_CONFLICT");
+
+    // NULL Hall buffer inherits the venue value. A linked Hall with a zero
+    // override must still respect the existing Hall's inherited buffer.
+    await db.update(venues).set({ bufferMinutes: 45 }).where(eq(venues.id, ids.venue));
+    await db.update(venueHalls).set({ bufferMinutes: null }).where(eq(venueHalls.id, ids.grand));
+    await db.update(venueHalls).set({ bufferMinutes: 0 }).where(eq(venueHalls.id, ids.garden));
+    const [group] = await db
+      .insert(venueHallConflictGroups)
+      .values({ venueId: ids.venue, name: "Asymmetric-buffer-group" })
+      .returning({ id: venueHallConflictGroups.id });
+    groupId = group.id;
+    await db.insert(venueHallConflictGroupMembers).values([
+      { groupId: group.id, hallId: ids.grand, venueId: ids.venue },
+      { groupId: group.id, hallId: ids.garden, venueId: ids.venue },
+    ]);
+    const inheritedHallBooking = await insertBooking({
+      date: "2027-12-12",
+      hallId: ids.grand,
+      reservationScope: "hall",
+    });
+    bookingIds.push(inheritedHallBooking.id);
+    const linkedHall = await availability({
+      hallId: ids.garden,
+      eventDate: "2027-12-12",
+      startTime: "22:30",
+      endTime: "23:30",
+    });
+    assert.equal(linkedHall.available, false);
+    assert.equal(linkedHall.code, "CONFLICT_GROUP");
+  } finally {
+    if (bookingIds.length > 0) {
+      await db.delete(bookingRequests).where(inArray(bookingRequests.id, bookingIds));
+    }
+    if (groupId != null) {
+      await db
+        .delete(venueHallConflictGroupMembers)
+        .where(eq(venueHallConflictGroupMembers.groupId, groupId));
+      await db
+        .delete(venueHallConflictGroups)
+        .where(eq(venueHallConflictGroups.id, groupId));
+    }
+    await db.update(venues).set({ bufferMinutes: 0 }).where(eq(venues.id, ids.venue));
+    await db
+      .update(venueHalls)
+      .set({ bufferMinutes: 0 })
+      .where(inArray(venueHalls.id, [ids.grand, ids.garden, ids.vip]));
+  }
 });
 
 test("overnight and DST Europe/Chisinau intervals are half-open and ordered", () => {
@@ -658,8 +990,8 @@ test("concurrent confirm and retry keep a single calendar projection", async () 
   assert.equal(ok.length, 1, JSON.stringify(results, null, 2));
   const [confirmed] = await db.select().from(bookingRequests).where(eq(bookingRequests.id, accepted.id));
   assert.equal(confirmed.status, "confirmed_by_client");
-  await persistConfirmationEffects(db, confirmed);
-  await persistConfirmationEffects(db, confirmed);
+  await replayConfirmationEffects(confirmed);
+  await replayConfirmationEffects(confirmed);
   const projections = await db
     .select({ id: calendarEvents.id })
     .from(calendarEvents)
@@ -667,6 +999,9 @@ test("concurrent confirm and retry keep a single calendar projection", async () 
   assert.equal(projections.length, 1);
   await db.delete(commissions).where(eq(commissions.bookingRequestId, confirmed.id));
   await db.delete(calendarEvents).where(eq(calendarEvents.bookingId, confirmed.id));
+  await db.execute(sql`DELETE FROM booking_effect_deliveries
+    WHERE effect_id IN (SELECT id FROM booking_effect_outbox WHERE booking_id = ${confirmed.id})`);
+  await db.execute(sql`DELETE FROM booking_effect_outbox WHERE booking_id = ${confirmed.id}`);
   await db.delete(bookingRequests).where(eq(bookingRequests.id, confirmed.id));
 });
 
@@ -786,6 +1121,7 @@ test("editing one hall must not delete a sister hall block", async () => {
   assert.equal(garden.ok, true);
   const removed = await deleteVenueScheduleBlocks({
     venueId: ids.venue,
+    actorUserId: ids.owner,
     eventDate: "2027-12-12",
     hallId: ids.grand,
     wholeVenue: false,
@@ -796,6 +1132,52 @@ test("editing one hall must not delete a sister hall block", async () => {
   assert.equal(leftover.filter((row) => row.hallId === ids.grand).length, 0);
   assert.equal(leftover.filter((row) => row.hallId === ids.garden).length, 1);
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
+});
+
+test("manual deletion preserves external backfill but can clear legacy manual backfill", async () => {
+  const [external, manual] = await db
+    .insert(venueScheduleBlocks)
+    .values([
+      {
+        venueId: ids.venue,
+        hallId: ids.grand,
+        startsAt: new Date("2027-12-14T00:00:00.000Z"),
+        endsAt: new Date("2027-12-15T00:00:00.000Z"),
+        kind: "external_calendar" as const,
+        source: "backfill_0028:calendar_events",
+        createdBy: ids.owner,
+      },
+      {
+        venueId: ids.venue,
+        hallId: ids.grand,
+        startsAt: new Date("2027-12-15T00:00:00.000Z"),
+        endsAt: new Date("2027-12-16T00:00:00.000Z"),
+        kind: "manual" as const,
+        source: "backfill_0028:calendar_events",
+        createdBy: ids.owner,
+      },
+    ])
+    .returning();
+  const externalAttempt = await deleteVenueScheduleBlocks({
+    venueId: ids.venue,
+    actorUserId: ids.owner,
+    id: external!.id,
+  });
+  assert.deepEqual(externalAttempt, { ok: true, deleted: 0 });
+  const manualAttempt = await deleteVenueScheduleBlocks({
+    venueId: ids.venue,
+    actorUserId: ids.owner,
+    id: manual!.id,
+  });
+  assert.deepEqual(manualAttempt, { ok: true, deleted: 1 });
+  const [externalStillPresent] = await db
+    .select({ id: venueScheduleBlocks.id })
+    .from(venueScheduleBlocks)
+    .where(eq(venueScheduleBlocks.id, external!.id));
+  assert.equal(externalStillPresent?.id, external!.id);
+  await db
+    .delete(venueScheduleBlocks)
+    .where(eq(venueScheduleBlocks.id, external!.id));
 });
 
 test("legacy calendar_events blocked day is not bookable", async () => {

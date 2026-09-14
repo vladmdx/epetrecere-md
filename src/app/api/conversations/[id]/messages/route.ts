@@ -21,6 +21,8 @@ import { contactsAreShared } from "@/lib/privacy/booking-contact";
 import { chatMessageForViewer } from "@/lib/privacy/chat-message";
 import { plainText } from "@/lib/content/plain-text";
 import { conversationMatchesVenueScope } from "@/lib/conversations/scope";
+import { conversationHasExclusiveParty, resolveConversationPartyXor, vendorConversationPath, clientConversationPath } from "@/lib/conversations/party";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 import { escapeHtml } from "@/lib/email/escape";
 
 // M0b #10 — Messages for a persistent client↔artist conversation.
@@ -43,21 +45,24 @@ async function loadContext(conversationId: number, clerkId: string, scopedVenueI
     .where(eq(conversations.id, conversationId))
     .limit(1);
   if (!conv) return null;
+  if (!conversationHasExclusiveParty(conv)) return null;
   if (!conversationMatchesVenueScope(conv.venueId, scopedVenueId)) return null;
+
+  const party = resolveConversationPartyXor(conv.artistId, conv.venueId);
+  if (!party.ok) return null;
 
   let side: "client" | "artist" | "venue" | null = null;
   if (conv.clientUserId === appUser.id) {
     side = "client";
-  } else if (conv.artistId) {
+  } else if (party.artistId != null) {
     const [ownsArtist] = await db
       .select({ id: artists.id })
       .from(artists)
-      .where(and(eq(artists.id, conv.artistId), eq(artists.userId, appUser.id)))
+      .where(and(eq(artists.id, party.artistId), eq(artists.userId, appUser.id)))
       .limit(1);
     if (ownsArtist) side = "artist";
-  } else if (conv.venueId) {
-    // ADR 0028 — venue ownership via the membership chain.
-    const access = await requireVenueAccess(conv.venueId, "staff");
+  } else {
+    const access = await requireVenueAccess(party.venueId, "staff");
     if (access.ok) side = "venue";
   }
 
@@ -66,12 +71,11 @@ async function loadContext(conversationId: number, clerkId: string, scopedVenueI
 }
 
 async function contactIsUnlocked(conv: typeof conversations.$inferSelect) {
-  const vendorCondition = conv.artistId
-    ? eq(bookingRequests.artistId, conv.artistId)
-    : conv.venueId
-      ? eq(bookingRequests.venueId, conv.venueId)
-      : null;
-  if (!vendorCondition) return false;
+  const party = resolveConversationPartyXor(conv.artistId, conv.venueId);
+  if (!party.ok) return false;
+  const vendorCondition = party.artistId != null
+    ? eq(bookingRequests.artistId, party.artistId)
+    : eq(bookingRequests.venueId, party.venueId);
 
   const [booking] = await db
     .select({ status: bookingRequests.status })
@@ -259,14 +263,21 @@ export async function POST(
     try {
       const { notificationEmail } = await import("@/lib/email/templates/notification-email");
 
-      // Resolve the vendor (artist OR venue)
+      const party = resolveConversationPartyXor(ctx.conv.artistId, ctx.conv.venueId);
+      if (!party.ok) return;
+
       let vendorName = "Vendor";
       let vendorUserId: string | null = null;
       let vendorEmail: string | null = null;
       let venueRecipients: Awaited<ReturnType<typeof getVenueOwnerRecipients>> = [];
-      let vendorDashboardUrl = "/dashboard/mesaje";
+      const vendorHref = vendorConversationPath({
+        artistId: party.artistId,
+        venueId: party.venueId,
+        conversationId,
+        multiHallEnabled: isMultiHallEnabled(),
+      });
 
-      if (ctx.conv.artistId) {
+      if (party.artistId != null) {
         const [artist] = await db
           .select({
             userId: artists.userId,
@@ -274,14 +285,14 @@ export async function POST(
             nameRo: artists.nameRo,
           })
           .from(artists)
-          .where(eq(artists.id, ctx.conv.artistId))
+          .where(eq(artists.id, party.artistId))
           .limit(1);
         if (artist) {
           vendorName = artist.nameRo;
           vendorUserId = artist.userId;
           vendorEmail = artist.email;
         }
-      } else if (ctx.conv.venueId) {
+      } else {
         const [venue] = await db
           .select({
             userId: venues.userId,
@@ -289,14 +300,13 @@ export async function POST(
             nameRo: venues.nameRo,
           })
           .from(venues)
-          .where(eq(venues.id, ctx.conv.venueId))
+          .where(eq(venues.id, party.venueId))
           .limit(1);
         if (venue) {
           vendorName = venue.nameRo;
           vendorUserId = venue.userId;
           vendorEmail = venue.email;
-          venueRecipients = await getVenueOwnerRecipients(ctx.conv.venueId);
-          vendorDashboardUrl = "/dashboard/sala/mesaje";
+          venueRecipients = await getVenueOwnerRecipients(party.venueId);
         }
       }
 
@@ -315,13 +325,13 @@ export async function POST(
             type: "booking_status_changed",
             title: `Mesaj nou de la ${vendorName}`,
             message: preview,
-            actionUrl: `/cabinet/mesaje?conversation=${conversationId}`,
+            actionUrl: clientConversationPath(conversationId),
             email: clientUser.email ?? undefined,
             emailSubject: `💬 Mesaj nou de la ${vendorName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${vendorName}`,
               message: `<strong>${escapeHtml(vendorName)}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${escapeHtml(preview)}</div>`,
-              ctaUrl: `https://epetrecere.md/cabinet/mesaje?conversation=${conversationId}`,
+              ctaUrl: `https://epetrecere.md${clientConversationPath(conversationId)}`,
               ctaText: "Răspunde →",
               emoji: "💬",
             }),
@@ -336,7 +346,7 @@ export async function POST(
         }
       } else {
         // Client sent a message → notify the vendor
-        const recipients = ctx.conv.venueId
+        const recipients = party.venueId
           ? venueRecipients
           : vendorUserId
             ? [{ userId: vendorUserId, email: vendorEmail }]
@@ -346,13 +356,13 @@ export async function POST(
             type: "booking_request_new",
             title: `Mesaj nou de la ${senderName}`,
             message: preview,
-            actionUrl: `${vendorDashboardUrl}?conversation=${conversationId}`,
+            actionUrl: vendorHref ?? "/dashboard/rezervari",
             email: recipient.email ?? undefined,
             emailSubject: `💬 Mesaj nou de la ${senderName} pe ePetrecere.md`,
             emailHtml: notificationEmail({
               title: `Mesaj nou de la ${senderName}`,
               message: `<strong>${escapeHtml(senderName)}</strong> ți-a trimis un mesaj:<br><br><div style="padding:12px;border-left:3px solid #C9A84C;background:#1a1a2e;border-radius:4px;color:#D4D4E0;">${escapeHtml(preview)}</div>`,
-              ctaUrl: `https://epetrecere.md${vendorDashboardUrl}?conversation=${conversationId}`,
+              ctaUrl: `https://epetrecere.md${vendorHref ?? "/dashboard/rezervari"}`,
               ctaText: "Răspunde →",
               emoji: "💬",
             }),

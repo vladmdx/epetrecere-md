@@ -7,7 +7,12 @@ import type { ESignatureValue } from "@/components/legal/e-signature";
 import { onboardingAgreementText } from "@/components/legal/onboarding-agreement-text";
 
 type Locale = "ro" | "ru" | "en";
-type RemoteState = { accountId?: string; loading: boolean; error: boolean; value: OnboardingAgreementStatus | null };
+type RemoteState = {
+  scopeKey?: string;
+  loading: boolean;
+  error: boolean;
+  value: OnboardingAgreementStatus | null;
+};
 
 function sameAgreement(a: SavedOnboardingAgreement | null, b: SavedOnboardingAgreement | null) {
   return a && b && a.subjectType === b.subjectType && a.documents.length === b.documents.length &&
@@ -28,15 +33,24 @@ export function useOnboardingAgreement(subjectType: "artist" | "venue", accountI
   const [remote, setRemote] = useState<RemoteState>({ loading: true, error: false, value: null });
   const requestGeneration = useRef(0);
   const text = onboardingAgreementText[locale];
-  const state = remote.accountId === accountId ? remote : { loading: true, error: false, value: null };
+  // A venue contract belongs to one organization, not merely to the Clerk
+  // account. Keeping the organization in the client state identity prevents a
+  // previously rendered/signed agreement for organization A from being reused
+  // while the same actor navigates to organization B.
+  const scopeKey = accountId
+    ? `${subjectType}:${accountId}:${organizationId ?? "personal"}`
+    : undefined;
+  const state = remote.scopeKey === scopeKey
+    ? remote
+    : { loading: true, error: false, value: null };
 
   const refresh = useCallback(async () => {
     if (!accountId) throw new Error("account_required");
     const generation = ++requestGeneration.current;
     // A pre-submit verification must not unmount a completed signature form.
-    setRemote(old => old.accountId === accountId && old.value
+    setRemote(old => old.scopeKey === scopeKey && old.value
       ? { ...old, error: false }
-      : { accountId, loading: true, error: false, value: null });
+      : { scopeKey, loading: true, error: false, value: null });
     try {
       const response = await fetch(`/api/legal/accept${organizationId ? `?organizationId=${organizationId}` : ""}`, { cache: "no-store" });
       if (!response.ok) throw new Error("agreement_verification_failed");
@@ -45,13 +59,15 @@ export function useOnboardingAgreement(subjectType: "artist" | "venue", accountI
       if (!value || !["unsigned", "resumable", "blocked"].includes(value.status) ||
         (value.status === "resumable" && !value.agreement)) throw new Error("agreement_verification_failed");
       if (generation !== requestGeneration.current) throw new Error("stale_agreement_check");
-      setRemote({ accountId, loading: false, error: false, value });
+      setRemote({ scopeKey, loading: false, error: false, value });
       return value;
     } catch (error) {
-      if (generation === requestGeneration.current) setRemote({ accountId, loading: false, error: true, value: null });
+      if (generation === requestGeneration.current) {
+        setRemote({ scopeKey, loading: false, error: true, value: null });
+      }
       throw error;
     }
-  }, [accountId, subjectType, organizationId]);
+  }, [accountId, organizationId, scopeKey, subjectType]);
 
   useEffect(() => {
     if (accountId) void refresh().catch(() => {});

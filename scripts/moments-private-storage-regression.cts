@@ -10,8 +10,8 @@ const originalLoad = Module._load;
 const originalFetch = global.fetch;
 const originalPrivate = process.env.MOMENTS_BLOB_READ_WRITE_TOKEN;
 const originalPublic = process.env.BLOB_READ_WRITE_TOKEN;
-process.env.MOMENTS_BLOB_READ_WRITE_TOKEN = "test-private-no-network";
-process.env.BLOB_READ_WRITE_TOKEN = "test-public-no-network";
+process.env.MOMENTS_BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_fixture_test-private-no-network";
+process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_fixture_test-public-no-network";
 const privateUrl = "https://fixture.private.blob.vercel-storage.com/event-photos/99/owned.webp";
 const legacyUrl = "https://fixture.public.blob.vercel-storage.com/uploads/legacy.jpg";
 const base = { id: 501, url: privateUrl, planId: 99, ownerId: "owner", isPublic: false, isApproved: true,
@@ -20,7 +20,7 @@ let state;
 const meta = (url, size = 3) => ({ url, pathname: new URL(url).pathname.slice(1), size, contentType: "image/webp" });
 function reset(extra = {}) {
   state = { row: { ...base }, clerk: null, actor: null, cookie: false, blobs: [meta(privateUrl)],
-    bytes: new Uint8Array([1, 2, 3]), listed: [], got: [], put: [], deleted: [], fetched: [], ...extra };
+    bytes: new Uint8Array([1, 2, 3]), listed: [], got: [], put: [], deleted: [], fetched: [], registry: new Map(), ...extra };
   global.fetch = async (url, options) => {
     assert.equal(url, legacyUrl); assert.equal(options.redirect, "error");
     assert.equal(options.headers, undefined);
@@ -30,18 +30,18 @@ function reset(extra = {}) {
 }
 const blob = {
   put: async (pathname, bytes, options) => {
-    assert.equal(options.token, "test-private-no-network"); assert.equal(options.access, "private");
+    assert.equal(options.token, "vercel_blob_rw_fixture_test-private-no-network"); assert.equal(options.access, "private");
     assert.ok(options.abortSignal); state.put.push(pathname);
     return { url: `https://${state.sdkMixedCase ? "FiXtUrE" : "fixture"}.private.blob.vercel-storage.com/${pathname}` };
   },
   list: async options => {
-    assert.ok(["test-private-no-network", "test-public-no-network"].includes(options.token));
+    assert.ok(["vercel_blob_rw_fixture_test-private-no-network", "vercel_blob_rw_fixture_test-public-no-network"].includes(options.token));
     state.listed.push(options);
     return { blobs: state.blobs.filter(b => b.pathname.startsWith(options.prefix)).slice(0, 1)
       .map(b => ({ ...b, url: state.sdkMixedCase ? b.url.replace("fixture.", "FiXtUrE.") : b.url })) };
   },
   get: async (pathname, options) => {
-    assert.equal(options.access, "private"); assert.equal(options.token, "test-private-no-network");
+    assert.equal(options.access, "private"); assert.equal(options.token, "vercel_blob_rw_fixture_test-private-no-network");
     assert.equal(options.useCache, false); assert.equal(options.headers, undefined);
     assert.ok(!pathname.includes("://")); state.got.push(pathname);
     const metadata = state.blobs.find(b => b.pathname === pathname);
@@ -50,14 +50,26 @@ const blob = {
       stream: new ReadableStream({ start(c) { c.enqueue(state.bytes); c.close(); } }) };
   },
   del: async (url, options) => {
-    assert.equal(options.token, url.includes(".private.") ? "test-private-no-network" : "test-public-no-network");
+    assert.equal(options.token, url.includes(".private.") ? "vercel_blob_rw_fixture_test-private-no-network" : "vercel_blob_rw_fixture_test-public-no-network");
     state.deleted.push(url);
   },
 };
 const db = { select() { let table; const q = {
   from(t) { table = t; return q; }, innerJoin() { return q; }, where() { return q; },
-  limit: async () => getTableName(table) === "users" ? (state.actor ? [state.actor] : []) : (state.row ? [state.row] : []),
-}; return q; } };
+  limit: async () => getTableName(table) === "users" ? (state.actor ? [state.actor] : [])
+    : getTableName(table) === "account_blob_assets" ? [...state.registry.values()]
+      : (state.row ? [state.row] : []),
+}; return q; },
+insert(table) {
+  assert.equal(getTableName(table), "account_blob_assets");
+  return { values(values) { return { onConflictDoNothing() { return { returning: async () => {
+    if (state.registry.has(values.assetKey)) return [];
+    state.registry.set(values.assetKey, { ...values, state: "active" });
+    return [{ assetKey: values.assetKey }];
+  } }; } }; } };
+},
+transaction(callback) { return callback(db); },
+};
 Module._load = function(request, parent, isMain) {
   let resolved; try { resolved = Module._resolveFilename(request, parent); } catch {}
   if (request === "@vercel/blob") return blob;
@@ -110,12 +122,13 @@ Module._load = function(request, parent, isMain) {
     console.log("PASS approved revealed PIN gallery and deliberately public UGC; withdrawal re-evaluated on every request");
 
     reset(); delete process.env.MOMENTS_BLOB_READ_WRITE_TOKEN;
-    await assert.rejects(storage.storePrivatePhoto(Buffer.from([1]), 99));
+    await assert.rejects(storage.storePrivatePhoto(Buffer.from([1]), 99, "owner"));
     assert.equal(state.put.length, 0);
     assert.equal(await storage.readManagedPhotoBytes(privateUrl, { id: 99 }), null);
-    process.env.MOMENTS_BLOB_READ_WRITE_TOKEN = "test-private-no-network";
-    assert.match(await storage.storePrivatePhoto(Buffer.from([1]), 99), /^https:\/\/fixture\.private\./);
-    await assert.rejects(storage.storePrivatePhoto(Buffer.from([1]), -1));
+    process.env.MOMENTS_BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_fixture_test-private-no-network";
+    assert.match(await storage.storePrivatePhoto(Buffer.from([1]), 99, "owner"), /^https:\/\/fixture\.private\./);
+    assert.equal([...state.registry.values()][0].ownerUserId, "owner");
+    await assert.rejects(storage.storePrivatePhoto(Buffer.from([1]), -1, "owner"));
     console.log("PASS missing dedicated token fails closed, never falls back to public token/storage/local uploads");
 
     reset(); assert.deepEqual(await storage.readManagedPhotoBytes(privateUrl, { id: 99 }), state.bytes);
@@ -128,7 +141,7 @@ Module._load = function(request, parent, isMain) {
     reset({ sdkMixedCase: true, clerk: "qa", actor: { id: "owner", role: "user" } });
     assert.deepEqual(await storage.readManagedPhotoBytes(privateUrl, { id: 99 }), state.bytes);
     assert.equal((await route.GET(request(), context)).status, 200);
-    assert.match(await storage.storePrivatePhoto(Buffer.from([1]), 99), /^https:\/\/fixture\.private\./);
+    assert.match(await storage.storePrivatePhoto(Buffer.from([1]), 99, "owner"), /^https:\/\/fixture\.private\./);
     assert.equal(await storage.deleteManagedPhoto(privateUrl, { id: 99 }), true);
     assert.deepEqual(state.deleted, [privateUrl]);
     const priorCalls = state.listed.length + state.got.length;

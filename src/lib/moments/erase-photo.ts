@@ -1,7 +1,8 @@
 import { del, list } from "@vercel/blob";
+import { isRegisteredAccountBlobAsset } from "@/lib/privacy/account-asset-erasure";
 import { canonicalBlobResultUrl, managedPhotoPath, type PhotoPlanScope } from "./managed-photo";
 
-export type PhotoErasure = "deleted" | "already_missing" | "retry" | "unverified";
+export type PhotoErasure = "deleted" | "already_missing" | "registered" | "retry" | "unverified";
 export const PHOTO_ERASURE_BATCH_SIZE = 20;
 const OPERATION_TIMEOUT_MS = 2_000;
 
@@ -19,6 +20,10 @@ export async function eraseManagedPhoto(raw: string, plan: PhotoPlanScope): Prom
   const tokenStore = /^vercel_blob_rw_([a-zA-Z0-9]+)_[a-zA-Z0-9_-]+$/.exec(token)?.[1];
   if (!tokenStore || url.hostname !== `${tokenStore.toLowerCase()}.${access}.blob.vercel-storage.com`) return "unverified";
   try {
+    // New uploads have a server-side ownership receipt and live claims. Their
+    // row-delete trigger creates durable outbox work after the final claim is
+    // removed. Do not race that worker with a synchronous provider deletion.
+    if (await isRegisteredAccountBlobAsset(raw)) return "registered";
     const result = await list({ token, prefix: pathname, limit: 1, abortSignal: AbortSignal.timeout(OPERATION_TIMEOUT_MS) });
     if (result.blobs.length === 0 && !result.hasMore) return "already_missing";
     const exact = result.blobs.find(blob => blob.pathname === pathname && canonicalBlobResultUrl(blob.url) === raw);
@@ -29,7 +34,7 @@ export async function eraseManagedPhoto(raw: string, plan: PhotoPlanScope): Prom
 }
 
 export function photoErasureSucceeded(result: PhotoErasure): boolean {
-  return result === "deleted" || result === "already_missing";
+  return result === "deleted" || result === "already_missing" || result === "registered";
 }
 
 export type ErasablePhoto = { id: number; url: string; plan: PhotoPlanScope };

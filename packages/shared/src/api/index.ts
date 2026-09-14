@@ -17,6 +17,8 @@
 // All response bodies are pre-parsed JSON. The caller validates with
 // a Zod schema from @epetrecere/shared/validators.
 
+export * from "./pending-json-request";
+
 export interface ApiClientOptions {
   baseUrl: string;
   getToken?: () => Promise<string | null>;
@@ -36,6 +38,14 @@ export interface ApiResponse<T> {
   error: { code: string; message: string } | null;
 }
 
+export interface ApiRequestInit {
+  signal?: AbortSignal;
+  query?: Record<string, string | number | boolean | null | undefined>;
+  /** Additive per-request headers such as Idempotency-Key. Authentication is
+   *  still owned by the client factory and cannot be overridden here. */
+  headers?: Readonly<Record<string, string>>;
+}
+
 export function createApiClient(opts: ApiClientOptions) {
   const timeout = opts.timeoutMs ?? 30_000;
 
@@ -43,7 +53,7 @@ export function createApiClient(opts: ApiClientOptions) {
     method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
     path: string,
     body?: unknown,
-    init?: { signal?: AbortSignal; query?: Record<string, string | number | boolean | null | undefined> },
+    init?: ApiRequestInit,
   ): Promise<ApiResponse<T>> {
     // Build URL with query string when query params are passed.
     // IMPORTANT: the base must end with "/" AND the path must NOT start with
@@ -63,6 +73,10 @@ export function createApiClient(opts: ApiClientOptions) {
       "Content-Type": "application/json",
       Accept: "application/json",
     };
+    for (const [name, value] of Object.entries(init?.headers ?? {})) {
+      if (name.toLowerCase() === "authorization") continue;
+      headers[name] = value;
+    }
     if (opts.userAgent) headers["X-Client"] = opts.userAgent;
     const token = await opts.getToken?.();
     if (token) headers.Authorization = `Bearer ${token}`;

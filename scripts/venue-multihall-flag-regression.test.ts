@@ -100,14 +100,22 @@ test("flag OFF: public booking does not persist hallId", async () => {
   });
 });
 
-test("kill-switch is wired at route level for org/hall mutations", () => {
+test("kill-switch is wired into transactional org/hall mutation services", () => {
   const registerVenue = readFileSync("src/app/api/auth/register-venue/route.ts", "utf8");
   assert.match(registerVenue, /jsonIfMultiHallEnabled\(\)/);
   assert.doesNotMatch(registerVenue, /jsonIfMultiHallDisabled\(\)/);
 
   const images = readFileSync("src/app/api/venue-images/route.ts", "utf8");
-  assert.match(images, /if \(parsed\.data\.hallId\)/);
-  assert.match(images, /jsonIfMultiHallDisabled\(\)/);
+  assert.match(images, /createVenueImage\(actor\.id/);
+  assert.match(images, /deleteVenueImage\(actor\.id/);
+  const imageById = readFileSync("src/app/api/venue-images/[id]/route.ts", "utf8");
+  assert.match(imageById, /updateVenueImage\(actor\.id/);
+  assert.match(imageById, /deleteVenueImage\(actor\.id/);
+  const imageWrites = readFileSync("src/lib/partner/venue-image-writes.ts", "utf8");
+  assert.match(imageWrites, /hallImageFeatureFailure/);
+  assert.match(imageWrites, /isMultiHallEnabled\(\)/);
+  const adminReg = readFileSync("src/app/api/admin/registration-requests/route.ts", "utf8");
+  assert.match(adminReg, /jsonIfOrganizationBackedVenueDisabled/);
 
   const legal = readFileSync("src/lib/legal/record-acceptance.ts", "utf8");
   assert.match(legal, /FEATURE_DISABLED/);

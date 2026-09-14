@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
           AND is_active = true
           ${artist.location ? sql`AND location = ${artist.location}` : sql``}
       `);
-      const row = stats.rows?.[0];
+      const row = stats[0];
       if (row) {
         marketSummary =
           `Artiști activi ${artist.location ? `în ${artist.location}` : "pe platformă"}: ` +
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
           AND is_active = true
           ${venue.city ? sql`AND city = ${venue.city}` : sql``}
       `);
-      const row = stats.rows?.[0];
+      const row = stats[0];
       if (row) {
         marketSummary =
           `Săli active ${venue.city ? `în ${venue.city}` : "pe platformă"}: ` +

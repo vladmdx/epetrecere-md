@@ -20,11 +20,11 @@ import {
 } from "../src/lib/db/schema";
 import {
   ensureDraftOrganization,
-  saveHallDraft,
   saveOrganizationProfile,
   saveVenueDraft,
   submitVenueForApproval,
 } from "../src/lib/partner/onboarding";
+import { createHallDraft } from "../src/lib/partner/hall-writes";
 import {
   approvePartnerVenue,
   listPendingPartnerVenues,
@@ -109,7 +109,12 @@ before(async () => {
   ids.owner = owner.id;
   const [admin] = await db
     .insert(users)
-    .values({ clerkId: MARK + "admin", email: `${MARK}admin@example.com`, name: "Admin" })
+    .values({
+      clerkId: MARK + "admin",
+      email: `${MARK}admin@example.com`,
+      name: "Admin",
+      role: "admin",
+    })
     .returning({ id: users.id });
   ids.admin = admin.id;
 
@@ -118,7 +123,7 @@ before(async () => {
     type: "company",
   });
   ids.org = org.id;
-  const profile = await saveOrganizationProfile(ids.org, {
+  const profile = await saveOrganizationProfile(appUser(ids.owner), ids.org, {
     type: "company",
     displayName: MARK + "Org",
     legalName: IDENTITY.legalName,
@@ -145,14 +150,15 @@ before(async () => {
   assert.equal(venue.ok, true, JSON.stringify(venue));
   if (!venue.ok) throw new Error("venue 1");
   ids.venue = venue.venue.id;
-  await saveHallDraft({
+  await createHallDraft(ids.owner, {
     venueId: ids.venue,
+    hallCreateRequestId: randomUUID(),
     nameRo: "Grand",
     capacityMin: 20,
     capacityMax: 100,
     imageUrls: [],
   });
-  const submitted = await submitVenueForApproval(ids.venue);
+  const submitted = await submitVenueForApproval(ids.owner, ids.venue);
   assert.equal(submitted.ok, true);
 });
 
@@ -177,7 +183,7 @@ test("queue includes the first pending venue", async () => {
 });
 
 test("approve first venue activates venue, pending halls and pending org", async () => {
-  const result = await approvePartnerVenue(ids.venue);
+  const result = await approvePartnerVenue(ids.admin, ids.venue);
   assert.equal(result.ok, true, JSON.stringify(result));
   const [venue] = await db.select().from(venues).where(eq(venues.id, ids.venue));
   assert.equal(venue.isActive, true);
@@ -194,6 +200,8 @@ test("approve first venue activates venue, pending halls and pending org", async
 test("second venue with user_id NULL appears in the queue and approve does not deactivate the first", async () => {
   const venue2 = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
+    createIntent: true,
+    createRequestId: randomUUID(),
     name: MARK + "Local 2",
     phone: PHONE,
     city: "Chișinău",
@@ -204,18 +212,19 @@ test("second venue with user_id NULL appears in the queue and approve does not d
   if (!venue2.ok) throw new Error("venue 2");
   ids.venue2 = venue2.venue.id;
   assert.equal(venue2.venue.userId, null);
-  await saveHallDraft({
+  await createHallDraft(ids.owner, {
     venueId: ids.venue2,
+    hallCreateRequestId: randomUUID(),
     nameRo: "VIP",
     capacityMin: 10,
     capacityMax: 40,
     imageUrls: [],
   });
-  const submitted = await submitVenueForApproval(ids.venue2);
+  const submitted = await submitVenueForApproval(ids.owner, ids.venue2);
   assert.equal(submitted.ok, true);
   const pending = await listPendingPartnerVenues();
   assert.ok(pending.some((row) => row.id === ids.venue2 && row.userId == null));
-  const result = await approvePartnerVenue(ids.venue2);
+  const result = await approvePartnerVenue(ids.admin, ids.venue2);
   assert.equal(result.ok, true, JSON.stringify(result));
   const [first] = await db.select({ isActive: venues.isActive }).from(venues).where(eq(venues.id, ids.venue));
   const [second] = await db.select({ isActive: venues.isActive, userId: venues.userId }).from(venues).where(eq(venues.id, ids.venue2));
@@ -256,7 +265,7 @@ test("reject keeps the venue draft and does not delete onboarding work", async (
     sortOrder: 0,
     isCover: true,
   });
-  const rejected = await rejectPartnerVenue(draft.id);
+  const rejected = await rejectPartnerVenue(ids.admin, draft.id);
   assert.equal(rejected.ok, true);
   const [kept] = await db.select().from(venues).where(eq(venues.id, draft.id));
   assert.ok(kept);
@@ -265,7 +274,7 @@ test("reject keeps the venue draft and does not delete onboarding work", async (
   assert.equal(hallRow.status, "rejected");
   const [org] = await db.select({ status: partnerOrganizations.status }).from(partnerOrganizations).where(eq(partnerOrganizations.id, ids.org));
   assert.equal(org.status, "active", "rejecting an extra venue must not deactivate an already active org");
-  const resubmit = await submitVenueForApproval(draft.id);
+  const resubmit = await submitVenueForApproval(ids.owner, draft.id);
   assert.equal(resubmit.ok, true, JSON.stringify(resubmit));
   const [hallPending] = await db.select({ status: venueHalls.status }).from(venueHalls).where(eq(venueHalls.id, hall.id));
   assert.equal(hallPending.status, "pending");

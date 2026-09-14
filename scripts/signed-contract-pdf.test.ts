@@ -18,8 +18,13 @@ import {
   signedContractSessionKey,
   type SignedContractEvidence,
 } from "../src/lib/legal/signed-contract-pdf";
+import {
+  LEGAL_PACK_MANIFEST_VARIANTS,
+  legalPackManifest,
+} from "../src/lib/legal/pack-manifest";
 
 const ACCEPTED_AT = "2026-09-11T07:10:53.000Z";
+const SESSION_ID = "00000000-0000-4000-8000-000000000099";
 
 async function fixtureRows(): Promise<SignedContractEvidence[]> {
   const signature = await sharp(Buffer.from(`
@@ -46,6 +51,8 @@ async function fixtureRows(): Promise<SignedContractEvidence[]> {
     return {
       id: 9001 + index,
       userId: "00000000-0000-4000-8000-000000000001",
+      organizationId: 99,
+      acceptanceSessionId: SESSION_ID,
       subjectType: "venue",
       documentSlug: slug,
       documentVersion: document.version,
@@ -92,14 +99,101 @@ test("a PDF never mixes signing sessions or renders a modified frozen snapshot",
   const rows = await fixtureRows();
   assert.notEqual(
     signedContractSessionKey(rows[0]),
-    signedContractSessionKey({ ...rows[0], acceptedAt: "2026-09-10T07:10:54.000Z" }),
+    signedContractSessionKey({
+      ...rows[0],
+      acceptanceSessionId: "00000000-0000-4000-8000-000000000100",
+    }),
   );
   await assert.rejects(
-    () => generateSignedContractPdf([rows[0], { ...rows[1], acceptedAt: "2026-09-10T07:10:54.000Z" }]),
+    () => generateSignedContractPdf([
+      rows[0],
+      {
+        ...rows[1],
+        acceptanceSessionId: "00000000-0000-4000-8000-000000000100",
+      },
+    ]),
     (error: unknown) => error instanceof SignedContractPdfError && error.code === "incomplete_session",
   );
   await assert.rejects(
-    () => generateSignedContractPdf([{ ...rows[0], documentBlocks: [{ type: "p", text: "modified" }] }]),
+    () => generateSignedContractPdf([
+      rows[0],
+      { ...rows[1], organizationId: 100 },
+      ...rows.slice(2),
+    ]),
+    (error: unknown) =>
+      error instanceof SignedContractPdfError && error.code === "incomplete_session",
+  );
+  await assert.rejects(
+    () => generateSignedContractPdf([
+      rows[0],
+      { ...rows[1], acceptedAt: "2026-09-10T07:10:54.000Z" },
+      ...rows.slice(2),
+    ]),
+    (error: unknown) =>
+      error instanceof SignedContractPdfError && error.code === "incomplete_session",
+  );
+  await assert.rejects(
+    () => generateSignedContractPdf(rows.slice(0, -1)),
+    (error: unknown) =>
+      error instanceof SignedContractPdfError && error.code === "incomplete_session",
+  );
+  await assert.rejects(
+    () => generateSignedContractPdf([
+      { ...rows[0], documentBlocks: [{ type: "p", text: "modified" }] },
+      ...rows.slice(1),
+    ]),
     (error: unknown) => error instanceof SignedContractPdfError && error.code === "invalid_snapshot",
+  );
+});
+
+test("historical pack 1.0 uses its own venue manifest and still renders", async () => {
+  const current = await fixtureRows();
+  const manifest = legalPackManifest("1.0", "venue");
+  assert.ok(manifest);
+  const bySlug = new Map(current.map((row) => [row.documentSlug, row]));
+  const historical = manifest.map((document, index) => ({
+    ...bySlug.get(document.slug)!,
+    id: 9101 + index,
+    acceptanceSessionId: "00000000-0000-4000-8000-000000000101",
+    packVersion: "1.0",
+    documentVersion: document.version,
+  }));
+  assert.equal(historical.length, 5);
+  assert.equal(historical.some((row) => row.documentSlug === "acord-parteneri"), false);
+  const pdf = await generateSignedContractPdf([...historical].reverse());
+  assert.equal(Buffer.from(pdf.subarray(0, 5)).toString("ascii"), "%PDF-");
+  await assert.rejects(
+    () => generateSignedContractPdf([
+      { ...historical[0], documentVersion: "9.9" },
+      ...historical.slice(1),
+    ]),
+    (error: unknown) =>
+      error instanceof SignedContractPdfError && error.code === "incomplete_session",
+  );
+});
+
+test("an early pack 2.2 document-version combination still renders exactly", async () => {
+  const current = await fixtureRows();
+  const earlyManifest = LEGAL_PACK_MANIFEST_VARIANTS["2.2"].venue[0];
+  const bySlug = new Map(current.map((row) => [row.documentSlug, row]));
+  const historical = earlyManifest.map((document, index) => ({
+    ...bySlug.get(document.slug)!,
+    id: 9201 + index,
+    acceptanceSessionId: "00000000-0000-4000-8000-000000000102",
+    packVersion: "2.2",
+    documentVersion: document.version,
+  }));
+  const pdf = await generateSignedContractPdf([...historical].reverse());
+  assert.equal(Buffer.from(pdf.subarray(0, 5)).toString("ascii"), "%PDF-");
+
+  const hybrid = historical.map((row) =>
+    row.documentSlug === "politica-confidentialitate"
+      ? { ...row, documentVersion: "1.3" }
+      : row,
+  );
+  await assert.rejects(
+    () => generateSignedContractPdf(hybrid),
+    (error: unknown) =>
+      error instanceof SignedContractPdfError && error.code === "incomplete_session",
   );
 });

@@ -10,6 +10,17 @@ import { useLocale } from "@/hooks/use-locale";
 import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 import { ALL_EVENT_TYPES, EVENT_TYPE_EMOJI, eventTypeLabel } from "@/lib/events/normalize";
+import {
+  bookingCreateScope,
+  submitBookingCreateRequest,
+} from "@/lib/booking/booking-create-client";
+import {
+  endTimeAfterHours,
+  listBookableStartHours,
+  maximumDurationHours,
+  resolveDailyWorkingWindows,
+  type DailyClockRange,
+} from "@/lib/booking/daily-time-windows";
 
 interface CalendarWidgetProps {
   entityType: "artist" | "venue";
@@ -38,7 +49,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
     value: k,
     label: `${EVENT_TYPE_EMOJI[k]} ${eventTypeLabel(k, locale)}`,
   }));
-  const { user, isSignedIn: _isSignedIn } = useUser();
+  const { user, isSignedIn: _isSignedIn, isLoaded: isUserLoaded } = useUser();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() };
@@ -57,6 +68,9 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
   const [workingHours, setWorkingHours] = useState<
     { start: string; end: string } | null | undefined
   >(undefined);
+  const [workingRanges, setWorkingRanges] = useState<
+    DailyClockRange[] | undefined
+  >(undefined);
   const [selectedStartTime, setSelectedStartTime] = useState<string>("");
   const [selectedDuration, setSelectedDuration] = useState<string>("");
 
@@ -68,6 +82,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
       setBookedRanges([]);
       setWholeDayBlocked(false);
       setWorkingHours(undefined);
+      setWorkingRanges(undefined);
       return;
     }
     let cancelled = false;
@@ -80,6 +95,9 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
         setBookedRanges(d.bookedRanges || []);
         setWholeDayBlocked(!!d.wholeDayBlocked);
         setWorkingHours(d.workingHours);
+        setWorkingRanges(
+          Array.isArray(d.workingRanges) ? d.workingRanges : undefined,
+        );
       })
       .catch(() => {
         /* silent */
@@ -92,27 +110,18 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
   // Day-of-week working hours window in 24h units. When working hours
   // aren't configured we fall back to a sensible 08:00–23:00 default
   // so existing artists without a schedule still see usable options.
-  const wsBoundaries = (() => {
-    if (workingHours === null) return null; // explicit day off
-    if (workingHours) {
-      const [wsH] = workingHours.start.split(":").map(Number);
-      const [weH] = workingHours.end.split(":").map(Number);
-      const weEffective = weH === 0 ? 24 : weH;
-      return { startH: wsH, endH: weEffective };
-    }
-    return { startH: 8, endH: 23 };
-  })();
+  const workingWindows = resolveDailyWorkingWindows({
+    workingRanges,
+    // Preserve the historical public-form default for artists without a
+    // configured schedule. Canonical API ranges supersede this singular value.
+    workingHours: workingRanges === undefined && workingHours === undefined
+      ? { start: "08:00", end: "23:00" }
+      : workingHours,
+  });
 
   // Hours offered as start time — every full hour from open until one
   // hour before close (so at least a 1-hour booking fits).
-  const availableStartHours: number[] = (() => {
-    if (!wsBoundaries) return [];
-    const out: number[] = [];
-    for (let h = wsBoundaries.startH; h < wsBoundaries.endH; h++) {
-      out.push(h);
-    }
-    return out;
-  })();
+  const availableStartHours = listBookableStartHours(workingWindows);
 
   // Whether a given start hour is unavailable (booked / blocked).
   function isHourBooked(hour: number): boolean {
@@ -134,9 +143,8 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
   // Maximum allowed duration given the selected start hour and the end of
   // the working-hours window. Capped at 8 hours.
   const maxDuration: number = (() => {
-    if (!wsBoundaries || !selectedStartTime) return 8;
-    const [h] = selectedStartTime.split(":").map(Number);
-    return Math.max(0, Math.min(8, wsBoundaries.endH - h));
+    if (!selectedStartTime) return 0;
+    return maximumDurationHours(selectedStartTime, workingWindows, 8);
   })();
 
   const fetchEvents = useCallback(async () => {
@@ -235,54 +243,63 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
 
   async function handleBookingSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    setSubmitting(true);
+    if (!isUserLoaded) return;
     const form = new FormData(e.currentTarget);
 
     const startTime = form.get("startTime") as string;
     const duration = Number(form.get("duration") || 0);
     let endTime: string | undefined;
     if (startTime && duration) {
-      const [h, m] = startTime.split(":").map(Number);
-      let endH = h + duration;
-      // Clamp to working-hours end if configured
-      if (workingHours) {
-        const [weH] = workingHours.end.split(":").map(Number);
-        const weEffective = weH === 0 ? 24 : weH;
-        if (endH > weEffective) {
-          alert(
-            t("calendar.durationExceedsHours", {
-              start: workingHours.start,
-              end: workingHours.end,
-            }),
-          );
-          return;
-        }
-      } else if (endH > 23) {
-        endH = 23;
+      if (duration > maximumDurationHours(startTime, workingWindows, 8)) {
+        const scheduleLabel = (workingRanges ?? (workingHours ? [workingHours] : []))
+          .map((range) => `${range.start}–${range.end}`)
+          .join(", ");
+        alert(
+          t("calendar.durationExceedsHours", {
+            start: scheduleLabel || "08:00",
+            end: scheduleLabel || "23:00",
+          }),
+        );
+        return;
       }
-      endTime = `${String(endH).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      endTime = endTimeAfterHours(startTime, duration) ?? undefined;
+      if (!endTime) return;
     }
+    setSubmitting(true);
 
     try {
       // For artists: create booking request (shows in artist's Rezervări)
       // For venues: skip booking-requests (schema requires artistId) — only create lead
       if (entityType === "artist") {
-        const res = await fetch("/api/booking-requests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const payload = {
+          artistId: entityId,
+          clientName: form.get("name") as string,
+          clientPhone: `+373${form.get("phone") as string}`,
+          clientEmail: (form.get("email") as string) || undefined,
+          eventDate: selectedDate || "",
+          startTime: startTime || undefined,
+          endTime: endTime || undefined,
+          eventType: (form.get("eventType") as string) || undefined,
+          message: (form.get("message") as string) || undefined,
+        };
+        const res = await submitBookingCreateRequest({
+          scope: bookingCreateScope({
+            actorId: user?.id,
             artistId: entityId,
-            clientName: form.get("name") as string,
-            clientPhone: `+373${form.get("phone") as string}`,
-            clientEmail: (form.get("email") as string) || undefined,
-            eventDate: selectedDate || "",
-            startTime: startTime || undefined,
-            endTime: endTime || undefined,
-            eventType: (form.get("eventType") as string) || undefined,
-            message: (form.get("message") as string) || undefined,
           }),
+          payload,
         });
-        if (!res.ok) throw new Error();
+        if (!res.ok) {
+          const body = await res.response.clone().json().catch(() => null) as
+            | { error?: unknown; code?: unknown }
+            | null;
+          const message = [body?.error, body?.code].find(
+            (value): value is string =>
+              typeof value === "string" && Boolean(value.trim()),
+          );
+          throw new Error(message?.trim().slice(0, 200)
+            || t("calendar.genericError"));
+        }
       }
 
       // Create a lead for the matching system (works for both artists and venues)
@@ -301,13 +318,19 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
           ...(entityType === "artist" ? { artistId: entityId, skipArtistNotification: true } : { venueId: entityId }),
         }),
       });
-      if (entityType === "venue" && !leadRes.ok) throw new Error();
+      if (entityType === "venue" && !leadRes.ok) {
+        throw new Error(t("calendar.genericError"));
+      }
 
       toast.success(t("calendar.bookingRequestSent"));
       setSubmitted(true);
       setShowForm(false);
-    } catch {
-      toast.error(t("calendar.genericError"));
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : t("calendar.genericError"),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -558,7 +581,7 @@ export function CalendarWidget({ entityType, entityId, enabled: _enabled, onDate
                 </Button>
                 <Button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || !isUserLoaded}
                   className="flex-1 h-9 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-xs font-semibold rounded-lg"
                 >
                   {submitting ? (

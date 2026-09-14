@@ -23,13 +23,35 @@ const ROLE_RANK: Record<OrgRole, number> = {
   owner: 3,
 };
 
-function roleMeets(role: OrgRole, capability: keyof typeof ORG_CAPABILITY_MIN_ROLE): boolean {
+export function organizationRoleHasCapability(
+  role: OrgRole,
+  capability: keyof typeof ORG_CAPABILITY_MIN_ROLE,
+): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[ORG_CAPABILITY_MIN_ROLE[capability]];
+}
+
+export type OrganizationCapabilities = Readonly<{
+  manageVenues: boolean;
+  manageBilling: boolean;
+  manageLegal: boolean;
+  manageMembers: boolean;
+}>;
+
+/** Client-safe capability projection; callers never need to recreate role ranks. */
+export function organizationCapabilitiesForRole(
+  role: OrgRole,
+): OrganizationCapabilities {
+  return {
+    manageVenues: organizationRoleHasCapability(role, "manage_venues"),
+    manageBilling: organizationRoleHasCapability(role, "manage_billing"),
+    manageLegal: organizationRoleHasCapability(role, "manage_legal"),
+    manageMembers: organizationRoleHasCapability(role, "manage_members"),
+  };
 }
 
 /** Operational DTO for staff; legal/contract fields only with manage_legal; billing with manage_billing. */
 export function redactOrganizationForRole<T extends OrgRow>(org: T, role: OrgRole) {
-  const legal = roleMeets(role, "manage_legal")
+  const legal = organizationRoleHasCapability(role, "manage_legal")
     ? {
         legalName: org.legalName,
         idNumber: org.idNumber,
@@ -40,7 +62,7 @@ export function redactOrganizationForRole<T extends OrgRow>(org: T, role: OrgRol
         idNumber: null,
         legalAddress: null,
       };
-  const billing = roleMeets(role, "manage_billing")
+  const billing = organizationRoleHasCapability(role, "manage_billing")
     ? {
         billingEmail: org.billingEmail,
         billingPhone: org.billingPhone,
@@ -61,5 +83,6 @@ export function redactOrganizationForRole<T extends OrgRow>(org: T, role: OrgRol
     ...legal,
     ...billing,
     role,
+    capabilities: organizationCapabilitiesForRole(role),
   };
 }

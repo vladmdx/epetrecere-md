@@ -124,8 +124,8 @@ test("published tariffs and pricing in all three languages match the approved te
   const docs=JSON.parse(readFileSync("src/content/legal/documents.json","utf8"));
   assert.equal(LEGAL_PACK_VERSION,"2.2");
   for(const slug of ["acord-parteneri","acord-locatii","tarife"]) assert.equal(getLegalDocument(slug)?.version,"2.2");
-  assert.equal(getLegalDocument("termeni-generali")?.version,"2.0");
-  assert.equal(getLegalDocument("politica-confidentialitate")?.version,"1.2");
+  assert.equal(getLegalDocument("termeni-generali")?.version,"2.2");
+  assert.equal(getLegalDocument("politica-confidentialitate")?.version,"1.3");
   for(const locale of ["ro","ru","en"]) {
     const tariffs=docs.find((d:{slug:string})=>d.slug==="tarife").blocks[locale].map((b:{text:string})=>b.text).join("\n");
     assert.ok(tariffs.includes("30"));

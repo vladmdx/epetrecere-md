@@ -261,3 +261,35 @@ test("conversations.artist_id is nullable with a vendor-required check", () => {
   assert.doesNotMatch(slice, /artistId: integer\("artist_id"\)[\s\S]{0,80}\.notNull\(\)/);
   assert.match(slice, /conversations_vendor_required_chk/);
 });
+
+test("legal evidence uniqueness is session-scoped and delivery is durable", () => {
+  const source = readFileSync("src/lib/db/schema.ts", "utf8");
+  const acceptanceStart = source.indexOf("export const legalAcceptances");
+  const acceptanceSlice = source.slice(acceptanceStart, acceptanceStart + 6800);
+  assert.match(
+    acceptanceSlice,
+    /legal_acceptances_unique[\s\S]*acceptanceSessionId[\s\S]*documentSlug/,
+  );
+  assert.match(
+    acceptanceSlice,
+    /legal_acceptances_org_unique[\s\S]*acceptanceSessionId[\s\S]*documentSlug/,
+  );
+  assert.match(acceptanceSlice, /legal_acceptances_org_subject_chk/);
+  assert.match(acceptanceSlice, /legal_acceptances_id_session_unique/);
+  assert.match(acceptanceSlice, /export const legalContractDeliveryOutbox/);
+  assert.match(acceptanceSlice, /id: serial\("id"\)\.primaryKey\(\)/);
+  assert.match(acceptanceSlice, /acceptanceSessionId: uuid\("acceptance_session_id"\)\.notNull\(\)/);
+  assert.match(acceptanceSlice, /legal_contract_delivery_recipient_unique/);
+  assert.match(acceptanceSlice, /recipientKey: text\("recipient_key"\)\.notNull\(\)/);
+  assert.match(acceptanceSlice, /recipientEmail: text\("recipient_email"\)\.notNull\(\)/);
+  assert.match(acceptanceSlice, /nextAttemptAt: timestamp\("next_attempt_at"/);
+  assert.match(acceptanceSlice, /deadLetteredAt: timestamp\("dead_lettered_at"/);
+  assert.match(acceptanceSlice, /leaseToken: uuid\("lease_token"\)/);
+  assert.match(acceptanceSlice, /legal_contract_delivery_anchor_session_fk/);
+  assert.match(acceptanceSlice, /legal_contract_delivery_status_chk/);
+  assert.match(acceptanceSlice, /legal_contract_delivery_channel_chk/);
+
+  const inngest = readFileSync("src/lib/inngest/functions.ts", "utf8");
+  assert.match(inngest, /id: "retry-legal-contract-deliveries"/);
+  assert.match(inngest, /retryPendingLegalContractDeliveries/);
+});

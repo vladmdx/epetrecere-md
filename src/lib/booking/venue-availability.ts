@@ -31,6 +31,11 @@ const BLOCKING_STATUSES = ["pending", "accepted", "confirmed_by_client", "comple
 type AvailabilityExecutor = typeof db;
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
 
+/** Conflict expansion uses the same usable set as archive: active|pending only. */
+function isUsableAvailabilityHallStatus(status: string): boolean {
+  return status === "active" || status === "pending";
+}
+
 export type AvailabilityMode = "public" | "owner" | "admin";
 
 export type AvailabilityCode =
@@ -262,8 +267,9 @@ export async function evaluateVenueAvailability(opts: {
   }
 
   const localDates = localDatesIntersecting(interval);
-  const bufferMinutes = hall?.bufferMinutes ?? venue.bufferMinutes ?? DEFAULT_BUFFER_MINUTES;
-  const bufferedEnd = new Date(interval.endsAt.getTime() + bufferMinutes * 60_000);
+  const venueBufferMinutes = venue.bufferMinutes ?? DEFAULT_BUFFER_MINUTES;
+  const requestBufferMinutes = hall?.bufferMinutes ?? venueBufferMinutes;
+  const bufferedEnd = new Date(interval.endsAt.getTime() + requestBufferMinutes * 60_000);
 
   const conflictMembers = resolved.hallId
     ? await q
@@ -281,14 +287,34 @@ export async function evaluateVenueAvailability(opts: {
   const groupIds = [...new Set(
     conflictMembers.filter((row) => row.hallId === resolved.hallId).map((row) => row.groupId),
   )];
-  const incompatibleHallIds = [...new Set(
-    conflictMembers.filter((row) => groupIds.includes(row.groupId) && row.hallId !== resolved.hallId).map((row) => row.hallId),
-  )];
-
   const allHalls = await q
-    .select({ id: venueHalls.id })
+    .select({
+      id: venueHalls.id,
+      status: venueHalls.status,
+      bufferMinutes: venueHalls.bufferMinutes,
+    })
     .from(venueHalls)
     .where(eq(venueHalls.venueId, venue.id));
+  const hallBufferMinutes = new Map(
+    allHalls.map((row) => [
+      row.id,
+      row.bufferMinutes ?? venueBufferMinutes,
+    ]),
+  );
+  const archivedHallIds = new Set(
+    allHalls.filter((row) => row.status === "archived").map((row) => row.id),
+  );
+  const unusableHallIds = new Set(
+    allHalls.filter((row) => !isUsableAvailabilityHallStatus(row.status)).map((row) => row.id),
+  );
+  const incompatibleHallIds = [...new Set(
+    conflictMembers
+      .filter((row) => groupIds.includes(row.groupId) && row.hallId !== resolved.hallId)
+      .map((row) => row.hallId)
+      .filter((hallId) => !archivedHallIds.has(hallId)),
+  )];
+  const conflictingUsableHallIds = incompatibleHallIds.filter((hallId) => !unusableHallIds.has(hallId));
+
   const lockKeys: AvailabilityLockKeys = {
     venueId: venue.id,
     hallIds:
@@ -315,16 +341,9 @@ export async function evaluateVenueAvailability(opts: {
         lockKeys,
       };
     }
-    if (resolved.hallId != null && block.hallId === resolved.hallId) {
-      return {
-        available: false,
-        code: "HALL_BLOCK",
-        message: PUBLIC_UNAVAILABLE,
-        hallId: resolved.hallId,
-        interval,
-        lockKeys,
-      };
-    }
+    // A request that closes the whole venue conflicts with every existing
+    // hall block, including historical rows whose Hall later became unusable.
+    // The unusable-Hall exception only isolates sister Hall requests.
     if (opts.reservationScope === "venue") {
       return {
         available: false,
@@ -335,7 +354,20 @@ export async function evaluateVenueAvailability(opts: {
         lockKeys,
       };
     }
-    if (incompatibleHallIds.includes(block.hallId)) {
+    if (unusableHallIds.has(block.hallId) && block.hallId !== resolved.hallId) {
+      continue;
+    }
+    if (resolved.hallId != null && block.hallId === resolved.hallId) {
+      return {
+        available: false,
+        code: "HALL_BLOCK",
+        message: PUBLIC_UNAVAILABLE,
+        hallId: resolved.hallId,
+        interval,
+        lockKeys,
+      };
+    }
+    if (conflictingUsableHallIds.includes(block.hallId)) {
       return {
         available: false,
         code: "CONFLICT_GROUP",
@@ -375,6 +407,9 @@ export async function evaluateVenueAvailability(opts: {
       timezone,
     });
     if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, other.startsAt, other.endsAt)) continue;
+    // Whole-venue requests must see every overlapping imported/manual event.
+    // Only a request for a different Hall may ignore an event whose Hall is
+    // no longer usable.
     if (event.hallId == null || opts.reservationScope === "venue") {
       return {
         available: false,
@@ -384,6 +419,9 @@ export async function evaluateVenueAvailability(opts: {
         interval,
         lockKeys,
       };
+    }
+    if (unusableHallIds.has(event.hallId) && event.hallId !== resolved.hallId) {
+      continue;
     }
     if (resolved.hallId != null && event.hallId === resolved.hallId) {
       return {
@@ -395,7 +433,7 @@ export async function evaluateVenueAvailability(opts: {
         lockKeys,
       };
     }
-    if (incompatibleHallIds.includes(event.hallId)) {
+    if (conflictingUsableHallIds.includes(event.hallId)) {
       return {
         available: false,
         code: "CONFLICT_GROUP",
@@ -427,15 +465,47 @@ export async function evaluateVenueAvailability(opts: {
       startsAt: booking.startsAt,
       endsAt: booking.endsAt,
     });
-    const otherEnd = new Date(other.endsAt.getTime() + bufferMinutes * 60_000);
+    // Each side contributes its own post-event buffer. For the request that is
+    // the selected Hall override (or venue inheritance); for the existing row
+    // it is the booked Hall override, or the venue buffer for whole-venue and
+    // legacy venue-wide reservations. Reusing the request buffer here creates
+    // false negatives whenever linked Halls have different cleanup windows.
+    const existingBufferMinutes =
+      booking.reservationScope === "venue" || booking.hallId == null
+        ? venueBufferMinutes
+        : hallBufferMinutes.get(booking.hallId) ?? venueBufferMinutes;
+    const otherEnd = new Date(
+      other.endsAt.getTime() + existingBufferMinutes * 60_000,
+    );
     if (!intervalsOverlapHalfOpen(interval.startsAt, bufferedEnd, other.startsAt, otherEnd)) continue;
+    // Conflict scope is symmetric: an existing whole-venue reservation blocks
+    // a Hall request, while a new whole-venue reservation is blocked by every
+    // existing Hall reservation. Neither direction may be bypassed by a stale
+    // hallId that now points at an unusable Hall.
+    const wholeVenueConflict =
+      booking.reservationScope === "venue" || opts.reservationScope === "venue";
+    if (wholeVenueConflict) {
+      return {
+        available: false,
+        code: "BOOKING_CONFLICT",
+        message: redact
+          ? PUBLIC_UNAVAILABLE
+          : `Conflict: există deja o rezervare în acest interval${booking.hallId ? "" : ""}.`,
+        hallId: resolved.hallId,
+        interval,
+        lockKeys,
+        conflictBookingId: booking.id,
+      };
+    }
+    if (booking.hallId != null && unusableHallIds.has(booking.hallId) && booking.hallId !== resolved.hallId) {
+      continue;
+    }
 
-    const wholeVenue = booking.reservationScope === "venue" || opts.reservationScope === "venue";
     const sameHall = resolved.hallId != null && booking.hallId === resolved.hallId;
-    const otherIncompatible = booking.hallId != null && incompatibleHallIds.includes(booking.hallId);
+    const otherIncompatible = booking.hallId != null && conflictingUsableHallIds.includes(booking.hallId);
     const legacyVenueWide = booking.hallId == null && resolved.hallId == null;
 
-    if (wholeVenue || sameHall || legacyVenueWide) {
+    if (sameHall || legacyVenueWide) {
       return {
         available: false,
         code: "BOOKING_CONFLICT",

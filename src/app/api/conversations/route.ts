@@ -8,11 +8,13 @@ import {
   venues,
   bookingRequests,
 } from "@/lib/db/schema";
-import { and, eq, desc, isNull, inArray } from "drizzle-orm";
+import { and, eq, desc, inArray } from "drizzle-orm";
 import { listAccessibleVenueIds, requireVenueCapability } from "@/lib/venue-access";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { plainText } from "@/lib/content/plain-text";
 import { contactsAreShared } from "@/lib/privacy/booking-contact";
+import { conversationHasExclusiveParty, resolveConversationPartyXor } from "@/lib/conversations/party";
+import { findOrCreateConversation } from "@/lib/conversations/find-or-create";
 
 /** Shape we attach to each conversation so the UI can show "Re: Nuntă 20 sept". */
 type LinkedBooking = {
@@ -37,7 +39,8 @@ async function attachLinkedBookings<
     clientName?: string | null;
     vendorName?: string | null;
   },
->(rows: T[]): Promise<(T & { linkedBooking: LinkedBooking | null })[]> {
+>(incoming: T[]): Promise<(T & { linkedBooking: LinkedBooking | null })[]> {
+  const rows = incoming.filter((row) => conversationHasExclusiveParty(row));
   if (rows.length === 0) return [];
 
   const clientIds = Array.from(new Set(rows.map((r) => r.clientUserId)));
@@ -120,12 +123,11 @@ async function attachLinkedBookings<
   const byKey = new Map<string, LinkedBooking>();
   for (const b of all) {
     if (!b.clientUserId) continue;
-    const key = b.artistId
-      ? `${b.clientUserId}|a${b.artistId}`
-      : b.venueId
-        ? `${b.clientUserId}|v${b.venueId}`
-        : null;
-    if (!key) continue;
+    const party = resolveConversationPartyXor(b.artistId, b.venueId);
+    if (!party.ok) continue;
+    const key = party.artistId
+      ? `${b.clientUserId}|a${party.artistId}`
+      : `${b.clientUserId}|v${party.venueId}`;
     if (byKey.has(key)) continue; // keep first (= most recent)
     byKey.set(key, {
       id: b.id,
@@ -136,11 +138,12 @@ async function attachLinkedBookings<
   }
 
   return rows.map((r) => {
-    const key = r.artistId
-      ? `${r.clientUserId}|a${r.artistId}`
-      : r.venueId
-        ? `${r.clientUserId}|v${r.venueId}`
-        : "";
+    const party = resolveConversationPartyXor(r.artistId, r.venueId);
+    const key = !party.ok
+      ? ""
+      : party.artistId
+        ? `${r.clientUserId}|a${party.artistId}`
+        : `${r.clientUserId}|v${party.venueId}`;
     const linkedBooking = byKey.get(key) ?? null;
     const contactUnlocked = linkedBooking
       ? contactsAreShared(linkedBooking.status)
@@ -390,22 +393,6 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const artistId = body?.artistId ? Number(body.artistId) : null;
-  const venueId = body?.venueId ? Number(body.venueId) : null;
-
-  if (!artistId && !venueId) {
-    return NextResponse.json(
-      { error: "artistId or venueId required" },
-      { status: 400 },
-    );
-  }
-  if (artistId && venueId) {
-    return NextResponse.json(
-      { error: "provide only one of artistId or venueId" },
-      { status: 400 },
-    );
-  }
-
   const [appUser] = await db
     .select({ id: users.id })
     .from(users)
@@ -418,34 +405,20 @@ export async function POST(req: Request) {
     );
   }
 
-  const [existing] = await db
-    .select()
-    .from(conversations)
-    .where(
-      and(
-        eq(conversations.clientUserId, appUser.id),
-        artistId
-          ? eq(conversations.artistId, artistId)
-          : eq(conversations.venueId, venueId!),
-        artistId
-          ? isNull(conversations.venueId)
-          : isNull(conversations.artistId),
-      ),
-    )
-    .limit(1);
-
-  if (existing) {
-    return NextResponse.json({ id: existing.id, created: false });
+  const result = await findOrCreateConversation({
+    clientUserId: appUser.id,
+    artistId: body?.artistId != null ? Number(body.artistId) : null,
+    venueId: body?.venueId != null ? Number(body.venueId) : null,
+  });
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: "provide exactly one of artistId or venueId", code: result.code },
+      { status: 400 },
+    );
   }
 
-  const [created] = await db
-    .insert(conversations)
-    .values({
-      clientUserId: appUser.id,
-      artistId: artistId ?? null,
-      venueId: venueId ?? null,
-    })
-    .returning({ id: conversations.id });
-
-  return NextResponse.json({ id: created.id, created: true }, { status: 201 });
+  return NextResponse.json(
+    { id: result.id, created: result.created },
+    { status: result.created ? 201 : 200 },
+  );
 }

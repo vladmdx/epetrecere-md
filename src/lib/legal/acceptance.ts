@@ -26,6 +26,13 @@ export const acceptanceSchema = z.object({
     representativeName: z.string().trim().max(200).nullable().optional(),
   }),
 }).superRefine((data, ctx) => {
+  if (data.subjectType === "artist" && data.organizationId !== undefined) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["organizationId"],
+      message: "organization_id_is_venue_only",
+    });
+  }
   const required = data.subjectType === "venue" ? VENUE_REQUIRED_DOCS : PARTNER_REQUIRED_DOCS;
   if (data.documents.length !== required.length || new Set(data.documents).size !== required.length ||
       required.some(slug => !data.documents.includes(slug))) {

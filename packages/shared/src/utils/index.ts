@@ -69,6 +69,24 @@ export const MONTHS_RO_SHORT = [
   "dec.",
 ] as const;
 
+/**
+ * Serialize the calendar date selected in the user's local timezone.
+ *
+ * A native/browser date picker represents a wall-calendar choice. Converting
+ * local midnight through `toISOString()` first changes it to UTC and can move
+ * Moldova dates to the previous day. Reading local components preserves the
+ * day the user actually selected on web and React Native.
+ */
+export function localDateToIsoDate(date: Date): string {
+  if (!Number.isFinite(date.getTime())) {
+    throw new RangeError("Invalid local calendar date");
+  }
+  const year = String(date.getFullYear()).padStart(4, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 /** Parse YYYY-MM-DD into a local Date without timezone shift. */
 export function parseIsoDate(iso: string): Date | null {
   if (!/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;

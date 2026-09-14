@@ -3,12 +3,28 @@ import { auth } from "@clerk/nextjs/server";
 import { rateLimit } from "@/lib/rate-limit";
 import path from "path";
 import fs from "fs/promises";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
+import { storeRegisteredBlob } from "@/lib/privacy/account-asset-erasure";
+import {
+  createServerLogCorrelationId,
+  safeServerErrorLog,
+} from "@/lib/safe-server-log";
 
 export async function POST(req: NextRequest) {
   // Auth: require signed-in user to upload files
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const [appUser] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.clerkId, userId))
+    .limit(1);
+  if (!appUser) {
+    return NextResponse.json({ error: "User not found" }, { status: 403 });
   }
 
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
@@ -60,13 +76,21 @@ export async function POST(req: NextRequest) {
   // Try Vercel Blob first (production), fall back to local disk (dev)
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     try {
-      const { put } = await import("@vercel/blob");
-      const blob = await put(`${folder}/${filename}`, file, {
+      const url = await storeRegisteredBlob({
+        pathname: `${folder}/${filename}`,
+        body: file,
         access: "public",
+        ownerUserId: appUser.id,
+        provenance: `public_upload:${folder}`,
       });
-      return NextResponse.json({ url: blob.url, filename: file.name });
+      return NextResponse.json({ url, filename: file.name });
     } catch (err) {
-      console.error("Vercel Blob upload failed:", err);
+      console.error(
+        "[upload] Vercel Blob upload failed",
+        safeServerErrorLog(err, {
+          correlationId: createServerLogCorrelationId(),
+        }),
+      );
       return NextResponse.json(
         { error: "Upload failed. Check Blob store configuration." },
         { status: 503 },
@@ -86,7 +110,12 @@ export async function POST(req: NextRequest) {
     const url = `/uploads/${folder}/${filename}`;
     return NextResponse.json({ url, filename: file.name });
   } catch (err) {
-    console.error("Local upload failed:", err);
+    console.error(
+      "[upload] local upload failed",
+      safeServerErrorLog(err, {
+        correlationId: createServerLogCorrelationId(),
+      }),
+    );
     return NextResponse.json(
       { error: "Upload failed" },
       { status: 500 },

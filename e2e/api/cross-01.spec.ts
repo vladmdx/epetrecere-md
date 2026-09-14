@@ -44,6 +44,25 @@ test.describe.serial("CROSS-01 condensed wedding flow", () => {
 
     // Clean up anything left behind by a prior run on the same date.
     await sql`
+      delete from booking_effect_deliveries
+      where effect_id in (
+        select o.id from booking_effect_outbox o
+        join booking_requests b on b.id = o.booking_id
+        where b.artist_id = ${artistId}
+          and b.event_date = ${eventDate}
+          and b.client_name = 'CROSS-01 Client'
+      )
+    `;
+    await sql`
+      delete from booking_effect_outbox
+      where booking_id in (
+        select id from booking_requests
+        where artist_id = ${artistId}
+          and event_date = ${eventDate}
+          and client_name = 'CROSS-01 Client'
+      )
+    `;
+    await sql`
       delete from booking_requests
       where artist_id = ${artistId}
       and event_date = ${eventDate}
@@ -59,6 +78,9 @@ test.describe.serial("CROSS-01 condensed wedding flow", () => {
   test.afterAll(async () => {
     if (bookingId) {
       await sql`delete from offer_requests where artist_id = ${artistId} and event_date = ${eventDate}`;
+      await sql`delete from booking_effect_deliveries
+        where effect_id in (select id from booking_effect_outbox where booking_id = ${bookingId})`;
+      await sql`delete from booking_effect_outbox where booking_id = ${bookingId}`;
       await sql`delete from booking_requests where id = ${bookingId}`;
     }
     await sql`

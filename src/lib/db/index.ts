@@ -1,17 +1,13 @@
-import { neon } from "@neondatabase/serverless";
-import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
 import { drizzle as drizzlePg } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
 /**
- * Picks the driver from the connection string rather than at build time, so
- * moving between hosts is a change of DATABASE_URL and nothing else.
- *
- * Neon is reached over its HTTP driver: there is no connection to keep alive,
- * which is what lets it survive a serverless platform running hundreds of
- * short-lived instances. Everything else — Supabase included — speaks the
- * ordinary wire protocol and goes through postgres.js.
+ * Every supported provider uses a transaction-capable PostgreSQL driver.
+ * Drizzle's neon-http adapter deliberately rejects interactive transactions;
+ * selecting it by hostname made onboarding, approval, and account writes fail
+ * only after deployment to Neon. Neon pooled URLs and Supabase pooler URLs
+ * both support the PostgreSQL wire protocol used by postgres.js.
  *
  * On Supabase, point DATABASE_URL at the pooler (port 6543, transaction
  * mode). A direct connection on 5432 exhausts the project's connections under
@@ -20,11 +16,7 @@ import * as schema from "./schema";
  * intermittently once the pooler reuses backends, which is a miserable thing
  * to diagnose in production.
  */
-function isNeon(url: string) {
-  return url.includes("neon.tech");
-}
-
-type Db = ReturnType<typeof drizzleNeon<typeof schema>>;
+type Db = ReturnType<typeof drizzlePg<typeof schema>>;
 
 function createDb(): Db {
   const url = process.env.DATABASE_URL;
@@ -43,7 +35,15 @@ function createDb(): Db {
     }
   }
 
-  if (isNeon(url)) return drizzleNeon(neon(url), { schema });
+  const requestedE2EPoolMax = Number(process.env.E2E_DB_POOL_MAX ?? "8");
+  if (
+    process.env.E2E_RUNTIME === "1"
+    && (!Number.isInteger(requestedE2EPoolMax)
+      || requestedE2EPoolMax < 1
+      || requestedE2EPoolMax > 8)
+  ) {
+    throw new Error("E2E_DB_POOL_MAX must be an integer from 1 to 8.");
+  }
 
   // Runtime gets exactly two sockets; production builds get four. A single
   // runtime socket can strand even tiny concurrent reads behind the Supabase
@@ -88,7 +88,11 @@ function createDb(): Db {
     // Hosted Postgres (Supabase/Neon session) still requires it.
     ssl: loopback ? false : "require",
     prepare: false,
-    max: isBuild ? 4 : process.env.E2E_RUNTIME === "1" ? 8 : 2,
+    max: isBuild
+      ? 4
+      : process.env.E2E_RUNTIME === "1"
+        ? requestedE2EPoolMax
+        : 2,
     // Do not lower the driver's global pipeline limit: in postgres.js 3.4.9
     // that same boundary controls the BEGIN reservation hook, so low values
     // can make transactions unsafe or leave a queued BEGIN stalled. Critical
@@ -113,9 +117,7 @@ function createDb(): Db {
       statement_timeout: 20_000,
     },
   });
-  // The two drivers expose the same query surface; the driver-specific halves
-  // of the type are not used anywhere in this codebase.
-  return drizzlePg(client, { schema }) as unknown as Db;
+  return drizzlePg(client, { schema });
 }
 
 let _db: Db | null = null;

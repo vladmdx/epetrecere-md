@@ -36,6 +36,8 @@ import { useLocale } from "@/hooks/use-locale";
 import { CalendarWeekdays } from "@/components/shared/calendar-weekdays";
 import Link from "@/components/shared/locale-link";
 import { NOUNS, plural, type AllForms } from "@/lib/i18n/plural";
+import { submitManualArtistBooking } from "@/lib/booking/manual-artist-booking-client";
+import { useUser } from "@clerk/nextjs";
 
 /** Monday-first, matching the grid layout. Labels come from the dictionary. */
 const DAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] as const;
@@ -190,6 +192,7 @@ interface Entity {
 
 export default function VendorCalendarPage() {
   const { t, locale } = useLocale();
+  const { user } = useUser();
   const DAYS = DAY_KEYS.map((k) => t(`date.weekday.${k}`));
   const MONTHS = MONTH_KEYS.map((k) => t(`date.monthCap.${k}`));
 
@@ -507,6 +510,10 @@ export default function VendorCalendarPage() {
 
   async function submitManualBooking() {
     if (!entity || entity.type !== "artist" || !selectedDate) return;
+    if (!user?.id) {
+      toast.error(t("vendor.calPage.errSave"));
+      return;
+    }
     if (manualPackageId == null) {
       toast.error(t("vendor.calPage.errPickPackage"));
       return;
@@ -522,18 +529,19 @@ export default function VendorCalendarPage() {
     }
     setManualSaving(true);
     try {
-      const res = await fetch("/api/artist-bookings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          artistId: entity.id,
-          eventDate: selectedDate,
-          startTime: manualStartTime,
-          packageId: manualPackageId,
-          price: priceNum,
-          note: manualNote.trim() || undefined,
-          eventType: manualEventType || undefined,
-        }),
+      const payload = {
+        artistId: entity.id,
+        eventDate: selectedDate,
+        startTime: manualStartTime,
+        packageId: manualPackageId,
+        price: priceNum,
+        note: manualNote.trim() || undefined,
+        eventType: manualEventType || undefined,
+      };
+      const res = await submitManualArtistBooking({
+        actorId: user.id,
+        artistId: entity.id,
+        payload,
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -564,7 +572,7 @@ export default function VendorCalendarPage() {
         return;
       }
       toast.success(t("vendor.calPage.bookingDeleted"));
-      await refreshDayBookings();
+      await Promise.all([refreshDayBookings(), loadEvents()]);
     } catch {
       toast.error(t("vendor.calPage.errDelete"));
     }

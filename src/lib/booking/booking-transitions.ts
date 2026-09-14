@@ -6,10 +6,19 @@
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { bookingRequests, calendarEvents } from "@/lib/db/schema";
-import { persistConfirmationEffects } from "./confirmation-persist";
-import { claimBookingEffect } from "./effect-outbox";
-import { withVenueAvailabilityWrite } from "./venue-booking-write";
+import {
+  lockConfirmationVendorParents,
+  persistConfirmationEffects,
+} from "./confirmation-persist";
+import {
+  withVenueAvailabilityWrite,
+  withVenueAvailabilityWriteInTransaction,
+} from "./venue-booking-write";
 import { cancelCommissionForBooking } from "@/lib/commissions/service";
+import {
+  acquireBookingConfirmationBarrier,
+  cancelBookingConfirmationEffects,
+} from "./effect-outbox";
 
 export type BookingRow = typeof bookingRequests.$inferSelect;
 type Executor = typeof db;
@@ -139,25 +148,63 @@ export async function rejectBooking(bookingId: number, reply?: string): Promise<
   return row;
 }
 
-export async function clientCancelBooking(bookingId: number): Promise<BookingRow> {
-  const row = await casUpdateBookingStatus(db, bookingId, ["pending", "accepted"], {
+async function clientCancelBookingWithExecutor(
+  executor: Executor,
+  bookingId: number,
+): Promise<BookingRow> {
+  await acquireBookingConfirmationBarrier(executor, bookingId);
+  const row = await casUpdateBookingStatus(executor, bookingId, ["pending", "accepted"], {
     status: "cancelled",
   });
   if (!row) throw new BookingChangedError();
+  await cancelBookingConfirmationEffects(executor, bookingId, "cancelled_by_client");
   return row;
 }
 
-export async function vendorCancelBooking(bookingId: number, reply?: string): Promise<BookingRow> {
-  return db.transaction(async (tx) => {
-    const row = await casUpdateBookingStatus(tx as unknown as Executor, bookingId, ["accepted", "confirmed_by_client"], {
-      status: "cancelled",
-      artistReply: reply || "Rezervarea a fost anulată de organizator.",
-    });
-    if (!row) throw new BookingChangedError();
-    await tx.delete(calendarEvents).where(eq(calendarEvents.bookingId, bookingId));
-    await cancelCommissionForBooking(bookingId, "Anulată de furnizor", tx as unknown as Executor);
-    return row;
+export async function clientCancelBooking(
+  bookingId: number,
+  executor?: Executor,
+): Promise<BookingRow> {
+  if (executor) return clientCancelBookingWithExecutor(executor, bookingId);
+  return db.transaction(async (tx) =>
+    clientCancelBookingWithExecutor(tx as unknown as Executor, bookingId));
+}
+
+async function vendorCancelBookingWithExecutor(
+  executor: Executor,
+  bookingId: number,
+  reply?: string,
+): Promise<BookingRow> {
+  await acquireBookingConfirmationBarrier(executor, bookingId);
+  const row = await casUpdateBookingStatus(executor, bookingId, ["accepted", "confirmed_by_client"], {
+    status: "cancelled",
+    artistReply: reply || "Rezervarea a fost anulată de organizator.",
   });
+  if (!row) throw new BookingChangedError();
+  await cancelBookingConfirmationEffects(
+    executor,
+    bookingId,
+    "cancelled_by_vendor",
+  );
+  await executor.delete(calendarEvents).where(eq(calendarEvents.bookingId, bookingId));
+  await cancelCommissionForBooking(bookingId, "Anulată de furnizor", executor);
+  return row;
+}
+
+export async function vendorCancelBooking(
+  bookingId: number,
+  reply?: string,
+  executor?: Executor,
+): Promise<BookingRow> {
+  if (executor) {
+    return vendorCancelBookingWithExecutor(executor, bookingId, reply);
+  }
+  return db.transaction(async (tx) =>
+    vendorCancelBookingWithExecutor(
+      tx as unknown as Executor,
+      bookingId,
+      reply,
+    ));
 }
 
 export async function confirmBookingWithEffects(
@@ -186,42 +233,62 @@ export async function confirmBookingWithEffects(
           throw err;
         }
       }
+      // Availability writers take their advisory locks before vendor rows.
+      // Deletion does not take an availability lock, so vendor -> booking is
+      // still preserved without introducing advisory -> vendor inversions.
+      if (!(await lockConfirmationVendorParents(executor, booking))) {
+        throw new BookingChangedError();
+      }
       const row = await write(executor);
       if (!row) throw new BookingChangedError();
+      if (!bookingVendorTupleMatches(row, booking)) throw new BookingChangedError();
       if (row.status === "confirmed_by_client") {
         await persistConfirmationEffects(executor, row);
       }
       return row;
     });
   }
-  return withVenueAvailabilityWrite(
-    {
-      venueId: booking.venueId,
-      hallId: booking.hallId,
-      guestCount: booking.guestCount,
-      eventDate: booking.eventDate,
-      startTime: booking.startTime,
-      endTime: booking.endTime,
-      timezone: booking.timezone,
-      reservationScope: booking.reservationScope === "venue" ? "venue" : "hall",
-      excludeBookingId: booking.id,
-      mode: "owner",
-    },
-    async (tx) => {
-      const executor = tx as unknown as Executor;
-      const row = await write(executor);
-      if (!row) throw new BookingChangedError();
-      if (row.status === "confirmed_by_client") {
-        await persistConfirmationEffects(executor, row);
-      }
-      return row;
-    },
-  );
+  return db.transaction(async (tx) => {
+    const executor = tx as unknown as Executor;
+    return withVenueAvailabilityWriteInTransaction(
+      tx,
+      {
+        venueId: booking.venueId!,
+        hallId: booking.hallId,
+        guestCount: booking.guestCount,
+        eventDate: booking.eventDate,
+        startTime: booking.startTime,
+        endTime: booking.endTime,
+        timezone: booking.timezone,
+        reservationScope: booking.reservationScope === "venue" ? "venue" : "hall",
+        excludeBookingId: booking.id,
+        mode: "owner",
+      },
+      async () => {
+        // `withVenueAvailabilityWriteInTransaction` already owns the canonical
+        // venue/day/hall advisory locks. Freeze FK parents only afterwards,
+        // matching hall archive/schedule writers, and still before booking.
+        if (!(await lockConfirmationVendorParents(executor, booking))) {
+          throw new BookingChangedError();
+        }
+        const row = await write(executor);
+        if (!row) throw new BookingChangedError();
+        if (!bookingVendorTupleMatches(row, booking)) throw new BookingChangedError();
+        if (row.status === "confirmed_by_client") {
+          await persistConfirmationEffects(executor, row);
+        }
+        return row;
+      },
+    );
+  });
 }
 
 export async function replayConfirmationEffects(booking: BookingRow): Promise<BookingRow> {
   return db.transaction(async (tx) => {
     const executor = tx as unknown as Executor;
+    if (!(await lockConfirmationVendorParents(executor, booking))) {
+      throw new BookingChangedError();
+    }
     const [locked] = await tx
       .select()
       .from(bookingRequests)
@@ -231,10 +298,13 @@ export async function replayConfirmationEffects(booking: BookingRow): Promise<Bo
     if (!locked || (locked.status !== "confirmed_by_client" && locked.status !== "completed")) {
       throw new BookingChangedError();
     }
+    if (!bookingVendorTupleMatches(locked, booking)) throw new BookingChangedError();
     return persistConfirmationEffects(executor, locked);
   });
 }
 
-export async function claimConfirmationNotify(bookingId: number, executor: Executor = db): Promise<boolean> {
-  return claimBookingEffect(executor, bookingId, "confirm_notify");
+function bookingVendorTupleMatches(current: BookingRow, expected: BookingRow): boolean {
+  return current.artistId === expected.artistId
+    && current.venueId === expected.venueId
+    && current.hallId === expected.hallId;
 }

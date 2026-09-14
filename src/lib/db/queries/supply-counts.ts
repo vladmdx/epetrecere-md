@@ -93,11 +93,7 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
           '{}'::jsonb
         ) AS "bySlug"
     `);
-    // neon-http returns { rows }, while postgres.js returns its row array
-    // directly. The shared DB facade intentionally supports both drivers.
-    const rows: SupplyCountRow[] = Array.isArray(response)
-      ? response as unknown as SupplyCountRow[]
-      : response.rows;
+    const rows = response as unknown as SupplyCountRow[];
     const row = rows[0];
     if (!row) throw new Error("Supply count query returned no row");
 

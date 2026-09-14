@@ -2,7 +2,7 @@
 // Powers venue owner dashboard detection and the profile editor load.
 
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { venues, venueImages } from "@/lib/db/schema";
 import { getCurrentAppUser, resolveSelectedVenue } from "@/lib/venue-access";
@@ -53,7 +53,15 @@ export async function GET(req: Request) {
   const images = await db
     .select()
     .from(venueImages)
-    .where(eq(venueImages.venueId, venue.id));
+    .where(and(
+      eq(venueImages.venueId, venue.id),
+      isNull(venueImages.hallId),
+    ))
+    .orderBy(
+      desc(venueImages.isCover),
+      asc(venueImages.sortOrder),
+      asc(venueImages.id),
+    );
 
   return NextResponse.json({ venue: { ...venue, images }, multiHall });
 }

@@ -105,7 +105,7 @@ export default function VenueOnboardingPage() {
     let alive = true;
     fetch("/api/me/venue", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { venue: null }))
-      .then((res: { venue: Record<string, unknown> | null; images?: Array<{ url: string }> }) => {
+      .then((res: { venue: (Record<string, unknown> & { images?: Array<{ url: string }> }) | null }) => {
         if (!alive) return;
         const v = res?.venue;
         if (!v) return;
@@ -125,7 +125,7 @@ export default function VenueOnboardingPage() {
           capacityMin: Number(v.capacityMin) || 50,
           capacityMax: Number(v.capacityMax) || 200,
           description: (v.descriptionRo as string) || "",
-          imageUrls: Array.isArray(res.images) ? res.images.map((i) => i.url) : [],
+          imageUrls: Array.isArray(v.images) ? v.images.map((image) => image.url) : [],
           menuPdfUrl: (v.menuPdfUrl as string) || "",
           menuUrl: (v.menuUrl as string) || "",
           virtualTourUrl: (v.virtualTourUrl as string) || "",

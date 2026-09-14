@@ -208,7 +208,7 @@ export default function VendorBookingsPage() {
           setLoading(false);
           return;
         }
-        const r = await fetch(`/api/auth/check-role?email=${encodeURIComponent(email)}`);
+        const r = await fetch("/api/auth/check-role", { cache: "no-store" });
         const data = await r.json();
         if (data.artistId) {
           setArtistId(data.artistId);

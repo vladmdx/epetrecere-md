@@ -1,11 +1,14 @@
 /** Read-only projection tests, real notification APIs with in-memory DB/auth. */
-const assert = require("node:assert/strict");
-const Module = require("node:module");
-const path = require("node:path");
-const { readFileSync } = require("node:fs");
-const { getTableName } = require("drizzle-orm");
-const { PgDialect } = require("drizzle-orm/pg-core");
-const { NextRequest } = require("next/server");
+import assert from "node:assert/strict";
+import Module from "node:module";
+import path from "node:path";
+import { createRequire } from "node:module";
+import { readFileSync } from "node:fs";
+import { getTableName } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
+import { NextRequest } from "next/server";
+
+const loadAfterMocks = createRequire(__filename);
 const root = path.resolve(__dirname, "..");
 const oldLoad = Module._load;
 const oldFetch = global.fetch;
@@ -22,6 +25,7 @@ const db = {
       const params = condition ? dialect.sqlToQuery(condition).params : [];
       state.calls.push({ name, params });
       if (name === "users") { assert.ok(params.includes("viewer")); return [{ role: state.role }]; }
+      if (name === "partner_organization_members" || name === "partner_organizations") return [];
       if (name === "venues" || name === "artists") {
         assert.ok(params.includes("viewer"), "actual profile ownership is checked");
         return (name === "venues" ? state.ownsVenue : state.ownsArtist) ? [{ id: 45 }] : [];
@@ -40,7 +44,7 @@ const db = {
       }
       throw Error(`Unexpected select ${name}`);
     };
-    const q = { from(value) { table = value; return q; }, leftJoin() { return q; }, where(value) { condition = value; return q; }, orderBy() { return q; }, limit() { return Promise.resolve(rows()); }, then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
+    const q = { from(value) { table = value; return q; }, leftJoin() { return q; }, innerJoin() { return q; }, where(value) { condition = value; return q; }, orderBy() { return q; }, limit() { return Promise.resolve(rows()); }, then(resolve, reject) { return Promise.resolve(rows()).then(resolve, reject); } };
     return q;
   },
   update(table) { assert.equal(getTableName(table), "notifications"); return { set(value) { assert.deepEqual(value, { isRead: true }); return { where() { return { returning: async () => state.items }; } }; } }; },
@@ -54,10 +58,10 @@ Module._load = function(request, parent, isMain) {
 
 (async () => {
   try {
-    const { notificationsForUser } = require("../src/lib/privacy/notification-view");
-    const { notificationContext, notificationHasContact, conversationPartyKey } = require("../src/lib/privacy/notification-context");
-    const api = require("../src/app/api/notifications/route");
-    const single = require("../src/app/api/notifications/[id]/route");
+    const { notificationsForUser } = loadAfterMocks("../src/lib/privacy/notification-view");
+    const { notificationContext, notificationHasContact, conversationPartyKey } = loadAfterMocks("../src/lib/privacy/notification-context");
+    const api = loadAfterMocks("../src/app/api/notifications/route");
+    const single = loadAfterMocks("../src/app/api/notifications/[id]/route");
     const req = new NextRequest("https://example.invalid/api/notifications");
     let count = 0;
     const passed = label => { count++; console.log("PASS", label); };
@@ -132,7 +136,14 @@ Module._load = function(request, parent, isMain) {
     assert.equal(state.calls.length, 0);
     passed("real GET and mark-read response redact historical contact text and preserve auth/unread count");
     assert.deepEqual(notificationContext("https://epetrecere.md/en/dashboard/mesaje?conversation=50"), { kind: "conversation", id: 50 });
+    assert.deepEqual(notificationContext("/dashboard/locatii/88/mesaje?conversation=9"), { kind: "conversation", id: 9 });
+    assert.deepEqual(notificationContext("/ru/dashboard/locatii/88/mesaje?conversation=9"), { kind: "conversation", id: 9 });
+    assert.equal(notificationContext("/dashboard/locatii/0/mesaje?conversation=9"), null);
+    assert.equal(notificationContext("/dashboard/locatii/88/mesaje-extra?conversation=9"), null);
+    assert.equal(notificationContext("https://evil.invalid/dashboard/locatii/88/mesaje?conversation=9"), null);
     assert.notEqual(conversationPartyKey("client", 10, null), conversationPartyKey("client", null, 10));
+    assert.equal(conversationPartyKey("client", 10, 20), null);
+    assert.equal(conversationPartyKey("client", null, null), null);
     const venue = readFileSync("src/lib/db/queries/venue-bookings.ts", "utf8");
     const linked = venue.slice(venue.indexOf("const linkedRows"), venue.indexOf("// Count accepted bookings"));
     assert.doesNotMatch(linked, /"accepted"/);

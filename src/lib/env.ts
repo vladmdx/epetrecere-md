@@ -41,6 +41,15 @@ export const env = {
   /** Clerk webhook secret for user sync */
   CLERK_WEBHOOK_SECRET: optional("CLERK_WEBHOOK_SECRET"),
 
+  /**
+   * Stable HMAC key for permanent account-erasure identity tombstones.
+   * This is deliberately separate from rotating Clerk webhook credentials.
+   * Runtime erasure/bootstrap paths fail closed unless it is at least 32 bytes.
+   */
+  ACCOUNT_ERASURE_IDENTITY_SECRET: optional(
+    "ACCOUNT_ERASURE_IDENTITY_SECRET",
+  ),
+
   /** Anthropic API key for AI assistant */
   ANTHROPIC_API_KEY: optional("ANTHROPIC_API_KEY"),
 

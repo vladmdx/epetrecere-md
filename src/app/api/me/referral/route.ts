@@ -6,10 +6,11 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, referralEvents } from "@/lib/db/schema";
 import { buildReferralCode } from "@/lib/referrals/code";
+import { isUniqueViolation } from "@/lib/reviews/duplicate-error";
 
 export async function GET() {
   const { userId: clerkId } = await auth();
@@ -39,13 +40,31 @@ export async function GET() {
     for (let i = 0; i < 5 && !code; i++) {
       const candidate = buildReferralCode(user.name || user.email);
       try {
-        await db
+        const [assigned] = await db
           .update(users)
           .set({ referralCode: candidate })
-          .where(eq(users.id, user.id));
-        code = candidate;
-      } catch {
-        // collision — try again with a new tail
+          .where(and(eq(users.id, user.id), isNull(users.referralCode)))
+          .returning({ referralCode: users.referralCode });
+        if (assigned?.referralCode) {
+          code = assigned.referralCode;
+          break;
+        }
+      } catch (error) {
+        // Only a collision on the unique referral code is retryable. Do not
+        // hide connectivity, permission, or schema failures as collisions.
+        if (!isUniqueViolation(error)) throw error;
+      }
+
+      // A concurrent GET may have won the compare-and-set while this request
+      // waited (or while its candidate collided). Adopt that immutable value;
+      // never overwrite it with a later random candidate.
+      const [concurrentWinner] = await db
+        .select({ referralCode: users.referralCode })
+        .from(users)
+        .where(eq(users.id, user.id))
+        .limit(1);
+      if (concurrentWinner?.referralCode) {
+        code = concurrentWinner.referralCode;
       }
     }
     if (!code) {
@@ -89,6 +108,12 @@ export async function GET() {
     }
   >();
   for (const e of events) {
+    // Account erasure keeps the financial milestone but nulls its user link.
+    // Such ledger-only rows still contribute to the persisted account balance,
+    // but are not an addressable referred-user profile and must not be exposed
+    // or grouped under a synthetic/null identifier.
+    if (!e.referredUserId) continue;
+
     const existing = byUser.get(e.referredUserId);
     const milestone = {
       eventType: e.eventType,

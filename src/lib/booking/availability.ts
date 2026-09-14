@@ -1,8 +1,8 @@
 // Availability / time-slot conflict detection for artist bookings.
 //
-// Two bookings conflict if they are on the same date AND their time
-// ranges overlap. A booking without startTime/endTime is treated as
-// occupying the whole day.
+// Artist intervals are anchored to their event date. An end time at or before
+// the start time is on the next calendar day (23:00-02:00 is overnight). A
+// booking without a complete time range occupies its entire start date.
 
 import { and, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -52,16 +52,220 @@ function toEndMinutes(
   return raw;
 }
 
-/** Check if two time ranges [a1, a2] and [b1, b2] overlap. Null = whole day. */
-function rangesOverlap(
-  a1: number | null,
-  a2: number | null,
-  b1: number | null,
-  b2: number | null,
+const MINUTES_PER_DAY = 24 * 60;
+
+function isoDateDayNumber(date: string): number {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+  if (!match) throw new Error(`Invalid ISO date: ${date}`);
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const timestamp = Date.UTC(year, month - 1, day);
+  const canonical = new Date(timestamp).toISOString().slice(0, 10);
+  if (canonical !== date) throw new Error(`Invalid ISO date: ${date}`);
+  return Math.floor(timestamp / 86_400_000);
+}
+
+function shiftIsoDate(date: string, offsetDays: number): string {
+  const dayNumber = isoDateDayNumber(date) + offsetDays;
+  return new Date(dayNumber * 86_400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Rows starting the previous day can run into `eventDate`; rows starting on
+ * `eventDate` can run into the next day. Artist buffers are capped well below
+ * one day, so this three-day window is complete for an interval starting here.
+ */
+export function artistAvailabilityDateWindow(eventDate: string): string[] {
+  return [shiftIsoDate(eventDate, -1), eventDate, shiftIsoDate(eventDate, 1)];
+}
+
+export type ArtistDailyTimeRange = Readonly<{
+  start: string;
+  end: string;
+}>;
+
+export type ArtistWorkScheduleEntry = Readonly<{
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  isWorking: boolean;
+}>;
+
+function formatDayMinute(value: number): string {
+  const normalized = ((value % MINUTES_PER_DAY) + MINUTES_PER_DAY)
+    % MINUTES_PER_DAY;
+  return `${String(Math.floor(normalized / 60)).padStart(2, "0")}:${String(
+    normalized % 60,
+  ).padStart(2, "0")}`;
+}
+
+/** Project dated busy intervals onto one selected day. Overnight rows from
+ * the previous date spill into 00:00+, while rows starting on the selected
+ * date are clipped at next-day midnight. Identical booking/calendar
+ * projections are deduplicated and no identifying fields are returned. */
+export function projectArtistBusyRangesToDate(
+  entries: readonly {
+    eventDate: string;
+    startTime: string | null;
+    endTime: string | null;
+  }[],
+  selectedDate: string,
+): { bookedRanges: ArtistDailyTimeRange[]; wholeDayBlocked: boolean } {
+  const dayStart = isoDateDayNumber(selectedDate) * MINUTES_PER_DAY;
+  const dayEnd = dayStart + MINUTES_PER_DAY;
+  const ranges = new Map<string, ArtistDailyTimeRange>();
+  let wholeDayBlocked = false;
+  for (const entry of entries) {
+    const interval = anchoredArtistInterval(
+      entry.eventDate,
+      entry.startTime,
+      entry.endTime,
+    );
+    const start = Math.max(interval.start, dayStart);
+    const end = Math.min(interval.end, dayEnd);
+    if (start >= end) continue;
+    if (start === dayStart && end === dayEnd) {
+      wholeDayBlocked = true;
+      continue;
+    }
+    const projected = {
+      start: formatDayMinute(start - dayStart),
+      // 00:00 is the canonical next-midnight representation accepted by the
+      // booking validator; never serialize the invalid value 24:00.
+      end: formatDayMinute(end - dayStart),
+    };
+    ranges.set(`${projected.start}-${projected.end}`, projected);
+  }
+  return {
+    bookedRanges: [...ranges.values()].sort((left, right) =>
+      left.start.localeCompare(right.start) || left.end.localeCompare(right.end)),
+    wholeDayBlocked,
+  };
+}
+
+function monStartDayOfWeek(date: string): number {
+  const value = (isoDateDayNumber(date) + 3) % 7;
+  return value < 0 ? value + 7 : value;
+}
+
+type ArtistWorkingScheduleProjection = Readonly<{
+  configured: boolean;
+  intervals: AnchoredArtistInterval[];
+  ranges: ArtistDailyTimeRange[];
+}>;
+
+/** Build the effective working intervals touching a selected date. A shift
+ * such as Monday 18:00–04:00 contributes Monday 18:00–00:00 and Tuesday
+ * 00:00–04:00. A current-day row (including an explicit day off) keeps the
+ * historical rule that a configured day is restrictive; an unrelated
+ * previous-day daytime row does not. */
+export function projectArtistWorkingScheduleToDate(
+  entries: readonly ArtistWorkScheduleEntry[],
+  selectedDate: string,
+): ArtistWorkingScheduleProjection {
+  const selectedDay = isoDateDayNumber(selectedDate);
+  const selectedDow = monStartDayOfWeek(selectedDate);
+  const previousDow = (selectedDow + 6) % 7;
+  const currentRows = entries.filter((row) => row.dayOfWeek === selectedDow);
+  const previousOvernightRows = entries.filter((row) => {
+    if (row.dayOfWeek !== previousDow || !row.isWorking) return false;
+    const start = toMinutes(row.startTime);
+    const end = toMinutes(row.endTime);
+    return start !== null && end !== null && end <= start;
+  });
+  const configured = currentRows.length > 0 || previousOvernightRows.length > 0;
+  const intervals: AnchoredArtistInterval[] = [];
+  for (const row of [...previousOvernightRows, ...currentRows]) {
+    if (!row.isWorking) continue;
+    const startMinute = toMinutes(row.startTime);
+    const endMinute = toMinutes(row.endTime);
+    if (startMinute === null || endMinute === null) continue;
+    const startsPreviousDay = row.dayOfWeek === previousDow
+      && !currentRows.includes(row);
+    const base = (selectedDay + (startsPreviousDay ? -1 : 0))
+      * MINUTES_PER_DAY;
+    intervals.push({
+      start: base + startMinute,
+      end: base + endMinute + (endMinute <= startMinute ? MINUTES_PER_DAY : 0),
+    });
+  }
+
+  const dayStart = selectedDay * MINUTES_PER_DAY;
+  const dayEnd = dayStart + MINUTES_PER_DAY;
+  const ranges = new Map<string, ArtistDailyTimeRange>();
+  for (const interval of intervals) {
+    const start = Math.max(interval.start, dayStart);
+    const end = Math.min(interval.end, dayEnd);
+    if (start >= end) continue;
+    // Preserve the current day's overnight end (18:00–04:00) so booking UIs
+    // can offer a duration crossing midnight. A spill that started yesterday
+    // is clipped to today's 00:00–04:00 start window.
+    const displayedEnd = interval.start >= dayStart
+      ? interval.end - dayStart
+      : end - dayStart;
+    const range = {
+      start: formatDayMinute(start - dayStart),
+      end: formatDayMinute(displayedEnd),
+    };
+    ranges.set(`${range.start}-${range.end}`, range);
+  }
+  return {
+    configured,
+    intervals,
+    ranges: [...ranges.values()].sort((left, right) =>
+      left.start.localeCompare(right.start) || left.end.localeCompare(right.end)),
+  };
+}
+
+export function isArtistSlotWithinWorkingSchedule(
+  entries: readonly ArtistWorkScheduleEntry[],
+  input: { eventDate: string; startTime: string; endTime: string },
+): { allowed: boolean; configured: boolean; ranges: ArtistDailyTimeRange[] } {
+  const projection = projectArtistWorkingScheduleToDate(entries, input.eventDate);
+  if (!projection.configured) {
+    return { allowed: true, configured: false, ranges: [] };
+  }
+  const target = anchoredArtistInterval(
+    input.eventDate,
+    input.startTime,
+    input.endTime,
+  );
+  return {
+    allowed: projection.intervals.some(
+      (interval) => target.start >= interval.start && target.end <= interval.end,
+    ),
+    configured: true,
+    ranges: projection.ranges,
+  };
+}
+
+type AnchoredArtistInterval = Readonly<{ start: number; end: number }>;
+
+function anchoredArtistInterval(
+  eventDate: string,
+  startTime: string | null | undefined,
+  endTime: string | null | undefined,
+): AnchoredArtistInterval {
+  const base = isoDateDayNumber(eventDate) * MINUTES_PER_DAY;
+  const start = toMinutes(startTime);
+  const end = toEndMinutes(endTime, start);
+  if (start === null || end === null) {
+    return { start: base, end: base + MINUTES_PER_DAY };
+  }
+  return { start: base + start, end: base + end };
+}
+
+function anchoredRangesOverlap(
+  left: AnchoredArtistInterval,
+  right: AnchoredArtistInterval,
+  leftTrailingBuffer = 0,
+  rightTrailingBuffer = 0,
 ): boolean {
-  // If either range is whole-day, they conflict
-  if (a1 === null || a2 === null || b1 === null || b2 === null) return true;
-  return a1 < b2 && b1 < a2;
+  return (
+    left.start < right.end + rightTrailingBuffer
+    && right.start < left.end + leftTrailingBuffer
+  );
 }
 
 export interface ConflictInfo {
@@ -78,20 +282,108 @@ export interface AvailabilityResult {
   conflict?: ConflictInfo;
   /** True if the day is blocked by the artist (vacation / manually blocked). */
   dayBlocked?: boolean;
+  /** True if a booked calendar row occupies the requested interval. */
+  calendarBusy?: boolean;
   /** True if the requested time falls outside working hours. */
   outsideWorkingHours?: boolean;
   /** Working hours for the requested day (when outsideWorkingHours = true). */
   workingHours?: { start: string; end: string } | null;
 }
 
+export interface ArtistCalendarBusyEntry {
+  eventDate: string;
+  status: "available" | "booked" | "tentative" | "blocked";
+  bookingId: number | null;
+  startTime: string | null;
+  endTime: string | null;
+}
+
 /**
- * Get day-of-week index used by work_schedule (0=Mon … 6=Sun).
- * JS Date.getDay() returns 0=Sun … 6=Sat, so remap.
+ * Find the first busy calendar row that overlaps a requested artist slot.
+ *
+ * Keep this pure so the overlap and self-exclusion rules can be tested without
+ * a database. Calendar rows are projections/overrides, not just vacations:
+ * both `blocked` and `booked` occupy time. An excluded booking projection must
+ * not conflict with the booking currently being accepted or confirmed.
  */
-function dayOfWeekMonStart(dateStr: string): number {
-  const d = new Date(dateStr + "T00:00:00");
-  const js = d.getDay(); // 0=Sun..6=Sat
-  return (js + 6) % 7; // 0=Mon..6=Sun
+export function findOverlappingArtistCalendarEntry(
+  entries: readonly ArtistCalendarBusyEntry[],
+  opts: {
+    eventDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    excludeBookingId?: number;
+    bufferMinutes?: number;
+  },
+): ArtistCalendarBusyEntry | undefined {
+  const target = anchoredArtistInterval(
+    opts.eventDate,
+    opts.startTime,
+    opts.endTime,
+  );
+  const bufferMinutes = Math.max(0, opts.bufferMinutes ?? 0);
+
+  return entries.find((entry) => {
+    if (entry.status !== "blocked" && entry.status !== "booked") {
+      return false;
+    }
+    if (
+      opts.excludeBookingId !== undefined
+      && entry.bookingId === opts.excludeBookingId
+    ) {
+      return false;
+    }
+    const entryInterval = anchoredArtistInterval(
+      entry.eventDate,
+      entry.startTime,
+      entry.endTime,
+    );
+    // Booking projections represent another gig and therefore need the same
+    // symmetric turnaround buffer as booking rows. A manual block is exact.
+    const bookingBuffer = entry.status === "booked" ? bufferMinutes : 0;
+    return anchoredRangesOverlap(
+      target,
+      entryInterval,
+      bookingBuffer,
+      bookingBuffer,
+    );
+  });
+}
+
+export interface ArtistBookingBusyEntry {
+  id: number;
+  eventDate: string;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+/** Pure booking-row counterpart used by the DB path and regression tests. */
+export function findOverlappingArtistBooking<T extends ArtistBookingBusyEntry>(
+  entries: readonly T[],
+  opts: {
+    eventDate: string;
+    startTime?: string | null;
+    endTime?: string | null;
+    bufferMinutes?: number;
+  },
+): T | undefined {
+  const target = anchoredArtistInterval(
+    opts.eventDate,
+    opts.startTime,
+    opts.endTime,
+  );
+  const bufferMinutes = Math.max(0, opts.bufferMinutes ?? 0);
+  return entries.find((entry) =>
+    anchoredRangesOverlap(
+      target,
+      anchoredArtistInterval(
+        entry.eventDate,
+        entry.startTime,
+        entry.endTime,
+      ),
+      bufferMinutes,
+      bufferMinutes,
+    ));
 }
 
 /**
@@ -123,10 +415,8 @@ export async function checkArtistAvailability(opts: {
   const targetStart = toMinutes(opts.startTime);
   const targetEnd = toEndMinutes(opts.endTime, targetStart);
 
-  // Pull the artist's buffer setting (minutes between bookings). This is
-  // ADDED to the END of every existing booking when checking for conflicts,
-  // so a booking ending at 16:00 with a 15-min buffer is treated as taking
-  // the slot until 16:15 from the next-client's perspective.
+  // Pull the artist's turnaround buffer. It is applied to the trailing edge
+  // of both compared gigs so the decision is independent of creation order.
   const [artistRow] = await q
     .select({ bufferMinutes: artists.bufferMinutes })
     .from(artists)
@@ -139,9 +429,11 @@ export async function checkArtistAvailability(opts: {
   // work_schedule for the requested day-of-week — empty schedule means
   // "no working-hour restriction" (existing artists keep working).
   if (targetStart !== null && targetEnd !== null) {
-    const dow = dayOfWeekMonStart(eventDate);
-    const [scheduleRow] = await q
+    const dow = monStartDayOfWeek(eventDate);
+    const previousDow = (dow + 6) % 7;
+    const scheduleRows = await q
       .select({
+        dayOfWeek: workSchedule.dayOfWeek,
         startTime: workSchedule.startTime,
         endTime: workSchedule.endTime,
         isWorking: workSchedule.isWorking,
@@ -150,44 +442,31 @@ export async function checkArtistAvailability(opts: {
       .where(
         and(
           eq(workSchedule.artistId, artistId),
-          eq(workSchedule.dayOfWeek, dow),
+          inArray(workSchedule.dayOfWeek, [previousDow, dow]),
         ),
-      )
-      .limit(1);
-
-    if (scheduleRow) {
-      if (!scheduleRow.isWorking) {
-        return {
-          available: false,
-          outsideWorkingHours: true,
-          workingHours: null,
-        };
-      }
-      const wsStart = toMinutes(scheduleRow.startTime);
-      const wsEnd = toMinutes(scheduleRow.endTime);
-      // Treat 00:00 end as midnight (end of day)
-      const wsEndAdjusted = wsEnd === 0 ? 24 * 60 : wsEnd;
-      if (
-        wsStart !== null &&
-        wsEndAdjusted !== null &&
-        (targetStart < wsStart || targetEnd > wsEndAdjusted)
-      ) {
-        return {
-          available: false,
-          outsideWorkingHours: true,
-          workingHours: {
-            start: scheduleRow.startTime,
-            end: scheduleRow.endTime,
-          },
-        };
-      }
+      );
+    const scheduleDecision = isArtistSlotWithinWorkingSchedule(scheduleRows, {
+      eventDate,
+      startTime: opts.startTime!,
+      endTime: opts.endTime!,
+    });
+    if (!scheduleDecision.allowed) {
+      return {
+        available: false,
+        outsideWorkingHours: true,
+        workingHours: scheduleDecision.ranges[0] ?? null,
+      };
     }
   }
 
-  // 1. Check if the day is blocked on the calendar (vacation etc.)
-  const [blockedEntry] = await q
+  // 1. Calendar overrides and booking projections are both authoritative.
+  // Read every row because the first one returned by PostgreSQL might be a
+  // non-overlapping partial-day entry while a later row does overlap.
+  const busyCalendarEntries = await q
     .select({
+      eventDate: calendarEvents.date,
       status: calendarEvents.status,
+      bookingId: calendarEvents.bookingId,
       startTime: calendarEvents.startTime,
       endTime: calendarEvents.endTime,
     })
@@ -196,22 +475,29 @@ export async function checkArtistAvailability(opts: {
       and(
         eq(calendarEvents.entityType, "artist"),
         eq(calendarEvents.entityId, artistId),
-        eq(calendarEvents.date, eventDate),
-        eq(calendarEvents.status, "blocked"),
+        inArray(calendarEvents.date, artistAvailabilityDateWindow(eventDate)),
+        inArray(calendarEvents.status, ["blocked", "booked"]),
       ),
-    )
-    .limit(1);
+    );
 
-  if (blockedEntry) {
-    // If the block is time-bounded, check for overlap
-    const blockStart = toMinutes(blockedEntry.startTime);
-    const blockEnd = toMinutes(blockedEntry.endTime);
-    if (rangesOverlap(targetStart, targetEnd, blockStart, blockEnd)) {
-      return { available: false, dayBlocked: true };
-    }
+  const busyCalendarEntry = findOverlappingArtistCalendarEntry(
+    busyCalendarEntries,
+    {
+      eventDate,
+      startTime: opts.startTime,
+      endTime: opts.endTime,
+      excludeBookingId,
+      bufferMinutes: artistBufferMinutes,
+    },
+  );
+  if (busyCalendarEntry?.status === "blocked") {
+    return { available: false, dayBlocked: true };
+  }
+  if (busyCalendarEntry?.status === "booked") {
+    return { available: false, calendarBusy: true };
   }
 
-  // 2. Find all active bookings for this artist on this date
+  // 2. Find active bookings whose anchored intervals can reach this request.
   const bookings = await q
     .select({
       id: bookingRequests.id,
@@ -225,7 +511,10 @@ export async function checkArtistAvailability(opts: {
     .where(
       and(
         eq(bookingRequests.artistId, artistId),
-        eq(bookingRequests.eventDate, eventDate),
+        inArray(
+          bookingRequests.eventDate,
+          artistAvailabilityDateWindow(eventDate),
+        ),
         inArray(bookingRequests.status, [...blockingStatuses]),
         excludeBookingId !== undefined
           ? ne(bookingRequests.id, excludeBookingId)
@@ -233,25 +522,26 @@ export async function checkArtistAvailability(opts: {
       ),
     );
 
-  // 3. Check each for overlap. Existing booking's end-time is extended by
-  // the artist's bufferMinutes to enforce a gap between gigs.
-  for (const b of bookings) {
-    const bStart = toMinutes(b.startTime);
-    const bEnd = toEndMinutes(b.endTime, bStart);
-    const bEndPadded = bEnd === null ? null : bEnd + artistBufferMinutes;
-    if (rangesOverlap(targetStart, targetEnd, bStart, bEndPadded)) {
-      return {
-        available: false,
-        conflict: {
-          bookingId: b.id,
-          eventDate: b.eventDate,
-          startTime: b.startTime,
-          endTime: b.endTime,
-          clientName: bookingTextForViewer(b.clientName, false),
-          status: b.status,
-        },
-      };
-    }
+  // 3. Buffer both intervals' trailing edges. This is order-independent: if
+  // A then B is rejected for an insufficient turnaround, B then A is too.
+  const overlappingBooking = findOverlappingArtistBooking(bookings, {
+    eventDate,
+    startTime: opts.startTime,
+    endTime: opts.endTime,
+    bufferMinutes: artistBufferMinutes,
+  });
+  if (overlappingBooking) {
+    return {
+      available: false,
+      conflict: {
+        bookingId: overlappingBooking.id,
+        eventDate: overlappingBooking.eventDate,
+        startTime: overlappingBooking.startTime,
+        endTime: overlappingBooking.endTime,
+        clientName: bookingTextForViewer(overlappingBooking.clientName, false),
+        status: overlappingBooking.status,
+      },
+    };
   }
 
   return { available: true };
@@ -308,6 +598,9 @@ export function formatConflictMessage(result: AvailabilityResult): string {
   }
   if (result.dayBlocked) {
     return "Această zi este blocată (vacanță).";
+  }
+  if (result.calendarBusy) {
+    return "Acest interval este deja rezervat în calendar.";
   }
   if (result.conflict) {
     const { startTime, endTime, clientName, status } = result.conflict;

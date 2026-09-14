@@ -59,6 +59,7 @@ function signedRows(subjectType: SubjectType, options: {
       documentSlug: slug,
       documentVersion: doc.version,
       packVersion: LEGAL_PACK_VERSION,
+      acceptanceSessionId: `session-${options.firstId ?? 701}-${options.acceptedAt ?? ACCEPTED_AT}`,
       acceptedAt: options.acceptedAt ?? ACCEPTED_AT,
       locale,
       signatureName,
@@ -78,6 +79,10 @@ function signedRows(subjectType: SubjectType, options: {
 
 function assertBlocked(rows: EvidenceRow[], subjectType: SubjectType) {
   assert.deepEqual(onboardingAgreementStatus(rows, subjectType), { status: "blocked", agreement: null });
+}
+
+function assertRecoverable(rows: EvidenceRow[], subjectType: SubjectType) {
+  assert.deepEqual(onboardingAgreementStatus(rows, subjectType), { status: "unsigned", agreement: null });
 }
 
 for (const subjectType of ["artist", "venue"] as const) {
@@ -111,17 +116,17 @@ for (const subjectType of ["artist", "venue"] as const) {
     assert.deepEqual(onboardingAgreementStatus(signedRows(otherSubject), subjectType), { status: "unsigned", agreement: null });
   });
 
-  test(`every current ${subjectType} document is required for recovery`, () => {
+  test(`an incomplete ${subjectType} attempt is recoverable only by a fresh full signature`, () => {
     const rows = signedRows(subjectType);
     for (let index = 0; index < rows.length; index += 1) {
-      assertBlocked(rows.filter((_, rowIndex) => rowIndex !== index), subjectType);
+      assertRecoverable(rows.filter((_, rowIndex) => rowIndex !== index), subjectType);
     }
   });
 
   test(`duplicate ${subjectType} evidence cannot replace a missing required document`, () => {
     const rows = signedRows(subjectType);
     rows[0] = { ...rows[1], id: rows[0].id };
-    assertBlocked(rows, subjectType);
+    assertRecoverable(rows, subjectType);
   });
 
   const mixedFields: Array<[string, Partial<EvidenceRow>]> = [
@@ -147,7 +152,7 @@ for (const subjectType of ["artist", "venue"] as const) {
   test(`${subjectType} recovery cannot borrow a shared document from the other subject`, () => {
     const rows = signedRows(subjectType);
     rows[0].subjectType = subjectType === "artist" ? "venue" : "artist";
-    assertBlocked(rows, subjectType);
+    assertRecoverable(rows, subjectType);
   });
 
   test(`${subjectType} legacy placeholder identity cannot resume under current validation`, () => {
@@ -162,10 +167,10 @@ for (const subjectType of ["artist", "venue"] as const) {
     }
   });
 
-  test(`${subjectType} partial sessions stay blocked even when their combined slugs cover the pack`, () => {
+  test(`${subjectType} partial sessions stay separate and allow one fresh complete retry`, () => {
     const earlier = signedRows(subjectType);
     const later = signedRows(subjectType, { acceptedAt: "2026-09-06T09:30:00.000Z", firstId: 901 });
-    assertBlocked([...earlier.slice(0, 2), ...later.slice(2)], subjectType);
+    assertRecoverable([...earlier.slice(0, 2), ...later.slice(2)], subjectType);
   });
 
   test(`${subjectType} corrupt document content or hashes cannot resume`, () => {
@@ -202,7 +207,7 @@ for (const subjectType of ["artist", "venue"] as const) {
     const oldRows = signedRows(subjectType).map(row => ({ ...row, documentVersion: "historical-version" }));
     assert.deepEqual(onboardingAgreementStatus(oldRows, subjectType), { status: "unsigned", agreement: null });
     const currentRows = signedRows(subjectType);
-    assertBlocked([...currentRows.slice(1), oldRows[0]], subjectType);
+    assertRecoverable([...currentRows.slice(1), oldRows[0]], subjectType);
   });
 
   test(`current ${subjectType} documents signed under an old pack cannot be reused`, () => {
@@ -251,6 +256,6 @@ test("artist and venue packs from the same account remain independent", () => {
   const together = [...venue, ...artist].reverse();
   assert.deepEqual(onboardingAgreementStatus(together, "artist"), onboardingAgreementStatus(artist, "artist"));
   assert.deepEqual(onboardingAgreementStatus(together, "venue"), onboardingAgreementStatus(venue, "venue"));
-  assertBlocked([...artist.slice(1), ...venue], "artist");
-  assertBlocked([...artist, ...venue.slice(1)], "venue");
+  assertRecoverable([...artist.slice(1), ...venue], "artist");
+  assertRecoverable([...artist, ...venue.slice(1)], "venue");
 });

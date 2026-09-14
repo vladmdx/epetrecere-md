@@ -7,8 +7,9 @@ import { db } from "@/lib/db";
 import { eventPhotos, eventPlans } from "@/lib/db/schema";
 import { requestHasMomentsAccess } from "@/lib/moments/access";
 import { rateLimit } from "@/lib/rate-limit";
-import { deleteManagedPhoto, storePrivatePhoto } from "@/lib/moments/managed-photo";
+import { storePrivatePhoto } from "@/lib/moments/managed-photo";
 import { photoContentUrl } from "@/lib/moments/photo-url";
+import { enqueueRegisteredBlobCleanup } from "@/lib/privacy/account-asset-erasure";
 
 export const runtime = "nodejs";
 const CONSENT_VERSION = "moments-photo-2026-09-05.1";
@@ -47,6 +48,7 @@ export async function POST(
   const [plan] = await db
     .select({
       id: eventPlans.id,
+      userId: eventPlans.userId,
       enabled: eventPlans.momentsEnabled,
       openAt: eventPlans.momentsOpenAt,
       closeAt: eventPlans.momentsCloseAt,
@@ -115,7 +117,7 @@ export async function POST(
     ? parsed.data.tableLabel
     : null;
   let url: string;
-  try { url = await storePrivatePhoto(cleaned, plan.id); }
+  try { url = await storePrivatePhoto(cleaned, plan.id, plan.userId); }
   catch { return NextResponse.json({ error: "Private photo storage unavailable" }, { status: 503 }); }
   try {
     const [photo] = await db
@@ -142,7 +144,7 @@ export async function POST(
     { status: 201, headers: { "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } },
   );
   } catch {
-    await deleteManagedPhoto(url, { id: plan.id, momentsSlug: slug });
+    await enqueueRegisteredBlobCleanup(url).catch(() => false);
     return NextResponse.json({ error: "Photo could not be saved" }, { status: 503 });
   }
 }

@@ -1,5 +1,5 @@
 // Contract flow:
-//   GET    /api/booking-requests/[id]/contract  → stream the PDF (existing or regenerated)
+//   GET    /api/booking-requests/[id]/contract  → stream the exact retained PDF
 //   POST   /api/booking-requests/[id]/contract  → sign: save typed signature +
 //                                                 generate PDF + upload to Blob +
 //                                                 persist clientSignature/At/contractPdfUrl
@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { auth } from "@clerk/nextjs/server";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireVenueCapability } from "@/lib/venue-access";
 import {
@@ -20,28 +20,146 @@ import {
   bookingRequests,
 } from "@/lib/db/schema";
 import { generateContractPdf } from "@/lib/contract/generate-pdf";
+import {
+  enqueueRegisteredBlobCleanup,
+  readRegisteredPrivateBlob,
+  retainRegisteredBlobAsset,
+  storeRegisteredBlob,
+} from "@/lib/privacy/account-asset-erasure";
+import {
+  bookingContractBasis,
+  bookingContractClientMatches,
+  bookingContractCommitDecision,
+  type BookingContractBasis,
+} from "@/lib/booking/contract-data";
+import {
+  createServerLogCorrelationId,
+  safeServerErrorLog,
+} from "@/lib/safe-server-log";
 
 const signSchema = z.object({
   signature: z.string().min(2).max(100),
 });
 
-async function loadBookingFull(id: number) {
-  const [row] = await db
-    .select({
-      booking: bookingRequests,
-      artistName: artists.nameRo,
-      artistPhone: artists.phone,
-      artistEmail: artists.email,
-      venueName: venues.nameRo,
-      venuePhone: venues.phone,
-      venueEmail: venues.email,
-    })
+type Executor = typeof db;
+
+async function loadBookingFull(
+  id: number,
+  executor: Executor = db,
+) {
+  const [booking] = await executor
+    .select()
     .from(bookingRequests)
-    .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
-    .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
     .where(eq(bookingRequests.id, id))
     .limit(1);
-  return row ?? null;
+  if (!booking) return null;
+
+  const artistQuery = booking.artistId
+    ? executor
+        .select({ phone: artists.phone, email: artists.email })
+        .from(artists)
+        .where(eq(artists.id, booking.artistId))
+    : null;
+  const [artist] = artistQuery
+    ? await artistQuery.limit(1)
+    : [];
+  const venueQuery = booking.venueId
+    ? executor
+        .select({ phone: venues.phone, email: venues.email })
+        .from(venues)
+        .where(eq(venues.id, booking.venueId))
+    : null;
+  const [venue] = venueQuery
+    ? await venueQuery.limit(1)
+    : [];
+  return {
+    booking,
+    vendorPhone: booking.artistId ? artist?.phone ?? null : venue?.phone ?? null,
+    vendorEmail: booking.artistId ? artist?.email ?? null : venue?.email ?? null,
+  };
+}
+
+/**
+ * Vendor DELETE takes the parent row lock before PostgreSQL applies the
+ * booking FK SET NULL action. Signing must use the same vendor -> booking
+ * order; taking a vendor lock after booking would deadlock with that action.
+ */
+async function lockPreparedBookingVendor(
+  booking: Pick<typeof bookingRequests.$inferSelect, "artistId" | "venueId">,
+  executor: Executor,
+) {
+  if (booking.artistId != null) {
+    const [artist] = await executor
+      .select({ phone: artists.phone, email: artists.email })
+      .from(artists)
+      .where(eq(artists.id, booking.artistId))
+      .for("share")
+      .limit(1);
+    return {
+      vendorPhone: artist?.phone ?? null,
+      vendorEmail: artist?.email ?? null,
+    };
+  }
+  if (booking.venueId != null) {
+    const [venue] = await executor
+      .select({ phone: venues.phone, email: venues.email })
+      .from(venues)
+      .where(eq(venues.id, booking.venueId))
+      .for("share")
+      .limit(1);
+    return {
+      vendorPhone: venue?.phone ?? null,
+      vendorEmail: venue?.email ?? null,
+    };
+  }
+  return { vendorPhone: null, vendorEmail: null };
+}
+
+async function lockBookingForContractCommit(id: number, executor: Executor) {
+  const [booking] = await executor
+    .select()
+    .from(bookingRequests)
+    .where(eq(bookingRequests.id, id))
+    .for("update")
+    .limit(1);
+  return booking ?? null;
+}
+
+function pdfData(
+  basis: BookingContractBasis,
+  clientSignature: string | null,
+  clientSignedAt: Date | null,
+  generationDate: Date,
+) {
+  const {
+    clientUserId: _clientUserId,
+    vendorArtistId: _vendorArtistId,
+    vendorVenueId: _vendorVenueId,
+    ...data
+  } = basis;
+  return { ...data, clientSignature, clientSignedAt, generationDate };
+}
+
+function contractTemporarilyUnavailable() {
+  return NextResponse.json(
+    {
+      error: "contract_pdf_repair_required",
+      code: "CONTRACT_PDF_REPAIR_REQUIRED",
+      retryable: true,
+    },
+    {
+      status: 503,
+      headers: { "Cache-Control": "no-store" },
+    },
+  );
+}
+
+async function cleanupUnusedPdf(pdfUrl: string | null): Promise<void> {
+  if (!pdfUrl) return;
+  const queued = await enqueueRegisteredBlobCleanup(pdfUrl).catch(() => false);
+  if (!queued) {
+    console.error("[contract] unused registered PDF cleanup was not queued");
+  }
 }
 
 async function checkViewAccess(
@@ -58,9 +176,9 @@ async function checkViewAccess(
 
   const b = bookingRow.booking;
   // Client can view their own booking
-  if (b.clientUserId === u.id) return { ok: true as const, user: u };
-  if (u.email && b.clientEmail === u.email)
+  if (bookingContractClientMatches(b, u)) {
     return { ok: true as const, user: u };
+  }
 
   // Vendor side: artist/venue owner
   if (b.artistId) {
@@ -96,35 +214,29 @@ export async function GET(
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const b = row.booking;
-  const vendorKind: "artist" | "sala" = b.artistId ? "artist" : "sala";
-  if (!["confirmed_by_client", "completed"].includes(b.status)) {
+  if (!b.clientSignedAt && !["confirmed_by_client", "completed"].includes(b.status)) {
     return NextResponse.json({ error: "booking_confirmation_required" }, { status: 403 });
   }
-  const vendorName = b.artistId
-    ? row.artistName ?? "Artist"
-    : row.venueName ?? "Sală";
-  const vendorPhone = b.artistId ? row.artistPhone : row.venuePhone;
-  const vendorEmail = b.artistId ? row.artistEmail : row.venueEmail;
+  const basis = bookingContractBasis(b, row);
 
-  const pdf = await generateContractPdf({
-    bookingId: b.id,
-    clientName: b.clientName,
-    clientPhone: b.clientPhone,
-    clientEmail: b.clientEmail,
-    clientSignature: b.clientSignature,
-    clientSignedAt: b.clientSignedAt,
-    vendorName,
-    vendorKind,
-    vendorEmail,
-    vendorPhone,
-    eventDate: b.eventDate,
-    eventType: b.eventType,
-    startTime: b.startTime,
-    endTime: b.endTime,
-    guestCount: b.guestCount,
-    agreedPrice: b.agreedPrice,
-    message: b.message,
-  });
+  let pdf: Uint8Array;
+  if (b.clientSignedAt) {
+    // A signed document is immutable evidence. Never substitute a render from
+    // mutable live rows when the exact retained private object needs repair.
+    if (!b.contractPdfUrl) return contractTemporarilyUnavailable();
+    const storedPdf = await readRegisteredPrivateBlob({
+      url: b.contractPdfUrl,
+      provenance: "legal_contract",
+      contentType: "application/pdf",
+    });
+    if (!storedPdf) return contractTemporarilyUnavailable();
+    pdf = storedPdf;
+  } else {
+    // Unsigned preview generation remains separate and deterministic.
+    pdf = await generateContractPdf(
+      pdfData(basis, null, null, b.createdAt),
+    );
+  }
 
   return new NextResponse(new Uint8Array(pdf), {
     status: 200,
@@ -171,12 +283,21 @@ export async function POST(
   if (!u) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const b = row.booking;
-  const isClient =
-    b.clientUserId === u.id || (u.email && b.clientEmail === u.email);
+  const isClient = bookingContractClientMatches(b, u);
   if (!isClient) {
     return NextResponse.json(
       { error: "Doar clientul rezervarii poate semna contractul" },
       { status: 403 },
+    );
+  }
+
+  if (b.clientSignedAt) {
+    return NextResponse.json(
+      {
+        error: "Contractul este deja semnat",
+        contractPdfUrl: `/api/booking-requests/${bookingId}/contract`,
+      },
+      { status: 409 },
     );
   }
 
@@ -192,73 +313,155 @@ export async function POST(
     );
   }
 
-  if (b.clientSignedAt) {
-    return NextResponse.json(
-      { error: "Contractul este deja semnat", contractPdfUrl: b.contractPdfUrl },
-      { status: 409 },
-    );
-  }
-
   const signedAt = new Date();
 
-  // Generate PDF with the fresh signature
-  const vendorKind: "artist" | "sala" = b.artistId ? "artist" : "sala";
-  const vendorName = b.artistId
-    ? row.artistName ?? "Artist"
-    : row.venueName ?? "Sală";
-  const vendorPhone = b.artistId ? row.artistPhone : row.venuePhone;
-  const vendorEmail = b.artistId ? row.artistEmail : row.venueEmail;
-
-  const pdfBytes = await generateContractPdf({
-    bookingId: b.id,
-    clientName: b.clientName,
-    clientPhone: b.clientPhone,
-    clientEmail: b.clientEmail,
-    clientSignature: parsed.data.signature,
-    clientSignedAt: signedAt,
-    vendorName,
-    vendorKind,
-    vendorEmail,
-    vendorPhone,
-    eventDate: b.eventDate,
-    eventType: b.eventType,
-    startTime: b.startTime,
-    endTime: b.endTime,
-    guestCount: b.guestCount,
-    agreedPrice: b.agreedPrice,
-    message: b.message,
-  });
-
-  // Upload to Vercel Blob if configured, else skip persistence (the GET
-  // endpoint can always regenerate on demand).
-  let pdfUrl: string | null = null;
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    try {
-      const { put } = await import("@vercel/blob");
-      const filename = `contracts/contract-${b.id}-${Date.now()}.pdf`;
-      const blob = await put(filename, new Blob([new Uint8Array(pdfBytes)]), {
-        access: "public",
-        contentType: "application/pdf",
-      });
-      pdfUrl = blob.url;
-    } catch (err) {
-      console.error("[contract] upload failed", err);
-    }
+  // Render outside the transaction, then revalidate the complete basis under
+  // canonical user -> vendor -> booking locks before publishing the signature.
+  const preparedBasis = bookingContractBasis(b, row);
+  let pdfBytes: Uint8Array;
+  try {
+    pdfBytes = await generateContractPdf(
+      pdfData(preparedBasis, parsed.data.signature, signedAt, signedAt),
+    );
+  } catch (error) {
+    console.error(
+      "[contract] signed PDF render failed",
+      safeServerErrorLog(error, {
+        correlationId: createServerLogCorrelationId(),
+      }),
+    );
+    return contractTemporarilyUnavailable();
   }
 
-  await db
-    .update(bookingRequests)
-    .set({
-      clientSignature: parsed.data.signature,
-      clientSignedAt: signedAt,
-      contractPdfUrl: pdfUrl,
-      updatedAt: new Date(),
-    })
-    .where(eq(bookingRequests.id, bookingId));
+  // A new signature is committed only after its exact private object and
+  // registry receipt both exist. Signed evidence is never regenerated later.
+  let pdfUrl: string;
+  const legalBlobToken = process.env.LEGAL_BLOB_READ_WRITE_TOKEN
+    ?? process.env.MOMENTS_BLOB_READ_WRITE_TOKEN;
+  if (!legalBlobToken) return contractTemporarilyUnavailable();
+  try {
+    const filename = `legal-contracts/contract-${b.id}-${signedAt.toISOString()}.pdf`;
+    pdfUrl = await storeRegisteredBlob({
+      pathname: filename,
+      body: new Blob([new Uint8Array(pdfBytes)]),
+      access: "private",
+      token: legalBlobToken,
+      ownerUserId: u.id,
+      provenance: "legal_contract_pending",
+      contentType: "application/pdf",
+    });
+  } catch (error) {
+    console.error(
+      "[contract] private PDF or registry creation failed",
+      safeServerErrorLog(error, {
+        correlationId: createServerLogCorrelationId(),
+      }),
+    );
+    return contractTemporarilyUnavailable();
+  }
+
+  let commit: "signed" | "unauthorized" | "booking_changed" | "already_signed";
+  try {
+    commit = await db.transaction(async (tx) => {
+      const executor = tx as unknown as Executor;
+
+      // Account erasure locks the same user row before it minimizes bookings.
+      // Holding SHARE here makes signing and erasure linearizable, while the
+      // booking UPDATE lock serializes sign against cancellation.
+      const [currentUser] = await tx
+        .select({ id: users.id, email: users.email })
+        .from(users)
+        .where(and(eq(users.id, u.id), eq(users.clerkId, clerkId)))
+        .for("share")
+        .limit(1);
+      if (!currentUser) return "unauthorized" as const;
+
+      // Keep the global user -> vendor -> booking order. Artist/venue DELETE
+      // uses vendor -> booking through its FK action, so neither path can hold
+      // the booking while waiting for the vendor. The FK ids in the basis make
+      // a vendor replacement/deletion after the optimistic render lose safely.
+      const currentVendor = await lockPreparedBookingVendor(b, executor);
+      const currentBooking = await lockBookingForContractCommit(bookingId, executor);
+      if (!currentBooking) return "booking_changed" as const;
+      const currentBasis = bookingContractBasis(currentBooking, currentVendor);
+      const decision = bookingContractCommitDecision({
+        prepared: preparedBasis,
+        current: currentBasis,
+        authenticatedClient: bookingContractClientMatches(currentBooking, currentUser),
+        currentStatus: currentBooking.status,
+        currentSignedAt: currentBooking.clientSignedAt,
+      });
+      if (decision !== "sign") return decision;
+
+      if (!currentBooking.clientUserId && !currentUser.email) {
+        return "unauthorized" as const;
+      }
+      const ownership = currentBooking.clientUserId
+        ? eq(bookingRequests.clientUserId, currentUser.id)
+        : currentUser.email
+          ? and(
+              isNull(bookingRequests.clientUserId),
+              sql`lower(btrim(${bookingRequests.clientEmail})) = lower(btrim(${currentUser.email}))`,
+            )
+          : undefined;
+      if (!ownership) return "unauthorized" as const;
+      const [updated] = await tx
+        .update(bookingRequests)
+        .set({
+          clientSignature: parsed.data.signature,
+          clientSignedAt: signedAt,
+          contractPdfUrl: pdfUrl,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(bookingRequests.id, bookingId),
+          inArray(bookingRequests.status, ["confirmed_by_client", "completed"]),
+          isNull(bookingRequests.clientSignedAt),
+          ownership,
+        ))
+        .returning({ id: bookingRequests.id });
+      if (!updated) return "booking_changed" as const;
+
+      await retainRegisteredBlobAsset(
+        tx,
+        pdfUrl,
+        currentUser.id,
+        "legal_contract",
+      );
+      return "signed" as const;
+    });
+  } catch (error) {
+    await cleanupUnusedPdf(pdfUrl);
+    console.error(
+      "[contract] signature commit failed after private PDF creation",
+      safeServerErrorLog(error, {
+        correlationId: createServerLogCorrelationId(),
+      }),
+    );
+    return contractTemporarilyUnavailable();
+  }
+
+  if (commit !== "signed") {
+    await cleanupUnusedPdf(pdfUrl);
+    if (commit === "unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (commit === "already_signed") {
+      return NextResponse.json(
+        {
+          error: "Contractul este deja semnat",
+          contractPdfUrl: `/api/booking-requests/${bookingId}/contract`,
+        },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+  }
 
   return NextResponse.json({
     success: true,
-    contractPdfUrl: pdfUrl,
+    // Never expose the provider URL; all reads remain authorization-gated.
+    contractPdfUrl: `/api/booking-requests/${bookingId}/contract`,
     // Always also return the dynamic URL so the UI can display regardless
     dynamicUrl: `/api/booking-requests/${bookingId}/contract`,
   });

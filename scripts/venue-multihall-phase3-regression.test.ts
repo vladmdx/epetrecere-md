@@ -27,13 +27,14 @@ import {
 } from "../src/lib/venue-access";
 import {
   collectSubmitMissing,
+  createDraftOrganization,
   ensureDraftOrganization,
   archiveHall,
-  saveHallDraft,
   saveOrganizationProfile,
   saveVenueDraft,
   submitVenueForApproval,
 } from "../src/lib/partner/onboarding";
+import { createHallDraft, patchHallDraft } from "../src/lib/partner/hall-writes";
 import { organizationHasValidContract, organizationContractRows, resolveOrganizationSigningIdentity } from "../src/lib/partner/legal";
 import { organizationWriteCapability } from "../src/lib/partner/organization-write";
 import {
@@ -138,7 +139,7 @@ before(async () => {
   const again = await ensureDraftOrganization(appUser(ids.owner));
   assert.equal(again.id, org.id, "retry must not duplicate the draft organization");
 
-  const profile = await saveOrganizationProfile(ids.org, {
+  const profile = await saveOrganizationProfile(appUser(ids.owner), ids.org, {
     type: "company",
     displayName: MARK + "Org A",
     legalName: IDENTITY.legalName,
@@ -180,32 +181,30 @@ before(async () => {
   assert.equal(retryVenue.ok, true);
   if (retryVenue.ok) assert.equal(retryVenue.venue.id, ids.venue);
 
-  const hallA = await saveHallDraft({
+  const hallARequestId = randomUUID();
+  const hallAPayload = {
     venueId: ids.venue,
+    hallCreateRequestId: hallARequestId,
     nameRo: "Grand",
     nameRu: "Гранд",
     nameEn: "Grand",
     capacityMin: 50,
-    capacityMax: 100,
+    capacityMax: 120,
     pricingModel: "per_person",
     basePrice: 40,
     imageUrls: [],
-  });
+  };
+  const hallA = await createHallDraft(ids.owner, hallAPayload);
   assert.equal(hallA.ok, true);
   if (!hallA.ok) throw new Error("hall A failed");
   ids.hallA = hallA.hall.id;
-  const hallARetry = await saveHallDraft({
-    venueId: ids.venue,
-    nameRo: "Grand",
-    capacityMin: 50,
-    capacityMax: 120,
-    imageUrls: [],
-  });
+  const hallARetry = await createHallDraft(ids.owner, hallAPayload);
   assert.equal(hallARetry.ok, true);
-  if (hallARetry.ok) assert.equal(hallARetry.hall.id, ids.hallA, "same hall name must update, not duplicate");
+  if (hallARetry.ok) assert.equal(hallARetry.hall.id, ids.hallA, "same request key and payload must replay");
 
-  const hallB = await saveHallDraft({
+  const hallB = await createHallDraft(ids.owner, {
     venueId: ids.venue,
+    hallCreateRequestId: randomUUID(),
     nameRo: "Garden",
     capacityMin: 80,
     capacityMax: 250,
@@ -214,11 +213,13 @@ before(async () => {
   assert.equal(hallB.ok, true);
   if (hallB.ok) ids.hallB = hallB.hall.id;
 
-  const submitted = await submitVenueForApproval(ids.venue);
+  const submitted = await submitVenueForApproval(ids.owner, ids.venue);
   assert.equal(submitted.ok, true, JSON.stringify(submitted));
 
   const venue2 = await saveVenueDraft(appUser(ids.owner), {
     organizationId: ids.org,
+    createIntent: true,
+    createRequestId: randomUUID(),
     name: MARK + "Local 2",
     phone: "+37369111111",
     city: "Chișinău",
@@ -227,8 +228,9 @@ before(async () => {
   });
   assert.equal(venue2.ok, true);
   if (venue2.ok) ids.venue2 = venue2.venue.id;
-  await saveHallDraft({
+  await createHallDraft(ids.owner, {
     venueId: ids.venue2,
+    hallCreateRequestId: randomUUID(),
     nameRo: "VIP",
     capacityMin: 20,
     capacityMax: 60,
@@ -303,7 +305,7 @@ test("existing org with contract adds a second venue without resigning", async (
 });
 
 test("holder change after a signed contract is rejected", async () => {
-  const result = await saveOrganizationProfile(ids.org, {
+  const result = await saveOrganizationProfile(appUser(ids.owner), ids.org, {
     type: "company",
     displayName: MARK + "Org A",
     legalName: "Alt Titular SRL",
@@ -357,12 +359,12 @@ test("IDOR: org B cannot use org A venue or a forged hall id", async () => {
   const owner = appUser(ids.owner);
   const forged = await authorizeHallAccess(owner, ids.hallForeign);
   assert.equal(forged.ok, false);
-  const hallOnWrongVenue = await saveHallDraft({
-    venueId: ids.venue,
-    hallId: ids.hallForeign,
-    nameRo: "Hijack",
-    imageUrls: [],
-  });
+  const hallOnWrongVenue = await patchHallDraft(
+    ids.owner,
+    ids.venue,
+    ids.hallForeign,
+    { nameRo: "Hijack" },
+  );
   assert.equal(hallOnWrongVenue.ok, false);
 });
 
@@ -401,13 +403,14 @@ test("duplicate phone on another account is allowed when multi-hall is on", asyn
   }
 });
 
-test("POST resume does not mutate a pending or already active organization", async () => {
+test("explicit keyed create does not mutate a pending or already active organization", async () => {
   const [before] = await db
     .select({ displayName: partnerOrganizations.displayName, status: partnerOrganizations.status })
     .from(partnerOrganizations)
     .where(eq(partnerOrganizations.id, ids.org));
   assert.equal(before.status, "pending");
-  const createdFromPending = await ensureDraftOrganization(appUser(ids.owner), {
+  const createdFromPending = await createDraftOrganization(appUser(ids.owner), {
+    organizationCreateRequestId: randomUUID(),
     displayName: MARK + "Hijack Pending",
     type: "company",
   });
@@ -416,7 +419,8 @@ test("POST resume does not mutate a pending or already active organization", asy
   await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, createdFromPending.id));
 
   await db.update(partnerOrganizations).set({ status: "active", updatedAt: new Date() }).where(eq(partnerOrganizations.id, ids.org));
-  const createdFromActive = await ensureDraftOrganization(appUser(ids.owner), {
+  const createdFromActive = await createDraftOrganization(appUser(ids.owner), {
+    organizationCreateRequestId: randomUUID(),
     displayName: MARK + "Hijack Active",
     type: "company",
   });
@@ -432,7 +436,7 @@ test("POST resume does not mutate a pending or already active organization", asy
   await db.update(partnerOrganizations).set({ status: "pending", updatedAt: new Date() }).where(eq(partnerOrganizations.id, ids.org));
 });
 
-test("staff cannot change displayName on an eligible draft they do not own", async () => {
+test("staff cannot implicitly reuse or receive an eligible draft they do not own", async () => {
   const draft = await ensureDraftOrganization(appUser(ids.owner), {
     displayName: MARK + "Draft Extra",
     type: "company",
@@ -447,14 +451,50 @@ test("staff cannot change displayName on an eligible draft they do not own", asy
     displayName: MARK + "Staff Hijack",
     type: "company",
   });
-  assert.equal(again.id, draft.id);
+  assert.notEqual(again.id, draft.id);
+  assert.equal(again.displayName, MARK + "Staff Hijack");
   const [row] = await db
     .select({ displayName: partnerOrganizations.displayName })
     .from(partnerOrganizations)
     .where(eq(partnerOrganizations.id, draft.id));
   assert.equal(row.displayName, MARK + "Draft Extra");
-  await db.delete(partnerOrganizationMembers).where(eq(partnerOrganizationMembers.organizationId, draft.id));
-  await db.delete(partnerOrganizations).where(eq(partnerOrganizations.id, draft.id));
+  await db
+    .delete(partnerOrganizationMembers)
+    .where(inArray(partnerOrganizationMembers.organizationId, [draft.id, again.id]));
+  await db
+    .delete(partnerOrganizations)
+    .where(inArray(partnerOrganizations.id, [draft.id, again.id]));
+});
+
+test("global admin does not implicitly adopt an arbitrary reusable draft", async () => {
+  const globalAdminId = await mkUser("global-reuse-admin");
+  await db.update(users).set({ role: "admin" }).where(eq(users.id, globalAdminId));
+  const ownerDraft = await ensureDraftOrganization(appUser(ids.owner), {
+    displayName: MARK + "Owner-only draft",
+    type: "company",
+  });
+  const adminDraft = await ensureDraftOrganization({
+    id: globalAdminId,
+    role: "admin",
+    isGlobalAdmin: true,
+  }, {
+    displayName: MARK + "Admin's own draft",
+    type: "company",
+  });
+  assert.notEqual(adminDraft.id, ownerDraft.id);
+  assert.equal(adminDraft.displayName, MARK + "Admin's own draft");
+  const [ownerRow] = await db
+    .select({ displayName: partnerOrganizations.displayName })
+    .from(partnerOrganizations)
+    .where(eq(partnerOrganizations.id, ownerDraft.id));
+  assert.equal(ownerRow.displayName, MARK + "Owner-only draft");
+  await db
+    .delete(partnerOrganizationMembers)
+    .where(inArray(partnerOrganizationMembers.organizationId, [ownerDraft.id, adminDraft.id]));
+  await db
+    .delete(partnerOrganizations)
+    .where(inArray(partnerOrganizations.id, [ownerDraft.id, adminDraft.id]));
+  await db.delete(users).where(eq(users.id, globalAdminId));
 });
 
 test("staff of org A cannot manage_legal; empty legalName still requires manage_legal", async () => {
@@ -488,11 +528,11 @@ test("contract validity rejects a mismatched legal identity", async () => {
 });
 
 test("archiveHall refuses the last usable hall and future blocking bookings", async () => {
-  const last = await archiveHall(ids.hallA);
-  const lastB = await archiveHall(ids.hallB);
+  const last = await archiveHall(ids.owner, ids.hallA);
+  const lastB = await archiveHall(ids.owner, ids.hallB);
   assert.equal(last.ok || lastB.ok, true);
   const leftover = last.ok ? ids.hallB : ids.hallA;
-  const refused = await archiveHall(leftover);
+  const refused = await archiveHall(ids.owner, leftover);
   assert.equal(refused.ok, false);
   if (!refused.ok) assert.equal(refused.code, "LAST_USABLE_HALL");
 
@@ -520,10 +560,10 @@ test("archiveHall refuses the last usable hall and future blocking bookings", as
       reservationScope: "hall",
     })
     .returning({ id: bookingRequests.id });
-  const blocked = await archiveHall(extra.id);
+  const blocked = await archiveHall(ids.owner, extra.id);
   assert.equal(blocked.ok, false);
   if (!blocked.ok) assert.equal(blocked.code, "HALL_HAS_FUTURE_BOOKINGS");
   await db.delete(bookingRequests).where(eq(bookingRequests.id, booking.id));
-  const archived = await archiveHall(extra.id);
+  const archived = await archiveHall(ids.owner, extra.id);
   assert.equal(archived.ok, true);
 });

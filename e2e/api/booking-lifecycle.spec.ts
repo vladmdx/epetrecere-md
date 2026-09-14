@@ -42,6 +42,23 @@ test.describe.serial("booking lifecycle (CAL-02 / BOOK-02 / BOOK-03)", () => {
 
     // Guarantee no stale rows from a previous run on the same dates.
     await sql`
+      delete from booking_effect_deliveries
+      where effect_id in (
+        select o.id from booking_effect_outbox o
+        join booking_requests b on b.id = o.booking_id
+        where b.artist_id = ${artistId}
+          and b.event_date in (${dateA}, ${dateB})
+      )
+    `;
+    await sql`
+      delete from booking_effect_outbox
+      where booking_id in (
+        select id from booking_requests
+        where artist_id = ${artistId}
+          and event_date in (${dateA}, ${dateB})
+      )
+    `;
+    await sql`
       delete from booking_requests
       where artist_id = ${artistId}
       and event_date in (${dateA}, ${dateB})
@@ -60,6 +77,9 @@ test.describe.serial("booking lifecycle (CAL-02 / BOOK-02 / BOOK-03)", () => {
     if (bookingA || bookingB) {
       const ids = [bookingA, bookingB].filter(Boolean);
       await sql`delete from offer_requests where artist_id = ${artistId} and event_date in (${dateA}, ${dateB})`;
+      await sql`delete from booking_effect_deliveries
+        where effect_id in (select id from booking_effect_outbox where booking_id = any(${ids}))`;
+      await sql`delete from booking_effect_outbox where booking_id = any(${ids})`;
       await sql`delete from booking_requests where id = any(${ids})`;
     }
     await sql`

@@ -1,74 +1,87 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { z } from "zod/v4";
+import { BookingRequestCreateSchema } from "@epetrecere/shared";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
-import {
-  bookingRequests,
-  offerRequests,
-  artists,
-  venues,
-  eventPlans,
-} from "@/lib/db/schema";
+import { bookingRequests, artists, venues } from "@/lib/db/schema";
 import { users } from "@/lib/db/schema";
 import { eq, desc, and, inArray, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
 import { rateLimit } from "@/lib/rate-limit";
-import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
-import { sendPushToUser } from "@/lib/push/expo";
-import { sendEmail } from "@/lib/email/send";
-import { bookingRequestNewEmail } from "@/lib/email/templates/booking-request-new";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { bookingTextForViewer } from "@/lib/privacy/booking-text";
+import { authorizeVenueAccess } from "@/lib/venue-access";
+import { VenueAvailabilityError } from "@/lib/booking/venue-booking-write";
+import { dispatchBookingCreationEffects } from "@/lib/booking/booking-create-effects";
 import {
-  authorizeVenueAccess,
-  getVenueOwnerRecipients,
-  isVenuePartner,
-  type VenueNotificationRecipient,
-} from "@/lib/venue-access";
-import { publicVenueReservationScope } from "@/lib/booking/venue-booking-write";
+  BookingCreationActorNotFoundError,
+  BookingCreationIdempotencyConflictError,
+  EventPlanBookingWriteError,
+} from "@/lib/booking/booking-request-write";
+import {
+  ArtistAvailabilityWriteError,
+  BookingClientIdentityError,
+  BookingEventDateWriteError,
+  BookingPartnerAccountError,
+  BookingTargetUnavailableError,
+  createClientBookingRequest,
+  PublicVenueScopeWriteError,
+} from "@/lib/booking/client-booking-create";
+import { PlanBookingConflictError } from "@/lib/booking/plan-booking-constraints";
+import {
+  InvalidJsonRequestError,
+  readBoundedJson,
+  RequestBodyTooLargeError,
+} from "@/lib/http/read-bounded-json";
+import { bookingContractClientMatches } from "@/lib/booking/contract-data";
 
-const bookingSchema = z.object({
-  /** Either artistId or venueId must be set. */
-  artistId: z.number().int().positive().optional(),
-  venueId: z.number().int().positive().optional(),
-  clientName: z.string().min(2),
-  clientPhone: z.string().min(6),
-  clientEmail: z.string().optional(),
-  eventDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "eventDate must be YYYY-MM-DD")
-    .refine(d => { const date = new Date(`${d}T00:00:00Z`); return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === d; }, "Invalid event date")
-    .refine((d) => {
-      // Reject dates strictly before today (event can still be booked for "today").
-      // Compared against UTC date so a client in +3 doesn't accidentally reject
-      // today-in-their-zone.
-      const today = new Date();
-      const todayStr = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
-      return d >= todayStr;
-    }, "Event date cannot be in the past"),
-  startTime: z.preprocess(value => value === "" || value === null ? undefined : value, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional()),
-  endTime: z.preprocess(value => value === "" || value === null ? undefined : value, z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional()),
-  eventType: z.string().optional(),
-  guestCount: z.number().int().positive().max(10000).optional(),
-  message: z.string().optional(),
-  /** Optional — when the client sends the request from inside an event
-   *  plan we link the booking so its agreed price flows into the budget. */
-  eventPlanId: z.number().int().positive().optional(),
-  /** Optional — price in EUR the client picked (via artist package). */
-  agreedPrice: z.number().int().min(0).optional(),
-  /** Optional — artist package id selected by the client. */
-  packageId: z.number().int().positive().optional(),
-  /** Optional — concrete hall after MULTI_HALL is on. */
-  hallId: z.number().int().positive().optional(),
-  reservationScope: z.enum(["hall", "venue"]).optional(),
-}).refine(data => Boolean(data.artistId) !== Boolean(data.venueId), { message: "Exactly one artist or venue is required" });
+type BookingCreateRow = typeof bookingRequests.$inferSelect;
+
+/**
+ * POST never returns internal idempotency material or later private workflow
+ * fields (admin notes/signatures). Keep this allow-list explicit so a future
+ * schema column cannot silently become public through `.returning()`.
+ */
+function bookingCreateResponse(row: BookingCreateRow) {
+  return {
+    id: row.id,
+    artistId: row.artistId,
+    venueId: row.venueId,
+    hallId: row.hallId,
+    reservationScope: row.reservationScope,
+    startsAt: row.startsAt,
+    endsAt: row.endsAt,
+    timezone: row.timezone,
+    eventPlanId: row.eventPlanId,
+    clientName: row.clientName,
+    clientPhone: row.clientPhone,
+    clientEmail: row.clientEmail,
+    eventDate: row.eventDate,
+    startTime: row.startTime,
+    endTime: row.endTime,
+    eventType: row.eventType,
+    guestCount: row.guestCount,
+    message: row.message,
+    status: row.status,
+    agreedPrice: row.agreedPrice,
+    paidStatus: row.paidStatus,
+    source: row.source,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+const bookingSchema = BookingRequestCreateSchema;
+const BOOKING_REQUEST_MAX_BODY_BYTES = 16 * 1024;
 
 // GET booking requests — requires auth; scoped to caller's own data.
 // Admins can query any artist_id or client_email. Regular users can only
 // query bookings for their own artist profile or their own email.
 export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
-  if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!clerkId)
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Opportunistic expiry — every read flips any pending booking past
   // its response window (24h artists / 72h venues). The dedicated
@@ -176,8 +189,11 @@ export async function GET(req: NextRequest) {
       if (!b) {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
       }
-      let owns =
-        b.clientUserId === appUser.id || b.clientEmail === appUser.email;
+      // A durable clientUserId is authoritative. Legacy email ownership is
+      // allowed only when the booking has no user FK and both normalized
+      // addresses are non-empty; in particular, null === null is never proof
+      // of ownership and an old matching email cannot override another user.
+      let owns = bookingContractClientMatches(b, appUser);
       if (!owns && b.artistId) {
         const [a] = await db
           .select({ userId: artists.userId })
@@ -202,9 +218,17 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const conditions = [];
+  // Manual calendar deletions keep a cancelled idempotency tombstone. Hide
+  // only that technical row at SQL level so it cannot consume the 50-row
+  // window; ordinary client/vendor cancellations remain visible history.
+  const visibleBooking = sql<boolean>`NOT (
+    ${bookingRequests.source} = 'manual'
+    AND ${bookingRequests.status} = 'cancelled'
+  )`;
+  const conditions: SQL[] = [visibleBooking];
   if (artistId) conditions.push(eq(bookingRequests.artistId, Number(artistId)));
-  if (clientEmail) conditions.push(eq(bookingRequests.clientEmail, clientEmail));
+  if (clientEmail)
+    conditions.push(eq(bookingRequests.clientEmail, clientEmail));
   if (eventPlanId) {
     conditions.push(eq(bookingRequests.eventPlanId, Number(eventPlanId)));
   }
@@ -216,7 +240,6 @@ export async function GET(req: NextRequest) {
       artistId: bookingRequests.artistId,
       venueId: bookingRequests.venueId,
       eventPlanId: bookingRequests.eventPlanId,
-      clientUserId: bookingRequests.clientUserId,
       clientName: bookingRequests.clientName,
       clientPhone: bookingRequests.clientPhone,
       clientEmail: bookingRequests.clientEmail,
@@ -281,9 +304,14 @@ export async function GET(req: NextRequest) {
   // Phase 6 — enrich artist bookings with the venue on the same event plan
   // (if any). Lets the artist see "Eveniment la Sala X" on their rezervări.
   const planIds = Array.from(
-    new Set(result.map((r) => r.eventPlanId).filter((x): x is number => x !== null)),
+    new Set(
+      result.map((r) => r.eventPlanId).filter((x): x is number => x !== null),
+    ),
   );
-  const planToVenue = new Map<number, { id: number; nameRo: string; slug: string }>();
+  const planToVenue = new Map<
+    number,
+    { id: number; nameRo: string; slug: string }
+  >();
   if (planIds.length > 0 && artistId) {
     const venueBookings = await db
       .select({
@@ -296,6 +324,7 @@ export async function GET(req: NextRequest) {
       .innerJoin(venues, eq(venues.id, bookingRequests.venueId))
       .where(
         and(
+          visibleBooking,
           inArray(
             bookingRequests.eventPlanId,
             planIds as [number, ...number[]],
@@ -317,11 +346,12 @@ export async function GET(req: NextRequest) {
     const showContact =
       !redactByDefault || SHARED_CONTACT_STATUSES.has(row.status);
     const textShared = isAdmin || SHARED_CONTACT_STATUSES.has(row.status);
-    const linkedVenue = row.eventPlanId ? planToVenue.get(row.eventPlanId) ?? null : null;
-    const cats =
-      (row.artistCategoryIds ?? [])
-        .map((id) => catNameById.get(id))
-        .filter((n): n is string => Boolean(n));
+    const linkedVenue = row.eventPlanId
+      ? (planToVenue.get(row.eventPlanId) ?? null)
+      : null;
+    const cats = (row.artistCategoryIds ?? [])
+      .map((id) => catNameById.get(id))
+      .filter((n): n is string => Boolean(n));
     return {
       ...row,
       clientName: bookingTextForViewer(row.clientName, showContact),
@@ -331,11 +361,21 @@ export async function GET(req: NextRequest) {
       adminNotes: isAdmin ? row.adminNotes : null,
       message: bookingTextForViewer(row.message, textShared),
       artistReply: bookingTextForViewer(row.artistReply, textShared),
-      priceOffers: !textShared ? row.priceOffers?.map(o => ({ ...o, message: bookingTextForViewer(o.message, false) })) : row.priceOffers,
+      priceOffers: !textShared
+        ? row.priceOffers?.map((o) => ({
+            ...o,
+            message: bookingTextForViewer(o.message, false),
+          }))
+        : row.priceOffers,
       clientPhone: showContact ? row.clientPhone : null,
       clientEmail: showContact ? row.clientEmail : null,
       categoryNames: cats,
-      linkedVenue: linkedVenue ? { ...linkedVenue, nameRo: bookingTextForViewer(linkedVenue.nameRo, textShared) } : null,
+      linkedVenue: linkedVenue
+        ? {
+            ...linkedVenue,
+            nameRo: bookingTextForViewer(linkedVenue.nameRo, textShared),
+          }
+        : null,
     };
   });
 
@@ -344,14 +384,53 @@ export async function GET(req: NextRequest) {
 
 // CREATE booking request
 export async function POST(req: NextRequest) {
+  const rawIdempotencyKey = req.headers.get("idempotency-key");
+  let idempotencyKey: string | null = null;
+  if (rawIdempotencyKey !== null) {
+    const parsedKey = z.string().uuid().safeParse(rawIdempotencyKey);
+    if (!parsedKey.success) {
+      return NextResponse.json(
+        {
+          error: "Invalid Idempotency-Key; expected a UUID.",
+          code: "INVALID_IDEMPOTENCY_KEY",
+        },
+        { status: 400 },
+      );
+    }
+    // PostgreSQL's uuid type is case-insensitive. Normalize before deriving
+    // the advisory-lock identity so equivalent UUID spellings share a lock.
+    idempotencyKey = parsedKey.data.toLowerCase();
+  }
+
   const ip = req.headers.get("x-forwarded-for") || "anonymous";
   const { success } = await rateLimit(`booking:${ip}`, 5, 60_000);
-  if (!success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  if (!success)
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await readBoundedJson(req, BOOKING_REQUEST_MAX_BODY_BYTES);
+  } catch (error) {
+    if (error instanceof RequestBodyTooLargeError) {
+      return NextResponse.json(
+        { error: "Request body too large", code: "REQUEST_BODY_TOO_LARGE" },
+        { status: 413 },
+      );
+    }
+    if (error instanceof InvalidJsonRequestError) {
+      return NextResponse.json(
+        { error: "Invalid JSON body", code: "INVALID_JSON" },
+        { status: 400 },
+      );
+    }
+    throw error;
+  }
   const parsed = bookingSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
+    return NextResponse.json(
+      { error: "Validation failed", details: parsed.error.issues },
+      { status: 400 },
+    );
   }
   if (!parsed.data.artistId && !parsed.data.venueId) {
     return NextResponse.json(
@@ -359,587 +438,143 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  if (parsed.data.message) {
-    parsed.data.message = redactContact(parsed.data.message);
-  }
+  const submittedData = {
+    ...parsed.data,
+    message: parsed.data.message
+      ? redactContact(parsed.data.message)
+      : parsed.data.message,
+  };
 
   // Resolve the authenticated user so we can link booking to their account.
   // Also check that they aren't a partner — a vendor account creating
   // booking requests is almost certainly an accidental cross-role use.
   const { userId: clerkId } = await auth();
-  let clientUserId: string | undefined;
+  let actorUserId: string | null = null;
   if (clerkId) {
     const [appUser] = await db
-      .select({
-        id: users.id,
-        role: users.role,
-        name: users.name,
-        email: users.email,
-        phone: users.phone,
-      })
+      .select({ id: users.id })
       .from(users)
       .where(eq(users.clerkId, clerkId))
       .limit(1);
-    if (appUser) {
-      // Admins always pass through. For everyone else, reject if they
-      // own an artist or venue row, or hold the artist role.
-      const isAdmin = appUser.role === "admin" || appUser.role === "super_admin";
-      if (!isAdmin) {
-        const [artistOwn] = await db
-          .select({ id: artists.id })
-          .from(artists)
-          .where(eq(artists.userId, appUser.id))
-          .limit(1);
-        const venuePartner = artistOwn ? false : await isVenuePartner(appUser.id);
-        if (artistOwn || venuePartner || appUser.role === "artist") {
-          return NextResponse.json(
-            {
-              error:
-                "Conturile de partener nu pot trimite cereri de rezervare. Folosește un cont de client.",
-            },
-            { status: 403 },
-          );
-        }
-      }
-      clientUserId = appUser.id;
-
-      // Signed-in bookings use the account's canonical identity. This avoids
-      // spoofed names/emails and prevents planner fallbacks such as "000000"
-      // from becoming the contact stored on a real reservation.
-      parsed.data.clientName = appUser.name?.trim() || parsed.data.clientName;
-      parsed.data.clientEmail = appUser.email?.trim() || parsed.data.clientEmail;
-      if (appUser.phone?.trim()) parsed.data.clientPhone = appUser.phone.trim();
-
-      const phoneDigits = parsed.data.clientPhone.replace(/\D/g, "");
-      if (phoneDigits.length < 8 || /^(\d)\1+$/.test(phoneDigits)) {
-        return NextResponse.json(
-          {
-            error:
-              "Adaugă un număr de telefon valid în profil înainte de a trimite rezervarea.",
-            code: "CLIENT_PHONE_REQUIRED",
-          },
-          { status: 400 },
-        );
-      }
+    if (!appUser) {
+      return NextResponse.json({ error: "User not found" }, { status: 403 });
     }
+
+    actorUserId = appUser.id;
   }
 
-  // A booking linked to an event plan must come from the authenticated owner
-  // of that plan. Without this gate, a caller could attach a reservation to
-  // somebody else's plan by guessing its numeric id.
-  if (parsed.data.eventPlanId) {
-    if (!clientUserId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const [ownedPlan] = await db
-      .select({ id: eventPlans.id })
-      .from(eventPlans)
-      .where(
-        and(
-          eq(eventPlans.id, parsed.data.eventPlanId),
-          eq(eventPlans.userId, clientUserId),
-        ),
-      )
-      .limit(1);
-    if (!ownedPlan) {
-      return NextResponse.json({ error: "Event plan not found" }, { status: 404 });
-    }
+  // A plan-linked request must be authenticated. Ownership is deliberately
+  // checked again under the plan row lock in the write transaction below.
+  if (submittedData.eventPlanId && !actorUserId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Create booking request — keep the eventPlanId through so in-plan
-  // requests surface in the dashboard "Rezervări Artiști" tab.
-  // Extract fields that aren't columns of `booking_requests` so we can
-  // pass them separately to the insert.
-  const {
-    eventPlanId,
-    agreedPrice,
-    packageId: _packageId,
-    hallId,
-    reservationScope: _reservationScope,
-    ...bookingBase
-  } = parsed.data;
-
-  // One active request at a time per category per plan. The artist gets
-  // 24h to accept/reject; while their request is pending, the client
-  // can't shop the same category to another artist. After accept the
-  // booking takes the slot indefinitely; after reject/cancel/expire
-  // the category slot frees up so the client can try someone else.
-  if (eventPlanId && parsed.data.artistId) {
-    const [targetArtist] = await db
-      .select({ categoryIds: artists.categoryIds })
-      .from(artists)
-      .where(eq(artists.id, parsed.data.artistId))
-      .limit(1);
-    const targetCategoryIds = targetArtist?.categoryIds ?? [];
-
-    if (targetCategoryIds.length > 0) {
-      const existingBookings = await db
-        .select({
-          artistId: bookingRequests.artistId,
-          status: bookingRequests.status,
-          categoryIds: artists.categoryIds,
-          artistName: artists.nameRo,
-        })
-        .from(bookingRequests)
-        .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
-        .where(eq(bookingRequests.eventPlanId, eventPlanId));
-
-      // Prevent duplicate booking for the same artist on same plan.
-      // If the previous one was declined/cancelled/expired, surface a
-      // clearer message so the client knows to pick another artist.
-      const priorBooking = existingBookings.find(
-        (b) => b.artistId === parsed.data.artistId,
-      );
-      if (priorBooking) {
-        const declined =
-          priorBooking.status === "rejected" ||
-          priorBooking.status === "cancelled" ||
-          priorBooking.status === "expired";
-        return NextResponse.json(
-          {
-            error: declined
-              ? "Acest artist a refuzat deja cererea ta pentru acest eveniment. Te rugăm să alegi un alt artist."
-              : "Ai trimis deja o cerere către acest artist pentru acest eveniment.",
-          },
-          { status: 409 },
-        );
-      }
-
-      // Block if any artist in any of the target categories already
-      // has an ACTIVE (pending/accepted/confirmed/completed) booking on
-      // this plan. Pending blocks because we want a single open ask
-      // per category — no spamming five artists at once.
-      const ACTIVE_STATUSES = new Set([
-        "pending",
-        "accepted",
-        "confirmed_by_client",
-        "completed",
-      ]);
-      for (const catId of targetCategoryIds) {
-        const blocker = existingBookings.find(
-          (b) =>
-            ACTIVE_STATUSES.has(b.status) &&
-            (b.categoryIds ?? []).includes(catId),
-        );
-        if (blocker) {
-          return NextResponse.json(
-            {
-              error:
-                blocker.status === "pending"
-                  ? `Așteaptă răspunsul lui ${blocker.artistName ?? "artist"} (până la 24h) înainte de a trimite altă cerere în această categorie.`
-                  : `Ai deja un artist confirmat (${blocker.artistName ?? "artist"}) în această categorie pentru evenimentul tău.`,
-            },
-            { status: 409 },
-          );
-        }
-      }
-    }
-  }
-
-  // Venue side of the same constraint — only ONE active venue
-  // request per plan. Until the venue accepts/rejects/expires, the
-  // client can't shop another venue. Same status semantics as artists
-  // (pending/accepted/confirmed/completed = active; rejected /
-  // cancelled / expired free up the slot).
-  if (eventPlanId && parsed.data.venueId) {
-    const existingVenueBookings = await db
-      .select({
-        venueId: bookingRequests.venueId,
-        status: bookingRequests.status,
-        venueName: venues.nameRo,
-      })
-      .from(bookingRequests)
-      .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
-      .where(eq(bookingRequests.eventPlanId, eventPlanId));
-
-    // Reject duplicate venue request.
-    const priorVenue = existingVenueBookings.find(
-      (b) => b.venueId === parsed.data.venueId,
-    );
-    if (priorVenue) {
-      const declined =
-        priorVenue.status === "rejected" ||
-        priorVenue.status === "cancelled" ||
-        priorVenue.status === "expired";
-      return NextResponse.json(
-        {
-          error: declined
-            ? "Această sală a refuzat deja cererea ta pentru acest eveniment. Te rugăm să alegi o altă sală."
-            : "Ai trimis deja o cerere la această sală pentru acest eveniment.",
-        },
-        { status: 409 },
-      );
-    }
-
-    // Block while another venue request is still active.
-    const ACTIVE_STATUSES = new Set([
-      "pending",
-      "accepted",
-      "confirmed_by_client",
-      "completed",
-    ]);
-    const venueBlocker = existingVenueBookings.find(
-      (b) => b.venueId != null && ACTIVE_STATUSES.has(b.status),
-    );
-    if (venueBlocker) {
-      return NextResponse.json(
-        {
-          error:
-            venueBlocker.status === "pending"
-              ? `Așteaptă răspunsul de la ${venueBlocker.venueName ?? "sală"} (până la 72h) înainte de a trimite altă cerere la o sală.`
-              : `Ai deja o sală confirmată (${venueBlocker.venueName ?? "sală"}) pentru evenimentul tău.`,
-        },
-        { status: 409 },
-      );
-    }
-  }
-
-  // Artist availability check — working hours + conflicts.
-  if (parsed.data.artistId) {
-    const { checkArtistAvailability, formatConflictMessage } = await import(
-      "@/lib/booking/availability"
-    );
-    const result = await checkArtistAvailability({
-      artistId: parsed.data.artistId,
-      eventDate: parsed.data.eventDate,
-      startTime: parsed.data.startTime,
-      endTime: parsed.data.endTime,
+  let creation: Awaited<ReturnType<typeof createClientBookingRequest>>;
+  try {
+    creation = await createClientBookingRequest({
+      booking: submittedData,
+      actorUserId,
+      clerkId,
+      idempotencyKey,
     });
-    if (!result.available) {
+  } catch (error) {
+    if (error instanceof BookingCreationActorNotFoundError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    if (error instanceof BookingCreationIdempotencyConflictError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+    if (error instanceof BookingClientIdentityError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+    if (error instanceof BookingEventDateWriteError) {
       return NextResponse.json(
         {
-          error: formatConflictMessage(result),
-          conflict: result.conflict,
-          outsideWorkingHours: result.outsideWorkingHours,
-          workingHours: result.workingHours,
+          error: "Validation failed",
+          details: [
+            {
+              code: "custom",
+              path: ["eventDate"],
+              message: error.message,
+            },
+          ],
+        },
+        { status: error.status },
+      );
+    }
+    if (error instanceof BookingPartnerAccountError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    if (error instanceof BookingTargetUnavailableError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+    if (error instanceof PublicVenueScopeWriteError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
+    if (error instanceof EventPlanBookingWriteError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    if (error instanceof PlanBookingConflictError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
+    if (error instanceof ArtistAvailabilityWriteError) {
+      const { formatConflictMessage } =
+        await import("@/lib/booking/availability");
+      return NextResponse.json(
+        {
+          error: formatConflictMessage(error.result),
+          conflict: error.result.conflict,
+          outsideWorkingHours: error.result.outsideWorkingHours,
+          workingHours: error.result.workingHours,
         },
         { status: 409 },
       );
     }
+    if (error instanceof VenueAvailabilityError) {
+      const payload: Record<string, unknown> = {
+        error: error.result.message || error.result.code,
+        code: error.result.code,
+      };
+      if (error.result.code === "HALL_REQUIRED") payload.code = "HALL_REQUIRED";
+      return NextResponse.json(payload, { status: error.status });
+    }
+    throw error;
   }
 
-  // Venue availability check — working hours + conflicts.
-  let booking;
+  const booking = creation.booking;
 
-  if (parsed.data.venueId) {
-    const publicScope = publicVenueReservationScope({
-      hallId,
-      reservationScope: parsed.data.reservationScope,
-    });
-    if (!publicScope.ok) {
-      return NextResponse.json(
-        { error: publicScope.error, code: publicScope.code },
-        { status: publicScope.status },
-      );
-    }
-    const { withVenueAvailabilityWrite, VenueAvailabilityError } = await import(
-      "@/lib/booking/venue-booking-write"
-    );
-    try {
-      booking = await withVenueAvailabilityWrite(
-        {
-          venueId: parsed.data.venueId,
-          hallId: publicScope.hallId,
-          guestCount: parsed.data.guestCount,
-          eventDate: parsed.data.eventDate,
-          startTime: parsed.data.startTime,
-          endTime: parsed.data.endTime,
-          reservationScope: publicScope.reservationScope,
-          mode: "public",
-        },
-        async (tx, available) => {
-          const [row] = await tx.insert(bookingRequests).values({
-            ...bookingBase,
-            eventPlanId: eventPlanId ?? null,
-            clientUserId: clientUserId ?? null,
-            agreedPrice: agreedPrice ?? null,
-            hallId: available.hallId,
-            reservationScope: publicScope.reservationScope,
-            startsAt: available.interval?.startsAt ?? null,
-            endsAt: available.interval?.endsAt ?? null,
-            timezone: available.interval?.timezone ?? null,
-            status: "pending",
-          }).returning();
-          return row;
-        },
-      );
-    } catch (error) {
-      if (error instanceof VenueAvailabilityError) {
-        const payload: Record<string, unknown> = {
-          error: error.result.message || error.result.code,
-          code: error.result.code,
-        };
-        if (error.result.code === "HALL_REQUIRED") payload.code = "HALL_REQUIRED";
-        return NextResponse.json(payload, { status: error.status });
-      }
-      throw error;
-    }
-  } else {
-    const [row] = await db.insert(bookingRequests).values({
-      ...bookingBase,
-      eventPlanId: eventPlanId ?? null,
-      clientUserId: clientUserId ?? null,
-      agreedPrice: agreedPrice ?? null,
-      hallId: parsed.data.hallId ?? hallId ?? null,
-      reservationScope: parsed.data.venueId ? "hall" : null,
-      startsAt: null,
-      endsAt: null,
-      timezone: null,
-      status: "pending",
-    }).returning();
-    booking = row;
-  }
+  // The durable coordinator was committed atomically by the shared writer.
+  // Run the fast path for creates and replays alike: replay safely pulls a
+  // failed/pending row forward while the outbox lease prevents duplication.
+  after(() => dispatchBookingCreationEffects(creation));
 
-  // Also create offer request for admin
-  await db.insert(offerRequests).values({
-    artistId: parsed.data.artistId,
-    clientName: parsed.data.clientName,
-    clientPhone: parsed.data.clientPhone,
-    clientEmail: parsed.data.clientEmail,
-    eventType: parsed.data.eventType,
-    eventDate: parsed.data.eventDate,
-    message: parsed.data.message,
-    status: "new",
+  const response = NextResponse.json(bookingCreateResponse(booking), {
+    status: creation.created ? 201 : 200,
   });
-
-  // M5 — fire-and-forget notifications. Looks up the vendor owner (artist
-  // or venue) so the dashboard bell lights up immediately.
-  after(async () => {
-    try {
-      let artist: {
-        userId: string | null;
-        nameRo: string;
-        slug: string;
-        email: string | null;
-        autoReplyEnabled: boolean;
-        autoReplyMessage: string | null;
-      } | null = null;
-      let venueRecipients: VenueNotificationRecipient[] = [];
-      let dashboardUrl = "/dashboard/rezervari";
-
-      if (parsed.data.artistId) {
-        const [a] = await db
-          .select({
-            userId: artists.userId,
-            nameRo: artists.nameRo,
-            slug: artists.slug,
-            email: artists.email,
-            autoReplyEnabled: artists.autoReplyEnabled,
-            autoReplyMessage: artists.autoReplyMessage,
-          })
-          .from(artists)
-          .where(eq(artists.id, parsed.data.artistId))
-          .limit(1);
-        artist = a ?? null;
-      } else if (parsed.data.venueId) {
-        const { venues } = await import("@/lib/db/schema");
-        const [v] = await db
-          .select({
-            userId: venues.userId,
-            nameRo: venues.nameRo,
-            slug: venues.slug,
-            email: venues.email,
-            autoReplyEnabled: venues.autoReplyEnabled,
-            autoReplyMessage: venues.autoReplyMessage,
-          })
-          .from(venues)
-          .where(eq(venues.id, parsed.data.venueId))
-          .limit(1);
-        if (v) {
-          artist = {
-            userId: v.userId,
-            nameRo: v.nameRo,
-            slug: v.slug,
-            email: v.email,
-            autoReplyEnabled: v.autoReplyEnabled,
-            autoReplyMessage: v.autoReplyMessage,
-          };
-          venueRecipients = await getVenueOwnerRecipients(parsed.data.venueId);
-          dashboardUrl = "/dashboard/sala/rezervari";
-        }
-      }
-
-      const vendorRecipients = parsed.data.venueId
-        ? venueRecipients
-        : artist?.userId
-          ? [{ userId: artist.userId, email: artist.email }]
-          : [];
-
-      if (artist && vendorRecipients.length > 0) {
-        const timePart = parsed.data.startTime
-          ? ` · ${parsed.data.startTime}${parsed.data.endTime ? `–${parsed.data.endTime}` : ""}`
-          : "";
-        await Promise.all(vendorRecipients.map((recipient) => dispatchNotification({
-          userId: recipient.userId,
-          type: "booking_request_new",
-          title: "Cerere nouă de rezervare",
-          message: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} · ${parsed.data.eventDate}${timePart}`,
-          actionUrl: dashboardUrl,
-        })));
-        // Mobile push (fire-and-forget). The mobile app's push tap
-        // handler reads `data.kind` and routes to the inbox with the
-        // booking expanded.
-        for (const recipient of vendorRecipients) {
-          void sendPushToUser({
-            userId: recipient.userId,
-            title: "Cerere nouă de rezervare",
-            body: `${parsed.data.clientName} — ${parsed.data.eventType ?? "Eveniment"} pe ${parsed.data.eventDate}`,
-            data: { kind: "booking_new", id: booking.id },
-          });
-        }
-
-        // Spec 2.8 — pending-conflict alert: if 2+ pending requests now
-        // exist on the same (venue/artist, date), flag it so the vendor
-        // knows to triage quickly. We only fire this extra notification
-        // when the new request itself is the second (or later) competitor.
-        try {
-          const pendingCond = [
-            eq(bookingRequests.status, "pending"),
-            eq(bookingRequests.eventDate, parsed.data.eventDate),
-          ];
-          if (parsed.data.venueId) {
-            pendingCond.push(eq(bookingRequests.venueId, parsed.data.venueId));
-          } else if (parsed.data.artistId) {
-            pendingCond.push(
-              eq(bookingRequests.artistId, parsed.data.artistId),
-            );
-          }
-          const siblings = await db
-            .select({
-              id: bookingRequests.id,
-              clientName: bookingRequests.clientName,
-            })
-            .from(bookingRequests)
-            .where(and(...pendingCond));
-          // Ignore the just-inserted request — compare other pending ones.
-          const others = siblings.filter((s) => s.id !== booking.id);
-          if (others.length > 0) {
-            // Also check if the date is already blocked by an accepted/confirmed
-            // booking — that's a harder conflict.
-            const confirmedCond = [
-              inArray(bookingRequests.status, [
-                "accepted",
-                "confirmed_by_client",
-              ]),
-              eq(bookingRequests.eventDate, parsed.data.eventDate),
-            ];
-            if (parsed.data.venueId) {
-              confirmedCond.push(
-                eq(bookingRequests.venueId, parsed.data.venueId),
-              );
-            } else if (parsed.data.artistId) {
-              confirmedCond.push(
-                eq(bookingRequests.artistId, parsed.data.artistId),
-              );
-            }
-            const confirmed = await db
-              .select({ id: bookingRequests.id })
-              .from(bookingRequests)
-              .where(and(...confirmedCond));
-
-            const totalCompeting = others.length + confirmed.length;
-            await Promise.all(vendorRecipients.map((recipient) => dispatchNotification({
-              userId: recipient.userId,
-              type: "booking_conflict",
-              title: `⚠️ Conflict potențial pe ${parsed.data.eventDate}`,
-              message:
-                confirmed.length > 0
-                  ? `Ai deja o rezervare confirmată pe această dată + ${others.length + 1} cereri tentative.`
-                  : `${totalCompeting + 1} cereri tentative pe aceeași dată. Acceptă pe cea mai potrivită.`,
-              actionUrl: `${dashboardUrl}?date=${parsed.data.eventDate}`,
-            })));
-
-            // Loop in admins too — they mediate conflicts between vendor and clients.
-            void dispatchToAdmins({
-              type: "admin_lead_conflict",
-              title: "Conflict potențial la rezervare",
-              message: `${artist.nameRo ?? "Vendor"} — data ${parsed.data.eventDate} are ${totalCompeting + 1} cereri.`,
-              actionUrl: "/admin/cereri-oferte",
-            }).catch(() => {
-              /* non-blocking */
-            });
-          }
-        } catch (err) {
-          console.error("[booking conflict] check failed", err);
-        }
-      }
-      const { notificationEmail } = await import("@/lib/email/templates/notification-email");
-      await dispatchToAdmins({
-        type: "admin_lead_new",
-        title: "Cerere nouă în CRM",
-        message: `${parsed.data.clientName} — ${artist?.nameRo ?? "artist"}`,
-        actionUrl: "/admin/cereri-oferte",
-        emailSubject: `🔔 Cerere nouă: ${parsed.data.clientName} → ${artist?.nameRo ?? "artist"}`,
-        emailHtml: notificationEmail({
-          title: "Cerere Nouă de Rezervare",
-          message: `<strong>${parsed.data.clientName}</strong> a trimis o cerere pentru <strong>${artist?.nameRo ?? "artist"}</strong>.<br>Eveniment: ${parsed.data.eventType ?? "Nespecificat"} · Data: ${parsed.data.eventDate}${parsed.data.startTime ? ` · Ora: ${parsed.data.startTime}${parsed.data.endTime ? `–${parsed.data.endTime}` : ""}` : ""}`,
-          ctaUrl: "https://epetrecere.md/admin/cereri-oferte",
-          ctaText: "Deschide în CRM →",
-          emoji: "🔔",
-        }),
-      });
-
-      // Email the artist about the new booking request
-      const vendorEmails = parsed.data.venueId
-        ? [...new Set(venueRecipients.map((recipient) => recipient.email).filter(Boolean))]
-        : artist?.email
-          ? [artist.email]
-          : [];
-      for (const vendorEmail of vendorEmails) {
-        try {
-          await sendEmail({
-            to: vendorEmail!,
-            subject: `Cerere nouă de rezervare de la ${parsed.data.clientName}`,
-            html: bookingRequestNewEmail({
-              vendorName: artist?.nameRo ?? "Partener",
-              clientName: parsed.data.clientName,
-              eventType: parsed.data.eventType ?? null,
-              eventDate: parsed.data.eventDate ?? null,
-              startTime: parsed.data.startTime ?? null,
-              endTime: parsed.data.endTime ?? null,
-              message: parsed.data.message ?? null,
-            }),
-          });
-        } catch (mailErr) {
-          console.error("[booking-email] artist notification failed", mailErr);
-        }
-      }
-
-      // Feature 14 — auto-reply: dacă artistul a activat mesajul automat și
-      // clientul a lăsat un email, îi trimitem instant confirmarea primirii.
-      if (
-        artist?.autoReplyEnabled &&
-        artist.autoReplyMessage &&
-        parsed.data.clientEmail
-      ) {
-        try {
-          const artistName = artist.nameRo ?? "artist";
-          const safeMessage = artist.autoReplyMessage
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/\n/g, "<br/>");
-          await sendEmail({
-            to: parsed.data.clientEmail,
-            subject: `Cererea ta către ${artistName} a fost primită`,
-            html: `
-              <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#111">
-                <h2 style="margin:0 0 16px;font-size:20px">Salut ${parsed.data.clientName},</h2>
-                <p style="margin:0 0 16px;line-height:1.5">Îți mulțumim pentru cerere! Mesaj din partea <strong>${artistName}</strong>:</p>
-                <div style="padding:16px;border-left:4px solid #d4a574;background:#fafafa;margin:0 0 16px;line-height:1.5">${safeMessage}</div>
-                <p style="margin:0 0 8px;color:#666;font-size:13px">Data evenimentului: ${parsed.data.eventDate}</p>
-                <p style="margin:0;color:#666;font-size:13px">Acest mesaj a fost generat automat de ePetrecere.md</p>
-              </div>
-            `,
-          });
-        } catch (mailErr) {
-          console.error("[auto-reply] failed", mailErr);
-        }
-      }
-    } catch (err) {
-      console.error("[notifications] booking-request POST", err);
-    }
-  });
-
-  return NextResponse.json(booking, { status: 201 });
+  if (!creation.created) response.headers.set("Idempotency-Replayed", "true");
+  return response;
 }

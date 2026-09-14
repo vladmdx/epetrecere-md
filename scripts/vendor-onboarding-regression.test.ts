@@ -38,6 +38,21 @@ test("unknown admin action cannot fall through into destructive rejection", () =
   }
 });
 
+test("same-name artist registrations claim a unique slug inside the serialized write", () => {
+  const source = readFileSync("src/app/api/auth/register-artist/route.ts", "utf8");
+  const claimStart = source.indexOf("claimArtistRegistrationInDatabase({");
+  const claimEnd = source.indexOf("if (!claimed.ok)", claimStart);
+  assert.ok(claimStart >= 0 && claimEnd > claimStart);
+  const claimBody = source.slice(claimStart, claimEnd);
+  assert.match(claimBody, /pickUniqueSlug\(data\.name/);
+  assert.match(claimBody, /await executor[\s\S]*\.from\(artists\)/);
+  assert.match(
+    claimBody,
+    /\.insert\(artists\)[\s\S]*\.onConflictDoNothing\(\{ target: artists\.slug \}\)[\s\S]*\.returning\(\)/,
+  );
+  assert.doesNotMatch(source.slice(0, claimStart), /pickUniqueSlug\(data\.name/);
+});
+
 test("partner event types are canonical, ordered and backward compatible", () => {
   assert.deepEqual(normalizeArtistEventTypes(null), ALL_EVENT_TYPES);
   assert.deepEqual(
@@ -49,17 +64,20 @@ test("partner event types are canonical, ordered and backward compatible", () =>
 
 test("a duplicate onboarding phone returns to the editable field instead of trapping a signed request", () => {
   const artist = readFileSync("src/app/[locale]/(vendor)/dashboard/onboarding/page.tsx", "utf8");
-  const venue = readFileSync("src/app/[locale]/(vendor)/dashboard/venue-onboarding/page.tsx", "utf8");
+  const venue = readFileSync("src/app/[locale]/(vendor)/dashboard/venue-onboarding/legacy-client.tsx", "utf8");
   const artistRoute = readFileSync("src/app/api/auth/register-artist/route.ts", "utf8");
   const venueRoute = readFileSync("src/app/api/auth/register-venue/route.ts", "utf8");
+  const roleClaims = readFileSync("src/lib/auth/select-role.ts", "utf8");
 
   assert.match(artist, /phone: data\.phone/);
   assert.match(artist, /err\.code === "phone_in_use"[\s\S]*setStep\(1\)/);
   assert.match(artist, /ref=\{phoneInputRef\}/);
   assert.match(venue, /err\.code === "phone_in_use"[\s\S]*setStep\(0\)/);
   assert.match(venue, /ref=\{phoneInputRef\}/);
-  assert.match(artistRoute, /code: "phone_in_use"/);
-  assert.match(venueRoute, /code: "phone_in_use"/);
+  assert.match(artistRoute, /claimed\.code === "PHONE_IN_USE" \? "phone_in_use"/);
+  assert.match(venueRoute, /claimed\.code === "PHONE_IN_USE" \? "phone_in_use"/);
+  assert.match(roleClaims, /claimArtistRegistrationInDatabase[\s\S]*normalizedPhone/);
+  assert.match(roleClaims, /claimLegacyVenueRegistrationInDatabase[\s\S]*normalizedPhone/);
 });
 
 test("artist price selectors use only the event types selected by the partner", () => {

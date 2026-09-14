@@ -1,7 +1,13 @@
 import { db } from "@/lib/db";
 import { calendarEvents } from "@/lib/db/schema";
-import { eq, and, gte, lte, inArray, isNull } from "drizzle-orm";
+import { eq, and, gte, lte, inArray } from "drizzle-orm";
 import type { EntityType, CalendarStatus } from "@/types";
+import {
+  normalizeCalendarDates,
+  replaceManagedCalendarEvents,
+  type ManagedCalendarReplacementOptions,
+  type ManagedCalendarSource,
+} from "@/lib/booking/calendar-write";
 
 export async function getCalendarEvents(
   entityType: EntityType,
@@ -37,36 +43,19 @@ export async function setCalendarEvent(
   entityId: number,
   date: string,
   status: CalendarStatus,
-  source: "manual" | "google_sync" | "booking" = "manual",
+  source: ManagedCalendarSource = "manual",
   note?: string,
   eventType?: string | null,
 ) {
-  // Upsert: delete existing + insert new
-  await db
-    .delete(calendarEvents)
-    .where(
-      and(
-        eq(calendarEvents.entityType, entityType),
-        eq(calendarEvents.entityId, entityId),
-        eq(calendarEvents.date, date),
-        eq(calendarEvents.source, "manual"),
-      ),
-    );
-
-  if (status === "available") {
-    // Available = no record in the DB; deleting was enough.
-    return;
-  }
-
-  await db.insert(calendarEvents).values({
+  return bulkSetCalendarEvents(
     entityType,
     entityId,
-    date,
+    [date],
     status,
     source,
     note,
-    eventType: eventType ?? null,
-  });
+    eventType,
+  );
 }
 
 export async function bulkSetCalendarEvents(
@@ -74,39 +63,34 @@ export async function bulkSetCalendarEvents(
   entityId: number,
   dates: string[],
   status: CalendarStatus,
-  source: "manual" | "google_sync" | "booking" = "manual",
+  source: ManagedCalendarSource = "manual",
   note?: string | null,
   eventType?: string | null,
+  options: ManagedCalendarReplacementOptions = {},
 ) {
-  if (!dates.length) return;
-
-  // Delete only this source's unscoped venue/artist rows. Never touch
-  // booking projections (different source) or hall-scoped calendar rows.
-  await db
-    .delete(calendarEvents)
-    .where(
-      and(
-        eq(calendarEvents.entityType, entityType),
-        eq(calendarEvents.entityId, entityId),
-        inArray(calendarEvents.date, dates),
-        eq(calendarEvents.source, source),
-        isNull(calendarEvents.hallId),
-      ),
-    );
-
-  if (status === "available") return;
-
-  await db.insert(calendarEvents).values(
-    dates.map((date) => ({
-      entityType,
-      entityId,
-      date,
-      status,
-      source,
-      note: note ?? null,
-      eventType: eventType ?? null,
-    })),
-  );
+  const normalizedDates = normalizeCalendarDates(dates, {
+    maxDates: 366,
+    rejectDuplicates: true,
+  });
+  return replaceManagedCalendarEvents({
+    entities: [{ entityType, entityId }],
+    dates: normalizedDates,
+    source,
+    // Available means absence of this managed-source projection. Booking and
+    // hall-scoped rows remain untouched by the replacement helper.
+    rows:
+      status === "available"
+        ? []
+        : normalizedDates.map((date) => ({
+            entityType,
+            entityId,
+            date,
+            status,
+            source,
+            note: note ?? null,
+            eventType: eventType ?? null,
+          })),
+  }, options);
 }
 
 /** Get entity IDs that are booked/blocked on a given date (unavailable) */

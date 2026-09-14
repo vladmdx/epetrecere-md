@@ -3,46 +3,30 @@
 
 import { NextResponse } from "next/server";
 import { z } from "zod/v4";
-import { db } from "@/lib/db";
-import { venueImages } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
-import { requireVenueCapability } from "@/lib/venue-access";
+import { getCurrentAppUser } from "@/lib/venue-access";
+import {
+  deleteVenueImage,
+  updateVenueImage,
+  type VenueImageWriteFailure,
+} from "@/lib/partner/venue-image-writes";
 
-const updateSchema = z.object({
-  altRo: z.string().max(500).nullable().optional(),
-  altRu: z.string().max(500).nullable().optional(),
-  altEn: z.string().max(500).nullable().optional(),
-  sortOrder: z.number().int().min(0).max(10_000).optional(),
-  isCover: z.boolean().optional(),
-});
+const updateSchema = z
+  .object({
+    altRo: z.string().max(500).nullable().optional(),
+    altRu: z.string().max(500).nullable().optional(),
+    altEn: z.string().max(500).nullable().optional(),
+    sortOrder: z.number().int().min(0).max(10_000).optional(),
+    isCover: z.boolean().optional(),
+  })
+  .refine((patch) => Object.keys(patch).length > 0, {
+    message: "At least one field is required",
+  });
 
-// ADR 0028 — resolve the image, then authorize via its venue's membership
-// chain (legacy venues.user_id fallback + global-admin bypass inside
-// requireVenueAccess). A forged image id from another org is rejected.
-async function loadOwnedImage(imageId: number) {
-  const [row] = await db
-    .select({
-      imageId: venueImages.id,
-      venueId: venueImages.venueId,
-    })
-    .from(venueImages)
-    .where(eq(venueImages.id, imageId))
-    .limit(1);
-
-  if (!row) {
-    return { ok: false as const, status: 404, error: "Not found" };
-  }
-
-  const access = await requireVenueCapability(row.venueId, "manage_profile");
-  if (!access.ok) {
-    return { ok: false as const, status: access.status, error: access.error };
-  }
-
-  return {
-    ok: true as const,
-    imageId: row.imageId,
-    venueId: row.venueId,
-  };
+function writeFailureResponse(result: VenueImageWriteFailure) {
+  return NextResponse.json(
+    { error: result.error, code: result.code },
+    { status: result.status },
+  );
 }
 
 export async function PUT(
@@ -51,7 +35,7 @@ export async function PUT(
 ) {
   const { id } = await params;
   const imageId = Number(id);
-  if (!Number.isFinite(imageId)) {
+  if (!Number.isInteger(imageId) || imageId <= 0) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
@@ -64,31 +48,16 @@ export async function PUT(
     );
   }
 
-  const owner = await loadOwnedImage(imageId);
-  if (!owner.ok) {
-    return NextResponse.json({ error: owner.error }, { status: owner.status });
+  const actor = await getCurrentAppUser();
+  if (!actor) {
+    return NextResponse.json(
+      { error: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 },
+    );
   }
-
-  // Cover invariant — only one image per venue can be the cover.
-  if (parsed.data.isCover === true) {
-    await db
-      .update(venueImages)
-      .set({ isCover: false })
-      .where(eq(venueImages.venueId, owner.venueId));
-  }
-
-  await db
-    .update(venueImages)
-    .set(parsed.data)
-    .where(eq(venueImages.id, imageId));
-
-  const [updated] = await db
-    .select()
-    .from(venueImages)
-    .where(eq(venueImages.id, imageId))
-    .limit(1);
-
-  return NextResponse.json(updated);
+  const result = await updateVenueImage(actor.id, imageId, parsed.data);
+  if (!result.ok) return writeFailureResponse(result);
+  return NextResponse.json(result.image);
 }
 
 export async function DELETE(
@@ -97,15 +66,18 @@ export async function DELETE(
 ) {
   const { id } = await params;
   const imageId = Number(id);
-  if (!Number.isFinite(imageId)) {
+  if (!Number.isInteger(imageId) || imageId <= 0) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
 
-  const owner = await loadOwnedImage(imageId);
-  if (!owner.ok) {
-    return NextResponse.json({ error: owner.error }, { status: owner.status });
+  const actor = await getCurrentAppUser();
+  if (!actor) {
+    return NextResponse.json(
+      { error: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 },
+    );
   }
-
-  await db.delete(venueImages).where(eq(venueImages.id, imageId));
+  const result = await deleteVenueImage(actor.id, imageId);
+  if (!result.ok) return writeFailureResponse(result);
   return NextResponse.json({ success: true });
 }

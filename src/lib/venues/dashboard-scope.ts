@@ -109,5 +109,10 @@ export async function requireLocatieVenue(
   }
   const venue = await loadAuthorizedDashboardVenue(venueId);
   if (!venue) redirect(localizePath("/dashboard/locatii", locale));
+  if (isMultiHallEnabled() && venue.organizationId == null) {
+    redirect(
+      `${localizePath("/dashboard/venue-onboarding", locale)}?venueId=${venue.id}`,
+    );
+  }
   return venue;
 }

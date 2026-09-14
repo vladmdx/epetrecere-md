@@ -90,7 +90,7 @@ export default function VendorPackagesPage() {
           setLoading(false);
           return;
         }
-        const r = await fetch(`/api/auth/check-role?email=${encodeURIComponent(email)}`);
+        const r = await fetch("/api/auth/check-role", { cache: "no-store" });
         const data = await r.json();
         setArtistId(data.artistId ?? null);
       } catch {

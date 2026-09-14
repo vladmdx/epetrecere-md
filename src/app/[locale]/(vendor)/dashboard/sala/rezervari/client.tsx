@@ -57,7 +57,6 @@ interface Booking {
   id: number;
   venueId: number | null;
   eventPlanId: number | null;
-  clientUserId: string | null;
   clientName: string;
   clientPhone: string | null;
   clientEmail: string | null;

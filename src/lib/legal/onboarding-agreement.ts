@@ -31,6 +31,26 @@ interface EvidenceRow extends SignedDocumentEvidence {
   acceptanceSessionId?: string | null;
 }
 
+function sameSigningEvidence(first: EvidenceRow, row: EvidenceRow): boolean {
+  const firstDate = new Date(first.acceptedAt);
+  const rowDate = new Date(row.acceptedAt);
+  return (
+    !Number.isNaN(firstDate.getTime()) &&
+    !Number.isNaN(rowDate.getTime()) &&
+    firstDate.toISOString() === rowDate.toISOString() &&
+    row.subjectType === first.subjectType &&
+    row.locale === first.locale &&
+    row.signatureName === first.signatureName &&
+    row.signatureImage === first.signatureImage &&
+    row.partnerType === first.partnerType &&
+    row.legalName === first.legalName &&
+    row.idNumber === first.idNumber &&
+    row.legalAddress === first.legalAddress &&
+    row.representativeName === first.representativeName &&
+    row.representativeRole === first.representativeRole
+  );
+}
+
 /** Only a complete, coherent, current signing session can resume onboarding.
  * Never combine separate signatures, parties or languages into a new pack.
  * The caller must scope rows to the authenticated account before using this.
@@ -54,6 +74,7 @@ export function onboardingAgreementStatus(rows: EvidenceRow[], subjectType: "art
   for (const session of ordered) {
     if (missingCurrentDocuments(session, subjectType).length) continue;
     const first = session[0];
+    if (!session.every((row) => sameSigningEvidence(first, row))) continue;
     if (!first.signatureImage || first.signatureImage.length > 400_000 ||
       !/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(first.signatureImage)) continue;
     if (first.locale !== "ro" && first.locale !== "ru" && first.locale !== "en") continue;
@@ -86,7 +107,17 @@ export function onboardingAgreementStatus(rows: EvidenceRow[], subjectType: "art
       },
     };
   }
-  // Existing current-version rows occupy immutable unique keys. Re-signing
-  // cannot repair an incomplete/legacy pack; an administrator must review it.
+  // A session which never acquired every required document is recoverable:
+  // keep its rows as evidence, show a fresh signature form, and let the atomic
+  // writer append one complete session. Never merge partial attempts here.
+  const hasFullLookingSession = ordered.some((session) =>
+    required.every((slug) => session.some((row) => row.documentSlug === slug)),
+  );
+  if (ordered.length > 0 && !hasFullLookingSession) {
+    return { status: "unsigned", agreement: null };
+  }
+  // No coherent complete session exists. Callers may keep this blocked in the
+  // UI: all required slugs appear to exist, but integrity, identity or signing
+  // coherence failed and must not be silently presented as an ordinary retry.
   return { status: "blocked", agreement: null };
 }

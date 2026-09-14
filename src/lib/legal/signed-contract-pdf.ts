@@ -13,11 +13,17 @@ import {
   type RGB,
   rgb,
 } from "pdf-lib";
-import { getLegalDocument } from "@/lib/legal";
+import {
+  legalPackManifestForEvidence,
+} from "@/lib/legal/pack-manifest";
 
 export interface SignedContractEvidence {
   id: number;
   userId?: string | null;
+  artistId?: number | null;
+  venueId?: number | null;
+  organizationId?: number | null;
+  acceptanceSessionId?: string | null;
   subjectType: string;
   documentSlug: string;
   documentVersion: string;
@@ -207,10 +213,13 @@ function acceptedIso(row: SignedContractEvidence): string {
   return date.toISOString();
 }
 
-export function signedContractSessionKey(row: SignedContractEvidence): string {
+function signedContractEvidenceKey(row: SignedContractEvidence): string {
   const signatureHash = createHash("sha256").update(row.signatureImage ?? "").digest("hex");
   return JSON.stringify([
     row.userId ?? null,
+    row.artistId ?? null,
+    row.venueId ?? null,
+    row.organizationId ?? null,
     row.subjectType,
     row.packVersion,
     row.locale,
@@ -223,7 +232,18 @@ export function signedContractSessionKey(row: SignedContractEvidence): string {
     row.legalAddress,
     row.representativeName,
     row.representativeRole,
+    row.email,
+    row.phone,
+    row.ipAddress,
+    row.userAgent,
+    row.deviceSummary,
   ]);
+}
+
+export function signedContractSessionKey(row: SignedContractEvidence): string {
+  return row.acceptanceSessionId
+    ? `session:${row.acceptanceSessionId}`
+    : `legacy:${signedContractEvidenceKey(row)}`;
 }
 
 export function signedContractPdfFilename(row: Pick<SignedContractEvidence, "id" | "subjectType">): string {
@@ -231,10 +251,24 @@ export function signedContractPdfFilename(row: Pick<SignedContractEvidence, "id"
   return `epetrecere-contract-${subject}-${row.id}.pdf`;
 }
 
-function normalizeAndValidate(rows: SignedContractEvidence[]): SignedContractEvidence[] {
+export function validateSignedContractSession(
+  rows: SignedContractEvidence[],
+): SignedContractEvidence[] {
   if (!rows.length) throw new SignedContractPdfError("incomplete_session");
   const key = signedContractSessionKey(rows[0]);
   if (!rows.every((row) => signedContractSessionKey(row) === key)) {
+    throw new SignedContractPdfError("incomplete_session");
+  }
+  const evidenceKey = signedContractEvidenceKey(rows[0]);
+  if (!rows.every((row) => signedContractEvidenceKey(row) === evidenceKey)) {
+    throw new SignedContractPdfError("incomplete_session");
+  }
+  const manifest = legalPackManifestForEvidence(
+    rows[0].packVersion,
+    rows[0].subjectType,
+    rows,
+  );
+  if (!manifest) {
     throw new SignedContractPdfError("incomplete_session");
   }
   if (!rows[0].signatureImage?.startsWith("data:image/png;base64,")) {
@@ -249,11 +283,13 @@ function normalizeAndValidate(rows: SignedContractEvidence[]): SignedContractEvi
       .digest("hex");
     if (actual !== row.contentHash) throw new SignedContractPdfError("invalid_snapshot");
   }
-  return [...rows].sort((a, b) => {
-    const ao = getLegalDocument(a.documentSlug)?.order ?? Number.MAX_SAFE_INTEGER;
-    const bo = getLegalDocument(b.documentSlug)?.order ?? Number.MAX_SAFE_INTEGER;
-    return ao - bo || a.id - b.id;
-  });
+  const order = new Map(manifest.map((document, index) => [document.slug, index]));
+  return [...rows].sort(
+    (a, b) =>
+      (order.get(a.documentSlug) ?? Number.MAX_SAFE_INTEGER) -
+        (order.get(b.documentSlug) ?? Number.MAX_SAFE_INTEGER) ||
+      a.id - b.id,
+  );
 }
 
 function fontForCharacter(fonts: FontFamily, character: string): PDFFont {
@@ -631,7 +667,7 @@ function drawFooters(document: PDFDocument, fonts: Fonts, reference: string, loc
  * current published legal templates are never substituted for signed text.
  */
 export async function generateSignedContractPdf(input: SignedContractEvidence[]): Promise<Uint8Array> {
-  const rows = normalizeAndValidate(input);
+  const rows = validateSignedContractSession(input);
   const first = rows[0];
   const locale = localeOf(first.locale);
   const acceptedAt = new Date(first.acceptedAt);

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod/v4";
 import { db } from "@/lib/db";
-import { venueImages, venueHalls } from "@/lib/db/schema";
-import { and, asc, eq } from "drizzle-orm";
-import { requireVenueCapability } from "@/lib/venue-access";
-import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
+import { venueImages, venues } from "@/lib/db/schema";
+import { and, asc, eq, isNull } from "drizzle-orm";
+import {
+  authorizeVenueCapability,
+  getCurrentAppUser,
+} from "@/lib/venue-access";
+import {
+  createVenueImage,
+  deleteVenueImage,
+  reorderVenueImages,
+  type VenueImageWriteFailure,
+} from "@/lib/partner/venue-image-writes";
 
 // Venue gallery images CRUD — mirrors /api/artist-images.
 //
@@ -13,7 +21,10 @@ import { jsonIfMultiHallDisabled } from "@/lib/partner/multi-hall-gate";
 
 const createSchema = z.object({
   venueId: z.number().int().positive(),
-  hallId: z.number().int().positive().optional().nullable(),
+  // Hall galleries are submitted only through Hall POST/PATCH so active Hall
+  // edits enter moderation. Keep `null` for old general-gallery clients, but
+  // reject every concrete Hall id here.
+  hallId: z.null().optional(),
   url: z.string().url(),
   altRo: z.string().max(500).optional().nullable(),
   altRu: z.string().max(500).optional().nullable(),
@@ -21,15 +32,11 @@ const createSchema = z.object({
   isCover: z.boolean().default(false),
 });
 
-// ADR 0028 — ownership resolved through the org→venue membership chain
-// (with legacy venues.user_id fallback + global-admin bypass). Return shape is
-// kept so the handlers below are unchanged.
-async function requireVenueOwner(venueId: number) {
-  const access = await requireVenueCapability(venueId, "manage_profile");
-  if (!access.ok) {
-    return { ok: false as const, status: access.status, error: access.error };
-  }
-  return { ok: true as const, userId: access.user.id };
+function writeFailureResponse(result: VenueImageWriteFailure) {
+  return NextResponse.json(
+    { error: result.error, code: result.code },
+    { status: result.status },
+  );
 }
 
 // GET /api/venue-images?venue_id=N — public.
@@ -43,10 +50,48 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid venue_id" }, { status: 400 });
   }
 
+  const [venue] = await db
+    .select({ isActive: venues.isActive })
+    .from(venues)
+    .where(eq(venues.id, venueId))
+    .limit(1);
+  if (!venue) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+  let canViewInactive = false;
+  if (!venue.isActive) {
+    const actor = await getCurrentAppUser();
+    if (!actor) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    const access = await authorizeVenueCapability(actor, venueId, "view_private");
+    if (!access.ok) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    canViewInactive = true;
+  }
+
   const rows = await db
-    .select()
+    .select({
+      id: venueImages.id,
+      venueId: venueImages.venueId,
+      hallId: venueImages.hallId,
+      url: venueImages.url,
+      altRo: venueImages.altRo,
+      altRu: venueImages.altRu,
+      altEn: venueImages.altEn,
+      sortOrder: venueImages.sortOrder,
+      isCover: venueImages.isCover,
+    })
     .from(venueImages)
-    .where(eq(venueImages.venueId, venueId))
+    .innerJoin(venues, eq(venues.id, venueImages.venueId))
+    // This collection powers the venue-level gallery. Hall photos have their
+    // own hall endpoint and must never leak into the general gallery manager.
+    .where(and(
+      eq(venueImages.venueId, venueId),
+      isNull(venueImages.hallId),
+      canViewInactive ? undefined : eq(venues.isActive, true),
+    ))
     .orderBy(asc(venueImages.sortOrder), asc(venueImages.id));
 
   return NextResponse.json(rows);
@@ -63,46 +108,16 @@ export async function POST(req: Request) {
     );
   }
 
-  const owner = await requireVenueOwner(parsed.data.venueId);
-  if (!owner.ok) {
-    return NextResponse.json({ error: owner.error }, { status: owner.status });
+  const actor = await getCurrentAppUser();
+  if (!actor) {
+    return NextResponse.json(
+      { error: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 },
+    );
   }
-
-  if (parsed.data.hallId) {
-    const blocked = jsonIfMultiHallDisabled();
-    if (blocked) return blocked;
-    const [hall] = await db
-      .select({ id: venueHalls.id, venueId: venueHalls.venueId })
-      .from(venueHalls)
-      .where(eq(venueHalls.id, parsed.data.hallId))
-      .limit(1);
-    if (!hall || hall.venueId !== parsed.data.venueId) {
-      return NextResponse.json({ error: "Hall does not belong to this venue" }, { status: 403 });
-    }
-  }
-
-  // Ensure only one cover image at a time.
-  if (parsed.data.isCover) {
-    await db
-      .update(venueImages)
-      .set({ isCover: false })
-      .where(eq(venueImages.venueId, parsed.data.venueId));
-  }
-
-  const [created] = await db
-    .insert(venueImages)
-    .values({
-      venueId: parsed.data.venueId,
-      hallId: parsed.data.hallId ?? null,
-      url: parsed.data.url,
-      altRo: parsed.data.altRo ?? null,
-      altRu: parsed.data.altRu ?? null,
-      altEn: parsed.data.altEn ?? null,
-      isCover: parsed.data.isCover,
-    })
-    .returning();
-
-  return NextResponse.json(created, { status: 201 });
+  const result = await createVenueImage(actor.id, parsed.data);
+  if (!result.ok) return writeFailureResponse(result);
+  return NextResponse.json(result.image, { status: 201 });
 }
 
 // PUT /api/venue-images — bulk reorder. Body: { venueId, items: [{id, sortOrder}] }.
@@ -127,26 +142,15 @@ export async function PUT(req: Request) {
     );
   }
 
-  const owner = await requireVenueOwner(parsed.data.venueId);
-  if (!owner.ok) {
-    return NextResponse.json({ error: owner.error }, { status: owner.status });
+  const actor = await getCurrentAppUser();
+  if (!actor) {
+    return NextResponse.json(
+      { error: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 },
+    );
   }
-
-  // Apply updates sequentially — small sets (< 50 rows), so a Promise.all is
-  // fine and avoids a transaction dependency we don't otherwise need.
-  await Promise.all(
-    parsed.data.items.map((it) =>
-      db
-        .update(venueImages)
-        .set({ sortOrder: it.sortOrder })
-        .where(
-          and(
-            eq(venueImages.id, it.id),
-            eq(venueImages.venueId, parsed.data.venueId),
-          ),
-        ),
-    ),
-  );
+  const result = await reorderVenueImages(actor.id, parsed.data.venueId, parsed.data.items);
+  if (!result.ok) return writeFailureResponse(result);
 
   return NextResponse.json({ success: true });
 }
@@ -159,21 +163,17 @@ export async function DELETE(req: NextRequest) {
   }
 
   const imageId = Number(idParam);
-  const [img] = await db
-    .select({ id: venueImages.id, venueId: venueImages.venueId })
-    .from(venueImages)
-    .where(eq(venueImages.id, imageId))
-    .limit(1);
-
-  if (!img) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!Number.isInteger(imageId) || imageId <= 0) {
+    return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
-
-  const owner = await requireVenueOwner(img.venueId);
-  if (!owner.ok) {
-    return NextResponse.json({ error: owner.error }, { status: owner.status });
+  const actor = await getCurrentAppUser();
+  if (!actor) {
+    return NextResponse.json(
+      { error: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 },
+    );
   }
-
-  await db.delete(venueImages).where(eq(venueImages.id, imageId));
+  const result = await deleteVenueImage(actor.id, imageId);
+  if (!result.ok) return writeFailureResponse(result);
   return NextResponse.json({ success: true });
 }

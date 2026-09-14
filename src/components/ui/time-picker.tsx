@@ -17,6 +17,11 @@ import { createPortal } from "react-dom";
 import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/hooks/use-locale";
+import {
+  minuteIsInDailyWindows,
+  resolveDailyWorkingWindows,
+  type DailyClockRange,
+} from "@/lib/booking/daily-time-windows";
 
 export interface TimePickerProps {
   value: string; // "HH:MM" 24-hour, or "" for empty
@@ -37,6 +42,9 @@ export interface TimePickerProps {
    *   undefined — no restriction (full 0–23 range)
    */
   workingHours?: { start: string; end: string } | null;
+  /** Canonical selected-day windows. Supports a previous overnight spill plus
+   * a later current-day shift; when present it supersedes workingHours. */
+  workingRanges?: DailyClockRange[];
 }
 
 const pad2 = (n: number) => String(n).padStart(2, "0");
@@ -85,6 +93,7 @@ export function TimePicker({
   bookedRanges,
   wholeDayBlocked,
   workingHours,
+  workingRanges,
 }: TimePickerProps) {
   const { t } = useLocale();
   const parsed = parseTime(value);
@@ -172,34 +181,25 @@ export function TimePicker({
 
   // Resolve the working-hours window. null = day off (hide everything).
   // undefined / no value = no restriction (full 0..23 range).
-  const wsWindow = useMemo(() => {
-    if (workingHours === null) return { offDay: true as const };
-    if (workingHours) {
-      const s = parseTime(workingHours.start);
-      const e = parseTime(workingHours.end);
-      if (s && e) {
-        // 00:00 close means midnight (24h)
-        const startMin = s.h * 60 + s.m;
-        const endMinRaw = e.h * 60 + e.m;
-        const endMin = endMinRaw === 0 ? 24 * 60 : endMinRaw;
-        return { offDay: false as const, startMin, endMin };
-      }
-    }
-    return { offDay: false as const, startMin: 0, endMin: 24 * 60 };
-  }, [workingHours]);
+  const wsWindows = useMemo(
+    () => resolveDailyWorkingWindows({ workingHours, workingRanges }),
+    [workingHours, workingRanges],
+  );
+  const offDay = wsWindows.length === 0;
 
   // Hours that contain at least one selectable minute inside the window.
   const allHours = useMemo(() => {
-    if (wsWindow.offDay) return [] as number[];
+    if (offDay) return [] as number[];
     const out: number[] = [];
     for (let h = 0; h < 24; h++) {
       const hStart = h * 60;
       const hEnd = (h + 1) * 60;
       // Hour is visible if any minute of it is inside the window
-      if (hEnd > wsWindow.startMin && hStart < wsWindow.endMin) out.push(h);
+      if (wsWindows.some((window) =>
+        hEnd > window.start && hStart < window.end)) out.push(h);
     }
     return out;
-  }, [wsWindow]);
+  }, [offDay, wsWindows]);
 
   const allMinutes = useMemo(() => {
     const step = Math.max(1, Math.min(30, minuteStep));
@@ -212,16 +212,16 @@ export function TimePicker({
   // currently-active hour. E.g. if window ends at 22:00 and the user is
   // on hour 21, all four minute slots are valid; on hour 22, only :00.
   const allowedMinutesForHour = useMemo(() => {
-    if (wsWindow.offDay) return new Set<number>();
+    if (offDay) return new Set<number>();
     const h = parsed?.h;
     if (h === undefined) return new Set(allMinutes);
     const set = new Set<number>();
     for (const m of allMinutes) {
       const total = h * 60 + m;
-      if (total >= wsWindow.startMin && total < wsWindow.endMin) set.add(m);
+      if (minuteIsInDailyWindows(total, wsWindows)) set.add(m);
     }
     return set;
-  }, [wsWindow, parsed?.h, allMinutes]);
+  }, [offDay, wsWindows, parsed?.h, allMinutes]);
 
   // An hour is fully booked if every minute step inside it is booked.
   const fullyBookedHours = useMemo(() => {
@@ -229,13 +229,14 @@ export function TimePicker({
     const set = new Set<number>();
     if (!bookedRanges?.length) return set;
     for (const h of allHours) {
-      const allMinutesBlocked = allMinutes.every((m) =>
-        isTimeBooked(h, m, bookedRanges),
-      );
+      const selectableMinutes = allMinutes.filter((m) =>
+        minuteIsInDailyWindows(h * 60 + m, wsWindows));
+      const allMinutesBlocked = selectableMinutes.length > 0
+        && selectableMinutes.every((m) => isTimeBooked(h, m, bookedRanges));
       if (allMinutesBlocked) set.add(h);
     }
     return set;
-  }, [allHours, allMinutes, bookedRanges, wholeDayBlocked]);
+  }, [allHours, allMinutes, bookedRanges, wholeDayBlocked, wsWindows]);
 
   // For the currently-selected hour, which minutes are booked OR outside
   // the working-hours window?
@@ -269,12 +270,12 @@ export function TimePicker({
       return;
     }
     // Reject typed times outside the working-hours window or on a day off.
-    if (wsWindow.offDay) {
+    if (offDay) {
       setTyping(value);
       return;
     }
     const totalMin = p.h * 60 + p.m;
-    if (totalMin < wsWindow.startMin || totalMin >= wsWindow.endMin) {
+    if (!minuteIsInDailyWindows(totalMin, wsWindows)) {
       setTyping(value);
       return;
     }
@@ -386,12 +387,9 @@ export function TimePicker({
                 const isBooked = wholeDayBlocked || isTimeBooked(p.h, p.m, bookedRanges);
                 if (isBooked) return null; // hide booked quick picks
                 // Hide quick picks outside working hours
-                if (wsWindow.offDay) return null;
+                if (offDay) return null;
                 const totalMin = p.h * 60 + p.m;
-                if (
-                  totalMin < wsWindow.startMin ||
-                  totalMin >= wsWindow.endMin
-                ) {
+                if (!minuteIsInDailyWindows(totalMin, wsWindows)) {
                   return null;
                 }
                 const selected = displayValue === q;
@@ -426,14 +424,17 @@ export function TimePicker({
                 {t("timePicker.dayFullyBlocked")}
               </div>
             )}
-            {!wholeDayBlocked && wsWindow.offDay && (
+            {!wholeDayBlocked && offDay && (
               <div className="border-t border-border/30 bg-red-500/5 px-3 py-1.5 text-[10px] text-red-600 dark:text-red-400">
                 {t("timePicker.dayOff")}
               </div>
             )}
-            {!wholeDayBlocked && !wsWindow.offDay && workingHours && (
+            {!wholeDayBlocked && !offDay && (workingRanges !== undefined || workingHours) && (
               <div className="border-t border-border/30 bg-emerald-500/5 px-3 py-1.5 text-[10px] text-emerald-600 dark:text-emerald-400">
-                {t("calendar.scheduleLabel")} {workingHours.start}–{workingHours.end}
+                {t("calendar.scheduleLabel")}{" "}
+                {(workingRanges ?? (workingHours ? [workingHours] : []))
+                  .map((range) => `${range.start}–${range.end}`)
+                  .join(", ")}
               </div>
             )}
           </div>,

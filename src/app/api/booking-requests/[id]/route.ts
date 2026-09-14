@@ -2,6 +2,10 @@ import { NextResponse, after } from "next/server";
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { plainText } from "@/lib/content/plain-text";
 import { confirmationTransition } from "@/lib/booking/confirmation";
+import {
+  formatConflictMessage,
+  type AvailabilityResult,
+} from "@/lib/booking/availability";
 import { notifyConfirmationStep, scheduleConfirmationNotifications } from "@/lib/booking/confirmation-effects";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
@@ -9,47 +13,75 @@ import { bookingRequests, artists, users } from "@/lib/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import {
   getVenueOwnerRecipients,
-  requireVenueCapability,
-  type VenueCapability,
 } from "@/lib/venue-access";
+import {
+  BookingMutationBoundaryError,
+  withBookingMutationBoundary,
+  type BookingMutationPrincipal,
+} from "@/lib/booking/booking-mutation-boundary";
+import {
+  CommissionRequiredError,
+  persistConfirmationEffects,
+} from "@/lib/booking/confirmation-persist";
 import { dispatchNotification } from "@/lib/notifications/dispatch";
 import { sendEmail } from "@/lib/email/send";
 import { vendorBookingNotificationPath } from "@/lib/notifications/venue-routing";
-import type { VenueWriteTx } from "@/lib/booking/venue-booking-write";
 import { VenueAvailabilityError } from "@/lib/booking/venue-booking-write";
 import {
+  DEFAULT_VENUE_TZ,
+  localDateInZone,
+} from "@/lib/booking/zoned-interval";
+import {
   BookingChangedError,
-  acceptVenueBooking,
+  casUpdateBookingStatus,
   casClientConfirm,
   casSetPaid,
   clientCancelBooking,
-  confirmBookingWithEffects,
-  rejectBooking,
-  replayConfirmationEffects,
   vendorCancelBooking,
 } from "@/lib/booking/booking-transitions";
 
-/**
- * Raise the platform fee for a booking that has just reached a fee-bearing
- * status. Idempotent (unique index on booking_request_id) and non-blocking:
- * a fee failure must never break the status change the user asked for.
- *
- * Every path into 'confirmed_by_client' or 'completed' must call this. It
- * used to be wired only to the vendor's accept action, so a booking the
- * client confirmed, or one taken straight from accepted to completed, never
- * produced a commission row and simply went missing from the ledger.
- */
-function raiseCommission(bookingId: number): void {
-  after(async () => {
-    try {
-      const { ensureCommissionForBooking } = await import(
-        "@/lib/commissions/service"
-      );
-      await ensureCommissionForBooking(bookingId);
-    } catch (err) {
-      console.error("[commissions] ensure failed for booking", bookingId, err);
-    }
-  });
+function bookingMutationBoundaryResponse(error: unknown) {
+  if (!(error instanceof BookingMutationBoundaryError)) return null;
+  const message = error.code === "unauthorized"
+    ? "Unauthorized"
+    : error.code === "forbidden"
+      ? "Forbidden"
+      : "booking_changed";
+  return NextResponse.json({ error: message }, { status: error.status });
+}
+
+function artistAvailabilityResponse(
+  error: unknown,
+  verb: "accepta" | "confirma",
+) {
+  if (!(error instanceof Error) || error.message !== "artist_unavailable") {
+    return null;
+  }
+  const availability = (error as Error & {
+    availability?: AvailabilityResult;
+  }).availability;
+  return NextResponse.json(
+    {
+      error: `Nu poți ${verb} această rezervare — ` + (
+        availability
+          ? formatConflictMessage(availability).toLowerCase()
+          : "artist_unavailable"
+      ),
+    },
+    { status: 409 },
+  );
+}
+
+function isPastBookingMutation(
+  booking: typeof bookingRequests.$inferSelect,
+  action: string,
+): boolean {
+  if (!booking.eventDate) return false;
+  const today = localDateInZone(
+    new Date(),
+    booking.timezone || DEFAULT_VENUE_TZ,
+  );
+  return booking.eventDate < today && !["complete", "set_paid"].includes(action);
 }
 
 
@@ -95,18 +127,224 @@ export async function PUT(
     .limit(1);
 
   if (!booking) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  let bookingForDeferredEffects = booking;
+  let priceProposalPrincipal: BookingMutationPrincipal | null = null;
 
-  // Past-booking immutability guard (spec). Bookings whose event date is in
-  // the past are read-only — no new status transitions allowed. Exceptions:
-  //   - "complete" is explicitly the post-event action, so we allow it
-  //     regardless of date (a vendor may mark completed a day or week later).
-  //   - "set_paid" is also a post-event accounting action.
-  //   - Cancellation of a past event is not allowed (would strand the data).
-  if (booking.eventDate) {
-    const today = new Date().toISOString().slice(0, 10);
-    const isPast = booking.eventDate < today;
-    const postEventActions = new Set(["complete", "set_paid"]);
-    if (isPast && !postEventActions.has(action)) {
+  if (action === "accept") {
+    let result;
+    try {
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: { mode: "vendor", venueCapability: "manage_bookings" },
+        confirmationAvailability: true,
+        mutate: async ({ executor, booking: current }) => {
+          if (isPastBookingMutation(current, action)) {
+            return { kind: "past" as const };
+          }
+          if (current.status !== "pending") {
+            return { kind: "not_pending" as const };
+          }
+
+          // Resolve the sealed price from the locked row. A counteroffer which
+          // committed while this request waited must be observed here.
+          let finalAgreedPrice: number | undefined =
+            typeof agreedPrice === "number" ? agreedPrice : undefined;
+          if (
+            finalAgreedPrice === undefined
+            && Array.isArray(current.priceOffers)
+            && current.priceOffers.length > 0
+          ) {
+            const lastOffer = current.priceOffers.at(-1) as {
+              amount?: number;
+            } | undefined;
+            if (typeof lastOffer?.amount === "number") {
+              finalAgreedPrice = lastOffer.amount;
+            }
+          }
+          if (finalAgreedPrice === undefined) {
+            finalAgreedPrice = current.agreedPrice ?? undefined;
+          }
+          if (
+            current.artistId
+            && (!finalAgreedPrice || !Number.isSafeInteger(finalAgreedPrice))
+          ) {
+            return { kind: "price_required" as const };
+          }
+
+          const offered = await casUpdateBookingStatus(
+            executor,
+            current.id,
+            ["pending"],
+            {
+              status: "accepted",
+              artistReply:
+                reply || "Oferta este pregătită pentru acceptarea clientului.",
+              ...(finalAgreedPrice !== undefined
+                ? { agreedPrice: finalAgreedPrice }
+                : {}),
+            },
+          );
+          if (!offered) throw new BookingChangedError();
+          return { kind: "accepted" as const, row: offered };
+        },
+      });
+    } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
+      const artistAvailability = artistAvailabilityResponse(error, "accepta");
+      if (artistAvailability) return artistAvailability;
+      if (error instanceof VenueAvailabilityError) {
+        return NextResponse.json(
+          {
+            error: "Nu poți accepta această rezervare — "
+              + (error.result.message || error.result.code).toLowerCase(),
+            code: error.result.code,
+          },
+          { status: error.status },
+        );
+      }
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+      }
+      throw error;
+    }
+    if (result.kind === "past") {
+      return NextResponse.json(
+        { error: "Rezervările din trecut nu mai pot fi modificate." },
+        { status: 400 },
+      );
+    }
+    if (result.kind === "not_pending") {
+      return NextResponse.json(
+        { error: "Doar cererile în așteptare pot fi acceptate" },
+        { status: 409 },
+      );
+    }
+    if (result.kind === "price_required") {
+      return NextResponse.json(
+        { error: "final_offer_price_required" },
+        { status: 400 },
+      );
+    }
+    after(() => notifyConfirmationStep(
+      result.row,
+      "Ofertă primită. Se așteaptă acceptarea clientului",
+    ));
+    return NextResponse.json({ success: true, status: result.row.status });
+  } else if (action === "reject") {
+    let result;
+    try {
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: { mode: "vendor", venueCapability: "manage_bookings" },
+        mutate: async ({ executor, booking: current }) => {
+          if (isPastBookingMutation(current, action)) {
+            return { kind: "past" as const };
+          }
+          const row = await casUpdateBookingStatus(
+            executor,
+            current.id,
+            ["pending"],
+            {
+              status: "rejected",
+              artistReply: reply || "Ne pare rău, nu suntem disponibili.",
+            },
+          );
+          if (!row) throw new BookingChangedError();
+          return { kind: "rejected" as const, row };
+        },
+      });
+    } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "Doar cererile în așteptare pot fi refuzate" }, { status: 409 });
+      }
+      throw error;
+    }
+    if (result.kind === "past") {
+      return NextResponse.json(
+        { error: "Rezervările din trecut nu mai pot fi modificate." },
+        { status: 400 },
+      );
+    }
+    bookingForDeferredEffects = result.row;
+
+  } else if (action === "client_confirm") {
+    // The optimistic row is only a lock plan. Client ownership, vendor tuple,
+    // status and effects are all decided again inside one locked transaction.
+    let result;
+    try {
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: { mode: "client" },
+        confirmationAvailability:
+          booking.artistId != null && booking.status !== "confirmed_by_client",
+        requireLiveVendor: true,
+        mutate: async ({ executor, booking: current }) => {
+          if (isPastBookingMutation(current, action)) {
+            return { kind: "past" as const };
+          }
+          if (current.status === "confirmed_by_client") {
+            const row = await persistConfirmationEffects(executor, current);
+            return { kind: "confirmed" as const, row, awaitingVenue: false };
+          }
+          if (
+            current.status === "accepted"
+            && current.venueId
+            && current.clientConfirmedAt
+          ) {
+            return {
+              kind: "confirmed" as const,
+              row: current,
+              awaitingVenue: true,
+            };
+          }
+          if (current.status !== "accepted") {
+            return { kind: "not_accepted" as const };
+          }
+          const next = confirmationTransition({
+            status: current.status,
+            venue: Boolean(current.venueId),
+            clientConfirmed: Boolean(current.clientConfirmedAt),
+            action,
+          });
+          if (!next) return { kind: "invalid_step" as const };
+          const now = new Date();
+          const updated = await casClientConfirm(executor, current.id, {
+            status:
+              next === "awaiting_venue" ? "accepted" : "confirmed_by_client",
+            clientConfirmedAt: now,
+            confirmedAt: next === "awaiting_venue" ? null : now,
+          });
+          if (!updated) throw new BookingChangedError();
+          const row = next === "awaiting_venue"
+            ? updated
+            : await persistConfirmationEffects(executor, updated);
+          return {
+            kind: "confirmed" as const,
+            row,
+            awaitingVenue: next === "awaiting_venue",
+          };
+        },
+      });
+    } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
+      const artistAvailability = artistAvailabilityResponse(error, "confirma");
+      if (artistAvailability) return artistAvailability;
+      if (error instanceof VenueAvailabilityError) {
+        return NextResponse.json({ error: "venue_unavailable", code: error.result.code }, { status: error.status });
+      }
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+      }
+      throw error;
+    }
+    if (result.kind === "past") {
       return NextResponse.json(
         {
           error:
@@ -115,261 +353,103 @@ export async function PUT(
         { status: 400 },
       );
     }
-  }
-
-  // Ownership helper — resolves whether the signed-in user owns the target
-  // booking's vendor entity (artist OR venue).
-  async function requireBookingVendorAccess(
-    venueCapability: VenueCapability = "manage_bookings",
-  ) {
-    const { userId: clerkId } = await auth();
-    if (!clerkId) {
-      return { ok: false as const, status: 401, error: "Unauthorized" };
-    }
-    const [appUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
-    if (!appUser) {
-      return { ok: false as const, status: 401, error: "Unauthorized" };
-    }
-    // Venue booking — ADR 0028 ownership via the membership chain (IDOR-safe).
-    if (booking.venueId) {
-      const access = await requireVenueCapability(booking.venueId, venueCapability);
-      if (!access.ok) {
-        return { ok: false as const, status: access.status, error: access.error };
-      }
-      return { ok: true as const };
-    }
-    // Artist booking
-    if (booking.artistId) {
-      const [artist] = await db
-        .select({ id: artists.id, userId: artists.userId })
-        .from(artists)
-        .where(eq(artists.id, booking.artistId))
-        .limit(1);
-      if (!artist || artist.userId !== appUser.id) {
-        return { ok: false as const, status: 403, error: "Forbidden" };
-      }
-      return { ok: true as const };
-    }
-    return { ok: false as const, status: 404, error: "Booking has no vendor" };
-  }
-
-  if (action === "accept") {
-    const owner = await requireBookingVendorAccess();
-    if (!owner.ok) {
-      return NextResponse.json({ error: owner.error }, { status: owner.status });
-    }
-    if (booking.status !== "pending") {
-      return NextResponse.json(
-        { error: "Doar cererile în așteptare pot fi acceptate" },
-        { status: 409 },
-      );
-    }
-    // When the artist accepts, they may also declare the final agreed price.
-    // That price flows straight into the event plan's budget.
-    // If they don't specify, but there have been counter-offers, use the
-    // LATEST counter-offer's amount (whichever side proposed it) as the
-    // sealed price — accepting a negotiated booking should honor the
-    // last number on the table, not the original request.
-    let finalAgreedPrice: number | undefined =
-      typeof agreedPrice === "number" && agreedPrice >= 0
-        ? agreedPrice
-        : undefined;
-    if (finalAgreedPrice === undefined && Array.isArray(booking.priceOffers) && booking.priceOffers.length > 0) {
-      const lastOffer = booking.priceOffers[booking.priceOffers.length - 1] as { amount?: number };
-      if (typeof lastOffer?.amount === "number") {
-        finalAgreedPrice = lastOffer.amount;
-      }
-    }
-    if (finalAgreedPrice === undefined) finalAgreedPrice = booking.agreedPrice ?? undefined;
-    if (booking.artistId && (!finalAgreedPrice || !Number.isSafeInteger(finalAgreedPrice))) {
-      return NextResponse.json({ error: "final_offer_price_required" }, { status: 400 });
-    }
-    if (booking.artistId) {
-      try {
-        const { acceptArtistBooking } = await import("@/lib/booking/booking-transitions");
-        const offered = await acceptArtistBooking(booking, {
-          reply,
-          agreedPrice: finalAgreedPrice,
-        });
-        after(() => notifyConfirmationStep(offered, "Ofertă primită. Se așteaptă acceptarea clientului"));
-        return NextResponse.json({ success: true, status: offered.status });
-      } catch (error) {
-        if (error instanceof BookingChangedError) {
-          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-        }
-        if (error instanceof Error && error.message === "artist_unavailable") {
-          const { formatConflictMessage } = await import("@/lib/booking/availability");
-          const availability = (error as Error & { availability?: import("@/lib/booking/availability").AvailabilityResult }).availability;
-          return NextResponse.json(
-            {
-              error: "Nu poți accepta această rezervare — " + (availability ? formatConflictMessage(availability).toLowerCase() : "artist_unavailable"),
-            },
-            { status: 409 },
-          );
-        }
-        throw error;
-      }
-    }
-    if (booking.venueId) {
-      try {
-        const offered = await acceptVenueBooking(booking, {
-          reply,
-          agreedPrice: finalAgreedPrice,
-        });
-        after(() => notifyConfirmationStep(offered, "Ofertă primită. Se așteaptă acceptarea clientului"));
-        return NextResponse.json({ success: true, status: offered.status });
-      } catch (error) {
-        if (error instanceof VenueAvailabilityError) {
-          return NextResponse.json(
-            {
-              error: "Nu poți accepta această rezervare — " + (error.result.message || error.result.code).toLowerCase(),
-              code: error.result.code,
-            },
-            { status: error.status },
-          );
-        }
-        if (error instanceof BookingChangedError) {
-          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-        }
-        throw error;
-      }
-    }
-    const priceUpdate =
-      finalAgreedPrice !== undefined ? { agreedPrice: finalAgreedPrice } : {};
-    const [offered] = await db.update(bookingRequests).set({
-      status: "accepted", artistReply: reply || "Oferta este pregătită pentru acceptarea clientului.",
-      ...priceUpdate, ...(finalAgreedPrice !== undefined ? { agreedPrice: finalAgreedPrice } : {}),
-      updatedAt: new Date(),
-    }).where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "pending"))).returning();
-    if (!offered) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-    after(() => notifyConfirmationStep(offered, "Ofertă primită. Se așteaptă acceptarea clientului"));
-    return NextResponse.json({ success: true, status: offered.status });
-  } else if (action === "reject") {
-    const owner = await requireBookingVendorAccess();
-    if (!owner.ok) {
-      return NextResponse.json({ error: owner.error }, { status: owner.status });
-    }
-    try {
-      await rejectBooking(booking.id, reply);
-    } catch (error) {
-      if (error instanceof BookingChangedError) {
-        return NextResponse.json({ error: "Doar cererile în așteptare pot fi refuzate" }, { status: 409 });
-      }
-      throw error;
-    }
-
-  } else if (action === "client_confirm") {
-    // Only the original client (matched via users.clerkId → clientUserId) may
-    // promote an "accepted" booking to "confirmed_by_client".
-    const { userId: clerkId } = await auth();
-    if (!clerkId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const [appUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
-    if (!appUser || appUser.id !== booking.clientUserId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (booking.status === "confirmed_by_client") {
-      try {
-        const row = await replayConfirmationEffects(booking);
-        return NextResponse.json({ success: true, status: row.status });
-      } catch (error) {
-        if (error instanceof BookingChangedError) {
-          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-        }
-        throw error;
-      }
-    }
-    if (booking.venueId && booking.clientConfirmedAt) {
-      return NextResponse.json({ success: true, status: booking.status, awaitingVenue: true });
-    }
-    if (booking.status !== "accepted") {
+    if (result.kind === "not_accepted") {
       return NextResponse.json(
         { error: "Booking must be accepted by artist first" },
         { status: 409 },
       );
     }
-    const next = confirmationTransition({ status: booking.status, venue: Boolean(booking.venueId), clientConfirmed: Boolean(booking.clientConfirmedAt), action });
-    if (!next) return NextResponse.json({ error: "invalid_confirmation_step" }, { status: 409 });
-    const now = new Date();
-    const applyClientConfirm = async (tx: VenueWriteTx | typeof db) =>
-      casClientConfirm(tx as unknown as typeof db, booking.id, {
-        status: next === "awaiting_venue" ? "accepted" : "confirmed_by_client",
-        clientConfirmedAt: now,
-        confirmedAt: next === "awaiting_venue" ? null : now,
-      });
-    let updated;
-    try {
-      if (next === "awaiting_venue") {
-        updated = await applyClientConfirm(db);
-      } else {
-        updated = await confirmBookingWithEffects(booking, async (tx) => applyClientConfirm(tx));
-      }
-    } catch (error) {
-      if (error instanceof VenueAvailabilityError) {
-        return NextResponse.json({ error: "venue_unavailable", code: error.result.code }, { status: error.status });
-      }
-      if (error instanceof BookingChangedError) {
-        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-      }
-      throw error;
+    if (result.kind === "invalid_step") {
+      return NextResponse.json(
+        { error: "invalid_confirmation_step" },
+        { status: 409 },
+      );
     }
-    if (!updated) {
-      const [current] = await db
-        .select()
-        .from(bookingRequests)
-        .where(eq(bookingRequests.id, booking.id))
-        .limit(1);
-      if (current?.clientConfirmedAt) {
-        return NextResponse.json({
-          success: true,
-          status: current.status,
-          awaitingVenue: Boolean(current.venueId) && current.status === "accepted",
-        });
-      }
-      return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+    if (result.awaitingVenue) {
+      after(() => notifyConfirmationStep(
+        result.row,
+        "Clientul a acceptat oferta. Sala trebuie să confirme rezervarea",
+      ));
+    } else {
+      scheduleConfirmationNotifications(result.row);
     }
-    if (next === "awaiting_venue") after(() => notifyConfirmationStep(updated, "Clientul a acceptat oferta. Sala trebuie să confirme rezervarea"));
-    else scheduleConfirmationNotifications(updated);
-    return NextResponse.json({ success: true, status: updated.status, awaitingVenue: next === "awaiting_venue" });
+    return NextResponse.json({
+      success: true,
+      status: result.row.status,
+      awaitingVenue: result.awaitingVenue,
+    });
   } else if (action === "venue_confirm") {
-    const owner = await requireBookingVendorAccess();
-    if (!owner.ok) return NextResponse.json({ error: owner.error }, { status: owner.status });
-    if (booking.venueId && booking.status === "confirmed_by_client") {
-      try {
-        const row = await replayConfirmationEffects(booking);
-        return NextResponse.json({ success: true, status: row.status });
-      } catch (error) {
-        if (error instanceof BookingChangedError) {
-          return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-        }
-        throw error;
-      }
-    }
-    const next = confirmationTransition({ status: booking.status, venue: Boolean(booking.venueId), clientConfirmed: Boolean(booking.clientConfirmedAt), action });
-    if (!next) return NextResponse.json({ error: "client_acceptance_required" }, { status: 409 });
     const { getCommissionRules } = await import("@/lib/commissions/service");
     const { computeCommission } = await import("@/lib/commissions/rules");
-    if (!computeCommission({ vendorType: "venue", baseAmount: booking.agreedPrice ?? 0, guestCount: booking.guestCount, eventType: booking.eventType }, await getCommissionRules())) {
-      return NextResponse.json({ error: "Tariful acestui eveniment necesită clarificare cu administrația înainte de confirmare." }, { status: 409 });
-    }
-    let updated;
+    let result;
     try {
-      updated = await confirmBookingWithEffects(booking, async (tx) => {
-        const now = new Date();
-        const [row] = await tx.update(bookingRequests).set({ status: "confirmed_by_client", confirmedAt: now, updatedAt: now })
-          .where(and(eq(bookingRequests.id, booking.id), eq(bookingRequests.status, "accepted"))).returning();
-        return row;
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: { mode: "vendor", venueCapability: "manage_bookings" },
+        confirmationAvailability:
+          booking.status !== "confirmed_by_client"
+          && booking.status !== "completed",
+        confirmationBarrier: true,
+        mutate: async ({ executor, booking: current }) => {
+          if (isPastBookingMutation(current, action)) {
+            return { kind: "past" as const };
+          }
+          if (!current.venueId) {
+            return { kind: "client_required" as const };
+          }
+          if (current.status === "confirmed_by_client") {
+            const row = await persistConfirmationEffects(executor, current);
+            return { kind: "confirmed" as const, row };
+          }
+          const next = confirmationTransition({
+            status: current.status,
+            venue: true,
+            clientConfirmed: Boolean(current.clientConfirmedAt),
+            action,
+          });
+          if (!next) return { kind: "client_required" as const };
+          // Validate and persist from one transaction-bound rules snapshot.
+          // A concurrent admin edit may apply to the next booking, but cannot
+          // make this confirmation commit without the fee just validated.
+          const commissionRules = await getCommissionRules(executor);
+          if (!computeCommission({
+            vendorType: "venue",
+            baseAmount: current.agreedPrice ?? 0,
+            guestCount: current.guestCount,
+            eventType: current.eventType,
+          }, commissionRules)) {
+            return { kind: "tariff_required" as const };
+          }
+          const now = new Date();
+          const row = await casUpdateBookingStatus(
+            executor,
+            current.id,
+            ["accepted"],
+            {
+              status: "confirmed_by_client",
+              confirmedAt: now,
+            },
+          );
+          if (!row) throw new BookingChangedError();
+          return {
+            kind: "confirmed" as const,
+            row: await persistConfirmationEffects(executor, row, {
+              commissionRules,
+              requireCommission: true,
+            }),
+          };
+        },
       });
     } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
+      if (error instanceof CommissionRequiredError) {
+        return NextResponse.json(
+          { error: "commission_required" },
+          { status: 409 },
+        );
+      }
       if (error instanceof VenueAvailabilityError) {
         return NextResponse.json({ error: "venue_unavailable", code: error.result.code }, { status: error.status });
       }
@@ -378,62 +458,137 @@ export async function PUT(
       }
       throw error;
     }
-    scheduleConfirmationNotifications(updated);
-    return NextResponse.json({ success: true, status: updated.status });
+    if (result.kind === "past") {
+      return NextResponse.json(
+        { error: "Rezervările din trecut nu mai pot fi modificate." },
+        { status: 400 },
+      );
+    }
+    if (result.kind === "client_required") {
+      return NextResponse.json(
+        { error: "client_acceptance_required" },
+        { status: 409 },
+      );
+    }
+    if (result.kind === "tariff_required") {
+      return NextResponse.json(
+        {
+          error:
+            "Tariful acestui eveniment necesită clarificare cu administrația înainte de confirmare.",
+        },
+        { status: 409 },
+      );
+    }
+    scheduleConfirmationNotifications(result.row);
+    return NextResponse.json({ success: true, status: result.row.status });
   } else if (action === "cancel") {
-    // The client may cancel while the request is still pending.
-    const { userId: clerkId } = await auth();
-    if (!clerkId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const [appUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
-    if (!appUser || appUser.id !== booking.clientUserId) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // The barrier is acquired after the live actor row but before vendor and
+    // booking rows, matching delivery and deletion lock order.
+    let result;
     try {
-      await clientCancelBooking(booking.id);
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: { mode: "client" },
+        confirmationBarrier: true,
+        mutate: async ({ executor, booking: current }) => {
+          if (isPastBookingMutation(current, action)) {
+            return { kind: "past" as const };
+          }
+          const row = await clientCancelBooking(current.id, executor);
+          return { kind: "cancelled" as const, row };
+        },
+      });
     } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
       if (error instanceof BookingChangedError) {
         return NextResponse.json({ error: "Doar cererile neconfirmate pot fi retrase de client" }, { status: 409 });
       }
       throw error;
     }
+    if (result.kind === "past") {
+      return NextResponse.json(
+        {
+          error:
+            "Rezervările din trecut nu mai pot fi modificate. Doar marcarea ca 'completat' sau actualizarea plății sunt permise.",
+        },
+        { status: 400 },
+      );
+    }
+    bookingForDeferredEffects = result.row;
 
   } else if (action === "complete") {
-    const owner = await requireBookingVendorAccess();
-    if (!owner.ok) {
-      return NextResponse.json({ error: owner.error }, { status: owner.status });
+    let result;
+    try {
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: { mode: "vendor", venueCapability: "manage_bookings" },
+        mutate: async ({ executor, booking: current }) => {
+          if (current.status !== "confirmed_by_client") {
+            return { kind: "not_confirmed" as const };
+          }
+          const today = localDateInZone(
+            new Date(),
+            current.timezone || DEFAULT_VENUE_TZ,
+          );
+          if (current.eventDate > today) {
+            return { kind: "future" as const };
+          }
+          const row = await casUpdateBookingStatus(
+            executor,
+            current.id,
+            ["confirmed_by_client"],
+            { status: "completed" },
+          );
+          if (!row) throw new BookingChangedError();
+          return {
+            kind: "completed" as const,
+            row: await persistConfirmationEffects(executor, row),
+          };
+        },
+      });
+    } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+      }
+      throw error;
     }
-    if (booking.status !== "confirmed_by_client") {
+    if (result.kind === "not_confirmed") {
       return NextResponse.json(
         { error: "Both parties must confirm before completion" },
         { status: 409 },
       );
     }
-    if (booking.eventDate > new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Chisinau" })) {
+    if (result.kind === "future") {
       return NextResponse.json({ error: "Evenimentul nu poate fi finalizat înainte de data rezervată." }, { status: 409 });
     }
-    const [completed] = await db.update(bookingRequests).set({
-      status: "completed",
-      updatedAt: new Date(),
-    }).where(and(eq(bookingRequests.id, Number(id)), eq(bookingRequests.status, "confirmed_by_client"))).returning({ id: bookingRequests.id });
-    if (!completed) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-    raiseCommission(Number(id));
+    bookingForDeferredEffects = result.row;
   } else if (action === "vendor_cancel") {
     // Vendor-initiated cancellation of an accepted/confirmed booking. Frees
     // the calendar slot (like reject-after-accept) and notifies the client by
     // email + in-app so they know to find an alternative.
-    const owner = await requireBookingVendorAccess();
-    if (!owner.ok) {
-      return NextResponse.json({ error: owner.error }, { status: owner.status });
-    }
+    let result;
     try {
-      await vendorCancelBooking(booking.id, reply);
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: { mode: "vendor", venueCapability: "manage_bookings" },
+        confirmationBarrier: true,
+        mutate: async ({ executor, booking: current }) => {
+          if (isPastBookingMutation(current, action)) {
+            return { kind: "past" as const };
+          }
+          const row = await vendorCancelBooking(current.id, reply, executor);
+          return { kind: "cancelled" as const, row };
+        },
+      });
     } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
       if (error instanceof BookingChangedError) {
         return NextResponse.json(
           { error: "Only accepted/confirmed bookings can be cancelled by the vendor" },
@@ -442,11 +597,20 @@ export async function PUT(
       }
       throw error;
     }
+    if (result.kind === "past") {
+      return NextResponse.json(
+        { error: "Rezervările din trecut nu mai pot fi modificate." },
+        { status: 400 },
+      );
+    }
+    bookingForDeferredEffects = result.row;
+    const cancelledBooking = result.row;
 
     // Notify the client (in-app + email) — outside the main request flow so
     // a transient email failure doesn't break the status transition.
     after(async () => {
       try {
+        const booking = cancelledBooking;
         let vendorName = "Organizatorul";
         if (booking.venueId) {
           const { venues } = await import("@/lib/db/schema");
@@ -518,110 +682,121 @@ export async function PUT(
     // Either the client (from the budget tab) or the artist (from their
     // dashboard) can toggle paid status. Both sides have legitimate reasons
     // to mark money moved.
-    const { userId: clerkId } = await auth();
-    if (!clerkId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const [appUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
-    if (!appUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    // Client must own the booking OR be the artist/venue owner.
-    const isClient = appUser.id === booking.clientUserId;
-    let isVendorOwner = false;
-    if (!isClient && booking.artistId) {
-      const [artist] = await db
-        .select({ userId: artists.userId })
-        .from(artists)
-        .where(eq(artists.id, booking.artistId))
-        .limit(1);
-      isVendorOwner = artist?.userId === appUser.id;
-    }
-    if (!isClient && !isVendorOwner && booking.venueId) {
-      const access = await requireVenueCapability(
-        booking.venueId,
-        "manage_financials",
-      );
-      isVendorOwner = access.ok;
-    }
-    if (!isClient && !isVendorOwner) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
     if (!paidStatus || !["unpaid", "partial", "paid"].includes(paidStatus)) {
       return NextResponse.json({ error: "paidStatus required" }, { status: 400 });
     }
-    if (
-      booking.status !== "confirmed_by_client" &&
-      booking.status !== "completed"
-    ) {
+    let result;
+    try {
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: {
+          mode: "client_or_vendor",
+          venueCapability: "manage_financials",
+        },
+        mutate: async ({ executor, booking: current }) => {
+          if (
+            current.status !== "confirmed_by_client" &&
+            current.status !== "completed"
+          ) {
+            return { kind: "not_confirmed" as const };
+          }
+          const row = await casSetPaid(
+            executor,
+            current.id,
+            paidStatus as "unpaid" | "partial" | "paid",
+          );
+          if (!row) throw new BookingChangedError();
+          return { kind: "paid" as const, row };
+        },
+      });
+    } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+      }
+      throw error;
+    }
+    if (result.kind === "not_confirmed") {
       return NextResponse.json(
         { error: "Plata poate fi actualizată doar pentru rezervări confirmate" },
         { status: 409 },
       );
     }
-    const paid = await casSetPaid(db, Number(id), paidStatus as "unpaid" | "partial" | "paid");
-    if (!paid) {
-      return NextResponse.json({ error: "booking_changed" }, { status: 409 });
-    }
+    bookingForDeferredEffects = result.row;
   } else if (action === "propose_price") {
     // Either party can push a counter-offer onto the priceOffers jsonb log.
     // The offer does NOT change status — it's a negotiation signal only.
     // An accept (with agreedPrice) from the artist seals the number.
-    const { userId: clerkId } = await auth();
-    if (!clerkId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     if (typeof agreedPrice !== "number" || agreedPrice < 0) {
       return NextResponse.json({ error: "agreedPrice required" }, { status: 400 });
     }
-    const [appUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
-    if (!appUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    let result;
+    try {
+      result = await withBookingMutationBoundary({
+        clerkId: authenticatedId,
+        expected: booking,
+        access: {
+          mode: "client_or_vendor",
+          venueCapability: "manage_bookings",
+        },
+        requireLiveVendor: true,
+        mutate: async ({ executor, booking: current, principal }) => {
+          if (isPastBookingMutation(current, action)) {
+            return { kind: "past" as const };
+          }
+          if (current.status !== "pending") {
+            return { kind: "not_pending" as const };
+          }
+          const offer = {
+            from: principal === "client" ? "client" : "artist",
+            amount: agreedPrice,
+            message: reply,
+            at: new Date().toISOString(),
+          };
+          // Append in PostgreSQL so simultaneous counteroffers do not erase
+          // one another, and never append after vendor acceptance.
+          const [changed] = await executor
+            .update(bookingRequests)
+            .set({
+              priceOffers: sql`COALESCE(${bookingRequests.priceOffers}, '[]'::jsonb) || ${JSON.stringify([offer])}::jsonb`,
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(bookingRequests.id, current.id),
+              eq(bookingRequests.status, "pending"),
+            ))
+            .returning();
+          if (!changed) throw new BookingChangedError();
+          return { kind: "proposed" as const, row: changed, principal };
+        },
+      });
+    } catch (error) {
+      const boundary = bookingMutationBoundaryResponse(error);
+      if (boundary) return boundary;
+      if (error instanceof BookingChangedError) {
+        return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+      }
+      throw error;
     }
-    const isClient = appUser.id === booking.clientUserId;
-    let isArtistOwner = false;
-    if (!isClient && booking.artistId) {
-      const [artist] = await db
-        .select({ userId: artists.userId })
-        .from(artists)
-        .where(eq(artists.id, booking.artistId))
-        .limit(1);
-      isArtistOwner = artist?.userId === appUser.id;
+    if (result.kind === "past") {
+      return NextResponse.json(
+        {
+          error:
+            "Rezervările din trecut nu mai pot fi modificate. Doar marcarea ca 'completat' sau actualizarea plății sunt permise.",
+        },
+        { status: 400 },
+      );
     }
-    if (!isClient && !isArtistOwner && booking.venueId) {
-      const access = await requireVenueCapability(booking.venueId, "manage_bookings");
-      isArtistOwner = access.ok;
-    }
-    if (!isClient && !isArtistOwner) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-    if (booking.status !== "pending") {
+    if (result.kind === "not_pending") {
       return NextResponse.json(
         { error: "Negocierea este disponibilă doar cât cererea este în așteptare" },
         { status: 409 },
       );
     }
-    const offer = {
-      from: isClient ? "client" : "artist",
-      amount: agreedPrice,
-      message: reply,
-      at: new Date().toISOString(),
-    };
-    // Append in PostgreSQL so simultaneous counteroffers do not erase one
-    // another, and never append after the vendor has already accepted.
-    const [changed] = await db.update(bookingRequests).set({
-      priceOffers: sql`COALESCE(${bookingRequests.priceOffers}, '[]'::jsonb) || ${JSON.stringify([offer])}::jsonb`,
-      updatedAt: new Date(),
-    }).where(and(eq(bookingRequests.id, Number(id)), eq(bookingRequests.status, "pending"))).returning({ id: bookingRequests.id });
-    if (!changed) return NextResponse.json({ error: "booking_changed" }, { status: 409 });
+    bookingForDeferredEffects = result.row;
+    priceProposalPrincipal = result.principal;
   } else {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
@@ -630,43 +805,41 @@ export async function PUT(
   after(async () => {
     try {
       if (action === "reject") {
-        await notifyConfirmationStep({ ...booking, status: "rejected" }, "Furnizorul a refuzat solicitarea");
+        await notifyConfirmationStep(
+          bookingForDeferredEffects,
+          "Furnizorul a refuzat solicitarea",
+        );
       } else if (action === "propose_price") {
-        // Determine who proposed and notify the OTHER party
-        const { userId: clerkId } = await auth();
-        if (clerkId) {
-          const [appUser] = await db
-            .select({ id: users.id })
-            .from(users)
-            .where(eq(users.clerkId, clerkId))
+        // Use the principal and tuple authorized by the committed boundary;
+        // never reclassify the proposer from a later account snapshot.
+        const booking = bookingForDeferredEffects;
+        const isClient = priceProposalPrincipal === "client";
+
+        // Resolve vendor info
+        let vendorInfo: { userId: string | null; nameRo: string; email: string | null } | null = null;
+        let venueRecipients: Awaited<ReturnType<typeof getVenueOwnerRecipients>> = [];
+        if (booking.artistId) {
+          const [a] = await db
+            .select({ userId: artists.userId, nameRo: artists.nameRo, email: artists.email })
+            .from(artists)
+            .where(eq(artists.id, booking.artistId))
             .limit(1);
-          const isClient = appUser && appUser.id === booking.clientUserId;
+          vendorInfo = a ?? null;
+        } else if (booking.venueId) {
+          const { venues } = await import("@/lib/db/schema");
+          const [v] = await db
+            .select({ userId: venues.userId, nameRo: venues.nameRo, email: venues.email })
+            .from(venues)
+            .where(eq(venues.id, booking.venueId))
+            .limit(1);
+          vendorInfo = v ?? null;
+          venueRecipients = await getVenueOwnerRecipients(booking.venueId);
+        }
 
-          // Resolve vendor info
-          let vendorInfo: { userId: string | null; nameRo: string; email: string | null } | null = null;
-          let venueRecipients: Awaited<ReturnType<typeof getVenueOwnerRecipients>> = [];
-          if (booking.artistId) {
-            const [a] = await db
-              .select({ userId: artists.userId, nameRo: artists.nameRo, email: artists.email })
-              .from(artists)
-              .where(eq(artists.id, booking.artistId))
-              .limit(1);
-            vendorInfo = a ?? null;
-          } else if (booking.venueId) {
-            const { venues } = await import("@/lib/db/schema");
-            const [v] = await db
-              .select({ userId: venues.userId, nameRo: venues.nameRo, email: venues.email })
-              .from(venues)
-              .where(eq(venues.id, booking.venueId))
-              .limit(1);
-            vendorInfo = v ?? null;
-            venueRecipients = await getVenueOwnerRecipients(booking.venueId);
-          }
+        const { notificationEmail } = await import("@/lib/email/templates/notification-email");
+        const priceText = `${agreedPrice}€`;
 
-          const { notificationEmail } = await import("@/lib/email/templates/notification-email");
-          const priceText = `${agreedPrice}€`;
-
-          if (isClient && (vendorInfo?.userId || venueRecipients.length > 0)) {
+        if (isClient && (vendorInfo?.userId || venueRecipients.length > 0)) {
             // Client proposed — notify vendor
             const vendorDashboardPath = vendorBookingNotificationPath(booking.venueId);
             const recipients = booking.venueId
@@ -690,7 +863,7 @@ export async function PUT(
                 emoji: "💰",
               }),
             })));
-          } else if (!isClient && booking.clientUserId) {
+        } else if (!isClient && booking.clientUserId) {
             // Vendor proposed — notify client
             const [client] = await db
               .select({ email: users.email })
@@ -713,7 +886,6 @@ export async function PUT(
                 emoji: "💰",
               }),
             });
-          }
         }
       }
     } catch (err) {

@@ -5,7 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
-import { asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   artists,
@@ -153,8 +153,15 @@ export async function GET() {
             sortOrder: venueImages.sortOrder,
           })
           .from(venueImages)
-          .where(inArray(venueImages.venueId, venueIds))
-          .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder))
+          .where(and(
+            inArray(venueImages.venueId, venueIds),
+            isNull(venueImages.hallId),
+          ))
+          .orderBy(
+            desc(venueImages.isCover),
+            asc(venueImages.sortOrder),
+            asc(venueImages.id),
+          )
       : Promise.resolve([]),
   ]);
 

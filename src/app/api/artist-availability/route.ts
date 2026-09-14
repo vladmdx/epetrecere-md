@@ -14,6 +14,12 @@ import {
   calendarEvents,
   workSchedule,
 } from "@/lib/db/schema";
+import {
+  artistAvailabilityDateWindow,
+  projectArtistBusyRangesToDate,
+  projectArtistWorkingScheduleToDate,
+} from "@/lib/booking/availability";
+import { isValidCalendarDate } from "@/lib/booking/calendar-input-validation";
 
 const BLOCKING_STATUSES = [
   "pending",
@@ -37,14 +43,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid artist_id" }, { status: 400 });
   }
 
-  // Validate date format
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  if (!isValidCalendarDate(date)) {
     return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
   }
 
   // Fetch booking time ranges (no client names)
   const bookings = await db
     .select({
+      eventDate: bookingRequests.eventDate,
       startTime: bookingRequests.startTime,
       endTime: bookingRequests.endTime,
     })
@@ -52,7 +58,7 @@ export async function GET(req: NextRequest) {
     .where(
       and(
         eq(bookingRequests.artistId, artistId),
-        eq(bookingRequests.eventDate, date),
+        inArray(bookingRequests.eventDate, artistAvailabilityDateWindow(date)),
         inArray(bookingRequests.status, [...BLOCKING_STATUSES]),
       ),
     );
@@ -60,6 +66,7 @@ export async function GET(req: NextRequest) {
   // Include manually blocked calendar events (vacations)
   const blocks = await db
     .select({
+      eventDate: calendarEvents.date,
       startTime: calendarEvents.startTime,
       endTime: calendarEvents.endTime,
     })
@@ -68,34 +75,45 @@ export async function GET(req: NextRequest) {
       and(
         eq(calendarEvents.entityType, "artist"),
         eq(calendarEvents.entityId, artistId),
-        eq(calendarEvents.date, date),
-        eq(calendarEvents.status, "blocked"),
+        inArray(calendarEvents.date, artistAvailabilityDateWindow(date)),
+        inArray(calendarEvents.status, ["blocked", "booked"]),
       ),
     );
 
-  const bookedRanges = [...bookings, ...blocks]
-    .filter((b) => b.startTime && b.endTime)
-    .map((b) => ({ startTime: b.startTime!, endTime: b.endTime! }));
-
-  // If there's any whole-day booking/block, signal it
-  const wholeDayBlocked = [...bookings, ...blocks].some(
-    (b) => !b.startTime || !b.endTime,
+  const busyProjection = projectArtistBusyRangesToDate(
+    [...bookings, ...blocks],
+    date,
   );
+  const bookedRanges = busyProjection.bookedRanges.map((range) => ({
+    startTime: range.start,
+    endTime: range.end,
+  }));
+  const wholeDayBlocked = busyProjection.wholeDayBlocked;
 
   // Working hours for this date's day-of-week (Mon=0..Sun=6 to match work_schedule)
-  const d = new Date(date + "T00:00:00");
-  const dow = (d.getDay() + 6) % 7;
-  const [scheduleRow] = await db
+  const dateWindow = artistAvailabilityDateWindow(date);
+  const previousDate = dateWindow[0]!;
+  const dow = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const previousDow = (new Date(`${previousDate}T00:00:00Z`).getUTCDay() + 6) % 7;
+  const scheduleRows = await db
     .select({
+      dayOfWeek: workSchedule.dayOfWeek,
       startTime: workSchedule.startTime,
       endTime: workSchedule.endTime,
       isWorking: workSchedule.isWorking,
     })
     .from(workSchedule)
     .where(
-      and(eq(workSchedule.artistId, artistId), eq(workSchedule.dayOfWeek, dow)),
-    )
-    .limit(1);
+      and(
+        eq(workSchedule.artistId, artistId),
+        inArray(workSchedule.dayOfWeek, [previousDow, dow]),
+      ),
+    );
+  const scheduleProjection = projectArtistWorkingScheduleToDate(
+    scheduleRows,
+    date,
+  );
+  const scheduleRow = scheduleRows.find((row) => row.dayOfWeek === dow);
 
   const workingHours = scheduleRow
     ? scheduleRow.isWorking
@@ -103,5 +121,14 @@ export async function GET(req: NextRequest) {
       : null // explicit day off
     : undefined; // no schedule configured — no restriction
 
-  return NextResponse.json({ bookedRanges, wholeDayBlocked, workingHours });
+  const workingRanges = scheduleProjection.configured
+    ? scheduleProjection.ranges
+    : undefined;
+
+  return NextResponse.json({
+    bookedRanges,
+    wholeDayBlocked,
+    workingHours,
+    workingRanges,
+  });
 }

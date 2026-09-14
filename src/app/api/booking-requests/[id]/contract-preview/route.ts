@@ -5,8 +5,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users, venues, artists, bookingRequests } from "@/lib/db/schema";
+import { users, artists, bookingRequests } from "@/lib/db/schema";
 import { requireVenueCapability } from "@/lib/venue-access";
+import {
+  bookingContractClientMatches,
+  bookingContractVendorIdentity,
+} from "@/lib/booking/contract-data";
 
 export async function GET(
   _req: NextRequest,
@@ -23,19 +27,13 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [row] = await db
-    .select({
-      booking: bookingRequests,
-      artistName: artists.nameRo,
-      venueName: venues.nameRo,
-    })
+  const [b] = await db
+    .select()
     .from(bookingRequests)
-    .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
-    .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
     .where(eq(bookingRequests.id, bookingId))
     .limit(1);
 
-  if (!row) {
+  if (!b) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -49,10 +47,8 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const b = row.booking;
   let hasAccess = false;
-  if (b.clientUserId === u.id) hasAccess = true;
-  else if (u.email && b.clientEmail === u.email) hasAccess = true;
+  if (bookingContractClientMatches(b, u)) hasAccess = true;
   else if (b.artistId) {
     const [a] = await db
       .select({ userId: artists.userId })
@@ -68,21 +64,20 @@ export async function GET(
   if (!hasAccess) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
-  if (!["confirmed_by_client", "completed"].includes(b.status)) {
+  if (!b.clientSignedAt && !["confirmed_by_client", "completed"].includes(b.status)) {
     return NextResponse.json({ error: "booking_confirmation_required" }, { status: 403 });
   }
 
-  const vendorKind: "artist" | "sala" = b.artistId ? "artist" : "sala";
-  const vendorName = b.artistId
-    ? row.artistName ?? "Artist"
-    : row.venueName ?? "Sală";
+  const vendor = bookingContractVendorIdentity(b);
 
   return NextResponse.json({
     clientName: b.clientName,
     clientPhone: b.clientPhone,
     clientEmail: b.clientEmail,
-    vendorName,
-    vendorKind,
+    vendorName: vendor.vendorName,
+    vendorKind: vendor.vendorKind,
+    venueName: vendor.venueName,
+    hallName: vendor.hallName,
     eventDate: b.eventDate,
     eventType: b.eventType,
     startTime: b.startTime,
