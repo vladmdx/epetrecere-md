@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { DEFAULT_VENUE_TZ, zonedWallTimeToUtc } from "../src/lib/booking/zoned-interval";
+import {
+  canonicalVenueInterval,
+  DEFAULT_VENUE_TZ,
+  localDateInZone,
+  startOfLocalDayUtc,
+  zonedWallTimeToUtc,
+} from "../src/lib/booking/zoned-interval";
 import {
   canonicalVenueIcalTimeZone,
   classifyVenueScheduleBlockIcal,
@@ -10,6 +16,7 @@ import { readFileSync } from "node:fs";
 
 const TZ = "Europe/Chisinau";
 const NY = "America/New_York";
+const SANTIAGO = "America/Santiago";
 
 function interval(
   startDate: string,
@@ -66,6 +73,47 @@ test("Europe/Chisinau: DST spring-forward midnight-to-midnight is all-day by loc
     allDay: true,
     startDate: "2026-03-29",
     endDateExclusive: "2026-03-30",
+  });
+});
+
+test("America/Santiago: all-day begins at the first valid time when midnight is skipped", () => {
+  const startsAt = startOfLocalDayUtc("2026-09-06", SANTIAGO);
+  const endsAt = startOfLocalDayUtc("2026-09-07", SANTIAGO);
+  assert.equal(startsAt.toISOString(), "2026-09-06T04:00:00.000Z");
+  assert.equal(endsAt.toISOString(), "2026-09-07T03:00:00.000Z");
+  assert.equal(localDateInZone(startsAt, SANTIAGO), "2026-09-06");
+  assert.equal(endsAt.getTime() - startsAt.getTime(), 23 * 60 * 60 * 1000);
+  assert.deepEqual(classifyVenueScheduleBlockIcal(startsAt, endsAt, SANTIAGO), {
+    allDay: true,
+    startDate: "2026-09-06",
+    endDateExclusive: "2026-09-07",
+  });
+});
+
+test("America/Santiago: canonical all-day keeps the intended local date across midnight DST", () => {
+  const interval = canonicalVenueInterval({
+    eventDate: "2026-09-06",
+    timezone: SANTIAGO,
+  });
+  assert.equal(localDateInZone(interval.startsAt, SANTIAGO), "2026-09-06");
+  assert.equal(localDateInZone(new Date(interval.endsAt.getTime() - 1), SANTIAGO), "2026-09-06");
+  assert.deepEqual(classifyVenueScheduleBlockIcal(interval.startsAt, interval.endsAt, SANTIAGO), {
+    allDay: true,
+    startDate: "2026-09-06",
+    endDateExclusive: "2026-09-07",
+  });
+});
+
+test("America/Santiago: a midnight gap boundary remains a valid exclusive all-day end", () => {
+  const interval = canonicalVenueInterval({
+    eventDate: "2026-09-05",
+    timezone: SANTIAGO,
+  });
+  assert.equal(interval.endsAt.toISOString(), "2026-09-06T04:00:00.000Z");
+  assert.deepEqual(classifyVenueScheduleBlockIcal(interval.startsAt, interval.endsAt, SANTIAGO), {
+    allDay: true,
+    startDate: "2026-09-05",
+    endDateExclusive: "2026-09-06",
   });
 });
 

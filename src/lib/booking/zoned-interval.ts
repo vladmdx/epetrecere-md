@@ -33,6 +33,96 @@ export function zonedWallTimeToUtc(date: string, time: string, timeZone: string)
   return new Date(instant);
 }
 
+function localDateTimeInZone(instant: Date, timeZone: string): {
+  date: string;
+  hour: number;
+  minute: number;
+  second: number;
+} {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).formatToParts(instant);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value;
+  return {
+    date: `${value("year")}-${value("month")}-${value("day")}`,
+    // Some ICU builds format midnight as 24:00. It is still the start of the
+    // formatted calendar date for our purposes.
+    hour: Number(value("hour")) % 24,
+    minute: Number(value("minute")),
+    second: Number(value("second")),
+  };
+}
+
+/**
+ * Earliest representable instant of a venue-local calendar date.
+ *
+ * Midnight is not guaranteed to exist: some IANA zones advance their clocks
+ * at 00:00 (for example America/Santiago on 2026-09-06). In that case an
+ * all-day interval begins at the first valid wall time on the intended local
+ * date instead of silently landing on the preceding date.
+ */
+export function startOfLocalDayUtc(date: string, timeZone: string): Date {
+  const midnightCandidate = zonedWallTimeToUtc(date, "00:00", timeZone);
+  const midnightLocal = localDateTimeInZone(midnightCandidate, timeZone);
+  if (
+    midnightLocal.date === date &&
+    midnightLocal.hour === 0 &&
+    midnightLocal.minute === 0 &&
+    midnightLocal.second === 0
+  ) {
+    return midnightCandidate;
+  }
+
+  // Noon is deliberately used only as an interior point of the intended
+  // local date. From there, find the first instant whose formatted date is the
+  // requested date. This handles a midnight DST gap without guessing its size.
+  let inside = zonedWallTimeToUtc(date, "12:00", timeZone).getTime();
+  if (localDateInZone(new Date(inside), timeZone) !== date) {
+    const [year, month, day] = date.split("-").map(Number);
+    const utcNoon = Date.UTC(year, month - 1, day, 12, 0, 0);
+    let found: number | null = null;
+    for (let hours = -36; hours <= 36; hours += 1) {
+      const candidate = utcNoon + hours * 60 * 60 * 1000;
+      if (localDateInZone(new Date(candidate), timeZone) === date) {
+        found = candidate;
+        break;
+      }
+    }
+    if (found == null) {
+      throw new RangeError(`Local calendar date ${date} does not exist in ${timeZone}`);
+    }
+    inside = found;
+  }
+
+  let outside = inside - 6 * 60 * 60 * 1000;
+  for (let attempts = 0; attempts < 8 && localDateInZone(new Date(outside), timeZone) === date; attempts += 1) {
+    inside = outside;
+    outside -= 6 * 60 * 60 * 1000;
+  }
+  if (localDateInZone(new Date(outside), timeZone) === date) {
+    throw new RangeError(`Could not resolve the start of ${date} in ${timeZone}`);
+  }
+
+  // `outside` is before the date and `inside` is within it. Locate the exact
+  // millisecond boundary without assuming that the first wall time is 00:00.
+  while (inside - outside > 1) {
+    const middle = Math.floor((outside + inside) / 2);
+    if (localDateInZone(new Date(middle), timeZone) === date) {
+      inside = middle;
+    } else {
+      outside = middle;
+    }
+  }
+  return new Date(inside);
+}
+
 export function addLocalDays(date: string, days: number): string {
   const utc = zonedWallTimeToUtc(date, "12:00", "UTC");
   utc.setUTCDate(utc.getUTCDate() + days);
@@ -88,11 +178,14 @@ export function canonicalVenueInterval(opts: {
   const startTime = opts.startTime ?? null;
   const endTime = opts.endTime ?? null;
   if (!startTime && !endTime) {
-    const startsAt = zonedWallTimeToUtc(eventDate, "00:00", timezone);
-    const endsAt = zonedWallTimeToUtc(addLocalDays(eventDate, 1), "00:00", timezone);
+    const startsAt = startOfLocalDayUtc(eventDate, timezone);
+    const endsAt = startOfLocalDayUtc(addLocalDays(eventDate, 1), timezone);
     return { startsAt, endsAt, timezone, eventDate, startTime: null, endTime: null };
   }
-  const start = zonedWallTimeToUtc(eventDate, startTime || "00:00", timezone);
+  const startClock = startTime || "00:00";
+  const start = startClock === "00:00"
+    ? startOfLocalDayUtc(eventDate, timezone)
+    : zonedWallTimeToUtc(eventDate, startClock, timezone);
   let endDate = eventDate;
   let endClock = endTime || "00:00";
   if (!endTime) {
@@ -101,7 +194,9 @@ export function canonicalVenueInterval(opts: {
   } else if (endTime <= (startTime || "00:00")) {
     endDate = addLocalDays(eventDate, 1);
   }
-  const endsAt = zonedWallTimeToUtc(endDate, endClock, timezone);
+  const endsAt = endClock === "00:00"
+    ? startOfLocalDayUtc(endDate, timezone)
+    : zonedWallTimeToUtc(endDate, endClock, timezone);
   return { startsAt: start, endsAt, timezone, eventDate, startTime, endTime };
 }
 

@@ -1,4 +1,4 @@
-import { DEFAULT_VENUE_TZ, localDateInZone, zonedWallTimeToUtc } from "./zoned-interval";
+import { DEFAULT_VENUE_TZ, localDateInZone, startOfLocalDayUtc } from "./zoned-interval";
 
 export type VenueScheduleBlockIcal =
   | { allDay: false }
@@ -26,7 +26,8 @@ export function canonicalVenueIcalTimeZone(value: string | null | undefined): st
 
 /**
  * All-day iCal (VALUE=DATE) is allowed only when both bounds are exact local
- * midnight and the exclusive end is a later local calendar day.
+ * day boundaries and the exclusive end is a later local calendar day. A local
+ * day boundary can be later than 00:00 when midnight is skipped by a DST jump.
  * Duration is irrelevant: 20h+ and multi-day partial intervals stay timed.
  */
 export function classifyVenueScheduleBlockIcal(
@@ -36,11 +37,11 @@ export function classifyVenueScheduleBlockIcal(
 ): VenueScheduleBlockIcal {
   const startDate = localDateInZone(startsAt, timeZone);
   const endDate = localDateInZone(endsAt, timeZone);
-  const startMidnight = zonedWallTimeToUtc(startDate, "00:00", timeZone);
-  const endMidnight = zonedWallTimeToUtc(endDate, "00:00", timeZone);
+  const startOfDay = startOfLocalDayUtc(startDate, timeZone);
+  const endOfDay = startOfLocalDayUtc(endDate, timeZone);
   if (
-    startsAt.getTime() === startMidnight.getTime() &&
-    endsAt.getTime() === endMidnight.getTime() &&
+    startsAt.getTime() === startOfDay.getTime() &&
+    endsAt.getTime() === endOfDay.getTime() &&
     endDate > startDate
   ) {
     return { allDay: true, startDate, endDateExclusive: endDate };
