@@ -363,13 +363,12 @@ export function ResultsClient({ adminMode = false }: ResultsClientProps = {}) {
                 ) : (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {venues.map((venue) => (
-                      // The fetch above sends `date=wizard.eventDate`, so every
-                      // venue here really is free that day — this is the one
-                      // list where the availability badge is earned.
+                      // Date-only criteria prove capacity suitability, not a
+                      // time-window availability claim.
                       <VenueCard
                         key={venue.id}
                         venue={venue}
-                        availableOn={wizard.eventDate || null}
+                        availableOn={null}
                       />
                     ))}
                   </div>

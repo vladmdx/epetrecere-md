@@ -1,8 +1,8 @@
 import { notFound, permanentRedirect } from "next/navigation";
 import type { Metadata } from "next";
-import { asc, eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { redirects, venueMenuCategories, venueMenuItems, venueMenuPackages, venues } from "@/lib/db/schema";
+import { redirects } from "@/lib/db/schema";
 import { getVenueBySlug, getVenues } from "@/lib/db/queries/venues";
 
 /** When a venue slug is not found, check the redirects table — the
@@ -26,12 +26,16 @@ import { generateMeta } from "@/lib/seo/generate-meta";
 import { venueJsonLd, breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { getLocalized, t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
+import { localizePath } from "@/lib/i18n/routing";
+import { parseCatalogFilters } from "@/lib/venues/catalog-filters";
+import { resolveSelectedHall } from "@/lib/venues/hall-selection";
+import { getVenueMenuForHall } from "@/lib/venues/menu-query";
 import { VenueDetailClient } from "./client";
 import { ViewTracker } from "@/components/public/view-tracker";
-import { LOCALES } from "@/lib/i18n/routing";
 
 interface Props {
   params: Promise<{ locale: string; slug: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
 
@@ -48,12 +52,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const redirectTarget = await resolveLegacySlug(slug);
   if (redirectTarget) return { alternates: { canonical: redirectTarget } };
 
-  const venue = publicCatalogData(await getVenueBySlug(slug), true);
+  const venue = publicCatalogData(await getVenueBySlug(slug), false);
   if (!venue?.isActive) return { robots: { index: false, follow: false } };
 
   // Prefer explicit OG URL; fall back to the cover image from the gallery.
   const coverImage = venue.images?.find((i) => i.isCover) ?? venue.images?.[0];
-  const image = venue.ogImageUrl ?? coverImage?.url ?? undefined;
+  const image = ("ogImageUrl" in venue && typeof venue.ogImageUrl === "string"
+    ? venue.ogImageUrl
+    : undefined) ?? coverImage?.url ?? undefined;
 
   // The venue's name is data — only the words around it are translated.
   const name = getLocalized(venue, "name", locale);
@@ -86,7 +92,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return generateMeta({
     title: fallback.title,
     description: excerpt || fallback.description,
-    entity: publicCatalogData(venue, true),
+    entity: publicCatalogData(venue, false),
     path: `/sali/${slug}`,
     image,
     type: "profile",
@@ -94,16 +100,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
 }
 
-export default async function VenuePage({ params }: Props) {
+export default async function VenuePage({ params, searchParams }: Props) {
   const { locale: rawLocale, slug } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
+  const sp = await searchParams;
+  const param = (key: string) => {
+    const value = sp[key];
+    return typeof value === "string" ? value : undefined;
+  };
 
   // Check redirects FIRST — if slug was renamed, 308 to the new path
   // before loading any venue data.
   const redirectTarget = await resolveLegacySlug(slug);
   if (redirectTarget) permanentRedirect(redirectTarget);
 
-  const venue = await getVenueBySlug(slug);
+  const parsedFilters = parseCatalogFilters({
+    guest_count: param("guest_count") || param("guests") || param("capacity_min"),
+    date: param("date"),
+    start: param("start") || param("start_time"),
+    end: param("end") || param("end_time"),
+  });
+  const venue = await getVenueBySlug(slug, {
+    guestCount: parsedFilters.guestCount,
+    availableDate: parsedFilters.date,
+    startTime: parsedFilters.startTime,
+    endTime: parsedFilters.endTime,
+    revealPrices: false,
+  });
   if (!venue?.isActive) notFound();
 
   // Always the anonymous shape. Signed-in extras arrive from
@@ -111,19 +134,19 @@ export default async function VenuePage({ params }: Props) {
   const gatedVenue = publicCatalogData(venue);
 
   const name = getLocalized(gatedVenue, "name", locale);
+  const publicHalls = "halls" in gatedVenue && Array.isArray(gatedVenue.halls)
+    ? gatedVenue.halls
+    : [];
+  const initialHall = resolveSelectedHall({
+    halls: publicHalls,
+    requestedSlug: param("hall"),
+    intervalComplete: parsedFilters.intervalComplete,
+  });
 
-  // Load digital menu data (packages, categories, items)
-  const [menuCategories, menuPackages, relatedResult] = await Promise.all([
-    db
-      .select()
-      .from(venueMenuCategories)
-      .where(eq(venueMenuCategories.venueId, venue.id))
-      .orderBy(asc(venueMenuCategories.sortOrder), asc(venueMenuCategories.id)),
-    db
-      .select()
-      .from(venueMenuPackages)
-      .where(eq(venueMenuPackages.venueId, venue.id))
-      .orderBy(asc(venueMenuPackages.sortOrder), asc(venueMenuPackages.id)),
+  // The selected Hall's explicit menu set wins; otherwise it inherits the
+  // venue default set. Prices are redacted below for the anonymous RSC.
+  const [menu, relatedResult] = await Promise.all([
+    getVenueMenuForHall(venue.id, initialHall.hallId),
     getVenues({
       city: venue.city || undefined,
       limit: 5,
@@ -131,24 +154,12 @@ export default async function VenuePage({ params }: Props) {
     }),
   ]);
 
-  const catIds = menuCategories.map((c) => c.id);
-  const menuItems =
-    catIds.length > 0
-      ? await db
-          .select({
-            id: venueMenuItems.id,
-            categoryId: venueMenuItems.categoryId,
-            nameRo: venueMenuItems.nameRo,
-            nameRu: venueMenuItems.nameRu,
-            nameEn: venueMenuItems.nameEn,
-            descriptionRo: venueMenuItems.descriptionRo,
-            priceEur: venueMenuItems.priceEur,
-            sortOrder: venueMenuItems.sortOrder,
-          })
-          .from(venueMenuItems)
-          .where(inArray(venueMenuItems.categoryId, catIds))
-          .orderBy(asc(venueMenuItems.sortOrder), asc(venueMenuItems.id))
-      : [];
+  const jsonLdHalls = "halls" in gatedVenue && Array.isArray(gatedVenue.halls)
+    ? gatedVenue.halls.map((hall) => ({
+      slug: hall.slug,
+      name: getLocalized(hall, "name", locale) || hall.nameRo,
+    }))
+    : undefined;
 
   return (
     <>
@@ -161,6 +172,8 @@ export default async function VenuePage({ params }: Props) {
             slug,
             address: venue.address ?? undefined,
             city: venue.city ?? undefined,
+            locale,
+            halls: jsonLdHalls,
           })),
         }}
       />
@@ -168,19 +181,21 @@ export default async function VenuePage({ params }: Props) {
         type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: safeJsonLd(breadcrumbJsonLd([
-            { name: t("nav.home", locale), url: "/" },
-            { name: t("venuesPage.breadcrumb", locale), url: "/sali" },
-            { name, url: `/sali/${slug}` },
+            { name: t("nav.home", locale), url: localizePath("/", locale) },
+            { name: t("venuesPage.breadcrumb", locale), url: localizePath("/sali", locale) },
+            { name, url: localizePath(`/sali/${slug}`, locale) },
           ])),
         }}
       />
       <VenueDetailClient
         venue={gatedVenue}
-        menu={publicCatalogData({
-          categories: menuCategories,
-          items: menuItems,
-          packages: menuPackages,
-        })}
+        requestedHallSlug={param("hall") ?? null}
+        intervalComplete={parsedFilters.intervalComplete}
+        guestCount={parsedFilters.guestCount ?? null}
+        eventDate={parsedFilters.date ?? null}
+        startTime={parsedFilters.startTime ?? null}
+        endTime={parsedFilters.endTime ?? null}
+        menu={publicCatalogData(menu)}
         similar={relatedResult.items
           .filter((item) => item.id !== venue.id)
           .slice(0, 4)

@@ -11,6 +11,7 @@ import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { plural } from "@/lib/i18n/plural";
 import { t } from "@/i18n";
 import { VenueCard } from "@/components/public/venue-card";
+import { catalogSortForPrices, parseCatalogFilters } from "@/lib/venues/catalog-filters";
 
 // Search parameters and authenticated price visibility make the response
 // request-specific. Never put this HTML in the shared Full Route Cache.
@@ -98,18 +99,20 @@ export default async function VenuesByCityPage({ params, searchParams }: Props) 
   const cityIn = cityNameAfterIn(city, locale);
 
   const sp = await searchParams;
-  const page = sp.page ? Number(sp.page) : 1;
+  const { userId } = await auth();
+  const revealPrices = Boolean(userId);
+  const parsed = parseCatalogFilters({ sort: sp.sort, page: sp.page, limit: 24 });
 
   const { items, total, totalPages } = await getVenues({
     cityKeywords: city.keywords,
-    sort: (sp.sort as "popular" | "price_asc" | "price_desc" | "rating" | "capacity") || "popular",
-    page,
-    limit: 24,
+    sort: catalogSortForPrices(parsed.sort, revealPrices),
+    page: parsed.page,
+    limit: parsed.limit,
+    revealPrices,
   });
 
   // M0a #8 — redact pricePerPerson for anonymous visitors.
-  const { userId } = await auth();
-  const safeVenues = publicCatalogData(items, Boolean(userId));
+  const safeVenues = publicCatalogData(items, revealPrices);
 
   const breadcrumbs = [
     { name: t("nav.home", locale), url: "/" },
@@ -181,13 +184,13 @@ export default async function VenuesByCityPage({ params, searchParams }: Props) 
         {totalPages > 1 && (
           <div className="mt-10 flex items-center justify-center gap-2">
             {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
-              <a
+              <Link
                 key={p}
                 href={`/sali/in/${citySlug}?page=${p}`}
-                className={`rounded-md border px-3 py-1.5 text-sm ${p === page ? "border-gold bg-gold text-[#0D0D0D]" : "border-border/40 hover:border-gold/40"}`}
+                className={`rounded-md border px-3 py-1.5 text-sm ${p === parsed.page ? "border-gold bg-gold text-[#0D0D0D]" : "border-border/40 hover:border-gold/40"}`}
               >
                 {p}
-              </a>
+              </Link>
             ))}
           </div>
         )}

@@ -9,6 +9,7 @@ import {
   localizePath,
 } from "@/lib/i18n/routing";
 import { SITE_URL } from "@/lib/seo/generate-meta";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
 
 // M2 — Dynamic sitemap. Next.js calls this on demand (revalidated hourly)
 // and emits an XML sitemap at /sitemap.xml. Includes every indexable URL:
@@ -94,7 +95,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const activeVenues = await db
     .select({ slug: venues.slug, updatedAt: venues.updatedAt })
     .from(venues)
-    .where(eq(venues.isActive, true));
+    .where(publishedVenuePredicateSql());
 
   const venueRoutes: MetadataRoute.Sitemap = activeVenues.map((v) => ({
     url: `${BASE_URL}/sali/${v.slug}`,

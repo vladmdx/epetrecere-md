@@ -5,6 +5,7 @@ import { breadcrumbJsonLd, itemListJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { VenuesListClient } from "./client";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { t } from "@/i18n";
+import { catalogSortForPrices, parseCatalogFilters } from "@/lib/venues/catalog-filters";
 
 // Filters and authenticated price visibility make the response request-specific.
 // Never cache this HTML across users.
@@ -39,22 +40,37 @@ export default async function VenuesPage({ params, searchParams }: Props) {
   // never read it, so the filter silently did nothing and the cards claimed
   // availability nobody had checked. Anything that is not a calendar date is
   // dropped rather than handed to the calendar_events subquery.
-  const rawDate = typeof sp.date === "string" ? sp.date : "";
-  const availableDate = /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : undefined;
+  const { userId } = await auth();
+  const revealPrices = Boolean(userId);
+  const parsed = parseCatalogFilters({
+    guest_count: sp.guest_count ?? sp.capacity_min,
+    date: sp.date,
+    start: sp.start ?? sp.start_time,
+    end: sp.end ?? sp.end_time,
+    price_max: revealPrices ? sp.price_max : undefined,
+    sort: sp.sort,
+    page: sp.page,
+  });
 
   const filters = {
     city: (sp.city as string) || undefined,
-    capacityMin: sp.capacity_min ? Number(sp.capacity_min) : undefined,
-    availableDate,
-    sort: (sp.sort as "popular" | "price_asc" | "price_desc" | "rating" | "capacity") || "popular",
-    page: sp.page ? Number(sp.page) : 1,
+    capacityMin: parsed.guestCount,
+    guestCount: parsed.guestCount,
+    availableDate: parsed.date,
+    startTime: parsed.startTime,
+    endTime: parsed.endTime,
+    sort: catalogSortForPrices(parsed.sort, revealPrices),
+    page: parsed.page,
+    revealPrices,
+    priceMax: revealPrices ? parsed.priceMax : undefined,
   };
 
-  const result = await getVenues(filters);
+  const result = parsed.invalidFields.length
+    ? { items: [], total: 0, page: parsed.page, totalPages: 0 }
+    : await getVenues(filters);
 
   // M0a #8 — gate price per person behind login at the server layer.
-  const { userId } = await auth();
-  const items = publicCatalogData(result.items, Boolean(userId));
+  const items = publicCatalogData(result.items, revealPrices);
 
   // Extract unique cities from results for filter pills
   const allCities = Array.from(new Set(result.items.map((v) => v.city).filter(Boolean) as string[])).sort();
@@ -89,8 +105,8 @@ export default async function VenuesPage({ params, searchParams }: Props) {
         currentSort={filters.sort}
         cities={allCities}
         currentCity={(sp.city as string) || ""}
-        currentCapacityMin={(sp.capacity_min as string) || ""}
-        currentDate={availableDate ?? ""}
+        currentCapacityMin={parsed.guestCount != null ? String(parsed.guestCount) : ""}
+        currentDate={parsed.date ?? ""}
       />
     </>
   );

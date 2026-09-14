@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { artists, venues, leads, bookings } from "@/lib/db/schema";
 import { eq, count } from "drizzle-orm";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
 
 // Public endpoint — returns aggregate stats for the homepage counter section.
 // Cached for 5 minutes via Next.js revalidation.
@@ -16,7 +17,7 @@ export async function GET() {
   const [venueCount] = await db
     .select({ count: count() })
     .from(venues)
-    .where(eq(venues.isActive, true));
+    .where(publishedVenuePredicateSql());
 
   const [leadCount] = await db.select({ count: count() }).from(leads);
 

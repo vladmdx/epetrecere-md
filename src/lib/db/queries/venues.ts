@@ -9,6 +9,12 @@ import {
 } from "@/lib/db/schema";
 import { eq, and, desc, asc, sql, gte, lte, ilike, isNull, or } from "drizzle-orm";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
+import {
+  getFeaturedVenuesMultiHall,
+  getVenueBySlugMultiHall,
+  getVenuesMultiHall,
+} from "@/lib/venues/catalog-query";
+import { catalogSortForPrices } from "@/lib/venues/catalog-filters";
 
 export interface VenueFilters {
   capacityMin?: number;
@@ -20,9 +26,13 @@ export interface VenueFilters {
   featured?: boolean;
   /** Exclude venues that are booked/blocked on this date. Format: YYYY-MM-DD */
   availableDate?: string;
+  startTime?: string;
+  endTime?: string;
+  guestCount?: number;
   sort?: "popular" | "price_asc" | "price_desc" | "rating" | "capacity";
   page?: number;
   limit?: number;
+  revealPrices?: boolean;
 }
 
 /**
@@ -81,9 +91,13 @@ export async function getPublicVenueOgBySlug(slug: string) {
 }
 
 export async function getVenues(filters: VenueFilters = {}) {
+  if (isMultiHallEnabled()) {
+    return getVenuesMultiHall(filters);
+  }
   const page = filters.page ?? 1;
   const limit = filters.limit ?? 12;
   const offset = (page - 1) * limit;
+  const sort = catalogSortForPrices(filters.sort ?? "popular", filters.revealPrices === true);
 
   const conditions = [eq(venues.isActive, true)];
 
@@ -124,7 +138,7 @@ export async function getVenues(filters: VenueFilters = {}) {
   }
 
   let orderBy;
-  switch (filters.sort) {
+  switch (sort) {
     case "price_asc":
       orderBy = asc(venues.pricePerPerson);
       break;
@@ -182,7 +196,10 @@ export async function getVenues(filters: VenueFilters = {}) {
   };
 }
 
-export async function getVenueBySlug(slug: string) {
+export async function getVenueBySlug(slug: string, filters: VenueFilters = {}) {
+  if (isMultiHallEnabled()) {
+    return getVenueBySlugMultiHall(slug, filters);
+  }
   const results = await db
     .select()
     .from(venues)
@@ -224,7 +241,10 @@ export async function getVenueBySlug(slug: string) {
   return { ...venue, images, reviews: venueReviews };
 }
 
-export async function getFeaturedVenues(limit = 6) {
+export async function getFeaturedVenues(limit = 6, revealPrices = false) {
+  if (isMultiHallEnabled()) {
+    return getFeaturedVenuesMultiHall(limit, revealPrices);
+  }
   const items = await db
     .select()
     .from(venues)

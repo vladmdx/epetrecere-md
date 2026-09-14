@@ -181,6 +181,7 @@ npm run test:multihall:image-locking-source
 npm run test:multihall:registration-locking-source
 npm run test:multihall:availability-scope-source
 npx tsx --test scripts/venue-schedule-block-ical.test.ts
+npm run test:phase5:source
 npm run test:wishlist:visibility
 npm run test:booking-outbox:policy
 npm run test:legal-pack

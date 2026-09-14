@@ -183,23 +183,61 @@ function wallClockInZone(instant: Date, timeZone: string): string {
   return `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
 }
 
+/**
+ * Catalog and schedule writes share one DST policy:
+ * - a spring-forward gap has no valid instant and is rejected;
+ * - a fall-back fold has two valid instants; we always take the earlier one.
+ */
+export const VENUE_DST_FOLD_POLICY = "earlier" as const;
+
+function wallTimeMatches(
+  instant: Date,
+  date: string,
+  time: string,
+  timeZone: string,
+): boolean {
+  const local = localDateTimeInZone(instant, timeZone);
+  return (
+    local.date === date
+    && wallClockInZone(instant, timeZone) === time
+    && local.second === 0
+  );
+}
+
 function strictZonedWallTimeToUtc(
   date: string,
   time: string,
   timeZone: string,
 ): Date {
-  const instant = zonedWallTimeToUtc(date, time, timeZone);
-  const local = localDateTimeInZone(instant, timeZone);
-  if (
-    local.date !== date
-    || wallClockInZone(instant, timeZone) !== time
-    || local.second !== 0
-  ) {
+  const guessed = zonedWallTimeToUtc(date, time, timeZone);
+  const [year, month, day] = date.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const wallClockAsUtc = Date.UTC(year, month - 1, day, hour, minute, 0);
+  const matches: Date[] = [];
+
+  // Do not assume a one-hour DST transition. IANA contains zones with
+  // 30-minute folds (for example Australia/Lord_Howe) and historical larger
+  // changes. Sampling offsets around the local date gives the exact candidate
+  // instants without scanning every minute of the surrounding days.
+  const offsets = new Set<number>();
+  for (let hours = -72; hours <= 72; hours += 6) {
+    offsets.add(tzOffsetMs(wallClockAsUtc + hours * 60 * 60 * 1000, timeZone));
+  }
+  offsets.add(tzOffsetMs(guessed.getTime(), timeZone));
+  for (const offset of offsets) {
+    const candidate = new Date(wallClockAsUtc - offset);
+    if (!wallTimeMatches(candidate, date, time, timeZone)) continue;
+    if (!matches.some((item) => item.getTime() === candidate.getTime())) {
+      matches.push(candidate);
+    }
+  }
+  if (matches.length === 0) {
     throw new VenueIntervalValidationError(
       `Local time ${date} ${time} does not exist in ${timeZone}.`,
     );
   }
-  return instant;
+  matches.sort((left, right) => left.getTime() - right.getTime());
+  return matches[0]!;
 }
 
 /**
@@ -282,6 +320,26 @@ export function canonicalVenueIntervalStrict(opts: {
     );
   }
   const eventDate = opts.eventDate;
+  if (hasStartTime && hasEndTime) {
+    const startsAt = strictZonedWallTimeToUtc(eventDate, opts.startTime!, timezone);
+    const endDate =
+      opts.endTime! <= opts.startTime!
+        ? addLocalDays(eventDate, 1)
+        : eventDate;
+    const endsAt = strictZonedWallTimeToUtc(endDate, opts.endTime!, timezone);
+    if (!(endsAt.getTime() > startsAt.getTime())) {
+      throw new VenueIntervalValidationError("Interval end must be after its start.");
+    }
+    return {
+      startsAt,
+      endsAt,
+      timezone,
+      eventDate,
+      startTime: opts.startTime ?? null,
+      endTime: opts.endTime ?? null,
+    };
+  }
+
   if (hasStartTime) {
     strictZonedWallTimeToUtc(eventDate, opts.startTime!, timezone);
   }
@@ -299,7 +357,7 @@ export function canonicalVenueIntervalStrict(opts: {
     endTime: opts.endTime,
     timezone,
   });
-  if (interval.endsAt.getTime() <= interval.startsAt.getTime()) {
+  if (!(interval.endsAt.getTime() > interval.startsAt.getTime())) {
     throw new VenueIntervalValidationError("Interval end must be after its start.");
   }
   return interval;

@@ -3,6 +3,7 @@ import { describe, test } from "node:test";
 
 import {
   BOOKING_CREATE_STORAGE_PREFIX,
+  BookingCreateHallConflictError,
   BookingCreatePersistenceError,
   bookingCreateScope,
   isAmbiguousBookingCreateStatus,
@@ -321,4 +322,62 @@ test("shared API client forwards Idempotency-Key without allowing auth override"
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+describe("browser booking-create hall lock", () => {
+  test("Hall A retry keeps the same key and Hall A until resolved", async () => {
+    const storage = memoryStorage();
+    const scope = bookingCreateScope({ actorId: "user-a", venueId: 4 });
+    const sent: Array<{ key: string | null; body: string }> = [];
+    const fetcher = (async (_url, init) => {
+      const headers = new Headers(init?.headers);
+      sent.push({ key: headers.get("Idempotency-Key"), body: String(init?.body) });
+      return new Response("{}", { status: 503 });
+    }) as typeof fetch;
+
+    await submitBookingCreateRequest({
+      scope,
+      payload: { venueId: 4, hallId: 11, eventDate: "2026-10-10" },
+      storage,
+      fetcher,
+      createRequestId: () => REQUEST_ID,
+    });
+    const retry = await submitBookingCreateRequest({
+      scope,
+      payload: { venueId: 4, hallId: 11, eventDate: "2027-01-01" },
+      storage,
+      fetcher,
+      createRequestId: () => OTHER_ID,
+    });
+    assert.equal(retry.ok, false);
+    assert.equal(retry.requestId, REQUEST_ID);
+    assert.deepEqual(sent, [
+      { key: REQUEST_ID, body: JSON.stringify({ venueId: 4, hallId: 11, eventDate: "2026-10-10" }) },
+      { key: REQUEST_ID, body: JSON.stringify({ venueId: 4, hallId: 11, eventDate: "2026-10-10" }) },
+    ]);
+    assert.equal(readPendingBookingCreateRequest(storage, scope)?.requestId, REQUEST_ID);
+  });
+
+  test("Hall A to Hall B with the same pending key is a conflict", async () => {
+    const storage = memoryStorage();
+    const scope = bookingCreateScope({ actorId: "user-a", venueId: 4 });
+    await submitBookingCreateRequest({
+      scope,
+      payload: { venueId: 4, hallId: 11 },
+      storage,
+      fetcher: (async () => new Response("{}", { status: 503 })) as typeof fetch,
+      createRequestId: () => REQUEST_ID,
+    });
+    await assert.rejects(
+      submitBookingCreateRequest({
+        scope,
+        payload: { venueId: 4, hallId: 12 },
+        storage,
+        fetcher: (async () => new Response(JSON.stringify({ id: 1 }), { status: 201 })) as typeof fetch,
+        createRequestId: () => OTHER_ID,
+      }),
+      (error: unknown) => error instanceof BookingCreateHallConflictError,
+    );
+    assert.equal(readPendingBookingCreateRequest(storage, scope)?.payload.hallId, 11);
+  });
 });

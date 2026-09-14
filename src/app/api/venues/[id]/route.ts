@@ -19,6 +19,10 @@ import {
   acquireAvailabilityLocks,
   acquireLegalScopeLocks,
 } from "@/lib/booking/advisory-locks";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
+import { getVenueBySlug } from "@/lib/db/queries/venues";
+import { allowlistedVenueDetail } from "@/lib/venues/catalog-dto";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 export async function GET(
   _req: Request,
@@ -48,6 +52,30 @@ export async function GET(
   if (!venue.isActive && !privileged) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  if (!privileged) {
+    const [published] = await db
+      .select({ id: venues.id })
+      .from(venues)
+      .where(and(eq(venues.id, venue.id), publishedVenuePredicateSql()))
+      .limit(1);
+    if (!published) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    // Multi-Hall prices are disclosed only through gated-details for the one
+    // active Hall explicitly selected by the client. This generic detail API
+    // must not become a bypass that enumerates every Hall's prices.
+    const revealLegacyPrice = Boolean(userId) && !isMultiHallEnabled();
+    const publicVenue = await getVenueBySlug(venue.slug, {
+      revealPrices: revealLegacyPrice,
+    });
+    if (!publicVenue) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    return NextResponse.json(
+      publicCatalogData(allowlistedVenueDetail(publicVenue), revealLegacyPrice),
+      { headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
 
   const [images, venueReviews] = await Promise.all([
     db
@@ -75,7 +103,7 @@ export async function GET(
 
   // M0a #8 — price/contact gated behind login.
   const payload = { ...venue, images, reviews: venueReviews };
-  return NextResponse.json(privileged ? payload : publicCatalogData(payload, Boolean(userId)), {
+  return NextResponse.json(payload, {
     headers: { "Cache-Control": "private, no-store" },
   });
 }

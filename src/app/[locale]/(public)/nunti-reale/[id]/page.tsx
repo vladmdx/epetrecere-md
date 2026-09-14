@@ -12,6 +12,7 @@ import { breadcrumbJsonLd, safeJsonLd } from "@/lib/seo/jsonld";
 import { Calendar, MapPin, ArrowLeft, Users } from "lucide-react";
 import { RealWeddingGallery } from "./gallery";
 import { photoContentUrl } from "@/lib/moments/photo-url";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
 
 // M10 Intern #3 — Real Wedding detail page.
 // Server component: fetches all public+approved photos for a plan plus
@@ -71,7 +72,7 @@ async function getWedding(id: number) {
             slug: venues.slug,
           })
           .from(venues)
-          .where(inArray(venues.id, venueIds))
+          .where(and(inArray(venues.id, venueIds), publishedVenuePredicateSql()))
       : Promise.resolve([]),
   ]);
 

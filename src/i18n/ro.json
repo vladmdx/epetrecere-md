@@ -142,6 +142,12 @@
       "tagline": "Servicii pentru evenimente • portofoliu • rezervări online",
       "reviewsWord": "recenzii",
       "priceOnRequest": "Preț la cerere",
+      "fixedPrice": "Preț fix",
+      "minimumOrder": "Comandă minimă",
+      "estimatedTotal": "Total estimat pentru numărul de invitați",
+      "seatingOptions": "Variante de așezare",
+      "seatingOption": "Așezare",
+      "bookingTerms": "Condiții de rezervare",
       "fact": {
         "eventsLabel": "Evenimente",
         "eventsValue": "Private și corporate",
@@ -269,12 +275,19 @@
       "priceOnRequest": "Preț la cerere",
       "verifiedReviews": "Recenzii verificate",
       "verifiedReviewsHint": "Recenzia poate fi trimisă după un eveniment confirmat, direct din cabinetul clientului. Astfel, feedbackul public provine din rezervări reale.",
-      "eligibleBookings": "Vezi rezervările eligibile"
+      "eligibleBookings": "Vezi rezervările eligibile",
+      "selectHall": "Alege sala",
+      "hallTooSmall": "Această sală nu poate găzdui {count} invitați.",
+      "hallUnavailable": "Sala nu este disponibilă în intervalul ales.",
+      "chooseHallToBook": "Selectează o sală pentru a trimite cererea."
     },
     "card": {
       "available": "Disponibilă",
       "featured": "Recomandată",
-      "newVenue": "Locație nouă"
+      "newVenue": "Locație nouă",
+      "fromPrice": "de la {price}",
+      "hallsSummary": "Săli: {total} • potrivite: {suitable}",
+      "perPersonSuffix": "/ persoană"
     }
   },
   "form": {
@@ -3789,7 +3802,10 @@
     "sentSeeInMyBookings": "Cererea de rezervare a fost trimisă! O vezi în Rezervările Mele.",
     "sentWeWillContact": "Cererea de rezervare a fost trimisă! Vă vom contacta în curând.",
     "capacityWarning": "Depășește capacitatea maximă ({max} locuri)",
-    "sendBookingRequest": "Trimite cererea de rezervare"
+    "sendBookingRequest": "Trimite cererea de rezervare",
+    "errorNoHall": "Selectează o sală pentru rezervare.",
+    "hallLockedRetry": "Cererea pentru această sală este încă în curs. Nu poți schimba sala până la rezolvare.",
+    "hallUnavailable": "Sala selectată nu corespunde criteriilor sau nu este disponibilă."
   },
   "results": {
     "loadError": "Nu am putut încărca rezultatele. Încearcă din nou.",
@@ -3803,8 +3819,8 @@
     "bookingsTab": "Rezervări Artiști",
     "viewInCrm": "Vezi în CRM",
     "openPlan": "Deschide planul",
-    "venuesTitle": "Săli disponibile",
-    "venuesSubtitle": "Săli libere pe {date} pentru minim {guests} invitați",
+    "venuesTitle": "Săli potrivite",
+    "venuesSubtitle": "Săli cu capacitate pentru minim {guests} invitați. Disponibilitatea se confirmă după alegerea orei din {date}.",
     "venuesEmpty": "Nicio sală disponibilă pentru filtrele alese. Încearcă să modifici data sau numărul de invitați.",
     "artistsSubtitle": "{count} artiști liberi · {used}/{max} cereri trimise",
     "artistsEmpty": "Niciun artist disponibil în această categorie pentru data aleasă.",

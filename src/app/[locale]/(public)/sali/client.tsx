@@ -28,6 +28,7 @@ import { getLocalized } from "@/i18n";
 import { localizePath } from "@/lib/i18n/routing";
 import { cn } from "@/lib/utils";
 import { CatalogSeoContent } from "@/components/public/catalog-seo-content";
+import { useUser } from "@clerk/nextjs";
 
 interface Venue {
   id: number;
@@ -40,10 +41,17 @@ interface Venue {
   capacityMin: number | null;
   capacityMax: number | null;
   pricePerPerson: number | null;
+  minEffectivePrice?: number | null;
   ratingAvg: number | null;
   ratingCount: number | null;
   isFeatured: boolean;
   coverImageUrl?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  totalHallCount?: number;
+  suitableHallCount?: number;
+  availableHallCount?: number | null;
+  availabilityStatus?: string;
 }
 
 interface Props {
@@ -85,6 +93,7 @@ export function VenuesListClient({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t, locale } = useLocale();
+  const { isSignedIn, isLoaded } = useUser();
   const [city, setCity] = useState(currentCity);
   const [capacity, setCapacity] = useState(currentCapacityMin);
   const date = currentDate;
@@ -313,7 +322,9 @@ export function VenuesListClient({
                 </div>
                 <div className="lg:order-2">
                   <SortBar
-                    options={sortOptions.map((o) => ({ value: o.value, label: t(o.key) }))}
+                    options={sortOptions
+                      .filter((o) => isLoaded && isSignedIn || (o.value !== "price_asc" && o.value !== "price_desc"))
+                      .map((o) => ({ value: o.value, label: t(o.key) }))}
                     current={currentSort}
                     onChange={(value) => navigate({ sort: value })}
                   />
@@ -347,7 +358,18 @@ export function VenuesListClient({
               viewMode.kind === "grid" ? (
                 <div className={gridClassName(viewMode.cols)}>
                   {venues.map((venue, index) => (
-                    <VenueCard key={venue.id} venue={venue} imageIndex={index} availableOn={currentDate || null} />
+                    <VenueCard
+                      key={venue.id}
+                      venue={venue}
+                      imageIndex={index}
+                      availableOn={
+                        venue.availabilityStatus === "available"
+                          ? currentDate || null
+                          : venue.availableHallCount == null
+                            ? currentDate || null
+                            : null
+                      }
+                    />
                   ))}
                 </div>
               ) : (

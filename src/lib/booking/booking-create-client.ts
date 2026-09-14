@@ -192,6 +192,31 @@ export function isAmbiguousBookingCreateStatus(status: number): boolean {
   return status === 0 || status === 408 || status === 425 || status === 429 || status >= 500;
 }
 
+export class BookingCreateHallConflictError extends Error {
+  readonly code = "HALL_IDEMPOTENCY_CONFLICT";
+
+  constructor() {
+    super("HALL_IDEMPOTENCY_CONFLICT");
+    this.name = "BookingCreateHallConflictError";
+  }
+}
+
+function payloadHallId(payload: JsonObject): number | null {
+  const value = payload.hallId;
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0
+    ? value
+    : null;
+}
+
+/** Hall frozen on an unresolved retry, if the pending body named one. */
+export function pendingBookingCreateHallId(
+  storage: BookingCreateStorage,
+  scope: string,
+): number | null {
+  const pending = readPendingBookingCreateRequest(storage, scope);
+  return pending ? payloadHallId(pending.payload) : null;
+}
+
 function preparePendingBookingCreateRequest(
   storage: BookingCreateStorage,
   scope: string,
@@ -199,7 +224,14 @@ function preparePendingBookingCreateRequest(
   createRequestId: () => string,
 ): PendingBookingCreateRequest {
   const existing = readPendingBookingCreateRequest(storage, scope);
-  if (existing) return existing;
+  if (existing) {
+    const existingHallId = payloadHallId(existing.payload);
+    const nextHallId = payloadHallId(payload);
+    if (existingHallId != null && nextHallId != null && existingHallId !== nextHallId) {
+      throw new BookingCreateHallConflictError();
+    }
+    return existing;
+  }
   // A corrupt/unreadable slot is an unresolved request, not permission to
   // overwrite its identity and possibly create a duplicate booking.
   if (hasPendingSlot(storage, scope)) throw new BookingCreatePersistenceError();

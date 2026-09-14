@@ -22,6 +22,8 @@ import { useUser } from "@clerk/nextjs";
 import { localDateToIsoDate } from "@epetrecere/shared/utils";
 import {
   bookingCreateScope,
+  BookingCreateHallConflictError,
+  pendingBookingCreateHallId,
   submitBookingCreateRequest,
 } from "@/lib/booking/booking-create-client";
 
@@ -42,6 +44,14 @@ interface FormBaseProps {
    *  feeds the plan budget once the artist accepts. Only used on the
    *  artist flow; venues keep using /api/leads. */
   eventPlanId?: number;
+  hallId?: number | null;
+  hallRequired?: boolean;
+  hallLocked?: boolean;
+  hallUnavailable?: boolean;
+  onPendingHallChange?: (hallId: number | null) => void;
+  startTime?: string;
+  endTime?: string;
+  defaultGuestCount?: number;
 }
 
 async function responseErrorMessage(response: Response): Promise<string | null> {
@@ -170,7 +180,26 @@ export function RequestPriceForm({ artistId, venueId, className, label, variant 
 }
 
 // ─── Booking Request (full form) ─────────────────────────
-export function RequestBookingForm({ artistId, venueId, eventPlanId, preselectedDate, className, label, variant = "outline", icon, presetMessage, capacityMax }: FormBaseProps & { capacityMax?: number | null }) {
+export function RequestBookingForm({
+  artistId,
+  venueId,
+  eventPlanId,
+  preselectedDate,
+  className,
+  label,
+  variant = "outline",
+  icon,
+  presetMessage,
+  capacityMax,
+  hallId,
+  hallRequired,
+  hallLocked,
+  hallUnavailable,
+  onPendingHallChange,
+  startTime,
+  endTime,
+  defaultGuestCount,
+}: FormBaseProps & { capacityMax?: number | null }) {
   const { t, locale } = useLocale();
   const { user, isLoaded: isUserLoaded } = useUser();
   const [open, setOpen] = useState(false);
@@ -186,6 +215,22 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
       setEventDate(new Date(preselectedDate + "T00:00:00"));
     }
   }, [preselectedDate]);
+
+  function refreshPendingHall() {
+    if (!venueId) return;
+    try {
+      onPendingHallChange?.(pendingBookingCreateHallId(
+        window.sessionStorage,
+        bookingCreateScope({
+          actorId: user?.id,
+          venueId,
+          eventPlanId,
+        }),
+      ));
+    } catch {
+      onPendingHallChange?.(null);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -207,6 +252,18 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
     }
     if (useBookingFlow && !form.get("phone")) {
       toast.error(t("requestForm.errorNoPhone"));
+      return;
+    }
+    if (useBookingFlow && hallRequired && !hallId) {
+      toast.error(t("requestForm.errorNoHall"));
+      return;
+    }
+    if (useBookingFlow && hallLocked) {
+      toast.error(t("requestForm.hallLockedRetry"));
+      return;
+    }
+    if (useBookingFlow && (hallUnavailable || capacityWarning)) {
+      toast.error(t("requestForm.hallUnavailable"));
       return;
     }
 
@@ -235,6 +292,9 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
               ? Number(form.get("guestCount"))
               : undefined,
             message: (form.get("message") as string) || undefined,
+            ...(hallId ? { hallId } : {}),
+            ...(startTime ? { startTime } : {}),
+            ...(endTime ? { endTime } : {}),
           }
         : {
             name: form.get("name") as string,
@@ -263,11 +323,13 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
           payload,
         });
         if (!submission.ok) {
+          refreshPendingHall();
           throw new Error(
             await responseErrorMessage(submission.response)
               ?? t("form.errorRetry"),
           );
         }
+        refreshPendingHall();
       } else {
         const response = await fetch("/api/leads", {
           method: "POST",
@@ -289,10 +351,13 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
       );
       setOpen(false);
     } catch (error) {
+      refreshPendingHall();
       toast.error(
-        error instanceof Error && error.message
-          ? error.message
-          : t("form.errorRetry"),
+        error instanceof BookingCreateHallConflictError
+          ? t("requestForm.hallLockedRetry")
+          : error instanceof Error && error.message
+            ? error.message
+            : t("form.errorRetry"),
       );
     } finally {
       setLoading(false);
@@ -390,6 +455,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
 
               <FormField icon={Users} label={t("form.guest_count")}>
                 <input id="book-guests" name="guestCount" type="number" min={1}
+                  defaultValue={defaultGuestCount && defaultGuestCount > 0 ? defaultGuestCount : undefined}
                   className="form-input" placeholder={t("form.guestsPlaceholder")}
                   onChange={(e) => {
                     if (capacityMax && Number(e.target.value) > capacityMax) {
@@ -420,7 +486,17 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
                 </Label>
               </div>
 
-              <Button type="submit" disabled={loading || !isUserLoaded}
+              {hallRequired && !hallId && (
+                <p className="text-xs text-amber-500">{t("requestForm.errorNoHall")}</p>
+              )}
+              {hallLocked && (
+                <p className="text-xs text-amber-500">{t("requestForm.hallLockedRetry")}</p>
+              )}
+              {(hallUnavailable || capacityWarning) && (
+                <p className="text-xs text-amber-500">{t("requestForm.hallUnavailable")}</p>
+              )}
+
+              <Button type="submit" disabled={loading || !isUserLoaded || (hallRequired && !hallId) || hallLocked || hallUnavailable || capacityWarning}
                 className="w-full h-12 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                   <><Send className="mr-2 h-4 w-4" /> {t("requestForm.sendBookingRequest")}</>

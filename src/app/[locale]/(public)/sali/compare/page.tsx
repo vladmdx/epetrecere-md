@@ -11,7 +11,10 @@ import { t } from "@/i18n";
 import { DEFAULT_LOCALE, isLocale } from "@/lib/i18n/routing";
 import { ClearCompareButton } from "./clear-button";
 import { NotSpecified } from "@/components/public/not-specified";
-import { formatPrice } from "@/lib/format/price";
+import { formatAmount, formatPrice } from "@/lib/format/price";
+import { auth } from "@clerk/nextjs/server";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
+import { isMultiHallEnabled } from "@/lib/feature-flags";
 
 export const dynamic = "force-dynamic";
 
@@ -93,6 +96,10 @@ export default async function VenueComparePage({ params, searchParams }: Props) 
     );
   }
 
+  const { userId } = await auth();
+  const revealPrices = Boolean(userId);
+  const multiHallEnabled = isMultiHallEnabled();
+
   const [rows, images] = await Promise.all([
     db
       .select({
@@ -113,7 +120,7 @@ export default async function VenueComparePage({ params, searchParams }: Props) 
         menuPdfUrl: venues.menuPdfUrl,
       })
       .from(venues)
-      .where(and(inArray(venues.id, ids), eq(venues.isActive, true))),
+      .where(and(inArray(venues.id, ids), eq(venues.isActive, true), publishedVenuePredicateSql())),
     // Photos are the fastest way to tell three halls apart, and this page used
     // to draw the same grey pin for all of them. Same ordering as the listing
     // query, so a venue shows the same cover here as on its card.
@@ -125,6 +132,7 @@ export default async function VenueComparePage({ params, searchParams }: Props) 
         inArray(venueImages.venueId, ids),
         isNull(venueImages.hallId),
         eq(venues.isActive, true),
+        publishedVenuePredicateSql(),
       ))
       .orderBy(
         desc(venueImages.isCover),
@@ -144,7 +152,10 @@ export default async function VenueComparePage({ params, searchParams }: Props) 
 
   const ordered = ids
     .map((id) => rows.find((r) => r.id === id))
-    .filter((r): r is (typeof rows)[number] => !!r);
+    .filter((r): r is (typeof rows)[number] => !!r)
+    .map((row) => revealPrices && !multiHallEnabled
+      ? row
+      : { ...row, pricePerPerson: null });
 
   const rowDefs: Array<{
     label: string;
@@ -177,7 +188,12 @@ export default async function VenueComparePage({ params, searchParams }: Props) 
     },
     {
       label: t("compare.row.pricePerPerson", locale),
-      render: (v) => (v.pricePerPerson ? `${formatPrice(v.pricePerPerson, null, locale)}` : <NotSpecified />),
+      render: (v) => {
+        if (!revealPrices) return t("common.priceOnLogin", locale);
+        if (v.pricePerPerson == null || v.pricePerPerson < 0) return <NotSpecified />;
+        return formatPrice(v.pricePerPerson, null, locale)
+          ?? formatAmount(v.pricePerPerson, null, locale);
+      },
     },
     {
       label: t("catalog.rating", locale),

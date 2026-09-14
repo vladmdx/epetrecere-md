@@ -140,14 +140,19 @@ export function venueJsonLd(venue: {
   city?: string;
   image?: string;
   slug: string;
-  pricePerPerson?: number;
+  locale?: string;
+  halls?: Array<{ slug: string; name: string }>;
 }) {
+  const path = venue.locale && venue.locale !== "ro"
+    ? `/${venue.locale}/sali/${venue.slug}`
+    : `/sali/${venue.slug}`;
+  const url = `${BASE_URL}${path}`;
   return {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: venue.name,
     description: venue.description,
-    url: `${BASE_URL}/sali/${venue.slug}`,
+    url,
     ...(venue.image && { image: venue.image }),
     ...(venue.address && {
       address: {
@@ -157,6 +162,15 @@ export function venueJsonLd(venue: {
         addressCountry: "MD",
       },
     }),
+    ...(venue.halls?.length
+      ? {
+          containsPlace: venue.halls.map((hall) => ({
+            "@type": "Place",
+            name: hall.name,
+            "@id": `${url}#hall-${hall.slug}`,
+          })),
+        }
+      : {}),
   };
 }
 

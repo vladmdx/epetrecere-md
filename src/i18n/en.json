@@ -142,6 +142,12 @@
       "tagline": "Event services • portfolio • online booking",
       "reviewsWord": "reviews",
       "priceOnRequest": "Price on request",
+      "fixedPrice": "Fixed price",
+      "minimumOrder": "Minimum order",
+      "estimatedTotal": "Estimated total for the selected guest count",
+      "seatingOptions": "Seating options",
+      "seatingOption": "Seating",
+      "bookingTerms": "Booking terms",
       "fact": {
         "eventsLabel": "Events",
         "eventsValue": "Private and corporate",
@@ -269,12 +275,19 @@
       "priceOnRequest": "Price on request",
       "verifiedReviews": "Verified reviews",
       "verifiedReviewsHint": "Reviews can be sent after a confirmed event, directly from the client cabinet. This way, public feedback comes from real bookings.",
-      "eligibleBookings": "See eligible bookings"
+      "eligibleBookings": "See eligible bookings",
+      "selectHall": "Choose a hall",
+      "hallTooSmall": "This hall cannot host {count} guests.",
+      "hallUnavailable": "This hall is not available in the selected interval.",
+      "chooseHallToBook": "Select a hall to send the request."
     },
     "card": {
       "available": "Available",
       "featured": "Recommended",
-      "newVenue": "New location"
+      "newVenue": "New location",
+      "fromPrice": "from {price}",
+      "hallsSummary": "Halls: {total} • suitable: {suitable}",
+      "perPersonSuffix": "/ person"
     }
   },
   "form": {
@@ -3789,6 +3802,9 @@
     "sentSeeInMyBookings": "Your booking request was sent! You can see it in My Bookings.",
     "sentWeWillContact": "Your booking request was sent! We will contact you shortly.",
     "capacityWarning": "Exceeds the maximum capacity ({max} seats)",
+    "errorNoHall": "Select a hall to send the booking request.",
+    "hallLockedRetry": "The request for this hall is still in progress. You cannot switch halls until it is resolved.",
+    "hallUnavailable": "The selected hall does not match the criteria or is unavailable.",
     "sendBookingRequest": "Send booking request"
   },
   "results": {
@@ -3803,8 +3819,8 @@
     "bookingsTab": "Artist reservations",
     "viewInCrm": "View in CRM",
     "openPlan": "Open plan",
-    "venuesTitle": "Available halls",
-    "venuesSubtitle": "Free halls on {date} for at least {guests} guests",
+    "venuesTitle": "Suitable halls",
+    "venuesSubtitle": "Halls for at least {guests} guests. Availability is confirmed after choosing a time on {date}.",
     "venuesEmpty": "No venues available for the selected filters. Try changing the date or number of guests.",
     "artistsSubtitle": "{count} free artists · {used}/{max} requests sent",
     "artistsEmpty": "No artists available in this category for the selected date.",

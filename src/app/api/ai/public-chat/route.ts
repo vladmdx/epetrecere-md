@@ -12,6 +12,7 @@ import { artists, venues, categories } from "@/lib/db/schema";
 import { sql, eq } from "drizzle-orm";
 export const runtime = "nodejs";
 import { rateLimit } from "@/lib/rate-limit";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
 
 const chatSchema = z.object({
   messages: z
@@ -48,7 +49,7 @@ async function getStats(): Promise<Stats> {
     db
       .select({ c: sql<number>`count(*)::int` })
       .from(venues)
-      .where(eq(venues.isActive, true)),
+      .where(publishedVenuePredicateSql()),
     db
       .select({ slug: categories.slug, nameRo: categories.nameRo })
       .from(categories)

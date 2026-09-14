@@ -13,8 +13,9 @@ const PRIVATE_FIELDS = new Set([
 
 const PRICE_FIELDS = new Set([
   "price_from", "price_per_person", "price_eur", "base_price",
-  "priceFrom", "pricePerPerson", "price", "priceEur", "basePrice",
+  "priceFrom", "pricePerPerson", "price", "priceEur", "priceMdl", "basePrice",
   "packageMinPrice", "packageMaxPrice", "travelSurchargeAmount",
+  "minEffectivePrice", "minUnitPrice", "minimumOrder", "depositValue",
 ]);
 
 export function publicCatalogData<T>(value: T, showPrices = false): T {

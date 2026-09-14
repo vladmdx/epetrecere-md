@@ -11,6 +11,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { artists, venues, categories, bookingRequests, users } from "@/lib/db/schema";
+import { publishedVenuePredicateSql } from "@/lib/venues/public-publication";
 
 export interface SupplyCounts {
   /** Per homepage tile key. */
@@ -79,7 +80,7 @@ export async function getSupplyCounts(): Promise<SupplyCounts> {
         (SELECT count(*)::int FROM ${artists}
           WHERE ${artists.isActive} = true) AS "activeArtists",
         (SELECT count(*)::int FROM ${venues}
-          WHERE ${venues.isActive} = true) AS "activeVenues",
+          WHERE ${publishedVenuePredicateSql()}) AS "activeVenues",
         (SELECT count(*)::int FROM ${categories}) AS "serviceCategories",
         (SELECT count(*)::int
           FROM ${bookingRequests}

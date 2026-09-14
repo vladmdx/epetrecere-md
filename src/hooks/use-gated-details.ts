@@ -16,6 +16,7 @@ import { useAuth } from "@clerk/nextjs";
 export function useGatedDetails<T extends object>(
   type: "artist" | "venue",
   slug: string,
+  extraQuery?: string,
 ): T | null {
   const { isLoaded, isSignedIn } = useAuth();
   const [data, setData] = useState<T | null>(null);
@@ -24,8 +25,9 @@ export function useGatedDetails<T extends object>(
     setData(null);
     if (!isLoaded || !isSignedIn || !slug) return;
     let alive = true;
+    const query = extraQuery ? `&${extraQuery}` : "";
     fetch(
-      `/api/public/gated-details?type=${type}&slug=${encodeURIComponent(slug)}`,
+      `/api/public/gated-details?type=${type}&slug=${encodeURIComponent(slug)}${query}`,
     )
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
@@ -37,7 +39,7 @@ export function useGatedDetails<T extends object>(
     return () => {
       alive = false;
     };
-  }, [isLoaded, isSignedIn, type, slug]);
+  }, [isLoaded, isSignedIn, type, slug, extraQuery]);
 
   return isLoaded && isSignedIn ? data : null;
 }
