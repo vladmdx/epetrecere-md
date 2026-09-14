@@ -40,7 +40,10 @@ test("artist decisions are serialized and atomic inside the decision service", (
 
   assert.match(body, /db\.transaction/);
   assert.match(body, /acquireLegalScopeLocks\(tx/);
-  assert.match(body, /getLockedAppUserById\(adminUserId, executor\)/);
+  assert.match(
+    body,
+    /participantUserIds[\s\S]*\.from\(users\)[\s\S]*\.orderBy\(asc\(users\.id\)\)[\s\S]*\.for\("update"\)[\s\S]*lockedAdmin/,
+  );
   assert.match(body, /\.from\(artists\)[\s\S]*\.for\("update"\)/);
   assert.match(body, /rowVersion !== expected\.rowVersion/);
   assert.match(body, /missingRegistrationDocuments\(ownerId, "artist", executor\)/);
@@ -96,7 +99,11 @@ test("registration transition actor reads take a users row lock", () => {
 
   assert.equal(
     decision.match(/getLockedAppUserById\(adminUserId, executor\)/g)?.length,
-    3,
+    2,
+  );
+  assert.match(
+    decision,
+    /const lockedParticipants = await executor[\s\S]*\.from\(users\)[\s\S]*\.orderBy\(asc\(users\.id\)\)[\s\S]*\.for\("update"\)/,
   );
   assert.equal(
     onboarding.match(/getLockedAppUserById\(actorUserId, executor\)/g)?.length,
@@ -123,7 +130,14 @@ test("organization legal authority is rechecked under actor, organization, and m
     /\.from\(partnerOrganizations\)[\s\S]*\.for\("update"\)[\s\S]*ORG_STATUSES_ALLOWING_ACCESS/,
   );
 
-  assert.match(acceptance, /getLockedAppUserById\(input\.userId, executor\)/);
+  const acceptanceStart = acceptance.indexOf(
+    "export async function recordLegalAcceptancePack",
+  );
+  const acceptanceBody = acceptance.slice(acceptanceStart);
+  assert.match(
+    acceptanceBody,
+    /const lockedAudience = await tx[\s\S]*?\.from\(users\)[\s\S]*?\.orderBy\(asc\(users\.id\)\)[\s\S]*?\.for\("share"\)[\s\S]*?lockedAudience\.find\([\s\S]*?candidate\.id === input\.userId/,
+  );
   assert.match(
     acceptance,
     /authorizeOrganizationCapabilityLocked\([\s\S]*?"manage_legal",[\s\S]*?executor/,
@@ -144,6 +158,38 @@ test("organization legal authority is rechecked under actor, organization, and m
   );
   assert.doesNotMatch(memberWrites, /\bgetAppUserById\b/);
   assert.doesNotMatch(memberWrites, /\bauthorizeOrganizationCapability\b/);
+});
+
+test("generic profile editors cannot publish registered partners around approval gates", () => {
+  const artistRoute = readFileSync("src/app/api/artists/crud/route.ts", "utf8");
+  const venueRoute = readFileSync("src/app/api/venues/[id]/route.ts", "utf8");
+  const bulkRoute = readFileSync("src/app/api/admin/bulk/route.ts", "utf8");
+
+  assert.match(
+    artistRoute,
+    /db\.transaction[\s\S]*acquireLegalScopeLocks[\s\S]*getLockedAppUserById[\s\S]*\.from\(artists\)[\s\S]*\.for\("update"\)/,
+  );
+  assert.match(
+    artistRoute,
+    /existing\.userId[\s\S]*normalizedData\.isActive === true[\s\S]*APPROVAL_FLOW_REQUIRED/,
+  );
+  assert.match(artistRoute, /"userId" in rawData[\s\S]*OWNERSHIP_TRANSFER_REQUIRED/);
+  assert.match(
+    venueRoute,
+    /db\.transaction[\s\S]*acquireLegalScopeLocks[\s\S]*acquireAvailabilityLocks[\s\S]*getLockedAppUserById[\s\S]*\.from\(venues\)[\s\S]*\.for\("update"\)[\s\S]*authorizeVenueCapabilityLocked/,
+  );
+  assert.match(
+    venueRoute,
+    /venue\.organizationId !== expectedOrganizationId[\s\S]*VENUE_SCOPE_CHANGED/,
+  );
+  assert.match(
+    venueRoute,
+    /data\.isActive === true[\s\S]*venue\.organizationId != null[\s\S]*APPROVAL_FLOW_REQUIRED/,
+  );
+  assert.match(
+    bulkRoute,
+    /action === "activate"[\s\S]*APPROVAL_FLOW_REQUIRED[\s\S]*status: 409/,
+  );
 });
 
 test("submit owns the deduped admin notification and the route never redispatches it", () => {

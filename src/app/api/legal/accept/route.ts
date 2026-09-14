@@ -36,6 +36,11 @@ import {
   PARTNER_REQUIRED_DOCS,
   VENUE_REQUIRED_DOCS,
 } from "@/lib/legal";
+import { bootstrapAccountUserUnlessErased } from "@/lib/privacy/account-erasure-identity";
+import {
+  createServerLogCorrelationId,
+  safeServerErrorLog,
+} from "@/lib/safe-server-log";
 
 export const dynamic = "force-dynamic";
 
@@ -151,15 +156,34 @@ export async function POST(req: NextRequest) {
     .where(eq(users.clerkId, clerkId))
     .limit(1);
   if (!u) {
-    await db.insert(users).values({ clerkId, email: cu.primaryEmailAddress.emailAddress,
+    const bootstrapped = await bootstrapAccountUserUnlessErased({
+      clerkId,
+      email: cu.primaryEmailAddress.emailAddress,
       name: [cu.firstName, cu.lastName].filter(Boolean).join(" ") || null,
-      // Phone ownership is synchronized separately under a canonical lock.
-      phone: null, role: "user",
-    }).onConflictDoNothing();
-    [u] = await db.select({ id: users.id, phone: users.phone })
-      .from(users).where(eq(users.clerkId, clerkId)).limit(1);
+      avatarUrl: cu.imageUrl || null,
+    });
+    if (!bootstrapped) {
+      return NextResponse.json(
+        { error: "account_erased", code: "ACCOUNT_ERASED" },
+        { status: 410 },
+      );
+    }
+    u = bootstrapped;
   }
   if (!u) return NextResponse.json({ error: "account_sync_required" }, { status: 409 });
+  const { recordLegalAcceptancePack, syncVerifiedLegalEmail } = await import(
+    "@/lib/legal/record-acceptance"
+  );
+  const emailBinding = await syncVerifiedLegalEmail({
+    userId: u.id,
+    verifiedEmail: cu.primaryEmailAddress.emailAddress,
+  });
+  if (!emailBinding.ok) {
+    return NextResponse.json(
+      { error: "verified_email_could_not_be_bound", code: emailBinding.code },
+      { status: emailBinding.status },
+    );
+  }
   const phone = u.phone ?? cu.phoneNumbers?.[0]?.phoneNumber ?? null;
 
   // Link the signature to the vendor profile when one already exists. During
@@ -189,7 +213,6 @@ export async function POST(req: NextRequest) {
   const ip = clientIp(req);
   const ua = req.headers.get("user-agent")?.slice(0, 1000) ?? null;
   const device = describeDevice(ua, req.headers.get("x-client"));
-  const { recordLegalAcceptancePack } = await import("@/lib/legal/record-acceptance");
   const recordedPack = await recordLegalAcceptancePack({
     userId: u.id,
     subjectType,
@@ -204,9 +227,10 @@ export async function POST(req: NextRequest) {
     ipAddress: ip,
     userAgent: ua,
     deviceSummary: device,
-    // Bind delivery/evidence to the verified identity used for this request,
-    // even if an older local users.email mirror is empty or stale.
-    email: cu.primaryEmailAddress.emailAddress,
+    // The verified Clerk address was synchronized under the user lock above;
+    // recordLegalAcceptancePack rechecks the same binding under its delivery
+    // audience lock before it stores evidence or recipients.
+    email: emailBinding.email,
     phone,
     slugs,
   });
@@ -235,7 +259,12 @@ export async function POST(req: NextRequest) {
         dedupeKey: `legal_signed:${recordedPack.sessionId}:${admin.id}`,
       }))).onConflictDoNothing();
     } catch (error) {
-      console.error("[legal] in-app notification failed", error);
+      console.error(
+        "[legal] in-app notification failed",
+        safeServerErrorLog(error, {
+          correlationId: createServerLogCorrelationId(),
+        }),
+      );
     }
   }
 
@@ -248,7 +277,12 @@ export async function POST(req: NextRequest) {
       );
       await processLegalContractDelivery(recordedPack.sessionId);
     } catch (error) {
-      console.error("[legal] contract delivery failed; retry remains pending", error);
+      console.error(
+        "[legal] contract delivery failed; retry remains pending",
+        safeServerErrorLog(error, {
+          correlationId: createServerLogCorrelationId(),
+        }),
+      );
     }
   });
 

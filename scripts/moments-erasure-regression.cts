@@ -19,7 +19,7 @@ let state;
 function reset(extra = {}) {
   state = { photos: [photo(500)], blobs: new Set([urlFor(500)]), failed: new Set(), listFail: false, allowed: true,
     lists: [], dels: [], removed: [], parentDeleted: false, userDeleted: false, clerkDeleted: false,
-    updates: [], tx: false, locks: [], injectConcurrent: false, vendorMedia: null, ...extra };
+    updates: [], enqueuedAssets: [], registeredAssets: new Set(), googleCalendarPurges: [], tx: false, locks: [], injectConcurrent: false, vendorMedia: null, ...extra };
 }
 const blob = {
   list: async options => {
@@ -66,9 +66,21 @@ const db = {
       if (row) { assert.ok(params.includes(row.url), "only exact erased URL row is removed"); state.photos = state.photos.filter(p => p.id !== id); state.removed.push(id); }
     }
     if (name === "event_plans" || name === "users") {
-      assert.equal(state.tx, true); assert.equal(state.photos.length, 0, "cascade never loses unprocessed provenance");
+      assert.equal(state.tx, true);
       assert.ok(state.locks.includes("event_plans"));
-      if (name === "users") { assert.ok(state.locks.includes("users")); state.userDeleted = true; }
+      if (name === "users") {
+        assert.ok(state.locks.includes("users"));
+        for (const photoRow of state.photos) {
+          assert.ok(
+            state.enqueuedAssets.includes(photoRow.url),
+            "every cascaded photo URL must already have durable deletion intent",
+          );
+        }
+        state.photos = [];
+        state.userDeleted = true;
+      } else {
+        assert.equal(state.photos.length, 0, "plan cascade never loses unprocessed provenance");
+      }
       state.parentDeleted = true;
     }
     if (state.vendorMedia && name in state.vendorMedia) {
@@ -80,7 +92,12 @@ const db = {
     const name = getTableName(table); assert.equal(state.tx, true); state.updates.push(name);
     if (state.vendorMedia && name in state.vendorMedia) state.vendorMedia[name] = state.vendorMedia[name].map(row => ({ ...row, ...values }));
   } }; } }; },
-  execute: async query => { assert.match(dialect.sqlToQuery(query).sql, /SET LOCAL (lock_timeout|statement_timeout)/); },
+  execute: async query => {
+    assert.match(
+      dialect.sqlToQuery(query).sql,
+      /SET LOCAL (lock_timeout|statement_timeout)|select pg_advisory_xact_lock/,
+    );
+  },
   transaction: async fn => { assert.equal(state.tx, false); state.tx = true; try { return await fn(db); } finally { state.tx = false; } },
 };
 Module._load = function(request, parent, isMain) {
@@ -94,6 +111,56 @@ Module._load = function(request, parent, isMain) {
   if (resolved === path.join(root, "src/lib/rate-limit.ts")) return { rateLimit: async () => ({ success: true }) };
   if (resolved === path.join(root, "src/lib/privacy/guest-encryption.ts")) return { revealGuestListRecord: row => row };
   if (resolved === path.join(root, "src/lib/vendors/revalidate.ts")) return { revalidateVendorCatalog() {} };
+  if (resolved === path.join(root, "src/lib/privacy/account-asset-erasure.ts")) return {
+    isRegisteredAccountBlobAsset: async url => state.registeredAssets.has(url),
+    captureAccountAssetErasures: async () => {
+      assert.equal(state.tx, true);
+      state.locks.push("event_plans", "artists", "venues");
+      if (state.injectConcurrent) {
+        state.photos.push(photo(999));
+        state.blobs.add(urlFor(999));
+        state.injectConcurrent = false;
+      }
+      const artistRows = state.vendorMedia?.artists ?? [];
+      const venueRows = state.vendorMedia?.venues ?? [];
+      state.enqueuedAssets = [
+        ...state.photos.map(row => row.url),
+        ...artistRows.map(row => row.photoUrl),
+        ...venueRows.flatMap(row => [row.menuPdfUrl, row.ogImageUrl]),
+        ...(state.vendorMedia?.artist_images ?? []).map(row => row.url),
+        ...(state.vendorMedia?.venue_images ?? []).map(row => row.url),
+      ].filter(Boolean);
+      return {
+        artists: artistRows.map(row => ({ id: row.id, slug: row.slug ?? "qa-artist", isActive: row.isActive ?? true })),
+        venues: venueRows.map(row => ({ id: row.id, slug: row.slug ?? "qa-venue", isActive: row.isActive ?? true })),
+        artistIds: artistRows.map(row => row.id),
+        venueIds: venueRows.map(row => row.id),
+        planIds: [99],
+        enqueued: state.enqueuedAssets.length,
+      };
+    },
+  };
+  if (resolved === path.join(root, "src/lib/privacy/account-erasure-identity.ts")) return {
+    assertAccountErasureIdentityConfigured: () => undefined,
+    lockAccountErasureIdentity: async () => "a".repeat(64),
+    enqueueAccountErasureIdentity: async () => undefined,
+    processAccountErasureIdentity: async () => { state.clerkDeleted = true; return { status: "completed" }; },
+  };
+  if (resolved === path.join(root, "src/lib/legal/contract-delivery-privacy.ts")) return {
+    scrubLegalContractDeliveriesForUserErasure: async () => {
+      assert.equal(state.tx, true);
+      state.updates.push("legal_contract_delivery_outbox");
+    },
+  };
+  if (resolved === path.join(root, "src/lib/google/calendar-erasure.ts")) return {
+    purgeGoogleCalendarForAccountErasure: async (tx, input) => {
+      assert.equal(tx, db);
+      assert.equal(state.tx, true, "Google calendar PII is purged inside the account-erasure transaction");
+      assert.deepEqual(input, { userId: "qa-owner", organizationIds: [] });
+      state.googleCalendarPurges.push(input);
+      return { deleted: 0, scrubbed: 0 };
+    },
+  };
   return previousLoad.call(this, request, parent, isMain);
 };
 
@@ -116,6 +183,9 @@ Module._load = function(request, parent, isMain) {
     }
     reset({ listFail: true }); assert.equal(await erasure.eraseManagedPhoto(urlFor(500), plan), "retry");
     assert.equal(state.dels.length, 0);
+    reset({ registeredAssets: new Set([urlFor(500)]) });
+    assert.equal(await erasure.eraseManagedPhoto(urlFor(500), plan), "registered");
+    assert.equal(state.lists.length + state.dels.length, 0, "registered photo waits for its durable claim/outbox cleanup");
     reset({ sdkMixedCase: true }); assert.equal(await erasure.eraseManagedPhoto(urlFor(500), plan), "deleted");
     assert.deepEqual(state.dels, [urlFor(500)], "SDK host casing is normalized, deletion uses the canonical verified URL");
     console.log("PASS already-missing requires successful exact-store listing; foreign, wrong-plan, generic legacy and outage never authorize erasure");
@@ -146,11 +216,11 @@ Module._load = function(request, parent, isMain) {
     console.log("PASS plan deletion progresses in bounded batches and final locked recheck preserves concurrent upload");
 
     reset({ failed: new Set([urlFor(500)]) });
-    assert.equal((await account.DELETE()).status, 503);
-    assert.equal(state.photos.length, 1); assert.equal(state.userDeleted, false); assert.equal(state.clerkDeleted, false); assert.deepEqual(state.updates, []);
-    state.failed.clear(); state.blobs.clear();
     assert.equal((await account.DELETE()).status, 200);
     assert.equal(state.photos.length, 0); assert.equal(state.userDeleted, true); assert.equal(state.clerkDeleted, true);
+    assert.equal(state.googleCalendarPurges.length, 1);
+    assert.deepEqual(state.dels, [], "account erasure never calls Blob while deleting local rows");
+    assert.deepEqual(state.enqueuedAssets, [urlFor(500)]);
     const vendorMedia = {
       artists: [{ id: 561, photoUrl: "https://fixture.public.blob.vercel-storage.com/artist-cover.jpg" }],
       venues: [{ id: 24, menuPdfUrl: "https://fixture.public.blob.vercel-storage.com/menu.pdf", ogImageUrl: "https://fixture.public.blob.vercel-storage.com/venue-cover.jpg" }],
@@ -159,11 +229,19 @@ Module._load = function(request, parent, isMain) {
       artist_videos: [{ url: "https://example.invalid/vendor-video" }],
     };
     reset({ injectConcurrent: true, vendorMedia: structuredClone(vendorMedia) });
-    assert.equal((await account.DELETE()).status, 503);
-    assert.equal(state.userDeleted, false); assert.equal(state.clerkDeleted, false); assert.equal(state.photos.length, 1);
-    assert.deepEqual(state.vendorMedia, vendorMedia, "concurrent photo retry preserves all vendor URL fields and media rows");
-    assert.deepEqual(state.updates, [], "no minimization before final locked photo recheck");
-    console.log("PASS account storage cleanup precedes all mutation/cascade/Clerk deletion, with parent locks and final concurrent-photo guard");
+    assert.equal((await account.DELETE()).status, 200);
+    assert.equal(state.userDeleted, true); assert.equal(state.clerkDeleted, true); assert.equal(state.photos.length, 0);
+    assert.equal(state.googleCalendarPurges.length, 1);
+    assert.ok(state.enqueuedAssets.includes(urlFor(500)) && state.enqueuedAssets.includes(urlFor(999)));
+    for (const value of [
+      vendorMedia.artists[0].photoUrl,
+      vendorMedia.venues[0].menuPdfUrl,
+      vendorMedia.venues[0].ogImageUrl,
+      vendorMedia.artist_images[0].url,
+      vendorMedia.venue_images[0].url,
+    ]) assert.ok(state.enqueuedAssets.includes(value));
+    assert.deepEqual(state.dels, [], "worker owns all Blob I/O after commit");
+    console.log("PASS account deletion durably captures concurrent photo and vendor assets before local cascade; Blob I/O is deferred");
 
     let now = 0, removed = 0;
     const result = await erasure.erasePhotoBatch(batch.map(p => ({ ...p, plan })), async () => { removed++; now += 13_000; }, { now: () => now, erase: async () => "deleted" });

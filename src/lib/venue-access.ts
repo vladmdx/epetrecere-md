@@ -633,8 +633,12 @@ export async function getVenueOwnerRecipients(
   return [...recipients].map(([userId, email]) => ({ userId, email }));
 }
 
-export async function getVenueOwnerUserIds(venueId: number): Promise<string[]> {
-  return (await getVenueOwnerRecipients(venueId)).map((recipient) => recipient.userId);
+export async function getVenueOwnerUserIds(
+  venueId: number,
+  executor: typeof db = db,
+): Promise<string[]> {
+  return (await getVenueOwnerRecipients(venueId, executor))
+    .map((recipient) => recipient.userId);
 }
 
 export type ResolvedSelection =

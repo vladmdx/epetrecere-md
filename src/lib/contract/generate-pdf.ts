@@ -16,9 +16,16 @@ export interface ContractData {
   clientEmail: string | null;
   clientSignature: string | null;
   clientSignedAt: Date | null;
+  /** Stable render timestamp. For a signed document this is exactly the
+   * signing instant; unsigned previews use the immutable booking creation. */
+  generationDate: Date;
   // Vendor
   vendorName: string;
   vendorKind: "artist" | "sala";
+  /** Frozen venue/hall names for a venue booking. Never sourced from a live
+   * profile after confirmation. */
+  venueName?: string | null;
+  hallName?: string | null;
   vendorEmail: string | null;
   vendorPhone: string | null;
   // Event
@@ -29,6 +36,30 @@ export interface ContractData {
   guestCount: number | null;
   agreedPrice: number | null;
   message: string | null;
+}
+
+export function contractVendorPartyRows(
+  data: Pick<
+    ContractData,
+    | "vendorKind"
+    | "vendorName"
+    | "venueName"
+    | "hallName"
+    | "vendorPhone"
+    | "vendorEmail"
+  >,
+): Array<[string, string]> {
+  const identityRows: Array<[string, string]> = data.vendorKind === "sala"
+    ? [
+        ["Local (Prestator):", data.venueName || "Local"],
+        ["  Sala:", data.hallName || "Sala"],
+      ]
+    : [["Artist (Prestator):", data.vendorName]];
+  return [
+    ...identityRows,
+    ["  Telefon:", data.vendorPhone || "-"],
+    ["  Email:", data.vendorEmail || "-"],
+  ];
 }
 
 // Sanitize text for pdf-lib's Helvetica (WinAnsi). Romanian diacritics
@@ -51,6 +82,11 @@ export async function generateContractPdf(
   data: ContractData,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
+  doc.setTitle(`ePetrecere contract #${data.bookingId}`);
+  doc.setCreator("ePetrecere.md");
+  doc.setProducer("ePetrecere.md");
+  doc.setCreationDate(data.generationDate);
+  doc.setModificationDate(data.generationDate);
   const page = doc.addPage([595, 842]); // A4
   const { width, height } = page.getSize();
 
@@ -98,7 +134,9 @@ export async function generateContractPdf(
     color: dark,
   });
   y -= 20;
-  page.drawText(`Data generarii: ${new Date().toLocaleDateString("ro-RO")}`, {
+  page.drawText(`Data generarii: ${data.generationDate.toLocaleDateString("ro-RO", {
+    timeZone: "Europe/Chisinau",
+  })}`, {
     x: MARGIN,
     y,
     size: 9,
@@ -142,7 +180,6 @@ export async function generateContractPdf(
     y -= 10;
   }
 
-  const vendorLabel = data.vendorKind === "sala" ? "Sala" : "Artist";
   const price = data.agreedPrice ? `${data.agreedPrice} EUR` : "de negociat";
   const time =
     data.startTime && data.endTime
@@ -150,9 +187,7 @@ export async function generateContractPdf(
       : data.startTime || "-";
 
   section("PARTILE CONTRACTANTE", [
-    [`${vendorLabel} (Prestator):`, data.vendorName],
-    ["  Telefon:", data.vendorPhone || "-"],
-    ["  Email:", data.vendorEmail || "-"],
+    ...contractVendorPartyRows(data),
     ["Client (Beneficiar):", data.clientName],
     ["  Telefon:", data.clientPhone],
     ["  Email:", data.clientEmail || "-"],
@@ -234,7 +269,9 @@ export async function generateContractPdf(
     });
     if (data.clientSignedAt) {
       page.drawText(
-        `Semnat electronic la ${data.clientSignedAt.toLocaleString("ro-RO")}`,
+        `Semnat electronic la ${data.clientSignedAt.toLocaleString("ro-RO", {
+          timeZone: "Europe/Chisinau",
+        })}`,
         {
           x: MARGIN + 8,
           y: y - 35,

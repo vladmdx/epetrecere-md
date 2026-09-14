@@ -93,6 +93,47 @@ Module._load = function(request, parent, isMain) {
   } };
   let resolved; try { resolved = Module._resolveFilename(request, parent); } catch {}
   if (request === "@/lib/db" || resolved === path.join(root, "src/lib/db/index.ts")) return { db };
+  if (resolved === path.join(root, "src/lib/privacy/account-asset-erasure.ts")) return {
+    captureAccountAssetErasures: async () => {
+      assert.equal(state.inTx, true, "asset intent is captured inside erasure tx");
+      state.trace.push("enqueue:account-assets");
+      const ownedArtists = state.artistExists && state.ownedKinds.includes("artist")
+        ? [{ id: 101, slug: "qa-artist", isActive: true }]
+        : [];
+      const ownedVenues = state.venueExists && state.ownedKinds.includes("venue")
+        ? [{ id: 202, slug: "qa-venue", isActive: true }]
+        : [];
+      return {
+        artists: ownedArtists,
+        venues: ownedVenues,
+        artistIds: ownedArtists.map(row => row.id),
+        venueIds: ownedVenues.map(row => row.id),
+        planIds: [],
+        enqueued: 0,
+      };
+    },
+  };
+  if (resolved === path.join(root, "src/lib/privacy/account-erasure-identity.ts")) return {
+    assertAccountErasureIdentityConfigured: () => undefined,
+    lockAccountErasureIdentity: async () => { state.trace.push("lock:identity"); return "a".repeat(64); },
+    enqueueAccountErasureIdentity: async () => { state.trace.push("enqueue:identity"); },
+    processAccountErasureIdentity: async () => { state.trace.push("delete:clerk"); return { status: "completed" }; },
+  };
+  if (resolved === path.join(root, "src/lib/legal/contract-delivery-privacy.ts")) return {
+    scrubLegalContractDeliveriesForUserErasure: async () => {
+      assert.equal(state.inTx, true);
+      state.trace.push("update:legal_contract_delivery_outbox");
+    },
+  };
+  if (resolved === path.join(root, "src/lib/google/calendar-erasure.ts")) return {
+    purgeGoogleCalendarForAccountErasure: async (tx, input) => {
+      assert.equal(tx, db);
+      assert.equal(state.inTx, true, "Google calendar PII is purged inside the account-erasure transaction");
+      assert.deepEqual(input, { userId: "qa-private-id", organizationIds: [] });
+      state.trace.push("purge:google-calendar");
+      return { deleted: 0, scrubbed: 0 };
+    },
+  };
   return originalLoad.call(this, request, parent, isMain);
 };
 
@@ -155,6 +196,15 @@ Module._load = function(request, parent, isMain) {
       reset({ ownedKinds, accountDelete: true });
       assert.equal((await account.DELETE()).status, 200);
       assert.ok(state.trace.includes("lock:legal-scope"), "account erasure is serialized with membership/signing mutations");
+      assert.equal(state.trace.filter(entry => entry === "purge:google-calendar").length, 1);
+      assert.ok(
+        state.trace.indexOf("purge:google-calendar") < state.trace.indexOf("delete:users"),
+        "Google calendar PII is purged before the local user is cascaded",
+      );
+      assert.ok(
+        state.trace.indexOf("enqueue:account-assets") < state.trace.indexOf("delete:users"),
+        "durable asset intent must precede the user cascade",
+      );
       const cache = state.trace.filter(entry => entry.startsWith("cache:"));
       assert.equal(cache.length, ownedKinds.length * 16);
       for (const kind of ownedKinds) {
@@ -166,6 +216,13 @@ Module._load = function(request, parent, isMain) {
       }
       assert.ok(cache.every(entry => !entry.includes("[") && !entry.includes("(public)")));
       assert.ok(!state.trace.some(entry => entry.includes("legal_acceptances")), "signed evidence is never altered");
+      const offerErasure = state.trace.indexOf("update:offer_requests");
+      const bookingErasure = state.trace.lastIndexOf("update:booking_requests");
+      const userErasure = state.trace.indexOf("delete:users");
+      assert.ok(
+        offerErasure >= 0 && offerErasure < bookingErasure && bookingErasure < userErasure,
+        "linked offer and booking PII is minimized atomically before the user row",
+      );
       assert.ok(state.trace.includes("delete:clerk"));
       passed(`account: ${ownedKinds.join("+") || "client-only"} invalidates only owned catalogs and preserves signed evidence`);
     }

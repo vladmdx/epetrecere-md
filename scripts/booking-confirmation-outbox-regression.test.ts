@@ -779,16 +779,26 @@ test("permanent channel failure dead-letters and does not starve healthy work", 
   await vendorCancelBooking(brokenBooking.id, "end requeue test");
 });
 
-test("provider timeout releases a wedged channel and lets healthy rows behind run", async () => {
+test("push timeout stops provider transport before the barrier is released", async () => {
   const booking = await createBooking();
   const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
   let emails = 0;
   let emailIdempotencyKey = "";
+  let observedSignal: AbortSignal | undefined;
+  let transportStopped = false;
   const started = Date.now();
   const result = await processConfirmationNotificationEffect(effect.id, {
     providerTimeoutMs: 25,
     drivers: {
-      sendPushToUser: async () => new Promise(() => undefined),
+      sendPushToUser: async (_userId, _payload, options) => {
+        observedSignal = options?.signal;
+        return new Promise((_, reject) => {
+          options?.signal?.addEventListener("abort", () => {
+            transportStopped = true;
+            reject(options.signal?.reason ?? new Error("aborted"));
+          }, { once: true });
+        });
+      },
       sendWhatsAppToUser: async () => ({ sent: true }),
       sendEmail: async (input) => {
         emails += 1;
@@ -798,10 +808,42 @@ test("provider timeout releases a wedged channel and lets healthy rows behind ru
     },
   });
   assert.equal(result.status, "failed");
-  assert.ok(Date.now() - started < 2_000, "never-resolving provider is bounded");
+  assert.ok(Date.now() - started < 2_000, "abortable provider is bounded");
+  assert.equal(observedSignal?.aborted, true);
+  assert.equal(transportStopped, true,
+    "provider transport settles before cancellation can acquire the barrier");
   assert.equal(emails, 1, "later healthy channel is not starved");
   assert.match(emailIdempotencyKey, new RegExp(`^booking:${booking.id}:.*:email$`));
   await vendorCancelBooking(booking.id, "end timeout test");
+});
+
+test("email timeout aborts provider transport before the booking barrier is released", async () => {
+  const booking = await createBooking();
+  const effect = await enqueueBookingEffect(db, booking.id, CONFIRMATION_NOTIFICATION_EFFECT);
+  let observedSignal: AbortSignal | undefined;
+  let transportStopped = false;
+  const started = Date.now();
+  const result = await processConfirmationNotificationEffect(effect.id, {
+    providerTimeoutMs: 25,
+    drivers: {
+      sendPushToUser: async () => ({ sent: 1, pruned: 0 }),
+      sendWhatsAppToUser: async () => ({ sent: true }),
+      sendEmail: async (input) => {
+        observedSignal = input.signal;
+        return new Promise((_, reject) => {
+          input.signal?.addEventListener("abort", () => {
+            transportStopped = true;
+            reject(input.signal?.reason ?? new Error("aborted"));
+          }, { once: true });
+        });
+      },
+    },
+  });
+  assert.equal(result.status, "failed");
+  assert.ok(Date.now() - started < 2_000, "never-resolving email is bounded");
+  assert.equal(observedSignal?.aborted, true);
+  assert.equal(transportStopped, true, "provider transport stops before cancellation can acquire the barrier");
+  await vendorCancelBooking(booking.id, "end email timeout test");
 });
 
 test("cron auth, Inngest recovery and API confirmation wiring stay active", async () => {
@@ -843,9 +885,9 @@ test("cron auth, Inngest recovery and API confirmation wiring stay active", asyn
   assert.match(inngest, /cron:\s*"\*\/5 \* \* \* \*"/);
   assert.match(inngest, /booking_confirmation_outbox_unhealthy/);
   const route = readFileSync("src/app/api/booking-requests/[id]/route.ts", "utf8");
-  assert.match(route, /confirmBookingWithEffects/);
-  assert.match(route, /replayConfirmationEffects/);
-  assert.match(route, /scheduleConfirmationNotifications\(updated\)/);
+  assert.match(route, /withBookingMutationBoundary/);
+  assert.match(route, /persistConfirmationEffects\(executor/);
+  assert.match(route, /scheduleConfirmationNotifications\(result\.row\)/);
   assert.match(route, /clientCancelBooking/);
   assert.match(route, /vendorCancelBooking/);
 });

@@ -24,6 +24,8 @@ interface SendEmailOptions {
   attachments?: EmailAttachment[];
   /** Resend keeps the first successful request for this stable key. */
   idempotencyKey?: string;
+  /** Cancels the provider HTTP request when the caller's lease expires. */
+  signal?: AbortSignal;
 }
 
 export async function sendEmail({
@@ -33,9 +35,14 @@ export async function sendEmail({
   replyTo,
   attachments,
   idempotencyKey,
+  signal,
 }: SendEmailOptions) {
   const from = process.env.EMAIL_FROM || "ePetrecere.md <noreply@epetrecere.md>";
 
+  const requestOptions = {
+    ...(idempotencyKey ? { idempotencyKey } : {}),
+    ...(signal ? { signal } : {}),
+  };
   return getResend().emails.send({
     from,
     to,
@@ -51,7 +58,11 @@ export async function sendEmail({
           })),
         }
       : {}),
-  }, idempotencyKey ? { idempotencyKey } : undefined);
+    // Resend 6.x forwards request options to native fetch. Its public type
+    // omits RequestInit.signal, so keep this structural cast isolated here.
+  }, requestOptions as Parameters<
+    ReturnType<typeof getResend>["emails"]["send"]
+  >[1]);
 }
 
 /** Turn a PNG data URL into an attachment Resend accepts. */

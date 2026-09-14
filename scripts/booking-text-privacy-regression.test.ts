@@ -49,11 +49,26 @@ test("calendar visitors see availability only, while owner/admin notes remain av
 
 test("booking API and venue DTO gate all displayed free-text names before delivery", () => {
   const api = readFileSync("src/app/api/booking-requests/route.ts", "utf8");
+  assert.match(api, /bookingContractClientMatches\(b, appUser\)/);
+  assert.doesNotMatch(
+    api,
+    /b\.clientUserId === appUser\.id \|\| b\.clientEmail === appUser\.email/,
+    "null e-mails and a stale matching e-mail must never bypass clientUserId",
+  );
   for (const key of ["clientName", "artistName", "venueName", "eventType", "message", "artistReply"]) {
     assert.match(api, new RegExp(`${key}: bookingTextForViewer\\(row\\.${key},`));
   }
   assert.match(api, /clientName: bookingTextForViewer\(row\.clientName, showContact\)/);
   assert.match(api, /nameRo: bookingTextForViewer\(linkedVenue\.nameRo, textShared\)/);
+  const publicRows = api.slice(
+    api.indexOf("const result = await db"),
+    api.indexOf("// Resolve artist category", api.indexOf("const result = await db")),
+  );
+  assert.doesNotMatch(
+    publicRows,
+    /clientUserId:/,
+    "stable internal client UUID must not be part of the response DTO",
+  );
   const venue = readFileSync("src/lib/db/queries/venue-bookings.ts", "utf8");
   for (const key of ["clientName", "planTitle", "eventType", "message", "artistReply"]) {
     assert.match(venue, new RegExp(`${key}: bookingTextForViewer\\(r\\.${key}, canSeeContact\\)`));
@@ -69,7 +84,10 @@ test("both private iCal feeds and venue calendar sanitize the same client name a
     assert.match(source, /const clientName = bookingTextForViewer\(b\.clientName, shared\)/);
     assert.match(source, /const eventType = bookingTextForViewer\(b\.eventType, shared\)/);
     assert.doesNotMatch(source, /\$\{b\.clientName\}/);
-    assert.match(source, /bookingTextForViewer\(b\.message, shared\)/);
+    assert.doesNotMatch(source, /`Mesaj:\s*\$\{b\.message\}/);
+    if (source.includes("b.message")) {
+      assert.match(source, /bookingTextForViewer\(b\.message, shared\)/);
+    }
   }
   const calendar = readFileSync("src/app/[locale]/(vendor)/dashboard/sala/calendar/page.tsx", "utf8");
   assert.match(calendar, /clientName: bookingTextForViewer\(booking\.clientName, contactsAreShared\(booking\.status\)\)/);
@@ -80,7 +98,10 @@ test("dashboard summaries and availability conflict messages do not reopen the n
     assert.match(readFileSync(path, "utf8"), /clientName: bookingTextForViewer\(/);
   }
   const availability = readFileSync("src/lib/booking/availability.ts", "utf8");
-  assert.equal((availability.match(/clientName: bookingTextForViewer\(b\.clientName, false\)/g) ?? []).length, 2);
+  assert.match(
+    availability,
+    /clientName: bookingTextForViewer\([^,]+\.clientName, false\)/,
+  );
   const offers = visiblePriceOffers([{ from: "artist", amount: 300, at: "2026-09-07", message: "test&#64;example.com" }], "accepted")!;
   assert.equal(containsContact(offers[0].message!), false);
   assert.ok(!offers[0].message!.includes("&#64;"));

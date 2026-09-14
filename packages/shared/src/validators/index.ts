@@ -51,29 +51,103 @@ const HHMMSchema = z
   .string()
   .regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "Ora trebuie să fie HH:MM");
 
-const PhoneSchema = z
-  .string()
-  .min(7, "Numărul de telefon e prea scurt")
-  .max(20, "Numărul de telefon e prea lung");
+/** Canonical booking contact representation: optional leading `+`, followed
+ * only by digits. Formatting separators are accepted at the boundary and
+ * removed before the value is hashed or persisted. */
+export function normalizeBookingPhone(value: string): string {
+  const trimmed = value.trim();
+  const digits = trimmed.replace(/\D/g, "");
+  return trimmed.startsWith("+") ? `+${digits}` : digits;
+}
 
-const EmailSchema = z.string().email("Email invalid");
+export function isValidBookingPhone(value: string): boolean {
+  const trimmed = value.trim();
+  if (
+    trimmed.length < 1
+    || trimmed.length > 40
+    || !/^\+?[0-9\s().-]+$/.test(trimmed)
+  ) {
+    return false;
+  }
+  const digits = trimmed.replace(/\D/g, "");
+  return digits.length >= 8
+    && digits.length <= 15
+    && !/^(\d)\1+$/.test(digits)
+    && !/(\d)\1{6,}$/.test(digits);
+}
+
+export const BookingPhoneSchema = z
+  .string()
+  .refine(isValidBookingPhone, "Număr de telefon invalid")
+  .transform(normalizeBookingPhone);
+
+const EmailSchema = z
+  .string()
+  .trim()
+  .max(254, "Email prea lung")
+  .email("Email invalid")
+  .transform((value) => value.toLowerCase());
 
 // ─── Booking request — create from client ───────────────────────────
 
-export const BookingRequestCreateSchema = z.object({
-  artistId: z.number().int().positive().nullable().optional(),
-  venueId: z.number().int().positive().nullable().optional(),
-  eventPlanId: z.number().int().positive().nullable().optional(),
-  clientName: z.string().min(2, "Numele e prea scurt").max(100),
-  clientPhone: PhoneSchema,
-  clientEmail: EmailSchema.nullable().optional(),
-  eventDate: IsoDateSchema,
-  startTime: HHMMSchema.nullable().optional(),
-  endTime: HHMMSchema.nullable().optional(),
-  eventType: z.string().nullable().optional(),
-  guestCount: z.number().int().positive().nullable().optional(),
-  message: z.string().max(2000).nullable().optional(),
-});
+const OptionalPositiveIdSchema = z.preprocess(
+  (value) => (value === null ? undefined : value),
+  z.number().int().positive().max(2_147_483_647).optional(),
+);
+
+const OptionalHHMMSchema = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Ora trebuie să fie HH:MM").optional(),
+);
+
+const OptionalTrimmedText = (max: number) => z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.string().trim().max(max).optional(),
+);
+
+export const BookingRequestCreateSchema = z
+  .object({
+    artistId: OptionalPositiveIdSchema,
+    venueId: OptionalPositiveIdSchema,
+    eventPlanId: OptionalPositiveIdSchema,
+    clientName: z.string().trim().min(2, "Numele e prea scurt").max(100),
+    clientPhone: BookingPhoneSchema,
+    clientEmail: z.preprocess(
+      (value) => (value === "" || value === null ? undefined : value),
+      EmailSchema.optional(),
+    ),
+    eventDate: IsoDateSchema.refine((value) => {
+      const parsed = new Date(`${value}T00:00:00Z`);
+      return Number.isFinite(parsed.getTime())
+        && parsed.toISOString().slice(0, 10) === value;
+    }, "Data evenimentului este invalidă"),
+    startTime: OptionalHHMMSchema,
+    endTime: OptionalHHMMSchema,
+    eventType: z.preprocess(
+      (value) => (value === "" || value === null ? undefined : value),
+      EventTypeSchema.optional(),
+    ),
+    guestCount: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().int().positive().max(10_000).optional(),
+    ),
+    message: OptionalTrimmedText(2_000),
+    agreedPrice: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.number().int().min(0).max(10_000_000).optional(),
+    ),
+    packageId: OptionalPositiveIdSchema,
+    hallId: OptionalPositiveIdSchema,
+    reservationScope: z.preprocess(
+      (value) => (value === null ? undefined : value),
+      z.enum(["hall", "venue"]).optional(),
+    ),
+  })
+  .strict()
+  .refine((data) => Boolean(data.artistId) !== Boolean(data.venueId), {
+    message: "Este necesar exact un artist sau un local",
+    path: ["artistId"],
+  });
 
 // ─── Booking request — artist actions on a pending request ─────────
 

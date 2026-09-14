@@ -4,10 +4,11 @@
  * must follow the organization, not the legacy owner column.
  */
 import { createHash } from "node:crypto";
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   artists,
+  bookingRequests,
   notifications,
   partnerOrganizations,
   users,
@@ -74,17 +75,44 @@ async function decidePartnerArtist(
 
   const decided = await db.transaction(async (tx) => {
     const executor = tx as unknown as typeof db;
+    const participantUserIds = [
+      ...new Set([adminUserId, ...(expected.userId ? [expected.userId] : [])]),
+    ].sort();
     await acquireLegalScopeLocks(tx, {
-      userIds: [adminUserId, ...(expected.userId ? [expected.userId] : [])],
+      userIds: participantUserIds,
     });
 
-    const admin = await getLockedAppUserById(adminUserId, executor);
-    if (!admin?.isGlobalAdmin) {
+    // Every actor row precedes the vendor parent. Booking creation follows the
+    // same user -> artist order, so a rejection cannot hold the artist while
+    // waiting to demote its owner. UUID ordering also keeps overlapping admin
+    // decisions deterministic.
+    const lockedParticipants = await executor
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(inArray(users.id, participantUserIds))
+      .orderBy(asc(users.id))
+      .for("update");
+    const lockedAdmin = lockedParticipants.find(({ id }) => id === adminUserId);
+    if (
+      !lockedAdmin
+      || (lockedAdmin.role !== "admin" && lockedAdmin.role !== "super_admin")
+    ) {
       return {
         ok: false as const,
         error: "Forbidden",
         status: 403,
         code: "FORBIDDEN",
+      };
+    }
+    if (
+      expected.userId
+      && !lockedParticipants.some(({ id }) => id === expected.userId)
+    ) {
+      return {
+        ok: false as const,
+        error: "registration_changed",
+        status: 409,
+        code: "REGISTRATION_CHANGED",
       };
     }
 
@@ -183,6 +211,15 @@ async function decidePartnerArtist(
         dedupeKey: `registration_rejected:artist:${artistId}:${decisionKey}:${ownerId}`,
       })
       .onConflictDoNothing();
+    // Rejection deletes the profile and lets artist_id become NULL. Preserve
+    // the vendor identity first so historical/manual bookings and their
+    // contracts cannot silently turn into venue bookings after the FK action.
+    await executor
+      .update(bookingRequests)
+      .set({
+        artistNameSnapshot: sql`COALESCE(NULLIF(BTRIM(${bookingRequests.artistNameSnapshot}), ''), ${current.artist.nameRo})`,
+      })
+      .where(eq(bookingRequests.artistId, artistId));
     const [deleted] = await executor
       .delete(artists)
       .where(and(eq(artists.id, artistId), eq(artists.isActive, false)))

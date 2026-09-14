@@ -35,9 +35,9 @@ import {
   BookingChangedError,
   clientCancelBooking,
   confirmBookingWithEffects,
+  replayConfirmationEffects,
   vendorCancelBooking,
 } from "../src/lib/booking/booking-transitions";
-import { persistConfirmationEffects } from "../src/lib/booking/confirmation-persist";
 import { createVenueScheduleBlock, deleteVenueScheduleBlocks } from "../src/lib/booking/venue-schedule-write";
 import { getMergedVenueCalendar } from "../src/lib/booking/merged-calendar";
 import {
@@ -990,8 +990,8 @@ test("concurrent confirm and retry keep a single calendar projection", async () 
   assert.equal(ok.length, 1, JSON.stringify(results, null, 2));
   const [confirmed] = await db.select().from(bookingRequests).where(eq(bookingRequests.id, accepted.id));
   assert.equal(confirmed.status, "confirmed_by_client");
-  await persistConfirmationEffects(db, confirmed);
-  await persistConfirmationEffects(db, confirmed);
+  await replayConfirmationEffects(confirmed);
+  await replayConfirmationEffects(confirmed);
   const projections = await db
     .select({ id: calendarEvents.id })
     .from(calendarEvents)
@@ -1121,6 +1121,7 @@ test("editing one hall must not delete a sister hall block", async () => {
   assert.equal(garden.ok, true);
   const removed = await deleteVenueScheduleBlocks({
     venueId: ids.venue,
+    actorUserId: ids.owner,
     eventDate: "2027-12-12",
     hallId: ids.grand,
     wholeVenue: false,
@@ -1131,6 +1132,52 @@ test("editing one hall must not delete a sister hall block", async () => {
   assert.equal(leftover.filter((row) => row.hallId === ids.grand).length, 0);
   assert.equal(leftover.filter((row) => row.hallId === ids.garden).length, 1);
   await db.delete(venueScheduleBlocks).where(eq(venueScheduleBlocks.venueId, ids.venue));
+});
+
+test("manual deletion preserves external backfill but can clear legacy manual backfill", async () => {
+  const [external, manual] = await db
+    .insert(venueScheduleBlocks)
+    .values([
+      {
+        venueId: ids.venue,
+        hallId: ids.grand,
+        startsAt: new Date("2027-12-14T00:00:00.000Z"),
+        endsAt: new Date("2027-12-15T00:00:00.000Z"),
+        kind: "external_calendar" as const,
+        source: "backfill_0028:calendar_events",
+        createdBy: ids.owner,
+      },
+      {
+        venueId: ids.venue,
+        hallId: ids.grand,
+        startsAt: new Date("2027-12-15T00:00:00.000Z"),
+        endsAt: new Date("2027-12-16T00:00:00.000Z"),
+        kind: "manual" as const,
+        source: "backfill_0028:calendar_events",
+        createdBy: ids.owner,
+      },
+    ])
+    .returning();
+  const externalAttempt = await deleteVenueScheduleBlocks({
+    venueId: ids.venue,
+    actorUserId: ids.owner,
+    id: external!.id,
+  });
+  assert.deepEqual(externalAttempt, { ok: true, deleted: 0 });
+  const manualAttempt = await deleteVenueScheduleBlocks({
+    venueId: ids.venue,
+    actorUserId: ids.owner,
+    id: manual!.id,
+  });
+  assert.deepEqual(manualAttempt, { ok: true, deleted: 1 });
+  const [externalStillPresent] = await db
+    .select({ id: venueScheduleBlocks.id })
+    .from(venueScheduleBlocks)
+    .where(eq(venueScheduleBlocks.id, external!.id));
+  assert.equal(externalStillPresent?.id, external!.id);
+  await db
+    .delete(venueScheduleBlocks)
+    .where(eq(venueScheduleBlocks.id, external!.id));
 });
 
 test("legacy calendar_events blocked day is not bookable", async () => {

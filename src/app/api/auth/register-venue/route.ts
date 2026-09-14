@@ -22,6 +22,7 @@ import { jsonIfMultiHallEnabled } from "@/lib/partner/multi-hall-gate";
 import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { claimLegacyVenueRegistrationInDatabase } from "@/lib/auth/select-role";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
+import { bootstrapAccountUserUnlessErased } from "@/lib/privacy/account-erasure-identity";
 
 // Each day is `{ open: HH:mm, close: HH:mm }` or null (closed). Mirrors
 // venues.workingHours so we can pass it straight through.
@@ -122,40 +123,21 @@ export async function POST(req: Request) {
         );
       }
 
-      const [created] = await db
-        .insert(users)
-        .values({
-          clerkId,
-          email,
-          name: [clerkUser.firstName, clerkUser.lastName]
-            .filter(Boolean)
-            .join(" ") || null,
-          // Phone ownership is claimed under the account + canonical-phone
-          // locks below. Importing it here would recreate the duplicate-phone
-          // race before the registration transaction begins.
-          phone: null,
-          avatarUrl: clerkUser.imageUrl || null,
-          role: "user",
-        })
-        .onConflictDoNothing()
-        .returning({ id: users.id, email: users.email });
-
-      if (created) {
-        appUser = created;
-      } else {
-        const [existing] = await db
-          .select({ id: users.id, email: users.email })
-          .from(users)
-          .where(eq(users.clerkId, clerkId))
-          .limit(1);
-        if (!existing) {
-          return NextResponse.json(
-            { error: "User creation failed" },
-            { status: 500 },
-          );
-        }
-        appUser = existing;
+      const bootstrapped = await bootstrapAccountUserUnlessErased({
+        clerkId,
+        email,
+        name: [clerkUser.firstName, clerkUser.lastName]
+          .filter(Boolean)
+          .join(" ") || null,
+        avatarUrl: clerkUser.imageUrl || null,
+      });
+      if (!bootstrapped) {
+        return NextResponse.json(
+          { error: "Account erased", code: "ACCOUNT_ERASED" },
+          { status: 410 },
+        );
       }
+      appUser = bootstrapped;
     }
 
     const missing = await missingRegistrationDocuments(appUser.id, "venue");
@@ -391,10 +373,7 @@ export async function POST(req: Request) {
     after(async () => {
       try {
         const { triggerReferral } = await import("@/lib/referrals/trigger");
-        await triggerReferral(appUser.id, "onboarded", {
-          kind: "venue",
-          venueId: venue.id,
-        });
+        await triggerReferral(appUser.id, "onboarded");
       } catch (err) {
         console.error("[referral] venue onboarded trigger failed", err);
       }

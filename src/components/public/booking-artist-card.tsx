@@ -14,6 +14,10 @@ import { toast } from "sonner";
 import { useLocale } from "@/hooks/use-locale";
 import { getLocalized } from "@/i18n";
 import { formatPrice } from "@/lib/format/price";
+import {
+  bookingCreateScope,
+  submitBookingCreateRequest,
+} from "@/lib/booking/booking-create-client";
 
 interface BookingArtistCardProps {
   artist: {
@@ -61,7 +65,7 @@ export function BookingArtistCard({
   onBookingSent,
 }: BookingArtistCardProps) {
   const { locale, t } = useLocale();
-  const { isSignedIn, isLoaded } = useUser();
+  const { user, isSignedIn, isLoaded } = useUser();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -77,26 +81,30 @@ export function BookingArtistCard({
   const showPrice = isLoaded && isSignedIn;
 
   async function handleSubmit() {
-    if (submitting) return;
+    if (submitting || !isLoaded) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/booking-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = {
+        artistId: artist.id,
+        clientName: eventContext.clientName,
+        clientPhone: eventContext.clientPhone,
+        clientEmail: eventContext.clientEmail,
+        eventDate: eventContext.eventDate,
+        eventType: eventContext.eventType,
+        guestCount: eventContext.guestCount,
+        message: message.trim() || undefined,
+        eventPlanId: eventContext.eventPlanId ?? undefined,
+      };
+      const res = await submitBookingCreateRequest({
+        scope: bookingCreateScope({
+          actorId: user?.id,
           artistId: artist.id,
-          clientName: eventContext.clientName,
-          clientPhone: eventContext.clientPhone,
-          clientEmail: eventContext.clientEmail,
-          eventDate: eventContext.eventDate,
-          eventType: eventContext.eventType,
-          guestCount: eventContext.guestCount,
-          message: message.trim() || undefined,
-          eventPlanId: eventContext.eventPlanId ?? undefined,
+          eventPlanId: eventContext.eventPlanId,
         }),
+        payload,
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
+        const err = await res.response.json().catch(() => ({}));
         throw new Error(err.error || t("booking.card.sendError"));
       }
       toast.success(t("booking.card.sentTo", { name }));
@@ -169,7 +177,7 @@ export function BookingArtistCard({
                   rows={3}
                   placeholder={t("booking.card.messagePlaceholder")}
                   className="mt-1"
-                  disabled={submitting}
+                  disabled={submitting || !isLoaded}
                 />
               </div>
             </div>
@@ -194,7 +202,7 @@ export function BookingArtistCard({
                 <Button
                   size="sm"
                   onClick={handleSubmit}
-                  disabled={submitting}
+                  disabled={submitting || !isLoaded}
                   className="gap-2 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
                 >
                   {submitting ? (

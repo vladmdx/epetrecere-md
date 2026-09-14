@@ -35,19 +35,113 @@ import {
   lte,
   sql,
 } from "drizzle-orm";
-import { resolveSelectedVenue, requireVenueCapability } from "@/lib/venue-access";
+import {
+  authorizeVenueCapabilityLocked,
+  getLockedAppUserById,
+  resolveSelectedVenue,
+  requireVenueCapability,
+} from "@/lib/venue-access";
 import { rateLimit } from "@/lib/rate-limit";
 import {
   generateVenueDescription,
   generateSEOTexts,
 } from "@/lib/ai";
 import { getAiClient } from "@/lib/ai/provider";
+import {
+  CalendarWriteValidationError,
+  calendarDateRange,
+} from "@/lib/booking/calendar-write";
+import { hasExplicitAiCalendarBlockConfirmation } from "@/lib/booking/ai-calendar-confirmation";
+import {
+  CalendarWriteAuthorizationError,
+  venueCalendarWriteAuthorization,
+} from "@/lib/booking/calendar-write-authorization";
+import { bulkSetCalendarEvents } from "@/lib/db/queries/calendar";
+import { acquireLegalScopeLocks } from "@/lib/booking/advisory-locks";
+import {
+  createServerLogCorrelationId,
+  safeServerErrorLog,
+} from "@/lib/safe-server-log";
 
 function getClient() {
   return getAiClient();
 }
 
 const MODEL = "claude-sonnet-4-5";
+
+const SAFE_AI_PROVIDER_STATUSES = new Set([
+  400, 401, 403, 404, 408, 409, 413, 422, 425, 429, 500, 502, 503, 504,
+]);
+
+class VenueAiWriteAuthorizationError extends Error {
+  constructor(readonly status: 401 | 403 | 404 | 409 = 403) {
+    super("Venue AI write authorization changed.");
+    this.name = "VenueAiWriteAuthorizationError";
+  }
+}
+
+type VenueAiWriteExecutor = typeof db;
+
+/**
+ * Re-authorize every AI-triggered profile/review write after the potentially
+ * slow provider round-trip. The optimistic route gate is discovery only.
+ *
+ * Lock order matches the other venue writers: user legal scope -> organization
+ * legal scope -> actor row -> venue row -> organization/membership rows.
+ */
+async function withAuthorizedVenueAiWrite<T>(input: {
+  actorUserId: string;
+  venueId: number;
+  expectedOrganizationId: number | null;
+}, write: (executor: VenueAiWriteExecutor) => Promise<T>): Promise<T> {
+  return db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
+    await acquireLegalScopeLocks(tx, {
+      userIds: [input.actorUserId],
+      organizationIds:
+        input.expectedOrganizationId == null
+          ? []
+          : [input.expectedOrganizationId],
+    });
+
+    const actor = await getLockedAppUserById(input.actorUserId, executor);
+    if (!actor) throw new VenueAiWriteAuthorizationError(401);
+
+    const [lockedVenue] = await executor
+      .select({ id: venues.id, organizationId: venues.organizationId })
+      .from(venues)
+      .where(eq(venues.id, input.venueId))
+      .for("update")
+      .limit(1);
+    if (!lockedVenue) throw new VenueAiWriteAuthorizationError(404);
+    if (lockedVenue.organizationId !== input.expectedOrganizationId) {
+      throw new VenueAiWriteAuthorizationError(409);
+    }
+
+    const access = await authorizeVenueCapabilityLocked(
+      actor,
+      lockedVenue.id,
+      "manage_ai",
+      executor,
+    );
+    if (!access.ok) throw new VenueAiWriteAuthorizationError(access.status);
+    return write(executor);
+  });
+}
+
+function venueAiWriteFailure(error: unknown): string {
+  return JSON.stringify({
+    success: false,
+    code:
+      error instanceof VenueAiWriteAuthorizationError
+        ? "VENUE_AI_WRITE_FORBIDDEN"
+        : "VENUE_AI_WRITE_FAILED",
+    error:
+      error instanceof VenueAiWriteAuthorizationError
+        ? "Nu mai ai dreptul să modifici această sală."
+        : "Actualizarea nu a reușit.",
+  });
+}
 
 type ClientMessage = {
   role: "user" | "assistant";
@@ -97,9 +191,21 @@ const TOOLS: Anthropic.Messages.Tool[] = [
     input_schema: {
       type: "object",
       properties: {
-        fromDate: { type: "string", description: "YYYY-MM-DD" },
-        toDate: { type: "string", description: "YYYY-MM-DD" },
-        reason: { type: "string", description: "Motiv (ex: 'Renovare')" },
+        fromDate: {
+          type: "string",
+          pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+          description: "YYYY-MM-DD",
+        },
+        toDate: {
+          type: "string",
+          pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+          description: "YYYY-MM-DD",
+        },
+        reason: {
+          type: "string",
+          maxLength: 200,
+          description: "Motiv (ex: 'Renovare')",
+        },
       },
       required: ["fromDate", "toDate"],
     },
@@ -299,7 +405,7 @@ Reguli critice:
 1. Răspunde în română, scurt și prietenos (emoji-uri OK cu moderație).
 2. Folosește tools pentru ORICE întrebare despre date concrete (rezervări, ocupare, recenzii, analytics). Niciodată nu inventa numere.
 3. **Acțiuni destructive sau publice necesită confirmare explicită a owner-ului**:
-   - block_calendar_days → "Vrei să blochez 1-10 ian? (Da/Nu)"
+   - block_calendar_days → cere confirmare cu intervalul exact în format ISO, de exemplu "Vrei să blochez 2026-01-01–2026-01-10? (Da/Nu)"
    - reply_to_review → afișează TEXTUL propus, cere "E OK să postez?" înainte de apel
    - save_description / save_seo → arată preview-ul din improve_description sau generate_seo, cere "Salvez?" înainte de a apela save_*
 4. Pentru sugestii preț, folosește suggest_price apoi oferă rationale concret (vs medie oraș).
@@ -333,8 +439,13 @@ Reguli critice:
         messages: conversation,
       });
     } catch (err) {
-      const e = err as { status?: number; message?: string };
-      console.error("[ai/venue-assistant] Anthropic error:", e.status, e.message);
+      console.error(
+        "[ai/venue-assistant] provider request failed",
+        safeServerErrorLog(err, {
+          correlationId: createServerLogCorrelationId(),
+          allowedStatuses: SAFE_AI_PROVIDER_STATUSES,
+        }),
+      );
       return NextResponse.json(
         { error: "Serviciul AI e temporar indisponibil. Încearcă din nou." },
         { status: 502 },
@@ -430,34 +541,53 @@ Reguli critice:
           toDate: string;
           reason?: string;
         };
-        // Generate all dates in range
-        const start = new Date(input.fromDate);
-        const end = new Date(input.toDate);
-        const dates: string[] = [];
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          dates.push(d.toISOString().split("T")[0]);
+        if (!hasExplicitAiCalendarBlockConfirmation(incoming, input)) {
+          toolResult = JSON.stringify({
+            success: false,
+            code: "EXPLICIT_CONFIRMATION_REQUIRED",
+            error:
+              `Cere confirmarea explicită pentru intervalul exact ${input.fromDate}–${input.toDate} înainte de blocare.`,
+          });
+        } else {
+          try {
+            const dates = calendarDateRange(input.fromDate, input.toDate, {
+              maxDates: 366,
+            });
+            const note = (input.reason?.trim() || "Blocat de AI assistant").slice(
+              0,
+              200,
+            );
+            await bulkSetCalendarEvents(
+              "venue",
+              venue.id,
+              dates,
+              "blocked",
+              "manual",
+              note,
+              null,
+              venueCalendarWriteAuthorization({
+                user: venueAccess.user,
+                venueId: venue.id,
+                organizationId: venueAccess.organizationId,
+              }),
+            );
+            toolResult = JSON.stringify({
+              blocked: dates.length,
+              fromDate: input.fromDate,
+              toDate: input.toDate,
+            });
+          } catch (error) {
+            toolResult = JSON.stringify({
+              success: false,
+              error:
+                error instanceof CalendarWriteValidationError
+                  ? error.message
+                  : error instanceof CalendarWriteAuthorizationError
+                    ? "Nu mai ai dreptul să modifici acest calendar."
+                  : "Calendar update failed.",
+            });
+          }
         }
-        // Bulk insert blocks
-        if (dates.length > 0) {
-          await db
-            .insert(calendarEvents)
-            .values(
-              dates.map((date) => ({
-                entityType: "venue" as const,
-                entityId: venue.id,
-                date,
-                status: "blocked" as const,
-                source: "manual" as const,
-                note: input.reason ?? "Blocat de AI assistant",
-              })),
-            )
-            .onConflictDoNothing();
-        }
-        toolResult = JSON.stringify({
-          blocked: dates.length,
-          fromDate: input.fromDate,
-          toDate: input.toDate,
-        });
       } else if (toolUse.name === "recent_reviews") {
         const input = toolUse.input as {
           onlyUnanswered?: boolean;
@@ -491,34 +621,53 @@ Reguli critice:
         });
       } else if (toolUse.name === "reply_to_review") {
         const input = toolUse.input as { reviewId: number; reply: string };
-        // Ownership re-check — refuse if the review doesn't belong to this venue.
-        const [target] = await db
-          .select({ id: reviews.id, venueId: reviews.venueId })
-          .from(reviews)
-          .where(eq(reviews.id, input.reviewId))
-          .limit(1);
-        if (!target || target.venueId !== venue.id) {
+        if (!Number.isSafeInteger(input.reviewId) || input.reviewId < 1) {
           toolResult = JSON.stringify({
             success: false,
-            error: "Recenzia nu aparține sălii tale sau nu există.",
+            error: "Recenzie invalidă.",
           });
-        } else if (!input.reply || input.reply.trim().length === 0) {
+        } else if (typeof input.reply !== "string" || input.reply.trim().length === 0) {
           toolResult = JSON.stringify({
             success: false,
             error: "Răspunsul nu poate fi gol.",
           });
         } else {
-          await db
-            .update(reviews)
-            .set({
-              reply: input.reply.trim().slice(0, 1000),
-              replyAt: new Date(),
-            })
-            .where(eq(reviews.id, input.reviewId));
-          toolResult = JSON.stringify({
-            success: true,
-            reviewId: input.reviewId,
-          });
+          try {
+            const result = await withAuthorizedVenueAiWrite({
+              actorUserId: venueAccess.user.id,
+              venueId: venue.id,
+              expectedOrganizationId: venueAccess.organizationId,
+            }, async (executor) => {
+              // Scope and lock the child row in the authorization transaction;
+              // a concurrent reassignment cannot move it across venues.
+              const [target] = await executor
+                .select({ id: reviews.id, venueId: reviews.venueId })
+                .from(reviews)
+                .where(eq(reviews.id, input.reviewId))
+                .for("update")
+                .limit(1);
+              if (!target || target.venueId !== venue.id) {
+                return {
+                  success: false,
+                  error: "Recenzia nu aparține sălii tale sau nu există.",
+                };
+              }
+              await executor
+                .update(reviews)
+                .set({
+                  reply: input.reply.trim().slice(0, 1000),
+                  replyAt: new Date(),
+                })
+                .where(and(
+                  eq(reviews.id, target.id),
+                  eq(reviews.venueId, venue.id),
+                ));
+              return { success: true, reviewId: target.id };
+            });
+            toolResult = JSON.stringify(result);
+          } catch (error) {
+            toolResult = venueAiWriteFailure(error);
+          }
         }
       } else if (toolUse.name === "improve_description") {
         const input = toolUse.input as {
@@ -569,7 +718,12 @@ Reguli critice:
           lang: "ro" | "ru" | "en";
           html: string;
         };
-        if (!input.html || input.html.length > 20_000) {
+        if (
+          !["ro", "ru", "en"].includes(input.lang)
+          || typeof input.html !== "string"
+          || input.html.length === 0
+          || input.html.length > 20_000
+        ) {
           toolResult = JSON.stringify({
             success: false,
             error: "HTML lipsă sau prea lung (>20k)",
@@ -581,14 +735,22 @@ Reguli critice:
               : input.lang === "ru"
                 ? "descriptionRu"
                 : "descriptionEn";
-          await db
-            .update(venues)
-            .set({ [field]: input.html, updatedAt: new Date() })
-            .where(eq(venues.id, venue.id));
-          toolResult = JSON.stringify({
-            success: true,
-            lang: input.lang,
-          });
+          try {
+            const result = await withAuthorizedVenueAiWrite({
+              actorUserId: venueAccess.user.id,
+              venueId: venue.id,
+              expectedOrganizationId: venueAccess.organizationId,
+            }, async (executor) => {
+              await executor
+                .update(venues)
+                .set({ [field]: input.html, updatedAt: new Date() })
+                .where(eq(venues.id, venue.id));
+              return { success: true, lang: input.lang };
+            });
+            toolResult = JSON.stringify(result);
+          } catch (error) {
+            toolResult = venueAiWriteFailure(error);
+          }
         }
       } else if (toolUse.name === "generate_seo") {
         const input = toolUse.input as { lang?: "ro" | "ru" | "en" };
@@ -645,27 +807,49 @@ Reguli critice:
           title: string;
           description: string;
         };
-        const titleField =
-          input.lang === "ro"
-            ? "seoTitleRo"
-            : input.lang === "ru"
-              ? "seoTitleRu"
-              : "seoTitleEn";
-        const descField =
-          input.lang === "ro"
-            ? "seoDescRo"
-            : input.lang === "ru"
-              ? "seoDescRu"
-              : "seoDescEn";
-        await db
-          .update(venues)
-          .set({
-            [titleField]: input.title.slice(0, 100),
-            [descField]: input.description.slice(0, 300),
-            updatedAt: new Date(),
-          })
-          .where(eq(venues.id, venue.id));
-        toolResult = JSON.stringify({ success: true, lang: input.lang });
+        if (
+          !["ro", "ru", "en"].includes(input.lang)
+          || typeof input.title !== "string"
+          || typeof input.description !== "string"
+        ) {
+          toolResult = JSON.stringify({
+            success: false,
+            error: "Date SEO invalide.",
+          });
+        } else {
+          const titleField =
+            input.lang === "ro"
+              ? "seoTitleRo"
+              : input.lang === "ru"
+                ? "seoTitleRu"
+                : "seoTitleEn";
+          const descField =
+            input.lang === "ro"
+              ? "seoDescRo"
+              : input.lang === "ru"
+                ? "seoDescRu"
+                : "seoDescEn";
+          try {
+            const result = await withAuthorizedVenueAiWrite({
+              actorUserId: venueAccess.user.id,
+              venueId: venue.id,
+              expectedOrganizationId: venueAccess.organizationId,
+            }, async (executor) => {
+              await executor
+                .update(venues)
+                .set({
+                  [titleField]: input.title.slice(0, 100),
+                  [descField]: input.description.slice(0, 300),
+                  updatedAt: new Date(),
+                })
+                .where(eq(venues.id, venue.id));
+              return { success: true, lang: input.lang };
+            });
+            toolResult = JSON.stringify(result);
+          } catch (error) {
+            toolResult = venueAiWriteFailure(error);
+          }
+        }
       } else if (toolUse.name === "analytics_summary") {
         const input = toolUse.input as { days?: number };
         const days = [7, 30, 90, 365].includes(input.days ?? -1)

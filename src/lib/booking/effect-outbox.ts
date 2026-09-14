@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, like, lt, lte, or, sql } from "drizzle-orm";
 import {
   bookingEffectDeliveries,
   bookingEffectOutbox,
   bookingRequests,
+  notifications,
+  users,
   type BookingEffectChannel,
 } from "@/lib/db/schema";
 import { db } from "@/lib/db";
@@ -24,6 +26,7 @@ export type BookingEffectPayload = BookingEffectDelivery["payload"];
 // Keep the 0030 key so rows created by the old one-shot implementation are
 // recovered by 0031 instead of becoming invisible to the worker.
 export const CONFIRMATION_NOTIFICATION_EFFECT = "confirm_notify";
+export const BOOKING_CREATION_NOTIFICATION_EFFECT = "create_notify";
 
 export type BookingEffectClockOptions = {
   now?: Date;
@@ -154,25 +157,6 @@ async function withLeaseHeartbeat<T>(
     return value;
   } finally {
     clearInterval(timer);
-  }
-}
-
-async function withDispatchDeadline<T>(
-  work: () => Promise<T>,
-  timeoutMs: number,
-): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error("booking_effect_dispatch_timeout")),
-      Math.max(1, timeoutMs),
-    );
-    timer.unref?.();
-  });
-  try {
-    return await Promise.race([work(), timeout]);
-  } finally {
-    if (timer) clearTimeout(timer);
   }
 }
 
@@ -544,12 +528,14 @@ export async function renewBookingEffectDeliveryLease(
  *   and its delivery settlement finish. The provider result and child state
  *   therefore become visible before cancellation can inspect the row.
  */
-export async function withBookingEffectDeliveryDispatchPermit<T>(
+async function withBookingEffectDeliveryDispatchPermitPolicy<T>(
   bookingId: number,
-  delivery: Pick<BookingEffectDelivery, "id" | "leaseToken">,
+  delivery: Pick<BookingEffectDelivery, "id" | "leaseToken" | "recipientUserId">,
   dispatch: (permitted: BookingEffectDelivery, executor: Executor) => Promise<T>,
   now = new Date(),
   statementTimeoutMs = BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
+  eligibility: "confirmed" | "exists" = "confirmed",
+  requireRecipientUser = true,
 ): Promise<{ permitted: false } | { permitted: true; value: T }> {
   const leaseToken = delivery.leaseToken;
   if (!leaseToken) return { permitted: false };
@@ -566,13 +552,33 @@ export async function withBookingEffectDeliveryDispatchPermit<T>(
         true
       )
     `);
+    // Account erasure locks the actor first and then scrubs outbox rows. Take
+    // the recipient lock before the booking barrier/child row as well, so an
+    // in-app FK insert cannot form user -> child / child -> user deadlocks.
+    // Synthetic direct-email recipients simply produce no row here.
+    const [recipient] = await executor
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, delivery.recipientUserId))
+      .for("share")
+      .limit(1);
+    if (requireRecipientUser && !recipient) {
+      return { permitted: false } as const;
+    }
     await acquireBookingConfirmationBarrier(executor, bookingId);
     const [active] = await executor
       .select({ status: bookingRequests.status })
       .from(bookingRequests)
       .where(eq(bookingRequests.id, bookingId))
       .limit(1);
-    if (active?.status !== "confirmed_by_client" && active?.status !== "completed") {
+    if (
+      !active
+      || (
+        eligibility === "confirmed"
+        && active.status !== "confirmed_by_client"
+        && active.status !== "completed"
+      )
+    ) {
       return { permitted: false } as const;
     }
     const [permitted] = await executor
@@ -594,10 +600,10 @@ export async function withBookingEffectDeliveryDispatchPermit<T>(
     // production dispatch is bounded by a provider timeout shorter than the
     // lease, so cancellation waits for a finite, defined interval. Database
     // work in the callback must use `executor`, never the global pool.
-    const value = await withDispatchDeadline(
-      () => dispatch(permitted, executor),
-      statementTimeoutMs + 250,
-    );
+    // External channel dispatchers own an abortable provider deadline. Do not
+    // race away here: a losing Promise.race would release the booking barrier
+    // while a push/e-mail request could still be accepted by the provider.
+    const value = await dispatch(permitted, executor);
     const [settled] = await executor
       .update(bookingEffectDeliveries)
       .set({
@@ -619,6 +625,48 @@ export async function withBookingEffectDeliveryDispatchPermit<T>(
     if (!settled) throw new Error("booking_effect_delivery_settlement_lost");
     return { permitted: true, value } as const;
   });
+}
+
+/** Final-confirmation delivery permit; cancelled bookings are suppressed. */
+export async function withBookingEffectDeliveryDispatchPermit<T>(
+  bookingId: number,
+  delivery: Pick<BookingEffectDelivery, "id" | "leaseToken" | "recipientUserId">,
+  dispatch: (permitted: BookingEffectDelivery, executor: Executor) => Promise<T>,
+  now = new Date(),
+  statementTimeoutMs = BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
+): Promise<{ permitted: false } | { permitted: true; value: T }> {
+  return withBookingEffectDeliveryDispatchPermitPolicy(
+    bookingId,
+    delivery,
+    dispatch,
+    now,
+    statementTimeoutMs,
+    "confirmed",
+    true,
+  );
+}
+
+/**
+ * Booking-created delivery permit. Creation is a historical event, so a later
+ * accept/reject/cancel transition must not erase its notification; the durable
+ * outbox FK guarantees the booking still exists while the effect is pending.
+ */
+export async function withBookingCreationEffectDeliveryDispatchPermit<T>(
+  bookingId: number,
+  delivery: Pick<BookingEffectDelivery, "id" | "leaseToken" | "recipientUserId">,
+  dispatch: (permitted: BookingEffectDelivery, executor: Executor) => Promise<T>,
+  now = new Date(),
+  statementTimeoutMs = BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
+): Promise<{ permitted: false } | { permitted: true; value: T }> {
+  return withBookingEffectDeliveryDispatchPermitPolicy(
+    bookingId,
+    delivery,
+    dispatch,
+    now,
+    statementTimeoutMs,
+    "exists",
+    false,
+  );
 }
 
 async function finishBookingEffectDelivery(
@@ -935,6 +983,201 @@ export async function reconcileOrphanedCancelledBookingEffectDeliveries(
     ))
     .returning({ id: bookingEffectDeliveries.id });
   return rows.length;
+}
+
+/**
+ * Minimize every durable booking notification payload before account erasure
+ * commits. The deleting transaction already owns the actor row, which blocks
+ * new booking creation; locking coordinators here serializes an in-flight
+ * materializer. Updating delivery rows then waits for any already-started
+ * provider call to settle, so no worker can dispatch the old payload after
+ * this transaction commits.
+ *
+ * Historical delivery/dedupe records remain for operational evidence, but all
+ * recipient/contact/message data is replaced with deterministic non-PII.
+ */
+async function scrubPersistedBookingNotificationsForErasure(
+  executor: Executor,
+  bookingIds: readonly number[],
+): Promise<void> {
+  // A client-facing status notification may have been written by the older
+  // best-effort path and therefore have no child outbox row. Stable booking
+  // dedupe prefixes let us minimize every already-persisted projection.
+  const batchSize = 250;
+  for (let offset = 0; offset < bookingIds.length; offset += batchSize) {
+    const batch = bookingIds.slice(offset, offset + batchSize);
+    const predicate = or(...batch.map((bookingId) =>
+      like(notifications.dedupeKey, `booking:${bookingId}:%`)
+    ));
+    if (!predicate) continue;
+    await executor
+      .update(notifications)
+      .set({
+        type: "booking_erased",
+        title: "Date personale eliminate",
+        message: null,
+        actionUrl: null,
+      })
+      .where(predicate);
+  }
+}
+
+export async function scrubBookingEffectsForClientErasure(
+  executor: Executor,
+  bookingIds: readonly number[],
+  now = new Date(),
+): Promise<void> {
+  const ids = [...new Set(bookingIds)]
+    .filter((id) => Number.isSafeInteger(id) && id > 0)
+    .sort((left, right) => left - right);
+  if (ids.length === 0) return;
+
+  const effects = await executor
+    .select({ id: bookingEffectOutbox.id })
+    .from(bookingEffectOutbox)
+    .where(and(
+      inArray(bookingEffectOutbox.bookingId, ids),
+      inArray(bookingEffectOutbox.effectKey, [
+        BOOKING_CREATION_NOTIFICATION_EFFECT,
+        CONFIRMATION_NOTIFICATION_EFFECT,
+      ]),
+    ))
+    .orderBy(asc(bookingEffectOutbox.id))
+    .for("update");
+  if (effects.length > 0) {
+    const effectIds = effects.map((effect) => effect.id);
+
+    await executor
+      .update(bookingEffectDeliveries)
+      .set({
+        recipientUserId: sql`md5('booking-effect-erased:' || ${bookingEffectDeliveries.id}::text)::uuid`,
+        payload: sql`jsonb_build_object(
+          'userId', md5('booking-effect-erased:' || ${bookingEffectDeliveries.id}::text)::uuid::text,
+          'type', 'booking_erased',
+          'title', 'Date personale eliminate',
+          'dedupeKey', ${bookingEffectDeliveries.dedupeKey}
+        )`,
+        status: sql`CASE
+          WHEN ${bookingEffectDeliveries.status} IN ('pending', 'processing', 'dispatching', 'failed')
+            THEN 'cancelled'
+          ELSE ${bookingEffectDeliveries.status}
+        END`,
+        nextAttemptAt: now,
+        leaseToken: null,
+        leaseUntil: null,
+        cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now})`,
+        lastError: "personal_data_erased",
+        deliveredAt: sql`CASE
+          WHEN ${bookingEffectDeliveries.status} = 'delivered'
+            THEN ${bookingEffectDeliveries.deliveredAt}
+          ELSE NULL
+        END`,
+        updatedAt: now,
+      })
+      .where(inArray(bookingEffectDeliveries.effectId, effectIds));
+
+    await executor
+      .update(bookingEffectOutbox)
+      .set({
+        status: sql`CASE
+          WHEN ${bookingEffectOutbox.status} IN ('pending', 'processing', 'failed')
+            THEN 'cancelled'
+          ELSE ${bookingEffectOutbox.status}
+        END`,
+        nextAttemptAt: now,
+        leaseToken: null,
+        leaseUntil: null,
+        lastError: "personal_data_erased",
+        referralLastError: null,
+        materializationLastError: null,
+        resolutionNote: null,
+        deliveredAt: sql`CASE
+          WHEN ${bookingEffectOutbox.status} = 'delivered'
+            THEN ${bookingEffectOutbox.deliveredAt}
+          ELSE NULL
+        END`,
+        updatedAt: now,
+      })
+      .where(inArray(bookingEffectOutbox.id, effectIds));
+  }
+
+  // Last by design: a worker that began before erasure can only insert an
+  // in-app row while its child delivery is still live. Waiting for/scrubbing
+  // every child first guarantees this final pass observes that insertion.
+  await scrubPersistedBookingNotificationsForErasure(executor, ids);
+}
+
+/**
+ * Remove a deleted account from already-materialized creation and confirmation
+ * deliveries, including when it was a venue owner, artist or administrator
+ * rather than the booking client.
+ *
+ * The caller must hold this user's row FOR UPDATE. Materialization locks every
+ * real recipient FOR SHARE before its coordinator, so either these delivery
+ * rows are committed and visible here, or account erasure wins and the worker
+ * drops the now-missing recipient before inserting anything.
+ */
+export async function scrubBookingEffectRecipientForErasure(
+  executor: Executor,
+  userId: string,
+  now = new Date(),
+): Promise<void> {
+  const rows = await executor
+    .select({ effectId: bookingEffectDeliveries.effectId })
+    .from(bookingEffectDeliveries)
+    .innerJoin(
+      bookingEffectOutbox,
+      eq(bookingEffectOutbox.id, bookingEffectDeliveries.effectId),
+    )
+    .where(and(
+      eq(bookingEffectDeliveries.recipientUserId, userId),
+      inArray(bookingEffectOutbox.effectKey, [
+        BOOKING_CREATION_NOTIFICATION_EFFECT,
+        CONFIRMATION_NOTIFICATION_EFFECT,
+      ]),
+    ));
+  const effectIds = [...new Set(rows.map(({ effectId }) => effectId))]
+    .sort((left, right) => left - right);
+  if (effectIds.length === 0) return;
+
+  await executor
+    .select({ id: bookingEffectOutbox.id })
+    .from(bookingEffectOutbox)
+    .where(inArray(bookingEffectOutbox.id, effectIds))
+    .orderBy(asc(bookingEffectOutbox.id))
+    .for("update");
+
+  await executor
+    .update(bookingEffectDeliveries)
+    .set({
+      recipientUserId: sql`md5('booking-effect-erased:' || ${bookingEffectDeliveries.id}::text)::uuid`,
+      payload: sql`jsonb_build_object(
+        'userId', md5('booking-effect-erased:' || ${bookingEffectDeliveries.id}::text)::uuid::text,
+        'type', 'booking_erased',
+        'title', 'Date personale eliminate',
+        'dedupeKey', ${bookingEffectDeliveries.dedupeKey}
+      )`,
+      status: sql`CASE
+        WHEN ${bookingEffectDeliveries.status} IN ('pending', 'processing', 'dispatching', 'failed')
+          THEN 'cancelled'
+        ELSE ${bookingEffectDeliveries.status}
+      END`,
+      nextAttemptAt: now,
+      leaseToken: null,
+      leaseUntil: null,
+      cancelRequestedAt: sql`COALESCE(${bookingEffectDeliveries.cancelRequestedAt}, ${now})`,
+      lastError: "recipient_personal_data_erased",
+      deliveredAt: sql`CASE
+        WHEN ${bookingEffectDeliveries.status} = 'delivered'
+          THEN ${bookingEffectDeliveries.deliveredAt}
+        ELSE NULL
+      END`,
+      updatedAt: now,
+    })
+    .where(and(
+      inArray(bookingEffectDeliveries.effectId, effectIds),
+      eq(bookingEffectDeliveries.recipientUserId, userId),
+    ));
 }
 
 /**

@@ -12,6 +12,7 @@ import {
 import { eq, inArray } from "drizzle-orm";
 import { rateLimit } from "@/lib/rate-limit";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
+import { bootstrapAccountUserUnlessErased } from "@/lib/privacy/account-erasure-identity";
 
 // This endpoint drives the post-signup role picker. The response MUST
 // reflect the latest DB state — a stale cached "you're already onboarded"
@@ -57,31 +58,26 @@ export async function GET(req: NextRequest) {
         .join(" ") || null;
 
       if (fallbackEmail) {
-        const [created] = await db
-          .insert(users)
-          .values({
-            clerkId,
-            email: fallbackEmail,
-            name: fallbackName,
-            avatarUrl: clerkUser.imageUrl || null,
-            role: "user",
-          })
-          .onConflictDoNothing()
-          .returning();
-        dbUser = created ?? null;
-
-        // If insert was a no-op (conflict), try fetching again
-        if (!dbUser) {
-          const [found] = await db
-            .select()
-            .from(users)
-            .where(eq(users.clerkId, clerkId))
-            .limit(1);
-          dbUser = found ?? null;
+        const bootstrapped = await bootstrapAccountUserUnlessErased({
+          clerkId,
+          email: fallbackEmail,
+          name: fallbackName,
+          avatarUrl: clerkUser.imageUrl || null,
+        });
+        if (!bootstrapped) {
+          return NextResponse.json(
+            { error: "Account erased", code: "ACCOUNT_ERASED" },
+            { status: 410 },
+          );
         }
+        dbUser = bootstrapped;
       }
     } catch (err) {
       console.error("[check-role] Fallback user creation failed:", err);
+      return NextResponse.json(
+        { error: "Account sync unavailable", code: "ACCOUNT_SYNC_RETRY" },
+        { status: 503 },
+      );
     }
   }
 

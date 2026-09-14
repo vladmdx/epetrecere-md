@@ -9,6 +9,10 @@ import {
   signedContractPdfFilename,
 } from "@/lib/legal/signed-contract-pdf";
 import { canViewLegalAcceptance } from "@/lib/legal/acceptance-access";
+import {
+  createServerLogCorrelationId,
+  safeServerErrorLog,
+} from "@/lib/safe-server-log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,7 +70,12 @@ export async function GET(
     if (error instanceof SignedContractPdfError) {
       return NextResponse.json({ error: error.code }, { status: 410 });
     }
-    console.error("[legal] signed contract PDF failed", error);
+    console.error(
+      "[legal] signed contract PDF failed",
+      safeServerErrorLog(error, {
+        correlationId: createServerLogCorrelationId(),
+      }),
+    );
     return NextResponse.json({ error: "pdf_generation_failed" }, { status: 500 });
   }
 }

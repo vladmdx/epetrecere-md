@@ -24,8 +24,8 @@
 // Now it is taken out of the shop window first.
 
 import { NextResponse } from "next/server";
-import { auth, clerkClient } from "@clerk/nextjs/server";
-import { and, asc, eq, isNull, ne, sql } from "drizzle-orm";
+import { auth } from "@clerk/nextjs/server";
+import { and, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   users,
@@ -35,18 +35,76 @@ import {
   artistVideos,
   venues,
   venueImages,
-  eventPlans,
-  eventPhotos,
   reviews,
   bookingRequests,
+  offerRequests,
   partnerOrganizations,
   partnerOrganizationMembers,
 } from "@/lib/db/schema";
 import { inArray } from "drizzle-orm";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
-import { erasePhotoBatch, photoErasureError, PHOTO_ERASURE_BATCH_SIZE } from "@/lib/moments/erase-photo";
-import { BOOKING_CLIENT_ERASURE } from "@/lib/privacy/account-erasure";
+import {
+  BOOKING_CLIENT_ERASURE,
+  BOOKING_CREATION_IDENTITY_ERASURE,
+  OFFER_REQUEST_CLIENT_ERASURE,
+} from "@/lib/privacy/account-erasure";
 import { acquireUserMembershipMutationLocks } from "@/lib/partner/organization-members";
+import {
+  scrubBookingEffectRecipientForErasure,
+  scrubBookingEffectsForClientErasure,
+} from "@/lib/booking/effect-outbox";
+import { captureAccountAssetErasures } from "@/lib/privacy/account-asset-erasure";
+import { scrubLegalContractDeliveriesForUserErasure } from "@/lib/legal/contract-delivery-privacy";
+import {
+  assertAccountErasureIdentityConfigured,
+  enqueueAccountErasureIdentity,
+  lockAccountErasureIdentity,
+  processAccountErasureIdentity,
+} from "@/lib/privacy/account-erasure-identity";
+import {
+  createServerLogCorrelationId,
+  safeServerErrorLog,
+} from "@/lib/safe-server-log";
+import { purgeGoogleCalendarForAccountErasure } from "@/lib/google/calendar-erasure";
+
+const SAFE_ACCOUNT_ERASURE_ERROR_CODES = new Set([
+  "ACCOUNT_ERASURE_IDENTITY_SECRET_INVALID",
+  "23502",
+  "23503",
+  "23505",
+  "23514",
+  "40001",
+  "40P01",
+  "55P03",
+  "57014",
+  "ECONNRESET",
+  "ENOTFOUND",
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+]);
+const SAFE_ACCOUNT_ERASURE_ERROR_STATUSES = new Set([
+  400, 401, 403, 404, 408, 409, 422, 425, 429, 500, 502, 503, 504,
+]);
+
+async function tryDeleteErasedClerkIdentity(
+  identityHash: string,
+): Promise<"completed" | "failed" | "pending"> {
+  try {
+    const result = await processAccountErasureIdentity(identityHash);
+    return result.status === "not_due" ? "pending" : result.status;
+  } catch (error) {
+    const correlationId = createServerLogCorrelationId();
+    console.error(
+      "[delete-account] durable Clerk deletion attempt failed",
+      safeServerErrorLog(error, {
+        correlationId,
+        allowedCodes: SAFE_ACCOUNT_ERASURE_ERROR_CODES,
+        allowedStatuses: SAFE_ACCOUNT_ERASURE_ERROR_STATUSES,
+      }),
+    );
+    return "pending";
+  }
+}
 
 export async function DELETE() {
   const { userId: clerkId } = await auth();
@@ -54,14 +112,85 @@ export async function DELETE() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [user] = await db
+  try {
+    assertAccountErasureIdentityConfigured();
+  } catch (error) {
+    const correlationId = createServerLogCorrelationId();
+    console.error(
+      "[delete-account] identity erasure configuration unavailable",
+      safeServerErrorLog(error, {
+        correlationId,
+        allowedCodes: SAFE_ACCOUNT_ERASURE_ERROR_CODES,
+      }),
+    );
+    return NextResponse.json(
+      {
+        error: "Account deletion is temporarily unavailable. Please retry.",
+        code: "ACCOUNT_ERASURE_RETRY",
+        retryable: true,
+        correlationId,
+      },
+      { status: 503, headers: { "X-Correlation-Id": correlationId } },
+    );
+  }
+
+  let user: typeof users.$inferSelect | undefined = (await db
     .select()
     .from(users)
     .where(eq(users.clerkId, clerkId))
-    .limit(1);
+    .limit(1))[0];
 
   if (!user) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    // DELETE is idempotent even if the local projection is already absent.
+    // Recheck under the same identity lock used by every bootstrap: a fallback
+    // insert may have committed between the optimistic SELECT above and this
+    // transaction. If so, continue through the full local minimization path.
+    const missingResolution = await db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL lock_timeout = '3s'`);
+      await tx.execute(sql`SET LOCAL statement_timeout = '8s'`);
+      await lockAccountErasureIdentity(tx as unknown as typeof db, clerkId);
+      const [racedUser] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, clerkId))
+        .for("update")
+        .limit(1);
+      if (racedUser) {
+        return { user: racedUser, identityHash: null };
+      }
+      const queued = await enqueueAccountErasureIdentity(
+        tx as unknown as typeof db,
+        clerkId,
+      );
+      return { user: null, identityHash: queued.identityHash };
+    }).catch(() => null);
+    if (!missingResolution) {
+      return NextResponse.json(
+        {
+          error: "Account deletion could not be completed safely. Please retry.",
+          code: "ACCOUNT_ERASURE_RETRY",
+          retryable: true,
+        },
+        { status: 503 },
+      );
+    }
+    if (missingResolution.identityHash) {
+      const identityDeletion = await tryDeleteErasedClerkIdentity(
+        missingResolution.identityHash,
+      );
+      return NextResponse.json({ success: true, identityDeletion });
+    }
+    user = missingResolution.user ?? undefined;
+    if (!user) {
+      return NextResponse.json(
+        {
+          error: "Account deletion could not be completed safely. Please retry.",
+          code: "ACCOUNT_ERASURE_RETRY",
+          retryable: true,
+        },
+        { status: 503 },
+      );
+    }
   }
 
   // An organization must never be left without an owner. This preflight runs
@@ -109,42 +238,36 @@ export async function DELETE() {
     );
   }
 
-  const ownedPlans = await db
-    .select({ id: eventPlans.id, momentsSlug: eventPlans.momentsSlug })
-    .from(eventPlans)
-    .where(eq(eventPlans.userId, user.id));
-  const ownedPhotoUrls = ownedPlans.length
-    ? await db
-        .select({ id: eventPhotos.id, url: eventPhotos.url, planId: eventPhotos.planId })
-        .from(eventPhotos)
-        .where(inArray(eventPhotos.planId, ownedPlans.map((p) => p.id)))
-        .orderBy(asc(eventPhotos.id)).limit(PHOTO_ERASURE_BATCH_SIZE + 1)
-    : [];
-  const cleanup = await erasePhotoBatch(ownedPhotoUrls.map(photo => ({ ...photo, plan: ownedPlans.find(plan => plan.id === photo.planId)! })), async photo => {
-    await db.delete(eventPhotos).where(and(eq(eventPhotos.id, photo.id), eq(eventPhotos.planId, photo.plan.id), eq(eventPhotos.url, photo.url)));
-  });
-  if (!cleanup.complete) return NextResponse.json(photoErasureError(cleanup.reason!), { status: cleanup.reason === "unverified" ? 409 : 503 });
-  const [ownedArtists, ownedVenues] = await Promise.all([
-    db.select({ id: artists.id, slug: artists.slug, isActive: artists.isActive, photoUrl: artists.photoUrl }).from(artists).where(eq(artists.userId, user.id)),
-    db.select({ id: venues.id, slug: venues.slug, isActive: venues.isActive, menuPdfUrl: venues.menuPdfUrl, ogImageUrl: venues.ogImageUrl }).from(venues).where(and(eq(venues.userId, user.id), isNull(venues.organizationId))),
-  ]);
-  const artistIds = ownedArtists.map((profile) => profile.id);
-  const venueIds = ownedVenues.map((profile) => profile.id);
-  const [ownedArtistImages, ownedVenueImages] = await Promise.all([
-    artistIds.length
-      ? db.select({ url: artistImages.url }).from(artistImages).where(inArray(artistImages.artistId, artistIds))
-      : Promise.resolve([]),
-    venueIds.length
-      ? db.select({ url: venueImages.url }).from(venueImages).where(inArray(venueImages.venueId, venueIds))
-      : Promise.resolve([]),
-  ]);
-
   const deleted = await db.transaction(async tx => {
     await tx.execute(sql`SET LOCAL lock_timeout = '3s'`);
     await tx.execute(sql`SET LOCAL statement_timeout = '8s'`);
-    await acquireUserMembershipMutationLocks(tx, user.id);
-    const [current] = await tx.select({ id: users.id }).from(users).where(eq(users.id, user.id)).for("update");
-    if (!current) return { ok: true as const };
+    // Identity is the first application lock in both bootstrap and erasure.
+    // This closes the absent-row race where a delayed Clerk webhook could
+    // otherwise insert a user immediately after this transaction commits.
+    const identityHash = await lockAccountErasureIdentity(
+      tx as unknown as typeof db,
+      clerkId,
+    );
+    const lockedOrganizationIds = await acquireUserMembershipMutationLocks(tx, user.id);
+    const [current] = await tx
+      .select({
+        id: users.id,
+        email: users.email,
+        phone: users.phone,
+        avatarUrl: users.avatarUrl,
+      })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .for("update");
+    if (!current) {
+      await enqueueAccountErasureIdentity(tx as unknown as typeof db, clerkId);
+      return {
+        ok: true as const,
+        identityHash,
+        artistSlugs: [] as string[],
+        venueSlugs: [] as string[],
+      };
+    }
 
     // The earlier check protects external cleanup from avoidable work; this
     // locked check is authoritative against concurrent grant/transfer/sign.
@@ -178,16 +301,28 @@ export async function DELETE() {
     if (lockedLastOwnerIds.length) {
       return { ok: false as const, lastOwnerOrganizationIds: lockedLastOwnerIds };
     }
-    // Lock parents and recheck before any profile minimization. A concurrent
-    // upload must not make a retry lose the vendor's original media URLs.
-    const plans = await tx.select({ id: eventPlans.id }).from(eventPlans).where(eq(eventPlans.userId, user.id)).for("update");
-    if (plans.length) {
-      const remaining = await tx.select({ id: eventPhotos.id }).from(eventPhotos).where(inArray(eventPhotos.planId, plans.map(plan => plan.id))).limit(1);
-      if (remaining.length) return { ok: false as const, remaining: true as const };
-    }
+    // Provider summaries can contain personal event text. Under the same
+    // user/org legal locks used by Google replacement, delete owned-profile
+    // rows and scrub shared-org notes while retaining their blocked state.
+    await purgeGoogleCalendarForAccountErasure(tx, {
+      userId: current.id,
+      organizationIds: lockedOrganizationIds,
+    });
+    // Commit the retryable raw Clerk id before deleting the local user. The
+    // row's permanent HMAC also becomes the no-reprovision tombstone.
+    await enqueueAccountErasureIdentity(tx as unknown as typeof db, clerkId);
+    // Capture every managed URL before any profile field is cleared or child
+    // row is cascaded. The durable outbox insert is part of this transaction;
+    // Blob deletion is performed later by the scheduled worker.
+    const capturedAssets = await captureAccountAssetErasures(
+      tx,
+      user.id,
+      current.avatarUrl,
+    );
+    const { artistIds, venueIds } = capturedAssets;
 
     // 1. Anonymize leads (vendors legitimately kept them as business records).
-    if (user.email) {
+    if (current.email) {
       await tx
         .update(leads)
         .set({
@@ -197,7 +332,7 @@ export async function DELETE() {
           message: null,
           wizardData: null,
         })
-        .where(eq(leads.email, user.email));
+        .where(eq(leads.email, current.email));
     }
 
     // 2. Reviews remain useful to the marketplace, but the deleted account's
@@ -269,20 +404,97 @@ export async function DELETE() {
       await tx.delete(venueImages).where(inArray(venueImages.venueId, venueIds));
     }
 
-    // CP3 #3 — anonymize the client's bookings BEFORE deleting the user, then
-    // let the SET NULL FK detach them. The booking (and its commission) is kept
-    // as financial evidence with no personal data, so deletion never hits the
+    // CP3 #3 — anonymize every CRM projection linked to one of the client's
+    // bookings before minimizing its parent. `offer_requests` has no user FK,
+    // so a user deletion cannot clean these copied contact/message fields for
+    // us. The user row lock above serializes this set with booking creation.
+    const clientBookings = await tx
+      .select({ id: bookingRequests.id })
+      .from(bookingRequests)
+      .where(eq(bookingRequests.clientUserId, user.id));
+    const clientBookingIds = clientBookings.map((booking) => booking.id);
+    if (clientBookingIds.length > 0) {
+      await tx
+        .update(offerRequests)
+        .set(OFFER_REQUEST_CLIENT_ERASURE)
+        .where(inArray(offerRequests.bookingRequestId, clientBookingIds));
+    }
+
+    // Rows created by the legacy/direct CRM flow intentionally have no
+    // booking_request_id, so the relational update above cannot reach them.
+    // Exact account e-mail/phone matches are the only deterministic identity
+    // evidence available for those records. Keep the fallback restricted to
+    // unlinked rows so it cannot widen the linked booking scope.
+    const legacyOfferIdentity = or(
+      current.email ? eq(offerRequests.clientEmail, current.email) : undefined,
+      current.phone ? eq(offerRequests.clientPhone, current.phone) : undefined,
+    );
+    if (legacyOfferIdentity) {
+      await tx
+        .update(offerRequests)
+        .set(OFFER_REQUEST_CLIENT_ERASURE)
+        .where(
+          and(
+            isNull(offerRequests.bookingRequestId),
+            legacyOfferIdentity,
+          ),
+        );
+    }
+
+    // Booking notifications freeze recipient/contact/message fields for
+    // retryability. Cancel pending sends and minimize outbox plus in-app
+    // projections in the same transaction before detaching the user.
+    await scrubBookingEffectsForClientErasure(
+      tx as unknown as typeof db,
+      clientBookingIds,
+    );
+    await scrubBookingEffectRecipientForErasure(
+      tx as unknown as typeof db,
+      current.id,
+    );
+    await scrubLegalContractDeliveriesForUserErasure(
+      tx as unknown as typeof db,
+      current.id,
+    );
+
+    // Anonymize the client's bookings BEFORE deleting the user, then let the
+    // SET NULL FK detach them. The booking (and its commission) is kept as
+    // financial evidence with no personal data, so deletion never hits the
     // commission RESTRICT and never 503s on that path.
     await tx
       .update(bookingRequests)
       .set(BOOKING_CLIENT_ERASURE)
       .where(eq(bookingRequests.clientUserId, user.id));
 
+    const ownedManualTarget = or(
+      artistIds.length > 0
+        ? inArray(bookingRequests.artistId, artistIds)
+        : undefined,
+      venueIds.length > 0
+        ? inArray(bookingRequests.venueId, venueIds)
+        : undefined,
+    );
+    if (ownedManualTarget) {
+      await tx
+        .update(bookingRequests)
+        .set(BOOKING_CREATION_IDENTITY_ERASURE)
+        .where(and(eq(bookingRequests.source, "manual"), ownedManualTarget));
+    }
+
     // 4. Delete the user row — cascades to event plans, messages,
     //    conversations, invitations and photos; booking_requests.client_user_id
     //    is SET NULL (evidence retained).
     await tx.delete(users).where(eq(users.id, user.id));
-    return { ok: true as const };
+    return {
+      ok: true as const,
+      identityHash,
+      artistSlugs: capturedAssets.artists
+        .filter(({ isActive }) => isActive)
+        .map(({ slug }) => slug),
+      venueSlugs: capturedAssets.venues
+        .filter(({ isActive }) => isActive)
+        .map(({ slug }) => slug),
+    };
   }).catch(() => null);
   if (deleted && !deleted.ok && "lastOwnerOrganizationIds" in deleted) {
     return NextResponse.json(
@@ -294,11 +506,20 @@ export async function DELETE() {
       { status: 409 },
     );
   }
-  if (!deleted?.ok) return NextResponse.json(photoErasureError("remaining"), { status: 503 });
+  if (!deleted?.ok) {
+    return NextResponse.json(
+      {
+        error: "Account deletion could not be completed safely. Please retry.",
+        code: "ACCOUNT_ERASURE_RETRY",
+        retryable: true,
+      },
+      { status: 503 },
+    );
+  }
   // Invalidate only after the atomic local erasure committed. Signed legal
   // evidence is unrelated to the public catalog and remains untouched.
-  const publishedArtistSlugs = ownedArtists.filter(profile => profile.isActive).map(profile => profile.slug);
-  const publishedVenueSlugs = ownedVenues.filter(profile => profile.isActive).map(profile => profile.slug);
+  const publishedArtistSlugs = deleted.artistSlugs;
+  const publishedVenueSlugs = deleted.venueSlugs;
   if (publishedArtistSlugs.length > 0) {
     revalidateVendorCatalog("artist", {
       profileSlugs: publishedArtistSlugs,
@@ -315,31 +536,11 @@ export async function DELETE() {
       services: true,
     });
   }
-  if (process.env.BLOB_READ_WRITE_TOKEN) {
-    const urls = [
-      ...ownedArtistImages.map((image) => image.url),
-      ...ownedVenueImages.map((image) => image.url),
-      ...ownedArtists.map((profile) => profile.photoUrl),
-      ...ownedVenues.flatMap((profile) => [profile.menuPdfUrl, profile.ogImageUrl]),
-    ].filter((url): url is string => Boolean(url?.includes("blob.vercel-storage.com")));
-    if (urls.length > 0) {
-      try {
-        const { del } = await import("@vercel/blob");
-        await del(urls);
-      } catch (error) {
-        console.error("[delete-account] blob cleanup failed", error);
-      }
-    }
-  }
+  // 5. Try immediately; the 5-minute workers durably recover any provider or
+  // process failure. The raw Clerk id is cleared only after delete/404.
+  const identityDeletion = await tryDeleteErasedClerkIdentity(
+    deleted.identityHash,
+  );
 
-  // 5. Delete the Clerk account so the user can't log back in.
-  try {
-    const client = await clerkClient();
-    await client.users.deleteUser(clerkId);
-  } catch (e) {
-    console.error("[delete-account] Clerk delete failed", e);
-    // Continue — local data is already gone.
-  }
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, identityDeletion });
 }

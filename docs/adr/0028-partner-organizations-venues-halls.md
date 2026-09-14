@@ -127,6 +127,7 @@ Ownership currently flows through `venues.user_id` in **52 files / 73 sites**
 membership resolvers. Grouped by zone:
 
 ### Dashboard (vendor) — server pages/layouts
+
 - `src/app/[locale]/(vendor)/dashboard/layout.tsx`
 - `src/app/[locale]/(vendor)/dashboard/page.tsx`
 - `src/app/[locale]/(vendor)/dashboard/analytics/page.tsx`
@@ -137,6 +138,7 @@ membership resolvers. Grouped by zone:
 - `src/app/[locale]/(client)/cabinet/layout.tsx` (partner detection)
 
 ### Venue APIs
+
 - `src/app/api/me/venue/route.ts`, `src/app/api/me/venue/stats/route.ts`
 - `src/app/api/venues/[id]/route.ts`
 - `src/app/api/venue-images/route.ts`, `src/app/api/venue-images/[id]/route.ts`
@@ -146,10 +148,12 @@ membership resolvers. Grouped by zone:
   `.../ai/analytics-suggestion/route.ts`
 
 ### Auth / onboarding
+
 - `src/app/api/auth/register-venue/route.ts`, `.../auth/select-role/route.ts`,
   `.../auth/check-role/route.ts`, `.../auth/register-artist/route.ts`
 
 ### Booking / contracts / chat / reviews / commissions
+
 - `src/app/api/booking-requests/route.ts`, `.../booking-requests/[id]/route.ts`,
   `.../booking-requests/[id]/contract/route.ts`,
   `.../booking-requests/[id]/contract-preview/route.ts`
@@ -161,11 +165,13 @@ membership resolvers. Grouped by zone:
 - `src/lib/booking/confirmation-effects.ts`
 
 ### Calendar / iCal / Inngest
+
 - `src/app/api/calendar/route.ts`,
   `src/app/api/calendar/venue-ical/[venueId]/[token]/route.ts`
 - `src/lib/inngest/functions.ts`
 
 ### Admin / legal / privacy / export / delete / planner
+
 - `src/app/[locale]/(admin)/admin/contracte/page.tsx`
 - `src/app/api/admin/registration-requests/route.ts`
 - `src/app/api/legal/accept/route.ts`
@@ -298,6 +304,12 @@ Hall that later became unusable. Canonical intervals are half-open and
 timezone-aware. iCal all-day classification uses actual local-day boundaries,
 including zones where a DST jump skips local midnight.
 
+Artist availability still stores a civil `event_date` plus wall-clock times.
+Overnight intervals are anchored to adjacent civil dates, but an ambiguous
+wall-clock time during a DST fall-back cannot select the first versus second
+occurrence. Persisting canonical instants (and an artist timezone) is a schema
+backlog item; it must be completed before offering fold-time disambiguation.
+
 ## 8. Phase 3–4 implementation and rollout boundary
 
 - Organization → Venue → Hall onboarding is resumable and request-id
@@ -312,11 +324,15 @@ including zones where a DST jump skips local midnight.
 - Manual whole-Venue/Hall blocks, conflict groups, aggregated calendar and iCal
   are Hall-aware. Inngest is the frequent durable-outbox runner; the Vercel
   Hobby-compatible cron is a daily fallback.
-- Manual migrations `0029`–`0032` extend the expand model with Hall-aware
+- Manual migrations `0029`–`0033` extend the expand model with Hall-aware
   calendar integrity, legal acceptance sessions, durable booking-effect outbox
-  state and onboarding/publication hardening.
+  state, onboarding/publication hardening, and durable idempotent creation of a
+  booking plus its one-to-one CRM offer projection. Migration `0033` also
+  preserves offer history when an artist or Venue is deleted by detaching that
+  target instead of cascading the offer.
 
 The feature remains behind `FEATURE_MULTI_HALL`. PostgreSQL migration and
 concurrency suites must still pass on a disposable guarded database through
-`0032` before Preview/staging. Preview/Production have not been migrated by
-this correction branch, and phase 5 public catalog work has not started.
+`0033` before Preview/staging. Migration `0033` has not been applied to any
+shared Preview, staging, or Production database by this correction branch, and
+phase 5 public catalog work has not started.

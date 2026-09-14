@@ -10,20 +10,43 @@ import {
   getCalendarEvents,
   bulkSetCalendarEvents,
 } from "@/lib/db/queries/calendar";
+import {
+  CalendarWriteValidationError,
+  isValidCalendarDate,
+  isValidCalendarMonth,
+  type ManagedCalendarReplacementOptions,
+} from "@/lib/booking/calendar-write";
+import {
+  artistCalendarWriteAuthorization,
+  CalendarWriteAuthorizationError,
+  venueCalendarWriteAuthorization,
+} from "@/lib/booking/calendar-write-authorization";
 
 const getSchema = z.object({
   entity_type: z.enum(["artist", "venue"]),
-  entity_id: z.coerce.number(),
-  month: z.string().regex(/^\d{4}-\d{2}$/),
+  entity_id: z.coerce.number().int().positive(),
+  month: z.string().refine(isValidCalendarMonth, {
+    message: "Month must be a real YYYY-MM calendar month",
+  }),
 });
 
 const postSchema = z.object({
   entity_type: z.enum(["artist", "venue"]),
-  entity_id: z.number(),
-  dates: z.array(z.string()),
+  entity_id: z.number().int().positive(),
+  dates: z
+    .array(
+      z.string().refine(isValidCalendarDate, {
+        message: "Date must be a real YYYY-MM-DD calendar date",
+      }),
+    )
+    .min(1)
+    .max(366)
+    .refine((dates) => new Set(dates).size === dates.length, {
+      message: "Duplicate dates are not allowed",
+    }),
   status: z.enum(["available", "booked", "tentative", "blocked"]),
-  note: z.string().nullable().optional(),
-  event_type: z.string().nullable().optional(),
+  note: z.string().max(500).nullable().optional(),
+  event_type: z.string().max(120).nullable().optional(),
 });
 
 /** Normalize a date value to YYYY-MM-DD string, handling timezone offsets */
@@ -107,7 +130,7 @@ export async function POST(req: Request) {
   }
 
   const [appUser] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, role: users.role })
     .from(users)
     .where(eq(users.clerkId, clerkId))
     .limit(1);
@@ -116,7 +139,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Verify ownership of the target entity before touching its calendar.
+  // Fast preflight for a useful response. The same authority is locked and
+  // rechecked inside the calendar replacement transaction below.
+  let writeAuthorization: ManagedCalendarReplacementOptions;
   if (parsed.data.entity_type === "artist") {
     const [artist] = await db
       .select({ id: artists.id, userId: artists.userId })
@@ -126,23 +151,46 @@ export async function POST(req: Request) {
     if (!artist || artist.userId !== appUser.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
+    writeAuthorization = artistCalendarWriteAuthorization({
+      userId: appUser.id,
+      artistId: parsed.data.entity_id,
+    });
   } else {
     // ADR 0028 — venue ownership via the membership chain (IDOR-safe).
     const access = await requireVenueCapability(parsed.data.entity_id, "manage_calendar");
     if (!access.ok) {
       return NextResponse.json({ error: access.error }, { status: access.status });
     }
+    writeAuthorization = venueCalendarWriteAuthorization({
+      user: access.user,
+      venueId: parsed.data.entity_id,
+      organizationId: access.organizationId,
+    });
   }
 
-  await bulkSetCalendarEvents(
-    parsed.data.entity_type,
-    parsed.data.entity_id,
-    parsed.data.dates,
-    parsed.data.status,
-    "manual",
-    parsed.data.note ?? null,
-    parsed.data.event_type ?? null,
-  );
+  try {
+    await bulkSetCalendarEvents(
+      parsed.data.entity_type,
+      parsed.data.entity_id,
+      parsed.data.dates,
+      parsed.data.status,
+      "manual",
+      parsed.data.note ?? null,
+      parsed.data.event_type ?? null,
+      writeAuthorization,
+    );
+  } catch (error) {
+    if (error instanceof CalendarWriteAuthorizationError) {
+      return NextResponse.json(
+        { error: "Forbidden", code: error.code },
+        { status: error.status },
+      );
+    }
+    if (error instanceof CalendarWriteValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({ success: true });
 }

@@ -6,7 +6,6 @@
 
 import { useState } from "react";
 import {
-  CheckCircle2,
   XCircle,
   Star,
   StarOff,
@@ -24,7 +23,7 @@ interface Props {
   onComplete: () => void;
 }
 
-type Action = "activate" | "deactivate" | "feature" | "unfeature" | "delete";
+type Action = "deactivate" | "feature" | "unfeature" | "delete";
 
 export function BulkActionsBar({
   entity,
@@ -79,18 +78,6 @@ export function BulkActionsBar({
           {t("admin.bulk.selected", { count: selectedIds.length })}
         </span>
         <span className="mx-1 h-4 w-px bg-border/50" />
-        <button
-          onClick={() => run("activate")}
-          disabled={busy !== null}
-          className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-xs font-medium text-emerald-400 hover:bg-emerald-500/25 disabled:opacity-50"
-        >
-          {busy === "activate" ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <CheckCircle2 className="h-3 w-3" />
-          )}
-          {t("admin.bulk.activate")}
-        </button>
         <button
           onClick={() => run("deactivate")}
           disabled={busy !== null}

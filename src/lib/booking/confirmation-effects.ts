@@ -1,5 +1,5 @@
 import { after } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   artists,
@@ -18,7 +18,6 @@ import {
   type NotificationChannelDrivers,
 } from "@/lib/notifications/dispatch";
 import { getVenueOwnerUserIds } from "@/lib/venue-access";
-import { persistConfirmationEffects } from "./confirmation-persist";
 import {
   BOOKING_EFFECT_MAX_ATTEMPTS,
   BOOKING_EFFECT_PROVIDER_TIMEOUT_MS,
@@ -117,11 +116,14 @@ async function confirmedBooking(bookingId: number): Promise<Booking | null> {
     : null;
 }
 
-async function finalNotificationInputs(b: Booking): Promise<DispatchInput[]> {
+async function finalNotificationInputs(
+  b: Booking,
+  executor: typeof db = db,
+): Promise<DispatchInput[]> {
   const vendorUserIds = b.venueId
-    ? await getVenueOwnerUserIds(b.venueId)
+    ? await getVenueOwnerUserIds(b.venueId, executor)
     : b.artistId
-      ? (await db
+      ? (await executor
           .select({ userId: artists.userId })
           .from(artists)
           .where(eq(artists.id, b.artistId))
@@ -132,13 +134,13 @@ async function finalNotificationInputs(b: Booking): Promise<DispatchInput[]> {
   const { isMultiHallEnabled } = await import("@/lib/feature-flags");
   const { venueHallDisplayName } = await import("@/lib/booking/venue-booking-write");
   const place = b.venueId
-    ? await venueHallDisplayName(b.venueId, b.hallId ?? null)
+    ? await venueHallDisplayName(b.venueId, b.hallId ?? null, executor)
     : "";
   const title = "Rezervare confirmată de ambele părți";
   const inputs: DispatchInput[] = [];
   for (const userId of new Set([b.clientUserId, ...vendorUserIds])) {
     if (!userId) continue;
-    const [user] = await db
+    const [user] = await executor
       .select({ email: users.email })
       .from(users)
       .where(eq(users.id, userId))
@@ -173,41 +175,33 @@ async function materializeConfirmationDeliveries(
 ): Promise<BookingEffectDelivery[]> {
   const existing = await bookingEffectDeliveriesFor(effect.id);
   if (existing.length > 0) return existing;
-  const rows: Array<{
-    recipientUserId: string;
-    channel: BookingEffectChannel;
-    dedupeKey: string;
-    payload: NonNullable<BookingEffectDelivery["payload"]>;
-  }> = [];
-  for (const input of await finalNotificationInputs(b)) {
-    const channels = await resolveNotificationChannels(input);
-    for (const channel of channels) {
-      rows.push({
-        recipientUserId: input.userId,
-        channel,
-        dedupeKey: `${input.dedupeKey}:${channel}`,
-        payload: {
-          userId: input.userId,
-          type: String(input.type),
-          title: input.title,
-          ...(input.message ? { message: input.message } : {}),
-          ...(input.actionUrl ? { actionUrl: input.actionUrl } : {}),
-          ...(input.email ? { email: input.email } : {}),
-          ...(input.emailSubject ? { emailSubject: input.emailSubject } : {}),
-          ...(input.emailHtml ? { emailHtml: input.emailHtml } : {}),
-          dedupeKey: input.dedupeKey!,
-        },
-      });
-    }
-  }
+  // Resolve recipients once outside the transaction only to establish the
+  // global lock order. The immutable payload itself is rebuilt from a fresh
+  // booking and current recipients/preferences inside the transaction.
+  const candidateInputs = await finalNotificationInputs(b);
+  const candidateUserIds = [...new Set(candidateInputs.map(({ userId }) => userId))]
+    .sort();
   return db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
+    // Account erasure owns a user row before scrubbing outbox rows. Matching
+    // that order here prevents user/coordinator deadlocks and ensures erasure
+    // either sees committed children or makes the recipient disappear first.
+    const lockedUsers = candidateUserIds.length > 0
+      ? await tx
+          .select({ id: users.id })
+          .from(users)
+          .where(inArray(users.id, candidateUserIds))
+          .orderBy(users.id)
+          .for("share")
+      : [];
+    const lockedUserIds = new Set(lockedUsers.map(({ id }) => id));
+
     // Lock in the same booking -> outbox order used by cancellation. If
     // cancellation committed first, no children are created. If this lock
     // wins first, cancellation waits and then invalidates every inserted row.
-    const executor = tx as unknown as typeof db;
     await acquireBookingConfirmationBarrier(executor, b.id);
     const [activeBooking] = await tx
-      .select({ status: bookingRequests.status })
+      .select()
       .from(bookingRequests)
       .where(eq(bookingRequests.id, b.id))
       .for("share")
@@ -235,6 +229,36 @@ async function materializeConfirmationDeliveries(
     }
     const concurrentExisting = await bookingEffectDeliveriesFor(effect.id, executor);
     if (concurrentExisting.length > 0) return concurrentExisting;
+    const rows: Array<{
+      recipientUserId: string;
+      channel: BookingEffectChannel;
+      dedupeKey: string;
+      payload: NonNullable<BookingEffectDelivery["payload"]>;
+    }> = [];
+    for (const input of await finalNotificationInputs(activeBooking, executor)) {
+      // A recipient deleted while this worker waited must never be recreated
+      // as a stale durable payload after account erasure committed.
+      if (!lockedUserIds.has(input.userId)) continue;
+      const channels = await resolveNotificationChannels(input, executor);
+      for (const channel of channels) {
+        rows.push({
+          recipientUserId: input.userId,
+          channel,
+          dedupeKey: `${input.dedupeKey}:${channel}`,
+          payload: {
+            userId: input.userId,
+            type: String(input.type),
+            title: input.title,
+            ...(input.message ? { message: input.message } : {}),
+            ...(input.actionUrl ? { actionUrl: input.actionUrl } : {}),
+            ...(input.email ? { email: input.email } : {}),
+            ...(input.emailSubject ? { emailSubject: input.emailSubject } : {}),
+            ...(input.emailHtml ? { emailHtml: input.emailHtml } : {}),
+            dedupeKey: input.dedupeKey!,
+          },
+        });
+      }
+    }
     return enqueueBookingEffectDeliveries(executor, effect.id, rows);
   });
 }
@@ -372,21 +396,23 @@ async function runConfirmationDeliveries(
       return;
     }
     if (booking.clientUserId) {
-      const { triggerReferral, isFirstBookingForUser } = await import("@/lib/referrals/trigger");
-      if (await isFirstBookingForUser(booking.clientUserId)) {
-        const result = await triggerReferral(booking.clientUserId, "first_booking", {
-          bookingId: booking.id,
-          eventDate: booking.eventDate,
-        });
-        if (result.reason === "db_error") throw new Error("referral_delivery_failed");
-      }
+      const { triggerFirstBookingReferral } = await import("@/lib/referrals/trigger");
+      const result = await triggerFirstBookingReferral({
+        bookingId: booking.id,
+        referredUserId: booking.clientUserId,
+      });
+      if (result.reason === "db_error") throw new Error("referral_delivery_failed");
     }
   }, options.now);
 
   await runPreparationStep(effect, "materialization", async () => {
     await materializeConfirmationDeliveries(booking, effect);
   }, options.now);
-  const due = await dueBookingEffectDeliveries(effect.id, 100, options.now);
+  const due = await dueBookingEffectDeliveries(
+    effect.id,
+    options.maxDeliveriesPerEffect ?? 100,
+    options.now,
+  );
   for (const row of due) {
     const result = await processBookingEffectDelivery(
       row.id,
@@ -419,7 +445,14 @@ async function runConfirmationDeliveries(
       },
       options,
     );
-    if (result.status === "cancelled") throw new BookingEffectCancelledError();
+    if (result.status === "cancelled") {
+      // Account erasure may cancel only one recipient. Keep delivering to the
+      // other party while the booking itself remains final; a true booking
+      // cancellation still terminates the whole coordinator.
+      if (!await confirmedBooking(effect.bookingId)) {
+        throw new BookingEffectCancelledError();
+      }
+    }
   }
 
   const all = await bookingEffectDeliveriesFor(effect.id);
@@ -430,11 +463,12 @@ async function runConfirmationDeliveries(
       .join("; ");
     throw new BookingEffectDeadLetterError(terminal);
   }
-  if (all.some((row) => row.status === "cancelled")) {
+  const live = all.filter((row) => row.status !== "cancelled");
+  if (live.length === 0 && all.length > 0) {
     throw new BookingEffectCancelledError();
   }
-  if (all.some((row) => row.status !== "delivered")) {
-    const retrying = all.filter((row) => row.status !== "delivered").length;
+  if (live.some((row) => row.status !== "delivered")) {
+    const retrying = live.filter((row) => row.status !== "delivered").length;
     throw new Error(`confirmation_deliveries_retrying:${retrying}`);
   }
 }
@@ -488,6 +522,8 @@ type ConfirmationProcessorOptions = BookingEffectClockOptions & {
   /** Test seam for preparation retry budgets. */
   referral?: (booking: Booking, effect: BookingEffect) => Promise<void>;
   providerTimeoutMs?: number;
+  /** Vercel fallback only: cap sequential provider calls inside one effect. */
+  maxDeliveriesPerEffect?: number;
 };
 
 export async function processConfirmationNotificationEffect(
@@ -539,6 +575,8 @@ export async function drainConfirmationNotificationOutbox(options: {
   now?: Date;
   deliver?: ConfirmationProcessorOptions["deliver"];
   drivers?: NotificationChannelDrivers;
+  providerTimeoutMs?: number;
+  maxDeliveriesPerEffect?: number;
 } = {}) {
   await reconcileOrphanedCancelledBookingEffectDeliveries(db, options.now);
   const effects = await dueBookingEffects(
@@ -564,6 +602,8 @@ export async function drainConfirmationNotificationOutbox(options: {
       ...(options.now ? { now: options.now } : {}),
       deliver: options.deliver,
       drivers: options.drivers,
+      providerTimeoutMs: options.providerTimeoutMs,
+      maxDeliveriesPerEffect: options.maxDeliveriesPerEffect,
     });
     if (result.status === "delivered") summary.delivered += 1;
     else if (result.status === "failed") {
@@ -614,6 +654,10 @@ export function scheduleConfirmationNotifications(b: Booking) {
 }
 
 export async function finalConfirmationEffects(b: Booking) {
-  const row = await persistConfirmationEffects(db, b);
+  // The replay helper owns the canonical vendor -> booking lock protocol.
+  // Calling persistence directly here would release a standalone vendor read
+  // lock before the commission/booking effects are committed.
+  const { replayConfirmationEffects } = await import("./booking-transitions");
+  const row = await replayConfirmationEffects(b);
   scheduleConfirmationNotifications(row);
 }

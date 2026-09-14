@@ -11,7 +11,7 @@
 // to /api/v1/booking-requests; success → push to booking detail with
 // confetti animation; failure → inline error under the submit button.
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,8 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { useUser } from "@clerk/clerk-expo";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Crypto from "expo-crypto";
 import { SafeAreaView } from "react-native-safe-area-context";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { X, Calendar, Clock, Users } from "lucide-react-native";
@@ -31,8 +33,17 @@ import { useApi } from "../../lib/api";
 import {
   API_PATHS,
   BookingRequestCreateSchema,
+  clearPendingJsonRequest,
+  isAmbiguousIdempotentRequestStatus,
+  pendingJsonRequestStorageKey,
+  preparePendingJsonRequest,
+  isValidBookingPhone,
 } from "@epetrecere/shared";
-import { eventTypeLabel, formatDateRO } from "@epetrecere/shared/utils";
+import {
+  eventTypeLabel,
+  formatDateRO,
+  localDateToIsoDate,
+} from "@epetrecere/shared/utils";
 
 const EVENT_TYPES = [
   "wedding",
@@ -50,7 +61,7 @@ export default function BookingNewScreen() {
     venueId?: string;
   }>();
   const router = useRouter();
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const api = useApi();
 
   const artistId = params.artistId ? Number(params.artistId) : null;
@@ -70,9 +81,19 @@ export default function BookingNewScreen() {
   // The partner calls this number back, so a placeholder is worse than an
   // empty field: "+37300000000" is 11 non-uniform digits, which sails through
   // the server's sanity check and reaches the partner looking real.
-  const clerkPhone = user?.phoneNumbers?.[0]?.phoneNumber ?? "";
-  const [phone, setPhone] = useState(clerkPhone);
-  const phoneOk = phone.replace(/\D/g, "").length >= 8;
+  // Never guess from Clerk's array order when an account has more than one
+  // number. A missing primary number stays editable and must be entered by the
+  // client explicitly.
+  const clerkPhone = user?.primaryPhoneNumber?.phoneNumber ?? "";
+  const [phone, setPhone] = useState("");
+  const phoneEdited = useRef(false);
+  const phoneOk = isValidBookingPhone(phone);
+
+  // Clerk loads asynchronously after the initial render. Fill its verified
+  // phone once it arrives, but never overwrite a value the person has typed.
+  useEffect(() => {
+    if (isLoaded && clerkPhone && !phoneEdited.current) setPhone(clerkPhone);
+  }, [clerkPhone, isLoaded]);
 
   const [guestCount, setGuestCount] = useState("100");
   const [message, setMessage] = useState("");
@@ -82,6 +103,7 @@ export default function BookingNewScreen() {
 
   const submitMutation = useMutation({
     mutationFn: async () => {
+      if (!user?.id) throw new Error("Contul nu este încă disponibil.");
       // Absent fields are omitted, never sent as null. The server declares
       // them `.optional()` without `.nullable()`, so an explicit null fails
       // validation — which is why every booking sent from the app came back
@@ -96,15 +118,71 @@ export default function BookingNewScreen() {
         ...(user?.primaryEmailAddress?.emailAddress
           ? { clientEmail: user.primaryEmailAddress.emailAddress }
           : {}),
-        eventDate: eventDate.toISOString().slice(0, 10),
+        eventDate: localDateToIsoDate(eventDate),
         startTime: `${String(startTime.getHours()).padStart(2, "0")}:${String(startTime.getMinutes()).padStart(2, "0")}`,
         eventType,
         ...(Number(guestCount) ? { guestCount: Number(guestCount) } : {}),
         ...(message.trim() ? { message: message.trim() } : {}),
       });
-      const res = await api.post(API_PATHS.bookingRequests, body);
-      if (!res.ok) throw new Error(res.error?.message ?? "submit_failed");
-      return res.data as { id: number };
+      const scope = JSON.stringify([
+        "v1",
+        user.id,
+        artistId !== null ? "artist" : "venue",
+        artistId ?? venueId,
+        null,
+      ]);
+      const storageKey = pendingJsonRequestStorageKey(
+        "epetrecere:booking-create:v1",
+        scope,
+      );
+      const pending = await preparePendingJsonRequest({
+        storage: AsyncStorage,
+        storageKey,
+        scope,
+        payload: body,
+        createRequestId: Crypto.randomUUID,
+      });
+      const res = await api.post(
+        API_PATHS.bookingRequests,
+        pending.payload,
+        { headers: { "Idempotency-Key": pending.requestId } },
+      );
+      if (!res.ok) {
+        if (!isAmbiguousIdempotentRequestStatus(res.status)) {
+          const cleared = await clearPendingJsonRequest({
+            storage: AsyncStorage,
+            storageKey,
+            scope,
+            requestId: pending.requestId,
+          });
+          if (!cleared) {
+            throw new Error(
+              "Aplicația nu a putut reseta cererea locală. Încearcă din nou.",
+            );
+          }
+        }
+        throw new Error(res.error?.message ?? "submit_failed");
+      }
+      const data = res.data as { id?: unknown } | null;
+      if (!Number.isSafeInteger(data?.id) || Number(data?.id) <= 0) {
+        // A malformed 2xx is ambiguous: keep the same key/body for replay.
+        throw new Error("Răspuns incomplet de la server. Încearcă din nou.");
+      }
+      const cleared = await clearPendingJsonRequest({
+        storage: AsyncStorage,
+        storageKey,
+        scope,
+        requestId: pending.requestId,
+      });
+      if (!cleared) {
+        // The server already committed this exact idempotent request. Stay on
+        // this screen and replay it until compare-and-clear succeeds; otherwise
+        // a later booking for the same target could inherit the stale body.
+        throw new Error(
+          "Rezervarea a fost înregistrată, dar sincronizarea locală nu s-a încheiat. Apasă din nou.",
+        );
+      }
+      return data as { id: number };
     },
     onSuccess: (data) => {
       router.replace(`/(client)/bookings/${data.id}`);
@@ -184,7 +262,7 @@ export default function BookingNewScreen() {
                 Data evenimentului
               </Text>
               <Text className="mt-0.5 text-[15px] font-semibold text-foreground">
-                {formatDateRO(eventDate.toISOString().slice(0, 10))}
+                {formatDateRO(localDateToIsoDate(eventDate))}
               </Text>
             </View>
           </Card>
@@ -213,7 +291,10 @@ export default function BookingNewScreen() {
           <Input
             label="Telefon de contact"
             value={phone}
-            onChangeText={setPhone}
+            onChangeText={(value) => {
+              phoneEdited.current = true;
+              setPhone(value);
+            }}
             keyboardType="phone-pad"
             hint={
               clerkPhone
@@ -253,7 +334,7 @@ export default function BookingNewScreen() {
         <Button
           onPress={() => submitMutation.mutate()}
           loading={submitMutation.isPending}
-          disabled={!phoneOk}
+          disabled={!isLoaded || !user?.id || !phoneOk || submitMutation.isPending}
           fullWidth
           size="lg"
         >

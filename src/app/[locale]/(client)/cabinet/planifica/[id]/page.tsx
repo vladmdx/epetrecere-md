@@ -94,6 +94,11 @@ import { venueRequestInterval } from "@/lib/planner/venue-request-interval";
 import { planTabFromQuery, planTabHref, type PlanTabKey } from "@/lib/planner/tab-navigation";
 import { guestHeadcount, assignedHeadcount } from "@/lib/planner/guest-headcount";
 import { checklistDisplayTitle } from "@/lib/planner/checklist-copy";
+import {
+  bookingCreateScope,
+  isAmbiguousBookingCreateStatus,
+  submitBookingCreateRequest,
+} from "@/lib/booking/booking-create-client";
 const DATE_LOCALES = { ro: "ro-MD", ru: "ru-RU", en: "en-GB" } as const;
 
 function eventRateLabel(tier: PricingTier | undefined, locale: keyof typeof DATE_LOCALES, fallback: string): string {
@@ -326,8 +331,8 @@ export default function PlanDetailPage({
   // Auto-book hand-off: when the user clicked "Eveniment nou" from an
   // artist page, we stash { artistId, artistSlug } in sessionStorage. The
   // moment they land on this newly-created plan we fire the booking
-  // request automatically — no extra clicks. Single-fire: clear the
-  // stash even on failure so a stuck flag doesn't loop forever.
+  // request automatically — no extra clicks. Ambiguous failures keep both
+  // this intent and the frozen idempotent body so refresh retries safely.
   useEffect(() => {
     if (!plan || !user?.primaryEmailAddress?.emailAddress) return;
     let raw: string | null = null;
@@ -337,44 +342,57 @@ export default function PlanDetailPage({
       return;
     }
     if (!raw) return;
-    try {
-      sessionStorage.removeItem("auto-book-after-plan");
-    } catch {
-      /* ignore */
-    }
+    const clearAutoBookIntent = () => {
+      try {
+        sessionStorage.removeItem("auto-book-after-plan");
+      } catch {
+        /* ignore */
+      }
+    };
     let parsed: { artistId?: number } | null = null;
     try {
       parsed = JSON.parse(raw) as { artistId?: number };
     } catch {
+      clearAutoBookIntent();
       return;
     }
     const artistId = parsed?.artistId;
-    if (!artistId || !Number.isFinite(artistId)) return;
+    if (!artistId || !Number.isFinite(artistId)) {
+      clearAutoBookIntent();
+      return;
+    }
     if (!plan.eventDate) {
+      clearAutoBookIntent();
       toast.message(t("cabinet.plan.autoBookNeedsDate"));
       return;
     }
     void (async () => {
       try {
-        const res = await fetch("/api/booking-requests", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const payload = {
+          artistId,
+          clientName: user.fullName || "Client",
+          clientPhone: "000000",
+          clientEmail: user.primaryEmailAddress?.emailAddress,
+          eventDate: plan.eventDate,
+          eventType: plan.eventType ?? undefined,
+          guestCount: plan.guestCountTarget ?? undefined,
+          eventPlanId: plan.id,
+        };
+        const res = await submitBookingCreateRequest({
+          scope: bookingCreateScope({
+            actorId: user.id,
             artistId,
-            clientName: user.fullName || "Client",
-            clientPhone: "000000",
-            clientEmail: user.primaryEmailAddress?.emailAddress,
-            eventDate: plan.eventDate,
-            eventType: plan.eventType ?? undefined,
-            guestCount: plan.guestCountTarget ?? undefined,
             eventPlanId: plan.id,
           }),
+          payload,
         });
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
+          if (!isAmbiguousBookingCreateStatus(res.response.status)) clearAutoBookIntent();
+          const err = await res.response.json().catch(() => ({}));
           toast.error(err.error || t("cabinet.plan.autoBookFailed"));
           return;
         }
+        clearAutoBookIntent();
         toast.success(t("cabinet.plan.requestSentPartner"));
         await refreshBookings();
         // Switch to the bookings tab so the user sees the request right
@@ -2714,6 +2732,7 @@ function PlanArtistCard({
   onRefresh: () => void;
 }) {
   const { t, locale } = useLocale();
+  const { user } = useUser();
   const [modalOpen, setModalOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -2743,6 +2762,9 @@ function PlanArtistCard({
   const [artistWorkingHours, setArtistWorkingHours] = useState<
     { start: string; end: string } | null | undefined
   >(undefined);
+  const [artistWorkingRanges, setArtistWorkingRanges] = useState<
+    Array<{ start: string; end: string }> | undefined
+  >(undefined);
   const [bookedRanges, setBookedRanges] = useState<
     Array<{ startTime: string; endTime: string }>
   >([]);
@@ -2769,6 +2791,7 @@ function PlanArtistCard({
   useEffect(() => {
     if (!modalOpen || !plan.eventDate) {
       setArtistWorkingHours(undefined);
+      setArtistWorkingRanges(undefined);
       setBookedRanges([]);
       setWholeDayBlocked(false);
       return;
@@ -2781,6 +2804,9 @@ function PlanArtistCard({
       .then((d) => {
         if (cancelled || !d) return;
         setArtistWorkingHours(d.workingHours);
+        setArtistWorkingRanges(
+          Array.isArray(d.workingRanges) ? d.workingRanges : undefined,
+        );
         setBookedRanges(d.bookedRanges || []);
         setWholeDayBlocked(!!d.wholeDayBlocked);
       })
@@ -2996,6 +3022,10 @@ function PlanArtistCard({
 
   async function submit() {
     if (submitting) return;
+    if (!user?.id) {
+      toast.error(t("cabinet.plan.genericError"));
+      return;
+    }
     if (!canSubmit) {
       if (hasPricedOffer && selectedDurationMinutes == null && selectedEventTierId == null) {
         toast.error(
@@ -3010,31 +3040,35 @@ function PlanArtistCard({
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/booking-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = {
+        artistId: artist.id,
+        clientName: clientName || "Client",
+        clientPhone: clientPhone || "000000",
+        clientEmail: clientEmail,
+        eventDate: plan.eventDate,
+        eventType: plan.eventType ?? undefined,
+        guestCount: plan.guestCountTarget ?? undefined,
+        startTime,
+        endTime,
+        agreedPrice: computedPrice ?? undefined,
+        packageId: resolvedForSelection?.tier.id ?? undefined,
+        durationHours:
+          selectedDurationMinutes != null
+            ? selectedDurationMinutes / 60
+            : undefined,
+        message: message.trim() || undefined,
+        eventPlanId: plan.id,
+      };
+      const res = await submitBookingCreateRequest({
+        scope: bookingCreateScope({
+          actorId: user.id,
           artistId: artist.id,
-          clientName: clientName || "Client",
-          clientPhone: clientPhone || "000000",
-          clientEmail: clientEmail,
-          eventDate: plan.eventDate,
-          eventType: plan.eventType ?? undefined,
-          guestCount: plan.guestCountTarget ?? undefined,
-          startTime,
-          endTime,
-          agreedPrice: computedPrice ?? undefined,
-          packageId: resolvedForSelection?.tier.id ?? undefined,
-          durationHours:
-            selectedDurationMinutes != null
-              ? selectedDurationMinutes / 60
-              : undefined,
-          message: message.trim() || undefined,
           eventPlanId: plan.id,
         }),
+        payload,
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
+        const err = await res.response.json().catch(() => ({}));
         throw new Error(err.error || t("cabinet.plan.sendError"));
       }
       const summary =
@@ -3235,6 +3269,7 @@ function PlanArtistCard({
                       setSelectedSlotId(null);
                     }}
                     workingHours={artistWorkingHours}
+                    workingRanges={artistWorkingRanges}
                     bookedRanges={bookedRanges}
                     wholeDayBlocked={wholeDayBlocked}
                   />
@@ -5090,30 +5125,38 @@ function VenueDiscoveryCard({
     submitting || sent || !!blockedByOtherVenue || declinedHere;
 
   async function sendRequest() {
+    if (!user?.id) {
+      toast.error(t("cabinet.plan.genericError"));
+      return;
+    }
     if (!plan.eventDate) {
       toast.error(t("cabinet.plan.venueCard.needDate"));
       return;
     }
     setSubmitting(true);
     try {
-      const res = await fetch("/api/booking-requests", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = {
+        venueId: v.id,
+        eventPlanId: plan.id,
+        clientName: user.fullName?.trim() || "Client",
+        clientPhone: user.phoneNumbers?.[0]?.phoneNumber?.trim() || "000000",
+        clientEmail: user.primaryEmailAddress?.emailAddress,
+        eventDate: plan.eventDate,
+        ...venueRequestInterval(plan),
+        eventType: plan.eventType ?? undefined,
+        guestCount: plan.guestCountTarget ?? undefined,
+        message: `Cerere din planul ${plan.title}`,
+      };
+      const res = await submitBookingCreateRequest({
+        scope: bookingCreateScope({
+          actorId: user.id,
           venueId: v.id,
           eventPlanId: plan.id,
-          clientName: user?.fullName?.trim() || "Client",
-          clientPhone: user?.phoneNumbers?.[0]?.phoneNumber?.trim() || "000000",
-          clientEmail: user?.primaryEmailAddress?.emailAddress,
-          eventDate: plan.eventDate,
-          ...venueRequestInterval(plan),
-          eventType: plan.eventType ?? undefined,
-          guestCount: plan.guestCountTarget ?? undefined,
-          message: `Cerere din planul ${plan.title}`,
         }),
+        payload,
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
+        const err = await res.response.json().catch(() => ({}));
         throw new Error(err.error || t("cabinet.plan.sendError"));
       }
       toast.success(t("cabinet.plan.venueCard.requestSent", { name: v.nameRo }));

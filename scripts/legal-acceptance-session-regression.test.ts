@@ -62,6 +62,8 @@ const ids = {
   raceOwner: "",
   concurrentOwner: "",
   admin: "",
+  adminOk: "",
+  adminFail: "",
   org: 0,
   partialOrg: 0,
   raceOrg: 0,
@@ -77,6 +79,12 @@ function appUser(id: string): AppUser {
 }
 
 async function signInput(userId: string, organizationId: number) {
+  const [signer] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  if (!signer) throw new Error("missing legal-session signer fixture");
   return {
     userId,
     subjectType: "venue" as const,
@@ -90,7 +98,7 @@ async function signInput(userId: string, organizationId: number) {
     ipAddress: null,
     userAgent: null,
     deviceSummary: null,
-    email: `${MARK}owner@example.com`,
+    email: signer.email,
     phone: "+37369111111",
     slugs: VENUE_REQUIRED_DOCS,
   };
@@ -133,6 +141,25 @@ before(async () => {
     })
     .returning({ id: users.id });
   ids.admin = admin.id;
+  const [adminOk, adminFail] = await db
+    .insert(users)
+    .values([
+      {
+        clerkId: MARK + "admin-ok",
+        email: `${MARK}admin-ok@example.invalid`,
+        name: "Admin OK",
+        role: "admin",
+      },
+      {
+        clerkId: MARK + "admin-fail",
+        email: `${MARK}admin-fail@example.invalid`,
+        name: "Admin Fail",
+        role: "admin",
+      },
+    ])
+    .returning({ id: users.id });
+  ids.adminOk = adminOk.id;
+  ids.adminFail = adminFail.id;
 
   const outsiderOrg = await ensureDraftOrganization(appUser(ids.outsider), {
     displayName: MARK + "Unrelated Org",
@@ -453,11 +480,15 @@ test("failed PDF delivery remains durable and succeeds exactly once on retry", a
   await db
     .delete(legalContractDeliveryOutbox)
     .where(eq(legalContractDeliveryOutbox.acceptanceSessionId, anchor.acceptanceSessionId));
-  await db.insert(legalContractDeliveryOutbox).values([
+  const [poisonInserted, healthyInserted] = await db
+    .insert(legalContractDeliveryOutbox)
+    .values([
     {
       acceptanceSessionId: anchor.acceptanceSessionId,
       anchorAcceptanceId: anchor.id,
       channel: "signer",
+      recipientUserId: anchor.userId!,
+      recipientRoleSnapshot: "signer",
       recipientKey: anchor.userId!,
       recipientEmail: anchor.email!,
       nextAttemptAt: new Date("2026-09-13T08:00:00.000Z"),
@@ -466,11 +497,15 @@ test("failed PDF delivery remains durable and succeeds exactly once on retry", a
       acceptanceSessionId: anchor.acceptanceSessionId,
       anchorAcceptanceId: anchor.id,
       channel: "admin",
+      recipientUserId: ids.admin,
+      recipientRoleSnapshot: "admin",
       recipientKey: ids.admin,
       recipientEmail: `${MARK}admin@example.com`,
       nextAttemptAt: new Date("2026-09-13T08:00:00.000Z"),
     },
-  ]);
+    ])
+    .returning({ id: legalContractDeliveryOutbox.id });
+  assert.ok(poisonInserted && healthyInserted);
 
   let renders = 0;
   const sent: Array<{
@@ -500,7 +535,7 @@ test("failed PDF delivery remains durable and succeeds exactly once on retry", a
 
   await assert.rejects(
     () => processLegalContractDelivery(anchor.acceptanceSessionId, dependencies),
-    /simulated_pdf_failure/,
+    /contract_delivery_preparation_failed/,
   );
   const failed = await db
     .select()
@@ -549,24 +584,30 @@ test("a partial recipient failure retries only that recipient", async () => {
       acceptanceSessionId: anchor.acceptanceSessionId,
       anchorAcceptanceId: anchor.id,
       channel: "signer",
+      recipientUserId: anchor.userId!,
+      recipientRoleSnapshot: "signer",
       recipientKey: anchor.userId!,
-      recipientEmail: "signer@example.invalid",
+      recipientEmail: anchor.email!,
       nextAttemptAt: now0,
     },
     {
       acceptanceSessionId: anchor.acceptanceSessionId,
       anchorAcceptanceId: anchor.id,
       channel: "admin",
-      recipientKey: "admin-ok",
-      recipientEmail: "admin-ok@example.invalid",
+      recipientUserId: ids.adminOk,
+      recipientRoleSnapshot: "admin",
+      recipientKey: ids.adminOk,
+      recipientEmail: `${MARK}admin-ok@example.invalid`,
       nextAttemptAt: now0,
     },
     {
       acceptanceSessionId: anchor.acceptanceSessionId,
       anchorAcceptanceId: anchor.id,
       channel: "admin",
-      recipientKey: "admin-fail",
-      recipientEmail: "admin-fail@example.invalid",
+      recipientUserId: ids.adminFail,
+      recipientRoleSnapshot: "admin",
+      recipientKey: ids.adminFail,
+      recipientEmail: `${MARK}admin-fail@example.invalid`,
       nextAttemptAt: now0,
     },
   ]);
@@ -583,7 +624,7 @@ test("a partial recipient failure retries only that recipient", async () => {
     generatePdf: generateSignedContractPdf,
     sendEmail: async (message: (typeof sent)[number]) => {
       sent.push(message);
-      if (message.to === "admin-fail@example.invalid" && failAdmin) {
+      if (message.to === `${MARK}admin-fail@example.invalid` && failAdmin) {
         throw new Error("simulated_admin_failure");
       }
       return { data: { id: `mail-${sent.length}` }, error: null };
@@ -598,7 +639,7 @@ test("a partial recipient failure retries only that recipient", async () => {
     .from(legalContractDeliveryOutbox)
     .where(eq(legalContractDeliveryOutbox.acceptanceSessionId, anchor.acceptanceSessionId));
   assert.equal(firstState.filter((job) => job.status === "delivered").length, 2);
-  const failed = firstState.find((job) => job.recipientKey === "admin-fail");
+  const failed = firstState.find((job) => job.recipientKey === ids.adminFail);
   assert.equal(failed?.status, "failed");
   assert.equal(failed?.attempts, 1);
   assert.ok((failed?.nextAttemptAt.getTime() ?? 0) > now.getTime());
@@ -609,9 +650,9 @@ test("a partial recipient failure retries only that recipient", async () => {
     await processLegalContractDelivery(anchor.acceptanceSessionId, dependencies),
     "delivered",
   );
-  assert.equal(sent.filter((message) => message.to === "signer@example.invalid").length, 1);
-  assert.equal(sent.filter((message) => message.to === "admin-ok@example.invalid").length, 1);
-  const retried = sent.filter((message) => message.to === "admin-fail@example.invalid");
+  assert.equal(sent.filter((message) => message.to === anchor.email).length, 1);
+  assert.equal(sent.filter((message) => message.to === `${MARK}admin-ok@example.invalid`).length, 1);
+  const retried = sent.filter((message) => message.to === `${MARK}admin-fail@example.invalid`);
   assert.equal(retried.length, 2);
   assert.equal(retried[0]?.idempotencyKey, retried[1]?.idempotencyKey);
   assert.ok(sent.every((message) => message.attachments?.[0]?.contentType === "application/pdf"));
@@ -648,13 +689,15 @@ test("a poisoned recipient dead-letters without starving a healthy session", asy
   assert.ok(poisonAnchor && healthyAnchor);
   await db.delete(legalContractDeliveryOutbox);
   const now = new Date("2026-09-13T10:00:00.000Z");
-  await db.insert(legalContractDeliveryOutbox).values([
+  const [poisonInserted] = await db.insert(legalContractDeliveryOutbox).values([
     {
       acceptanceSessionId: poisonAnchor.acceptanceSessionId,
       anchorAcceptanceId: poisonAnchor.id,
       channel: "admin",
-      recipientKey: "poison",
-      recipientEmail: "poison@example.invalid",
+      recipientUserId: ids.admin,
+      recipientRoleSnapshot: "admin",
+      recipientKey: ids.admin,
+      recipientEmail: `${MARK}admin@example.com`,
       attempts: LEGAL_DELIVERY_MAX_ATTEMPTS - 1,
       nextAttemptAt: new Date(now.getTime() - 2_000),
       createdAt: new Date(now.getTime() - 2_000),
@@ -663,41 +706,59 @@ test("a poisoned recipient dead-letters without starving a healthy session", asy
       acceptanceSessionId: healthyAnchor.acceptanceSessionId,
       anchorAcceptanceId: healthyAnchor.id,
       channel: "signer",
-      recipientKey: "healthy",
-      recipientEmail: "healthy@example.invalid",
+      recipientUserId: healthyAnchor.userId!,
+      recipientRoleSnapshot: "signer",
+      recipientKey: healthyAnchor.userId!,
+      recipientEmail: healthyAnchor.email!,
       nextAttemptAt: new Date(now.getTime() - 1_000),
       createdAt: new Date(now.getTime() - 1_000),
     },
-  ]);
+  ]).returning({ id: legalContractDeliveryOutbox.id });
+  assert.ok(poisonInserted);
   const sent: string[] = [];
   const dependencies = {
     now: () => now,
     generatePdf: generateSignedContractPdf,
     sendEmail: async (message: { to: string }) => {
       sent.push(message.to);
-      if (message.to === "poison@example.invalid") throw new Error("permanent_failure");
+      if (message.to === `${MARK}admin@example.com`) throw new Error("permanent_failure");
       return { data: { id: "ok" }, error: null };
     },
   };
   const first = await retryPendingLegalContractDeliveries(20, dependencies);
-  assert.deepEqual(first, { inspected: 2, delivered: 1, failed: 1 });
+  assert.deepEqual(first, {
+    inspected: 2,
+    delivered: 1,
+    failed: 1,
+    newlyDeadLettered: 0,
+    deadLetterBacklog: 1,
+  });
   const [poison] = await db
     .select()
     .from(legalContractDeliveryOutbox)
-    .where(eq(legalContractDeliveryOutbox.recipientKey, "poison"));
+    .where(eq(legalContractDeliveryOutbox.id, poisonInserted.id));
   const [healthy] = await db
     .select()
     .from(legalContractDeliveryOutbox)
-    .where(eq(legalContractDeliveryOutbox.recipientKey, "healthy"));
+    .where(eq(legalContractDeliveryOutbox.recipientKey, healthyAnchor.userId!));
   assert.equal(poison.status, "dead_letter");
   assert.equal(poison.attempts, LEGAL_DELIVERY_MAX_ATTEMPTS);
   assert.ok(poison.deadLetteredAt);
   assert.equal(poison.leaseToken, null);
+  assert.equal(poison.recipientUserId, null);
+  assert.equal(poison.recipientEmail, null);
+  assert.equal(poison.recipientKey, `retired:${poison.id}`);
   assert.equal(healthy.status, "delivered");
   const sentBefore = sent.length;
   assert.deepEqual(
     await retryPendingLegalContractDeliveries(20, dependencies),
-    { inspected: 0, delivered: 0, failed: 0 },
+    {
+      inspected: 0,
+      delivered: 0,
+      failed: 0,
+      newlyDeadLettered: 0,
+      deadLetterBacklog: 1,
+    },
   );
   assert.equal(sent.length, sentBefore);
 });
@@ -711,18 +772,21 @@ test("an abandoned final-attempt lease is closed as dead-letter", async () => {
   assert.ok(anchor);
   await db.delete(legalContractDeliveryOutbox);
   const now = new Date("2026-09-13T12:00:00.000Z");
-  await db.insert(legalContractDeliveryOutbox).values({
+  const [inserted] = await db.insert(legalContractDeliveryOutbox).values({
     acceptanceSessionId: anchor.acceptanceSessionId,
     anchorAcceptanceId: anchor.id,
     channel: "admin",
-    recipientKey: "abandoned-final-attempt",
-    recipientEmail: "abandoned@example.invalid",
+    recipientUserId: ids.admin,
+    recipientRoleSnapshot: "admin",
+    recipientKey: ids.admin,
+    recipientEmail: `${MARK}admin@example.com`,
     status: "processing",
     attempts: LEGAL_DELIVERY_MAX_ATTEMPTS,
     nextAttemptAt: new Date(now.getTime() - 60_000),
     lockedAt: new Date(now.getTime() - 6 * 60_000),
     leaseToken: randomUUID(),
-  });
+  }).returning({ id: legalContractDeliveryOutbox.id });
+  assert.ok(inserted);
   let effects = 0;
   const result = await processLegalContractDelivery(anchor.acceptanceSessionId, {
     now: () => now,
@@ -740,10 +804,13 @@ test("an abandoned final-attempt lease is closed as dead-letter", async () => {
   const [job] = await db
     .select()
     .from(legalContractDeliveryOutbox)
-    .where(eq(legalContractDeliveryOutbox.recipientKey, "abandoned-final-attempt"));
+    .where(eq(legalContractDeliveryOutbox.id, inserted.id));
   assert.equal(job.status, "dead_letter");
   assert.ok(job.deadLetteredAt);
   assert.equal(job.leaseToken, null);
+  assert.equal(job.recipientUserId, null);
+  assert.equal(job.recipientEmail, null);
+  assert.equal(job.recipientKey, `retired:${job.id}`);
 });
 
 test("a revoke committed under the legal lock wins over a waiting signature", async () => {

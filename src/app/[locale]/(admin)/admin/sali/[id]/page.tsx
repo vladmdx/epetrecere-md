@@ -256,7 +256,7 @@ export default function AdminEditVenuePage() {
             </div>
             <Switch
               checked={venue.isActive}
-              onCheckedChange={(v) => update({ isActive: v })}
+              disabled
             />
           </div>
           <div className="flex items-center justify-between rounded-lg bg-muted/30 p-3">

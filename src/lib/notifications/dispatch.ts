@@ -99,6 +99,7 @@ export interface DispatchOptions {
       subject: string;
       html: string;
       idempotencyKey?: string;
+      signal?: AbortSignal;
     }) => Promise<unknown>;
   };
 }
@@ -111,18 +112,18 @@ async function withProviderDeadline<T>(
   work: (signal: AbortSignal) => Promise<T>,
 ): Promise<T> {
   const controller = new AbortController();
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => {
-      controller.abort(new Error("notification_provider_timeout"));
-      reject(new Error("notification_provider_timeout"));
-    }, timeoutMs);
-    timer.unref?.();
-  });
+  const timer = setTimeout(() => {
+    controller.abort(new Error("notification_provider_timeout"));
+  }, timeoutMs);
+  timer.unref?.();
   try {
-    return await Promise.race([work(controller.signal), timeout]);
+    // Every production external-channel adapter is abortable. Await its
+    // cancellation settlement rather than racing away from live provider I/O;
+    // booking cancellation/account erasure may release their barrier only
+    // after the underlying transport has actually stopped.
+    return await work(controller.signal);
   } finally {
-    if (timer) clearTimeout(timer);
+    clearTimeout(timer);
   }
 }
 
@@ -168,8 +169,9 @@ function categoryOf(type: string): NotificationCategory | null {
 async function resolvePrefs(
   userId: string,
   type: string,
+  executor: typeof db = db,
 ): Promise<{ email: boolean; push: boolean }> {
-  const [row] = await db
+  const [row] = await executor
     .select({ prefs: users.notificationPrefs })
     .from(users)
     .where(eq(users.id, userId))
@@ -199,8 +201,9 @@ function providerError(result: unknown): unknown {
  */
 export async function resolveNotificationChannels(
   input: DispatchInput,
+  executor: typeof db = db,
 ): Promise<NotificationChannel[]> {
-  const prefs = await resolvePrefs(input.userId, String(input.type));
+  const prefs = await resolvePrefs(input.userId, String(input.type), executor);
   const channels: NotificationChannel[] = ["in_app"];
   if (prefs.push) channels.push("push");
   if (CRITICAL_TYPES.has(String(input.type))) channels.push("whatsapp");
@@ -208,7 +211,7 @@ export async function resolveNotificationChannels(
     const isCritical = CRITICAL_TYPES.has(String(input.type));
     let shouldEmailNow = true;
     if (!isCritical) {
-      const [userRow] = await db
+      const [userRow] = await executor
         .select({ freq: users.notificationDigestFrequency })
         .from(users)
         .where(eq(users.id, input.userId))
@@ -294,15 +297,12 @@ export async function dispatchNotificationChannel(
     throw new Error("email_payload_missing");
   }
   const sender = drivers.sendEmail ?? (await import("@/lib/email/send")).sendEmail;
-  // Resend's SDK adapter does not expose AbortSignal. This deadline releases
-  // the worker/DB barrier, but an already-started request may still complete
-  // in the background. Its stable provider idempotency key makes the retry
-  // safe within Resend's idempotency guarantee; this is not transport cancel.
-  const result = await withProviderDeadline(options.timeoutMs ?? 15_000, () => sender({
+  const result = await withProviderDeadline(options.timeoutMs ?? 15_000, (signal) => sender({
     to: input.email!,
     subject: input.emailSubject || input.title,
     html: input.emailHtml!,
     idempotencyKey: options.idempotencyKey,
+    signal,
   }));
   const error = providerError(result);
   if (error) throw new Error("email_delivery_failed", { cause: error });

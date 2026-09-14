@@ -198,7 +198,6 @@ export default function EditArtistPage() {
             <CardHeader><CardTitle>{t("admin.artistEdit.settings")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               {([
-                ["isActive", "admin.artistEdit.flagActive", "admin.artistEdit.flagActiveHint"],
                 ["isFeatured", "admin.artistEdit.flagFeatured", "admin.artistEdit.flagFeaturedHint"],
                 ["isVerified", "admin.artistEdit.flagVerified", "admin.artistEdit.flagVerifiedHint"],
                 ["isPremium", "admin.artistEdit.flagPremium", "admin.artistEdit.flagPremiumHint"],

@@ -5,10 +5,20 @@ import { db } from "@/lib/db";
 import { venues, venueImages, reviews, redirects } from "@/lib/db/schema";
 import { eq, and, asc, desc, isNull } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth/admin";
-import { requireVenueCapability, getCurrentAppUser, authorizeVenueAccess } from "@/lib/venue-access";
+import {
+  authorizeVenueAccess,
+  authorizeVenueCapabilityLocked,
+  getCurrentAppUser,
+  getLockedAppUserById,
+  requireVenueCapability,
+} from "@/lib/venue-access";
 import { publicCatalogData } from "@/lib/privacy/public-catalog";
 import { venueOwnerFields } from "@/lib/validation/vendor-profile";
 import { revalidateVendorCatalog } from "@/lib/vendors/revalidate";
+import {
+  acquireAvailabilityLocks,
+  acquireLegalScopeLocks,
+} from "@/lib/booking/advisory-locks";
 
 export async function GET(
   _req: Request,
@@ -157,26 +167,6 @@ export async function PUT(
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
-  const isAdmin = access.viaAdmin;
-
-  const [venue] = await db
-    .select({
-      id: venues.id,
-      userId: venues.userId,
-      slug: venues.slug,
-      isActive: venues.isActive,
-      isFeatured: venues.isFeatured,
-      capacityMin: venues.capacityMin,
-      capacityMax: venues.capacityMax,
-    })
-    .from(venues)
-    .where(eq(venues.id, venueId))
-    .limit(1);
-
-  if (!venue) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
-
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
@@ -186,80 +176,155 @@ export async function PUT(
     );
   }
 
-  // Strip empty strings to null for URL/email columns so we don't persist "".
-  const data: Partial<typeof venues.$inferInsert> = venueOwnerFields(parsed.data, isAdmin);
-  const capacityMin = data.capacityMin === undefined ? venue.capacityMin : data.capacityMin;
-  const capacityMax = data.capacityMax === undefined ? venue.capacityMax : data.capacityMax;
-  if (capacityMin != null && capacityMax != null && capacityMin > capacityMax) {
-    return NextResponse.json({ error: "Maximum capacity must not be lower than minimum capacity" }, { status: 400 });
-  }
-  for (const k of [
-    "email",
-    "website",
-    "menuUrl",
-    "menuPdfUrl",
-    "virtualTourUrl",
-  ] as const) {
-    if (data[k] === "") data[k] = null;
-  }
+  const expectedOrganizationId = access.organizationId;
+  const result = await db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
 
-  // If the slug is changing, (1) block conflicts with a friendly error and
-  // (2) record a legacy redirect so existing inbound links still resolve.
-  let oldSlug: string | null = null;
-  if (typeof data.slug === "string") {
-    const [current] = await db
-      .select({ slug: venues.slug })
+    // The optimistic capability check above is discovery only. Serialize with
+    // membership/account changes, availability-sensitive profile writes and
+    // moderation, then re-authorize from the locked current rows.
+    await acquireLegalScopeLocks(tx, {
+      userIds: [access.user.id],
+      organizationIds:
+        expectedOrganizationId == null ? [] : [expectedOrganizationId],
+    });
+    await acquireAvailabilityLocks(tx, {
+      venueId,
+      hallIds: [],
+      localDates: [],
+      conflictGroupIds: [],
+    });
+
+    const actor = await getLockedAppUserById(access.user.id, executor);
+    if (!actor) {
+      return { ok: false as const, status: 403, error: "Forbidden" };
+    }
+    const [venue] = await executor
+      .select()
       .from(venues)
       .where(eq(venues.id, venueId))
+      .for("update")
       .limit(1);
-    if (current && current.slug !== data.slug) {
-      const [conflict] = await db
-        .select({ id: venues.id })
-        .from(venues)
-        .where(eq(venues.slug, data.slug))
-        .limit(1);
-      if (conflict) {
-        return NextResponse.json(
-          { error: "Slug-ul este deja folosit de altă sală" },
-          { status: 409 },
-        );
-      }
-      oldSlug = current.slug;
-    } else {
-      // No actual change — don't spam the redirects table.
+    if (!venue) {
+      return { ok: false as const, status: 404, error: "Not found" };
+    }
+    if (venue.organizationId !== expectedOrganizationId) {
+      return {
+        ok: false as const,
+        status: 409,
+        error: "Venue scope changed. Retry the update.",
+        code: "VENUE_SCOPE_CHANGED",
+      };
+    }
+
+    const lockedAccess = await authorizeVenueCapabilityLocked(
+      actor,
+      venueId,
+      "manage_profile",
+      executor,
+    );
+    if (!lockedAccess.ok) {
+      return {
+        ok: false as const,
+        status: lockedAccess.status,
+        error: lockedAccess.error,
+      };
+    }
+
+    // Build the allow-listed owner/admin projection only after the actor role
+    // and membership have been frozen. This prevents a demoted admin from
+    // retaining moderation-only fields.
+    const data: Partial<typeof venues.$inferInsert> = venueOwnerFields(
+      parsed.data,
+      lockedAccess.viaAdmin,
+    );
+    if (
+      lockedAccess.viaAdmin
+      && venue.isActive === false
+      && data.isActive === true
+      && (venue.userId != null || venue.organizationId != null)
+    ) {
+      return {
+        ok: false as const,
+        status: 409,
+        error: "Folosește fluxul de aprobare pentru activarea localului.",
+        code: "APPROVAL_FLOW_REQUIRED",
+      };
+    }
+
+    const capacityMin =
+      data.capacityMin === undefined ? venue.capacityMin : data.capacityMin;
+    const capacityMax =
+      data.capacityMax === undefined ? venue.capacityMax : data.capacityMax;
+    if (capacityMin != null && capacityMax != null && capacityMin > capacityMax) {
+      return {
+        ok: false as const,
+        status: 400,
+        error: "Maximum capacity must not be lower than minimum capacity",
+      };
+    }
+    for (const key of [
+      "email",
+      "website",
+      "menuUrl",
+      "menuPdfUrl",
+      "virtualTourUrl",
+    ] as const) {
+      if (data[key] === "") data[key] = null;
+    }
+
+    const oldSlug = venue.slug;
+    const requestedSlug = typeof data.slug === "string" ? data.slug : null;
+    const slugChanged = requestedSlug != null && requestedSlug !== oldSlug;
+    if (requestedSlug != null && !slugChanged) {
       delete (data as { slug?: string }).slug;
     }
-  }
+    if (slugChanged) {
+      const [conflict] = await executor
+        .select({ id: venues.id })
+        .from(venues)
+        .where(eq(venues.slug, requestedSlug))
+        .limit(1);
+      if (conflict && conflict.id !== venueId) {
+        return {
+          ok: false as const,
+          status: 409,
+          error: "Slug-ul este deja folosit de altă sală",
+        };
+      }
+    }
 
-  await db
-    .update(venues)
-    .set({ ...data, updatedAt: new Date() })
-    .where(eq(venues.id, venueId));
-
-  if (oldSlug && typeof data.slug === "string") {
-    try {
-      await db.insert(redirects).values({
+    const [updated] = await executor
+      .update(venues)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(venues.id, venueId))
+      .returning();
+    if (!updated) {
+      return { ok: false as const, status: 404, error: "Not found" };
+    }
+    if (slugChanged && requestedSlug) {
+      await executor.insert(redirects).values({
         fromPath: `/sali/${oldSlug}`,
-        toPath: `/sali/${data.slug}`,
+        toPath: `/sali/${requestedSlug}`,
         statusCode: "301",
       });
-    } catch (err) {
-      // Duplicate redirect (e.g., slug flipped back and forth) — non-fatal.
-      console.warn("[venue slug] redirect insert skipped:", err);
     }
-  }
+    return { ok: true as const, before: venue, updated };
+  });
 
-  const [updated] = await db
-    .select()
-    .from(venues)
-    .where(eq(venues.id, venueId))
-    .limit(1);
-  if (venue.isActive || updated?.isActive) {
-    const publicationChanged = venue.isActive !== updated?.isActive;
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error, ...(result.code ? { code: result.code } : {}) },
+      { status: result.status },
+    );
+  }
+  const { before: venue, updated } = result;
+  if (venue.isActive || updated.isActive) {
+    const publicationChanged = venue.isActive !== updated.isActive;
     revalidateVendorCatalog("venue", {
-      profileSlugs: [venue.slug, updated?.slug],
+      profileSlugs: [venue.slug, updated.slug],
       directory: true,
-      homepage: publicationChanged || venue.isFeatured || Boolean(updated?.isFeatured),
+      homepage: publicationChanged || venue.isFeatured || updated.isFeatured,
       services: publicationChanged,
     });
   }
@@ -288,16 +353,36 @@ export async function DELETE(
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
-  const [venue] = await db
-    .select({ id: venues.id, slug: venues.slug, isActive: venues.isActive })
-    .from(venues)
-    .where(eq(venues.id, venueId))
-    .limit(1);
-  if (!venue) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
-  }
+  const deletion = await db.transaction(async (tx) => {
+    const executor = tx as unknown as typeof db;
+    await acquireLegalScopeLocks(tx, { userIds: [admin.userId] });
+    const lockedAdmin = await getLockedAppUserById(admin.userId, executor);
+    if (!lockedAdmin?.isGlobalAdmin) {
+      return { ok: false as const, status: 403, error: "Admin only" };
+    }
 
-  await db.delete(venues).where(eq(venues.id, venueId));
+    // Parent first, then the booking rows touched by the FK SET NULL action.
+    // Contract signing follows the same vendor -> booking lock order.
+    const [existing] = await tx
+      .select({ id: venues.id, slug: venues.slug, isActive: venues.isActive })
+      .from(venues)
+      .where(eq(venues.id, venueId))
+      .for("update")
+      .limit(1);
+    if (!existing) {
+      return { ok: false as const, status: 404, error: "Not found" };
+    }
+
+    await tx.delete(venues).where(eq(venues.id, venueId));
+    return { ok: true as const, deleted: existing };
+  });
+  if (!deletion.ok) {
+    return NextResponse.json(
+      { error: deletion.error },
+      { status: deletion.status },
+    );
+  }
+  const { deleted: venue } = deletion;
   if (venue.isActive) {
     revalidateVendorCatalog("venue", {
       profileSlugs: [venue.slug],

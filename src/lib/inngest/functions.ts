@@ -9,20 +9,45 @@ import {
   artists,
   invitations,
   invitationGuests,
-  users,
-  venues,
-  calendarEvents,
 } from "@/lib/db/schema";
-import { and, eq, sql, isNotNull, inArray } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
+  createGoogleCalendarSyncWindow,
   refreshAccessToken,
   fetchUpcomingEvents,
-  expandDays,
 } from "@/lib/google/calendar";
 import { revealInvitationGuestRecord } from "@/lib/privacy/guest-encryption";
 import { isGuestTokenActive } from "@/lib/invitations/access";
 import { drainConfirmationNotificationOutbox } from "@/lib/booking/confirmation-effects";
+import { drainBookingCreationNotificationOutbox } from "@/lib/booking/booking-create-effects";
 import { retryPendingLegalContractDeliveries } from "@/lib/legal/contract-delivery";
+import {
+  buildGoogleCalendarEntityPlans,
+  clearGoogleCalendarOrphanProjection,
+  fetchGoogleCalendarContributorFeeds,
+  replaceGoogleCalendarEntityProjection,
+  resolveGoogleCalendarOrphanProjections,
+  resolveGoogleCalendarJobSnapshot,
+  type GoogleCalendarContributorCredential,
+} from "@/lib/google/calendar-sync";
+import { drainAccountAssetErasureOutbox } from "@/lib/privacy/account-asset-erasure";
+import { drainAccountErasureIdentityOutbox } from "@/lib/privacy/account-erasure-identity";
+import { reconcileOnboardedReferrals } from "@/lib/referrals/trigger";
+import {
+  createServerLogCorrelationId,
+  safeServerErrorLog,
+} from "@/lib/safe-server-log";
+
+const SAFE_GOOGLE_SYNC_ERROR_CODES = new Set([
+  "23502",
+  "23503",
+  "23505",
+  "23514",
+  "40001",
+  "40P01",
+  "55P03",
+  "57014",
+]);
 
 // Trigger 1: New lead → emails
 export const onLeadCreated = inngest.createFunction(
@@ -345,9 +370,9 @@ export const expirePendingBookings = inngest.createFunction(
   },
 );
 
-// Durable confirmation effects. `after()` gives the fast path; this poller
-// recovers a process crash before/after that callback. A daily Vercel cron is
-// the Hobby-compatible fallback when the primary Inngest scheduler is down.
+// Durable booking creation + confirmation effects. `after()` gives the fast
+// path; this poller recovers a process crash before/after that callback. A
+// daily Vercel cron is the Hobby-compatible fallback when Inngest is down.
 export const bookingConfirmationOutbox = inngest.createFunction(
   {
     id: "booking-confirmation-outbox",
@@ -356,19 +381,73 @@ export const bookingConfirmationOutbox = inngest.createFunction(
   },
   async ({ step }) => {
     return step.run("deliver-booking-confirmations", async () => {
-      const result = await drainConfirmationNotificationOutbox({ limit: 50 });
+      const referrals = await reconcileOnboardedReferrals({ limit: 25 });
+      const confirmation = await drainConfirmationNotificationOutbox({ limit: 50 });
+      const creation = await drainBookingCreationNotificationOutbox({ limit: 50 });
+      // Preserve the legacy top-level confirmation summary consumed by
+      // monitoring/tests while exposing creation health alongside it.
+      const result = { ...confirmation, creation, referrals };
       // Throw inside the step so Inngest re-executes the drain on retry instead
       // of memoizing an unhealthy successful step result.
       if (
-        result.failed > 0
-        || result.failedBacklog > 0
-        || result.newlyReportedTerminal > 0
+        confirmation.failed > 0
+        || confirmation.failedBacklog > 0
+        || confirmation.newlyReportedTerminal > 0
+        || creation.failed > 0
+        || creation.failedBacklog > 0
+        || creation.newlyReportedTerminal > 0
+        || referrals.failed > 0
       ) {
         throw new Error(`booking_confirmation_outbox_unhealthy:${JSON.stringify(result)}`);
       }
       return result;
     });
   },
+);
+
+// Account erasure commits only durable deletion intent. This worker performs
+// the fallible Blob call after commit and retries it with a fenced lease.
+export const accountAssetErasureOutbox = inngest.createFunction(
+  {
+    id: "account-asset-erasure-outbox",
+    triggers: [{ cron: "*/5 * * * *" }],
+    concurrency: { limit: 1 },
+  },
+  async ({ step }) =>
+    step.run("delete-account-blob-assets", async () => {
+      const result = await drainAccountAssetErasureOutbox({ limit: 10 });
+      if (
+        result.failed > 0
+        || result.deadLettered > 0
+        || result.leaseLost > 0
+      ) {
+        throw new Error(
+          `account_asset_erasure_outbox_unhealthy:${JSON.stringify(result)}`,
+        );
+      }
+      return result;
+    }),
+);
+
+// A local erasure is final even if Clerk is temporarily unavailable. Retry
+// the provider deletion until it succeeds (or confirms 404), then discard the
+// raw Clerk id while retaining only its HMAC tombstone.
+export const accountErasureIdentityOutboxWorker = inngest.createFunction(
+  {
+    id: "account-erasure-identity-outbox",
+    triggers: [{ cron: "*/5 * * * *" }],
+    concurrency: { limit: 1 },
+  },
+  async ({ step }) =>
+    step.run("delete-erased-clerk-identities", async () => {
+      const result = await drainAccountErasureIdentityOutbox({ limit: 2 });
+      if (result.failed > 0) {
+        throw new Error(
+          `account_erasure_identity_outbox_unhealthy:failed=${result.failed};selected=${result.selected}`,
+        );
+      }
+      return result;
+    }),
 );
 
 // Durable legal-delivery recovery. The request path tries immediately via
@@ -381,163 +460,174 @@ export const retryLegalContractDeliveries = inngest.createFunction(
     concurrency: { limit: 1 },
   },
   async ({ step }) =>
-    step.run("deliver-pending-legal-contracts", () =>
-      retryPendingLegalContractDeliveries(20),
-    ),
+    step.run("deliver-pending-legal-contracts", async () => {
+      const result = await retryPendingLegalContractDeliveries(20);
+      if (
+        result.failed > 0
+        || result.newlyDeadLettered > 0
+        || result.deadLetterBacklog > 0
+      ) {
+        throw new Error(
+          `legal_contract_delivery_unhealthy:failed=${result.failed};newly_dead_lettered=${result.newlyDeadLettered};dead_letter_backlog=${result.deadLetterBacklog};inspected=${result.inspected}`,
+        );
+      }
+      return result;
+    }),
 );
 
 /**
  * Google Calendar pull sync — spec section 2.6.
  *
- * Every 15 minutes, iterate over users with a refresh token, refresh their
- * access token, fetch upcoming events, and upsert each day as a `blocked`
- * row in `calendar_events` for every artist + venue they own.
+ * Every 15 minutes, snapshot the exact contributors for every artist/venue,
+ * fetch each contributor once, union successful feeds per entity, then make
+ * at most one atomic replacement per entity.
  *
  * Strategy:
  *  - Only rows with `source = 'google_sync'` are managed here. Manual
  *    blocks and booking-created blocks are never touched.
- *  - On each run we first delete the user's existing google_sync rows
- *    for the sync window ([today, +90d]), then reinsert from the fresh
- *    feed. This mirrors the upstream state exactly — cancelled/moved
- *    events disappear, new events appear.
+ *  - If any current contributor fails, that entity's previous projection is
+ *    preserved. Other independent entities can still update.
+ *  - Zero current contributors produces an empty replacement, clearing stale
+ *    rows after token/membership removal or artist ownership transfer.
+ *  - Every provider request finishes before the first replacement transaction.
+ *    Each transaction rechecks the exact contributor/authority snapshot.
  */
 export const googleCalendarSync = inngest.createFunction(
   {
     id: "google-calendar-sync",
     triggers: [{ cron: "*/15 * * * *" }],
-    concurrency: { limit: 4 }, // throttle so we don't hammer Google's API
+    // A single job-wide snapshot must not be overtaken by an older overlapping
+    // run. Provider calls inside the run are already sequential and bounded.
+    concurrency: { limit: 1 },
   },
   async ({ step }) => {
     return await step.run("pull-google-events", async () => {
-      const connected = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(isNotNull(users.googleRefreshToken));
+      const syncWindow = createGoogleCalendarSyncWindow(new Date());
+      const windowDates = [...syncWindow.dates];
+      // Polymorphic calendar rows do not have a database FK. Clear a bounded
+      // batch of rows whose artist/venue was deleted, using the same entity/day
+      // locks as every other calendar writer and a post-lock parent recheck.
+      const orphanProjections = await resolveGoogleCalendarOrphanProjections();
+      let orphanRowsCleared = 0;
+      let orphanFailures = 0;
+      for (const orphan of orphanProjections) {
+        try {
+          await clearGoogleCalendarOrphanProjection(orphan);
+          orphanRowsCleared += orphan.existingDates.length;
+        } catch (error) {
+          const correlationId = createServerLogCorrelationId();
+          console.error("[google-sync] orphan projection cleanup failed", {
+            entityType: orphan.entityType,
+            ...safeServerErrorLog(error, {
+              correlationId,
+              allowedCodes: SAFE_GOOGLE_SYNC_ERROR_CODES,
+            }),
+          });
+          orphanFailures += 1;
+        }
+      }
 
-      if (connected.length === 0) return { synced: 0 };
+      const snapshots = await resolveGoogleCalendarJobSnapshot();
+      if (snapshots.length === 0) {
+        return {
+          synced: 0,
+          entities: 0,
+          orphanRowsCleared,
+          orphanFailures,
+        };
+      }
 
-      const today = new Date().toISOString().slice(0, 10);
-      const windowEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .slice(0, 10);
+      const contributorCredentialsByUser = new Map<
+        string,
+        GoogleCalendarContributorCredential
+      >();
+      for (const credential of snapshots.flatMap(
+        (snapshot) => snapshot.contributorCredentials,
+      )) {
+        const existing = contributorCredentialsByUser.get(credential.userId);
+        if (
+          existing
+          && existing.credentialFingerprint !== credential.credentialFingerprint
+        ) {
+          throw new Error("google_calendar_snapshot_credential_conflict");
+        }
+        contributorCredentialsByUser.set(credential.userId, credential);
+      }
+      const contributorCredentials = [...contributorCredentialsByUser.values()];
+      // All network work is complete before any replacement transaction opens.
+      const feeds = await fetchGoogleCalendarContributorFeeds(
+        contributorCredentials,
+        async (contributor) => {
+          const credential = await refreshAccessToken(contributor.userId, {
+            expectedCredentialFingerprint: contributor.credentialFingerprint,
+          });
+          if (!credential) throw new Error("google_calendar_token_unavailable");
+          const events = await fetchUpcomingEvents(credential.accessToken, {
+            window: syncWindow,
+          });
+          return {
+            events,
+            credentialFingerprint: credential.credentialFingerprint,
+          };
+        },
+      );
+      const plans = buildGoogleCalendarEntityPlans({
+        snapshots,
+        feeds,
+        windowDates,
+      });
 
+      let replaced = 0;
+      let cleared = 0;
+      let preserved = 0;
+      let failed = 0;
       let totalEvents = 0;
       let totalDays = 0;
-      let totalUsers = 0;
-      const failures: string[] = [];
-
-      for (const u of connected) {
+      for (const plan of plans) {
+        if (plan.action === "preserve") {
+          preserved += 1;
+          if (plan.reason === "work_limit") failed += 1;
+          continue;
+        }
         try {
-          const token = await refreshAccessToken(u.id);
-          if (!token) continue; // refresh token revoked or missing creds
-          const events = await fetchUpcomingEvents(token);
-
-          // Resolve entities this user owns
-          const [ownedArtists, ownedVenues] = await Promise.all([
-            db
-              .select({ id: artists.id })
-              .from(artists)
-              .where(eq(artists.userId, u.id)),
-            db
-              .select({ id: venues.id })
-              .from(venues)
-              .where(eq(venues.userId, u.id)),
-          ]);
-
-          if (ownedArtists.length === 0 && ownedVenues.length === 0) continue;
-
-          // Clear existing google_sync rows in the window for each entity.
-          const artistIds = ownedArtists.map((a) => a.id);
-          const venueIds = ownedVenues.map((v) => v.id);
-          if (artistIds.length > 0) {
-            await db
-              .delete(calendarEvents)
-              .where(
-                and(
-                  eq(calendarEvents.entityType, "artist"),
-                  inArray(calendarEvents.entityId, artistIds),
-                  eq(calendarEvents.source, "google_sync"),
-                  sql`${calendarEvents.date} >= ${today}`,
-                  sql`${calendarEvents.date} <= ${windowEnd}`,
-                ),
-              );
+          await replaceGoogleCalendarEntityProjection(plan);
+          replaced += 1;
+          totalEvents += plan.eventCount;
+          totalDays += plan.dayNotes.size;
+          if (
+            plan.snapshot.contributorUserIds.length === 0
+            && plan.snapshot.existingDates.length > 0
+          ) {
+            cleared += 1;
           }
-          if (venueIds.length > 0) {
-            await db
-              .delete(calendarEvents)
-              .where(
-                and(
-                  eq(calendarEvents.entityType, "venue"),
-                  inArray(calendarEvents.entityId, venueIds),
-                  eq(calendarEvents.source, "google_sync"),
-                  sql`${calendarEvents.date} >= ${today}`,
-                  sql`${calendarEvents.date} <= ${windowEnd}`,
-                ),
-              );
-          }
-
-          // Expand events to days, dedupe, bulk insert per entity.
-          const allDays = new Set<string>();
-          const noteByDay = new Map<string, string>();
-          for (const ev of events) {
-            const days = expandDays(ev.start, ev.end);
-            for (const d of days) {
-              if (d < today || d > windowEnd) continue;
-              allDays.add(d);
-              // First summary wins on a given day
-              if (!noteByDay.has(d)) noteByDay.set(d, ev.summary.slice(0, 200));
-            }
-          }
-
-          const rowsToInsert: Array<{
-            entityType: "artist" | "venue";
-            entityId: number;
-            date: string;
-            status: "blocked";
-            source: "google_sync";
-            note: string;
-          }> = [];
-          for (const d of allDays) {
-            for (const aid of artistIds) {
-              rowsToInsert.push({
-                entityType: "artist",
-                entityId: aid,
-                date: d,
-                status: "blocked",
-                source: "google_sync",
-                note: `Google: ${noteByDay.get(d) ?? "Ocupat"}`,
-              });
-            }
-            for (const vid of venueIds) {
-              rowsToInsert.push({
-                entityType: "venue",
-                entityId: vid,
-                date: d,
-                status: "blocked",
-                source: "google_sync",
-                note: `Google: ${noteByDay.get(d) ?? "Ocupat"}`,
-              });
-            }
-          }
-
-          if (rowsToInsert.length > 0) {
-            await db.insert(calendarEvents).values(rowsToInsert);
-          }
-
-          totalEvents += events.length;
-          totalDays += allDays.size;
-          totalUsers += 1;
-        } catch (err) {
-          console.error("[google-sync] user failed", u.id, err);
-          failures.push(u.id);
+        } catch (error) {
+          // An authority change is expected to abort before DELETE; the next
+          // cron run will take a fresh graph. Keep processing other entities.
+          const correlationId = createServerLogCorrelationId();
+          console.error("[google-sync] entity replacement failed", {
+            entityType: plan.snapshot.entityType,
+            ...safeServerErrorLog(error, {
+              correlationId,
+              allowedCodes: SAFE_GOOGLE_SYNC_ERROR_CODES,
+            }),
+          });
+          failed += 1;
         }
       }
 
       return {
-        synced: totalUsers,
+        synced: replaced,
+        entities: plans.length,
+        contributors: contributorCredentials.length,
         events: totalEvents,
         days: totalDays,
-        failures: failures.length,
+        cleared,
+        orphanRowsCleared,
+        orphanFailures,
+        preserved,
+        failures: failed
+          + orphanFailures
+          + [...feeds.values()].filter((feed) => !feed.ok).length,
       };
     });
   },
@@ -550,6 +640,8 @@ export const functions = [
   invitationRsvpReminders,
   expirePendingBookings,
   bookingConfirmationOutbox,
+  accountAssetErasureOutbox,
+  accountErasureIdentityOutboxWorker,
   retryLegalContractDeliveries,
   googleCalendarSync,
 ];

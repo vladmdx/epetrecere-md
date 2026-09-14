@@ -25,6 +25,12 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@epetrecere/shared": [
+        "./packages/shared/src"
+      ],
+      "@epetrecere/shared/*": [
+        "./packages/shared/src/*"
       ]
     }
   },

@@ -18,6 +18,7 @@ import { missingRegistrationDocuments } from "@/lib/legal/registration-gate";
 import { artistLocationUpdate, artistTravelShape } from "@/lib/validation/vendor-profile";
 import { isMultiHallEnabled } from "@/lib/feature-flags";
 import { claimArtistRegistrationInDatabase } from "@/lib/auth/select-role";
+import { bootstrapAccountUserUnlessErased } from "@/lib/privacy/account-erasure-identity";
 
 /** A single duration → price tier the onboarding wizard can submit
  *  alongside the artist row. Mirrors the artist_packages columns. */
@@ -166,40 +167,21 @@ export async function POST(req: Request) {
         );
       }
 
-      const [created] = await db
-        .insert(users)
-        .values({
-          clerkId,
-          email,
-          name: [clerkUser.firstName, clerkUser.lastName]
-            .filter(Boolean)
-            .join(" ") || null,
-          // Registration claims the canonical phone under a dedicated lock;
-          // never pre-populate an unverified duplicate during fallback sync.
-          phone: null,
-          avatarUrl: clerkUser.imageUrl || null,
-          role: "user",
-        })
-        .onConflictDoNothing()
-        .returning({ id: users.id, email: users.email, phone: users.phone });
-
-      if (created) {
-        appUser = created;
-      } else {
-        // Conflict means the user was created between our check and insert
-        const [existing] = await db
-          .select({ id: users.id, email: users.email, phone: users.phone })
-          .from(users)
-          .where(eq(users.clerkId, clerkId))
-          .limit(1);
-        if (!existing) {
-          return NextResponse.json(
-            { error: "User creation failed" },
-            { status: 500 },
-          );
-        }
-        appUser = existing;
+      const bootstrapped = await bootstrapAccountUserUnlessErased({
+        clerkId,
+        email,
+        name: [clerkUser.firstName, clerkUser.lastName]
+          .filter(Boolean)
+          .join(" ") || null,
+        avatarUrl: clerkUser.imageUrl || null,
+      });
+      if (!bootstrapped) {
+        return NextResponse.json(
+          { error: "Account erased", code: "ACCOUNT_ERASED" },
+          { status: 410 },
+        );
       }
+      appUser = bootstrapped;
     }
 
     const missing = await missingRegistrationDocuments(appUser.id, "artist");
@@ -434,10 +416,7 @@ export async function POST(req: Request) {
     after(async () => {
       try {
         const { triggerReferral } = await import("@/lib/referrals/trigger");
-        await triggerReferral(appUser.id, "onboarded", {
-          kind: "artist",
-          artistId: artist.id,
-        });
+        await triggerReferral(appUser.id, "onboarded");
       } catch (err) {
         console.error("[referral] artist onboarded trigger failed", err);
       }

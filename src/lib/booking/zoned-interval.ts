@@ -2,6 +2,12 @@
  * Convert venue-local wall times to UTC instants, including overnight and DST.
  */
 
+import {
+  isValidCalendarDate,
+  isValidCalendarTime,
+  isValidIanaTimeZone,
+} from "./calendar-input-validation";
+
 export const DEFAULT_VENUE_TZ = "Europe/Chisinau";
 
 function tzOffsetMs(utcMs: number, timeZone: string): number {
@@ -148,6 +154,156 @@ export type CanonicalInterval = {
   startTime: string | null;
   endTime: string | null;
 };
+
+export class VenueIntervalValidationError extends RangeError {
+  readonly code = "INVALID_INTERVAL";
+
+  constructor(message: string) {
+    super(message);
+    this.name = "VenueIntervalValidationError";
+  }
+}
+
+function parsedInstant(value: Date | string | null | undefined): Date | null {
+  if (value instanceof Date) {
+    return Number.isFinite(value.getTime()) ? new Date(value.getTime()) : null;
+  }
+  if (
+    typeof value !== "string"
+    || !/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)
+  ) {
+    return null;
+  }
+  const instant = new Date(value);
+  return Number.isFinite(instant.getTime()) ? instant : null;
+}
+
+function wallClockInZone(instant: Date, timeZone: string): string {
+  const local = localDateTimeInZone(instant, timeZone);
+  return `${String(local.hour).padStart(2, "0")}:${String(local.minute).padStart(2, "0")}`;
+}
+
+function strictZonedWallTimeToUtc(
+  date: string,
+  time: string,
+  timeZone: string,
+): Date {
+  const instant = zonedWallTimeToUtc(date, time, timeZone);
+  const local = localDateTimeInZone(instant, timeZone);
+  if (
+    local.date !== date
+    || wallClockInZone(instant, timeZone) !== time
+    || local.second !== 0
+  ) {
+    throw new VenueIntervalValidationError(
+      `Local time ${date} ${time} does not exist in ${timeZone}.`,
+    );
+  }
+  return instant;
+}
+
+/**
+ * Strict schedule-write boundary around the legacy-compatible interval
+ * converter. It rejects malformed input and nonexistent DST wall times rather
+ * than allowing Date/Intl to normalize them into another day or hour.
+ */
+export function canonicalVenueIntervalStrict(opts: {
+  eventDate?: string | null;
+  startTime?: string | null;
+  endTime?: string | null;
+  timezone?: string | null;
+  startsAt?: Date | string | null;
+  endsAt?: Date | string | null;
+}): CanonicalInterval {
+  const timezone = opts.timezone ?? DEFAULT_VENUE_TZ;
+  if (!isValidIanaTimeZone(timezone)) {
+    throw new VenueIntervalValidationError("Timezone must be a valid IANA identifier.");
+  }
+
+  const hasStartsAt = opts.startsAt !== undefined && opts.startsAt !== null;
+  const hasEndsAt = opts.endsAt !== undefined && opts.endsAt !== null;
+  if (hasStartsAt !== hasEndsAt) {
+    throw new VenueIntervalValidationError(
+      "startsAt and endsAt must be provided together.",
+    );
+  }
+
+  const hasStartTime = opts.startTime !== undefined && opts.startTime !== null;
+  const hasEndTime = opts.endTime !== undefined && opts.endTime !== null;
+  if (hasStartTime && !isValidCalendarTime(opts.startTime)) {
+    throw new VenueIntervalValidationError("startTime must use HH:mm.");
+  }
+  if (hasEndTime && !isValidCalendarTime(opts.endTime)) {
+    throw new VenueIntervalValidationError("endTime must use HH:mm.");
+  }
+
+  if (hasStartsAt && hasEndsAt) {
+    const startsAt = parsedInstant(opts.startsAt);
+    const endsAt = parsedInstant(opts.endsAt);
+    if (!startsAt || !endsAt) {
+      throw new VenueIntervalValidationError(
+        "startsAt and endsAt must be valid ISO instants with an offset.",
+      );
+    }
+    if (endsAt.getTime() <= startsAt.getTime()) {
+      throw new VenueIntervalValidationError("endsAt must be after startsAt.");
+    }
+    const startDate = localDateInZone(startsAt, timezone);
+    if (opts.eventDate != null && opts.eventDate !== "") {
+      if (!isValidCalendarDate(opts.eventDate) || opts.eventDate !== startDate) {
+        throw new VenueIntervalValidationError(
+          "eventDate must be the startsAt calendar date in the venue timezone.",
+        );
+      }
+    }
+    if (hasStartTime && wallClockInZone(startsAt, timezone) !== opts.startTime) {
+      throw new VenueIntervalValidationError(
+        "startTime must match startsAt in the venue timezone.",
+      );
+    }
+    if (hasEndTime && wallClockInZone(endsAt, timezone) !== opts.endTime) {
+      throw new VenueIntervalValidationError(
+        "endTime must match endsAt in the venue timezone.",
+      );
+    }
+    return {
+      startsAt,
+      endsAt,
+      timezone,
+      eventDate: startDate,
+      startTime: opts.startTime ?? null,
+      endTime: opts.endTime ?? null,
+    };
+  }
+
+  if (!isValidCalendarDate(opts.eventDate)) {
+    throw new VenueIntervalValidationError(
+      "eventDate must be a real YYYY-MM-DD calendar date.",
+    );
+  }
+  const eventDate = opts.eventDate;
+  if (hasStartTime) {
+    strictZonedWallTimeToUtc(eventDate, opts.startTime!, timezone);
+  }
+  if (hasEndTime) {
+    const endDate =
+      opts.endTime! <= (opts.startTime ?? "00:00")
+        ? addLocalDays(eventDate, 1)
+        : eventDate;
+    strictZonedWallTimeToUtc(endDate, opts.endTime!, timezone);
+  }
+
+  const interval = canonicalVenueInterval({
+    eventDate,
+    startTime: opts.startTime,
+    endTime: opts.endTime,
+    timezone,
+  });
+  if (interval.endsAt.getTime() <= interval.startsAt.getTime()) {
+    throw new VenueIntervalValidationError("Interval end must be after its start.");
+  }
+  return interval;
+}
 
 /**
  * Half-open [startsAt, endsAt). Full-day → next local midnight.

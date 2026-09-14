@@ -11,6 +11,7 @@
 //   VAPID_SUBJECT                 — mailto:... or https://... contact
 
 import webpush from "web-push";
+import { request as httpsRequest } from "node:https";
 import { db } from "@/lib/db";
 import { pushSubscriptions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -44,6 +45,70 @@ export interface PushPayload {
   tag?: string;
 }
 
+async function sendAbortableWebPush(
+  subscription: Parameters<typeof webpush.generateRequestDetails>[0],
+  payload: string,
+  options: { timeoutMs: number; signal?: AbortSignal },
+): Promise<void> {
+  options.signal?.throwIfAborted();
+  const details = webpush.generateRequestDetails(subscription, payload);
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (error?: unknown) => {
+      if (settled) return;
+      settled = true;
+      if (error) reject(error);
+      else resolve();
+    };
+    const request = httpsRequest(
+      details.endpoint,
+      {
+        method: details.method,
+        headers: details.headers,
+        timeout: options.timeoutMs,
+        // Node destroys the ClientRequest when this signal aborts. This is a
+        // real transport cancellation, unlike web-push's socket-idle timeout.
+        signal: options.signal,
+      },
+      (response) => {
+        let responseText = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk: string) => {
+          // Provider diagnostics are never persisted. Bound them anyway so a
+          // hostile endpoint cannot grow memory while the barrier is held.
+          if (responseText.length < 8_192) {
+            responseText += chunk.slice(0, 8_192 - responseText.length);
+          }
+        });
+        response.on("end", () => {
+          const statusCode = response.statusCode ?? 0;
+          if (statusCode >= 200 && statusCode <= 299) {
+            finish();
+            return;
+          }
+          finish(Object.assign(
+            new Error("Received unexpected web-push response code"),
+            {
+              statusCode,
+              headers: response.headers,
+              body: responseText,
+              endpoint: details.endpoint,
+            },
+          ));
+        });
+        response.on("error", finish);
+      },
+    );
+    request.on("timeout", () => {
+      request.destroy(new Error("Web-push socket timeout"));
+    });
+    request.on("error", finish);
+    if (details.body) request.write(details.body);
+    request.end();
+  });
+}
+
 /** Send a push notification to ALL of a user's active subscriptions.
  *  Dead subscriptions (404/410) are pruned automatically. */
 export async function sendPushToUser(
@@ -52,6 +117,7 @@ export async function sendPushToUser(
   options: { timeoutMs?: number; signal?: AbortSignal; executor?: typeof db } = {},
 ): Promise<{ sent: number; pruned: number; failed: number }> {
   if (!ensureConfigured()) return { sent: 0, pruned: 0, failed: 0 };
+  options.signal?.throwIfAborted();
 
   const executor = options.executor ?? db;
   const subs = await executor
@@ -76,13 +142,16 @@ export async function sendPushToUser(
   await Promise.all(
     subs.map(async (s) => {
       try {
-        await webpush.sendNotification(
+        await sendAbortableWebPush(
           {
             endpoint: s.endpoint,
             keys: { p256dh: s.p256dh, auth: s.auth },
           },
           body,
-          { timeout: options.timeoutMs ?? 15_000 },
+          {
+            timeoutMs: options.timeoutMs ?? 15_000,
+            signal: options.signal,
+          },
         );
         sent += 1;
       } catch (err) {
@@ -91,6 +160,8 @@ export async function sendPushToUser(
         if (statusCode === 404 || statusCode === 410) {
           deadEndpoints.push(s.endpoint);
           pruned += 1;
+        } else if (options.signal?.aborted) {
+          failed += 1;
         } else {
           failed += 1;
           console.error("[push] send failed", statusCode, err);
@@ -98,6 +169,8 @@ export async function sendPushToUser(
       }
     }),
   );
+
+  options.signal?.throwIfAborted();
 
   if (deadEndpoints.length > 0) {
     // Delete dead rows. `inArray` would work but we'd need to import it;

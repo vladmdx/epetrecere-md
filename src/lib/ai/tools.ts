@@ -4,6 +4,25 @@ import { artists, leads, bookings, bookingRequests, venues, calendarEvents } fro
 import { redactContact } from "@/lib/privacy/contact-redaction";
 import { eq, and, sql, desc, gte, count } from "drizzle-orm";
 import { executeAdminReadTool } from "./admin-read-tools";
+import { normalizeCalendarDates } from "@/lib/booking/calendar-write";
+import { bulkSetCalendarEvents } from "@/lib/db/queries/calendar";
+import {
+  CalendarWriteAuthorizationError,
+  artistCalendarWriteAuthorization,
+} from "@/lib/booking/calendar-write-authorization";
+import { acquireLegalScopeLocks } from "@/lib/booking/advisory-locks";
+import { getLockedAppUserById } from "@/lib/venue-access";
+
+const VALID_LEAD_STATUSES = [
+  "new",
+  "contacted",
+  "proposal_sent",
+  "negotiation",
+  "confirmed",
+  "completed",
+  "lost",
+  "follow_up",
+] as const;
 
 // Tool definitions for Claude
 export const adminTools: Anthropic.Tool[] = [
@@ -117,8 +136,19 @@ export const vendorTools: Anthropic.Tool[] = [
     input_schema: {
       type: "object" as const,
       properties: {
-        dates: { type: "array", items: { type: "string" }, description: "Array of dates in YYYY-MM-DD format" },
-        status: { type: "string", description: "Status: available, booked, tentative, blocked" },
+        dates: {
+          type: "array",
+          minItems: 1,
+          maxItems: 31,
+          uniqueItems: true,
+          items: { type: "string", pattern: "^\\d{4}-\\d{2}-\\d{2}$" },
+          description: "Unique real dates in YYYY-MM-DD format (maximum 31)",
+        },
+        status: {
+          type: "string",
+          enum: ["available", "booked", "tentative", "blocked"],
+          description: "Calendar status",
+        },
       },
       required: ["dates", "status"],
     },
@@ -131,6 +161,7 @@ export async function executeTool(
   input: Record<string, unknown>,
   _vendorArtistId?: number,
   verifiedAdminRole?: "admin" | "super_admin",
+  actorUserId?: string,
 ): Promise<string> {
   // Enforce role boundaries here as well as in the chat route; model output is untrusted.
   if (_vendorArtistId !== undefined && !vendorTools.some(tool => tool.name === name)) {
@@ -211,10 +242,46 @@ export async function executeTool(
       }
 
       case "update_lead_status": {
-        await db.execute(
-          sql`UPDATE leads SET status = ${input.status as string}, updated_at = NOW() WHERE id = ${input.lead_id as number}`,
-        );
-        return JSON.stringify({ success: true, lead_id: input.lead_id, new_status: input.status });
+        const leadId = input.lead_id;
+        const status = input.status;
+        if (
+          !actorUserId
+          || !Number.isSafeInteger(leadId)
+          || (leadId as number) < 1
+          || typeof status !== "string"
+          || !VALID_LEAD_STATUSES.includes(
+            status as (typeof VALID_LEAD_STATUSES)[number],
+          )
+        ) {
+          return JSON.stringify({ error: "Invalid or missing admin write context" });
+        }
+        return db.transaction(async (tx) => {
+          const executor = tx as unknown as typeof db;
+          await acquireLegalScopeLocks(tx, { userIds: [actorUserId] });
+          const actor = await getLockedAppUserById(actorUserId, executor);
+          if (!actor?.isGlobalAdmin) {
+            return JSON.stringify({ error: "Admin authorization changed" });
+          }
+          const [target] = await executor
+            .select({ id: leads.id })
+            .from(leads)
+            .where(eq(leads.id, leadId as number))
+            .for("update")
+            .limit(1);
+          if (!target) return JSON.stringify({ error: "Lead not found" });
+          await executor
+            .update(leads)
+            .set({
+              status: status as (typeof VALID_LEAD_STATUSES)[number],
+              updatedAt: new Date(),
+            })
+            .where(eq(leads.id, target.id));
+          return JSON.stringify({
+            success: true,
+            lead_id: target.id,
+            new_status: status,
+          });
+        });
       }
 
       case "get_my_bookings": {
@@ -268,8 +335,13 @@ export async function executeTool(
       }
 
       case "update_my_calendar": {
-        if (!_vendorArtistId) return JSON.stringify({ error: "No artist context" });
-        const dates = input.dates as string[];
+        if (!_vendorArtistId || !actorUserId) {
+          return JSON.stringify({ error: "No authorized artist context" });
+        }
+        const dates = normalizeCalendarDates(
+          Array.isArray(input.dates) ? input.dates : [],
+          { maxDates: 31, rejectDuplicates: true },
+        );
         const status = input.status as string;
         const validStatuses = ["available", "booked", "tentative", "blocked"] as const;
         type CalStatus = (typeof validStatuses)[number];
@@ -277,34 +349,19 @@ export async function executeTool(
           return JSON.stringify({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` });
         }
         const typedStatus = status as CalStatus;
-        for (const date of dates) {
-          // Upsert: check if entry exists, update or insert
-          const [existing] = await db
-            .select({ id: calendarEvents.id })
-            .from(calendarEvents)
-            .where(
-              and(
-                eq(calendarEvents.entityType, "artist"),
-                eq(calendarEvents.entityId, _vendorArtistId),
-                eq(calendarEvents.date, date),
-              ),
-            )
-            .limit(1);
-
-          if (existing) {
-            await db
-              .update(calendarEvents)
-              .set({ status: typedStatus })
-              .where(eq(calendarEvents.id, existing.id));
-          } else {
-            await db.insert(calendarEvents).values({
-              entityType: "artist" as const,
-              entityId: _vendorArtistId,
-              date,
-              status: typedStatus,
-            });
-          }
-        }
+        await bulkSetCalendarEvents(
+          "artist",
+          _vendorArtistId,
+          dates,
+          typedStatus,
+          "manual",
+          undefined,
+          undefined,
+          artistCalendarWriteAuthorization({
+            userId: actorUserId,
+            artistId: _vendorArtistId,
+          }),
+        );
         return JSON.stringify({ success: true, message: `Calendar updated for ${dates.length} dates`, dates, status });
       }
 
@@ -312,6 +369,9 @@ export async function executeTool(
         return JSON.stringify({ error: "Unknown tool" });
     }
   } catch (err) {
+    if (err instanceof CalendarWriteAuthorizationError) {
+      return JSON.stringify({ error: "Artist calendar authorization changed" });
+    }
     return JSON.stringify({ error: String(err) });
   }
 }

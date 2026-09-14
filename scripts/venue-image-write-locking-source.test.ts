@@ -7,6 +7,10 @@ const collectionRoute = readFileSync("src/app/api/venue-images/route.ts", "utf8"
 const itemRoute = readFileSync("src/app/api/venue-images/[id]/route.ts", "utf8");
 const access = readFileSync("src/lib/venue-access.ts", "utf8");
 const venueQueries = readFileSync("src/lib/db/queries/venues.ts", "utf8");
+const venueOgRoute = readFileSync(
+  "src/app/[locale]/(public)/sali/[slug]/opengraph-image.tsx",
+  "utf8",
+);
 const meVenueRoute = readFileSync("src/app/api/me/venue/route.ts", "utf8");
 const publicVenueRoute = readFileSync("src/app/api/venues/[id]/route.ts", "utf8");
 const comparePage = readFileSync(
@@ -69,6 +73,44 @@ test("venue-level reads exclude hall-scoped images", () => {
     comparePage,
     /\.from\(venueImages\)[\s\S]*\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)[\s\S]*eq\(venues\.isActive, true\)/,
   );
+});
+
+test("venue Open Graph data follows the public publication boundary", () => {
+  const queryStart = venueQueries.indexOf(
+    "export async function getPublicVenueOgBySlug",
+  );
+  const queryEnd = venueQueries.indexOf(
+    "export async function getVenues",
+    queryStart,
+  );
+  assert.ok(queryStart >= 0 && queryEnd > queryStart);
+  const query = venueQueries.slice(queryStart, queryEnd);
+
+  assert.match(query, /if \(!isMultiHallEnabled\(\)\)/);
+  assert.match(
+    query,
+    /eq\(venues\.slug, slug\)[\s\S]*eq\(venues\.isActive, true\)/,
+  );
+  assert.match(
+    query,
+    /\.innerJoin\([\s\S]*venueHalls[\s\S]*eq\(venueHalls\.venueId, venues\.id\)[\s\S]*eq\(venueHalls\.status, "active"\)/,
+  );
+  assert.match(
+    query,
+    /\.leftJoin\([\s\S]*partnerOrganizations[\s\S]*eq\(partnerOrganizations\.id, venues\.organizationId\)/,
+  );
+  assert.match(
+    query,
+    /or\([\s\S]*isNull\(venues\.organizationId\)[\s\S]*eq\(partnerOrganizations\.status, "active"\)/,
+  );
+  assert.doesNotMatch(query, /pricePerPerson|phone|email|bankDetails/);
+
+  assert.match(venueOgRoute, /export const revalidate = 0/);
+  assert.match(venueOgRoute, /getPublicVenueOgBySlug\(slug\)/);
+  assert.match(venueOgRoute, /if \(!venue\) notFound\(\)/);
+  assert.doesNotMatch(venueOgRoute, /\.from\(venues\)/);
+  assert.doesNotMatch(venueOgRoute, /pricePerPerson/);
+  assert.doesNotMatch(venueOgRoute, /DB not available/);
 });
 
 test("the public gallery never exposes inactive venue images to anonymous callers", () => {

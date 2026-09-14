@@ -17,11 +17,11 @@ const originalPrivateToken = process.env.MOMENTS_BLOB_READ_WRITE_TOKEN;
 process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_fixture_test-public-no-network";
 process.env.MOMENTS_BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_fixture_test-private-no-network";
 const store = "https://fixture.public.blob.vercel-storage.com";
-const scope = { id: 99, momentsSlug: "qa-plan-99" };
+const scope = { id: 99, momentsSlug: "qa-plan-99", userId: "qa-owner" };
 const ownUrl = `${store}/event-photos/99/owned.webp`;
 let state;
 function reset(extra = {}) {
-  state = { allowed: true, access: true, rows: [], blobs: [], puts: [], dels: [], lists: [], queries: [], inserts: [], deletes: 0, insertFailure: false, ...extra };
+  state = { allowed: true, access: true, rows: [], blobs: [], puts: [], dels: [], lists: [], queries: [], inserts: [], registry: new Map(), outbox: [], deletes: 0, insertFailure: false, ...extra };
   global.fetch = async () => { throw Error("External HTTP forbidden"); };
 }
 function metadata(url, size = 3) { return { url, pathname: new URL(url).pathname.slice(1), size }; }
@@ -55,21 +55,44 @@ const db = {
       const name = getTableName(table);
       const rendered = dialect.sqlToQuery(condition);
       state.queries.push({ name, params: rendered.params });
-      if (name === "event_plans") { assert.deepEqual(rendered.params, [99]); return [{ title: "QA Moments", eventDate: "2026-09-20" }]; }
+      if (name === "event_plans") { assert.deepEqual(rendered.params, [99]); return [{ title: "QA Moments", eventDate: "2026-09-20", userId: scope.userId }]; }
+      if (name === "account_blob_assets") return [...state.registry.values()].filter(row => rendered.params.includes(row.assetKey));
+      if (name === "account_blob_asset_claims") return [];
       assert.equal(name, "event_photos");
       assert.ok(rendered.params.includes(99) || rendered.params.includes(scope.momentsSlug));
       return state.rows;
     };
-    const q = { from(t) { table = t; return q; }, innerJoin() { return q; }, where(c) { condition = c; return q; }, orderBy() { return q; }, limit() { return Promise.resolve(result()); }, then(resolve, reject) { return Promise.resolve().then(result).then(resolve, reject); } };
+    const q = { from(t) { table = t; return q; }, innerJoin() { return q; }, where(c) { condition = c; return q; }, orderBy() { return q; }, for() { return q; }, limit() { return Promise.resolve(result()); }, then(resolve, reject) { return Promise.resolve().then(result).then(resolve, reject); } };
     return q;
   },
   insert(table) {
-    assert.equal(getTableName(table), "event_photos");
+    const name = getTableName(table);
+    if (name === "account_blob_assets") return { values(values) { return { onConflictDoNothing() { return { returning: async () => {
+      if (state.registry.has(values.assetKey)) return [];
+      const row = { ...values, state: "active" };
+      state.registry.set(values.assetKey, row);
+      return [{ assetKey: values.assetKey }];
+    } }; } }; } };
+    if (name === "account_asset_erasure_outbox") return { values(values) { return { onConflictDoNothing() { return { returning: async () => {
+      state.outbox.push(values);
+      return [{ assetKey: values.assetKey }];
+    } }; } }; } };
+    assert.equal(name, "event_photos");
     return { values(values) { return { returning: async () => {
       if (state.insertFailure) throw Error("Synthetic database failure");
       state.inserts.push(values);
       return [{ id: 500, ...values }];
     } }; } };
+  },
+  update(table) {
+    assert.equal(getTableName(table), "account_blob_assets");
+    let patch;
+    return { set(values) { patch = values; return { where() { return { returning: async () => {
+      const [row] = [...state.registry.values()];
+      if (!row) return [];
+      Object.assign(row, patch);
+      return [{ assetKey: row.assetKey }];
+    } }; } }; } };
   },
   delete(table) {
     assert.equal(getTableName(table), "event_photos");
@@ -80,6 +103,7 @@ const db = {
       return { returning: async () => result(), then(resolve, reject) { return Promise.resolve().then(result).then(resolve, reject); } };
     } };
   },
+  transaction(callback) { return callback(db); },
 };
 Module._load = function(request, parent, isMain) {
   let resolved; try { resolved = Module._resolveFilename(request, parent); } catch {}
@@ -147,8 +171,11 @@ Module._load = function(request, parent, isMain) {
       return new Request("https://example.invalid", { method: "POST", body: form });
     };
     reset();
+    await helpers.storePrivatePhoto(Buffer.from([1, 2, 3]), 99, "qa-owner");
+    assert.equal(state.registry.size, 1);
+    reset();
     const uploaded = await owner.POST(multipart(), context);
-    assert.equal(uploaded.status, 201);
+    assert.equal(uploaded.status, 201, await uploaded.clone().text());
     assert.equal(state.puts.length, 1);
     assert.equal((await uploaded.json()).photo.url, "/api/event-photos/500/file");
     assert.match(state.puts[0].pathname, /^event-photos\/99\/[\da-f-]+\.webp$/);
@@ -158,10 +185,14 @@ Module._load = function(request, parent, isMain) {
     assert.equal(state.inserts[0].planId, 99); assert.equal(state.inserts[0].userId, "qa-owner");
     assert.equal(state.inserts[0].isPublic, false); assert.equal(state.inserts[0].isApproved, false);
     assert.notEqual(state.inserts[0].url, `${store}/artists/foreign.jpg`);
+    assert.equal([...state.registry.values()][0].ownerUserId, "qa-owner");
+    assert.equal([...state.registry.values()][0].provenance, "moments_photo");
     reset({ insertFailure: true });
     assert.equal((await owner.POST(multipart(), context)).status, 503);
-    assert.deepEqual(state.dels, [state.blobs[0].url]);
-    console.log("PASS valid own upload is atomically attached from processed metadata-free bytes; caller publication/URL fields ignored; failed insert cleans only its managed file");
+    assert.deepEqual(state.dels, []);
+    assert.equal(state.outbox.length, 1);
+    assert.equal([...state.registry.values()][0].state, "queued");
+    console.log("PASS valid own upload records server ownership; caller publication/URL fields are ignored; failed attachment queues only its registered object");
 
     for (const url of [...unsafe, ownUrl.replace("fixture.public", "foreign.public")]) {
       reset({ rows: [row(url)], blobs: [metadata(ownUrl)] });

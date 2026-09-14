@@ -20,6 +20,7 @@ import {
   completeVenueRoleSelection,
   selectRoleInDatabase,
 } from "@/lib/auth/select-role";
+import { bootstrapAccountUserUnlessErased } from "@/lib/privacy/account-erasure-identity";
 
 const schema = z.object({
   role: z.enum(["client", "artist", "venue"]),
@@ -59,45 +60,21 @@ export async function POST(req: Request) {
       if (!email) {
         return NextResponse.json({ error: "No email" }, { status: 400 });
       }
-      const [created] = await db
-        .insert(users)
-        .values({
-          clerkId,
-          email,
-          name:
-            [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
-            null,
-          // Phone is claimed by /api/auth/set-phone under its canonical
-          // identity lock; role selection must not create a duplicate.
-          phone: null,
-          avatarUrl: clerkUser.imageUrl || null,
-          role: "user",
-        })
-        .onConflictDoNothing()
-        .returning({
-          id: users.id,
-          email: users.email,
-          name: users.name,
-          role: users.role,
-        });
-      if (!created) {
-        const [refound] = await db
-          .select({
-            id: users.id,
-            email: users.email,
-            name: users.name,
-            role: users.role,
-          })
-          .from(users)
-          .where(eq(users.clerkId, clerkId))
-          .limit(1);
-        appUser = refound;
-      } else {
-        appUser = created;
+      const bootstrapped = await bootstrapAccountUserUnlessErased({
+        clerkId,
+        email,
+        name:
+          [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+          null,
+        avatarUrl: clerkUser.imageUrl || null,
+      });
+      if (!bootstrapped) {
+        return NextResponse.json(
+          { error: "Account erased", code: "ACCOUNT_ERASED" },
+          { status: 410 },
+        );
       }
-      if (!appUser) {
-        return NextResponse.json({ error: "User create failed" }, { status: 500 });
-      }
+      appUser = bootstrapped;
     }
 
     const role = parsed.data.role;

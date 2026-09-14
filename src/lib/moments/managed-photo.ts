@@ -1,5 +1,6 @@
-import { del, get, list, put } from "@vercel/blob";
+import { del, get, list } from "@vercel/blob";
 import { randomUUID } from "node:crypto";
+import { storeRegisteredBlob } from "@/lib/privacy/account-asset-erasure";
 
 export interface PhotoPlanScope { id: number; momentsSlug?: string | null }
 
@@ -29,15 +30,26 @@ export function canonicalBlobResultUrl(raw: string): string | null {
 }
 
 /** Fail closed: a missing private store never turns personal photos public. */
-export async function storePrivatePhoto(bytes: Buffer, planId: number): Promise<string> {
+export async function storePrivatePhoto(
+  bytes: Buffer,
+  planId: number,
+  ownerUserId: string,
+): Promise<string> {
   const token = process.env.MOMENTS_BLOB_READ_WRITE_TOKEN;
-  if (!token || !Number.isSafeInteger(planId) || planId < 1) throw new Error("Private photo storage unavailable");
+  if (!token || !ownerUserId || !Number.isSafeInteger(planId) || planId < 1) {
+    throw new Error("Private photo storage unavailable");
+  }
   const pathname = `event-photos/${planId}/${randomUUID()}.webp`;
-  const blob = await put(pathname, bytes, {
-    token, access: "private", contentType: "image/webp", addRandomSuffix: false,
-    abortSignal: AbortSignal.timeout(15_000),
+  const url = await storeRegisteredBlob({
+    pathname,
+    body: bytes,
+    token,
+    access: "private",
+    ownerUserId,
+    provenance: "moments_photo",
+    contentType: "image/webp",
+    addRandomSuffix: false,
   });
-  const url = canonicalBlobResultUrl(blob.url);
   if (!url || !new URL(url).hostname.includes(".private.") || new URL(url).pathname !== `/${pathname}`) throw new Error("Private photo storage unavailable");
   return url;
 }

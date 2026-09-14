@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   legalAcceptances,
   legalContractDeliveryOutbox,
+  users,
 } from "@/lib/db/schema";
 import type { EmailAttachment } from "@/lib/email/send";
 import {
@@ -11,29 +12,37 @@ import {
   signedContractPdfFilename,
   validateSignedContractSession,
 } from "@/lib/legal/signed-contract-pdf";
+import {
+  legalContractDeliverySafeFailure,
+  legalContractDeliverySafeLog,
+  legalDeliveryRecipientIsAuthorized,
+} from "@/lib/legal/contract-delivery-policy";
+import {
+  sendLegalContractEmail,
+  type LegalContractDeliveryEmail,
+} from "@/lib/legal/contract-delivery-provider";
 
 export const LEGAL_DELIVERY_MAX_ATTEMPTS = 8;
 const DELIVERY_LEASE_MS = 5 * 60 * 1000;
 const RETRY_BASE_MS = 5 * 60 * 1000;
 const RETRY_CAP_MS = 24 * 60 * 60 * 1000;
 
-type DeliveryEmail = {
-  to: string;
-  subject: string;
-  html: string;
-  attachments?: EmailAttachment[];
-  idempotencyKey?: string;
-};
+type Executor = typeof db;
 
 export type ContractDeliveryDependencies = {
   generatePdf?: typeof generateSignedContractPdf;
-  sendEmail?: (input: DeliveryEmail) => Promise<unknown>;
+  sendEmail?: (input: LegalContractDeliveryEmail) => Promise<unknown>;
   now?: () => Date;
+  /** Bounded Vercel fallback; primary Inngest processing keeps the default. */
+  maxRecipientsPerSession?: number;
+  /** Provider deadline override for the bounded Vercel fallback. */
+  providerTimeoutMs?: number;
 };
 
 export type ContractDeliveryResult =
   | "delivered"
   | "already_delivered"
+  | "cancelled"
   | "dead_lettered"
   | "busy"
   | "missing";
@@ -42,26 +51,17 @@ type ClaimedDelivery = typeof legalContractDeliveryOutbox.$inferSelect & {
   leaseToken: string;
 };
 
-function providerError(result: unknown): unknown {
-  if (!result || typeof result !== "object") return null;
-  return "error" in result ? (result as { error?: unknown }).error : null;
-}
-
-async function sendOrThrow(
-  sendEmail: (input: DeliveryEmail) => Promise<unknown>,
-  input: DeliveryEmail,
-): Promise<void> {
-  const result = await sendEmail(input);
-  const error = providerError(result);
-  if (error) {
-    throw new Error(`contract_email_provider_error: ${JSON.stringify(error)}`);
-  }
-}
-
 /** Exponential retry with a finite cap; exported for deterministic tests. */
 export function legalContractRetryDelayMs(attempt: number): number {
   const exponent = Math.max(0, Math.min(attempt - 1, 20));
   return Math.min(RETRY_BASE_MS * 2 ** exponent, RETRY_CAP_MS);
+}
+
+function legalDeliveryBatchLimit(value: number | undefined, fallback = 100): number {
+  const candidate = typeof value === "number" && Number.isFinite(value)
+    ? Math.floor(value)
+    : fallback;
+  return Math.max(1, Math.min(candidate, 100));
 }
 
 /**
@@ -72,35 +72,65 @@ export function legalContractRetryDelayMs(attempt: number): number {
 async function deadLetterExpiredFinalAttempts(
   now: Date,
   acceptanceSessionId?: string,
-): Promise<void> {
+  limit = 100,
+): Promise<number> {
   const staleBefore = new Date(now.getTime() - DELIVERY_LEASE_MS);
-  await db
-    .update(legalContractDeliveryOutbox)
-    .set({
-      status: "dead_letter",
-      lockedAt: null,
-      leaseToken: null,
-      deadLetteredAt: now,
-      lastError: sql`coalesce(${legalContractDeliveryOutbox.lastError}, 'delivery lease expired after maximum attempts')`,
-      updatedAt: now,
-    })
-    .where(and(
+  const batchLimit = legalDeliveryBatchLimit(limit);
+  return db.transaction(async (tx) => {
+    const retryableFinalAttempt = and(
       acceptanceSessionId
         ? eq(legalContractDeliveryOutbox.acceptanceSessionId, acceptanceSessionId)
         : undefined,
       isNull(legalContractDeliveryOutbox.deliveredAt),
       isNull(legalContractDeliveryOutbox.deadLetteredAt),
+      isNull(legalContractDeliveryOutbox.cancelledAt),
       gte(legalContractDeliveryOutbox.attempts, LEGAL_DELIVERY_MAX_ATTEMPTS),
       or(
         isNull(legalContractDeliveryOutbox.lockedAt),
         lt(legalContractDeliveryOutbox.lockedAt, staleBefore),
       ),
-    ));
+    );
+    const candidates = await tx
+      .select({ id: legalContractDeliveryOutbox.id })
+      .from(legalContractDeliveryOutbox)
+      .where(retryableFinalAttempt)
+      .orderBy(
+        asc(legalContractDeliveryOutbox.updatedAt),
+        asc(legalContractDeliveryOutbox.id),
+      )
+      .limit(batchLimit)
+      .for("update", { skipLocked: true });
+    if (candidates.length === 0) return 0;
+
+    const rows = await tx
+      .update(legalContractDeliveryOutbox)
+      .set({
+        status: "dead_letter",
+        recipientUserId: null,
+        recipientEmail: null,
+        recipientKey: sql`'retired:' || ${legalContractDeliveryOutbox.id}::text`,
+        lockedAt: null,
+        leaseToken: null,
+        deadLetteredAt: now,
+        lastError: sql`coalesce(${legalContractDeliveryOutbox.lastError}, 'delivery lease expired after maximum attempts')`,
+        updatedAt: now,
+      })
+      .where(and(
+        inArray(
+          legalContractDeliveryOutbox.id,
+          candidates.map((candidate) => candidate.id),
+        ),
+        retryableFinalAttempt,
+      ))
+      .returning({ id: legalContractDeliveryOutbox.id });
+    return rows.length;
+  });
 }
 
 async function claimDueRecipients(
   acceptanceSessionId: string,
   now: Date,
+  limit = 100,
 ): Promise<ClaimedDelivery[]> {
   const staleBefore = new Date(now.getTime() - DELIVERY_LEASE_MS);
   const candidates = await db
@@ -111,6 +141,7 @@ async function claimDueRecipients(
         eq(legalContractDeliveryOutbox.acceptanceSessionId, acceptanceSessionId),
         isNull(legalContractDeliveryOutbox.deliveredAt),
         isNull(legalContractDeliveryOutbox.deadLetteredAt),
+        isNull(legalContractDeliveryOutbox.cancelledAt),
         lt(legalContractDeliveryOutbox.attempts, LEGAL_DELIVERY_MAX_ATTEMPTS),
         lte(legalContractDeliveryOutbox.nextAttemptAt, now),
         or(
@@ -124,7 +155,7 @@ async function claimDueRecipients(
       asc(legalContractDeliveryOutbox.createdAt),
       asc(legalContractDeliveryOutbox.id),
     )
-    .limit(100);
+    .limit(legalDeliveryBatchLimit(limit));
 
   const claimed: ClaimedDelivery[] = [];
   for (const candidate of candidates) {
@@ -144,6 +175,7 @@ async function claimDueRecipients(
           eq(legalContractDeliveryOutbox.id, candidate.id),
           isNull(legalContractDeliveryOutbox.deliveredAt),
           isNull(legalContractDeliveryOutbox.deadLetteredAt),
+          isNull(legalContractDeliveryOutbox.cancelledAt),
           lt(legalContractDeliveryOutbox.attempts, LEGAL_DELIVERY_MAX_ATTEMPTS),
           lte(legalContractDeliveryOutbox.nextAttemptAt, now),
           or(
@@ -163,7 +195,7 @@ async function failDelivery(
   error: unknown,
   failedAt: Date,
 ): Promise<void> {
-  const message = error instanceof Error ? error.message : String(error);
+  const safeFailure = legalContractDeliverySafeFailure(error);
   const exhausted = delivery.attempts >= LEGAL_DELIVERY_MAX_ATTEMPTS;
   await db
     .update(legalContractDeliveryOutbox)
@@ -175,7 +207,14 @@ async function failDelivery(
       lockedAt: null,
       leaseToken: null,
       deadLetteredAt: exhausted ? failedAt : null,
-      lastError: message.slice(0, 4000),
+      ...(exhausted
+        ? {
+            recipientUserId: null,
+            recipientEmail: null,
+            recipientKey: sql`'retired:' || ${legalContractDeliveryOutbox.id}::text`,
+          }
+        : {}),
+      lastError: safeFailure,
       updatedAt: failedAt,
     })
     .where(
@@ -187,10 +226,11 @@ async function failDelivery(
 }
 
 async function completeDelivery(
+  executor: Executor,
   delivery: ClaimedDelivery,
   deliveredAt: Date,
 ): Promise<boolean> {
-  const [completed] = await db
+  const [completed] = await executor
     .update(legalContractDeliveryOutbox)
     .set({
       status: "delivered",
@@ -198,6 +238,9 @@ async function completeDelivery(
       lockedAt: null,
       leaseToken: null,
       lastError: null,
+      // The timestamp/channel/role snapshot are sufficient evidence after a
+      // successful send; retaining the address indefinitely is unnecessary.
+      recipientEmail: null,
       updatedAt: deliveredAt,
     })
     .where(
@@ -217,13 +260,151 @@ async function currentDeliveryState(
     .select({
       deliveredAt: legalContractDeliveryOutbox.deliveredAt,
       deadLetteredAt: legalContractDeliveryOutbox.deadLetteredAt,
+      cancelledAt: legalContractDeliveryOutbox.cancelledAt,
     })
     .from(legalContractDeliveryOutbox)
     .where(eq(legalContractDeliveryOutbox.acceptanceSessionId, acceptanceSessionId));
   if (!rows.length) return "missing";
-  if (rows.every((row) => row.deliveredAt)) return "already_delivered";
+  if (rows.every((row) => row.deliveredAt || row.cancelledAt)) {
+    return rows.some((row) => row.deliveredAt)
+      ? "already_delivered"
+      : "cancelled";
+  }
   if (rows.some((row) => row.deadLetteredAt)) return "dead_lettered";
   return "busy";
+}
+
+type PreparedDelivery = {
+  attachment: EmailAttachment;
+  sendEmail: (input: LegalContractDeliveryEmail) => Promise<unknown>;
+  signerMessage: { subject: string; html: string };
+  adminMessage: { subject: string; html: string };
+  signerUserId: string | null;
+};
+
+async function cancelClaimedDelivery(
+  executor: Executor,
+  delivery: ClaimedDelivery,
+  cancelledAt: Date,
+): Promise<void> {
+  await executor
+    .update(legalContractDeliveryOutbox)
+    .set({
+      status: "cancelled",
+      cancelledAt,
+      recipientUserId: null,
+      recipientEmail: null,
+      recipientKey: sql`'retired:' || ${legalContractDeliveryOutbox.id}::text`,
+      lockedAt: null,
+      leaseToken: null,
+      lastError: null,
+      updatedAt: cancelledAt,
+    })
+    .where(and(
+      eq(legalContractDeliveryOutbox.id, delivery.id),
+      eq(legalContractDeliveryOutbox.leaseToken, delivery.leaseToken),
+    ));
+}
+
+/**
+ * User -> outbox is the canonical lock order shared with account erasure.
+ * The provider call stays inside this bounded transaction so deletion or an
+ * admin demotion cannot commit in the gap between authorization and send.
+ */
+async function deliverClaimedRecipient(
+  delivery: ClaimedDelivery,
+  prepared: PreparedDelivery,
+  deliveredAt: Date,
+  providerTimeoutMs?: number,
+): Promise<"delivered" | "cancelled" | "lease_lost"> {
+  return db.transaction(async (tx) => {
+    const executor = tx as unknown as Executor;
+    // Account erasure takes one user's UPDATE lock and then scrubs the outbox.
+    // Take every identity needed for this send in deterministic UUID order,
+    // before the outbox row, so signer erasure and admin deletion have a
+    // single linearization point without a users/outbox deadlock.
+    const userIds = [...new Set([
+      prepared.signerUserId,
+      delivery.recipientUserId,
+    ].filter((value): value is string => Boolean(value)))].sort();
+    const liveUsers = userIds.length > 0
+      ? await tx
+          .select({ id: users.id, email: users.email, role: users.role })
+          .from(users)
+          .where(inArray(users.id, userIds))
+          .orderBy(asc(users.id))
+          .for("share")
+      : [];
+    const liveUsersById = new Map(liveUsers.map((user) => [user.id, user]));
+
+    const [current] = await tx
+      .select()
+      .from(legalContractDeliveryOutbox)
+      .where(and(
+        eq(legalContractDeliveryOutbox.id, delivery.id),
+        eq(legalContractDeliveryOutbox.leaseToken, delivery.leaseToken),
+        isNull(legalContractDeliveryOutbox.deliveredAt),
+        isNull(legalContractDeliveryOutbox.deadLetteredAt),
+        isNull(legalContractDeliveryOutbox.cancelledAt),
+      ))
+      .for("update")
+      .limit(1);
+    if (!current) return "lease_lost" as const;
+
+    const [signerBinding] = await tx
+      .select({ id: legalAcceptances.id, userId: legalAcceptances.userId })
+      .from(legalAcceptances)
+      .where(and(
+        eq(legalAcceptances.id, current.anchorAcceptanceId),
+        eq(legalAcceptances.acceptanceSessionId, current.acceptanceSessionId),
+      ))
+      .limit(1);
+    const liveUser = current.recipientUserId
+      ? liveUsersById.get(current.recipientUserId) ?? null
+      : null;
+    const sessionSignerLive = Boolean(
+      prepared.signerUserId
+      && signerBinding?.userId === prepared.signerUserId
+      && liveUsersById.has(prepared.signerUserId),
+    );
+    const authorized = legalDeliveryRecipientIsAuthorized({
+      delivery: current,
+      user: liveUser,
+      signerAcceptanceBound: Boolean(
+        current.channel === "signer"
+        && liveUser
+        && signerBinding?.userId === liveUser.id,
+      ),
+      sessionSignerLive,
+    });
+    if (!authorized || !current.recipientEmail) {
+      await cancelClaimedDelivery(
+        executor,
+        { ...current, leaseToken: delivery.leaseToken },
+        deliveredAt,
+      );
+      return "cancelled" as const;
+    }
+
+    const message = current.channel === "signer"
+      ? prepared.signerMessage
+      : prepared.adminMessage;
+    await sendLegalContractEmail(prepared.sendEmail, {
+      to: current.recipientEmail,
+      subject: message.subject,
+      html: message.html,
+      attachments: [prepared.attachment],
+      idempotencyKey:
+        `legal:${current.acceptanceSessionId}:${current.channel}:${current.recipientKey}`,
+    }, providerTimeoutMs);
+    return await completeDelivery(
+      executor,
+      { ...current, leaseToken: delivery.leaseToken },
+      deliveredAt,
+    )
+      ? "delivered" as const
+      : "lease_lost" as const;
+  });
 }
 
 /**
@@ -236,14 +417,22 @@ export async function processLegalContractDelivery(
   dependencies: ContractDeliveryDependencies = {},
 ): Promise<ContractDeliveryResult> {
   const now = dependencies.now?.() ?? new Date();
-  await deadLetterExpiredFinalAttempts(now, acceptanceSessionId);
-  const claimed = await claimDueRecipients(acceptanceSessionId, now);
+  await deadLetterExpiredFinalAttempts(
+    now,
+    acceptanceSessionId,
+    dependencies.maxRecipientsPerSession ?? 100,
+  );
+  const claimed = await claimDueRecipients(
+    acceptanceSessionId,
+    now,
+    dependencies.maxRecipientsPerSession,
+  );
   if (!claimed.length) return currentDeliveryState(acceptanceSessionId);
 
   // Claim ownership covers every fallible preparation step, not just PDF
   // rendering. A failed lazy import or template render must release every
   // claimed recipient with the same durable backoff as a provider failure.
-  const prepared = await (async () => {
+  const prepared: PreparedDelivery = await (async () => {
     try {
       const rows = await db
         .select()
@@ -306,37 +495,38 @@ export async function processLegalContractDelivery(
         hasContractPdf: true,
         hasSignatureImage: Boolean(first.signatureImage),
       });
-      return { attachment, sendEmail, signerMessage, adminMessage };
+      return {
+        attachment,
+        sendEmail,
+        signerMessage,
+        adminMessage,
+        signerUserId: first.userId ?? null,
+      };
     } catch (error) {
       await Promise.all(claimed.map((delivery) => failDelivery(delivery, error, now)));
-      throw error;
+      throw new Error("contract_delivery_preparation_failed");
     }
   })();
 
-  const errors: unknown[] = [];
+  let failures = 0;
   for (const delivery of claimed) {
     try {
-      const message = delivery.channel === "signer"
-        ? prepared.signerMessage
-        : prepared.adminMessage;
-      await sendOrThrow(prepared.sendEmail, {
-        to: delivery.recipientEmail,
-        subject: message.subject,
-        html: message.html,
-        attachments: [prepared.attachment],
-        idempotencyKey:
-          `legal:${acceptanceSessionId}:${delivery.channel}:${delivery.recipientKey}`,
-      });
-      if (!await completeDelivery(delivery, dependencies.now?.() ?? new Date())) {
-        errors.push(new Error(`contract_delivery_lease_lost:${delivery.id}`));
+      const result = await deliverClaimedRecipient(
+        delivery,
+        prepared,
+        dependencies.now?.() ?? new Date(),
+        dependencies.providerTimeoutMs,
+      );
+      if (result === "lease_lost") {
+        failures += 1;
       }
     } catch (error) {
-      errors.push(error);
+      failures += 1;
       await failDelivery(delivery, error, dependencies.now?.() ?? new Date());
     }
   }
-  if (errors.length) {
-    throw new AggregateError(errors, "contract_delivery_partial_failure");
+  if (failures > 0) {
+    throw new Error("contract_delivery_partial_failure");
   }
 
   const state = await currentDeliveryState(acceptanceSessionId);
@@ -351,10 +541,21 @@ export async function processLegalContractDelivery(
 export async function retryPendingLegalContractDeliveries(
   limit = 20,
   dependencies: ContractDeliveryDependencies = {},
-): Promise<{ inspected: number; delivered: number; failed: number }> {
+): Promise<{
+  inspected: number;
+  delivered: number;
+  failed: number;
+  newlyDeadLettered: number;
+  deadLetterBacklog: number;
+}> {
   const now = dependencies.now?.() ?? new Date();
   const staleBefore = new Date(now.getTime() - DELIVERY_LEASE_MS);
-  await deadLetterExpiredFinalAttempts(now);
+  const batchLimit = legalDeliveryBatchLimit(limit, 20);
+  const newlyDeadLettered = await deadLetterExpiredFinalAttempts(
+    now,
+    undefined,
+    batchLimit,
+  );
   const jobs = await db
     .select({ sessionId: legalContractDeliveryOutbox.acceptanceSessionId })
     .from(legalContractDeliveryOutbox)
@@ -362,6 +563,7 @@ export async function retryPendingLegalContractDeliveries(
       and(
         isNull(legalContractDeliveryOutbox.deliveredAt),
         isNull(legalContractDeliveryOutbox.deadLetteredAt),
+        isNull(legalContractDeliveryOutbox.cancelledAt),
         lt(legalContractDeliveryOutbox.attempts, LEGAL_DELIVERY_MAX_ATTEMPTS),
         lte(legalContractDeliveryOutbox.nextAttemptAt, now),
         or(
@@ -375,7 +577,7 @@ export async function retryPendingLegalContractDeliveries(
       asc(legalContractDeliveryOutbox.createdAt),
       asc(legalContractDeliveryOutbox.id),
     )
-    .limit(Math.max(1, Math.min(limit, 100)));
+    .limit(batchLimit);
   const sessionIds = [...new Set(jobs.map((job) => job.sessionId))];
 
   let delivered = 0;
@@ -387,8 +589,25 @@ export async function retryPendingLegalContractDeliveries(
       else if (result === "dead_lettered") failed += 1;
     } catch (error) {
       failed += 1;
-      console.error("[legal] scheduled contract delivery retry failed", sessionId, error);
+      console.error(
+        "[legal] scheduled contract delivery retry failed",
+        legalContractDeliverySafeLog(error),
+      );
     }
   }
-  return { inspected: sessionIds.length, delivered, failed };
+  const [deadLetters] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(legalContractDeliveryOutbox)
+    .where(and(
+      isNull(legalContractDeliveryOutbox.deliveredAt),
+      isNull(legalContractDeliveryOutbox.cancelledAt),
+      eq(legalContractDeliveryOutbox.status, "dead_letter"),
+    ));
+  return {
+    inspected: sessionIds.length,
+    delivered,
+    failed,
+    newlyDeadLettered,
+    deadLetterBacklog: deadLetters?.count ?? 0,
+  };
 }

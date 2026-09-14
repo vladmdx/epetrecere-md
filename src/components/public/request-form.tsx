@@ -18,6 +18,12 @@ import {
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ALL_EVENT_TYPES, EVENT_TYPE_EMOJI, eventTypeLabel } from "@/lib/events/normalize";
+import { useUser } from "@clerk/nextjs";
+import { localDateToIsoDate } from "@epetrecere/shared/utils";
+import {
+  bookingCreateScope,
+  submitBookingCreateRequest,
+} from "@/lib/booking/booking-create-client";
 
 // ─── Shared props ────────────────────────────────────────
 interface FormBaseProps {
@@ -36,6 +42,18 @@ interface FormBaseProps {
    *  feeds the plan budget once the artist accepts. Only used on the
    *  artist flow; venues keep using /api/leads. */
   eventPlanId?: number;
+}
+
+async function responseErrorMessage(response: Response): Promise<string | null> {
+  const body = await response.clone().json().catch(() => null) as
+    | { error?: unknown; code?: unknown }
+    | null;
+  for (const value of [body?.error, body?.code]) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim().slice(0, 200);
+    }
+  }
+  return null;
 }
 
 // ─── Price Request (simple: name + phone) ────────────────
@@ -154,6 +172,7 @@ export function RequestPriceForm({ artistId, venueId, className, label, variant 
 // ─── Booking Request (full form) ─────────────────────────
 export function RequestBookingForm({ artistId, venueId, eventPlanId, preselectedDate, className, label, variant = "outline", icon, presetMessage, capacityMax }: FormBaseProps & { capacityMax?: number | null }) {
   const { t, locale } = useLocale();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [capacityWarning, setCapacityWarning] = useState(false);
@@ -170,6 +189,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!isUserLoaded) return;
     const form = new FormData(e.currentTarget);
 
     // Client-side validation — eventDate is required by the API but is
@@ -210,7 +230,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
             clientPhone: `+373${form.get("phone") as string}`,
             clientEmail: (form.get("email") as string) || undefined,
             eventType: (form.get("eventType") as string) || undefined,
-            eventDate: eventDate ? eventDate.toISOString().split("T")[0] : undefined,
+            eventDate: eventDate ? localDateToIsoDate(eventDate) : undefined,
             guestCount: form.get("guestCount")
               ? Number(form.get("guestCount"))
               : undefined,
@@ -222,7 +242,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
             phonePrefix: "+373",
             email: (form.get("email") as string) || undefined,
             eventType: (form.get("eventType") as string) || undefined,
-            eventDate: eventDate ? eventDate.toISOString().split("T")[0] : undefined,
+            eventDate: eventDate ? localDateToIsoDate(eventDate) : undefined,
             location: (form.get("location") as string) || undefined,
             guestCount: form.get("guestCount")
               ? Number(form.get("guestCount"))
@@ -232,15 +252,34 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
             artistId,
             venueId,
           };
-      const res = await fetch(
-        useBookingFlow ? "/api/booking-requests" : "/api/leads",
-        {
+      if (useBookingFlow) {
+        const submission = await submitBookingCreateRequest({
+          scope: bookingCreateScope({
+            actorId: user?.id,
+            artistId,
+            venueId,
+            eventPlanId,
+          }),
+          payload,
+        });
+        if (!submission.ok) {
+          throw new Error(
+            await responseErrorMessage(submission.response)
+              ?? t("form.errorRetry"),
+          );
+        }
+      } else {
+        const response = await fetch("/api/leads", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
-        },
-      );
-      if (!res.ok) throw new Error();
+        });
+        if (!response.ok) {
+          throw new Error(
+            await responseErrorMessage(response) ?? t("form.errorRetry"),
+          );
+        }
+      }
       toast.success(
         useBookingFlow
           ? eventPlanId
@@ -249,8 +288,12 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
           : t("requestForm.sentWeWillContact"),
       );
       setOpen(false);
-    } catch {
-      toast.error(t("form.errorRetry"));
+    } catch (error) {
+      toast.error(
+        error instanceof Error && error.message
+          ? error.message
+          : t("form.errorRetry"),
+      );
     } finally {
       setLoading(false);
     }
@@ -377,7 +420,7 @@ export function RequestBookingForm({ artistId, venueId, eventPlanId, preselected
                 </Label>
               </div>
 
-              <Button type="submit" disabled={loading}
+              <Button type="submit" disabled={loading || !isUserLoaded}
                 className="w-full h-12 bg-gold text-[#0D0D0D] hover:bg-gold-dark text-sm font-semibold rounded-xl mt-2">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
                   <><Send className="mr-2 h-4 w-4" /> {t("requestForm.sendBookingRequest")}</>

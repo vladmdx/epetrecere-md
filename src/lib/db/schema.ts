@@ -546,19 +546,18 @@ export const users = pgTable("users", {
  *   onboarded    — referee published a venue or artist profile (+5€)
  *   first_booking — referee received their first confirmed booking (+20€)
  *
- * A given (referrer, referred, eventType) triple is unique — we never
- * double-credit the same milestone.
+ * A live (referrer, referred, eventType) triple is unique — we never
+ * double-credit the same milestone. Either user reference becomes NULL when
+ * that account is erased, while the financial event itself is retained.
  */
 export const referralEvents = pgTable(
   "referral_events",
   {
     id: serial("id").primaryKey(),
     referrerUserId: uuid("referrer_user_id")
-      .references(() => users.id, { onDelete: "cascade" })
-      .notNull(),
+      .references(() => users.id, { onDelete: "set null" }),
     referredUserId: uuid("referred_user_id")
-      .references(() => users.id, { onDelete: "cascade" })
-      .notNull(),
+      .references(() => users.id, { onDelete: "set null" }),
     eventType: text("event_type").notNull(),
     creditCents: integer("credit_cents").default(0).notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
@@ -567,6 +566,11 @@ export const referralEvents = pgTable(
   (t) => [
     index("idx_referral_referrer").on(t.referrerUserId, t.createdAt),
     index("idx_referral_referred").on(t.referredUserId),
+    uniqueIndex("referral_events_milestone_uidx").on(
+      t.referrerUserId,
+      t.referredUserId,
+      t.eventType,
+    ),
   ],
 );
 
@@ -1337,6 +1341,76 @@ export const notifications = pgTable("notifications", {
 ]);
 
 // ═══════════════════════════════════════════════════════
+// ACCOUNT ERASURE IDENTITY TOMBSTONES
+// ═══════════════════════════════════════════════
+export type AccountErasureIdentityStatus =
+  | "pending"
+  | "processing"
+  | "failed"
+  | "completed";
+
+/**
+ * Durable Clerk-identity deletion and permanent no-reprovision tombstone.
+ *
+ * `identityHash` is an HMAC of the Clerk id and survives completion so a late
+ * create/update webhook cannot recreate an erased account. The raw Clerk id
+ * exists only while an external delete still needs to be retried. Authoritative
+ * SQL and Data API hardening live in manual migration 0035.
+ */
+export const accountErasureIdentityOutbox = pgTable(
+  "account_erasure_identity_outbox",
+  {
+    identityHash: text("identity_hash").primaryKey(),
+    clerkId: text("clerk_id"),
+    status: text("status")
+      .$type<AccountErasureIdentityStatus>()
+      .default("pending")
+      .notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (t) => [
+    index("account_erasure_identity_due_idx")
+      .on(t.nextAttemptAt, t.identityHash)
+      .where(sql`${t.status} IN ('pending', 'failed')`),
+    index("account_erasure_identity_expired_lease_idx")
+      .on(t.leaseUntil, t.identityHash)
+      .where(sql`${t.status} = 'processing'`),
+    check(
+      "account_erasure_identity_hash_chk",
+      sql`${t.identityHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check("account_erasure_identity_attempts_chk", sql`${t.attempts} >= 0`),
+    check(
+      "account_erasure_identity_state_chk",
+      sql`(
+        (${t.status} = 'processing' AND ${t.clerkId} IS NOT NULL
+          AND ${t.leaseToken} IS NOT NULL AND ${t.leaseUntil} IS NOT NULL
+          AND ${t.completedAt} IS NULL)
+        OR (${t.status} IN ('pending', 'failed') AND ${t.clerkId} IS NOT NULL
+          AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL
+          AND ${t.completedAt} IS NULL)
+        OR (${t.status} = 'completed' AND ${t.clerkId} IS NULL
+          AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL
+          AND ${t.completedAt} IS NOT NULL)
+      )`,
+    ),
+  ],
+);
+
+// ═══════════════════════════════════════════════
 // WISHLIST — users save artists / venues to revisit later.
 // Composite primary key (userId, entityType, entityId) so the same
 // user can't add the same item twice, and we get a free index.
@@ -1583,8 +1657,17 @@ export const legalContractDeliveryOutbox = pgTable(
     anchorAcceptanceId: integer("anchor_acceptance_id")
       .notNull(),
     channel: text("channel").notNull(),
+    /** Live authorization target. SET NULL on erasure; the terminal delivery
+     * receipt itself remains as legal evidence. Authoritative SQL: 0039. */
+    recipientUserId: uuid("recipient_user_id").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    /** Minimal historical reason this account was selected. Live role is
+     * revalidated immediately before provider delivery. */
+    recipientRoleSnapshot: text("recipient_role_snapshot").notNull(),
     recipientKey: text("recipient_key").notNull(),
-    recipientEmail: text("recipient_email").notNull(),
+    /** Cleared after delivery, dead-letter, cancellation, or account erasure. */
+    recipientEmail: text("recipient_email"),
     status: text("status").default("pending").notNull(),
     attempts: integer("attempts").default(0).notNull(),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).defaultNow().notNull(),
@@ -1593,6 +1676,7 @@ export const legalContractDeliveryOutbox = pgTable(
     leaseToken: uuid("lease_token"),
     deliveredAt: timestamp("delivered_at", { withTimezone: true }),
     deadLetteredAt: timestamp("dead_lettered_at", { withTimezone: true }),
+    cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
     lastError: text("last_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
@@ -1605,20 +1689,248 @@ export const legalContractDeliveryOutbox = pgTable(
     ),
     index("legal_contract_delivery_pending_idx")
       .on(t.nextAttemptAt, t.createdAt)
-      .where(sql`${t.deliveredAt} IS NULL AND ${t.deadLetteredAt} IS NULL`),
+      .where(
+        sql`${t.deliveredAt} IS NULL AND ${t.deadLetteredAt} IS NULL AND ${t.cancelledAt} IS NULL`,
+      ),
     index("legal_contract_delivery_session_idx").on(t.acceptanceSessionId),
+    index("legal_contract_delivery_recipient_user_idx").on(t.recipientUserId),
     check(
       "legal_contract_delivery_status_chk",
-      sql`${t.status} IN ('pending', 'processing', 'delivered', 'failed', 'dead_letter')`,
+      sql`${t.status} IN ('pending', 'processing', 'delivered', 'failed', 'dead_letter', 'cancelled')`,
     ),
     check(
       "legal_contract_delivery_channel_chk",
       sql`${t.channel} IN ('signer', 'admin')`,
     ),
+    check(
+      "legal_contract_delivery_role_snapshot_chk",
+      sql`${t.recipientRoleSnapshot} IN ('signer', 'admin', 'super_admin')`,
+    ),
+    check(
+      "legal_contract_delivery_recipient_state_chk",
+      sql`(
+        (${t.status} IN ('pending', 'failed')
+          AND ${t.deliveredAt} IS NULL
+          AND ${t.deadLetteredAt} IS NULL
+          AND ${t.cancelledAt} IS NULL
+          AND ${t.recipientUserId} IS NOT NULL
+          AND ${t.recipientEmail} IS NOT NULL
+          AND ${t.lockedAt} IS NULL
+          AND ${t.leaseToken} IS NULL)
+        OR (${t.status} = 'processing'
+          AND ${t.deliveredAt} IS NULL
+          AND ${t.deadLetteredAt} IS NULL
+          AND ${t.cancelledAt} IS NULL
+          AND ${t.recipientUserId} IS NOT NULL
+          AND ${t.recipientEmail} IS NOT NULL
+          AND ${t.lockedAt} IS NOT NULL
+          AND ${t.leaseToken} IS NOT NULL)
+        OR (${t.status} = 'delivered'
+          AND ${t.deliveredAt} IS NOT NULL
+          AND ${t.deadLetteredAt} IS NULL
+          AND ${t.cancelledAt} IS NULL
+          AND ${t.recipientEmail} IS NULL
+          AND ${t.lockedAt} IS NULL
+          AND ${t.leaseToken} IS NULL)
+        OR (${t.status} = 'dead_letter'
+          AND ${t.deliveredAt} IS NULL
+          AND ${t.deadLetteredAt} IS NOT NULL
+          AND ${t.cancelledAt} IS NULL
+          AND ${t.recipientUserId} IS NULL
+          AND ${t.recipientEmail} IS NULL
+          AND ${t.recipientKey} = 'retired:' || ${t.id}::text
+          AND ${t.lockedAt} IS NULL
+          AND ${t.leaseToken} IS NULL)
+        OR (${t.status} = 'cancelled'
+          AND ${t.deliveredAt} IS NULL
+          AND ${t.deadLetteredAt} IS NULL
+          AND ${t.cancelledAt} IS NOT NULL
+          AND ${t.recipientUserId} IS NULL
+          AND ${t.recipientEmail} IS NULL
+          AND ${t.lockedAt} IS NULL
+          AND ${t.leaseToken} IS NULL)
+      )`,
+    ),
     foreignKey({
       name: "legal_contract_delivery_anchor_session_fk",
       columns: [t.anchorAcceptanceId, t.acceptanceSessionId],
       foreignColumns: [legalAcceptances.id, legalAcceptances.acceptanceSessionId],
+    }).onDelete("restrict"),
+  ],
+);
+
+export type AccountBlobAssetState = "active" | "queued" | "deleted";
+export type AccountBlobAssetErasurePolicy = "account_erasure" | "retain";
+
+/**
+ * Server-side provenance for objects created in ePetrecere's Vercel Blob
+ * stores. A URL appearing in an application row is not ownership evidence;
+ * only an upload recorded here can ever enter account-erasure cleanup.
+ */
+export const accountBlobAssets = pgTable(
+  "account_blob_assets",
+  {
+    assetKey: text("asset_key").primaryKey(),
+    assetUrl: text("asset_url"),
+    ownerUserId: uuid("owner_user_id"),
+    provenance: text("provenance").notNull(),
+    erasurePolicy: text("erasure_policy")
+      .$type<AccountBlobAssetErasurePolicy>()
+      .default("account_erasure")
+      .notNull(),
+    state: text("state").$type<AccountBlobAssetState>().default("active").notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    uniqueIndex("account_blob_assets_live_url_uidx")
+      .on(t.assetUrl)
+      .where(sql`${t.assetUrl} IS NOT NULL`),
+    // The owner FK also covers retained assets, which the partial cleanup
+    // index intentionally excludes.
+    index("account_blob_assets_owner_idx").on(t.ownerUserId),
+    index("account_blob_assets_owner_active_idx")
+      .on(t.ownerUserId, t.assetKey)
+      .where(sql`${t.state} = 'active' AND ${t.erasurePolicy} = 'account_erasure'`),
+    index("account_blob_assets_pending_unclaimed_idx")
+      .on(t.createdAt, t.assetKey)
+      .where(sql`${t.state} = 'active'
+        AND ${t.erasurePolicy} = 'account_erasure'
+        AND ${t.provenance} = 'legal_contract_pending'`),
+    check("account_blob_assets_key_chk", sql`${t.assetKey} ~ '^[0-9a-f]{64}$'`),
+    check(
+      "account_blob_assets_provenance_chk",
+      sql`length(${t.provenance}) BETWEEN 1 AND 80 AND ${t.provenance} ~ '^[a-z0-9_:.-]+$'`,
+    ),
+    check(
+      "account_blob_assets_policy_chk",
+      sql`${t.erasurePolicy} IN ('account_erasure', 'retain')`,
+    ),
+    check(
+      "account_blob_assets_state_chk",
+      sql`(
+        (${t.state} = 'active' AND ${t.assetUrl} IS NOT NULL AND ${t.deletedAt} IS NULL)
+        OR (${t.state} = 'queued' AND ${t.assetUrl} IS NOT NULL AND ${t.ownerUserId} IS NULL
+          AND ${t.erasurePolicy} = 'account_erasure' AND ${t.deletedAt} IS NULL)
+        OR (${t.state} = 'deleted' AND ${t.assetUrl} IS NULL AND ${t.ownerUserId} IS NULL AND ${t.deletedAt} IS NOT NULL)
+      )`,
+    ),
+    foreignKey({
+      name: "account_blob_assets_owner_user_fk",
+      columns: [t.ownerUserId],
+      foreignColumns: [users.id],
+    }).onDelete("set null"),
+  ],
+);
+
+/**
+ * Current database references to registered Blob objects. Triggers installed
+ * by migration 0037 maintain these rows. `erasureUserId = NULL` means the
+ * source survives an individual account deletion (organization/catalog/legal
+ * data), so account cleanup must retain the object.
+ */
+export const accountBlobAssetClaims = pgTable(
+  "account_blob_asset_claims",
+  {
+    claimKey: text("claim_key").primaryKey(),
+    assetKey: text("asset_key").notNull(),
+    erasureUserId: uuid("erasure_user_id"),
+    sourceTable: text("source_table").notNull(),
+    sourceId: text("source_id").notNull(),
+    sourceField: text("source_field").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("account_blob_asset_claims_asset_idx").on(t.assetKey),
+    index("account_blob_asset_claims_erasure_user_idx")
+      .on(t.erasureUserId, t.assetKey)
+      .where(sql`${t.erasureUserId} IS NOT NULL`),
+    check(
+      "account_blob_asset_claims_identity_chk",
+      sql`length(${t.claimKey}) BETWEEN 1 AND 512
+        AND length(${t.sourceTable}) BETWEEN 1 AND 64
+        AND length(${t.sourceId}) BETWEEN 1 AND 128
+        AND length(${t.sourceField}) BETWEEN 1 AND 64`,
+    ),
+    foreignKey({
+      name: "account_blob_asset_claims_asset_fk",
+      columns: [t.assetKey],
+      foreignColumns: [accountBlobAssets.assetKey],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "account_blob_asset_claims_erasure_user_fk",
+      columns: [t.erasureUserId],
+      foreignColumns: [users.id],
+    }).onDelete("cascade"),
+  ],
+);
+
+export type AccountAssetErasureStatus =
+  | "pending"
+  | "processing"
+  | "failed"
+  | "delivered";
+
+/**
+ * Durable deletion intent for account-owned Vercel Blob objects.
+ *
+ * The URL is captured before the referencing row is cleared/cascaded and in
+ * the same transaction as account erasure. It deliberately has no user FK,
+ * because the work must survive deletion of the user. The key references the
+ * server-side registry, and a successful worker clears URLs in both tables.
+ * Authoritative SQL: manual migration 0037.
+ */
+export const accountAssetErasureOutbox = pgTable(
+  "account_asset_erasure_outbox",
+  {
+    id: serial("id").primaryKey(),
+    assetKey: text("asset_key").notNull(),
+    assetUrl: text("asset_url"),
+    status: text("status")
+      .$type<AccountAssetErasureStatus>()
+      .default("pending")
+      .notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    leaseToken: uuid("lease_token"),
+    leaseUntil: timestamp("lease_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    unique("account_asset_erasure_outbox_asset_key_unique").on(t.assetKey),
+    index("account_asset_erasure_outbox_due_idx")
+      .on(t.nextAttemptAt, t.id)
+      .where(sql`${t.status} IN ('pending', 'failed')`),
+    index("account_asset_erasure_outbox_expired_lease_idx")
+      .on(t.leaseUntil, t.id)
+      .where(sql`${t.status} = 'processing'`),
+    check(
+      "account_asset_erasure_outbox_asset_key_chk",
+      sql`${t.assetKey} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      "account_asset_erasure_outbox_status_chk",
+      sql`${t.status} IN ('pending', 'processing', 'failed', 'delivered')`,
+    ),
+    check("account_asset_erasure_outbox_attempts_chk", sql`${t.attempts} >= 0`),
+    check(
+      "account_asset_erasure_outbox_state_chk",
+      sql`(
+        (${t.status} = 'processing' AND ${t.assetUrl} IS NOT NULL AND ${t.leaseToken} IS NOT NULL AND ${t.leaseUntil} IS NOT NULL AND ${t.deliveredAt} IS NULL)
+        OR (${t.status} = 'delivered' AND ${t.assetUrl} IS NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL AND ${t.deliveredAt} IS NOT NULL)
+        OR (${t.status} IN ('pending', 'failed') AND ${t.assetUrl} IS NOT NULL AND ${t.leaseToken} IS NULL AND ${t.leaseUntil} IS NULL AND ${t.deliveredAt} IS NULL)
+      )`,
+    ),
+    foreignKey({
+      name: "account_asset_erasure_outbox_registry_fk",
+      columns: [t.assetKey],
+      foreignColumns: [accountBlobAssets.assetKey],
     }).onDelete("restrict"),
   ],
 );
@@ -1753,6 +2065,12 @@ export const bookingRequests = pgTable("booking_requests", {
   // and keeps it (and its commission) as financial evidence.
   clientUserId: uuid("client_user_id")
     .references(() => users.id, { onDelete: "set null" }),
+  /** Server-only idempotency identity for one client booking submission.
+   *  All three creation fields are either populated together or NULL for a
+   *  legacy/no-key request. Authoritative SQL: manual migration 0033. */
+  creationScopeHash: text("creation_scope_hash"),
+  creationRequestId: uuid("creation_request_id"),
+  creationPayloadHash: text("creation_payload_hash"),
   clientName: text("client_name").notNull(),
   clientPhone: text("client_phone").notNull(),
   clientEmail: text("client_email"),
@@ -1794,6 +2112,9 @@ export const bookingRequests = pgTable("booking_requests", {
   index("idx_booking_client_user").on(t.clientUserId),
   index("idx_booking_event_plan").on(t.eventPlanId),
   index("booking_requests_hall_idx").on(t.hallId),
+  uniqueIndex("booking_requests_creation_scope_request_uidx")
+    .on(t.creationScopeHash, t.creationRequestId)
+    .where(sql`${t.creationScopeHash} IS NOT NULL AND ${t.creationRequestId} IS NOT NULL`),
   foreignKey({
     name: "booking_requests_artist_fk",
     columns: [t.artistId],
@@ -1809,6 +2130,15 @@ export const bookingRequests = pgTable("booking_requests", {
     foreignColumns: [venueHalls.id, venueHalls.venueId],
   }),
   check("booking_requests_hall_requires_venue_chk", sql`${t.hallId} IS NULL OR ${t.venueId} IS NOT NULL`),
+  check(
+    "booking_requests_creation_request_shape_chk",
+    sql`(${t.creationScopeHash} IS NULL
+        AND ${t.creationRequestId} IS NULL
+        AND ${t.creationPayloadHash} IS NULL)
+      OR (${t.creationScopeHash} IS NOT NULL
+        AND ${t.creationRequestId} IS NOT NULL
+        AND ${t.creationPayloadHash} IS NOT NULL)`,
+  ),
 ]);
 
 export type BookingEffectStatus =
@@ -2250,6 +2580,43 @@ export const eventPlans = pgTable("event_plans", {
   uniqueIndex("event_plans_user_wizard_submission_uidx").on(t.userId, t.wizardSubmissionId),
 ]);
 
+/**
+ * Short-lived, server-issued authorization for one AI booking proposal.
+ * Only a SHA-256 token digest is persisted. Consumption is tied to the exact
+ * user/plan/artist/category tuple and to one booking action id.
+ */
+export const aiBookingProposals = pgTable("ai_booking_proposals", {
+  id: serial("id").primaryKey(),
+  tokenHash: text("token_hash").notNull(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  eventPlanId: integer("event_plan_id")
+    .references(() => eventPlans.id, { onDelete: "cascade" })
+    .notNull(),
+  artistId: integer("artist_id")
+    .references(() => artists.id, { onDelete: "cascade" })
+    .notNull(),
+  categoryId: integer("category_id")
+    .references(() => categories.id, { onDelete: "cascade" })
+    .notNull(),
+  /** HMAC(token, canonical full booking fingerprint); never raw PII. */
+  payloadHash: text("payload_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  consumedActionId: uuid("consumed_action_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("ai_booking_proposals_token_hash_uidx").on(t.tokenHash),
+  index("ai_booking_proposals_expiry_idx").on(t.expiresAt),
+  index("ai_booking_proposals_user_plan_expiry_idx")
+    .on(t.userId, t.eventPlanId, t.expiresAt),
+  check(
+    "ai_booking_proposals_consumption_shape_chk",
+    sql`(${t.consumedAt} IS NULL AND ${t.consumedActionId} IS NULL) OR (${t.consumedAt} IS NOT NULL AND ${t.consumedActionId} IS NOT NULL)`,
+  ),
+]);
+
 // Planning checklist — seed from template on plan creation.
 export const checklistItems = pgTable("checklist_items", {
   id: serial("id").primaryKey(),
@@ -2515,10 +2882,13 @@ export const creditTransactions = pgTable("credit_transactions", {
 
 export const offerRequests = pgTable("offer_requests", {
   id: serial("id").primaryKey(),
+  /** One CRM projection per booking request. Nullable for legacy/direct
+   *  offer rows; new booking creates link this atomically. */
+  bookingRequestId: integer("booking_request_id"),
   artistId: integer("artist_id")
-    .references(() => artists.id, { onDelete: "cascade" }),
+    .references(() => artists.id, { onDelete: "set null" }),
   venueId: integer("venue_id")
-    .references(() => venues.id, { onDelete: "cascade" }),
+    .references(() => venues.id, { onDelete: "set null" }),
   clientName: text("client_name").notNull(),
   clientPhone: text("client_phone").notNull(),
   clientEmail: text("client_email"),
@@ -2530,7 +2900,16 @@ export const offerRequests = pgTable("offer_requests", {
   adminComment: text("admin_comment"),
   status: text("status").default("new").notNull(), // "new" | "seen" | "processed"
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (t) => [
+  uniqueIndex("offer_requests_booking_request_uidx")
+    .on(t.bookingRequestId)
+    .where(sql`${t.bookingRequestId} IS NOT NULL`),
+  foreignKey({
+    name: "offer_requests_booking_request_fk",
+    columns: [t.bookingRequestId],
+    foreignColumns: [bookingRequests.id],
+  }).onDelete("cascade"),
+]);
 
 // ═══════════════════════════════════════════════════════
 // PROFILE VIEWS (M5 — analytics)
