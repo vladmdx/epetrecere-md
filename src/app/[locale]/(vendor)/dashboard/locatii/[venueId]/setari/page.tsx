@@ -74,6 +74,7 @@ export default async function VenueSettingsPage({
       userTimezone={appUser.timezone ?? "Europe/Chisinau"}
       icalUrl={icalUrl}
       notificationDigestFrequency={appUser.notificationDigestFrequency}
+      organizationId={scoped.organizationId}
     />
   );
 }

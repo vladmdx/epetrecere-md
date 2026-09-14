@@ -62,6 +62,7 @@ export function VenueSettingsClient({
   userTimezone,
   icalUrl,
   notificationDigestFrequency,
+  organizationId = null,
 }: {
   venue: VenueSettings;
   userEmail: string | null;
@@ -70,6 +71,7 @@ export function VenueSettingsClient({
   userTimezone: string;
   icalUrl: string;
   notificationDigestFrequency: string;
+  organizationId?: number | null;
 }) {
   const { t } = useLocale();
   const defaultAutoReply = t("vendor.venueSettings.defaultAutoReply");
@@ -539,7 +541,7 @@ export function VenueSettingsClient({
       </Card>
 
       {/* The Legal Pack this venue signed, with the record kept about it. */}
-      <SignedDocumentsCard />
+      <SignedDocumentsCard organizationId={organizationId} />
 
       {/* Appearance */}
       <AppearanceSettings />
