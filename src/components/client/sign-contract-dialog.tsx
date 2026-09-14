@@ -22,6 +22,10 @@ import { Label } from "@/components/ui/label";
 import { FileSignature, Loader2, Download, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useLocale } from "@/hooks/use-locale";
+import {
+  bookingContractCopy,
+  bookingContractSignatureIsValid,
+} from "@/lib/contract/copy";
 
 interface BookingPreview {
   clientName: string;
@@ -51,7 +55,8 @@ export function SignContractDialog({
   onSigned,
   trigger,
 }: Props) {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const contractCopy = bookingContractCopy(locale);
   const [open, setOpen] = useState(false);
   const [signature, setSignature] = useState("");
   const [agreed, setAgreed] = useState(false);
@@ -59,8 +64,9 @@ export function SignContractDialog({
   const [signed, setSigned] = useState(initialSigned);
   const [preview, setPreview] = useState<BookingPreview | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const signatureValid = bookingContractSignatureIsValid(signature);
 
-  const pdfUrl = `/api/booking-requests/${bookingId}/contract`;
+  const pdfUrl = `/api/booking-requests/${bookingId}/contract?locale=${locale}`;
 
   // Fetch preview data when dialog opens
   useEffect(() => {
@@ -76,7 +82,7 @@ export function SignContractDialog({
   }, [open, bookingId, preview]);
 
   async function sign() {
-    if (signature.trim().length < 2) {
+    if (!signatureValid) {
       toast.error(t("contract.toast.signatureRequired"));
       return;
     }
@@ -91,7 +97,7 @@ export function SignContractDialog({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ signature: signature.trim() }),
+          body: JSON.stringify({ signature: signature.trim(), locale }),
         },
       );
       if (!res.ok) {
@@ -222,10 +228,9 @@ export function SignContractDialog({
                     {t("footer.terms")}
                   </p>
                   <ul className="space-y-1 text-xs text-muted-foreground">
-                    <li>{t("contract.term.delivery")}</li>
-                    <li>{t("contract.term.payment")}</li>
-                    <li>{t("contract.term.cancellation")}</li>
-                    <li>{t("contract.term.signature")}</li>
+                    {contractCopy.terms.map((term) => (
+                      <li key={term}>• {term}</li>
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -250,6 +255,7 @@ export function SignContractDialog({
                   value={signature}
                   onChange={(e) => setSignature(e.target.value)}
                   placeholder={t("contract.signaturePlaceholder")}
+                  maxLength={100}
                   className="mt-1 font-accent text-lg italic"
                 />
               </div>
@@ -288,7 +294,7 @@ export function SignContractDialog({
             ) : (
               <Button
                 onClick={sign}
-                disabled={busy || !agreed || signature.trim().length < 2}
+                disabled={busy || !agreed || !signatureValid}
                 className="gap-1.5 bg-gold text-[#0D0D0D] hover:bg-gold-dark"
               >
                 {busy ? (

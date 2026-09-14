@@ -21,6 +21,11 @@ import {
 } from "@/lib/db/schema";
 import { generateContractPdf } from "@/lib/contract/generate-pdf";
 import {
+  bookingContractLocale,
+  bookingContractSignatureIsValid,
+  type BookingContractLocale,
+} from "@/lib/contract/copy";
+import {
   enqueueRegisteredBlobCleanup,
   readRegisteredPrivateBlob,
   retainRegisteredBlobAsset,
@@ -38,7 +43,15 @@ import {
 } from "@/lib/safe-server-log";
 
 const signSchema = z.object({
-  signature: z.string().min(2).max(100),
+  signature: z
+    .string()
+    .trim()
+    .min(2)
+    .max(100)
+    .refine(bookingContractSignatureIsValid, {
+      message: "Signature must contain at least two letters",
+    }),
+  locale: z.enum(["ro", "ru", "en"]).default("ro"),
 });
 
 type Executor = typeof db;
@@ -130,6 +143,7 @@ function pdfData(
   clientSignature: string | null,
   clientSignedAt: Date | null,
   generationDate: Date,
+  locale: BookingContractLocale,
 ) {
   const {
     clientUserId: _clientUserId,
@@ -137,7 +151,7 @@ function pdfData(
     vendorVenueId: _vendorVenueId,
     ...data
   } = basis;
-  return { ...data, clientSignature, clientSignedAt, generationDate };
+  return { ...data, clientSignature, clientSignedAt, generationDate, locale };
 }
 
 function contractTemporarilyUnavailable() {
@@ -198,12 +212,12 @@ async function checkViewAccess(
 
 // ─── GET ──────────────────────────────────────────────────
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
   const bookingId = Number(id);
-  if (!Number.isFinite(bookingId)) {
+  if (!Number.isSafeInteger(bookingId) || bookingId <= 0) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
   const row = await loadBookingFull(bookingId);
@@ -233,9 +247,25 @@ export async function GET(
     pdf = storedPdf;
   } else {
     // Unsigned preview generation remains separate and deterministic.
-    pdf = await generateContractPdf(
-      pdfData(basis, null, null, b.createdAt),
-    );
+    try {
+      pdf = await generateContractPdf(
+        pdfData(
+          basis,
+          null,
+          null,
+          b.createdAt,
+          bookingContractLocale(req.nextUrl.searchParams.get("locale")),
+        ),
+      );
+    } catch (error) {
+      console.error(
+        "[contract] unsigned PDF render failed",
+        safeServerErrorLog(error, {
+          correlationId: createServerLogCorrelationId(),
+        }),
+      );
+      return contractTemporarilyUnavailable();
+    }
   }
 
   return new NextResponse(new Uint8Array(pdf), {
@@ -243,7 +273,7 @@ export async function GET(
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="contract-${b.id}.pdf"`,
-      "Cache-Control": "private, no-cache",
+      "Cache-Control": "private, no-store",
     },
   });
 }
@@ -255,7 +285,7 @@ export async function POST(
 ) {
   const { id } = await params;
   const bookingId = Number(id);
-  if (!Number.isFinite(bookingId)) {
+  if (!Number.isSafeInteger(bookingId) || bookingId <= 0) {
     return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
   }
 
@@ -321,7 +351,13 @@ export async function POST(
   let pdfBytes: Uint8Array;
   try {
     pdfBytes = await generateContractPdf(
-      pdfData(preparedBasis, parsed.data.signature, signedAt, signedAt),
+      pdfData(
+        preparedBasis,
+        parsed.data.signature,
+        signedAt,
+        signedAt,
+        parsed.data.locale,
+      ),
     );
   } catch (error) {
     console.error(
