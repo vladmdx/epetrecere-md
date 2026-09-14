@@ -49,6 +49,15 @@ test("venue-level reads exclude hall-scoped images", () => {
     /eq\(venueImages\.venueId, venueId\)[\s\S]*isNull\(venueImages\.hallId\)/,
   );
   assert.match(
+    publicVenueRoute,
+    /\.from\(venueImages\)[\s\S]*\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)[\s\S]*privileged \? undefined : eq\(venues\.isActive, true\)/,
+  );
+  assert.equal(
+    (venueQueries.match(/\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)/g) ?? []).length,
+    3,
+  );
+  assert.ok((venueQueries.match(/eq\(venues\.isActive, true\)/g) ?? []).length >= 6);
+  assert.match(
     comparePage,
     /inArray\(venueImages\.venueId, ids\)[\s\S]*isNull\(venueImages\.hallId\)/,
   );
@@ -74,8 +83,9 @@ test("the public gallery never exposes inactive venue images to anonymous caller
     getBody,
     /if \(!venue\.isActive\)[\s\S]*getCurrentAppUser\(\)[\s\S]*authorizeVenueCapability\(actor, venueId, "view_private"\)/,
   );
-  assert.ok(
-    getBody.indexOf("if (!venue.isActive)") < getBody.indexOf(".from(venueImages)"),
+  assert.match(
+    getBody,
+    /\.from\(venueImages\)[\s\S]*\.innerJoin\(venues, eq\(venues\.id, venueImages\.venueId\)\)[\s\S]*canViewInactive \? undefined : eq\(venues\.isActive, true\)/,
   );
 
   assert.match(

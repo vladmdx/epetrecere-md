@@ -58,6 +58,7 @@ export async function GET(req: NextRequest) {
   if (!venue) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+  let canViewInactive = false;
   if (!venue.isActive) {
     const actor = await getCurrentAppUser();
     if (!actor) {
@@ -67,14 +68,30 @@ export async function GET(req: NextRequest) {
     if (!access.ok) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    canViewInactive = true;
   }
 
   const rows = await db
-    .select()
+    .select({
+      id: venueImages.id,
+      venueId: venueImages.venueId,
+      hallId: venueImages.hallId,
+      url: venueImages.url,
+      altRo: venueImages.altRo,
+      altRu: venueImages.altRu,
+      altEn: venueImages.altEn,
+      sortOrder: venueImages.sortOrder,
+      isCover: venueImages.isCover,
+    })
     .from(venueImages)
+    .innerJoin(venues, eq(venues.id, venueImages.venueId))
     // This collection powers the venue-level gallery. Hall photos have their
     // own hall endpoint and must never leak into the general gallery manager.
-    .where(and(eq(venueImages.venueId, venueId), isNull(venueImages.hallId)))
+    .where(and(
+      eq(venueImages.venueId, venueId),
+      isNull(venueImages.hallId),
+      canViewInactive ? undefined : eq(venues.isActive, true),
+    ))
     .orderBy(asc(venueImages.sortOrder), asc(venueImages.id));
 
   return NextResponse.json(rows);

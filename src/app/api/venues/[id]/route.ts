@@ -41,11 +41,23 @@ export async function GET(
 
   const [images, venueReviews] = await Promise.all([
     db
-      .select()
+      .select({
+        id: venueImages.id,
+        venueId: venueImages.venueId,
+        hallId: venueImages.hallId,
+        url: venueImages.url,
+        altRo: venueImages.altRo,
+        altRu: venueImages.altRu,
+        altEn: venueImages.altEn,
+        sortOrder: venueImages.sortOrder,
+        isCover: venueImages.isCover,
+      })
       .from(venueImages)
+      .innerJoin(venues, eq(venues.id, venueImages.venueId))
       .where(and(
         eq(venueImages.venueId, venueId),
         isNull(venueImages.hallId),
+        privileged ? undefined : eq(venues.isActive, true),
       ))
       .orderBy(asc(venueImages.sortOrder), asc(venueImages.id)),
     db.select().from(reviews).where(and(eq(reviews.venueId, venueId), eq(reviews.isApproved, true))).orderBy(desc(reviews.createdAt)).limit(20),

@@ -95,9 +95,11 @@ export async function getVenues(filters: VenueFilters = {}) {
           sortOrder: venueImages.sortOrder,
         })
         .from(venueImages)
+        .innerJoin(venues, eq(venues.id, venueImages.venueId))
         .where(and(
           sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`,
           isNull(venueImages.hallId),
+          eq(venues.isActive, true),
         ))
         .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder))
     : [];
@@ -129,9 +131,24 @@ export async function getVenueBySlug(slug: string) {
 
   const [images, venueReviews] = await Promise.all([
     db
-      .select()
+      .select({
+        id: venueImages.id,
+        venueId: venueImages.venueId,
+        hallId: venueImages.hallId,
+        url: venueImages.url,
+        altRo: venueImages.altRo,
+        altRu: venueImages.altRu,
+        altEn: venueImages.altEn,
+        sortOrder: venueImages.sortOrder,
+        isCover: venueImages.isCover,
+      })
       .from(venueImages)
-      .where(and(eq(venueImages.venueId, venue.id), isNull(venueImages.hallId)))
+      .innerJoin(venues, eq(venues.id, venueImages.venueId))
+      .where(and(
+        eq(venueImages.venueId, venue.id),
+        isNull(venueImages.hallId),
+        eq(venues.isActive, true),
+      ))
       .orderBy(asc(venueImages.sortOrder)),
     db
       .select()
@@ -162,9 +179,11 @@ export async function getFeaturedVenues(limit = 6) {
       sortOrder: venueImages.sortOrder,
     })
     .from(venueImages)
+    .innerJoin(venues, eq(venues.id, venueImages.venueId))
     .where(and(
       sql`${venueImages.venueId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})`,
       isNull(venueImages.hallId),
+      eq(venues.isActive, true),
     ))
     .orderBy(desc(venueImages.isCover), asc(venueImages.sortOrder));
 
