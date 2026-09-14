@@ -27,8 +27,8 @@ test("mini-calendar and stats share the exact same Moldova reporting instant and
   const page = readFileSync("src/app/[locale]/(vendor)/dashboard/sala/page.tsx", "utf8");
   const stats = readFileSync("src/lib/db/queries/venue-stats.ts", "utf8");
   assert.match(page, /const \{ monthStart, nextMonthStart, monthYear, monthIndex \} = venueDashboardMonths\(now\)/);
-  assert.match(page, /getVenueStats\(venue\.id, now\)/);
-  assert.match(stats, /getVenueStats\(venueId: number, now = new Date\(\)\)/);
+  assert.match(page, /getVenueStats\(venue\.id, now, \{ includeFinancials: canManageFinancials \}\)/);
+  assert.match(stats, /getVenueStats\([\s\S]*venueId: number,[\s\S]*now = new Date\(\)/);
   assert.match(stats, /venueDashboardMonths\(now\)/);
   assert.match(page, /gte\(calendarEvents\.date, monthStart\)/);
   assert.match(page, /lt\(calendarEvents\.date, nextMonthStart\)/);
@@ -62,7 +62,7 @@ test("new requests and recent rows use the same source and IDs as the quick-acti
   const recent = source.slice(source.indexOf("export async function getVenueRecentBookings("), source.indexOf("export async function getVenueLegacyRecentBookings("));
   assert.match(recent, /id: bookingRequests\.id/);
   assert.match(recent, /guestCount: bookingRequests\.guestCount/);
-  assert.match(recent, /priceAgreed: bookingRequests\.agreedPrice/);
+  assert.match(recent, /\? bookingRequests\.agreedPrice\s*: sql<number \| null>`null`/);
   assert.match(recent, /\.where\(eq\(bookingRequests\.venueId, venueId\)\)/);
   assert.match(recent, /desc\(bookingRequests\.createdAt\), desc\(bookingRequests\.id\)/);
   assert.doesNotMatch(recent, /from\(bookings\)|leftJoin\(leads/);
@@ -73,7 +73,7 @@ test("new requests and recent rows use the same source and IDs as the quick-acti
 const summary = { totalBookings: 2, pendingBookings: 1, confirmedThisMonth: 1, revenueThisMonth: 450, revenueLastMonth: 600 };
 for (const locale of ["ro", "ru", "en"] as const) {
   test(`${locale}: historical totals remain visible without actionable legacy IDs`, () => {
-    const html = renderToStaticMarkup(createElement(LegacyVenueHistory, { locale, summary, rows: [{ id: 256, clientName: "QA Legacy Client", eventType: "wedding", eventDate: "2026-09-05", guestCount: 80, status: "confirmed", priceAgreed: 450 }] }));
+    const html = renderToStaticMarkup(createElement(LegacyVenueHistory, { locale, summary, canManageFinancials: true, rows: [{ id: 256, clientName: "QA Legacy Client", eventType: "wedding", eventDate: "2026-09-05", guestCount: 80, status: "confirmed", priceAgreed: 450 }] }));
     assert.match(html, /data-legacy-venue-history/);
     assert.match(html, /QA Legacy Client/);
     assert.match(html, /450 €/);
@@ -83,7 +83,7 @@ for (const locale of ["ro", "ru", "en"] as const) {
 }
 
 test("empty legacy archive is omitted for new venues", () => {
-  assert.equal(renderToStaticMarkup(createElement(LegacyVenueHistory, { locale: "en", summary: { ...summary, totalBookings: 0 }, rows: [] })), "");
+  assert.equal(renderToStaticMarkup(createElement(LegacyVenueHistory, { locale: "en", summary: { ...summary, totalBookings: 0 }, rows: [], canManageFinancials: false })), "");
 });
 
 test("home quick reject and post-refresh badges follow unified booking statuses", () => {
@@ -93,5 +93,16 @@ test("home quick reject and post-refresh badges follow unified booking statuses"
   assert.match(source, /useEffect\(\(\) => \{ setRecentBookings\(initialBookings\); \}, \[initialBookings\]\)/);
   assert.match(source, /status === "confirmed_by_client" \? "confirmed"/);
   assert.match(source, /status === "rejected" \? "declined"/);
-  assert.match(source, /<LegacyVenueHistory summary=\{stats\.legacy\} rows=\{legacyBookings\}/);
+  assert.match(source, /<LegacyVenueHistory[\s\S]*summary=\{stats\.legacy\}[\s\S]*rows=\{legacyBookings\}/);
+});
+
+test("legacy financial values are omitted without manage_financials", () => {
+  const html = renderToStaticMarkup(createElement(LegacyVenueHistory, {
+    locale: "ro",
+    summary,
+    canManageFinancials: false,
+    rows: [{ id: 256, clientName: "QA Legacy Client", eventType: "wedding", eventDate: "2026-09-05", guestCount: 80, status: "confirmed", priceAgreed: null }],
+  }));
+  assert.doesNotMatch(html, /450 €/);
+  assert.doesNotMatch(html, /600 €/);
 });

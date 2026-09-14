@@ -13,6 +13,7 @@ import { VenueHomeDashboard } from "../../sala/home-client";
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
 import { venueDashboardMonths } from "@/lib/vendors/dashboard-bookings";
 import { requireLocatieVenue, venueDashboardBase } from "@/lib/venues/dashboard-scope";
+import { requireVenueCapability } from "@/lib/venue-access";
 
 export const dynamic = "force-dynamic";
 
@@ -36,14 +37,19 @@ export default async function LocatieHomePage({
     .where(eq(users.clerkId, clerkId))
     .limit(1);
   if (!appUser) redirect(localizePath("/", locale));
+  const financialAccess = await requireVenueCapability(
+    venue.id,
+    "manage_financials",
+  );
+  const canManageFinancials = financialAccess.ok;
 
   const now = new Date();
   const { monthStart, nextMonthStart, monthYear, monthIndex } = venueDashboardMonths(now);
 
   const [stats, activity, recentBookings, monthCalendar, legacyBookings] = await Promise.all([
-    getVenueStats(venue.id, now),
+    getVenueStats(venue.id, now, { includeFinancials: canManageFinancials }),
     getVenueActivity(appUser.id, 10),
-    getVenueRecentBookings(venue.id, 5),
+    getVenueRecentBookings(venue.id, 5, { includeFinancials: canManageFinancials }),
     db
       .select({
         date: calendarEvents.date,
@@ -59,7 +65,9 @@ export default async function LocatieHomePage({
           lt(calendarEvents.date, nextMonthStart),
         ),
       ),
-    getVenueLegacyRecentBookings(venue.id, 5),
+    getVenueLegacyRecentBookings(venue.id, 5, {
+      includeFinancials: canManageFinancials,
+    }),
   ]);
 
   return (
@@ -68,6 +76,7 @@ export default async function LocatieHomePage({
       venueSlug={venue.slug}
       isActive={venue.isActive}
       basePath={venueDashboardBase(venue.id)}
+      canManageFinancials={canManageFinancials}
       stats={stats}
       activity={activity.map((a) => ({
         ...a,

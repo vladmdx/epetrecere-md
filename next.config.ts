@@ -1,5 +1,14 @@
 import type { NextConfig } from "next";
 
+const notoSansPdfFonts = [
+  "./node_modules/@fontsource/noto-sans/files/noto-sans-latin-400-normal.woff",
+  "./node_modules/@fontsource/noto-sans/files/noto-sans-latin-700-normal.woff",
+  "./node_modules/@fontsource/noto-sans/files/noto-sans-latin-ext-400-normal.woff",
+  "./node_modules/@fontsource/noto-sans/files/noto-sans-latin-ext-700-normal.woff",
+  "./node_modules/@fontsource/noto-sans/files/noto-sans-cyrillic-400-normal.woff",
+  "./node_modules/@fontsource/noto-sans/files/noto-sans-cyrillic-700-normal.woff",
+];
+
 const nextConfig: NextConfig = {
   /**
    * Next.js allows a statically generated page 60 seconds by default, retries
@@ -27,12 +36,9 @@ const nextConfig: NextConfig = {
   // They are data files, not JS modules, so include them explicitly in both
   // server routes that can generate a PDF (email attachment and download).
   outputFileTracingIncludes: {
-    "/api/legal/accept": [
-      "./node_modules/@fontsource/noto-sans/files/noto-sans-{latin,latin-ext,cyrillic}-{400,700}-normal.woff",
-    ],
-    "/api/legal/accept/*": [
-      "./node_modules/@fontsource/noto-sans/files/noto-sans-{latin,latin-ext,cyrillic}-{400,700}-normal.woff",
-    ],
+    "/api/legal/accept": notoSansPdfFonts,
+    "/api/legal/accept/*": notoSansPdfFonts,
+    "/api/booking-requests/\\[id\\]/contract": notoSansPdfFonts,
   },
   images: {
     // M11 Intern #2 — perf audit. Prefer AVIF where supported, WebP as

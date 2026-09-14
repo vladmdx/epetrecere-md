@@ -74,6 +74,7 @@ interface Props {
   venueName: string;
   venueSlug: string;
   isActive: boolean;
+  canManageFinancials: boolean;
   stats: VenueStats;
   activity: ActivityItem[];
   recentBookings: RecentBooking[];
@@ -137,6 +138,7 @@ export function VenueHomeDashboard({
   venueName,
   venueSlug,
   isActive,
+  canManageFinancials,
   stats,
   activity,
   recentBookings: initialBookings,
@@ -277,7 +279,7 @@ export function VenueHomeDashboard({
           progressPct={stats.occupancyRate}
         />
 
-        <KpiCard
+        {canManageFinancials && <KpiCard
           label={t("vendor.venueHome.kpiRevenue")}
           value={`${stats.revenueThisMonth.toLocaleString("ro-RO")}€`}
           subLabel={
@@ -290,7 +292,7 @@ export function VenueHomeDashboard({
           icon={Wallet}
           accentColor="text-emerald-400"
           href={`${basePath}/financiar`}
-        />
+        />}
 
         <KpiCard
           label={t("vendor.venueHome.kpiRating")}
@@ -488,7 +490,9 @@ export function VenueHomeDashboard({
                     <th className="pb-2 pr-3">{t("vendor.venueHome.colDate")}</th>
                     <th className="pb-2 pr-3">{t("vendor.venueHome.colGuests")}</th>
                     <th className="pb-2 pr-3">{t("vendor.venueHome.colStatus")}</th>
-                    <th className="pb-2 pr-3 text-right">{t("vendor.venueHome.colPrice")}</th>
+                    {canManageFinancials && <th className="pb-2 pr-3 text-right">
+                      {t("vendor.venueHome.colPrice")}
+                    </th>}
                     <th className="pb-2 text-right">{t("vendor.venueHome.colActions")}</th>
                   </tr>
                 </thead>
@@ -529,9 +533,9 @@ export function VenueHomeDashboard({
                         <td className="py-3 pr-3">
                           <StatusBadge status={b.status} />
                         </td>
-                        <td className="py-3 pr-3 text-right font-medium">
-                          {b.priceAgreed ? `${b.priceAgreed}€` : "—"}
-                        </td>
+                        {canManageFinancials && <td className="py-3 pr-3 text-right font-medium">
+                          {b.priceAgreed != null ? `${b.priceAgreed}€` : "—"}
+                        </td>}
                         <td className="py-3 text-right">
                           {isPending ? (
                             <div className="inline-flex gap-1">
@@ -577,7 +581,12 @@ export function VenueHomeDashboard({
           )}
         </CardContent>
       </Card>
-      <LegacyVenueHistory summary={stats.legacy} rows={legacyBookings} locale={locale} />
+      <LegacyVenueHistory
+        summary={stats.legacy}
+        rows={legacyBookings}
+        locale={locale}
+        canManageFinancials={canManageFinancials}
+      />
     </div>
   );
 }

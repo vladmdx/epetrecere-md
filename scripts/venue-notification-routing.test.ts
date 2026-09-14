@@ -4,6 +4,18 @@ import { readFileSync } from "node:fs";
 import { legacyVenueNotificationUrl, notificationForVenue, vendorBookingNotificationPath } from "../src/lib/notifications/venue-routing";
 import { registrationStatusEmail } from "../src/lib/email/templates/registration-status";
 
+function withMultiHallFlag(on: boolean, fn: () => void) {
+  const previous = process.env.FEATURE_MULTI_HALL;
+  if (on) process.env.FEATURE_MULTI_HALL = "1";
+  else delete process.env.FEATURE_MULTI_HALL;
+  try {
+    fn();
+  } finally {
+    if (previous === undefined) delete process.env.FEATURE_MULTI_HALL;
+    else process.env.FEATURE_MULTI_HALL = previous;
+  }
+}
+
 test("known venue history links preserve language, query and anchor without changing stored text", () => {
   for (const prefix of ["", "/en", "/ru"]) {
     const booking = { type: "booking_request_new", actionUrl: `${prefix}/dashboard/rezervari?expand=256#offer`, title: "QA Test client a propus un preț" };
@@ -34,14 +46,16 @@ test("unrelated, ambiguous, already-correct and external links are not rewritten
 });
 
 test("new counteroffer notifications and email CTAs use the correct vendor destination", () => {
-  assert.equal(
-    vendorBookingNotificationPath({ venueId: 45, bookingId: 256 }),
-    "/dashboard/sala/rezervari",
-  );
-  assert.equal(
-    vendorBookingNotificationPath({ venueId: null, bookingId: 256 }),
-    "/dashboard/rezervari",
-  );
+  withMultiHallFlag(false, () => {
+    assert.equal(
+      vendorBookingNotificationPath({ venueId: 45, bookingId: 256 }),
+      "/dashboard/sala/rezervari",
+    );
+    assert.equal(
+      vendorBookingNotificationPath({ venueId: null, bookingId: 256 }),
+      "/dashboard/rezervari",
+    );
+  });
   const source = readFileSync("src/app/api/booking-requests/[id]/route.ts", "utf8");
   assert.match(source, /vendorDashboardPath = vendorBookingNotificationPath\(\{\s*venueId: booking\.venueId,\s*bookingId: booking\.id,\s*\}\)/);
   assert.match(source, /actionUrl: vendorDashboardPath/);

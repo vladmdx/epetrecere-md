@@ -1,35 +1,19 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { legalAcceptances } from "@/lib/db/schema";
-import { organizationRoleHasCapability } from "@/lib/partner/organization-dto";
-import type { OrgRole } from "@/lib/venue-access";
 
 export type LegalAcceptanceListScope =
   | { kind: "personal"; userId: string }
   | { kind: "organization"; organizationId: number };
 
-export function parseLegalListOrganizationId(raw: string | null): number | null {
-  if (raw == null || raw === "") return null;
+/** `null` means absent; `undefined` means present but invalid. */
+export function parseLegalListOrganizationId(
+  raw: string | null,
+): number | null | undefined {
+  if (raw == null) return null;
+  if (!/^[1-9]\d*$/.test(raw)) return undefined;
   const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value <= 0) return null;
+  if (!Number.isSafeInteger(value)) return undefined;
   return value;
-}
-
-/**
- * Membership snapshot for organization legal list access.
- * Deleted (missing), deactivated, or non-owner ("refused"/demoted) → 403.
- */
-export function organizationLegalListAccess(membership: {
-  present: boolean;
-  isActive: boolean;
-  role: OrgRole | null;
-} | null): { ok: true } | { ok: false; status: 403 } {
-  if (!membership?.present || !membership.isActive || !membership.role) {
-    return { ok: false, status: 403 };
-  }
-  if (!organizationRoleHasCapability(membership.role, "manage_legal")) {
-    return { ok: false, status: 403 };
-  }
-  return { ok: true };
 }
 
 export function legalAcceptancesListScope(input: {

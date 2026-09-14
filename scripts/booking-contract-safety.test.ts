@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { test } from "node:test";
 import { PDFDocument } from "pdf-lib";
 
@@ -13,6 +14,10 @@ import {
   contractVendorPartyRows,
   generateContractPdf,
 } from "../src/lib/contract/generate-pdf";
+import {
+  bookingContractCopy,
+  bookingContractSignatureIsValid,
+} from "../src/lib/contract/copy";
 
 const venueBooking = {
   id: 501,
@@ -142,6 +147,80 @@ test("contract PDF metadata uses the explicit deterministic generation instant",
   assert.equal(pdf.getModificationDate()?.toISOString(), generationDate.toISOString());
 });
 
+test("booking contract renders Romanian and Cyrillic text across multiple A4 pages", async () => {
+  const generationDate = new Date("2032-06-12T13:14:15.000Z");
+  const longMessage = Array.from({ length: 40 }, (_, index) =>
+    `${index + 1}. Confirmăm sărbătoarea în Chișinău pentru Ири́на și Ștefan.`
+  ).join("\n").slice(0, 2_000);
+  const bytes = await generateContractPdf({
+    ...bookingContractBasis(
+      {
+        ...venueBooking,
+        clientName: "Ири́на Ștefan Țurcanu",
+        eventType: "Nuntă / Свадьба",
+        message: longMessage,
+        commercialSnapshot: {
+          venueName: "S.R.L. «Локация Sărbătoare»",
+          hallName: "Sala Mărțișor / Зал Большой",
+        },
+      },
+      contacts,
+    ),
+    clientSignature: "Ири́на Ștefan Țurcanu",
+    clientSignedAt: generationDate,
+    generationDate,
+    locale: "ru",
+  });
+  if (process.env.BOOKING_CONTRACT_PDF_OUTPUT) {
+    await writeFile(process.env.BOOKING_CONTRACT_PDF_OUTPUT, bytes);
+  }
+
+  assert.equal(Buffer.from(bytes.subarray(0, 5)).toString("ascii"), "%PDF-");
+  const pdf = await PDFDocument.load(bytes, { updateMetadata: false });
+  assert.ok(pdf.getPageCount() >= 2, "real maximum booking details must continue on later pages");
+  for (const page of pdf.getPages()) {
+    const { width, height } = page.getSize();
+    assert.ok(Math.abs(width - 595.28) < 0.1);
+    assert.ok(Math.abs(height - 841.89) < 0.1);
+  }
+  assert.equal(pdf.getCreationDate()?.toISOString(), generationDate.toISOString());
+  assert.equal(pdf.getModificationDate()?.toISOString(), generationDate.toISOString());
+});
+
+test("booking contract never truncates the accepted 100-character signature", async () => {
+  const generationDate = new Date("2032-06-12T13:14:15.000Z");
+  const bytes = await generateContractPdf({
+    ...bookingContractBasis(venueBooking, contacts),
+    clientSignature: "W".repeat(100),
+    clientSignedAt: generationDate,
+    generationDate,
+    locale: "en",
+  });
+  assert.equal(Buffer.from(bytes.subarray(0, 5)).toString("ascii"), "%PDF-");
+  const generator = readFileSync("src/lib/contract/generate-pdf.ts", "utf8");
+  assert.doesNotMatch(generator, /signatureLines[^\n]*\.slice\(/);
+  assert.match(generator, /while \(signatureLines\.length > 3 && signatureSize > 6\)/);
+});
+
+test("the dialog and PDF use the same locale-specific booking terms", () => {
+  assert.equal(bookingContractCopy("ro").terms.length, 4);
+  assert.equal(bookingContractCopy("ru").terms.length, 4);
+  assert.equal(bookingContractCopy("en").terms.length, 4);
+  const dialog = readFileSync("src/components/client/sign-contract-dialog.tsx", "utf8");
+  assert.match(dialog, /contractCopy\.terms\.map/);
+  assert.match(dialog, /JSON\.stringify\(\{ signature: signature\.trim\(\), locale \}\)/);
+  const generator = readFileSync("src/lib/contract/generate-pdf.ts", "utf8");
+  assert.match(generator, /for \(let index = 0; index < copy\.terms\.length/);
+});
+
+test("a booking contract signature must contain at least two Unicode letters", () => {
+  assert.equal(bookingContractSignatureIsValid("💍"), false);
+  assert.equal(bookingContractSignatureIsValid("\u0000\t"), false);
+  assert.equal(bookingContractSignatureIsValid("A"), false);
+  assert.equal(bookingContractSignatureIsValid("Șt"), true);
+  assert.equal(bookingContractSignatureIsValid("Ир"), true);
+});
+
 test("account erasure and cancellation both win over an in-flight sign render", () => {
   const prepared = bookingContractBasis(venueBooking, contacts);
   const erased = bookingContractBasis({
@@ -228,10 +307,17 @@ test("contract signing uses canonical user -> vendor -> booking order and cleans
   );
   assert.match(route, /if \(!legalBlobToken\) return contractTemporarilyUnavailable\(\)/);
   assert.match(route, /provenance: "legal_contract_pending"/);
+  assert.match(route, /\.refine\(bookingContractSignatureIsValid/);
+  assert.match(route, /\[contract\] unsigned PDF render failed/);
+  assert.match(route, /"Cache-Control": "private, no-store"/);
   assert.match(route, /await retainRegisteredBlobAsset\(/);
   assert.match(route, /if \(!b\.contractPdfUrl\) return contractTemporarilyUnavailable\(\)/);
   assert.match(route, /if \(!storedPdf\) return contractTemporarilyUnavailable\(\)/);
   assert.doesNotMatch(route, /storedPdf \?\?/);
+  assert.equal(
+    route.match(/!Number\.isSafeInteger\(bookingId\) \|\| bookingId <= 0/g)?.length,
+    2,
+  );
   assert.match(
     route,
     /if \(!b\.clientSignedAt && !\["confirmed_by_client", "completed"\]\.includes\(b\.status\)\)/,
@@ -245,6 +331,18 @@ test("contract signing uses canonical user -> vendor -> booking order and cleans
   assert.match(preview, /venueName: vendor\.venueName/);
   assert.match(preview, /hallName: vendor\.hallName/);
   assert.doesNotMatch(preview, /venues\.nameRo|artists\.nameRo/);
+
+  const nextConfig = readFileSync("next.config.ts", "utf8");
+  assert.ok(
+    nextConfig.includes('"/api/booking-requests/\\\\[id\\\\]/contract"'),
+  );
+  for (const subset of ["latin", "latin-ext", "cyrillic"]) {
+    for (const weight of [400, 700]) {
+      assert.ok(
+        nextConfig.includes(`noto-sans-${subset}-${weight}-normal.woff`),
+      );
+    }
+  }
 
   const artistDeleteRoute = readFileSync(
     "src/app/api/artists/crud/route.ts",

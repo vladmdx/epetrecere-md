@@ -31,20 +31,25 @@ const STATUS_KEYS: Record<string, string> = {
 };
 
 /** Legacy IDs never enter booking-request links or action handlers. */
-export function LegacyVenueHistory({ summary, rows, locale }: {
+export function LegacyVenueHistory({ summary, rows, locale, canManageFinancials }: {
   summary: VenueLegacySummary;
   rows: VenueRecentBooking[];
   locale: AppLocale;
+  canManageFinancials: boolean;
 }) {
   if (summary.totalBookings === 0) return null;
   const copy = COPY[locale];
-  const metrics = [
+  const metrics: Array<[string, string | number]> = [
     [copy.total, summary.totalBookings],
     [copy.pending, summary.pendingBookings],
     [copy.confirmed, summary.confirmedThisMonth],
-    [copy.current, `${summary.revenueThisMonth} €`],
-    [copy.previous, `${summary.revenueLastMonth} €`],
   ];
+  if (canManageFinancials) {
+    metrics.push(
+      [copy.current, `${summary.revenueThisMonth} €`],
+      [copy.previous, `${summary.revenueLastMonth} €`],
+    );
+  }
   return (
     <section data-legacy-venue-history data-no-auto-translate className="rounded-xl border border-border/40 bg-card p-5">
       <h2 className="font-heading text-base font-semibold">{copy.title}</h2>
@@ -60,7 +65,9 @@ export function LegacyVenueHistory({ summary, rows, locale }: {
             <span>{row.eventDate ? new Date(`${row.eventDate}T12:00:00Z`).toLocaleDateString(locale) : "-"}</span>
             <span>{eventTypeLabel(normalizeEventType(row.eventType), locale)}</span>
             <span>{t(`vendor.venueHome.${STATUS_KEYS[row.status] ?? "statusPending"}`, locale)}</span>
-            <span>{row.priceAgreed == null ? "-" : `${row.priceAgreed} €`}</span>
+            {canManageFinancials && <span>
+              {row.priceAgreed == null ? "-" : `${row.priceAgreed} €`}
+            </span>}
           </li>)}
         </ul>
       </details>}

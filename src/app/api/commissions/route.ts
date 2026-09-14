@@ -18,7 +18,11 @@ import {
 } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth/admin";
 import { contactsAreShared } from "@/lib/privacy/booking-contact";
-import { getCurrentAppUser, listAccessibleVenueIds } from "@/lib/venue-access";
+import {
+  authorizeVenueCapability,
+  getCurrentAppUser,
+  listVenueIdsForCapability,
+} from "@/lib/venue-access";
 import {
   markCommissionPaid,
   setCommissionStatus,
@@ -37,28 +41,68 @@ async function getVendorScope() {
     .from(artists)
     .where(eq(artists.userId, appUser.id))
     .limit(1);
-  const venueIds = await listAccessibleVenueIds(appUser.id);
+  const venueIds = await listVenueIdsForCapability(
+    appUser.id,
+    "manage_financials",
+  );
   return { user: appUser, artistId: a?.id ?? null, venueIds };
 }
 
 export async function GET(req: NextRequest) {
   const admin = await requireAdmin();
   const isAdmin = admin.ok;
+  const requestedVenueRaw = req.nextUrl.searchParams.get("venueId");
+  let requestedVenueId: number | null = null;
+  if (requestedVenueRaw != null) {
+    const parsedVenueId = Number(requestedVenueRaw);
+    if (
+      !/^\d+$/.test(requestedVenueRaw)
+      || !Number.isSafeInteger(parsedVenueId)
+      || parsedVenueId <= 0
+    ) {
+      return NextResponse.json({ error: "Invalid venueId" }, { status: 400 });
+    }
+    requestedVenueId = parsedVenueId;
+  }
 
-  let scopeWhere;
+  let scopeWhere = requestedVenueId == null
+    ? undefined
+    : eq(commissions.venueId, requestedVenueId);
   if (!isAdmin) {
     const scope = await getVendorScope();
     if (!scope) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const parts = [];
-    if (scope.artistId) parts.push(eq(commissions.artistId, scope.artistId));
-    if (scope.venueIds.length > 0) parts.push(inArray(commissions.venueId, scope.venueIds));
-    // A user with neither profile has no fees to see.
-    if (parts.length === 0) {
-      return NextResponse.json({ items: [], totals: emptyTotals() });
+    if (requestedVenueId != null) {
+      const access = await authorizeVenueCapability(
+        scope.user,
+        requestedVenueId,
+        "manage_financials",
+      );
+      if (!access.ok) {
+        return NextResponse.json(
+          { error: access.error },
+          { status: access.status },
+        );
+      }
+      // A per-venue request is intentionally venue-only. Do not merge the
+      // caller's artist ledger or another accessible venue into this page.
+      scopeWhere = eq(commissions.venueId, requestedVenueId);
+    } else {
+      const parts = [];
+      if (scope.artistId) parts.push(eq(commissions.artistId, scope.artistId));
+      if (scope.venueIds.length > 0) {
+        parts.push(inArray(commissions.venueId, scope.venueIds));
+      }
+      // A user with neither profile has no fees to see.
+      if (parts.length === 0) {
+        return NextResponse.json(
+          { items: [], totals: emptyTotals() },
+          { headers: { "Cache-Control": "private, no-store" } },
+        );
+      }
+      scopeWhere = parts.length === 1 ? parts[0] : or(...parts);
     }
-    scopeWhere = parts.length === 1 ? parts[0] : or(...parts);
   }
 
   const status = req.nextUrl.searchParams.get("status");

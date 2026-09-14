@@ -8,7 +8,7 @@ import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { listAccessibleVenueIds } from "@/lib/venue-access";
+import { listAccessibleVenueIds, requireVenueCapability } from "@/lib/venue-access";
 import { users, venues, calendarEvents } from "@/lib/db/schema";
 import {
   getVenueStats,
@@ -41,14 +41,19 @@ export default async function VenueHomePage({ params }: { params: Promise<{ loca
     .where(inArray(venues.id, await listAccessibleVenueIds(appUser.id)))
     .limit(1);
   if (!venue) redirect(localizePath("/dashboard", locale));
+  const financialAccess = await requireVenueCapability(
+    venue.id,
+    "manage_financials",
+  );
+  const canManageFinancials = financialAccess.ok;
 
   const now = new Date();
   const { monthStart, nextMonthStart, monthYear, monthIndex } = venueDashboardMonths(now);
 
   const [stats, activity, recentBookings, monthCalendar, legacyBookings] = await Promise.all([
-    getVenueStats(venue.id, now),
+    getVenueStats(venue.id, now, { includeFinancials: canManageFinancials }),
     getVenueActivity(appUser.id, 10),
-    getVenueRecentBookings(venue.id, 5),
+    getVenueRecentBookings(venue.id, 5, { includeFinancials: canManageFinancials }),
     // Scope to this venue only — the previous query fetched events for ALL
     // venues and filtered in JS, leaking other venues' availability.
     db
@@ -66,7 +71,9 @@ export default async function VenueHomePage({ params }: { params: Promise<{ loca
           lt(calendarEvents.date, nextMonthStart),
         ),
       ),
-    getVenueLegacyRecentBookings(venue.id, 5),
+    getVenueLegacyRecentBookings(venue.id, 5, {
+      includeFinancials: canManageFinancials,
+    }),
   ]);
 
   return (
@@ -74,6 +81,7 @@ export default async function VenueHomePage({ params }: { params: Promise<{ loca
       venueName={venue.nameRo}
       venueSlug={venue.slug}
       isActive={venue.isActive}
+      canManageFinancials={canManageFinancials}
       stats={stats}
       activity={activity.map((a) => ({
         ...a,

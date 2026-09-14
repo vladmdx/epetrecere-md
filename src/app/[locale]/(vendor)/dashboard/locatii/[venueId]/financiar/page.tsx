@@ -9,12 +9,10 @@
 // (50 € under 80 guests, 100 € from 80), so there is no rate to multiply by.
 // The venue now sees exactly the rows the admin sees in Finanțe.
 
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
-  users,
   venues,
   bookingRequests,
   commissions,
@@ -22,7 +20,9 @@ import {
 import { VenueFinanciarClient } from "../../../sala/financiar/client";
 import { CommissionPanel } from "@/components/vendor/commission-panel";
 import { requireLocatieVenue, venueDashboardBase } from "@/lib/venues/dashboard-scope";
+import { requireVenueCapability } from "@/lib/venue-access";
 import { DEFAULT_LOCALE, isLocale, localizePath } from "@/lib/i18n/routing";
+import { contactsAreShared } from "@/lib/privacy/booking-contact";
 
 export const dynamic = "force-dynamic";
 
@@ -34,16 +34,27 @@ export default async function VenueFinanciarPage({
 }) {
   const { locale: rawLocale, venueId } = await params;
   const locale = isLocale(rawLocale) ? rawLocale : DEFAULT_LOCALE;
-  const scoped = await requireLocatieVenue(venueId, locale);
-  const { userId: clerkId } = await auth();
-  if (!clerkId) redirect(`${localizePath("/sign-in", locale)}?redirect_url=${encodeURIComponent(localizePath(`${venueDashboardBase(scoped.id)}/financiar`, locale))}`);
-
-  const [appUser] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.clerkId, clerkId))
-    .limit(1);
-  if (!appUser) redirect("/");
+  const parsedVenueId = Number(venueId);
+  if (!Number.isSafeInteger(parsedVenueId) || parsedVenueId <= 0) {
+    redirect(localizePath("/dashboard/locatii", locale));
+  }
+  const returnPath = localizePath(
+    `${venueDashboardBase(parsedVenueId)}/financiar`,
+    locale,
+  );
+  const financialAccess = await requireVenueCapability(
+    parsedVenueId,
+    "manage_financials",
+  );
+  if (!financialAccess.ok) {
+    if (financialAccess.status === 401) {
+      redirect(
+        `${localizePath("/sign-in", locale)}?redirect_url=${encodeURIComponent(returnPath)}`,
+      );
+    }
+    redirect(localizePath("/dashboard/locatii", locale));
+  }
+  const scoped = await requireLocatieVenue(parsedVenueId, locale);
 
   const [venue] = await db
     .select({ id: venues.id, nameRo: venues.nameRo })
@@ -189,6 +200,8 @@ export default async function VenueFinanciarPage({
       }}
       bookings={confirmedBookings.map((b) => ({
         ...b,
+        clientName: contactsAreShared(b.status) ? b.clientName : `#${b.id}`,
+        eventType: contactsAreShared(b.status) ? b.eventType : null,
         eventDate: b.eventDate,
         updatedAt: b.updatedAt.toISOString(),
         createdAt: b.createdAt.toISOString(),
@@ -196,7 +209,7 @@ export default async function VenueFinanciarPage({
       chartData={chartData}
       commissionByBooking={commissionByBooking}
     />
-    <div className="px-6 pb-6"><CommissionPanel /></div>
+    <div className="px-6 pb-6"><CommissionPanel venueId={venue.id} /></div>
     </>
   );
 }
