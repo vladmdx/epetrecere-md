@@ -30,6 +30,11 @@ import {
   requireOrganizationCapability,
 } from "@/lib/venue-access";
 import {
+  legalAcceptancesListScope,
+  legalAcceptancesWhere,
+  parseLegalListOrganizationId,
+} from "@/lib/legal/acceptance-list-scope";
+import {
   LEGAL_PACK_VERSION,
   getLegalDocument,
   legalTitle,
@@ -55,13 +60,16 @@ function clientIp(req: NextRequest): string | null {
 export async function GET(req: NextRequest) {
   const { userId: clerkId } = await auth();
   if (!clerkId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const organizationIdRaw = Number(req.nextUrl.searchParams.get("organizationId") ?? "");
-  const organizationId = Number.isFinite(organizationIdRaw) && organizationIdRaw > 0 ? organizationIdRaw : null;
+  const organizationId = parseLegalListOrganizationId(
+    req.nextUrl.searchParams.get("organizationId"),
+  );
+  let orgAccessOk = false;
   if (organizationId) {
     const orgAccess = await requireOrganizationCapability(organizationId, "manage_legal");
     if (!orgAccess.ok) {
       return NextResponse.json({ error: orgAccess.error, code: "FORBIDDEN" }, { status: orgAccess.status });
     }
+    orgAccessOk = true;
   }
   const [u] = await db
     .select({ id: users.id })
@@ -71,6 +79,15 @@ export async function GET(req: NextRequest) {
   if (!u) return NextResponse.json({ items: [], packVersion: LEGAL_PACK_VERSION,
     onboarding: { artist: onboardingAgreementStatus([], "artist"), venue: onboardingAgreementStatus([], "venue") },
   }, { headers: { "Cache-Control": "private, no-store" } });
+
+  const scoped = legalAcceptancesListScope({
+    userId: u.id,
+    organizationId,
+    orgAccessOk,
+  });
+  if (!scoped.ok) {
+    return NextResponse.json({ error: "Forbidden", code: "FORBIDDEN" }, { status: scoped.status });
+  }
 
   const rows = await db
     .select({
@@ -103,11 +120,7 @@ export async function GET(req: NextRequest) {
       acceptanceSessionId: legalAcceptances.acceptanceSessionId,
     })
     .from(legalAcceptances)
-    .where(
-      organizationId
-        ? eq(legalAcceptances.organizationId, organizationId)
-        : eq(legalAcceptances.userId, u.id),
-    )
+    .where(legalAcceptancesWhere(scoped.scope))
     .orderBy(desc(legalAcceptances.acceptedAt));
 
   // Name each document server-side: the settings page must not pull the whole

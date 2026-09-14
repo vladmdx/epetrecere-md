@@ -17,6 +17,7 @@ import {
   type DispatchInput,
   type NotificationChannelDrivers,
 } from "@/lib/notifications/dispatch";
+import { vendorBookingNotificationPath } from "@/lib/notifications/venue-routing";
 import {
   getVenueOwnerRecipients,
   type VenueNotificationRecipient,
@@ -139,7 +140,10 @@ async function creationTarget(
       venueRecipients: venue
         ? await getVenueOwnerRecipients(booking.venueId, executor)
         : [],
-      dashboardUrl: "/dashboard/sala/rezervari",
+      dashboardUrl: vendorBookingNotificationPath({
+        venueId: booking.venueId,
+        bookingId: booking.id,
+      }),
     };
   }
   return {
@@ -273,7 +277,9 @@ async function creationDeliveryRows(
           : "Cerere nouă de rezervare",
         message: vendorMessage,
         actionUrl: conflict
-          ? `${dashboardUrl}?date=${booking.eventDate}`
+          ? dashboardUrl.includes("?")
+            ? dashboardUrl
+            : `${dashboardUrl}?date=${booking.eventDate}`
           : dashboardUrl,
         ...(recipient.email
           ? {

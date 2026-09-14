@@ -40,7 +40,11 @@ interface Acceptance {
   contentHash: string | null;
 }
 
-export function SignedDocumentsCard() {
+export function SignedDocumentsCard({
+  organizationId = null,
+}: {
+  organizationId?: number | null;
+}) {
   const { t, locale } = useLocale();
   const [openDoc, setOpenDoc] = useState<number | null>(null);
   const [items, setItems] = useState<Acceptance[] | null>(null);
@@ -48,7 +52,17 @@ export function SignedDocumentsCard() {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/legal/accept", { cache: "no-store" })
+    setLoading(true);
+    const params = new URLSearchParams();
+    if (
+      organizationId != null
+      && Number.isSafeInteger(organizationId)
+      && organizationId > 0
+    ) {
+      params.set("organizationId", String(organizationId));
+    }
+    const query = params.toString();
+    fetch(`/api/legal/accept${query ? `?${query}` : ""}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (!cancelled) setItems(Array.isArray(data?.items) ? data.items : []);
@@ -62,7 +76,7 @@ export function SignedDocumentsCard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [organizationId]);
 
   // The durable session id is the contract boundary. Never merge two signing
   // attempts merely because their timestamps or signer names happen to match.

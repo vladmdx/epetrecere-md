@@ -6,7 +6,9 @@ import { reviews, bookingRequests, users, artists } from "@/lib/db/schema";
 import { and, eq, or } from "drizzle-orm";
 import { dispatchNotification, dispatchToAdmins } from "@/lib/notifications/dispatch";
 import { isUniqueViolation } from "@/lib/reviews/duplicate-error";
+import { reviewHallIdFromBooking } from "@/lib/reviews/hall-context";
 import { getVenueOwnerRecipients } from "@/lib/venue-access";
+import { vendorReviewNotificationPath } from "@/lib/notifications/venue-routing";
 
 // M4 — POST /api/reviews/from-booking
 //
@@ -110,6 +112,7 @@ export async function POST(req: NextRequest) {
       .values({
         artistId: booking.artistId,
         venueId: booking.venueId,
+        hallId: reviewHallIdFromBooking(booking),
         bookingRequestId: booking.id,
         authorUserId: appUser.id,
         authorName: appUser.name || booking.clientName,
@@ -148,12 +151,13 @@ export async function POST(req: NextRequest) {
           }
         } else if (booking.venueId) {
           const recipients = await getVenueOwnerRecipients(booking.venueId);
+          const actionUrl = vendorReviewNotificationPath(booking.venueId);
           await Promise.all(recipients.map((recipient) => dispatchNotification({
             userId: recipient.userId,
             type: "review_new",
             title: "Ai o recenzie verificată nouă",
             message: `${parsed.data.rating}★ de la un client real`,
-            actionUrl: "/dashboard/sala/recenzii",
+            actionUrl,
           })));
         }
       } catch (err) {

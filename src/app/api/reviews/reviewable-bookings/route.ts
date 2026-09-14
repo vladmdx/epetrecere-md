@@ -7,9 +7,11 @@ import {
   users,
   artists,
   venues,
+  venueHalls,
 } from "@/lib/db/schema";
 import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { getLocalized } from "@/i18n";
+import { reviewableVenueHallProjection } from "@/lib/reviews/hall-context";
 
 // M4 — GET /api/reviews/reviewable-bookings
 //
@@ -44,11 +46,13 @@ export async function GET() {
       booking: bookingRequests,
       artist: artists,
       venue: venues,
+      hall: venueHalls,
       reviewId: reviews.id,
     })
     .from(bookingRequests)
     .leftJoin(artists, eq(artists.id, bookingRequests.artistId))
     .leftJoin(venues, eq(venues.id, bookingRequests.venueId))
+    .leftJoin(venueHalls, eq(venueHalls.id, bookingRequests.hallId))
     .leftJoin(reviews, eq(reviews.bookingRequestId, bookingRequests.id))
     .where(
       and(
@@ -65,7 +69,7 @@ export async function GET() {
     );
 
   return NextResponse.json({
-    bookings: rows.map(({ booking, artist, venue }) => ({
+    bookings: rows.map(({ booking, artist, venue, hall }) => ({
       id: booking.id,
       eventDate: booking.eventDate,
       eventType: booking.eventType,
@@ -77,6 +81,11 @@ export async function GET() {
       venueSlug: venue?.slug ?? null,
       vendorName: artist ? getLocalized(artist, "name", "ro") : venue ? getLocalized(venue, "name", "ro") : null,
       vendorHref: artist ? `/artisti/${artist.slug}` : venue ? `/sali/${venue.slug}` : null,
+      ...reviewableVenueHallProjection({
+        venueId: booking.venueId,
+        hallId: booking.hallId,
+        hallName: hall ? getLocalized(hall, "name", "ro") : null,
+      }),
     })),
   });
 }
